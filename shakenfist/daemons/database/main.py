@@ -3640,6 +3640,47 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def GetConsumedPortsForNode(
+        self,
+        request: database_pb2.GetConsumedPortsForNodeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetConsumedPortsForNodeReply:
+        """Get consumed console/VDI ports for instances on a node."""
+        try:
+            self.monitor.counters[
+                'get_consumed_ports_for_node'].inc()
+            ports = (
+                mariadb._direct_get_consumed_ports_for_node(
+                    request.node_uuid))
+            return database_pb2.GetConsumedPortsForNodeReply(
+                ports=ports)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetConsumedPortsForNode failed',
+                e)
+            return database_pb2.GetConsumedPortsForNodeReply(
+                ports=[])
+
+    def IsVsockCidInUse(
+        self,
+        request: database_pb2.IsVsockCidInUseRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.IsVsockCidInUseReply:
+        """Check if a vsock CID is in use by any instance."""
+        try:
+            self.monitor.counters[
+                'is_vsock_cid_in_use'].inc()
+            in_use = (
+                mariadb._direct_is_vsock_cid_in_use(
+                    request.cid))
+            return database_pb2.IsVsockCidInUseReply(
+                in_use=in_use)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database IsVsockCidInUse failed', e)
+            return database_pb2.IsVsockCidInUseReply(
+                in_use=False)
+
     # Object Metadata Operations
 
     def GetObjectMetadata(
@@ -4105,6 +4146,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_instance_attributes',
             'update_instance_attributes',
             'delete_instance_attributes',
+            'get_consumed_ports_for_node',
+            'is_vsock_cid_in_use',
             # MariaDB object metadata operations
             'get_object_metadata', 'set_metadata',
             'delete_object_metadata',

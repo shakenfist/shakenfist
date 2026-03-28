@@ -4601,6 +4601,67 @@ class DeleteInstanceAttributesRequest(google.protobuf.message.Message):
 global___DeleteInstanceAttributesRequest = DeleteInstanceAttributesRequest
 
 @typing.final
+class GetConsumedPortsForNodeRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["node_uuid", b"node_uuid"]) -> None: ...
+
+global___GetConsumedPortsForNodeRequest = GetConsumedPortsForNodeRequest
+
+@typing.final
+class GetConsumedPortsForNodeReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PORTS_FIELD_NUMBER: builtins.int
+    @property
+    def ports(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def __init__(
+        self,
+        *,
+        ports: collections.abc.Iterable[builtins.int] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["ports", b"ports"]) -> None: ...
+
+global___GetConsumedPortsForNodeReply = GetConsumedPortsForNodeReply
+
+@typing.final
+class IsVsockCidInUseRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CID_FIELD_NUMBER: builtins.int
+    cid: builtins.int
+    def __init__(
+        self,
+        *,
+        cid: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["cid", b"cid"]) -> None: ...
+
+global___IsVsockCidInUseRequest = IsVsockCidInUseRequest
+
+@typing.final
+class IsVsockCidInUseReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IN_USE_FIELD_NUMBER: builtins.int
+    in_use: builtins.bool
+    def __init__(
+        self,
+        *,
+        in_use: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["in_use", b"in_use"]) -> None: ...
+
+global___IsVsockCidInUseReply = IsVsockCidInUseReply
+
+@typing.final
 class GetObjectMetadataRequest(google.protobuf.message.Message):
     """Object Metadata Operations"""
 

@@ -13878,6 +13878,58 @@ def _direct_delete_instance_attributes(
         return False
 
 
+def _direct_get_consumed_ports_for_node(
+        node_uuid: str) -> list[int]:
+    """Get all consumed console/VDI ports for instances on a node."""
+    engine = _get_engine()
+    table = _get_instance_attributes_table()
+    consumed: list[int] = []
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(
+                table.c.ports, table.c.placement
+            ).where(table.c.placement.is_not(None))
+            for row in conn.execute(stmt):
+                placement = json.loads(row.placement) if isinstance(
+                    row.placement, str) else row.placement
+                if not placement or placement.get('node') != node_uuid:
+                    continue
+                ports = json.loads(row.ports) if isinstance(
+                    row.ports, str) else row.ports
+                if ports:
+                    for key in ('console_port', 'vdi_port',
+                                'vdi_tls_port'):
+                        if key in ports and ports[key]:
+                            consumed.append(ports[key])
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for consumed ports '
+            f'on node {node_uuid}: {e}')
+    return consumed
+
+
+def _direct_is_vsock_cid_in_use(cid: int) -> bool:
+    """Check if a vsock CID is in use by any instance."""
+    engine = _get_engine()
+    table = _get_instance_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.vsock_cids).where(
+                table.c.vsock_cids.is_not(None))
+            for row in conn.execute(stmt):
+                cids = json.loads(row.vsock_cids) if isinstance(
+                    row.vsock_cids, str) else row.vsock_cids
+                if cids and cid in cids.values():
+                    return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for vsock CID '
+            f'{cid}: {e}')
+    return False
+
+
 # =============================================================================
 # Instance gRPC Client Functions
 # These call the database microservice for Instance operations.
@@ -14175,6 +14227,35 @@ def _grpc_delete_instance_attributes(
         return False
 
 
+def _grpc_get_consumed_ports_for_node(
+        node_uuid: str) -> list[int]:
+    """Get consumed ports for a node via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetConsumedPortsForNodeRequest(
+            node_uuid=node_uuid)
+        reply = stub.GetConsumedPortsForNode(request)
+        return list(reply.ports)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetConsumedPortsForNode failed for '
+            f'{node_uuid}: {e}')
+        return []
+
+
+def _grpc_is_vsock_cid_in_use(cid: int) -> bool:
+    """Check if a vsock CID is in use via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.IsVsockCidInUseRequest(cid=cid)
+        reply = stub.IsVsockCidInUse(request)
+        return bool(reply.in_use)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC IsVsockCidInUse failed for CID {cid}: {e}')
+        return False
+
+
 # =============================================================================
 # Instance Public API Functions
 # These route to either direct or gRPC access based on configuration.
@@ -14302,3 +14383,31 @@ def delete_instance_attributes(inst_uuid: UUID) -> bool:
     if _use_database_service():
         return _grpc_delete_instance_attributes(inst_uuid)
     return _direct_delete_instance_attributes(inst_uuid)
+
+
+def get_consumed_ports_for_node(node_uuid: str) -> list[int]:
+    """Get all consumed console/VDI ports for instances on a node.
+
+    Args:
+        node_uuid: The UUID of the node.
+
+    Returns:
+        List of consumed port numbers.
+    """
+    if _use_database_service():
+        return _grpc_get_consumed_ports_for_node(node_uuid)
+    return _direct_get_consumed_ports_for_node(node_uuid)
+
+
+def is_vsock_cid_in_use(cid: int) -> bool:
+    """Check if a vsock CID is in use by any instance.
+
+    Args:
+        cid: The vsock CID to check.
+
+    Returns:
+        True if the CID is in use.
+    """
+    if _use_database_service():
+        return _grpc_is_vsock_cid_in_use(cid)
+    return _direct_is_vsock_cid_in_use(cid)

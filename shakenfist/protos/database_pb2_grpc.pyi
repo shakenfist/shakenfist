@@ -805,6 +805,16 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    GetConsumedPortsForNode: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetConsumedPortsForNodeRequest,
+        database_pb2.GetConsumedPortsForNodeReply,
+    ]
+
+    IsVsockCidInUse: grpc.UnaryUnaryMultiCallable[
+        database_pb2.IsVsockCidInUseRequest,
+        database_pb2.IsVsockCidInUseReply,
+    ]
+
     GetObjectMetadata: grpc.UnaryUnaryMultiCallable[
         database_pb2.GetObjectMetadataRequest,
         database_pb2.GetObjectMetadataReply,
@@ -1642,6 +1652,16 @@ class DatabaseServiceAsyncStub:
     DeleteInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteInstanceAttributesRequest,
         database_pb2.StatusReply,
+    ]
+
+    GetConsumedPortsForNode: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetConsumedPortsForNodeRequest,
+        database_pb2.GetConsumedPortsForNodeReply,
+    ]
+
+    IsVsockCidInUse: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.IsVsockCidInUseRequest,
+        database_pb2.IsVsockCidInUseReply,
     ]
 
     GetObjectMetadata: grpc.aio.UnaryUnaryMultiCallable[
@@ -2768,6 +2788,20 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteInstanceAttributesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def GetConsumedPortsForNode(
+        self,
+        request: database_pb2.GetConsumedPortsForNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetConsumedPortsForNodeReply, collections.abc.Awaitable[database_pb2.GetConsumedPortsForNodeReply]]: ...
+
+    @abc.abstractmethod
+    def IsVsockCidInUse(
+        self,
+        request: database_pb2.IsVsockCidInUseRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.IsVsockCidInUseReply, collections.abc.Awaitable[database_pb2.IsVsockCidInUseReply]]: ...
 
     @abc.abstractmethod
     def GetObjectMetadata(

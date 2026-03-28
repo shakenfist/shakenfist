@@ -749,6 +749,16 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteInstanceAttributesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.GetConsumedPortsForNode = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetConsumedPortsForNode',
+                request_serializer=database__pb2.GetConsumedPortsForNodeRequest.SerializeToString,
+                response_deserializer=database__pb2.GetConsumedPortsForNodeReply.FromString,
+                _registered_method=True)
+        self.IsVsockCidInUse = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/IsVsockCidInUse',
+                request_serializer=database__pb2.IsVsockCidInUseRequest.SerializeToString,
+                response_deserializer=database__pb2.IsVsockCidInUseReply.FromString,
+                _registered_method=True)
         self.GetObjectMetadata = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/GetObjectMetadata',
                 request_serializer=database__pb2.GetObjectMetadataRequest.SerializeToString,
@@ -1711,6 +1721,18 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetConsumedPortsForNode(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def IsVsockCidInUse(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetObjectMetadata(self, request, context):
         """Object Metadata Operations (MariaDB)
         These store user-defined metadata and last_cluster_operation for all
@@ -2487,6 +2509,16 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.DeleteInstanceAttributes,
                     request_deserializer=database__pb2.DeleteInstanceAttributesRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetConsumedPortsForNode': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetConsumedPortsForNode,
+                    request_deserializer=database__pb2.GetConsumedPortsForNodeRequest.FromString,
+                    response_serializer=database__pb2.GetConsumedPortsForNodeReply.SerializeToString,
+            ),
+            'IsVsockCidInUse': grpc.unary_unary_rpc_method_handler(
+                    servicer.IsVsockCidInUse,
+                    request_deserializer=database__pb2.IsVsockCidInUseRequest.FromString,
+                    response_serializer=database__pb2.IsVsockCidInUseReply.SerializeToString,
             ),
             'GetObjectMetadata': grpc.unary_unary_rpc_method_handler(
                     servicer.GetObjectMetadata,
@@ -6395,6 +6427,60 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/DeleteInstanceAttributes',
             database__pb2.DeleteInstanceAttributesRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetConsumedPortsForNode(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetConsumedPortsForNode',
+            database__pb2.GetConsumedPortsForNodeRequest.SerializeToString,
+            database__pb2.GetConsumedPortsForNodeReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def IsVsockCidInUse(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/IsVsockCidInUse',
+            database__pb2.IsVsockCidInUseRequest.SerializeToString,
+            database__pb2.IsVsockCidInUseReply.FromString,
             options,
             channel_credentials,
             insecure,

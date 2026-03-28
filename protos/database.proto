@@ -230,6 +230,8 @@ service DatabaseService {
   rpc GetInstanceAttributes (GetInstanceAttributesRequest) returns (GetInstanceAttributesReply) {}
   rpc UpdateInstanceAttributes (UpdateInstanceAttributesRequest) returns (StatusReply) {}
   rpc DeleteInstanceAttributes (DeleteInstanceAttributesRequest) returns (StatusReply) {}
+  rpc GetConsumedPortsForNode (GetConsumedPortsForNodeRequest) returns (GetConsumedPortsForNodeReply) {}
+  rpc IsVsockCidInUse (IsVsockCidInUseRequest) returns (IsVsockCidInUseReply) {}
 
   // Object Metadata Operations (MariaDB)
   // These store user-defined metadata and last_cluster_operation for all
@@ -1516,6 +1518,22 @@ message UpdateInstanceAttributesRequest {
 
 message DeleteInstanceAttributesRequest {
   string uuid = 1;
+}
+
+message GetConsumedPortsForNodeRequest {
+  string node_uuid = 1;
+}
+
+message GetConsumedPortsForNodeReply {
+  repeated int32 ports = 1;
+}
+
+message IsVsockCidInUseRequest {
+  int64 cid = 1;
+}
+
+message IsVsockCidInUseReply {
+  bool in_use = 1;
 }
 
 // Object Metadata Operations

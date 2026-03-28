@@ -1114,38 +1114,25 @@ class Instance(dbowo):
         self._delete_globally()
 
     def _allocate_console_port(self):
-        node = config.NODE_NAME
-        consumed = [value['port']
-                    for _, value in etcd.get_all('console', node)]
+        consumed = mariadb.get_consumed_ports_for_node(
+            config.NODE_UUID)
         while True:
             port = random.randint(30000, 50000)
-            # avoid hitting etcd if it's probably in use
             if port in consumed:
                 continue
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                # We hold this port open until it's in etcd to prevent
-                # anyone else needing to hit etcd to find out they can't
-                # use it as well as to verify we can use it
+                # Bind to verify the port is available locally.
+                # This prevents races between concurrent allocations
+                # on the same node.
                 s.bind(('0.0.0.0', port))
-                allocatedPort = etcd.create(
-                    'console', node, port,
-                    {
-                        'instance_uuid': self.uuid,
-                        'port': port,
-                    })
-                if allocatedPort:
-                    return port
+                return port
             except OSError:
                 LOG.with_fields({'instance': self.uuid}).info(
                     f'Collided with in use port {port}, selecting another')
                 consumed.append(port)
             finally:
                 s.close()
-
-    def _free_console_port(self, port):
-        if port:
-            etcd.delete('console', config.NODE_NAME, port)
 
     def allocate_instance_ports(self):
         with self.get_lock_attr('ports', 'Instance port allocation'):
@@ -1161,11 +1148,7 @@ class Instance(dbowo):
                 self.ports = p
 
     def deallocate_instance_ports(self):
-        ports = self.ports
-        self._free_console_port(ports.get('console_port'))
-        self._free_console_port(ports.get('vdi_port'))
-        self._free_console_port(ports.get('vdi_tls_port'))
-        self._db_delete_attribute('ports')
+        self._db_set_attribute('ports', None)
 
     def _configure_block_devices(self):
         with self.get_lock_attr(
@@ -1481,14 +1464,8 @@ class Instance(dbowo):
         iso.close()
 
     def _allocate_vsock_cid(self, channel_name):
-        reservation = {
-            'instance_uuid': self.uuid,
-            'channel_name': channel_name,
-            'when': time.time()
-            }
-
         cid = random.randint(3, 4294967295)
-        while not etcd.create('cid', None, cid, reservation):
+        while mariadb.is_vsock_cid_in_use(cid):
             cid = random.randint(3, 4294967295)
         return cid
 
