@@ -876,6 +876,12 @@ class MockEtcd():
             }
         return None
 
+    def get_mariadb_instance_attributes(
+            self, object_uuid: str) -> Optional[InstanceAttributesData]:
+        """Get instance attributes from the mock MariaDB store for test assertions."""
+        key = str(object_uuid)
+        return self.instance_attributes.get(key)
+
     #
     # MariaDB IPAM mock operations
     #

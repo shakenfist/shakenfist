@@ -134,8 +134,12 @@ class CleanerTestCase(base.ShakenFistTestCase):
                             ('paused', 'paused'),
                             ('suspended', 'paused')]:
             inst_uuid = instance_uuids[name]
-            read_state = self.mock_etcd.get_raw(
-                f'/sf/attribute/instance/{inst_uuid}/power_state')
+            # power_state is now written to MariaDB only (no etcd dual-write)
+            inst_attrs = self.mock_etcd.get_mariadb_instance_attributes(
+                inst_uuid)
+            self.assertIsNotNone(
+                inst_attrs,
+                f'No MariaDB attributes for instance "{name}"')
             self.assertEqual(
-                state, read_state['power_state'],
+                state, inst_attrs.power_state['power_state'],
                 f'State for instance "{name}" does not match "{state}"')

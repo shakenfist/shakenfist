@@ -78,10 +78,13 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
             },
             self.mock_etcd.get_mariadb_state(
                 'instance', '42424242-4242-4242-8242-424242424242'))
+        # power_state is now written to MariaDB only (no etcd dual-write)
+        inst_attrs = self.mock_etcd.get_mariadb_instance_attributes(
+            '42424242-4242-4242-8242-424242424242')
+        self.assertIsNotNone(inst_attrs)
         self.assertEqual(
-            ('attribute/instance', '42424242-4242-4242-8242-424242424242',
-             'power_state', {'power_state': instance.Instance.STATE_INITIAL}),
-            mock_put.mock_calls[0][1])
+            {'power_state': instance.Instance.STATE_INITIAL},
+            inst_attrs.power_state)
 
         # etcd.create is no longer called (base class no longer writes
         # to etcd). Instance static values are written to MariaDB via

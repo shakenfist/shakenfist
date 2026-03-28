@@ -458,29 +458,32 @@ class Instance(dbowo):
         if attribute in self.MARIADB_ATTRIBUTES:
             _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
             attrs = mariadb.get_instance_attributes(_uuid)
-            if attrs:
-                # Map the attribute name to the model field
-                field_name = attribute
-                if attribute == 'error':
-                    field_name = 'error_message'
+            if not attrs:
+                attrs = InstanceAttributesData(uuid=_uuid)
+                mariadb.create_instance_attributes(attrs)
 
-                val = getattr(attrs, field_name, None)
+            # Map the attribute name to the model field
+            field_name = attribute
+            if attribute == 'error':
+                field_name = 'error_message'
 
-                # Handle special cases for compatibility with etcd format
-                if attribute == 'kvm_pid':
-                    if val is not None:
-                        return {'pid': val}
-                    return default if default is not None else {}
-                if attribute == 'error':
-                    if val:
-                        return {'message': val}
-                    return default if default is not None else {}
-                if attribute == 'interfaces':
-                    return val if val else (default if default is not None else [])
+            val = getattr(attrs, field_name, None)
 
+            # Handle special cases for compatibility with etcd format
+            if attribute == 'kvm_pid':
                 if val is not None:
-                    return val
+                    return {'pid': val}
                 return default if default is not None else {}
+            if attribute == 'error':
+                if val:
+                    return {'message': val}
+                return default if default is not None else {}
+            if attribute == 'interfaces':
+                return val if val else (default if default is not None else [])
+
+            if val is not None:
+                return val
+            return default if default is not None else {}
 
         # Fall through to etcd for non-MariaDB attributes
         # (metadata, last_cluster_operation, vsock_cid:*, etc.)
@@ -491,27 +494,39 @@ class Instance(dbowo):
         if attribute in self.MARIADB_ATTRIBUTES:
             _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
             attrs = mariadb.get_instance_attributes(_uuid)
-            if attrs:
-                # Map the attribute name to the model field
-                if attribute == 'kvm_pid':
-                    attrs.kvm_pid = value.get('pid') if isinstance(value, dict) else value
-                elif attribute == 'error':
-                    attrs.error_message = value.get('message', '') if isinstance(value, dict) else str(value)
-                elif attribute == 'interfaces':
-                    attrs.interfaces = value if isinstance(value, list) else value
-                elif attribute == 'agent_state':
-                    if hasattr(value, 'model_dump'):
-                        attrs.agent_state = value.model_dump()
-                    else:
-                        attrs.agent_state = value
+            if not attrs:
+                attrs = InstanceAttributesData(uuid=_uuid)
+                mariadb.create_instance_attributes(attrs)
+
+            # Map the attribute name to the model field
+            if attribute == 'kvm_pid':
+                attrs.kvm_pid = value.get('pid') if isinstance(value, dict) else value
+            elif attribute == 'error':
+                attrs.error_message = value.get('message', '') if isinstance(value, dict) else str(value)
+            elif attribute == 'interfaces':
+                attrs.interfaces = value if isinstance(value, list) else value
+            elif attribute == 'agent_state':
+                if hasattr(value, 'model_dump'):
+                    attrs.agent_state = value.model_dump()
                 else:
-                    setattr(attrs, attribute, value)
+                    attrs.agent_state = value
+            else:
+                setattr(attrs, attribute, value)
 
-                mariadb.update_instance_attributes(attrs)
+            mariadb.update_instance_attributes(attrs)
 
-                # Preserve event logging from base class
-                super()._db_set_attribute(attribute, value)
-                return
+            # Log mutation event (matching base class pattern from
+            # baseobject._db_set_attribute without the etcd write)
+            if isinstance(value, baseobject.State):
+                event_values = value.obj_dict()
+            elif isinstance(value, dict):
+                event_values = value.copy()
+            else:
+                event_values = {'value': value}
+            event_values['attribute'] = attribute
+            self.add_event(EVENT_TYPE_MUTATE, 'set attribute',
+                           extra=event_values)
+            return
 
         # Fall through to etcd for non-MariaDB attributes
         super()._db_set_attribute(attribute, value)
