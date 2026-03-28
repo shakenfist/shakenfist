@@ -12,9 +12,7 @@ import shutil
 import socket
 import time
 import xml.etree.ElementTree as ET
-from collections import defaultdict
 from functools import partial
-import uuid
 from uuid import UUID
 from uuid import uuid4
 
@@ -27,7 +25,6 @@ from shakenfist import baseobject
 from shakenfist import blob
 from shakenfist import constants
 from shakenfist.constants import get_object_class
-from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.instance_attributes import InstanceAttributesData
 from shakenfist.schema.instance_data import InstanceData
@@ -157,6 +154,7 @@ class ConnectedVSockChannel():
 
 class Instance(dbowo):
     object_type = ObjectType.INSTANCE
+    initial_version = 19
     current_version = 19
 
     # Attributes stored in MariaDB (everything else stays in etcd)
@@ -250,116 +248,6 @@ class Instance(dbowo):
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
             raise exceptions.InstanceBadDiskSpecification()
-
-    @classmethod
-    def _upgrade_step_3_to_4(cls, static_values):
-        static_values['configdrive'] = 'openstack-disk'
-
-    @classmethod
-    def _upgrade_step_4_to_5(cls, static_values):
-        static_values['nvram_template'] = None
-        static_values['secure_boot'] = False
-
-    @classmethod
-    def _upgrade_step_5_to_6(cls, static_values):
-        static_values['machine_type'] = 'pc'
-
-    @classmethod
-    def _upgrade_step_6_to_7(cls, static_values):
-        static_values['side_channels'] = []
-
-    @classmethod
-    def _upgrade_step_7_to_8(cls, static_values):
-        cls._upgrade_metadata_to_attribute(static_values['uuid'])
-
-    @classmethod
-    def _upgrade_step_8_to_9(cls, static_values):
-        static_values['vdi_type'] = 'vnc'
-
-    @classmethod
-    def _upgrade_step_9_to_10(cls, static_values):
-        static_values['spice_concurrent'] = False
-
-    @classmethod
-    def _upgrade_step_10_to_11(cls, static_values):
-        video = static_values['video']
-        video['vdi'] = static_values.get('vdi_type', 'vnc')
-        if 'vdi_type' in static_values:
-            del static_values['vdi_type']
-
-    @classmethod
-    def _upgrade_step_11_to_12(cls, static_values):
-        blob_refs = defaultdict(int)
-
-        # We don't have a block devices structure until _initialize_block_devices()
-        # has been called as part of instance creation.
-        bd = etcd.get('attribute/instance', static_values['uuid'], 'block_devices')
-        if bd:
-            for d in bd.get('devices', []):
-                blob_uuid = d.get('blob_uuid')
-                if blob_uuid:
-                    blob_refs[blob_uuid] += 1
-
-        if static_values['nvram_template']:
-            blob_refs[static_values['nvram_template']] += 1
-
-        etcd.put('attribute/instance', static_values['uuid'], 'blob_references',
-                 blob_refs)
-
-    @classmethod
-    def _upgrade_step_12_to_13(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_13_to_14(cls, static_values):
-        if static_values.get('configdrive', 'openstack-disk') == 'openstack-disk':
-            bd = etcd.get(
-                'attribute/instance', static_values['uuid'], 'block_devices')
-            if bd:
-                devices = bd.get('devices', [])
-                if len(devices) > 1:
-                    bd['devices'][1]['is_configdrive'] = True
-                    etcd.put(
-                        'attribute/instance', static_values['uuid'],
-                        'block_devices', bd)
-
-    @classmethod
-    def _upgrade_step_14_to_15(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_15_to_16(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_16_to_17(cls, static_values):
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
-        ...
-
-    @classmethod
-    def _upgrade_step_17_to_18(cls, static_values):
-        # Convert placement['node'] from FQDN to node UUID. The scheduler
-        # and queue system now use node UUIDs instead of FQDNs.
-        placement = etcd.get('attribute/instance', static_values['uuid'], 'placement')
-        if not placement or not placement.get('node'):
-            return
-
-        node_value = placement['node']
-        try:
-            uuid.UUID(node_value)
-            # Already a UUID, nothing to do
-        except ValueError:
-            # It's an FQDN, look up the node to get its UUID
-            n = Node.from_db(node_value)
-            if n:
-                placement['node'] = str(n.uuid)
-                etcd.put('attribute/instance', static_values['uuid'], 'placement', placement)
-
-    @classmethod
-    def _upgrade_step_18_to_19(cls, static_values):
-        # Static values migration to MariaDB is handled by the
-        # database daemon data migrations.
-        ...
 
     @classmethod
     def _db_create(cls, object_uuid, metadata):
@@ -515,18 +403,7 @@ class Instance(dbowo):
                 setattr(attrs, attribute, value)
 
             mariadb.update_instance_attributes(attrs)
-
-            # Log mutation event (matching base class pattern from
-            # baseobject._db_set_attribute without the etcd write)
-            if isinstance(value, baseobject.State):
-                event_values = value.obj_dict()
-            elif isinstance(value, dict):
-                event_values = value.copy()
-            else:
-                event_values = {'value': value}
-            event_values['attribute'] = attribute
-            self.add_event(EVENT_TYPE_MUTATE, 'set attribute',
-                           extra=event_values)
+            self._log_attribute_mutation(attribute, value)
             return
 
         # Fall through to etcd for non-MariaDB attributes

@@ -459,24 +459,26 @@ class DatabaseBackedObject:
                                           str(self.__uuid), prefix=attribute_prefix):
                 yield key, data
 
-    def _db_set_attribute(self, attribute, value):
-        # Some attributes are simply too frequently changed to have much meaning
-        # as an event.
+    def _log_attribute_mutation(self, attribute, value):
+        """Log an EVENT_TYPE_MUTATE event for an attribute change.
+
+        Some attributes are too frequently changed to have much meaning
+        as an event and are excluded.
+        """
         if (self.object_type, attribute) not in [('node', 'blobs'),
                                                  ('node', 'observed'),
                                                  ('blob', 'last_used')]:
-            # Coerce the value into a dictionary.
             if isinstance(value, State):
                 event_values = value.obj_dict()
             elif isinstance(value, dict):
                 event_values = value.copy()
             else:
                 event_values = {'value': value}
-
-            # Add the attribute we're setting to the event so we're not confused
-            # later.
             event_values['attribute'] = attribute
             self.add_event(EVENT_TYPE_MUTATE, 'set attribute', extra=event_values)
+
+    def _db_set_attribute(self, attribute, value):
+        self._log_attribute_mutation(attribute, value)
 
         if self.__in_memory_only:
             self.__in_memory_values[attribute] = util_json.json_dump(value)
