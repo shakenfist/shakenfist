@@ -725,13 +725,6 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_set_metadata.stop)
 
-        self.mariadb_set_last_cluster_operation = mock.patch(
-            'shakenfist.mariadb.set_last_cluster_operation',
-            side_effect=self._mariadb_set_last_cluster_operation)
-        self.mariadb_set_last_cluster_operation.start()
-        self.test_obj.addCleanup(
-            self.mariadb_set_last_cluster_operation.stop)
-
         self.mariadb_delete_object_metadata = mock.patch(
             'shakenfist.mariadb.delete_object_metadata',
             side_effect=self._mariadb_delete_object_metadata)
@@ -1883,19 +1876,6 @@ class MockEtcd():
         self.object_metadata[key]['metadata'] = metadata_dict
         self._trace(
             f'MockMariaDB.set_metadata({key}): stored')
-        return True
-
-    def _mariadb_set_last_cluster_operation(
-            self, object_type, object_uuid, lco_dict):
-        """Mock implementation of mariadb.set_last_cluster_operation()"""
-        key = f'{object_type}/{object_uuid}'
-        if key not in self.object_metadata:
-            self.object_metadata[key] = {}
-        self.object_metadata[key][
-            'last_cluster_operation'] = lco_dict
-        self._trace(
-            f'MockMariaDB.set_last_cluster_operation({key}): '
-            f'stored')
         return True
 
     def _mariadb_delete_object_metadata(self, object_type,

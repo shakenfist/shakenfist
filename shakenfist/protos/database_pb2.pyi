@@ -4666,28 +4666,6 @@ class SetMetadataRequest(google.protobuf.message.Message):
 global___SetMetadataRequest = SetMetadataRequest
 
 @typing.final
-class SetLastClusterOperationRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    OBJECT_TYPE_FIELD_NUMBER: builtins.int
-    OBJECT_UUID_FIELD_NUMBER: builtins.int
-    LAST_CLUSTER_OPERATION_JSON_FIELD_NUMBER: builtins.int
-    object_type: shakenfist_enums_pb2.ObjectType.ValueType
-    object_uuid: builtins.str
-    last_cluster_operation_json: builtins.str
-    """JSON dict or empty"""
-    def __init__(
-        self,
-        *,
-        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
-        object_uuid: builtins.str = ...,
-        last_cluster_operation_json: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["last_cluster_operation_json", b"last_cluster_operation_json", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
-
-global___SetLastClusterOperationRequest = SetLastClusterOperationRequest
-
-@typing.final
 class DeleteObjectMetadataRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

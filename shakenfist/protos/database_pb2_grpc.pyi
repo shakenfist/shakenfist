@@ -819,11 +819,6 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
-    SetLastClusterOperation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.SetLastClusterOperationRequest,
-        database_pb2.StatusReply,
-    ]
-
     DeleteObjectMetadata: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteObjectMetadataRequest,
         database_pb2.StatusReply,
@@ -1660,11 +1655,6 @@ class DatabaseServiceAsyncStub:
 
     SetMetadata: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.SetMetadataRequest,
-        database_pb2.StatusReply,
-    ]
-
-    SetLastClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.SetLastClusterOperationRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2794,13 +2784,6 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def SetMetadata(
         self,
         request: database_pb2.SetMetadataRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
-
-    @abc.abstractmethod
-    def SetLastClusterOperation(
-        self,
-        request: database_pb2.SetLastClusterOperationRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

@@ -3708,40 +3708,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
-    def SetLastClusterOperation(
-        self,
-        request: database_pb2.SetLastClusterOperationRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Set last_cluster_operation for an object in MariaDB."""
-        try:
-            self.monitor.counters[
-                'set_last_cluster_operation'].inc()
-            object_type = ObjectType.from_proto_id(
-                request.object_type)
-            if object_type is None:
-                return database_pb2.StatusReply(
-                    success=False,
-                    error='Invalid object_type')
-            lco_dict = (
-                json.loads(
-                    request.last_cluster_operation_json)
-                if request.last_cluster_operation_json
-                else None)
-            success = (
-                mariadb._direct_set_last_cluster_operation(
-                    object_type,
-                    request.object_uuid,
-                    lco_dict))
-            return database_pb2.StatusReply(
-                success=success, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database SetLastClusterOperation failed',
-                e)
-            return database_pb2.StatusReply(
-                success=False, error=str(e))
-
     def DeleteObjectMetadata(
         self,
         request: database_pb2.DeleteObjectMetadataRequest,
@@ -4141,7 +4107,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_instance_attributes',
             # MariaDB object metadata operations
             'get_object_metadata', 'set_metadata',
-            'set_last_cluster_operation',
             'delete_object_metadata',
             # MariaDB cluster operation target operations
             'create_cluster_operation_target',

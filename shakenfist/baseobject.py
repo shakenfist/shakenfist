@@ -679,32 +679,19 @@ class DatabaseBackedObject:
 class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
     @property
     def last_cluster_operation(self):
-        if not self.in_memory_only:
-            # Try cluster_operation_targets table first (new table)
-            latest = mariadb.get_latest_cluster_operation_target(
-                self.object_type, str(self.uuid))
-            if latest is not None:
-                return {
-                    'op_type': latest.operation_type,
-                    'op_uuid': latest.operation_uuid
-                }
-
-            # Fallback to object_metadata for dual-write migration
-            obj_meta = mariadb.get_object_metadata(
-                self.object_type, str(self.uuid))
-            if obj_meta and obj_meta.last_cluster_operation is not None:
-                return obj_meta.last_cluster_operation
-
-        # Fallback to etcd for unmigrated objects
-        return self._db_get_attribute('last_cluster_operation')
+        if self.in_memory_only:
+            return None
+        latest = mariadb.get_latest_cluster_operation_target(
+            self.object_type, str(self.uuid))
+        if latest is not None:
+            return {
+                'op_type': latest.operation_type,
+                'op_uuid': latest.operation_uuid
+            }
+        return None
 
     def set_last_cluster_operation(self, op_type, op_uuid):
-        lco = {
-            'op_type': str(op_type),
-            'op_uuid': str(op_uuid)
-        }
         if not self.in_memory_only:
-            # Write to cluster_operation_targets (new table)
             mariadb.create_cluster_operation_target(
                 operation_uuid=str(op_uuid),
                 operation_type=str(op_type),
@@ -712,13 +699,6 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
                 target_uuid=str(self.uuid),
                 created_at=time.time()
             )
-
-            # Dual-write to object_metadata during migration period
-            mariadb.set_last_cluster_operation(
-                self.object_type, str(self.uuid), lco)
-
-        # Dual-write to etcd during migration period
-        self._db_set_attribute('last_cluster_operation', lco)
 
     def get_cluster_operations(self, outstanding_only=True):
         last_op = self.last_cluster_operation

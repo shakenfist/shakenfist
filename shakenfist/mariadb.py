@@ -3372,22 +3372,26 @@ def _migrate_etcd_object_metadata(
                     f'attribute/{ot.value}', obj_uuid,
                     'last_cluster_operation')
 
-                if md is None and lco is None:
-                    skipped_count += 1
-                    continue
+                if md is None:
+                    # Only metadata is migrated to object_metadata
+                    # table. last_cluster_operation is now in
+                    # cluster_operation_targets (etcd key is still
+                    # cleaned up below).
+                    if lco is None:
+                        skipped_count += 1
+                        continue
 
                 # Write to MariaDB using direct upsert functions
                 if md is not None:
                     _direct_set_metadata(ot, obj_uuid, md)
-                if lco is not None:
-                    _direct_set_last_cluster_operation(
-                        ot, obj_uuid, lco)
 
                 # Delete from etcd after successful migration
                 if md is not None:
                     etcd.delete(
                         f'attribute/{ot.value}', obj_uuid,
                         'metadata')
+                # Clean up legacy etcd last_cluster_operation
+                # (now stored in cluster_operation_targets table)
                 if lco is not None:
                     etcd.delete(
                         f'attribute/{ot.value}', obj_uuid,
@@ -4066,41 +4070,6 @@ def _direct_set_metadata(
         return False
 
 
-def _direct_set_last_cluster_operation(
-    object_type: ObjectType,
-    object_uuid: str,
-    lco_dict: Optional[dict[str, Any]]
-) -> bool:
-    """Write last_cluster_operation for an object directly to MariaDB.
-
-    Uses INSERT ... ON DUPLICATE KEY UPDATE for atomic upsert.
-    Only updates the last_cluster_operation_json column.
-    """
-    engine = _get_engine()
-    table = _get_object_metadata_table()
-
-    try:
-        lco_json = json.dumps(lco_dict) if lco_dict is not None else None
-        with engine.connect() as conn:
-            stmt = sa.dialects.mysql.insert(table).values(
-                object_uuid=object_uuid,
-                object_type=object_type,
-                metadata_json=None,
-                last_cluster_operation_json=lco_json
-            )
-            stmt = stmt.on_duplicate_key_update(
-                last_cluster_operation_json=lco_json
-            )
-            conn.execute(stmt)
-            conn.commit()
-            return True
-    except OperationalError as e:
-        LOG.warning(
-            f'MariaDB write failed for object_metadata '
-            f'{object_type}/{object_uuid}: {e}')
-        return False
-
-
 def _direct_delete_object_metadata(
     object_type: ObjectType,
     object_uuid: str
@@ -4188,30 +4157,6 @@ def _grpc_set_metadata(
         return False
 
 
-def _grpc_set_last_cluster_operation(
-    object_type: ObjectType,
-    object_uuid: str,
-    lco_dict: Optional[dict[str, Any]]
-) -> bool:
-    """Write last_cluster_operation for an object via the database microservice."""
-    try:
-        stub = _get_database_stub()
-        request = database_pb2.SetLastClusterOperationRequest(
-            object_type=cast(
-                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
-            object_uuid=object_uuid,
-            last_cluster_operation_json=(
-                json.dumps(lco_dict) if lco_dict is not None else '')
-        )
-        reply = stub.SetLastClusterOperation(request)
-        return bool(reply.success)
-    except grpc.RpcError as e:
-        LOG.warning(
-            f'gRPC SetLastClusterOperation failed for '
-            f'{object_type}/{object_uuid}: {e}')
-        return False
-
-
 def _grpc_delete_object_metadata(
     object_type: ObjectType,
     object_uuid: str
@@ -4274,26 +4219,6 @@ def set_metadata(
     if _use_database_service():
         return _grpc_set_metadata(object_type, object_uuid, metadata_dict)
     return _direct_set_metadata(object_type, object_uuid, metadata_dict)
-
-
-def set_last_cluster_operation(
-    object_type: ObjectType,
-    object_uuid: str,
-    lco_dict: Optional[dict[str, Any]]
-) -> bool:
-    """Write last_cluster_operation for an object.
-
-    Args:
-        object_type: The type of object.
-        object_uuid: The UUID of the object.
-        lco_dict: The last_cluster_operation dict, or None.
-
-    Returns:
-        True if the write succeeded, False otherwise.
-    """
-    if _use_database_service():
-        return _grpc_set_last_cluster_operation(object_type, object_uuid, lco_dict)
-    return _direct_set_last_cluster_operation(object_type, object_uuid, lco_dict)
 
 
 def delete_object_metadata(
