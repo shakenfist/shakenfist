@@ -28,8 +28,7 @@
 # - attribute/instance/{uuid}/error -> error_message
 #
 # NOTE: metadata and last_cluster_operation are stored in the shared
-# object_metadata table (phase 14). vsock_cid:* attributes remain in
-# etcd as they use dynamic keys and are per-node ephemeral state.
+# object_metadata table (phase 14).
 
 from typing import Annotated
 from typing import Any
@@ -112,3 +111,7 @@ class InstanceAttributesData(BaseModel):
 
     # Error message (None if no error)
     error_message: Optional[str] = None
+
+    # Vsock CID mappings: {channel_name: cid_value}
+    # e.g. {'sf-agent2': 12345}
+    vsock_cids: Optional[dict[str, int]] = None

@@ -3250,6 +3250,18 @@ def _migrate_etcd_instance_attributes(
                     error_data, dict):
                 error_message = error_data.get('message')
 
+            # Migrate vsock_cid:* dynamic keys into a single
+            # vsock_cids dict
+            vsock_cids: dict[str, int] = {}
+            vsock_keys_to_delete: list[str] = []
+            for attr_key, attr_val in etcd.get_all(
+                    'attribute/instance', inst_uuid):
+                if attr_key.startswith('vsock_cid:'):
+                    channel = attr_key[len('vsock_cid:'):]
+                    if isinstance(attr_val, (int, float)):
+                        vsock_cids[channel] = int(attr_val)
+                    vsock_keys_to_delete.append(attr_key)
+
             attrs = InstanceAttributesData(
                 uuid=UUIDType(inst_uuid),
                 placement=placement if isinstance(
@@ -3271,6 +3283,7 @@ def _migrate_etcd_instance_attributes(
                     agent_operations, dict) else None,
                 kvm_pid=kvm_pid,
                 error_message=error_message,
+                vsock_cids=vsock_cids if vsock_cids else None,
             )
             success = _direct_create_instance_attributes(attrs)
 
@@ -3282,7 +3295,7 @@ def _migrate_etcd_instance_attributes(
                     'interfaces', 'agent_state',
                     'agent_attributes', 'agent_operations',
                     'kvm_pid', 'error',
-                ]:
+                ] + vsock_keys_to_delete:
                     etcd.delete(
                         'attribute/instance', inst_uuid,
                         attr_name)
@@ -13534,6 +13547,17 @@ def _ensure_instance_attributes_schema(
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver >= 1:
+        # Add vsock_cids column (not in original v1 schema). Safe
+        # to run repeatedly -- IF NOT EXISTS is a no-op when the
+        # column already exists (e.g. new deployments where
+        # create_all included it).
+        with engine.connect() as conn:
+            conn.execute(sa.text(
+                'ALTER TABLE instance_attributes '
+                'ADD COLUMN IF NOT EXISTS vsock_cids JSON NULL'))
+            conn.commit()
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -13798,7 +13822,8 @@ def _direct_create_instance_attributes(
                 agent_operations=_json_dumps(
                     data.agent_operations),
                 kvm_pid=data.kvm_pid,
-                error_message=data.error_message or '')
+                error_message=data.error_message or '',
+                vsock_cids=_json_dumps(data.vsock_cids))
             conn.execute(stmt)
             conn.commit()
             return True
@@ -13845,6 +13870,7 @@ def _direct_get_instance_attributes(
                 result.agent_attributes)
             agent_operations = _parse_json(
                 result.agent_operations)
+            vsock_cids = _parse_json(result.vsock_cids)
 
             return InstanceAttributesData(
                 uuid=result.uuid,
@@ -13861,6 +13887,7 @@ def _direct_get_instance_attributes(
                 kvm_pid=result.kvm_pid,
                 error_message=(
                     result.error_message or None),
+                vsock_cids=vsock_cids,
             )
     except OperationalError as e:
         LOG.warning(
@@ -13894,7 +13921,8 @@ def _direct_update_instance_attributes(
                 agent_operations=_json_dumps(
                     data.agent_operations),
                 kvm_pid=data.kvm_pid,
-                error_message=data.error_message or '')
+                error_message=data.error_message or '',
+                vsock_cids=_json_dumps(data.vsock_cids))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0

@@ -3995,6 +3995,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 d.agent_operations_json),
             kvm_pid=d.kvm_pid or None,
             error_message=d.error_message or None,
+            vsock_cids=_parse(d.vsock_cids_json),
         )
 
     def _instance_attrs_to_proto(
@@ -4020,7 +4021,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             agent_operations_json=json.dumps(
                 data.agent_operations),
             kvm_pid=data.kvm_pid or 0,
-            error_message=data.error_message or '')
+            error_message=data.error_message or '',
+            vsock_cids_json=json.dumps(data.vsock_cids))
 
 
 class Monitor(daemon.WorkerPoolDaemon):

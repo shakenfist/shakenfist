@@ -164,6 +164,7 @@ class Instance(dbowo):
         'placement', 'power_state', 'ports', 'enforced_deletes',
         'block_devices', 'interfaces', 'agent_state',
         'agent_attributes', 'agent_operations', 'kvm_pid', 'error',
+        'vsock_cids',
     }
 
     # docs/developer_guide/state_machine.md has a description of these states.
@@ -852,10 +853,16 @@ class Instance(dbowo):
         self._db_set_attribute('kvm_pid', {'pid': pid})
 
     def vsock_cid(self, channel):
-        return self._db_get_attribute(f'vsock_cid:{channel}')
+        cids = self._db_get_attribute('vsock_cids')
+        if not cids:
+            return None
+        return cids.get(channel)
 
     def set_vsock_cid(self, channel, cid):
-        self._db_set_attribute(f'vsock_cid:{channel}', cid)
+        with self.get_lock_attr('vsock_cids', 'Set vsock CID'):
+            cids = self._db_get_attribute('vsock_cids') or {}
+            cids[channel] = cid
+            self._db_set_attribute('vsock_cids', cids)
 
     # Implementation
     def _initialize_block_devices(self):

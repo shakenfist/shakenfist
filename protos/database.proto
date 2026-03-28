@@ -1495,6 +1495,7 @@ message InstanceAttributesProto {
   string agent_operations_json = 10;   // JSON: {queue, queued, running, completed}
   int32 kvm_pid = 11;                  // KVM process PID (0 = not running)
   string error_message = 12;           // Error message (or empty)
+  string vsock_cids_json = 13;         // JSON: {channel_name: cid_value}
 }
 
 message CreateInstanceAttributesRequest {

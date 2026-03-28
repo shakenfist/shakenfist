@@ -4468,6 +4468,7 @@ class InstanceAttributesProto(google.protobuf.message.Message):
     AGENT_OPERATIONS_JSON_FIELD_NUMBER: builtins.int
     KVM_PID_FIELD_NUMBER: builtins.int
     ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+    VSOCK_CIDS_JSON_FIELD_NUMBER: builtins.int
     uuid: builtins.str
     """References instances.uuid"""
     placement_json: builtins.str
@@ -4492,6 +4493,8 @@ class InstanceAttributesProto(google.protobuf.message.Message):
     """KVM process PID (0 = not running)"""
     error_message: builtins.str
     """Error message (or empty)"""
+    vsock_cids_json: builtins.str
+    """JSON: {channel_name: cid_value}"""
     def __init__(
         self,
         *,
@@ -4507,8 +4510,9 @@ class InstanceAttributesProto(google.protobuf.message.Message):
         agent_operations_json: builtins.str = ...,
         kvm_pid: builtins.int = ...,
         error_message: builtins.str = ...,
+        vsock_cids_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["agent_attributes_json", b"agent_attributes_json", "agent_operations_json", b"agent_operations_json", "agent_state_json", b"agent_state_json", "block_devices_json", b"block_devices_json", "enforced_deletes_json", b"enforced_deletes_json", "error_message", b"error_message", "interfaces_json", b"interfaces_json", "kvm_pid", b"kvm_pid", "placement_json", b"placement_json", "ports_json", b"ports_json", "power_state_json", b"power_state_json", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_attributes_json", b"agent_attributes_json", "agent_operations_json", b"agent_operations_json", "agent_state_json", b"agent_state_json", "block_devices_json", b"block_devices_json", "enforced_deletes_json", b"enforced_deletes_json", "error_message", b"error_message", "interfaces_json", b"interfaces_json", "kvm_pid", b"kvm_pid", "placement_json", b"placement_json", "ports_json", b"ports_json", "power_state_json", b"power_state_json", "uuid", b"uuid", "vsock_cids_json", b"vsock_cids_json"]) -> None: ...
 
 global___InstanceAttributesProto = InstanceAttributesProto
 
