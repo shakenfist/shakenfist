@@ -51,7 +51,7 @@ jobs:
       - name: Install the github command line
         run: |
           sudo apt update
-          sudo apt install -y curl
+          sudo apt install -y curl git
 
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
           sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
