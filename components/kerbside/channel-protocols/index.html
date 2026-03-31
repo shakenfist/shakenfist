@@ -7380,7 +7380,8 @@ the VSC (Virtual Smart Card) protocol.</p>
 <a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>0       4     uint32  stream_id
 </code></pre></div>
 <h2 id="additional-image-types">Additional Image Types<a class="headerlink" href="#additional-image-types" title="Permanent link">&para;</a></h2>
-<p>Beyond the basic compression types documented earlier, SPICE supports:</p>
+<p>Beyond the basic compression types documented earlier, SPICE supports
+these image types (values from <code>spice-protocol/spice/enums.h</code>):</p>
 <table>
 <thead>
 <tr>
@@ -7393,37 +7394,12 @@ the VSC (Virtual Smart Card) protocol.</p>
 <tr>
 <td style="text-align: right;">0</td>
 <td>PIXMAP</td>
-<td>Uncompressed bitmap</td>
+<td>Uncompressed bitmap (BGRX)</td>
 </tr>
 <tr>
 <td style="text-align: right;">1</td>
 <td>QUIC</td>
 <td>QUIC compression</td>
-</tr>
-<tr>
-<td style="text-align: right;">2</td>
-<td>SURFACE</td>
-<td>Reference to existing surface</td>
-</tr>
-<tr>
-<td style="text-align: right;">3</td>
-<td>JPEG</td>
-<td>JPEG compression</td>
-</tr>
-<tr>
-<td style="text-align: right;">4</td>
-<td>ZLIB_GLZ_RGB</td>
-<td>Zlib-compressed GLZ</td>
-</tr>
-<tr>
-<td style="text-align: right;">5</td>
-<td>JPEG_ALPHA</td>
-<td>JPEG with alpha channel</td>
-</tr>
-<tr>
-<td style="text-align: right;">6</td>
-<td>LZ4</td>
-<td>LZ4 compression</td>
 </tr>
 <tr>
 <td style="text-align: right;">100</td>
@@ -7433,17 +7409,47 @@ the VSC (Virtual Smart Card) protocol.</p>
 <tr>
 <td style="text-align: right;">101</td>
 <td>LZ_RGB</td>
-<td>LZ RGB</td>
+<td>LZ RGB compression</td>
 </tr>
 <tr>
 <td style="text-align: right;">102</td>
 <td>GLZ_RGB</td>
-<td>GLZ with dictionary</td>
+<td>GLZ with cross-frame dictionary</td>
 </tr>
 <tr>
 <td style="text-align: right;">103</td>
 <td>FROM_CACHE</td>
 <td>Cached image reference</td>
+</tr>
+<tr>
+<td style="text-align: right;">104</td>
+<td>SURFACE</td>
+<td>Reference to existing surface</td>
+</tr>
+<tr>
+<td style="text-align: right;">105</td>
+<td>JPEG</td>
+<td>JPEG compression</td>
+</tr>
+<tr>
+<td style="text-align: right;">106</td>
+<td>FROM_CACHE_LOSSLESS</td>
+<td>Lossless cached image reference</td>
+</tr>
+<tr>
+<td style="text-align: right;">107</td>
+<td>ZLIB_GLZ_RGB</td>
+<td>Zlib-compressed GLZ data</td>
+</tr>
+<tr>
+<td style="text-align: right;">108</td>
+<td>JPEG_ALPHA</td>
+<td>JPEG with alpha channel</td>
+</tr>
+<tr>
+<td style="text-align: right;">109</td>
+<td>LZ4</td>
+<td>LZ4 per-row compression</td>
 </tr>
 </tbody>
 </table>
