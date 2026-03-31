@@ -831,21 +831,23 @@ Offset  Size  Type    Field
 
 ## Additional Image Types
 
-Beyond the basic compression types documented earlier, SPICE supports:
+Beyond the basic compression types documented earlier, SPICE supports
+these image types (values from `spice-protocol/spice/enums.h`):
 
-| Value | Type          | Description |
-|------:|---------------|-------------|
-| 0     | PIXMAP        | Uncompressed bitmap |
-| 1     | QUIC          | QUIC compression |
-| 2     | SURFACE       | Reference to existing surface |
-| 3     | JPEG          | JPEG compression |
-| 4     | ZLIB_GLZ_RGB  | Zlib-compressed GLZ |
-| 5     | JPEG_ALPHA    | JPEG with alpha channel |
-| 6     | LZ4           | LZ4 compression |
-| 100   | LZ_PLT        | LZ with palette |
-| 101   | LZ_RGB        | LZ RGB |
-| 102   | GLZ_RGB       | GLZ with dictionary |
-| 103   | FROM_CACHE    | Cached image reference |
+| Value | Type                | Description |
+|------:|---------------------|-------------|
+| 0     | PIXMAP              | Uncompressed bitmap (BGRX) |
+| 1     | QUIC                | QUIC compression |
+| 100   | LZ_PLT              | LZ with palette |
+| 101   | LZ_RGB              | LZ RGB compression |
+| 102   | GLZ_RGB             | GLZ with cross-frame dictionary |
+| 103   | FROM_CACHE          | Cached image reference |
+| 104   | SURFACE             | Reference to existing surface |
+| 105   | JPEG                | JPEG compression |
+| 106   | FROM_CACHE_LOSSLESS | Lossless cached image reference |
+| 107   | ZLIB_GLZ_RGB        | Zlib-compressed GLZ data |
+| 108   | JPEG_ALPHA          | JPEG with alpha channel |
+| 109   | LZ4                 | LZ4 per-row compression |
 
 ## Raster Operations (ROP)
 
