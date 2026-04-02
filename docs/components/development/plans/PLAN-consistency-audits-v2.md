@@ -287,24 +287,37 @@ Rather than a big-bang migration, I'd suggest:
 
 ## Execution
 
-### Phase 1: Modular audit specs
+### Phase 1: Modular audit specs -- DONE
 
-1. Create `audits/` directory with README explaining the structure.
-2. Extract each of the 12 criteria from
-   `PROJECT-CONSISTENCY-AUDITS.md` into individual files.
-3. Ensure each file links to its template and lists per-project
-   status.
-4. Add `consistency` label to all project repos.
-5. Create GitHub issues for all known non-compliant items.
+1. ~~Create `audits/` directory with README explaining the
+   structure.~~
+2. ~~Extract each of the 12 criteria from
+   `PROJECT-CONSISTENCY-AUDITS.md` into individual files.~~ 13
+   audit files created.
+3. ~~Ensure each file links to its template and lists per-project
+   status.~~
+4. ~~Add `consistency` label to all project repos.~~ Added to 10
+   repos (ryll has no GitHub repo).
+5. ~~Create GitHub issues for all known non-compliant items.~~ 35
+   issues created across 10 repos.
 
-### Phase 2: CI-based audit runner
+### Phase 2: CI-based audit runner -- DONE
 
-1. Write audit check scripts (shell or Python) for each criterion.
-2. Create a scheduled workflow in `development` that runs all checks
-   across all projects.
-3. Add issue creation/closure automation for audit results.
-4. Verify drift detection works by intentionally breaking a
-   criterion.
+1. ~~Write audit check scripts (shell or Python) for each
+   criterion.~~ `scripts/audit-check.py` checks 11 criteria
+   (4 subjective criteria skipped: security-sanitization,
+   console-logging, python-version, test-coverage).
+2. ~~Create a scheduled workflow in `development` that runs all
+   checks across all projects.~~
+   `.github/workflows/consistency-audit.yml` runs daily at
+   06:00 UTC with a matrix of 10 repos.
+3. ~~Add issue creation/closure automation for audit results.~~
+   `scripts/audit-manage-issues.py` creates issues for failures
+   and closes them when checks pass, using exact title matching
+   against existing manually-created issues.
+4. Verify drift detection works after first CI run. Requires
+   `AUDIT_TOKEN` secret to be configured on the development
+   repo with cross-repo issue permissions.
 
 ### Phase 3: Combined review+fix workflow
 
