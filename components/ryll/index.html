@@ -4059,13 +4059,13 @@
 support performance testing of the <strong>Kerbside</strong> SPICE proxy.</p>
 <h2 id="background">Background<a class="headerlink" href="#background" title="Permanent link">&para;</a></h2>
 <p><a href="https://github.com/shakenfist/kerbside">Kerbside</a> is a SPICE protocol native
-proxy that sits between SPICE clients and servers. Unlike HTTP-based proxies
-that terminate and re-establish connections, Kerbside understands the SPICE
+proxy that sits between SPICE clients and servers. Unlike layer 4 proxies
+that simply pass through unparsed traffic, Kerbside understands the SPICE
 protocol itself, allowing it to make intelligent routing and optimization
 decisions.</p>
 <p>Getting Kerbside integrated into OpenStack has been a long process (see
 <a href="https://github.com/shakenfist/kerbside-patches">kerbside-patches</a>), and now
-the focus shifts to performance validation.</p>
+the focus has started to shift to performance validation.</p>
 <h2 id="whats-with-the-name">What's With The Name?<a class="headerlink" href="#whats-with-the-name" title="Permanent link">&para;</a></h2>
 <p>Honestly, I am not super into Star Wars or anything, but "ryll" was the first
 good spice pun I came across. To quote the excellently named Wookieepedia:</p>
