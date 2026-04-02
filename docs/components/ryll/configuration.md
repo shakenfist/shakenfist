@@ -23,10 +23,11 @@ ryll [OPTIONS]
 | `--headless` | false | Run without GUI (for automated testing) |
 | `--cadence` | false | Send automatic keystroke every 2 seconds |
 
-### Debugging
+### Capture and Debugging
 
 | Option | Default | Description |
 |--------|---------|-------------|
+| `--capture <DIR>` | none | Write pcap + video capture to directory |
 | `-v, --verbose` | false | Enable debug-level logging |
 | `--latency-file <PATH>` | none | Write latency measurements to CSV file |
 
@@ -50,6 +51,9 @@ ryll --file test.vv --headless
 
 # Performance testing with latency tracking
 ryll --file test.vv --cadence --latency-file latency.csv
+
+# Capture protocol traffic and display video
+ryll --file test.vv --capture /tmp/capture
 
 # Verbose output for debugging
 ryll --file test.vv -v

@@ -8,14 +8,14 @@ support performance testing of the **Kerbside** SPICE proxy.
 ## Background
 
 [Kerbside](https://github.com/shakenfist/kerbside) is a SPICE protocol native
-proxy that sits between SPICE clients and servers. Unlike HTTP-based proxies
-that terminate and re-establish connections, Kerbside understands the SPICE
+proxy that sits between SPICE clients and servers. Unlike layer 4 proxies
+that simply pass through unparsed traffic, Kerbside understands the SPICE
 protocol itself, allowing it to make intelligent routing and optimization
 decisions.
 
 Getting Kerbside integrated into OpenStack has been a long process (see
 [kerbside-patches](https://github.com/shakenfist/kerbside-patches)), and now
-the focus shifts to performance validation.
+the focus has started to shift to performance validation.
 
 ## What's With The Name?
 
