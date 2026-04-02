@@ -27,7 +27,7 @@ dependencies = [
     "shakenfist-utilities==0.8.4",        # apache2
     "clingwrap==2.1",                  # apache2
 
-    "fixtures==4.3.1",                    # apache2
+    "fixtures==4.3.2",                    # apache2
     "PyYAML==6.0.3",                      # mit
     "Jinja2==3.1.6",                      # bsd
     "setproctitle==1.3.7",                # bsd
