@@ -77,6 +77,13 @@ jobs:
           path: occystrap
           fetch-depth: 0
 
+      - name: Checkout the ryll repository
+        uses: actions/checkout@v6
+        with:
+          repository: shakenfist/ryll
+          path: ryll
+          fetch-depth: 0
+
       - name: Import docs from other repositories
         env:
           GITHUB_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }}
