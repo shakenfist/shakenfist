@@ -102,7 +102,7 @@ Error: invalid peer certificate: UnknownIssuer
 
 **Causes:**
 - Image decompression failing (check for WARN lines in log)
-- Unsupported image type (QUIC, JPEG, JPEG_ALPHA are not yet
+- Unsupported image type (QUIC and JPEG_ALPHA are not yet
   implemented)
 - GLZ cross-frame dictionary corruption
 
@@ -119,14 +119,19 @@ Error: invalid peer certificate: UnknownIssuer
 
 ### Keyboard input not working
 
-**Symptom:** Key presses in the window don't reach the VM.
+**Symptom:** Key presses in the window don't reach the VM, or keys
+are sent but the display never updates in response.
 
 **Causes:**
 - Inputs channel didn't connect
 - Focus not on the ryll window (click on it first)
-- The VM's text field may not have focus — use Tab to
+- The VM's text field may not have focus -- use Tab to
   navigate to the input field
 - Scancode mapping issue for your keyboard layout
+- Missing display channel capabilities (if COMPOSITE is not
+  advertised, the guest QXL driver uses a slow software
+  rendering path that can flood the client with uncompressed
+  data, making it appear unresponsive)
 
 **Solutions:**
 1. Click on the ryll window to give it OS-level focus
@@ -135,6 +140,9 @@ Error: invalid peer certificate: UnknownIssuer
    egui is receiving key events
 4. Check for `inputs: key down:` lines to confirm keys are
    being sent to the server
+5. Enable verbose logging and check that the display channel
+   link negotiation includes COMPOSITE in the advertised
+   capabilities
 
 ### Mouse not working
 
