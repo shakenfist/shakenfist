@@ -23,6 +23,13 @@ ryll [OPTIONS]
 | `--headless` | false | Run without GUI (for automated testing) |
 | `--cadence` | false | Send automatic keystroke every 2 seconds |
 
+### USB Device Redirection
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--usb-disk <PATH>` | none | Present a RAW disk image as a USB mass storage device (repeatable) |
+| `--usb-disk-ro <PATH>` | none | Same as `--usb-disk` but read-only (repeatable) |
+
 ### Capture and Debugging
 
 | Option | Default | Description |
@@ -57,6 +64,15 @@ ryll --file test.vv --capture /tmp/capture
 
 # Verbose output for debugging
 ryll --file test.vv -v
+
+# Attach a RAW disk image as a USB flash drive
+ryll --file test.vv --usb-disk /path/to/image.raw
+
+# Attach a read-only USB disk
+ryll --file test.vv --usb-disk-ro /path/to/image.raw
+
+# Headless mode with USB disk
+ryll --file test.vv --headless --usb-disk /tmp/test.raw
 ```
 
 ## .vv File Format
@@ -161,3 +177,56 @@ timestamp,latency_ms
 
 This is primarily useful in cadence mode, where keystrokes are generated at
 known intervals.
+
+## USB Device Redirection
+
+Ryll can present a RAW disk image as a USB mass storage device to the
+remote VM. The guest OS sees a standard USB flash drive and can partition,
+format, mount, read, and write it.
+
+### Creating a Test Image
+
+```bash
+# Create a 64MB empty image
+dd if=/dev/zero of=test.raw bs=1M count=64
+
+# Optionally format it with a filesystem
+mkfs.ext4 test.raw
+```
+
+### QEMU Requirements
+
+The SPICE server (QEMU) must have USB redirection enabled:
+
+```
+-device qemu-xhci,id=xhci
+-chardev spicevmc,id=usbredir1,name=usbredir
+-device usb-redir,chardev=usbredir1,id=redir1
+```
+
+Use `make test-qemu-usb` to start a pre-configured QEMU instance.
+
+### Usage
+
+```bash
+# GUI mode
+ryll --direct localhost:5900 --usb-disk test.raw
+
+# Headless mode
+ryll --direct localhost:5900 --headless --usb-disk test.raw
+
+# Read-only (guest cannot write to the image)
+ryll --direct localhost:5900 --usb-disk-ro test.raw
+```
+
+### Notes
+
+- Only the first `--usb-disk` / `--usb-disk-ro` is connected (SPICE
+  supports one device per usbredir channel).
+- The image file must be at least 512 bytes.
+- If the file size is not a multiple of 512, trailing bytes are
+  inaccessible (a warning is logged).
+- The device auto-connects when the usbredir channel's hello exchange
+  completes.
+- Use `--capture <DIR>` to capture usbredir protocol traffic to
+  `usbredir.pcap` for debugging.

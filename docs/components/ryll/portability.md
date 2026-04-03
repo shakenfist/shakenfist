@@ -1,14 +1,30 @@
 # Binary Portability
 
-This document explains how ryll binaries can be shared between machines.
+This document explains how ryll binaries can be shared between machines
+and across platforms.
+
+## Supported Platforms
+
+| Platform | GUI | Headless | Capture (`--capture`) |
+|----------|-----|----------|----------------------|
+| Linux x86_64 | Yes | Yes | Yes |
+| macOS aarch64 (Apple Silicon) | Yes | Yes | Yes |
+| Windows x86_64 | Yes | Yes | No (feature-gated off) |
+
+Capture mode is disabled on Windows builds via a Cargo feature gate.
+On Linux and macOS, it is enabled by default.
 
 ## Build Environment vs Runtime Environment
 
 The devcontainer provides a consistent **build environment** - you can build ryll
-on any machine with Docker installed, and get the same binary output.
+on any machine with Docker installed, and get the same binary output. This is the
+primary local development workflow.
 
-However, for **running** the GUI client, you need to be on a machine with a
-display. The devcontainer is primarily for:
+For CI and release packaging, native builds on GitHub Actions runners are used
+for each platform (see `.github/workflows/`).
+
+For **running** the GUI client, you need to be on a machine with a display. The
+devcontainer is primarily for:
 
 - Building debug and release binaries
 - Running linting (rustfmt, clippy)
@@ -75,6 +91,20 @@ libraries at build time, but doesn't actually use them at runtime. This means:
 - Headless mode works on servers without displays
 - The binary still needs the .so files present (or use `LD_LIBRARY_PATH` tricks)
 
+## Cargo Features
+
+Ryll uses a Cargo feature to control optional functionality:
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `capture` | Yes | Protocol capture (`--capture` flag, pcap + video). Requires `openh264`, `mp4`, `pcap-file`, `etherparse`. |
+
+To build without capture support (e.g. for Windows):
+
+```bash
+cargo build --release --no-default-features
+```
+
 ## Maximising Portability
 
 If you need to distribute binaries widely:
@@ -86,6 +116,27 @@ If you need to distribute binaries widely:
 
 3. **Static musl build** - For headless-only use, you could build with musl
    for a fully static binary (doesn't work well with GUI)
+
+## macOS
+
+Ryll builds natively on macOS with Apple Silicon. eframe uses Metal and AppKit
+backends — no X11 or OpenGL needed. Install Xcode Command Line Tools:
+
+```bash
+xcode-select --install
+cargo build --release
+```
+
+## Windows
+
+Ryll builds on Windows with MSVC. eframe uses Direct3D and WinAPI. Install
+Visual Studio Build Tools, then:
+
+```powershell
+cargo build --release --no-default-features
+```
+
+The `--capture` flag is not available on Windows builds.
 
 ## Practical Workflow
 
