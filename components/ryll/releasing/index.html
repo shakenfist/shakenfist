@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/ryll/configuration/">
+        <link rel="canonical" href="https://shakenfist.com/components/ryll/releasing/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Configuration - Shaken Fist</title>
+        <title>Releasing - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#configuration" class="md-skip">
+        <a href="#releasing" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Configuration
+              Releasing
             
           </span>
         </div>
@@ -3945,22 +3945,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#command-line-options" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Command Line Options
+        Prerequisites
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Command Line Options">
+    <nav class="md-nav" aria-label="Prerequisites">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#connection-source-one-required" class="md-nav__link">
+  <a href="#tag-protection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Connection Source (one required)
+        Tag protection
       
     </span>
   </a>
@@ -3968,43 +3968,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#operating-modes" class="md-nav__link">
+  <a href="#homebrew_tap_token" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Operating Modes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#usb-device-redirection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        USB Device Redirection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#capture-and-debugging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Capture and Debugging
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
+        HOMEBREW_TAP_TOKEN
       
     </span>
   </a>
@@ -4017,22 +3984,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#vv-file-format" class="md-nav__link">
+  <a href="#release-process" class="md-nav__link">
     <span class="md-ellipsis">
       
-        .vv File Format
+        Release process
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label=".vv File Format">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifacts-produced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifacts produced
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#basic-format" class="md-nav__link">
+  <a href="#version-mismatch" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic Format
+        Version mismatch
       
     </span>
   </a>
@@ -4040,115 +4029,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#supported-fields" class="md-nav__link">
+  <a href="#homebrew-tap-update-fails" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Supported Fields
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#example-vv-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example .vv Files
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#environment-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Environment Variables
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#latency-file-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Latency File Format
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#usb-device-redirection_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        USB Device Redirection
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="USB Device Redirection">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#creating-a-test-image" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Creating a Test Image
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#qemu-requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        QEMU Requirements
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Usage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Notes
+        Homebrew tap update fails
       
     </span>
   </a>
@@ -4181,287 +4065,115 @@
   
 
 
-<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h1>
-<p>Ryll can be configured via command-line arguments and .vv configuration files.</p>
-<h2 id="command-line-options">Command Line Options<a class="headerlink" href="#command-line-options" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ryll [OPTIONS]
-</code></pre></div>
-<h3 id="connection-source-one-required">Connection Source (one required)<a class="headerlink" href="#connection-source-one-required" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Option</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>--url &lt;URL&gt;</code></td>
-<td>Fetch .vv configuration file from HTTP URL</td>
-</tr>
-<tr>
-<td><code>--file &lt;PATH&gt;</code></td>
-<td>Load .vv configuration from local file</td>
-</tr>
-<tr>
-<td><code>--direct &lt;CONN&gt;</code></td>
-<td>Direct connection: <code>HOST:PORT</code> or <code>HOST:PORT:TLS_PORT</code></td>
-</tr>
-</tbody>
-</table>
-<h3 id="operating-modes">Operating Modes<a class="headerlink" href="#operating-modes" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Option</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>--headless</code></td>
-<td>false</td>
-<td>Run without GUI (for automated testing)</td>
-</tr>
-<tr>
-<td><code>--cadence</code></td>
-<td>false</td>
-<td>Send automatic keystroke every 2 seconds</td>
-</tr>
-</tbody>
-</table>
-<h3 id="usb-device-redirection">USB Device Redirection<a class="headerlink" href="#usb-device-redirection" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Option</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>--usb-disk &lt;PATH&gt;</code></td>
-<td>none</td>
-<td>Present a RAW disk image as a USB mass storage device (repeatable)</td>
-</tr>
-<tr>
-<td><code>--usb-disk-ro &lt;PATH&gt;</code></td>
-<td>none</td>
-<td>Same as <code>--usb-disk</code> but read-only (repeatable)</td>
-</tr>
-</tbody>
-</table>
-<h3 id="capture-and-debugging">Capture and Debugging<a class="headerlink" href="#capture-and-debugging" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Option</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>--capture &lt;DIR&gt;</code></td>
-<td>none</td>
-<td>Write pcap + video capture to directory</td>
-</tr>
-<tr>
-<td><code>-v, --verbose</code></td>
-<td>false</td>
-<td>Enable debug-level logging</td>
-</tr>
-<tr>
-<td><code>--latency-file &lt;PATH&gt;</code></td>
-<td>none</td>
-<td>Write latency measurements to CSV file</td>
-</tr>
-</tbody>
-</table>
-<h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Connect using a .vv file from a URL</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>ryll<span class="w"> </span>--url<span class="w"> </span>https://cloud.example.com/console/vm-123.vv
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Connect using a local .vv file</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>ryll<span class="w"> </span>--file<span class="w"> </span>~/downloads/myvm.vv
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Direct connection to a SPICE server (insecure)</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>ryll<span class="w"> </span>--direct<span class="w"> </span><span class="m">192</span>.168.1.100:5900
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Direct connection with TLS</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>ryll<span class="w"> </span>--direct<span class="w"> </span><span class="m">192</span>.168.1.100:5900:5901
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Headless mode for automated testing</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># Performance testing with latency tracking</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--cadence<span class="w"> </span>--latency-file<span class="w"> </span>latency.csv
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="c1"># Capture protocol traffic and display video</span>
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--capture<span class="w"> </span>/tmp/capture
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="c1"># Verbose output for debugging</span>
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="c1"># Attach a RAW disk image as a USB flash drive</span>
-<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--usb-disk<span class="w"> </span>/path/to/image.raw
-<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>
-<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="c1"># Attach a read-only USB disk</span>
-<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--usb-disk-ro<span class="w"> </span>/path/to/image.raw
-<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>
-<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="c1"># Headless mode with USB disk</span>
-<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>--usb-disk<span class="w"> </span>/tmp/test.raw
-</code></pre></div>
-<h2 id="vv-file-format">.vv File Format<a class="headerlink" href="#vv-file-format" title="Permanent link">&para;</a></h2>
-<p>The .vv (virt-viewer) file is an INI-format configuration file. Ryll supports
-the standard virt-viewer format used by <code>remote-viewer</code> and other SPICE clients.</p>
-<h3 id="basic-format">Basic Format<a class="headerlink" href="#basic-format" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[virt-viewer]</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="na">type</span><span class="o">=</span><span class="s">spice</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="na">host</span><span class="o">=</span><span class="s">192.168.1.100</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="na">port</span><span class="o">=</span><span class="s">5900</span>
-</code></pre></div>
-<h3 id="supported-fields">Supported Fields<a class="headerlink" href="#supported-fields" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Required</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>host</code></td>
-<td>Yes</td>
-<td>SPICE server hostname or IP address</td>
-</tr>
-<tr>
-<td><code>port</code></td>
-<td>No*</td>
-<td>SPICE insecure port (usually 5900+)</td>
-</tr>
-<tr>
-<td><code>tls-port</code></td>
-<td>No*</td>
-<td>SPICE TLS port for secure connections</td>
-</tr>
-<tr>
-<td><code>password</code></td>
-<td>No</td>
-<td>SPICE password for authentication</td>
-</tr>
-<tr>
-<td><code>ca</code></td>
-<td>No</td>
-<td>Inline PEM CA certificate for TLS verification</td>
-</tr>
-<tr>
-<td><code>host-subject</code></td>
-<td>No</td>
-<td>Expected server certificate subject</td>
-</tr>
-</tbody>
-</table>
-<h3 id="example-vv-files">Example .vv Files<a class="headerlink" href="#example-vv-files" title="Permanent link">&para;</a></h3>
-<p><strong>Minimal (insecure connection):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[virt-viewer]</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="na">type</span><span class="o">=</span><span class="s">spice</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="na">host</span><span class="o">=</span><span class="s">192.168.1.100</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="na">port</span><span class="o">=</span><span class="s">5900</span>
-</code></pre></div></p>
-<p><strong>With password:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[virt-viewer]</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="na">type</span><span class="o">=</span><span class="s">spice</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="na">host</span><span class="o">=</span><span class="s">192.168.1.100</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="na">port</span><span class="o">=</span><span class="s">5900</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="na">password</span><span class="o">=</span><span class="s">mysecretpassword</span>
-</code></pre></div></p>
-<p><strong>TLS connection with inline CA (as generated by Shaken Fist):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">[virt-viewer]</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="na">type</span><span class="o">=</span><span class="s">spice</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="na">host</span><span class="o">=</span><span class="s">spice.example.com</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="na">tls-port</span><span class="o">=</span><span class="s">5901</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="na">ca</span><span class="o">=</span><span class="s">-----BEGIN CERTIFICATE-----\nMIIE...(base64)...\n-----END CERTIFICATE-----\n</span>
-</code></pre></div></p>
-<p>Note: the <code>ca=</code> field contains the PEM certificate inline with <code>\n</code>
-escape sequences for newlines, not a file path. Either <code>port</code> or
-<code>tls-port</code> (or both) must be specified.</p>
-<p><strong>Full configuration:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">[virt-viewer]</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="na">type</span><span class="o">=</span><span class="s">spice</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="na">host</span><span class="o">=</span><span class="s">spice.example.com</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="na">port</span><span class="o">=</span><span class="s">5900</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="na">tls-port</span><span class="o">=</span><span class="s">5901</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="na">password</span><span class="o">=</span><span class="s">mysecretpassword</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="na">ca</span><span class="o">=</span><span class="s">-----BEGIN CERTIFICATE-----\nMIIE...\n-----END CERTIFICATE-----\n</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="na">host-subject</span><span class="o">=</span><span class="s">CN=spice.example.com</span>
-</code></pre></div></p>
-<h2 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h2>
-<p>Currently, ryll does not use environment variables for configuration. All
-settings are provided via command-line arguments or .vv files.</p>
-<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
-<p>Ryll uses the <code>tracing</code> crate for logging. By default, INFO-level messages
-are shown. Use <code>-v</code> or <code>--verbose</code> for DEBUG-level output.</p>
-<p>Log output goes to stderr, so you can redirect stdout for data output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span><span class="m">2</span>&gt;debug.log
-</code></pre></div>
-<h2 id="latency-file-format">Latency File Format<a class="headerlink" href="#latency-file-format" title="Permanent link">&para;</a></h2>
-<p>When <code>--latency-file</code> is specified, ryll writes latency measurements in CSV
-format:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>timestamp,latency_ms
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>1706540400.123,45.2
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>1706540402.125,43.8
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>1706540404.127,44.1
-</code></pre></div>
+<h1 id="releasing">Releasing<a class="headerlink" href="#releasing" title="Permanent link">&para;</a></h1>
+<p>Releases are automated via GitHub Actions. Pushing a version tag
+triggers the release workflow, which builds all platform packages,
+creates a GitHub Release, and updates the Homebrew tap.</p>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<h3 id="tag-protection">Tag protection<a class="headerlink" href="#tag-protection" title="Permanent link">&para;</a></h3>
+<p>A tag protection rule should be configured so only authorised
+maintainers can push <code>v*</code> tags. Set this up in GitHub under
+Settings → Rules → Rulesets (or the older Settings → Tags):</p>
 <ul>
-<li><strong>timestamp</strong>: Unix timestamp of the measurement</li>
-<li><strong>latency_ms</strong>: Time from keystroke to display update in milliseconds</li>
+<li><strong>Pattern:</strong> <code>v*</code></li>
+<li><strong>Restrict who can create matching tags:</strong> maintainers only</li>
 </ul>
-<p>This is primarily useful in cadence mode, where keystrokes are generated at
-known intervals.</p>
-<h2 id="usb-device-redirection_1">USB Device Redirection<a class="headerlink" href="#usb-device-redirection_1" title="Permanent link">&para;</a></h2>
-<p>Ryll can present a RAW disk image as a USB mass storage device to the
-remote VM. The guest OS sees a standard USB flash drive and can partition,
-format, mount, read, and write it.</p>
-<h3 id="creating-a-test-image">Creating a Test Image<a class="headerlink" href="#creating-a-test-image" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Create a 64MB empty image</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>dd<span class="w"> </span><span class="k">if</span><span class="o">=</span>/dev/zero<span class="w"> </span><span class="nv">of</span><span class="o">=</span>test.raw<span class="w"> </span><span class="nv">bs</span><span class="o">=</span>1M<span class="w"> </span><span class="nv">count</span><span class="o">=</span><span class="m">64</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Optionally format it with a filesystem</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>mkfs.ext4<span class="w"> </span>test.raw
+<p>This prevents accidental or unauthorised releases.</p>
+<h3 id="homebrew_tap_token">HOMEBREW_TAP_TOKEN<a class="headerlink" href="#homebrew_tap_token" title="Permanent link">&para;</a></h3>
+<p>A repository secret <code>HOMEBREW_TAP_TOKEN</code> must be configured in the
+ryll repo settings. This is a GitHub personal access token (classic
+with <code>repo</code> scope, or fine-grained with write access to
+<code>shakenfist/homebrew-tap</code>). Without it, the Homebrew tap update step
+will fail — but the GitHub Release will still be created successfully.</p>
+<h2 id="release-process">Release process<a class="headerlink" href="#release-process" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Update the version</strong> in <code>Cargo.toml</code>:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.2.0&quot;</span>
 </code></pre></div>
-<h3 id="qemu-requirements">QEMU Requirements<a class="headerlink" href="#qemu-requirements" title="Permanent link">&para;</a></h3>
-<p>The SPICE server (QEMU) must have USB redirection enabled:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>-device qemu-xhci,id=xhci
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>-chardev spicevmc,id=usbredir1,name=usbredir
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>-device usb-redir,chardev=usbredir1,id=redir1
+<ol>
+<li><strong>Commit the version bump:</strong></li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>add<span class="w"> </span>Cargo.toml<span class="w"> </span>Cargo.lock
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Bump version to 0.2.0.&quot;</span>
 </code></pre></div>
-<p>Use <code>make test-qemu-usb</code> to start a pre-configured QEMU instance.</p>
-<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># GUI mode</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>ryll<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span>--usb-disk<span class="w"> </span>test.raw
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Headless mode</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>ryll<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span>--headless<span class="w"> </span>--usb-disk<span class="w"> </span>test.raw
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1"># Read-only (guest cannot write to the image)</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>ryll<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span>--usb-disk-ro<span class="w"> </span>test.raw
+<ol>
+<li><strong>Tag and push:</strong></li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>tag<span class="w"> </span>v0.2.0
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>develop
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.2.0
 </code></pre></div>
-<h3 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Only the first <code>--usb-disk</code> / <code>--usb-disk-ro</code> is connected (SPICE
-  supports one device per usbredir channel).</li>
-<li>The image file must be at least 512 bytes.</li>
-<li>If the file size is not a multiple of 512, trailing bytes are
-  inaccessible (a warning is logged).</li>
-<li>The device auto-connects when the usbredir channel's hello exchange
-  completes.</li>
-<li>Use <code>--capture &lt;DIR&gt;</code> to capture usbredir protocol traffic to
-  <code>usbredir.pcap</code> for debugging.</li>
-</ul>
+<ol>
+<li><strong>Wait for the workflow</strong> to complete. It will:</li>
+<li>Verify the tag matches <code>Cargo.toml</code> (fails and files an
+     issue if they don't match).</li>
+<li>Build release binaries on Linux, macOS, and Windows.</li>
+<li>Run tests on all platforms.</li>
+<li>Package: <code>.deb</code>, <code>.rpm</code>, macOS <code>.tar.gz</code>, Windows <code>.zip</code>.</li>
+<li>Create a GitHub Release with auto-generated release notes
+     and all artifacts attached.</li>
+<li>
+<p>Update <code>shakenfist/homebrew-tap</code> with the new version and
+     SHA256 for the macOS tarball.</p>
+</li>
+<li>
+<p><strong>Verify the release</strong> at
+   <a href="https://github.com/shakenfist/ryll/releases">https://github.com/shakenfist/ryll/releases</a></p>
+</li>
+</ol>
+<h2 id="artifacts-produced">Artifacts produced<a class="headerlink" href="#artifacts-produced" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Artifact</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Debian/Ubuntu</td>
+<td><code>ryll_{version}-1_amd64.deb</code></td>
+<td>Binary + auto-detected deps</td>
+</tr>
+<tr>
+<td>Fedora/RHEL</td>
+<td><code>ryll-{version}-1.x86_64.rpm</code></td>
+<td>Binary + auto-detected deps</td>
+</tr>
+<tr>
+<td>macOS (Apple Silicon)</td>
+<td><code>ryll-{version}-aarch64-apple-darwin.tar.gz</code></td>
+<td>Binary</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td><code>ryll-{version}-x86_64-pc-windows-msvc.zip</code></td>
+<td>Binary (no <code>--capture</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="version-mismatch">Version mismatch<a class="headerlink" href="#version-mismatch" title="Permanent link">&para;</a></h3>
+<p>If the tag doesn't match <code>Cargo.toml</code>, the workflow fails and
+creates a GitHub issue. Fix the version, commit, delete the bad
+tag, and re-tag:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>git<span class="w"> </span>tag<span class="w"> </span>-d<span class="w"> </span>v0.2.0
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.2.0
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># fix Cargo.toml, commit, then re-tag</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>git<span class="w"> </span>tag<span class="w"> </span>v0.2.0
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.2.0
+</code></pre></div>
+<h3 id="homebrew-tap-update-fails">Homebrew tap update fails<a class="headerlink" href="#homebrew-tap-update-fails" title="Permanent link">&para;</a></h3>
+<p>If the <code>HOMEBREW_TAP_TOKEN</code> secret is missing or expired, the
+tap update job fails but the release is still created. Update
+the formula manually:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">cd</span><span class="w"> </span>homebrew-tap
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># update version and sha256 in Formula/ryll.rb</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>git<span class="w"> </span>commit<span class="w"> </span>-am<span class="w"> </span><span class="s2">&quot;Update ryll to 0.2.0&quot;</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>git<span class="w"> </span>push
+</code></pre></div>
 
 
 
@@ -4482,7 +4194,7 @@ format, mount, read, and write it.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/ryll/configuration.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/ryll/configuration.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/ryll/configuration/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/ryll/releasing.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/ryll/releasing.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/ryll/releasing/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

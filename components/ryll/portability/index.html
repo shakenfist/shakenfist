@@ -3945,6 +3945,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#supported-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Platforms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#build-environment-vs-runtime-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4045,10 +4056,43 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cargo-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cargo Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#maximising-portability" class="md-nav__link">
     <span class="md-ellipsis">
       
         Maximising Portability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
       
     </span>
   </a>
@@ -4088,12 +4132,49 @@
 
 
 <h1 id="binary-portability">Binary Portability<a class="headerlink" href="#binary-portability" title="Permanent link">&para;</a></h1>
-<p>This document explains how ryll binaries can be shared between machines.</p>
+<p>This document explains how ryll binaries can be shared between machines
+and across platforms.</p>
+<h2 id="supported-platforms">Supported Platforms<a class="headerlink" href="#supported-platforms" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>GUI</th>
+<th>Headless</th>
+<th>Capture (<code>--capture</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linux x86_64</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>macOS aarch64 (Apple Silicon)</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Windows x86_64</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No (feature-gated off)</td>
+</tr>
+</tbody>
+</table>
+<p>Capture mode is disabled on Windows builds via a Cargo feature gate.
+On Linux and macOS, it is enabled by default.</p>
 <h2 id="build-environment-vs-runtime-environment">Build Environment vs Runtime Environment<a class="headerlink" href="#build-environment-vs-runtime-environment" title="Permanent link">&para;</a></h2>
 <p>The devcontainer provides a consistent <strong>build environment</strong> - you can build ryll
-on any machine with Docker installed, and get the same binary output.</p>
-<p>However, for <strong>running</strong> the GUI client, you need to be on a machine with a
-display. The devcontainer is primarily for:</p>
+on any machine with Docker installed, and get the same binary output. This is the
+primary local development workflow.</p>
+<p>For CI and release packaging, native builds on GitHub Actions runners are used
+for each platform (see <code>.github/workflows/</code>).</p>
+<p>For <strong>running</strong> the GUI client, you need to be on a machine with a display. The
+devcontainer is primarily for:</p>
 <ul>
 <li>Building debug and release binaries</li>
 <li>Running linting (rustfmt, clippy)</li>
@@ -4182,6 +4263,27 @@ libraries at build time, but doesn't actually use them at runtime. This means:</
 <li>Headless mode works on servers without displays</li>
 <li>The binary still needs the .so files present (or use <code>LD_LIBRARY_PATH</code> tricks)</li>
 </ul>
+<h2 id="cargo-features">Cargo Features<a class="headerlink" href="#cargo-features" title="Permanent link">&para;</a></h2>
+<p>Ryll uses a Cargo feature to control optional functionality:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>capture</code></td>
+<td>Yes</td>
+<td>Protocol capture (<code>--capture</code> flag, pcap + video). Requires <code>openh264</code>, <code>mp4</code>, <code>pcap-file</code>, <code>etherparse</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>To build without capture support (e.g. for Windows):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--no-default-features
+</code></pre></div>
 <h2 id="maximising-portability">Maximising Portability<a class="headerlink" href="#maximising-portability" title="Permanent link">&para;</a></h2>
 <p>If you need to distribute binaries widely:</p>
 <ol>
@@ -4197,21 +4299,33 @@ libraries at build time, but doesn't actually use them at runtime. This means:</
    for a fully static binary (doesn't work well with GUI)</p>
 </li>
 </ol>
+<h2 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h2>
+<p>Ryll builds natively on macOS with Apple Silicon. eframe uses Metal and AppKit
+backends — no X11 or OpenGL needed. Install Xcode Command Line Tools:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>xcode-select<span class="w"> </span>--install
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>cargo<span class="w"> </span>build<span class="w"> </span>--release
+</code></pre></div>
+<h2 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h2>
+<p>Ryll builds on Windows with MSVC. eframe uses Direct3D and WinAPI. Install
+Visual Studio Build Tools, then:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">cargo</span> <span class="n">build</span> <span class="p">-</span><span class="n">-release</span> <span class="p">-</span><span class="n">-no-default-features</span>
+</code></pre></div>
+<p>The <code>--capture</code> flag is not available on Windows builds.</p>
 <h2 id="practical-workflow">Practical Workflow<a class="headerlink" href="#practical-workflow" title="Permanent link">&para;</a></h2>
 <p>For typical use within your own infrastructure:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Build in container</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>make<span class="w"> </span>release
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Copy binary to target machine</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>scp<span class="w"> </span>target/release/ryll<span class="w"> </span>user@target:/usr/local/bin/
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Run on target (needs graphics libs installed)</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Build in container</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>make<span class="w"> </span>release
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Copy binary to target machine</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>scp<span class="w"> </span>target/release/ryll<span class="w"> </span>user@target:/usr/local/bin/
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Run on target (needs graphics libs installed)</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv
 </code></pre></div>
 <p>For automated testing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Run headless in container</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>docker<span class="w"> </span>run<span class="w"> </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>:/workspace<span class="w"> </span>ryll-dev<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span>/workspace/target/release/ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>--cadence
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Run headless in container</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>docker<span class="w"> </span>run<span class="w"> </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>:/workspace<span class="w"> </span>ryll-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span>/workspace/target/release/ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>--cadence
 </code></pre></div>
 
 
