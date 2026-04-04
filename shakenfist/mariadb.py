@@ -13486,11 +13486,15 @@ def _ensure_instance_attributes_schema(
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
-    if current_ver >= 1:
+    if current_ver < INSTANCE_ATTRIBUTES_VERSION:
         # Add vsock_cids column (not in original v1 schema). Safe
         # to run repeatedly -- IF NOT EXISTS is a no-op when the
         # column already exists (e.g. new deployments where
         # create_all included it).
+        #
+        # NOTE: We do NOT bump the version here. The version is
+        # bumped by the data migration in ensure_data_migrations()
+        # which also migrates instance attribute data from etcd.
         with engine.connect() as conn:
             conn.execute(sa.text(
                 'ALTER TABLE instance_attributes '
