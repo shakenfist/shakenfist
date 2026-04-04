@@ -478,7 +478,7 @@ PROMPT_EOF
     echo "Running Claude Code..."
     claude_output_file="${output_dir}/claude-output-${i}.txt"
 
-    if ! claude -p "$(cat "${output_dir}/claude-prompt-${i}.txt")" \
+    if ! ~/local/.bin/claude -p "$(cat "${output_dir}/claude-prompt-${i}.txt")" \
         --dangerously-skip-permissions \
         --max-turns "${max_turns}" \
         --output-format text > "${claude_output_file}" 2>&1; then

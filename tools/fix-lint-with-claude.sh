@@ -252,7 +252,7 @@ if [ "${interactive}" = true ]; then
     exit 1
 else
     # Headless mode - use JSON output to capture turn count and other metadata
-    claude -p "$(cat "${output_dir}/claude-prompt.txt")" \
+    ~/local/.bin/claude -p "$(cat "${output_dir}/claude-prompt.txt")" \
         --dangerously-skip-permissions \
         --max-turns "${max_turns}" \
         --output-format json > "${output_dir}/claude-output.json" || true
