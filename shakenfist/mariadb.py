@@ -14135,7 +14135,9 @@ def _grpc_create_instance_attributes(
                     data.agent_operations),
                 kvm_pid=data.kvm_pid or 0,
                 error_message=(
-                    data.error_message or '')))
+                    data.error_message or ''),
+                vsock_cids_json=_json_dumps(
+                    data.vsock_cids)))
         reply = _grpc_call(stub.CreateInstanceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -14180,6 +14182,7 @@ def _grpc_get_instance_attributes(
                 d.agent_operations_json),
             kvm_pid=d.kvm_pid or None,
             error_message=d.error_message or None,
+            vsock_cids=_parse(d.vsock_cids_json),
         )
     except grpc.RpcError as e:
         LOG.error(
@@ -14215,7 +14218,9 @@ def _grpc_update_instance_attributes(
                     data.agent_operations),
                 kvm_pid=data.kvm_pid or 0,
                 error_message=(
-                    data.error_message or '')))
+                    data.error_message or ''),
+                vsock_cids_json=_json_dumps(
+                    data.vsock_cids)))
         reply = _grpc_call(stub.UpdateInstanceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
