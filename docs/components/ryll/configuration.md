@@ -144,6 +144,17 @@ ca=-----BEGIN CERTIFICATE-----\nMIIE...\n-----END CERTIFICATE-----\n
 host-subject=CN=spice.example.com
 ```
 
+## Keyboard Shortcuts
+
+These shortcuts are available during a GUI session. They are consumed
+by ryll and not forwarded to the guest VM.
+
+| Shortcut | Action |
+|----------|--------|
+| F11 | Toggle the live traffic viewer side panel |
+| F12 | Open / close the bug report dialog |
+| Escape | Close the bug report dialog, or skip region selection |
+
 ## Environment Variables
 
 Currently, ryll does not use environment variables for configuration. All

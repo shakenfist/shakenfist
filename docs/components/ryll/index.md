@@ -81,6 +81,7 @@ both ends of the traffic through the proxy. This would allow:
 
 - [Binary Portability](/components/ryll/portability/) - How to share built binaries
 - [Configuration](/components/ryll/configuration/) - CLI options and .vv file format
+- [macOS Development](/components/ryll/development-macos/) - Build and test locally on macOS
 - [Troubleshooting](/components/ryll/troubleshooting/) - Common issues and debugging
 
 ## Project Files

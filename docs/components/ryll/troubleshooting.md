@@ -149,6 +149,12 @@ are sent but the display never updates in response.
 **Symptom:** Mouse cursor visible but clicks don't register.
 
 **Causes:**
+- Network stalls can cause the input channel to fill with mouse motion
+  events, which previously caused button press/release events to be
+  silently dropped (fixed in 0.1.2 via motion coalescing)
+- Opening a UI dialog (bug report, traffic viewer) while a mouse button
+  is held could suppress the release event, leaving the server stuck in
+  a "button held" state (fixed in 0.1.2 via synthetic releases)
 - Known issue: mouse clicks through kerbside proxy may not
   produce display responses depending on VM/agent config
 - The SPICE agent in the VM may not be running
@@ -157,8 +163,31 @@ are sent but the display never updates in response.
 1. Use Tab to navigate instead of mouse clicking
 2. Check `/tmp/ryll.log` for `inputs: mouse down:` lines
    to confirm clicks are being sent
-3. The `tools/test_click.py` script can test click delivery
+3. Submit a bug report (F12) with category **Input** — the
+   channel-state.json will show whether button events are
+   reaching the wire
+4. The `tools/test_click.py` script can test click delivery
    independently of ryll
+
+### Session becomes unresponsive after idle period
+
+**Symptom:** After leaving the session idle for a few minutes, all
+input (keyboard and mouse) stops working. The display may also
+freeze.
+
+**Causes:**
+- NAT devices, firewalls, or load balancers can silently drop idle
+  TCP connections. Prior to 0.1.2 ryll did not set TCP keepalive,
+  so idle channel sockets could be dropped without either end
+  detecting it
+- The SPICE server pings secondary channels only every 300 s; if
+  the TCP path is already broken, the ping never arrives
+
+**Solutions:**
+1. Upgrade to 0.1.2+ which enables TCP keepalive (30 s idle,
+   3 probes at 15 s) on all channel sockets
+2. If the problem persists, check whether a network appliance
+   between client and server has an unusually short idle timeout
 
 ## Performance Issues
 
@@ -258,11 +287,72 @@ ryll --file test.vv --headless -v
 
 If headless works but GUI doesn't, the issue is in the rendering layer.
 
+## Bug Reports
+
+Ryll has a built-in bug report feature that captures a snapshot of
+the client's state at the moment you observe a problem.
+
+### When to use bug reports
+
+Use a bug report when you see:
+- Display corruption (garbled pixels, wrong colours, missing regions)
+- Input not working (keys or mouse not reaching the VM)
+- Unexpected cursor behaviour
+- Connection issues that are hard to describe
+
+### How to generate a bug report
+
+1. Press **F12** or click the **Report** button in the status bar.
+2. A dialog appears with a privacy warning. Review it — reports may
+   contain screen contents, typed keystrokes, and protocol traffic.
+3. Select the **report type**:
+   - **Display** — captures a screenshot, image cache state, and
+     display channel traffic.
+   - **Input** — captures keyboard/mouse state and recent events.
+   - **Cursor** — captures the cursor cache and position.
+   - **Connection** — captures session info and main channel traffic.
+4. Optionally enter a brief **description** of what you observed.
+5. Click **Capture**.
+
+For Display reports, after clicking Capture you enter **region
+selection mode**: drag a rectangle over the area of corruption.
+A red overlay shows your selection.  Press **Escape** to skip and
+capture without highlighting a specific region.
+
+### What the zip file contains
+
+```
+ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
+├── metadata.json       — report type, description, ryll version,
+│                         platform, target host/port, timestamp
+├── session.json        — FPS, bandwidth, surfaces, uptime
+├── channel-state.json  — snapshot of the affected channel
+├── traffic.pcap        — recent protocol traffic (pcap format)
+└── screenshot.png      — full display surface (Display reports only)
+```
+
+### Where reports are saved
+
+- If `--capture <DIR>` is active: `<DIR>/bug-reports/`
+- Otherwise: the current working directory
+
+### Live traffic viewer
+
+Press **F11** or click **Traffic** in the status bar to open a side
+panel showing SPICE protocol messages in real time.  This is useful
+for live debugging without generating a full bug report.
+
+- Use the channel checkboxes to filter by channel (e.g. hide the
+  noisy display channel to focus on inputs).
+- Click **Pause** to freeze the display for inspection.
+
 ## Getting Help
 
 If you can't resolve an issue:
 
-1. Collect verbose logs: `ryll --file test.vv -v 2>&1 | tee debug.log`
-2. Note the exact error message
-3. Note your OS, Rust version, and how you built ryll
-4. Open an issue on the GitHub repository
+1. Generate a bug report (F12) to capture the current state
+2. Collect verbose logs: `ryll --file test.vv -v 2>&1 | tee debug.log`
+3. Note the exact error message
+4. Note your OS, Rust version, and how you built ryll
+5. Open an issue on the GitHub repository with the bug report zip
+   and log file attached
