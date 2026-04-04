@@ -158,12 +158,13 @@ class Blob(dbo):
     @classmethod
     def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
         """Create a blob record in MariaDB."""
-        mariadb.create_blob(
+        if not mariadb.create_blob(
             uuid.UUID(object_uuid),
             metadata['modified'],
             metadata['fetched_at'],
             metadata['version']
-        )
+        ):
+            raise RuntimeError(f'Failed to create blob {object_uuid} in MariaDB')
         super()._db_create(object_uuid, metadata)
 
     @classmethod

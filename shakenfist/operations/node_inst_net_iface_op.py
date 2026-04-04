@@ -5,6 +5,8 @@ from shakenfist.schema.operations.net_iface_op \
 from shakenfist.schema.operations.net_iface_op \
     import model_tasks as ni_tasks
 from shakenfist.schema.operations import node_inst_net_iface_op as schema
+from shakenfist.exceptions import InvalidLifecycleState
+from shakenfist.exceptions import InvalidStateException
 from shakenfist.instance import Instance
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
@@ -108,29 +110,54 @@ class NodeInstNetIfaceOp(BaseClusterOperation):
         inst = Instance.from_db(self.instance_uuid)
         if not inst:
             self.log.warning(f'Instance {self.instance_uuid} missing')
-            raise NoSuchInstance(self)
+            self.state = NodeInstNetIfaceOp.STATE_ERROR
+            return
 
         n = Network.from_db(self.network_uuid)
         if not n:
             self.log.warning(f'Network {self.network_uuid} missing')
-            raise NoSuchNetwork(self)
+            self.state = NodeInstNetIfaceOp.STATE_ERROR
+            return
 
         ni = NetworkInterface.from_db(self.interface_uuid)
         if not ni:
             self.log.warning(
                 f'Network interface {self.interface_uuid} missing')
-            raise NoSuchInterface(self)
+            self.state = NodeInstNetIfaceOp.STATE_ERROR
+            return
 
         try:
             self.__getattribute__(f'_{task.name}')(inst, n, ni)
         except Exception as e:
             util_exceptions.ignore_exception('node_inst_net_iface_op', e)
             self.state = NodeInstNetIfaceOp.STATE_ERROR
-            inst.state = Instance.STATE_ERROR
-            ni.state = NetworkInterface.STATE_ERROR
+            try:
+                inst.state = Instance.STATE_ERROR
+            except InvalidStateException:
+                self.log.warning(
+                    'Could not transition instance to error state, '
+                    f'current state is {inst.state}')
+            try:
+                ni.state = NetworkInterface.STATE_ERROR
+            except InvalidStateException:
+                self.log.warning(
+                    'Could not transition network interface to '
+                    f'error state, current state is {ni.state}')
 
     def _hot_plug_instance_interface(self, inst, n, ni):
-        inst.hot_plug_interface(n, ni)
+        try:
+            inst.hot_plug_interface(n, ni)
+        except InvalidLifecycleState as e:
+            self.log.with_fields({
+                'instance': inst.uuid,
+                'interface': ni.uuid,
+                'instance_state': inst.state.value,
+                'placement': inst.placement,
+            }).error(
+                'Cannot hot plug interface, instance not '
+                f'running: {e}')
+            return
+
         if ni.floating['floating_address']:
             op_type, op_uuid = ni_create_and_enqueue(
                 n.uuid,

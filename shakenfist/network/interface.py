@@ -88,7 +88,8 @@ class NetworkInterface(dbo):
             model=metadata['model'],
             version=metadata['version']
         )
-        mariadb.create_network_interface(data)
+        if not mariadb.create_network_interface(data):
+            raise RuntimeError(f'Failed to create network interface {object_uuid} in MariaDB')
 
     @classmethod
     def _db_get(cls, object_uuid) -> Optional[dict]:

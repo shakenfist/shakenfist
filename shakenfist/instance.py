@@ -290,11 +290,13 @@ class Instance(dbowo):
             side_channels=side_channels,
             version=metadata.get('version', cls.current_version)
         )
-        mariadb.create_instance(data)
+        if not mariadb.create_instance(data):
+            raise RuntimeError(f'Failed to create instance {object_uuid} in MariaDB')
 
         # Create initial attributes record
         attrs = InstanceAttributesData(uuid=_uuid)
-        mariadb.create_instance_attributes(attrs)
+        if not mariadb.create_instance_attributes(attrs):
+            raise RuntimeError(f'Failed to create instance attributes {object_uuid} in MariaDB')
 
     @staticmethod
     def _static_values_to_dict(data):
@@ -1973,6 +1975,11 @@ class Instance(dbowo):
         n.ensure_mesh()
 
         with util_libvirt.LibvirtConnection() as lc:
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
+            if not inst or not inst.isActive():
+                raise exceptions.InvalidLifecycleState(
+                    'instance is not running, cannot hot plug interface')
+
             bridge = n.subst_dict()['vx_bridge']
             mtu = config.MAX_HYPERVISOR_MTU - 50
             device_xml = f'''    <interface type="bridge">
@@ -1985,7 +1992,6 @@ class Instance(dbowo):
 
             flags = (lc.libvirt.VIR_DOMAIN_AFFECT_CONFIG |
                      lc.libvirt.VIR_DOMAIN_AFFECT_LIVE)
-            inst = lc.get_domain_from_sf_uuid(self.uuid)
             inst.attachDeviceFlags(device_xml, flags=flags)
             add_event_multi(
                 EVENT_TYPE_AUDIT, [self, n, ni], 'hot plugged interface')

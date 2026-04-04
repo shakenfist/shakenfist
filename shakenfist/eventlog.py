@@ -161,7 +161,8 @@ def _add_event_multi_inner(
                     f'Failed to add event for {object_type} with uuid '
                     f'{object_uuid}: {e}')
 
-        response = stub.RecordMultiEvent(request)
+        response = stub.RecordMultiEvent(
+            request, timeout=30, wait_for_ready=True)
         if response.ack:
             return
 

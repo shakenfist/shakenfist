@@ -134,11 +134,13 @@ class Network(dbowo):
             mesh_nic=metadata.get('mesh_nic'),
             version=metadata.get('version', cls.current_version)
         )
-        mariadb.create_network(data)
+        if not mariadb.create_network(data):
+            raise RuntimeError(f'Failed to create network {object_uuid} in MariaDB')
 
         # Create initial attributes record in MariaDB
         attrs = NetworkAttributesData(uuid=_uuid)
-        mariadb.create_network_attributes(attrs)
+        if not mariadb.create_network_attributes(attrs):
+            raise RuntimeError(f'Failed to create network attributes {object_uuid} in MariaDB')
 
     @staticmethod
     def _static_values_to_dict(data):
@@ -828,6 +830,8 @@ class Network(dbowo):
         node_fqdns = []
         for inst_uuid in instances:
             inst = instance.Instance.from_db(inst_uuid)
+            if not inst:
+                continue
             placement = inst.placement
             if not placement:
                 continue

@@ -70,6 +70,15 @@ The database microservice (`sf-database`) centralizes all database access:
 - All other daemons use the gRPC interface
 - Provides Prometheus metrics for database operations
 
+#### gRPC Reliability
+
+All gRPC calls use `timeout=30` seconds and `wait_for_ready=True` to handle
+transient service unavailability during startup or momentary congestion. The
+`_grpc_call()` helper in `mariadb.py` enforces this for all database service
+calls. The etcd proxy in `database.py` also uses these settings on all stub
+calls, and additionally wraps calls with the `_retry_database` decorator for
+exponential backoff retries. All gRPC failures are logged at ERROR level.
+
 ### Protocol Buffers and gRPC
 
 The gRPC interface is defined in `protos/*.proto` files. Generated Python code

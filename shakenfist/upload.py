@@ -67,12 +67,13 @@ class Upload(dbo):
     @classmethod
     def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
         """Create an upload record in MariaDB."""
-        mariadb.create_upload(
+        if not mariadb.create_upload(
             uuid.UUID(object_uuid),
             metadata['node'],
             metadata['created_at'],
             metadata['version']
-        )
+        ):
+            raise RuntimeError(f'Failed to create upload {object_uuid} in MariaDB')
         super()._db_create(object_uuid, metadata)
 
     @classmethod

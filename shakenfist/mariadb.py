@@ -182,6 +182,9 @@ def _use_database_service() -> bool:
     return True
 
 
+GRPC_TIMEOUT = 30
+
+
 def _get_database_stub() -> Any:
     """Get or create a gRPC stub for the database service.
 
@@ -193,6 +196,17 @@ def _get_database_stub() -> Any:
         _local.database_stub = database_pb2_grpc.DatabaseServiceStub(
             _local.database_channel)
     return _local.database_stub
+
+
+def _grpc_call(method: Any, request: Any) -> Any:
+    """Call a gRPC method with timeout and wait_for_ready.
+
+    This wrapper ensures all gRPC calls have consistent timeout and
+    retry behavior. wait_for_ready=True makes the call wait for the
+    channel to become ready instead of failing immediately when the
+    database service is temporarily unavailable.
+    """
+    return method(request, timeout=GRPC_TIMEOUT, wait_for_ready=True)
 
 
 # =============================================================================
@@ -3628,7 +3642,7 @@ def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State
                 shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid
         )
-        reply = stub.GetObjectState(request)
+        reply = _grpc_call(stub.GetObjectState, request)
         if not reply.found:
             return None
         return State(
@@ -3637,7 +3651,7 @@ def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State
             message=reply.message if reply.message else None
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetObjectState failed for {object_type}/{object_uuid}: {e}')
         return None
 
@@ -3654,10 +3668,10 @@ def _grpc_set_state(object_type: ObjectType, object_uuid: str, state: State) -> 
             update_time=state.update_time,
             message=state.message or ''
         )
-        reply = stub.SetObjectState(request)
+        reply = _grpc_call(stub.SetObjectState, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC SetObjectState failed for {object_type}/{object_uuid}: {e}')
         return False
 
@@ -3671,10 +3685,10 @@ def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
                 shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid
         )
-        reply = stub.DeleteObjectState(request)
+        reply = _grpc_call(stub.DeleteObjectState, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteObjectState failed for {object_type}/{object_uuid}: {e}')
         return False
 
@@ -3689,10 +3703,10 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
                 shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             state_values=state_values
         )
-        reply = stub.GetObjectsByState(request)
+        reply = _grpc_call(stub.GetObjectsByState, request)
         return list(reply.object_uuids)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetObjectsByState failed for {object_type}: {e}')
         return []
 
@@ -3727,10 +3741,10 @@ def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
                 comment=reservation.comment or ''
             )
         )
-        reply = stub.ReserveAddress(request)
+        reply = _grpc_call(stub.ReserveAddress, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC ReserveAddress failed for {reservation.ipam_uuid}/'
             f'{reservation.address}: {e}')
         return False
@@ -3761,10 +3775,10 @@ def _grpc_release_address(ipam_uuid: str, address: str,
                 comment=halo_reservation.comment or ''
             )
         )
-        reply = stub.ReleaseAddress(request)
+        reply = _grpc_call(stub.ReleaseAddress, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC ReleaseAddress failed for {ipam_uuid}/{address}: {e}')
+        LOG.error(f'gRPC ReleaseAddress failed for {ipam_uuid}/{address}: {e}')
         return False
 
 
@@ -3777,7 +3791,7 @@ def _grpc_get_reservation(ipam_uuid: str,
             ipam_uuid=ipam_uuid,
             address=address
         )
-        reply = stub.GetReservation(request)
+        reply = _grpc_call(stub.GetReservation, request)
         if not reply.found:
             return None
         res_type = ReservationType.from_proto_id(
@@ -3797,7 +3811,7 @@ def _grpc_get_reservation(ipam_uuid: str,
             comment=reply.reservation.comment or None
         )
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetReservation failed for {ipam_uuid}/{address}: {e}')
+        LOG.error(f'gRPC GetReservation failed for {ipam_uuid}/{address}: {e}')
         return None
 
 
@@ -3807,7 +3821,7 @@ def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
         stub = _get_database_stub()
         request = database_pb2.GetReservationsForIPAMRequest(
             ipam_uuid=ipam_uuid)
-        reply = stub.GetReservationsForIPAM(request)
+        reply = _grpc_call(stub.GetReservationsForIPAM, request)
         result = []
         for res in reply.reservations:
             res_type = ReservationType.from_proto_id(res.reservation_type)
@@ -3827,7 +3841,7 @@ def _grpc_get_reservations_for_ipam(ipam_uuid: str) -> list[IPAMReservation]:
             ))
         return result
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetReservationsForIPAM failed for {ipam_uuid}: {e}')
+        LOG.error(f'gRPC GetReservationsForIPAM failed for {ipam_uuid}: {e}')
         return []
 
 
@@ -3839,10 +3853,10 @@ def _grpc_delete_reservation(ipam_uuid: str, address: str) -> bool:
             ipam_uuid=ipam_uuid,
             address=address
         )
-        reply = stub.DeleteReservation(request)
+        reply = _grpc_call(stub.DeleteReservation, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteReservation failed for {ipam_uuid}/{address}: {e}')
         return False
 
@@ -3853,10 +3867,10 @@ def _grpc_delete_reservations_for_ipam(ipam_uuid: str) -> int:
         stub = _get_database_stub()
         request = database_pb2.DeleteReservationsForIPAMRequest(
             ipam_uuid=ipam_uuid)
-        reply = stub.DeleteReservationsForIPAM(request)
+        reply = _grpc_call(stub.DeleteReservationsForIPAM, request)
         return int(reply.count)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteReservationsForIPAM failed for {ipam_uuid}: {e}')
         return 0
 
@@ -3869,10 +3883,10 @@ def _grpc_release_haloed_addresses(ipam_uuid: str, older_than: float) -> int:
             ipam_uuid=ipam_uuid,
             older_than=older_than
         )
-        reply = stub.ReleaseHaloedAddresses(request)
+        reply = _grpc_call(stub.ReleaseHaloedAddresses, request)
         return int(reply.count)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC ReleaseHaloedAddresses failed for {ipam_uuid}: {e}')
         return 0
 
@@ -3883,10 +3897,10 @@ def _grpc_get_addresses_in_use(ipam_uuid: str) -> set[str]:
         stub = _get_database_stub()
         request = database_pb2.GetAddressesInUseRequest(
             ipam_uuid=ipam_uuid)
-        reply = stub.GetAddressesInUse(request)
+        reply = _grpc_call(stub.GetAddressesInUse, request)
         return set(reply.addresses)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetAddressesInUse failed for {ipam_uuid}: {e}')
+        LOG.error(f'gRPC GetAddressesInUse failed for {ipam_uuid}: {e}')
         return set()
 
 
@@ -4113,7 +4127,7 @@ def _grpc_get_object_metadata(
                 shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid
         )
-        reply = stub.GetObjectMetadata(request)
+        reply = _grpc_call(stub.GetObjectMetadata, request)
         if not reply.found:
             return None
 
@@ -4128,7 +4142,7 @@ def _grpc_get_object_metadata(
             last_cluster_operation=lco
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetObjectMetadata failed for '
             f'{object_type}/{object_uuid}: {e}')
         return None
@@ -4148,10 +4162,10 @@ def _grpc_set_metadata(
             object_uuid=object_uuid,
             metadata_json=json.dumps(metadata_dict) if metadata_dict is not None else ''
         )
-        reply = stub.SetMetadata(request)
+        reply = _grpc_call(stub.SetMetadata, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC SetMetadata failed for '
             f'{object_type}/{object_uuid}: {e}')
         return False
@@ -4169,10 +4183,10 @@ def _grpc_delete_object_metadata(
                 shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid
         )
-        reply = stub.DeleteObjectMetadata(request)
+        reply = _grpc_call(stub.DeleteObjectMetadata, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteObjectMetadata failed for '
             f'{object_type}/{object_uuid}: {e}')
         return False
@@ -4450,10 +4464,10 @@ def _grpc_create_cluster_operation_target(
             target_uuid=target_uuid,
             created_at=created_at
         )
-        reply = stub.CreateClusterOperationTarget(request)
+        reply = _grpc_call(stub.CreateClusterOperationTarget, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateClusterOperationTarget failed for '
             f'{operation_uuid}: {e}')
         return False
@@ -4483,12 +4497,12 @@ def _grpc_get_cluster_operation_target(
         request = database_pb2.GetClusterOperationTargetRequest(
             operation_uuid=operation_uuid
         )
-        reply = stub.GetClusterOperationTarget(request)
+        reply = _grpc_call(stub.GetClusterOperationTarget, request)
         if not reply.found:
             return None
         return _target_from_proto(reply.target)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetClusterOperationTarget failed for '
             f'{operation_uuid}: {e}')
         return None
@@ -4507,10 +4521,10 @@ def _grpc_get_cluster_operation_targets_for_object(
                 target_object_type.proto_id),
             target_uuid=target_uuid
         )
-        reply = stub.GetClusterOperationTargetsForObject(request)
+        reply = _grpc_call(stub.GetClusterOperationTargetsForObject, request)
         return [_target_from_proto(t) for t in reply.targets]
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetClusterOperationTargetsForObject failed for '
             f'{target_object_type}/{target_uuid}: {e}')
         return []
@@ -4529,12 +4543,12 @@ def _grpc_get_latest_cluster_operation_target(
                 target_object_type.proto_id),
             target_uuid=target_uuid
         )
-        reply = stub.GetLatestClusterOperationTarget(request)
+        reply = _grpc_call(stub.GetLatestClusterOperationTarget, request)
         if not reply.found:
             return None
         return _target_from_proto(reply.target)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetLatestClusterOperationTarget failed for '
             f'{target_object_type}/{target_uuid}: {e}')
         return None
@@ -4549,10 +4563,10 @@ def _grpc_delete_cluster_operation_target(
         request = database_pb2.DeleteClusterOperationTargetRequest(
             operation_uuid=operation_uuid
         )
-        reply = stub.DeleteClusterOperationTarget(request)
+        reply = _grpc_call(stub.DeleteClusterOperationTarget, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteClusterOperationTarget failed for '
             f'{operation_uuid}: {e}')
         return False
@@ -4571,10 +4585,10 @@ def _grpc_delete_cluster_operation_targets_for_object(
                 target_object_type.proto_id),
             target_uuid=target_uuid
         )
-        reply = stub.DeleteClusterOperationTargetsForObject(request)
+        reply = _grpc_call(stub.DeleteClusterOperationTargetsForObject, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteClusterOperationTargetsForObject failed for '
             f'{target_object_type}/{target_uuid}: {e}')
         return False
@@ -5409,10 +5423,10 @@ def _grpc_create_upload(upload_uuid: UUID, node: str, created_at: float,
                 version=version
             )
         )
-        reply = stub.CreateUpload(request)
+        reply = _grpc_call(stub.CreateUpload, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC CreateUpload failed for {upload_uuid}: {e}')
+        LOG.error(f'gRPC CreateUpload failed for {upload_uuid}: {e}')
         return False
 
 
@@ -5421,7 +5435,7 @@ def _grpc_get_upload(upload_uuid: UUID) -> Optional[UploadData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetUploadRequest(uuid=str(upload_uuid))
-        reply = stub.GetUpload(request)
+        reply = _grpc_call(stub.GetUpload, request)
         if not reply.found:
             return None
         return UploadData(
@@ -5431,7 +5445,7 @@ def _grpc_get_upload(upload_uuid: UUID) -> Optional[UploadData]:
             version=reply.upload.version
         )
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetUpload failed for {upload_uuid}: {e}')
+        LOG.error(f'gRPC GetUpload failed for {upload_uuid}: {e}')
         return None
 
 
@@ -5446,7 +5460,7 @@ def _grpc_get_uploads(
             node=node or '',
             created_before=created_before or 0.0
         )
-        reply = stub.GetUploads(request)
+        reply = _grpc_call(stub.GetUploads, request)
         return [
             UploadData(
                 uuid=u.uuid,
@@ -5457,7 +5471,7 @@ def _grpc_get_uploads(
             for u in reply.uploads
         ]
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetUploads failed: {e}')
+        LOG.error(f'gRPC GetUploads failed: {e}')
         return []
 
 
@@ -5466,10 +5480,10 @@ def _grpc_delete_upload(upload_uuid: UUID) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteUploadRequest(uuid=str(upload_uuid))
-        reply = stub.DeleteUpload(request)
+        reply = _grpc_call(stub.DeleteUpload, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteUpload failed for {upload_uuid}: {e}')
+        LOG.error(f'gRPC DeleteUpload failed for {upload_uuid}: {e}')
         return False
 
 
@@ -5485,10 +5499,10 @@ def _grpc_update_upload(data: UploadData) -> bool:
                 version=data.version
             )
         )
-        reply = stub.UpdateUpload(request)
+        reply = _grpc_call(stub.UpdateUpload, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpdateUpload failed for {data.uuid}: {e}')
+        LOG.error(f'gRPC UpdateUpload failed for {data.uuid}: {e}')
         return False
 
 
@@ -5510,10 +5524,10 @@ def _grpc_create_blob(blob_uuid: UUID, modified: float, fetched_at: float,
                 version=version
             )
         )
-        reply = stub.CreateBlob(request)
+        reply = _grpc_call(stub.CreateBlob, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC CreateBlob failed for {blob_uuid}: {e}')
+        LOG.error(f'gRPC CreateBlob failed for {blob_uuid}: {e}')
         return False
 
 
@@ -5522,7 +5536,7 @@ def _grpc_get_blob(blob_uuid: UUID) -> Optional[BlobData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetBlobRequest(uuid=str(blob_uuid))
-        reply = stub.GetBlob(request)
+        reply = _grpc_call(stub.GetBlob, request)
         if not reply.found:
             return None
         return BlobData(
@@ -5532,7 +5546,7 @@ def _grpc_get_blob(blob_uuid: UUID) -> Optional[BlobData]:
             version=reply.blob.version
         )
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetBlob failed for {blob_uuid}: {e}')
+        LOG.error(f'gRPC GetBlob failed for {blob_uuid}: {e}')
         return None
 
 
@@ -5541,10 +5555,10 @@ def _grpc_get_all_blob_uuids() -> list[str]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetAllBlobUuidsRequest()
-        reply = stub.GetAllBlobUuids(request)
+        reply = _grpc_call(stub.GetAllBlobUuids, request)
         return list(reply.uuids)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetAllBlobUuids failed: {e}')
+        LOG.error(f'gRPC GetAllBlobUuids failed: {e}')
         return []
 
 
@@ -5553,10 +5567,10 @@ def _grpc_delete_blob(blob_uuid: UUID) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteBlobRequest(uuid=str(blob_uuid))
-        reply = stub.DeleteBlob(request)
+        reply = _grpc_call(stub.DeleteBlob, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteBlob failed for {blob_uuid}: {e}')
+        LOG.error(f'gRPC DeleteBlob failed for {blob_uuid}: {e}')
         return False
 
 
@@ -5572,10 +5586,10 @@ def _grpc_update_blob(data: BlobData) -> bool:
                 version=data.version
             )
         )
-        reply = stub.UpdateBlob(request)
+        reply = _grpc_call(stub.UpdateBlob, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpdateBlob failed for {data.uuid}: {e}')
+        LOG.error(f'gRPC UpdateBlob failed for {data.uuid}: {e}')
         return False
 
 
@@ -6587,10 +6601,10 @@ def _grpc_create_dnsmasq(data: DnsMasqData) -> bool:
                 provide_dns=data.provide_dns
             )
         )
-        reply = stub.CreateDnsMasq(request)
+        reply = _grpc_call(stub.CreateDnsMasq, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC CreateDnsMasq failed for {data.uuid}: {e}')
+        LOG.error(f'gRPC CreateDnsMasq failed for {data.uuid}: {e}')
         return False
 
 
@@ -6599,7 +6613,7 @@ def _grpc_get_dnsmasq(dnsmasq_uuid: UUID) -> Optional[DnsMasqData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetDnsMasqRequest(uuid=str(dnsmasq_uuid))
-        reply = stub.GetDnsMasq(request)
+        reply = _grpc_call(stub.GetDnsMasq, request)
         if not reply.found:
             return None
         owner_type = ObjectType.from_proto_id(reply.dnsmasq.owner_type)
@@ -6615,7 +6629,7 @@ def _grpc_get_dnsmasq(dnsmasq_uuid: UUID) -> Optional[DnsMasqData]:
             provide_dns=reply.dnsmasq.provide_dns
         )
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetDnsMasq failed for {dnsmasq_uuid}: {e}')
+        LOG.error(f'gRPC GetDnsMasq failed for {dnsmasq_uuid}: {e}')
         return None
 
 
@@ -6631,7 +6645,7 @@ def _grpc_get_dnsmasqs(
             namespace=namespace or '',
             owner_uuid=str(owner_uuid) if owner_uuid else ''
         )
-        reply = stub.GetDnsMasqs(request)
+        reply = _grpc_call(stub.GetDnsMasqs, request)
         results = []
         for d in reply.dnsmasqs:
             owner_type = ObjectType.from_proto_id(d.owner_type)
@@ -6648,7 +6662,7 @@ def _grpc_get_dnsmasqs(
             ))
         return results
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetDnsMasqs failed: {e}')
+        LOG.error(f'gRPC GetDnsMasqs failed: {e}')
         return []
 
 
@@ -6657,10 +6671,10 @@ def _grpc_delete_dnsmasq(dnsmasq_uuid: UUID) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteDnsMasqRequest(uuid=str(dnsmasq_uuid))
-        reply = stub.DeleteDnsMasq(request)
+        reply = _grpc_call(stub.DeleteDnsMasq, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteDnsMasq failed for {dnsmasq_uuid}: {e}')
+        LOG.error(f'gRPC DeleteDnsMasq failed for {dnsmasq_uuid}: {e}')
         return False
 
 
@@ -6681,10 +6695,10 @@ def _grpc_update_dnsmasq(data: DnsMasqData) -> bool:
                 provide_dns=data.provide_dns
             )
         )
-        reply = stub.UpdateDnsMasq(request)
+        reply = _grpc_call(stub.UpdateDnsMasq, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpdateDnsMasq failed for {data.uuid}: {e}')
+        LOG.error(f'gRPC UpdateDnsMasq failed for {data.uuid}: {e}')
         return False
 
 
@@ -6718,10 +6732,10 @@ def _grpc_record_relationship(
                 target_type.proto_id),
             target_uuid=str(target_uuid)
         )
-        reply = stub.RecordRelationship(request)
+        reply = _grpc_call(stub.RecordRelationship, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC RecordRelationship failed: {e}')
+        LOG.error(f'gRPC RecordRelationship failed: {e}')
         return False
 
 
@@ -6750,10 +6764,10 @@ def _grpc_remove_relationship(
                 target_type.proto_id),
             target_uuid=str(target_uuid)
         )
-        reply = stub.RemoveRelationship(request)
+        reply = _grpc_call(stub.RemoveRelationship, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC RemoveRelationship failed: {e}')
+        LOG.error(f'gRPC RemoveRelationship failed: {e}')
         return False
 
 
@@ -6775,7 +6789,7 @@ def _grpc_get_references_to(
             request.relationship = cast(
                 shakenfist_enums_pb2.RelationshipType.ValueType,
                 relationship.proto_id)
-        reply = stub.GetReferencesTo(request)
+        reply = _grpc_call(stub.GetReferencesTo, request)
         refs = []
         for ref in reply.references:
             src_type = ObjectType.from_proto_id(ref.source_type)
@@ -6795,7 +6809,7 @@ def _grpc_get_references_to(
             ))
         return refs
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetReferencesTo failed: {e}')
+        LOG.error(f'gRPC GetReferencesTo failed: {e}')
         return []
 
 
@@ -6817,7 +6831,7 @@ def _grpc_get_references_from(
             request.relationship = cast(
                 shakenfist_enums_pb2.RelationshipType.ValueType,
                 relationship.proto_id)
-        reply = stub.GetReferencesFrom(request)
+        reply = _grpc_call(stub.GetReferencesFrom, request)
         refs = []
         for ref in reply.references:
             src_type = ObjectType.from_proto_id(ref.source_type)
@@ -6837,7 +6851,7 @@ def _grpc_get_references_from(
             ))
         return refs
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetReferencesFrom failed: {e}')
+        LOG.error(f'gRPC GetReferencesFrom failed: {e}')
         return []
 
 
@@ -6864,10 +6878,10 @@ def _grpc_count_references_to(
             target_uuid=str(target_uuid),
             exclude_relationships=excluded_proto
         )
-        reply = stub.CountReferencesTo(request)
+        reply = _grpc_call(stub.CountReferencesTo, request)
         return int(reply.count)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC CountReferencesTo failed: {e}')
+        LOG.error(f'gRPC CountReferencesTo failed: {e}')
         return 0
 
 
@@ -6889,10 +6903,10 @@ def _grpc_remove_all_references_from(
             request.relationship = cast(
                 shakenfist_enums_pb2.RelationshipType.ValueType,
                 relationship.proto_id)
-        reply = stub.RemoveAllReferencesFrom(request)
+        reply = _grpc_call(stub.RemoveAllReferencesFrom, request)
         return int(reply.count)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC RemoveAllReferencesFrom failed: {e}')
+        LOG.error(f'gRPC RemoveAllReferencesFrom failed: {e}')
         return 0
 
 
@@ -6921,10 +6935,10 @@ def _grpc_update_last_active(
                 target_type.proto_id),
             target_uuid=str(target_uuid)
         )
-        reply = stub.UpdateLastActive(request)
+        reply = _grpc_call(stub.UpdateLastActive, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpdateLastActive failed: {e}')
+        LOG.error(f'gRPC UpdateLastActive failed: {e}')
         return False
 
 
@@ -6933,7 +6947,7 @@ def _grpc_get_stale_references(older_than: float) -> list[ObjectReference]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetStaleReferencesRequest(older_than=older_than)
-        reply = stub.GetStaleReferences(request)
+        reply = _grpc_call(stub.GetStaleReferences, request)
         refs = []
         for ref in reply.references:
             src_type = ObjectType.from_proto_id(ref.source_type)
@@ -6953,7 +6967,7 @@ def _grpc_get_stale_references(older_than: float) -> list[ObjectReference]:
             ))
         return refs
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetStaleReferences failed: {e}')
+        LOG.error(f'gRPC GetStaleReferences failed: {e}')
         return []
 
 
@@ -6979,10 +6993,10 @@ def _grpc_upsert_blob_hash(blob_hash: BlobHash) -> bool:
                 error_message=blob_hash.error_message or ''
             )
         )
-        reply = stub.UpsertBlobHash(request)
+        reply = _grpc_call(stub.UpsertBlobHash, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpsertBlobHash failed: {e}')
+        LOG.error(f'gRPC UpsertBlobHash failed: {e}')
         return False
 
 
@@ -6996,7 +7010,7 @@ def _grpc_get_blob_hashes(
         request = database_pb2.GetBlobHashesRequest(blob_uuid=blob_uuid)
         if node is not None:
             request.node = node
-        reply = stub.GetBlobHashes(request)
+        reply = _grpc_call(stub.GetBlobHashes, request)
         hashes = []
         for h in reply.hashes:
             hashes.append(BlobHash(
@@ -7012,7 +7026,7 @@ def _grpc_get_blob_hashes(
             ))
         return hashes
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetBlobHashes failed: {e}')
+        LOG.error(f'gRPC GetBlobHashes failed: {e}')
         return []
 
 
@@ -7024,12 +7038,12 @@ def _grpc_find_blob_by_hash(algorithm: str, hash_value: str) -> Optional[str]:
             algorithm=algorithm,
             hash_value=hash_value
         )
-        reply = stub.FindBlobByHash(request)
+        reply = _grpc_call(stub.FindBlobByHash, request)
         if reply.found:
             return str(reply.blob_uuid)
         return None
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC FindBlobByHash failed: {e}')
+        LOG.error(f'gRPC FindBlobByHash failed: {e}')
         return None
 
 
@@ -7038,7 +7052,7 @@ def _grpc_get_stale_blob_hashes(older_than: float) -> list[BlobHash]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetStaleBlobHashesRequest(older_than=older_than)
-        reply = stub.GetStaleBlobHashes(request)
+        reply = _grpc_call(stub.GetStaleBlobHashes, request)
         hashes = []
         for h in reply.hashes:
             hashes.append(BlobHash(
@@ -7054,7 +7068,7 @@ def _grpc_get_stale_blob_hashes(older_than: float) -> list[BlobHash]:
             ))
         return hashes
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetStaleBlobHashes failed: {e}')
+        LOG.error(f'gRPC GetStaleBlobHashes failed: {e}')
         return []
 
 
@@ -7063,10 +7077,10 @@ def _grpc_delete_blob_hashes(blob_uuid: str) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteBlobHashesRequest(blob_uuid=blob_uuid)
-        reply = stub.DeleteBlobHashes(request)
+        reply = _grpc_call(stub.DeleteBlobHashes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteBlobHashes failed: {e}')
+        LOG.error(f'gRPC DeleteBlobHashes failed: {e}')
         return False
 
 
@@ -7812,10 +7826,10 @@ def _grpc_create_blob_transfer(transfer: 'BlobTransfer') -> bool:
                 updated_at=transfer.updated_at
             )
         )
-        reply = stub.CreateBlobTransfer(request)
+        reply = _grpc_call(stub.CreateBlobTransfer, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateBlobTransfer failed for '
             f'{transfer.source_node}/{transfer.transfer_name}: {e}')
         return False
@@ -7832,7 +7846,7 @@ def _grpc_get_blob_transfer(
             source_node=source_node,
             transfer_name=transfer_name
         )
-        reply = stub.GetBlobTransfer(request)
+        reply = _grpc_call(stub.GetBlobTransfer, request)
         if not reply.found:
             return None
         t = reply.transfer
@@ -7849,7 +7863,7 @@ def _grpc_get_blob_transfer(
             updated_at=t.updated_at
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetBlobTransfer failed for '
             f'{source_node}/{transfer_name}: {e}')
         return None
@@ -7864,7 +7878,7 @@ def _grpc_get_blob_transfers_for_node(
         request = database_pb2.GetBlobTransfersForNodeRequest(
             source_node=source_node
         )
-        reply = stub.GetBlobTransfersForNode(request)
+        reply = _grpc_call(stub.GetBlobTransfersForNode, request)
         transfers = []
         for t in reply.transfers:
             transfers.append(BlobTransfer(
@@ -7881,7 +7895,7 @@ def _grpc_get_blob_transfers_for_node(
             ))
         return transfers
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetBlobTransfersForNode failed for {source_node}: {e}')
+        LOG.error(f'gRPC GetBlobTransfersForNode failed for {source_node}: {e}')
         return []
 
 
@@ -7894,7 +7908,7 @@ def _grpc_get_blob_transfers_for_blob(
         request = database_pb2.GetBlobTransfersForBlobRequest(
             blob_uuid=blob_uuid
         )
-        reply = stub.GetBlobTransfersForBlob(request)
+        reply = _grpc_call(stub.GetBlobTransfersForBlob, request)
         transfers = []
         for t in reply.transfers:
             transfers.append(BlobTransfer(
@@ -7911,7 +7925,7 @@ def _grpc_get_blob_transfers_for_blob(
             ))
         return transfers
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetBlobTransfersForBlob failed for {blob_uuid}: {e}')
+        LOG.error(f'gRPC GetBlobTransfersForBlob failed for {blob_uuid}: {e}')
         return []
 
 
@@ -7938,10 +7952,10 @@ def _grpc_update_blob_transfer(
             kwargs['percentage'] = percentage
 
         request = database_pb2.UpdateBlobTransferRequest(**kwargs)
-        reply = stub.UpdateBlobTransfer(request)
+        reply = _grpc_call(stub.UpdateBlobTransfer, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC UpdateBlobTransfer failed for '
             f'{source_node}/{transfer_name}: {e}')
         return False
@@ -7958,10 +7972,10 @@ def _grpc_delete_blob_transfer(
             source_node=source_node,
             transfer_name=transfer_name
         )
-        reply = stub.DeleteBlobTransfer(request)
+        reply = _grpc_call(stub.DeleteBlobTransfer, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteBlobTransfer failed for '
             f'{source_node}/{transfer_name}: {e}')
         return False
@@ -7975,10 +7989,10 @@ def _grpc_delete_stale_transfers(max_age: float) -> int:
         request = database_pb2.DeleteStaleTransfersRequest(
             older_than=older_than
         )
-        reply = stub.DeleteStaleTransfers(request)
+        reply = _grpc_call(stub.DeleteStaleTransfers, request)
         return int(reply.count)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteStaleTransfers failed: {e}')
+        LOG.error(f'gRPC DeleteStaleTransfers failed: {e}')
         return 0
 
 
@@ -7989,10 +8003,10 @@ def _grpc_delete_blob_transfers_for_blob(blob_uuid: str) -> int:
         request = database_pb2.DeleteBlobTransfersForBlobRequest(
             blob_uuid=blob_uuid
         )
-        reply = stub.DeleteBlobTransfersForBlob(request)
+        reply = _grpc_call(stub.DeleteBlobTransfersForBlob, request)
         return int(reply.count)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteBlobTransfersForBlob failed: {e}')
+        LOG.error(f'gRPC DeleteBlobTransfersForBlob failed: {e}')
         return -1
 
 
@@ -8439,10 +8453,10 @@ def _grpc_create_blob_attributes(data: BlobAttributesData) -> bool:
                 expires_at=data.expires_at
             )
         )
-        reply = stub.CreateBlobAttributes(request)
+        reply = _grpc_call(stub.CreateBlobAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC CreateBlobAttributes failed for {data.uuid}: {e}')
+        LOG.error(f'gRPC CreateBlobAttributes failed for {data.uuid}: {e}')
         return False
 
 
@@ -8451,7 +8465,7 @@ def _grpc_get_blob_attributes(blob_uuid: UUID) -> Optional[BlobAttributesData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetBlobAttributesRequest(uuid=str(blob_uuid))
-        reply = stub.GetBlobAttributes(request)
+        reply = _grpc_call(stub.GetBlobAttributes, request)
         if not reply.found:
             return None
         d = reply.data
@@ -8463,7 +8477,7 @@ def _grpc_get_blob_attributes(blob_uuid: UUID) -> Optional[BlobAttributesData]:
             expires_at=d.expires_at
         )
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetBlobAttributes failed for {blob_uuid}: {e}')
+        LOG.error(f'gRPC GetBlobAttributes failed for {blob_uuid}: {e}')
         return None
 
 
@@ -8481,10 +8495,10 @@ def _grpc_update_blob_attributes(data: BlobAttributesData) -> bool:
                 expires_at=data.expires_at
             )
         )
-        reply = stub.UpdateBlobAttributes(request)
+        reply = _grpc_call(stub.UpdateBlobAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpdateBlobAttributes failed for {data.uuid}: {e}')
+        LOG.error(f'gRPC UpdateBlobAttributes failed for {data.uuid}: {e}')
         return False
 
 
@@ -8496,10 +8510,10 @@ def _grpc_update_blob_last_used(blob_uuid: UUID, last_used: float) -> bool:
             uuid=str(blob_uuid),
             last_used=last_used
         )
-        reply = stub.UpdateBlobLastUsed(request)
+        reply = _grpc_call(stub.UpdateBlobLastUsed, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpdateBlobLastUsed failed for {blob_uuid}: {e}')
+        LOG.error(f'gRPC UpdateBlobLastUsed failed for {blob_uuid}: {e}')
         return False
 
 
@@ -8508,10 +8522,10 @@ def _grpc_delete_blob_attributes(blob_uuid: UUID) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteBlobAttributesRequest(uuid=str(blob_uuid))
-        reply = stub.DeleteBlobAttributes(request)
+        reply = _grpc_call(stub.DeleteBlobAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteBlobAttributes failed for {blob_uuid}: {e}')
+        LOG.error(f'gRPC DeleteBlobAttributes failed for {blob_uuid}: {e}')
         return False
 
 
@@ -8525,10 +8539,10 @@ def _grpc_get_expired_blob_uuids(
         request = database_pb2.GetExpiredBlobUuidsRequest(
             current_time=current_time
         )
-        reply = stub.GetExpiredBlobUuids(request)
+        reply = _grpc_call(stub.GetExpiredBlobUuids, request)
         return list(reply.uuids)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetExpiredBlobUuids failed: {e}')
+        LOG.error(f'gRPC GetExpiredBlobUuids failed: {e}')
         return []
 
 
@@ -8539,10 +8553,10 @@ def _grpc_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
         request = database_pb2.GetStaleTranscodedBlobUuidsRequest(
             idle_seconds=idle_seconds
         )
-        reply = stub.GetStaleTranscodedBlobUuids(request)
+        reply = _grpc_call(stub.GetStaleTranscodedBlobUuids, request)
         return list(reply.uuids)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetStaleTranscodedBlobUuids failed: {e}')
+        LOG.error(f'gRPC GetStaleTranscodedBlobUuids failed: {e}')
         return []
 
 
@@ -9152,10 +9166,10 @@ def _grpc_create_node(
                 version=version
             )
         )
-        reply = stub.CreateNode(request)
+        reply = _grpc_call(stub.CreateNode, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateNode failed for {node_uuid}: {e}'
         )
         return False
@@ -9170,7 +9184,7 @@ def _grpc_get_node(
         request = database_pb2.GetNodeRequest(
             uuid=str(node_uuid)
         )
-        reply = stub.GetNode(request)
+        reply = _grpc_call(stub.GetNode, request)
         if not reply.found:
             return None
         return NodeData(
@@ -9180,7 +9194,7 @@ def _grpc_get_node(
             version=reply.node.version
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetNode failed for {node_uuid}: {e}'
         )
         return None
@@ -9195,7 +9209,7 @@ def _grpc_get_node_by_fqdn(
         request = database_pb2.GetNodeByFqdnRequest(
             fqdn=fqdn
         )
-        reply = stub.GetNodeByFqdn(request)
+        reply = _grpc_call(stub.GetNodeByFqdn, request)
         if not reply.found:
             return None
         return NodeData(
@@ -9205,7 +9219,7 @@ def _grpc_get_node_by_fqdn(
             version=reply.node.version
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetNodeByFqdn failed for {fqdn}: {e}'
         )
         return None
@@ -9216,10 +9230,10 @@ def _grpc_get_all_node_uuids() -> list[str]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetAllNodeUuidsRequest()
-        reply = stub.GetAllNodeUuids(request)
+        reply = _grpc_call(stub.GetAllNodeUuids, request)
         return list(reply.uuids)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetAllNodeUuids failed: {e}'
         )
         return []
@@ -9232,10 +9246,10 @@ def _grpc_delete_node(node_uuid: UUID) -> bool:
         request = database_pb2.DeleteNodeRequest(
             uuid=str(node_uuid)
         )
-        reply = stub.DeleteNode(request)
+        reply = _grpc_call(stub.DeleteNode, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteNode failed for {node_uuid}: {e}'
         )
         return False
@@ -9253,10 +9267,10 @@ def _grpc_update_node(data: NodeData) -> bool:
                 version=data.version
             )
         )
-        reply = stub.UpdateNode(request)
+        reply = _grpc_call(stub.UpdateNode, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC UpdateNode failed for {data.uuid}: {e}'
         )
         return False
@@ -9273,10 +9287,10 @@ def _grpc_create_node_attributes(
         request = database_pb2.CreateNodeAttributesRequest(
             data=_node_attrs_to_proto(data)
         )
-        reply = stub.CreateNodeAttributes(request)
+        reply = _grpc_call(stub.CreateNodeAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             'gRPC CreateNodeAttributes failed for '
             f'{data.uuid}: {e}'
         )
@@ -9292,12 +9306,12 @@ def _grpc_get_node_attributes(
         request = database_pb2.GetNodeAttributesRequest(
             uuid=str(node_uuid)
         )
-        reply = stub.GetNodeAttributes(request)
+        reply = _grpc_call(stub.GetNodeAttributes, request)
         if not reply.found:
             return None
         return _node_attrs_from_proto(reply.data)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             'gRPC GetNodeAttributes failed for '
             f'{node_uuid}: {e}'
         )
@@ -9313,10 +9327,10 @@ def _grpc_update_node_attributes(
         request = database_pb2.UpdateNodeAttributesRequest(
             data=_node_attrs_to_proto(data)
         )
-        reply = stub.UpdateNodeAttributes(request)
+        reply = _grpc_call(stub.UpdateNodeAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             'gRPC UpdateNodeAttributes failed for '
             f'{data.uuid}: {e}'
         )
@@ -9332,10 +9346,10 @@ def _grpc_delete_node_attributes(
         request = database_pb2.DeleteNodeAttributesRequest(
             uuid=str(node_uuid)
         )
-        reply = stub.DeleteNodeAttributes(request)
+        reply = _grpc_call(stub.DeleteNodeAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             'gRPC DeleteNodeAttributes failed for '
             f'{node_uuid}: {e}'
         )
@@ -9877,10 +9891,10 @@ def _grpc_create_namespace(name: str, version: int) -> bool:
         stub = _get_database_stub()
         request = database_pb2.CreateNamespaceRequest(
             namespace=database_pb2.NamespaceStaticData(name=name, version=version))
-        reply = stub.CreateNamespace(request)
+        reply = _grpc_call(stub.CreateNamespace, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC CreateNamespace failed for {name}: {e}')
+        LOG.error(f'gRPC CreateNamespace failed for {name}: {e}')
         return False
 
 
@@ -9889,12 +9903,12 @@ def _grpc_get_namespace(name: str) -> Optional[NamespaceData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetNamespaceRequest(name=name)
-        reply = stub.GetNamespace(request)
+        reply = _grpc_call(stub.GetNamespace, request)
         if not reply.found:
             return None
         return NamespaceData(name=reply.namespace.name, version=reply.namespace.version)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetNamespace failed for {name}: {e}')
+        LOG.error(f'gRPC GetNamespace failed for {name}: {e}')
         return None
 
 
@@ -9903,10 +9917,10 @@ def _grpc_get_all_namespace_names() -> list[str]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetAllNamespaceNamesRequest()
-        reply = stub.GetAllNamespaceNames(request)
+        reply = _grpc_call(stub.GetAllNamespaceNames, request)
         return list(reply.names)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetAllNamespaceNames failed: {e}')
+        LOG.error(f'gRPC GetAllNamespaceNames failed: {e}')
         return []
 
 
@@ -9915,10 +9929,10 @@ def _grpc_delete_namespace(name: str) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteNamespaceRequest(name=name)
-        reply = stub.DeleteNamespace(request)
+        reply = _grpc_call(stub.DeleteNamespace, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteNamespace failed for {name}: {e}')
+        LOG.error(f'gRPC DeleteNamespace failed for {name}: {e}')
         return False
 
 
@@ -9931,10 +9945,10 @@ def _grpc_create_namespace_attributes(data: NamespaceAttributesData) -> bool:
                 name=data.name,
                 keys_json=json.dumps(data.keys),
                 trust_json=json.dumps(data.trust)))
-        reply = stub.CreateNamespaceAttributes(request)
+        reply = _grpc_call(stub.CreateNamespaceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC CreateNamespaceAttributes failed for {data.name}: {e}')
+        LOG.error(f'gRPC CreateNamespaceAttributes failed for {data.name}: {e}')
         return False
 
 
@@ -9943,7 +9957,7 @@ def _grpc_get_namespace_attributes(name: str) -> Optional[NamespaceAttributesDat
     try:
         stub = _get_database_stub()
         request = database_pb2.GetNamespaceAttributesRequest(name=name)
-        reply = stub.GetNamespaceAttributes(request)
+        reply = _grpc_call(stub.GetNamespaceAttributes, request)
         if not reply.found:
             return None
         return NamespaceAttributesData(
@@ -9952,7 +9966,7 @@ def _grpc_get_namespace_attributes(name: str) -> Optional[NamespaceAttributesDat
             trust=json.loads(reply.data.trust_json) if reply.data.trust_json else ['system'],
         )
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetNamespaceAttributes failed for {name}: {e}')
+        LOG.error(f'gRPC GetNamespaceAttributes failed for {name}: {e}')
         return None
 
 
@@ -9965,10 +9979,10 @@ def _grpc_update_namespace_attributes(data: NamespaceAttributesData) -> bool:
                 name=data.name,
                 keys_json=json.dumps(data.keys),
                 trust_json=json.dumps(data.trust)))
-        reply = stub.UpdateNamespaceAttributes(request)
+        reply = _grpc_call(stub.UpdateNamespaceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpdateNamespaceAttributes failed for {data.name}: {e}')
+        LOG.error(f'gRPC UpdateNamespaceAttributes failed for {data.name}: {e}')
         return False
 
 
@@ -9977,10 +9991,10 @@ def _grpc_delete_namespace_attributes(name: str) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteNamespaceAttributesRequest(name=name)
-        reply = stub.DeleteNamespaceAttributes(request)
+        reply = _grpc_call(stub.DeleteNamespaceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteNamespaceAttributes failed for {name}: {e}')
+        LOG.error(f'gRPC DeleteNamespaceAttributes failed for {name}: {e}')
         return False
 
 
@@ -10486,10 +10500,10 @@ def _grpc_create_artifact(artifact_uuid: UUID, artifact_type: str,
                 version=version
             )
         )
-        reply = stub.CreateArtifact(request)
+        reply = _grpc_call(stub.CreateArtifact, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateArtifact failed for {artifact_uuid}: {e}')
         return False
 
@@ -10499,7 +10513,7 @@ def _grpc_get_artifact(artifact_uuid: UUID) -> Optional[ArtifactData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetArtifactRequest(uuid=str(artifact_uuid))
-        reply = stub.GetArtifact(request)
+        reply = _grpc_call(stub.GetArtifact, request)
         if not reply.found:
             return None
         return ArtifactData(
@@ -10511,7 +10525,7 @@ def _grpc_get_artifact(artifact_uuid: UUID) -> Optional[ArtifactData]:
             version=reply.artifact.version
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetArtifact failed for {artifact_uuid}: {e}')
         return None
 
@@ -10521,7 +10535,7 @@ def _grpc_get_all_artifacts() -> list[ArtifactData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetAllArtifactsRequest()
-        reply = stub.GetAllArtifacts(request)
+        reply = _grpc_call(stub.GetAllArtifacts, request)
         return [
             ArtifactData(
                 uuid=a.uuid,
@@ -10534,7 +10548,7 @@ def _grpc_get_all_artifacts() -> list[ArtifactData]:
             for a in reply.artifacts
         ]
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetAllArtifacts failed: {e}')
+        LOG.error(f'gRPC GetAllArtifacts failed: {e}')
         return []
 
 
@@ -10552,10 +10566,10 @@ def _grpc_update_artifact(data: ArtifactData) -> bool:
                 version=data.version
             )
         )
-        reply = stub.UpdateArtifact(request)
+        reply = _grpc_call(stub.UpdateArtifact, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpdateArtifact failed for {data.uuid}: {e}')
+        LOG.error(f'gRPC UpdateArtifact failed for {data.uuid}: {e}')
         return False
 
 
@@ -10565,10 +10579,10 @@ def _grpc_delete_artifact(artifact_uuid: UUID) -> bool:
         stub = _get_database_stub()
         request = database_pb2.DeleteArtifactRequest(
             uuid=str(artifact_uuid))
-        reply = stub.DeleteArtifact(request)
+        reply = _grpc_call(stub.DeleteArtifact, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteArtifact failed for {artifact_uuid}: {e}')
         return False
 
@@ -10590,10 +10604,10 @@ def _grpc_create_artifact_attributes(
                 highest_index=data.highest_index
             )
         )
-        reply = stub.CreateArtifactAttributes(request)
+        reply = _grpc_call(stub.CreateArtifactAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateArtifactAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -10606,7 +10620,7 @@ def _grpc_get_artifact_attributes(
         stub = _get_database_stub()
         request = database_pb2.GetArtifactAttributesRequest(
             uuid=str(artifact_uuid))
-        reply = stub.GetArtifactAttributes(request)
+        reply = _grpc_call(stub.GetArtifactAttributes, request)
         if not reply.found:
             return None
         d = reply.data
@@ -10617,7 +10631,7 @@ def _grpc_get_artifact_attributes(
             highest_index=d.highest_index
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetArtifactAttributes failed for '
             f'{artifact_uuid}: {e}')
         return None
@@ -10636,10 +10650,10 @@ def _grpc_update_artifact_attributes(
                 highest_index=data.highest_index
             )
         )
-        reply = stub.UpdateArtifactAttributes(request)
+        reply = _grpc_call(stub.UpdateArtifactAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC UpdateArtifactAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -10651,10 +10665,10 @@ def _grpc_delete_artifact_attributes(artifact_uuid: UUID) -> bool:
         stub = _get_database_stub()
         request = database_pb2.DeleteArtifactAttributesRequest(
             uuid=str(artifact_uuid))
-        reply = stub.DeleteArtifactAttributes(request)
+        reply = _grpc_call(stub.DeleteArtifactAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteArtifactAttributes failed for '
             f'{artifact_uuid}: {e}')
         return False
@@ -10676,10 +10690,10 @@ def _grpc_create_artifact_index(artifact_uuid: UUID, index_number: int,
                 blob_uuid=str(blob_uuid)
             )
         )
-        reply = stub.CreateArtifactIndex(request)
+        reply = _grpc_call(stub.CreateArtifactIndex, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateArtifactIndex failed for '
             f'{artifact_uuid}/{index_number}: {e}')
         return False
@@ -10695,7 +10709,7 @@ def _grpc_get_artifact_index(
             artifact_uuid=str(artifact_uuid),
             index_number=index_number
         )
-        reply = stub.GetArtifactIndex(request)
+        reply = _grpc_call(stub.GetArtifactIndex, request)
         if not reply.found:
             return None
         d = reply.data
@@ -10705,7 +10719,7 @@ def _grpc_get_artifact_index(
             blob_uuid=UUID(d.blob_uuid)
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetArtifactIndex failed for '
             f'{artifact_uuid}/{index_number}: {e}')
         return None
@@ -10718,7 +10732,7 @@ def _grpc_get_all_artifact_indexes(
         stub = _get_database_stub()
         request = database_pb2.GetAllArtifactIndexesRequest(
             artifact_uuid=str(artifact_uuid))
-        reply = stub.GetAllArtifactIndexes(request)
+        reply = _grpc_call(stub.GetAllArtifactIndexes, request)
         return [
             ArtifactIndexData(
                 artifact_uuid=UUID(idx.artifact_uuid),
@@ -10728,7 +10742,7 @@ def _grpc_get_all_artifact_indexes(
             for idx in reply.indexes
         ]
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetAllArtifactIndexes failed for '
             f'{artifact_uuid}: {e}')
         return []
@@ -10743,10 +10757,10 @@ def _grpc_delete_artifact_index(artifact_uuid: UUID,
             artifact_uuid=str(artifact_uuid),
             index_number=index_number
         )
-        reply = stub.DeleteArtifactIndex(request)
+        reply = _grpc_call(stub.DeleteArtifactIndex, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteArtifactIndex failed for '
             f'{artifact_uuid}/{index_number}: {e}')
         return False
@@ -10759,10 +10773,10 @@ def _grpc_delete_all_artifact_indexes(artifact_uuid: UUID) -> int:
         stub = _get_database_stub()
         request = database_pb2.DeleteAllArtifactIndexesRequest(
             artifact_uuid=str(artifact_uuid))
-        reply = stub.DeleteAllArtifactIndexes(request)
+        reply = _grpc_call(stub.DeleteAllArtifactIndexes, request)
         return int(reply.count)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteAllArtifactIndexes failed for '
             f'{artifact_uuid}: {e}')
         return 0
@@ -11437,10 +11451,10 @@ def _grpc_create_network_interface(
                 version=data.version
             )
         )
-        reply = stub.CreateNetworkInterface(request)
+        reply = _grpc_call(stub.CreateNetworkInterface, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateNetworkInterface failed for '
             f'{data.uuid}: {e}')
         return False
@@ -11454,7 +11468,7 @@ def _grpc_get_network_interface(
         stub = _get_database_stub()
         request = database_pb2.GetNetworkInterfaceRequest(
             uuid=str(ni_uuid))
-        reply = stub.GetNetworkInterface(request)
+        reply = _grpc_call(stub.GetNetworkInterface, request)
         if not reply.found:
             return None
         d = reply.network_interface
@@ -11469,7 +11483,7 @@ def _grpc_get_network_interface(
             version=d.version
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetNetworkInterface failed for {ni_uuid}: {e}')
         return None
 
@@ -11483,7 +11497,7 @@ def _grpc_get_network_interfaces_by_instance(
         request = \
             database_pb2.GetNetworkInterfacesByInstanceRequest(
                 instance_uuid=str(instance_uuid))
-        reply = stub.GetNetworkInterfacesByInstance(request)
+        reply = _grpc_call(stub.GetNetworkInterfacesByInstance, request)
         return [
             NetworkInterfaceData(
                 uuid=d.uuid,
@@ -11498,7 +11512,7 @@ def _grpc_get_network_interfaces_by_instance(
             for d in reply.network_interfaces
         ]
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetNetworkInterfacesByInstance failed for '
             f'{instance_uuid}: {e}')
         return []
@@ -11513,7 +11527,7 @@ def _grpc_get_network_interfaces_by_network(
         request = \
             database_pb2.GetNetworkInterfacesByNetworkRequest(
                 network_uuid=str(network_uuid))
-        reply = stub.GetNetworkInterfacesByNetwork(request)
+        reply = _grpc_call(stub.GetNetworkInterfacesByNetwork, request)
         return [
             NetworkInterfaceData(
                 uuid=d.uuid,
@@ -11528,7 +11542,7 @@ def _grpc_get_network_interfaces_by_network(
             for d in reply.network_interfaces
         ]
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetNetworkInterfacesByNetwork failed for '
             f'{network_uuid}: {e}')
         return []
@@ -11541,10 +11555,10 @@ def _grpc_delete_network_interface(ni_uuid: UUID) -> bool:
         stub = _get_database_stub()
         request = database_pb2.DeleteNetworkInterfaceRequest(
             uuid=str(ni_uuid))
-        reply = stub.DeleteNetworkInterface(request)
+        reply = _grpc_call(stub.DeleteNetworkInterface, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteNetworkInterface failed for '
             f'{ni_uuid}: {e}')
         return False
@@ -11568,10 +11582,10 @@ def _grpc_update_network_interface(
                 version=data.version
             )
         )
-        reply = stub.UpdateNetworkInterface(request)
+        reply = _grpc_call(stub.UpdateNetworkInterface, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC UpdateNetworkInterface failed for '
             f'{data.uuid}: {e}')
         return False
@@ -11591,10 +11605,10 @@ def _grpc_create_network_interface_attributes(
                 data=database_pb2.NetworkInterfaceAttributesProto(
                     uuid=str(data.uuid),
                     floating_address=data.floating_address or ''))
-        reply = stub.CreateNetworkInterfaceAttributes(request)
+        reply = _grpc_call(stub.CreateNetworkInterfaceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateNetworkInterfaceAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -11608,7 +11622,7 @@ def _grpc_get_network_interface_attributes(
         request = \
             database_pb2.GetNetworkInterfaceAttributesRequest(
                 uuid=str(ni_uuid))
-        reply = stub.GetNetworkInterfaceAttributes(request)
+        reply = _grpc_call(stub.GetNetworkInterfaceAttributes, request)
         if not reply.found:
             return None
         return NetworkInterfaceAttributesData(
@@ -11618,7 +11632,7 @@ def _grpc_get_network_interface_attributes(
                               else None),
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetNetworkInterfaceAttributes failed for '
             f'{ni_uuid}: {e}')
         return None
@@ -11634,10 +11648,10 @@ def _grpc_update_network_interface_attributes(
                 data=database_pb2.NetworkInterfaceAttributesProto(
                     uuid=str(data.uuid),
                     floating_address=data.floating_address or ''))
-        reply = stub.UpdateNetworkInterfaceAttributes(request)
+        reply = _grpc_call(stub.UpdateNetworkInterfaceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC UpdateNetworkInterfaceAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -11651,10 +11665,10 @@ def _grpc_delete_network_interface_attributes(
         request = \
             database_pb2.DeleteNetworkInterfaceAttributesRequest(
                 uuid=str(ni_uuid))
-        reply = stub.DeleteNetworkInterfaceAttributes(request)
+        reply = _grpc_call(stub.DeleteNetworkInterfaceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteNetworkInterfaceAttributes failed for '
             f'{ni_uuid}: {e}')
         return False
@@ -12010,10 +12024,10 @@ def _grpc_create_ipam(data: IPAMData) -> bool:
                 version=data.version
             )
         )
-        reply = stub.CreateIPAM(request)
+        reply = _grpc_call(stub.CreateIPAM, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC CreateIPAM failed for {data.uuid}: {e}')
+        LOG.error(f'gRPC CreateIPAM failed for {data.uuid}: {e}')
         return False
 
 
@@ -12022,7 +12036,7 @@ def _grpc_get_ipam(ipam_uuid: UUID) -> Optional[IPAMData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetIPAMRequest(uuid=str(ipam_uuid))
-        reply = stub.GetIPAM(request)
+        reply = _grpc_call(stub.GetIPAM, request)
         if not reply.found:
             return None
         d = reply.ipam
@@ -12034,7 +12048,7 @@ def _grpc_get_ipam(ipam_uuid: UUID) -> Optional[IPAMData]:
             version=d.version
         )
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetIPAM failed for {ipam_uuid}: {e}')
+        LOG.error(f'gRPC GetIPAM failed for {ipam_uuid}: {e}')
         return None
 
 
@@ -12043,10 +12057,10 @@ def _grpc_delete_ipam(ipam_uuid: UUID) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteIPAMRequest(uuid=str(ipam_uuid))
-        reply = stub.DeleteIPAM(request)
+        reply = _grpc_call(stub.DeleteIPAM, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC DeleteIPAM failed for {ipam_uuid}: {e}')
+        LOG.error(f'gRPC DeleteIPAM failed for {ipam_uuid}: {e}')
         return False
 
 
@@ -12063,10 +12077,10 @@ def _grpc_update_ipam(data: IPAMData) -> bool:
                 version=data.version
             )
         )
-        reply = stub.UpdateIPAM(request)
+        reply = _grpc_call(stub.UpdateIPAM, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC UpdateIPAM failed for {data.uuid}: {e}')
+        LOG.error(f'gRPC UpdateIPAM failed for {data.uuid}: {e}')
         return False
 
 
@@ -12523,10 +12537,10 @@ def _grpc_create_network(data: NetworkData) -> bool:
                 version=data.version
             )
         )
-        reply = stub.CreateNetwork(request)
+        reply = _grpc_call(stub.CreateNetwork, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateNetwork failed for {data.uuid}: {e}')
         return False
 
@@ -12538,7 +12552,7 @@ def _grpc_get_network(
         stub = _get_database_stub()
         request = database_pb2.GetNetworkRequest(
             uuid=str(net_uuid))
-        reply = stub.GetNetwork(request)
+        reply = _grpc_call(stub.GetNetwork, request)
         if not reply.found:
             return None
         d = reply.network
@@ -12556,7 +12570,7 @@ def _grpc_get_network(
             version=d.version
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetNetwork failed for {net_uuid}: {e}')
         return None
 
@@ -12566,7 +12580,7 @@ def _grpc_get_all_networks() -> list[NetworkData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetAllNetworksRequest()
-        reply = stub.GetAllNetworks(request)
+        reply = _grpc_call(stub.GetAllNetworks, request)
         return [
             NetworkData(
                 uuid=d.uuid,
@@ -12584,7 +12598,7 @@ def _grpc_get_all_networks() -> list[NetworkData]:
             for d in reply.networks
         ]
     except grpc.RpcError as e:
-        LOG.warning(f'gRPC GetAllNetworks failed: {e}')
+        LOG.error(f'gRPC GetAllNetworks failed: {e}')
         return []
 
 
@@ -12594,10 +12608,10 @@ def _grpc_delete_network(net_uuid: UUID) -> bool:
         stub = _get_database_stub()
         request = database_pb2.DeleteNetworkRequest(
             uuid=str(net_uuid))
-        reply = stub.DeleteNetwork(request)
+        reply = _grpc_call(stub.DeleteNetwork, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteNetwork failed for {net_uuid}: {e}')
         return False
 
@@ -12616,10 +12630,10 @@ def _grpc_create_network_attributes(
                 networkinterfaces_initialized=(
                     data.networkinterfaces_initialized),
                 hosteddns_json=json.dumps(data.hosteddns)))
-        reply = stub.CreateNetworkAttributes(request)
+        reply = _grpc_call(stub.CreateNetworkAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateNetworkAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -12632,7 +12646,7 @@ def _grpc_get_network_attributes(
         stub = _get_database_stub()
         request = database_pb2.GetNetworkAttributesRequest(
             uuid=str(net_uuid))
-        reply = stub.GetNetworkAttributes(request)
+        reply = _grpc_call(stub.GetNetworkAttributes, request)
         if not reply.found:
             return None
         d = reply.data
@@ -12648,7 +12662,7 @@ def _grpc_get_network_attributes(
             hosteddns=dns,
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetNetworkAttributes failed for '
             f'{net_uuid}: {e}')
         return None
@@ -12668,10 +12682,10 @@ def _grpc_update_network_attributes(
                 networkinterfaces_initialized=(
                     data.networkinterfaces_initialized),
                 hosteddns_json=json.dumps(data.hosteddns)))
-        reply = stub.UpdateNetworkAttributes(request)
+        reply = _grpc_call(stub.UpdateNetworkAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC UpdateNetworkAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -12684,10 +12698,10 @@ def _grpc_delete_network_attributes(
         stub = _get_database_stub()
         request = database_pb2.DeleteNetworkAttributesRequest(
             uuid=str(net_uuid))
-        reply = stub.DeleteNetworkAttributes(request)
+        reply = _grpc_call(stub.DeleteNetworkAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteNetworkAttributes failed for '
             f'{net_uuid}: {e}')
         return False
@@ -13139,10 +13153,10 @@ def _grpc_create_agent_operation(data: AgentOperationData) -> bool:
                 version=data.version
             )
         )
-        reply = stub.CreateAgentOperation(request)
+        reply = _grpc_call(stub.CreateAgentOperation, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateAgentOperation failed for '
             f'{data.uuid}: {e}')
         return False
@@ -13155,7 +13169,7 @@ def _grpc_get_agent_operation(
         stub = _get_database_stub()
         request = database_pb2.GetAgentOperationRequest(
             uuid=str(aop_uuid))
-        reply = stub.GetAgentOperation(request)
+        reply = _grpc_call(stub.GetAgentOperation, request)
         if not reply.found:
             return None
         d = reply.data
@@ -13168,7 +13182,7 @@ def _grpc_get_agent_operation(
             version=d.version
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetAgentOperation failed for '
             f'{aop_uuid}: {e}')
         return None
@@ -13180,10 +13194,10 @@ def _grpc_delete_agent_operation(aop_uuid: UUID) -> bool:
         stub = _get_database_stub()
         request = database_pb2.DeleteAgentOperationRequest(
             uuid=str(aop_uuid))
-        reply = stub.DeleteAgentOperation(request)
+        reply = _grpc_call(stub.DeleteAgentOperation, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteAgentOperation failed for '
             f'{aop_uuid}: {e}')
         return False
@@ -13198,10 +13212,10 @@ def _grpc_create_agent_operation_attributes(
             data=database_pb2.AgentOperationAttributesProto(
                 uuid=str(data.uuid),
                 results_json=json.dumps(data.results)))
-        reply = stub.CreateAgentOperationAttributes(request)
+        reply = _grpc_call(stub.CreateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateAgentOperationAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -13215,7 +13229,7 @@ def _grpc_get_agent_operation_attributes(
         stub = _get_database_stub()
         request = database_pb2.GetAgentOperationAttributesRequest(
             uuid=str(aop_uuid))
-        reply = stub.GetAgentOperationAttributes(request)
+        reply = _grpc_call(stub.GetAgentOperationAttributes, request)
         if not reply.found:
             return None
         d = reply.data
@@ -13225,7 +13239,7 @@ def _grpc_get_agent_operation_attributes(
             results=results,
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetAgentOperationAttributes failed for '
             f'{aop_uuid}: {e}')
         return None
@@ -13240,10 +13254,10 @@ def _grpc_update_agent_operation_attributes(
             data=database_pb2.AgentOperationAttributesProto(
                 uuid=str(data.uuid),
                 results_json=json.dumps(data.results)))
-        reply = stub.UpdateAgentOperationAttributes(request)
+        reply = _grpc_call(stub.UpdateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC UpdateAgentOperationAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -13256,10 +13270,10 @@ def _grpc_delete_agent_operation_attributes(
         stub = _get_database_stub()
         request = database_pb2.DeleteAgentOperationAttributesRequest(
             uuid=str(aop_uuid))
-        reply = stub.DeleteAgentOperationAttributes(request)
+        reply = _grpc_call(stub.DeleteAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteAgentOperationAttributes failed for '
             f'{aop_uuid}: {e}')
         return False
@@ -13963,10 +13977,10 @@ def _grpc_create_instance(data: InstanceData) -> bool:
                 version=data.version
             )
         )
-        reply = stub.CreateInstance(request)
+        reply = _grpc_call(stub.CreateInstance, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateInstance failed for '
             f'{data.uuid}: {e}')
         return False
@@ -13979,7 +13993,7 @@ def _grpc_get_instance(
         stub = _get_database_stub()
         request = database_pb2.GetInstanceRequest(
             uuid=str(inst_uuid))
-        reply = stub.GetInstance(request)
+        reply = _grpc_call(stub.GetInstance, request)
         if not reply.found:
             return None
         d = reply.data
@@ -14014,7 +14028,7 @@ def _grpc_get_instance(
             version=d.version
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetInstance failed for '
             f'{inst_uuid}: {e}')
         return None
@@ -14025,7 +14039,7 @@ def _grpc_get_all_instances() -> list[InstanceData]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetAllInstancesRequest()
-        reply = stub.GetAllInstances(request)
+        reply = _grpc_call(stub.GetAllInstances, request)
         results = []
         for d in reply.instances:
             disk_spec = (json.loads(d.disk_spec_json)
@@ -14061,7 +14075,7 @@ def _grpc_get_all_instances() -> list[InstanceData]:
             ))
         return results
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetAllInstances failed: {e}')
         return []
 
@@ -14071,10 +14085,10 @@ def _grpc_get_all_instance_uuids() -> list[str]:
     try:
         stub = _get_database_stub()
         request = database_pb2.GetAllInstanceUuidsRequest()
-        reply = stub.GetAllInstanceUuids(request)
+        reply = _grpc_call(stub.GetAllInstanceUuids, request)
         return list(reply.uuids)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetAllInstanceUuids failed: {e}')
         return []
 
@@ -14085,10 +14099,10 @@ def _grpc_delete_instance(inst_uuid: UUID) -> bool:
         stub = _get_database_stub()
         request = database_pb2.DeleteInstanceRequest(
             uuid=str(inst_uuid))
-        reply = stub.DeleteInstance(request)
+        reply = _grpc_call(stub.DeleteInstance, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteInstance failed for '
             f'{inst_uuid}: {e}')
         return False
@@ -14122,10 +14136,10 @@ def _grpc_create_instance_attributes(
                 kvm_pid=data.kvm_pid or 0,
                 error_message=(
                     data.error_message or '')))
-        reply = stub.CreateInstanceAttributes(request)
+        reply = _grpc_call(stub.CreateInstanceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC CreateInstanceAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -14139,7 +14153,7 @@ def _grpc_get_instance_attributes(
         stub = _get_database_stub()
         request = database_pb2.GetInstanceAttributesRequest(
             uuid=str(inst_uuid))
-        reply = stub.GetInstanceAttributes(request)
+        reply = _grpc_call(stub.GetInstanceAttributes, request)
         if not reply.found:
             return None
         d = reply.data
@@ -14168,7 +14182,7 @@ def _grpc_get_instance_attributes(
             error_message=d.error_message or None,
         )
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetInstanceAttributes failed for '
             f'{inst_uuid}: {e}')
         return None
@@ -14202,10 +14216,10 @@ def _grpc_update_instance_attributes(
                 kvm_pid=data.kvm_pid or 0,
                 error_message=(
                     data.error_message or '')))
-        reply = stub.UpdateInstanceAttributes(request)
+        reply = _grpc_call(stub.UpdateInstanceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC UpdateInstanceAttributes failed for '
             f'{data.uuid}: {e}')
         return False
@@ -14218,10 +14232,10 @@ def _grpc_delete_instance_attributes(
         stub = _get_database_stub()
         request = database_pb2.DeleteInstanceAttributesRequest(
             uuid=str(inst_uuid))
-        reply = stub.DeleteInstanceAttributes(request)
+        reply = _grpc_call(stub.DeleteInstanceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC DeleteInstanceAttributes failed for '
             f'{inst_uuid}: {e}')
         return False
@@ -14234,10 +14248,10 @@ def _grpc_get_consumed_ports_for_node(
         stub = _get_database_stub()
         request = database_pb2.GetConsumedPortsForNodeRequest(
             node_uuid=node_uuid)
-        reply = stub.GetConsumedPortsForNode(request)
+        reply = _grpc_call(stub.GetConsumedPortsForNode, request)
         return list(reply.ports)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC GetConsumedPortsForNode failed for '
             f'{node_uuid}: {e}')
         return []
@@ -14248,10 +14262,10 @@ def _grpc_is_vsock_cid_in_use(cid: int) -> bool:
     try:
         stub = _get_database_stub()
         request = database_pb2.IsVsockCidInUseRequest(cid=cid)
-        reply = stub.IsVsockCidInUse(request)
+        reply = _grpc_call(stub.IsVsockCidInUse, request)
         return bool(reply.in_use)
     except grpc.RpcError as e:
-        LOG.warning(
+        LOG.error(
             f'gRPC IsVsockCidInUse failed for CID {cid}: {e}')
         return False
 

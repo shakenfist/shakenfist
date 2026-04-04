@@ -694,13 +694,23 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
 
     def set_last_cluster_operation(self, op_type, op_uuid):
         if not self.in_memory_only:
-            mariadb.create_cluster_operation_target(
+            success = mariadb.create_cluster_operation_target(
                 operation_uuid=str(op_uuid),
                 operation_type=str(op_type),
                 target_object_type=self.object_type,
                 target_uuid=str(self.uuid),
                 created_at=time.time()
             )
+            if not success:
+                LOG.with_fields({
+                    'object_type': self.object_type,
+                    'object_uuid': str(self.uuid),
+                    'op_type': str(op_type),
+                    'op_uuid': str(op_uuid),
+                }).error(
+                    'Failed to write cluster operation target '
+                    'to MariaDB'
+                )
 
     def get_cluster_operations(self, outstanding_only=True):
         last_op = self.last_cluster_operation
