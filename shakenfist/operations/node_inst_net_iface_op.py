@@ -156,7 +156,7 @@ class NodeInstNetIfaceOp(BaseClusterOperation):
             }).error(
                 'Cannot hot plug interface, instance not '
                 f'running: {e}')
-            return
+            raise
 
         if ni.floating['floating_address']:
             op_type, op_uuid = ni_create_and_enqueue(
