@@ -978,11 +978,6 @@ class Instance(dbowo):
                 suppress_failure_audit=True):
             agentop.delete()
 
-        # Clean up MariaDB records
-        _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
-        mariadb.delete_instance_attributes(_uuid)
-        mariadb.delete_instance(_uuid)
-
         if self.state.value.endswith(f'-{self.STATE_ERROR}'):
             self.state = self.STATE_ERROR
         else:
@@ -991,6 +986,12 @@ class Instance(dbowo):
     def delete(self, global_only=False):
         self._delete_on_hypervisor()
         self._delete_globally()
+
+    def hard_delete(self):
+        _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
+        mariadb.delete_instance_attributes(_uuid)
+        mariadb.delete_instance(_uuid)
+        super().hard_delete()
 
     def _allocate_console_port(self):
         consumed = mariadb.get_consumed_ports_for_node(
