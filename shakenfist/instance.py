@@ -1993,7 +1993,16 @@ class Instance(dbowo):
 
             flags = (lc.libvirt.VIR_DOMAIN_AFFECT_CONFIG |
                      lc.libvirt.VIR_DOMAIN_AFFECT_LIVE)
-            inst.attachDeviceFlags(device_xml, flags=flags)
+            try:
+                inst.attachDeviceFlags(device_xml, flags=flags)
+            except lc.libvirt.libvirtError as e:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, [self, n, ni],
+                    'hot plug interface failed',
+                    extra={'error': str(e)})
+                raise exceptions.InvalidLifecycleState(
+                    f'hot plug interface failed: {e}')
+
             add_event_multi(
                 EVENT_TYPE_AUDIT, [self, n, ni], 'hot plugged interface')
             self._record_domain_xml()
