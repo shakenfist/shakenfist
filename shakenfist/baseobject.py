@@ -711,6 +711,10 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
                     'Failed to write cluster operation target '
                     'to MariaDB'
                 )
+                raise RuntimeError(
+                    f'Failed to write cluster operation target for '
+                    f'{self.object_type}/{self.uuid} op {op_type}/{op_uuid}'
+                )
 
     def get_cluster_operations(self, outstanding_only=True):
         last_op = self.last_cluster_operation

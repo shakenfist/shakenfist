@@ -1750,7 +1750,10 @@ class Instance(dbowo):
             PRIORITY.user_facing,
             runs_after=[self.last_cluster_operation],
             request_id=util_general.get_request_id())
-        self.set_last_cluster_operation(op_type, op_uuid)
+        try:
+            self.set_last_cluster_operation(op_type, op_uuid)
+        except RuntimeError:
+            pass  # Delete must proceed even if LCO tracking fails
 
     def enqueue_delete_due_error(self, error_msg):
         # Error needs to be set immediately so that API clients get

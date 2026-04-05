@@ -183,6 +183,8 @@ def _use_database_service() -> bool:
 
 
 GRPC_TIMEOUT = 30
+GRPC_RETRIES = 3
+GRPC_RETRY_DELAY = 0.5
 
 
 def _get_database_stub() -> Any:
@@ -198,15 +200,42 @@ def _get_database_stub() -> Any:
     return _local.database_stub
 
 
-def _grpc_call(method: Any, request: Any) -> Any:
-    """Call a gRPC method with timeout and wait_for_ready.
+def _reset_database_stub() -> None:
+    """Close and reset the gRPC channel so the next call creates a fresh one."""
+    if hasattr(_local, 'database_channel') and _local.database_channel is not None:
+        try:
+            _local.database_channel.close()
+        except Exception:
+            pass
+    _local.database_channel = None
+    _local.database_stub = None
 
-    This wrapper ensures all gRPC calls have consistent timeout and
-    retry behavior. wait_for_ready=True makes the call wait for the
-    channel to become ready instead of failing immediately when the
-    database service is temporarily unavailable.
+
+def _grpc_call(method: Any, request: Any) -> Any:
+    """Call a gRPC method with timeout, wait_for_ready, and retry.
+
+    Retries on UNAVAILABLE and DEADLINE_EXCEEDED with a short delay
+    between attempts. Resets the gRPC channel after persistent failures
+    so the next attempt gets a fresh connection.
     """
-    return method(request, timeout=GRPC_TIMEOUT, wait_for_ready=True)
+    retryable_codes = {
+        grpc.StatusCode.UNAVAILABLE,
+        grpc.StatusCode.DEADLINE_EXCEEDED,
+    }
+
+    last_error: grpc.RpcError = grpc.RpcError()
+    for attempt in range(GRPC_RETRIES):
+        try:
+            return method(request, timeout=GRPC_TIMEOUT, wait_for_ready=True)
+        except grpc.RpcError as e:
+            last_error = e
+            if e.code() not in retryable_codes:
+                raise
+            if attempt < GRPC_RETRIES - 1:
+                time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
+                _reset_database_stub()
+
+    raise last_error
 
 
 # =============================================================================

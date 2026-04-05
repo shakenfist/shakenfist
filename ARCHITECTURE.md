@@ -75,9 +75,19 @@ The database microservice (`sf-database`) centralizes all database access:
 All gRPC calls use `timeout=30` seconds and `wait_for_ready=True` to handle
 transient service unavailability during startup or momentary congestion. The
 `_grpc_call()` helper in `mariadb.py` enforces this for all database service
-calls. The etcd proxy in `database.py` also uses these settings on all stub
-calls, and additionally wraps calls with the `_retry_database` decorator for
-exponential backoff retries. All gRPC failures are logged at ERROR level.
+calls and retries up to 3 times on UNAVAILABLE/DEADLINE_EXCEEDED errors with
+channel reset between attempts. The etcd proxy in `database.py` also uses
+these settings on all stub calls, and additionally wraps calls with the
+`_retry_database` decorator for exponential backoff retries. All gRPC failures
+are logged at ERROR level.
+
+#### Cluster Operation Tracking
+
+`set_last_cluster_operation()` records which cluster operation was most recently
+enqueued for an object. API clients poll this to wait for operations to complete.
+The write now raises `RuntimeError` on failure so API endpoints return 500
+instead of silently losing the tracking data. Callers in deletion paths and
+daemons catch this exception to ensure cleanup always proceeds.
 
 ### Protocol Buffers and gRPC
 

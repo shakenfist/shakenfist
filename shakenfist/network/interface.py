@@ -252,7 +252,10 @@ class NetworkInterface(dbo):
                 priority=PRIORITY.user_facing)
             n = network.Network.from_db(self.network_uuid)
             if n:
-                n.set_last_cluster_operation(op_type, op_uuid)
+                try:
+                    n.set_last_cluster_operation(op_type, op_uuid)
+                except RuntimeError:
+                    pass  # Delete must proceed even if LCO tracking fails
 
             fn = network.floating_network()
             fn.ipam.release(floating_address)

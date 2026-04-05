@@ -301,7 +301,7 @@ class BaseTestCase(testtools.TestCase):
             i = self.system_client.get_instance(instance_uuid)
             if not i:
                 return
-            if i['state'].startswith('delete'):
+            if i['state'] in ('deleted', 'error'):
                 return
             time.sleep(5)
         self.fail(f'Failed to delete instance after 5 minutes {instance_uuid}')
@@ -405,8 +405,16 @@ class BaseTestCase(testtools.TestCase):
                 lco['op_type'], lco['op_uuid'])
             if lco_details['state'] in ['complete', 'deleted', 'abort']:
                 return
+            if lco_details['state'] == 'error':
+                self.fail(
+                    f'Cluster operation {lco["op_uuid"]} for instance '
+                    f'{instance_uuid} ended in error state')
 
             time.sleep(10)
+
+        self.fail(
+            f'Instance operations did not complete within 5 minutes '
+            f'for {instance_uuid}')
 
     def _await_image_download_success(self, image_uuid, after=None):
         return self._await_image_event(image_uuid, 'fetch', 'success', after)
