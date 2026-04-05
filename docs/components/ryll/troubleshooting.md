@@ -189,6 +189,25 @@ freeze.
 2. If the problem persists, check whether a network appliance
    between client and server has an unusually short idle timeout
 
+## USB Issues
+
+### Connection drops when attaching a USB device
+
+**Symptom:** All channels disconnect shortly after a USB device is
+connected. The QEMU log may show "usbredirparser: error invalid
+packet" or an assertion failure in `redirect.c`.
+
+**Causes:**
+- Protocol mismatch between ryll and the QEMU usbredirparser version
+- Server rejecting a message with unexpected length or type
+
+**Solutions:**
+1. Check the QEMU/libvirt log for the exact error message
+2. Submit a bug report — the "Report this as a bug" button appears on
+   both USB errors (in the USB panel) and generic channel errors (in
+   the main display area)
+3. Use `--capture <DIR>` to record pcap traffic for analysis
+
 ## Performance Issues
 
 ### High CPU usage
@@ -311,6 +330,7 @@ Use a bug report when you see:
    - **Input** — captures keyboard/mouse state and recent events.
    - **Cursor** — captures the cursor cache and position.
    - **Connection** — captures session info and main channel traffic.
+   - **USB** — captures usbredir channel and device state.
 4. Optionally enter a brief **description** of what you observed.
 5. Click **Capture**.
 

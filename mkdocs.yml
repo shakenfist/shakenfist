@@ -156,8 +156,10 @@ nav:
                 - "Bug reporting mode for ryll": components/ryll/plans/PLAN-bug-reports.md
                 - "Capture mode for protocol and display debugging": components/ryll/plans/PLAN-capture.md
                 - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
+                - "Interactive USB device management UI": components/ryll/plans/PLAN-usb-ui.md
                 - "Phase 10: Testing and QEMU setup": components/ryll/plans/PLAN-usb-redir-phase-10-testing.md
                 - "Phase 1: Capture infrastructure": components/ryll/plans/PLAN-capture-phase-01-infra.md
+                - "Phase 1: Fix enumerate_physical bus field": components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix.md
                 - "Phase 1: Parse SpiceCursor image data": components/ryll/plans/PLAN-cursor-rendering-phase-01-parse.md
                 - "Phase 1: Platform Portability": components/ryll/plans/PLAN-packaging-phase-01-portability.md
                 - "Phase 1: Ring buffer infrastructure": components/ryll/plans/PLAN-bug-reports-phase-01-ring-buffer.md
@@ -167,22 +169,29 @@ nav:
                 - "Phase 2: Pcap packet capture": components/ryll/plans/PLAN-capture-phase-02-pcap.md
                 - "Phase 2: Render cursor as egui overlay": components/ryll/plans/PLAN-cursor-rendering-phase-02-render.md
                 - "Phase 2: usbredir protocol parser": components/ryll/plans/PLAN-usb-redir-phase-02-usbredir-parser.md
+                - "Phase 2: Wire usb_tx and channel events": components/ryll/plans/PLAN-usb-ui-phase-02-wire-tx.md
                 - "Phase 3: Bug report assembly and zip output": components/ryll/plans/PLAN-bug-reports-phase-03-zip-output.md
                 - "Phase 3: Debian Packaging": components/ryll/plans/PLAN-packaging-phase-03-debian.md
                 - "Phase 3: Device backend trait": components/ryll/plans/PLAN-usb-redir-phase-03-device-backend.md
+                - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
+                - "Phase 4: Device enumeration display": components/ryll/plans/PLAN-usb-ui-phase-04-enumerate.md
                 - "Phase 4: GUI report button and description dialog": components/ryll/plans/PLAN-bug-reports-phase-04-gui-button.md
                 - "Phase 4: Real device enumeration and passthrough": components/ryll/plans/PLAN-usb-redir-phase-04-real-devices.md
                 - "Phase 4: RPM Packaging": components/ryll/plans/PLAN-packaging-phase-04-rpm.md
+                - "Phase 5: Connect and disconnect controls": components/ryll/plans/PLAN-usb-ui-phase-05-connect.md
                 - "Phase 5: Device connection lifecycle": components/ryll/plans/PLAN-usb-redir-phase-05-device-connect.md
                 - "Phase 5: GUI display region selection": components/ryll/plans/PLAN-bug-reports-phase-05-region-select.md
                 - "Phase 5: macOS Packaging": components/ryll/plans/PLAN-packaging-phase-05-macos.md
+                - "Phase 6: Add virtual disk at runtime": components/ryll/plans/PLAN-usb-ui-phase-06-add-disk.md
                 - "Phase 6: Control and bulk transfers": components/ryll/plans/PLAN-usb-redir-phase-06-transfers.md
                 - "Phase 6: GUI live traffic viewer": components/ryll/plans/PLAN-bug-reports-phase-06-traffic-viewer.md
                 - "Phase 6: Windows Packaging": components/ryll/plans/PLAN-packaging-phase-06-windows.md
                 - "Phase 7: Documentation and testing": components/ryll/plans/PLAN-bug-reports-phase-07-docs.md
                 - "Phase 7: Release Automation": components/ryll/plans/PLAN-packaging-phase-07-release.md
+                - "Phase 7: Status feedback and polish": components/ryll/plans/PLAN-usb-ui-phase-07-polish.md
                 - "Phase 7: Virtual mass storage device (RAW images)": components/ryll/plans/PLAN-usb-redir-phase-07-virtual-msc.md
+                - "Phase 8: Documentation": components/ryll/plans/PLAN-usb-ui-phase-08-docs.md
                 - "Phase 8: UI integration and CLI flags": components/ryll/plans/PLAN-usb-redir-phase-08-ui.md
                 - "Phase 9: Interrupt transfers": components/ryll/plans/PLAN-usb-redir-phase-09-interrupt.md
                 - "Plan: Port Ryll SPICE Client to Rust": components/ryll/plans/PLAN-initial.md

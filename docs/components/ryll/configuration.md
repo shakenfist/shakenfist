@@ -241,3 +241,35 @@ ryll --direct localhost:5900 --usb-disk-ro test.raw
   completes.
 - Use `--capture <DIR>` to capture usbredir protocol traffic to
   `usbredir.pcap` for debugging.
+
+### USB Panel (GUI Mode)
+
+In GUI mode, click the **USB** button in the status bar to open the USB
+device management panel. The panel shows:
+
+- **Channel status** — whether a usbredir channel is available from the
+  SPICE server.
+- **Connected device** — the currently redirected device with elapsed
+  connection time.
+- **Device list** — all available USB devices (physical and virtual).
+  Physical devices are enumerated from the host via nusb. Virtual devices
+  come from `--usb-disk` flags and runtime additions. Each device has a
+  Connect or Disconnect button.
+- **Add Disk...** — opens a native file picker to add a RAW disk image as
+  a virtual USB device for the current session. A "Read-only" checkbox
+  controls write access. The file is validated (must be a regular file,
+  >= 512 bytes).
+- **Refresh** — re-enumerates available devices. Useful if USB devices
+  were plugged in or removed after the panel was opened.
+- **Error display** — connection failures appear in red with a Dismiss
+  button and a "Report this as a bug" button that opens the bug report
+  dialog pre-populated with the USB error and usbredir channel context.
+
+The panel can be open simultaneously with the Traffic viewer panel.
+Devices added via the panel persist for the session but are not saved
+across restarts — use `--usb-disk` for persistent configuration.
+
+Physical USB device passthrough requires the host to have accessible USB
+devices (appropriate permissions, not claimed by a kernel driver). The
+panel enumerates whatever nusb can see — if the list is empty, check
+host USB permissions.
