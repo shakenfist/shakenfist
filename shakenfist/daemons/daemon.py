@@ -253,6 +253,8 @@ class Daemon:
 
     def check_daemon_state(self):
         n = Node.this_node(suppress_failure_audit=True)
+        if not n:
+            return
         daemon_state = n.get_daemon_state(self.daemon_name).value
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:

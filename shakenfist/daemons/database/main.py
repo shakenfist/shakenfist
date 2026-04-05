@@ -4140,7 +4140,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_agent_operation_attributes',
             # MariaDB instance operations
             'create_instance', 'get_instance',
-            'get_all_instances', 'delete_instance',
+            'get_all_instances', 'get_all_instance_uuids',
+            'delete_instance',
             # MariaDB instance attributes operations
             'create_instance_attributes',
             'get_instance_attributes',

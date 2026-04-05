@@ -88,7 +88,12 @@ def main():
     procname = daemon.process_name('net')
     setproctitle.setproctitle(procname)
 
-    n = Node.from_db(config.NODE_NAME)
+    while True:
+        n = Node.from_db(config.NODE_NAME)
+        if n:
+            break
+        LOG.info('Waiting for node record to be available')
+        time.sleep(1)
     n.set_daemon_state('net', Node.DAEMON_STATE_RUNNING)
 
     while not daemon.health_check_nodelock():

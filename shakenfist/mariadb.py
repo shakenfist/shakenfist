@@ -224,15 +224,24 @@ def _grpc_call(method: Any, request: Any) -> Any:
     Retries on UNAVAILABLE and DEADLINE_EXCEEDED with a short delay
     between attempts. Resets the gRPC channel after persistent failures
     so the next attempt gets a fresh connection.
+
+    The method parameter is a bound method on the stub (e.g.
+    stub.GetNode). On retry we must re-resolve the method from a
+    fresh stub, because _reset_database_stub() closes the old
+    channel and any methods bound to it become invalid.
     """
     retryable_codes = {
         grpc.StatusCode.UNAVAILABLE,
         grpc.StatusCode.DEADLINE_EXCEEDED,
     }
+    method_name = getattr(method, '__name__', None)
 
     last_error: grpc.RpcError = grpc.RpcError()
     for attempt in range(GRPC_RETRIES):
         try:
+            if attempt > 0 and method_name:
+                stub = _get_database_stub()
+                method = getattr(stub, method_name)
             return method(request, timeout=GRPC_TIMEOUT, wait_for_ready=True)
         except grpc.RpcError as e:
             last_error = e
