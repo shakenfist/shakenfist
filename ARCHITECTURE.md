@@ -76,10 +76,13 @@ All gRPC calls use `timeout=30` seconds and `wait_for_ready=True` to handle
 transient service unavailability during startup or momentary congestion. The
 `_grpc_call()` helper in `mariadb.py` enforces this for all database service
 calls and retries up to 3 times on UNAVAILABLE/DEADLINE_EXCEEDED errors with
-channel reset between attempts. The etcd proxy in `database.py` also uses
-these settings on all stub calls, and additionally wraps calls with the
-`_retry_database` decorator for exponential backoff retries. All gRPC failures
-are logged at ERROR level.
+channel reset between attempts. The database gRPC channel uses HTTP/2
+keepalive (ping every 10s, 5s timeout) to detect stale connections before
+they cause failures. The database gRPC server uses a 20-thread pool to
+handle concurrent requests from all daemons. The etcd proxy in `database.py`
+also uses these settings on all stub calls, and additionally wraps calls with
+the `_retry_database` decorator for exponential backoff retries. All gRPC
+failures are logged at ERROR level.
 
 #### Cluster Operation Tracking
 

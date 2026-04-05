@@ -194,7 +194,14 @@ def _get_database_stub() -> Any:
     """
     if not hasattr(_local, 'database_channel') or _local.database_channel is None:
         _local.database_channel = grpc.insecure_channel(
-            f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
+            f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}',
+            options=[
+                ('grpc.keepalive_time_ms', 10000),
+                ('grpc.keepalive_timeout_ms', 5000),
+                ('grpc.http2.max_pings_without_data', 0),
+                ('grpc.keepalive_permit_without_calls', 1),
+            ]
+        )
         _local.database_stub = database_pb2_grpc.DatabaseServiceStub(
             _local.database_channel)
     return _local.database_stub
