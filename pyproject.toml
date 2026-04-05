@@ -117,7 +117,7 @@ dependencies = [
     "wraps==0.15.0",
     "certifi==2026.2.25",
     "charset-normalizer==3.4.6",
-    "debtcollector==3.0.0",
+    "debtcollector==3.1.0",
     "fasteners==0.20",
     "idna==3.11",
     "jsonschema==4.26.0",
