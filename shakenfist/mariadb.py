@@ -516,18 +516,21 @@ def _get_cluster_operation_targets_table() -> sa.Table:
     global _cluster_operation_targets_table
     if _cluster_operation_targets_table is None:
         metadata = _get_metadata()
+        # sequence_number must be the primary key for MySQL/MariaDB to
+        # apply AUTO_INCREMENT. SQLAlchemy only generates AUTO_INCREMENT
+        # DDL for the first column of the primary key on MySQL backends.
+        # operation_uuid is made UNIQUE instead to preserve fast lookups.
         _cluster_operation_targets_table = sa.Table(
             'cluster_operation_targets',
             metadata,
+            sa.Column('sequence_number', sa.BigInteger(),
+                      primary_key=True, autoincrement=True),
             sa.Column('operation_uuid', sa.String(36),
-                      nullable=False, primary_key=True),
+                      nullable=False, unique=True),
             sa.Column('operation_type', sa.String(64), nullable=False),
             sa.Column('target_object_type', sa.Enum(ObjectType),
                       nullable=False),
             sa.Column('target_uuid', sa.String(36), nullable=False),
-            sa.Column('sequence_number', sa.BigInteger(),
-                      nullable=False, autoincrement=True,
-                      unique=True),
             sa.Column('created_at', sa.Double(), nullable=False),
             # Indexes for common query patterns
             sa.Index('idx_cot_target', 'target_object_type', 'target_uuid'),
@@ -4329,8 +4332,11 @@ def _direct_create_cluster_operation_target(
             conn.execute(stmt)
             conn.commit()
             return True
-    except IntegrityError:
+    except IntegrityError as e:
         # Duplicate operation_uuid — already recorded
+        LOG.debug(
+            f'IntegrityError writing cluster_operation_targets '
+            f'{operation_uuid}: {e}')
         return False
     except OperationalError as e:
         LOG.warning(

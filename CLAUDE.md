@@ -448,7 +448,8 @@ performance. This is required for all deployments - MariaDB must be configured.
   Artifact, Network, Blob) with AUTO_INCREMENT sequence numbering
   for ordering. Replaces the single-pointer `last_cluster_operation`
   in `object_metadata` with a full append-only history. Primary key
-  is `operation_uuid`, indexed on `(target_object_type, target_uuid)`
+  is `sequence_number` (AUTO_INCREMENT), with a UNIQUE constraint on
+  `operation_uuid`. Indexed on `(target_object_type, target_uuid)`
   and `created_at`. Dual-write with object_metadata fallback.
 
 ### Migrating Existing Deployments
