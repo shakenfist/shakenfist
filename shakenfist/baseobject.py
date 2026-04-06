@@ -596,7 +596,17 @@ class DatabaseBackedObject:
 
         # Primary state is stored in MariaDB
         if state_attribute_name == 'state':
-            mariadb.set_state(self.object_type, str(self.uuid), new_state)
+            if not mariadb.set_state(self.object_type, str(self.uuid), new_state):
+                LOG.with_fields({
+                    'object_type': self.object_type,
+                    'object_uuid': str(self.uuid),
+                    'new_state': new_value,
+                }).error('Failed to write state to MariaDB')
+                raise RuntimeError(
+                    f'Failed to write state {new_value} for '
+                    f'{self.object_type}/{self.uuid} to MariaDB'
+                )
+            self._log_attribute_mutation('state', new_state)
         else:
             # Secondary state attributes (like 'power_state') go to etcd
             self._db_set_attribute(state_attribute_name, new_state)
