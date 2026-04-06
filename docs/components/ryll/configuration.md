@@ -30,6 +30,18 @@ ryll [OPTIONS]
 | `--usb-disk <PATH>` | none | Present a RAW disk image as a USB mass storage device (repeatable) |
 | `--usb-disk-ro <PATH>` | none | Same as `--usb-disk` but read-only (repeatable) |
 
+### Folder Sharing
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--share-dir <PATH>` | none | Share a local directory with the guest via WebDAV |
+| `--share-dir-ro` | false | Make the shared directory read-only |
+
+**Guest requirements:** The guest VM needs `spice-webdavd` installed (from
+the phodav project) and `davfs2` for mounting. The QEMU VM must be configured
+with a spiceport chardev named `org.spice-space.webdav.0` — see the QEMU
+configuration section below.
+
 ### Capture and Debugging
 
 | Option | Default | Description |
@@ -73,6 +85,15 @@ ryll --file test.vv --usb-disk-ro /path/to/image.raw
 
 # Headless mode with USB disk
 ryll --file test.vv --headless --usb-disk /tmp/test.raw
+
+# Share a local directory with the guest
+ryll --file test.vv --share-dir /home/user/documents
+
+# Share a directory read-only
+ryll --file test.vv --share-dir /home/user/documents --share-dir-ro
+
+# Headless mode with folder sharing
+ryll --file test.vv --headless --share-dir /tmp/test-share
 ```
 
 ## .vv File Format
@@ -273,3 +294,47 @@ Physical USB device passthrough requires the host to have accessible USB
 devices (appropriate permissions, not claimed by a kernel driver). The
 panel enumerates whatever nusb can see — if the list is empty, check
 host USB permissions.
+
+## Folder Sharing (WebDAV)
+
+### GUI Panel
+
+Click "Folders" in the status bar to open the Folders panel. It shows:
+
+- **Channel status** — whether the SPICE WebDAV channel is connected.
+- **Active share** — the shared directory path, read-only status, and
+  elapsed time since sharing started.
+- **Share Directory...** — opens a native directory picker to select a
+  folder to share. A "Read-only" checkbox controls write access.
+- **Stop Sharing** — stops the current share and disconnects all clients.
+- **Error display** — errors appear in red with a Dismiss button and
+  auto-clear after 10 seconds.
+
+### QEMU Configuration
+
+The QEMU VM must have a spiceport chardev for folder sharing:
+
+```
+-device virtio-serial-pci,id=virtio-serial0
+-chardev spiceport,name=org.spice-space.webdav.0,id=webdav0
+-device virtserialport,chardev=webdav0,name=org.spice-space.webdav.0
+```
+
+Or in libvirt domain XML:
+
+```xml
+<channel type='spiceport'>
+  <source channel='org.spice-space.webdav.0'/>
+  <target type='virtio' name='org.spice-space.webdav.0'/>
+</channel>
+```
+
+Use `make test-qemu-webdav` to start a pre-configured QEMU instance.
+
+### Guest Requirements
+
+The guest needs:
+- **spice-webdavd** — daemon that bridges the SPICE channel to a local
+  WebDAV endpoint (from the phodav project, `apt install spice-webdavd`)
+- **davfs2** — to mount the WebDAV share as a filesystem
+  (`apt install davfs2`)
