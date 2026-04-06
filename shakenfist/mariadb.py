@@ -4332,12 +4332,12 @@ def _direct_create_cluster_operation_target(
             conn.execute(stmt)
             conn.commit()
             return True
-    except IntegrityError as e:
-        # Duplicate operation_uuid — already recorded
-        LOG.debug(
-            f'IntegrityError writing cluster_operation_targets '
-            f'{operation_uuid}: {e}')
-        return False
+    except IntegrityError:
+        # Duplicate operation_uuid — already recorded, which is fine.
+        # This happens when set_last_cluster_operation is called more
+        # than once for the same operation (e.g. at enqueue time and
+        # again when the operation starts executing).
+        return True
     except OperationalError as e:
         LOG.warning(
             f'MariaDB write failed for cluster_operation_targets '
