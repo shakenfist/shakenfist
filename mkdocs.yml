@@ -164,8 +164,10 @@ nav:
                 - "Phase 1: Platform Portability": components/ryll/plans/PLAN-packaging-phase-01-portability.md
                 - "Phase 1: Ring buffer infrastructure": components/ryll/plans/PLAN-bug-reports-phase-01-ring-buffer.md
                 - "Phase 1: SpiceVMC channel transport": components/ryll/plans/PLAN-usb-redir-phase-01-vmc-channel.md
+                - "Phase 1: SpiceVMC port channel transport for WebDAV": components/ryll/plans/PLAN-webdav-phase-01-port-channel.md
                 - "Phase 2: Channel state snapshots": components/ryll/plans/PLAN-bug-reports-phase-02-channel-state.md
                 - "Phase 2: GitHub Actions CI": components/ryll/plans/PLAN-packaging-phase-02-ci.md
+                - "Phase 2: Mux protocol (demux and remux)": components/ryll/plans/PLAN-webdav-phase-02-mux-protocol.md
                 - "Phase 2: Pcap packet capture": components/ryll/plans/PLAN-capture-phase-02-pcap.md
                 - "Phase 2: Render cursor as egui overlay": components/ryll/plans/PLAN-cursor-rendering-phase-02-render.md
                 - "Phase 2: usbredir protocol parser": components/ryll/plans/PLAN-usb-redir-phase-02-usbredir-parser.md
@@ -173,19 +175,23 @@ nav:
                 - "Phase 3: Bug report assembly and zip output": components/ryll/plans/PLAN-bug-reports-phase-03-zip-output.md
                 - "Phase 3: Debian Packaging": components/ryll/plans/PLAN-packaging-phase-03-debian.md
                 - "Phase 3: Device backend trait": components/ryll/plans/PLAN-usb-redir-phase-03-device-backend.md
+                - "Phase 3: Embedded WebDAV server": components/ryll/plans/PLAN-webdav-phase-03-webdav-server.md
                 - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
                 - "Phase 4: Device enumeration display": components/ryll/plans/PLAN-usb-ui-phase-04-enumerate.md
                 - "Phase 4: GUI report button and description dialog": components/ryll/plans/PLAN-bug-reports-phase-04-gui-button.md
+                - "Phase 4: Integration (mux ↔ WebDAV server)": components/ryll/plans/PLAN-webdav-phase-04-integration.md
                 - "Phase 4: Real device enumeration and passthrough": components/ryll/plans/PLAN-usb-redir-phase-04-real-devices.md
                 - "Phase 4: RPM Packaging": components/ryll/plans/PLAN-packaging-phase-04-rpm.md
                 - "Phase 5: Connect and disconnect controls": components/ryll/plans/PLAN-usb-ui-phase-05-connect.md
                 - "Phase 5: Device connection lifecycle": components/ryll/plans/PLAN-usb-redir-phase-05-device-connect.md
                 - "Phase 5: GUI display region selection": components/ryll/plans/PLAN-bug-reports-phase-05-region-select.md
                 - "Phase 5: macOS Packaging": components/ryll/plans/PLAN-packaging-phase-05-macos.md
+                - "Phase 5: UI panel": components/ryll/plans/PLAN-webdav-phase-05-ui.md
                 - "Phase 6: Add virtual disk at runtime": components/ryll/plans/PLAN-usb-ui-phase-06-add-disk.md
                 - "Phase 6: Control and bulk transfers": components/ryll/plans/PLAN-usb-redir-phase-06-transfers.md
                 - "Phase 6: GUI live traffic viewer": components/ryll/plans/PLAN-bug-reports-phase-06-traffic-viewer.md
+                - "Phase 6: Testing and documentation": components/ryll/plans/PLAN-webdav-phase-06-testing.md
                 - "Phase 6: Windows Packaging": components/ryll/plans/PLAN-packaging-phase-06-windows.md
                 - "Phase 7: Documentation and testing": components/ryll/plans/PLAN-bug-reports-phase-07-docs.md
                 - "Phase 7: Release Automation": components/ryll/plans/PLAN-packaging-phase-07-release.md
@@ -198,6 +204,7 @@ nav:
                 - "Remaining issues after initial bring-up": components/ryll/plans/PLAN-remaining-issues.md
                 - "Render SPICE cursor on screen": components/ryll/plans/PLAN-cursor-rendering.md
                 - "USB device redirection via the SPICE usbredir channel": components/ryll/plans/PLAN-usb-redir.md
+                - "WebDAV folder sharing via the SPICE port channel": components/ryll/plans/PLAN-webdav.md
     - Features: features.md
     - Release notes:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
