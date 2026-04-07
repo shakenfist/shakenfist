@@ -3652,10 +3652,12 @@ def _direct_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
 
 
 def _direct_get_objects_by_state(object_type: ObjectType,
-                                 state_values: list[str]) -> list[str]:
+                                 state_values: list[str]
+                                 ) -> Optional[list[str]]:
     """Get all object UUIDs of a given type in specified states.
 
     This is the direct access version used by the database daemon.
+    Returns None on error (distinct from [] for no matches).
     """
     engine = _get_engine()
     table = _get_object_states_table()
@@ -3673,7 +3675,7 @@ def _direct_get_objects_by_state(object_type: ObjectType,
     except OperationalError as e:
         LOG.warning(
             f'MariaDB query failed for {object_type} in {state_values}: {e}')
-        return []
+        return None
 
 
 # =============================================================================
@@ -3742,8 +3744,12 @@ def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
 
 
 def _grpc_get_objects_by_state(object_type: ObjectType,
-                               state_values: list[str]) -> list[str]:
-    """Get all object UUIDs of a given type in specified states via gRPC."""
+                               state_values: list[str]
+                               ) -> Optional[list[str]]:
+    """Get all object UUIDs of a given type in specified states via gRPC.
+
+    Returns None on error (distinct from [] for no matches).
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.GetObjectsByStateRequest(
@@ -3756,7 +3762,7 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
     except grpc.RpcError as e:
         LOG.error(
             f'gRPC GetObjectsByState failed for {object_type}: {e}')
-        return []
+        return None
 
 
 # Note: ObjectType and ReservationType now have proto_id attributes and
@@ -4004,7 +4010,8 @@ def delete_state(object_type: ObjectType, object_uuid: str) -> bool:
 
 
 def get_objects_by_state(object_type: ObjectType,
-                         state_values: list[str]) -> list[str]:
+                         state_values: list[str]
+                         ) -> Optional[list[str]]:
     """Get all object UUIDs of a given type in specified states.
 
     This is the primary use case for MariaDB state storage - efficient
@@ -4015,7 +4022,8 @@ def get_objects_by_state(object_type: ObjectType,
         state_values: List of state values to match.
 
     Returns:
-        List of object UUIDs matching the criteria.
+        List of object UUIDs matching the criteria, or None if the
+        query failed (distinct from [] which means no matches).
     """
     if _use_database_service():
         return _grpc_get_objects_by_state(object_type, state_values)
@@ -5814,10 +5822,10 @@ def get_active_blob_uuids() -> list[str]:
     Active states are 'initial' and 'created' (not 'deleted' or 'error').
 
     Returns:
-        List of blob UUID strings in active states.
+        List of blob UUID strings in active states (empty on error).
     """
     active_states = ['initial', 'created']
-    return _direct_get_objects_by_state(ObjectType.BLOB, active_states)
+    return _direct_get_objects_by_state(ObjectType.BLOB, active_states) or []
 
 
 # =============================================================================

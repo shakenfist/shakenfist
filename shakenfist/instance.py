@@ -2035,10 +2035,20 @@ class Instances(dbo_iter):
                 raise exceptions.InvalidObjectPrefilter(
                     self.prefilter)
 
-            matching_uuids = set(
-                mariadb.get_objects_by_state(
-                    Instance.object_type,
-                    list(target_states)))
+            matching_uuids_list = mariadb.get_objects_by_state(
+                Instance.object_type, list(target_states))
+
+            if matching_uuids_list is None:
+                # State query failed; yield all and let caller
+                # filters handle correctness.
+                LOG.warning('get_objects_by_state returned None for '
+                            'instances, falling back to full scan')
+                for data in mariadb.get_all_instances():
+                    yield (str(data.uuid),
+                           Instance._static_values_to_dict(data))
+                return
+
+            matching_uuids = set(matching_uuids_list)
 
             results = []
             for data in mariadb.get_all_instances():

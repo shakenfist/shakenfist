@@ -790,8 +790,21 @@ class DatabaseBackedObjectIterator:
             raise exceptions.InvalidObjectPrefilter(self.prefilter)
 
         # Use MariaDB for efficient state-based filtering
-        matching_uuids = set(mariadb.get_objects_by_state(
-            self.base_object.object_type, list(target_states)))
+        matching_uuids_list = mariadb.get_objects_by_state(
+            self.base_object.object_type, list(target_states))
+
+        if matching_uuids_list is None:
+            # MariaDB/gRPC query failed; fall back to yielding all
+            # objects from etcd so callers still find their targets.
+            LOG.warning('get_objects_by_state returned None for '
+                        f'{self.base_object.object_type}, falling '
+                        'back to full etcd scan')
+            for objuuid, objdata in etcd.get_all(
+                    self.base_object.object_type, None):
+                yield objuuid, objdata
+            return
+
+        matching_uuids = set(matching_uuids_list)
 
         # Fetch static values only for objects in the target states
         # We fetch all results in a block before yielding to avoid inconsistency

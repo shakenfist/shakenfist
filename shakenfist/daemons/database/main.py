@@ -520,7 +520,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 return database_pb2.GetObjectsByStateReply(object_uuids=[])
             uuids = mariadb.get_objects_by_state(
                 object_type, list(request.state_values))
-            return database_pb2.GetObjectsByStateReply(object_uuids=uuids)
+            return database_pb2.GetObjectsByStateReply(
+                object_uuids=uuids or [])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetObjectsByState failed', e)

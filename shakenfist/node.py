@@ -641,9 +641,11 @@ class Nodes(dbo_iter):
                 from shakenfist import exceptions
                 raise exceptions.InvalidObjectPrefilter(self.prefilter)
 
-            matching = set(mariadb.get_objects_by_state(
-                ObjectType.NODE, list(target_states)))
-            all_uuids = [u for u in all_uuids if u in matching]
+            matching = mariadb.get_objects_by_state(
+                ObjectType.NODE, list(target_states))
+            if matching is not None:
+                matching = set(matching)
+                all_uuids = [u for u in all_uuids if u in matching]
 
         for node_uuid in all_uuids:
             n = Node.from_db(node_uuid)

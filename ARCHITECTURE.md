@@ -84,6 +84,11 @@ also uses these settings on all stub calls, and additionally wraps calls with
 the `_retry_database` decorator for exponential backoff retries. All gRPC
 failures are logged at ERROR level.
 
+`get_objects_by_state()` returns `None` on error (distinct from `[]` for no
+matches). All object iterators handle this by falling back to unfiltered
+scans, ensuring that transient gRPC failures do not silently drop objects
+from iteration results (e.g. interfaces during instance deletion).
+
 #### Cluster Operation Tracking
 
 `set_last_cluster_operation()` records which cluster operation was most recently
