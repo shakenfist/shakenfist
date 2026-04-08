@@ -177,9 +177,24 @@ echo
 # Step 2: Check Claude availability
 echo -e "${YELLOW}Step 2: Checking Claude Code availability...${NC}"
 
-claude_bin="${CLAUDE_BIN:-claude}"
-if ! command -v "${claude_bin}" &> /dev/null; then
-    echo -e "${RED}Error: Claude Code CLI not found (${claude_bin})${NC}"
+# Locate the claude binary. Honour CLAUDE_BIN if set, then look on PATH,
+# then fall back to the default install location used by the official
+# installer (~/.local/bin/claude is not always on PATH for non-login
+# shells like the GitHub Actions runner).
+if [ -n "${CLAUDE_BIN:-}" ]; then
+    claude_bin="${CLAUDE_BIN}"
+elif command -v claude &> /dev/null; then
+    claude_bin="claude"
+elif [ -x "${HOME}/.local/bin/claude" ]; then
+    claude_bin="${HOME}/.local/bin/claude"
+else
+    claude_bin=""
+fi
+if [ -z "${claude_bin}" ] || \
+        { ! command -v "${claude_bin}" &> /dev/null && \
+          ! [ -x "${claude_bin}" ]; }; then
+    echo -e "${RED}Error: Claude Code CLI not found" \
+        "(${claude_bin:-not set})${NC}"
     echo "Install with: npm install -g @anthropic-ai/claude-code"
     echo "Or set CLAUDE_BIN to the path of an existing install."
     ci_output "claude_available" "false"
