@@ -11,6 +11,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
+from shakenfist import mariadb
 from shakenfist import upload
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
@@ -283,3 +284,21 @@ def clear_old_libvirt_logs():
 @util_general.recorded_method
 def remove_stale_uploads_for_this_node():
     upload.remove_stale_uploads_for_this_node()
+
+
+@util_general.recorded_method
+def prune_cluster_operation_targets():
+    """Prune old cluster_operation_targets rows for completed operations.
+
+    Bounded by CLUSTER_OPERATION_TARGET_RETENTION. A retention of 0
+    disables pruning. Operations still in flight (queued/preflight/
+    executing) are never pruned regardless of age.
+    """
+    max_age = config.CLUSTER_OPERATION_TARGET_RETENTION
+    if max_age <= 0:
+        return
+
+    deleted = mariadb.delete_stale_cluster_operation_targets(max_age)
+    if deleted:
+        LOG.with_fields({'deleted': deleted}).info(
+            'Pruned stale cluster_operation_targets rows')

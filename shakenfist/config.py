@@ -144,6 +144,16 @@ class SFConfig(BaseSettings):
             'How long to wait before removing old data from the  database.'
         )
     )
+    CLUSTER_OPERATION_TARGET_RETENTION: int = Field(
+        7 * 24 * 3600,
+        description=(
+            'How long (in seconds) to retain rows in the '
+            'cluster_operation_targets history table for completed or '
+            'aborted operations. Active (queued/preflight/executing) '
+            'operations are never pruned regardless of age. Set to 0 '
+            'to disable pruning.'
+        )
+    )
     NODE_CHECKIN_MAXIMUM: int = Field(
         120,
         description=(

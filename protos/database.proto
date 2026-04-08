@@ -249,6 +249,7 @@ service DatabaseService {
   rpc GetLatestClusterOperationTarget (GetLatestClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
   rpc DeleteClusterOperationTarget (DeleteClusterOperationTargetRequest) returns (StatusReply) {}
   rpc DeleteClusterOperationTargetsForObject (DeleteClusterOperationTargetsForObjectRequest) returns (StatusReply) {}
+  rpc DeleteStaleClusterOperationTargets (DeleteStaleClusterOperationTargetsRequest) returns (DeleteCountReply) {}
 }
 
 // Generic status reply
@@ -1614,4 +1615,10 @@ message DeleteClusterOperationTargetRequest {
 message DeleteClusterOperationTargetsForObjectRequest {
   ObjectType target_object_type = 1;
   string target_uuid = 2;
+}
+
+message DeleteStaleClusterOperationTargetsRequest {
+  // Unix timestamp - delete targets with created_at < this whose
+  // operation is no longer in an active state.
+  double older_than = 1;
 }

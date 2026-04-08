@@ -180,6 +180,10 @@ class Monitor(daemon.Daemon):
         last_compaction = time.time() - random.randint(1, 20*60)
         last_missing_blob_check = 0
         last_libvirt_log_clean = 0
+        # Stagger first run to avoid all nodes hitting at once on cluster
+        # restart -- only the etcd master ever runs the prune, but the
+        # offset still smooths things out across restarts.
+        last_cot_prune = time.time() - random.randint(1, 20*60)
 
         n = node.Node.from_db(config.NODE_NAME)
         while daemon.check_abort_path(self.abort_path):
@@ -218,6 +222,16 @@ class Monitor(daemon.Daemon):
                                                         threshold=1):
                         self._compact_etcd()
                         last_compaction = time.time()
+
+                # Prune the cluster_operation_targets history table.
+                # This is a cluster-wide table so we only run from the
+                # etcd master to avoid duplicated work.
+                if time.time() - last_cot_prune > 1800:
+                    with util_general.RecordedOperation(
+                            'prune cluster operation targets', n,
+                            threshold=1):
+                        scheduled_tasks.prune_cluster_operation_targets()
+                        last_cot_prune = time.time()
 
             # Cleanup libvirt logs, but less frequently
             if time.time() - last_libvirt_log_clean > 1800:

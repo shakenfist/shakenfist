@@ -4000,6 +4000,26 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def DeleteStaleClusterOperationTargets(
+        self,
+        request: database_pb2.DeleteStaleClusterOperationTargetsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteCountReply:
+        """Prune cluster_operation_targets rows for completed operations."""
+        try:
+            self.monitor.counters[
+                'delete_stale_cluster_operation_targets'].inc()
+            count = (
+                mariadb
+                ._direct_delete_stale_cluster_operation_targets(
+                    request.older_than))
+            return database_pb2.DeleteCountReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteStaleClusterOperationTargets failed',
+                e)
+            return database_pb2.DeleteCountReply(count=0)
+
     def _instance_attrs_from_proto(
             self,
             d: database_pb2.InstanceAttributesProto
@@ -4184,7 +4204,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_cluster_operation_targets_for_object',
             'get_latest_cluster_operation_target',
             'delete_cluster_operation_target',
-            'delete_cluster_operation_targets_for_object'
+            'delete_cluster_operation_targets_for_object',
+            'delete_stale_cluster_operation_targets'
         ]
         for op in operations:
             self.counters[op] = Counter(

@@ -4934,3 +4934,21 @@ class DeleteClusterOperationTargetsForObjectRequest(google.protobuf.message.Mess
     def ClearField(self, field_name: typing.Literal["target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
 
 global___DeleteClusterOperationTargetsForObjectRequest = DeleteClusterOperationTargetsForObjectRequest
+
+@typing.final
+class DeleteStaleClusterOperationTargetsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OLDER_THAN_FIELD_NUMBER: builtins.int
+    older_than: builtins.float
+    """Unix timestamp - delete targets with created_at < this whose
+    operation is no longer in an active state.
+    """
+    def __init__(
+        self,
+        *,
+        older_than: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["older_than", b"older_than"]) -> None: ...
+
+global___DeleteStaleClusterOperationTargetsRequest = DeleteStaleClusterOperationTargetsRequest
