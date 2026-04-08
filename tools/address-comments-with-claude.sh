@@ -206,8 +206,11 @@ if ! command -v gh &> /dev/null; then
     exit 1
 fi
 
-if ! command -v claude &> /dev/null; then
-    echo -e "${RED}Error: Claude Code CLI not found${NC}"
+claude_bin="${CLAUDE_BIN:-claude}"
+if ! command -v "${claude_bin}" &> /dev/null; then
+    echo -e "${RED}Error: Claude Code CLI not found (${claude_bin})${NC}"
+    echo "Install with: npm install -g @anthropic-ai/claude-code"
+    echo "Or set CLAUDE_BIN to the path of an existing install."
     exit 1
 fi
 
@@ -478,7 +481,7 @@ PROMPT_EOF
     echo "Running Claude Code..."
     claude_output_file="${output_dir}/claude-output-${i}.txt"
 
-    if ! ~/local/.bin/claude -p "$(cat "${output_dir}/claude-prompt-${i}.txt")" \
+    if ! "${claude_bin}" -p "$(cat "${output_dir}/claude-prompt-${i}.txt")" \
         --dangerously-skip-permissions \
         --max-turns "${max_turns}" \
         --output-format text > "${claude_output_file}" 2>&1; then
