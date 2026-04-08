@@ -497,8 +497,10 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             resp.get_json())
 
     def test_get_namespace_metadata(self):
-        self.mock_etcd.db['/sf/attribute/namespace/system/metadata'] = \
-            json.dumps({'a': 'a', 'b': 'b'}, indent=4, sort_keys=True).encode()
+        # Set up metadata in MariaDB mock
+        self.mock_etcd.object_metadata['namespace/system'] = {
+            'metadata': {'a': 'a', 'b': 'b'}
+        }
         resp = self.client.get(
             '/auth/namespaces/system/metadata', headers={'Authorization': self.auth_token})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
@@ -516,8 +518,8 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
-            json.dumps({'foo': 'bar'}, indent=4, sort_keys=True).encode(),
-            self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
+            {'foo': 'bar'},
+            self.mock_etcd.object_metadata['namespace/system']['metadata'])
 
     @mock.patch('shakenfist.etcd.ClusterLock')
     def test_post_namespace_metadata(self, mock_get_lock):
@@ -530,23 +532,22 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
-            json.dumps({'foo': 'bar'}, indent=4, sort_keys=True).encode(),
-            self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
+            {'foo': 'bar'},
+            self.mock_etcd.object_metadata['namespace/system']['metadata'])
 
     @mock.patch('shakenfist.etcd.ClusterLock')
     def test_delete_namespace_metadata(self, mock_get_lock):
-        self.mock_etcd.db['/sf/attribute/namespace/system/metadata'] = \
-            json.dumps(
-                {'foo': 'bar', 'real': 'smart'},
-                indent=4,
-                sort_keys=True).encode()
+        # Set up metadata in MariaDB mock
+        self.mock_etcd.object_metadata['namespace/system'] = {
+            'metadata': {'foo': 'bar', 'real': 'smart'}
+        }
         resp = self.client.delete('/auth/namespaces/system/metadata/foo',
                                   headers={'Authorization': self.auth_token})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
-            json.dumps({'real': 'smart'}, indent=4, sort_keys=True).encode(),
-            self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
+            {'real': 'smart'},
+            self.mock_etcd.object_metadata['namespace/system']['metadata'])
 
     @mock.patch('shakenfist.etcd.ClusterLock')
     def test_delete_namespace_metadata_bad_key(self, mock_get_lock):

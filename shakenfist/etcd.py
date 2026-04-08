@@ -637,7 +637,7 @@ def compact(revision):
     try:
         stub = etcd_pb2_grpc.MaintenanceStub(channel)
         request = etcd_pb2.DefragmentRequest()
-        stub.Defragment(request)
+        stub.Defragment(request, timeout=30, wait_for_ready=True)
     except grpc.RpcError as rpc_error:
         _log_and_raise_error(rpc_error)
         return False

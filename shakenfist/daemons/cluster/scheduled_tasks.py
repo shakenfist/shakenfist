@@ -49,7 +49,7 @@ def per_blob_checks():
 def _fill_per_blob_queue():
     blob_uuids = mariadb.get_objects_by_state(
         ObjectType.BLOB, [Blob.STATE_CREATED])
-    for blob_uuid in blob_uuids:
+    for blob_uuid in (blob_uuids or []):
         b = Blob.from_db(blob_uuid)
         if not b:
             continue

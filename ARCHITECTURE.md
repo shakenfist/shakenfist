@@ -70,6 +70,39 @@ The database microservice (`sf-database`) centralizes all database access:
 - All other daemons use the gRPC interface
 - Provides Prometheus metrics for database operations
 
+#### gRPC Reliability
+
+All gRPC calls use `timeout=30` seconds and `wait_for_ready=True` to handle
+transient service unavailability during startup or momentary congestion. The
+`_grpc_call()` helper in `mariadb.py` enforces this for all database service
+calls and retries up to 3 times on UNAVAILABLE/DEADLINE_EXCEEDED errors with
+channel reset between attempts. The database gRPC channel uses HTTP/2
+keepalive (ping every 10s, 5s timeout) to detect stale connections before
+they cause failures. The database gRPC server uses a 20-thread pool to
+handle concurrent requests from all daemons. The etcd proxy in `database.py`
+also uses these settings on all stub calls, and additionally wraps calls with
+the `_retry_database` decorator for exponential backoff retries. All gRPC
+failures are logged at ERROR level.
+
+`get_objects_by_state()` returns `None` on error (distinct from `[]` for no
+matches). All object iterators handle this by falling back to unfiltered
+scans, ensuring that transient gRPC failures do not silently drop objects
+from iteration results (e.g. interfaces during instance deletion).
+
+Object types with static values in MariaDB (`Instances`, `Networks`,
+`NetworkInterfaces`) override `get_iterator()` in their iterator classes
+to read from MariaDB via `get_all_*()` functions instead of etcd. This
+is essential because new objects are written to MariaDB as the primary
+store and may not exist in etcd.
+
+#### Cluster Operation Tracking
+
+`set_last_cluster_operation()` records which cluster operation was most recently
+enqueued for an object. API clients poll this to wait for operations to complete.
+The write now raises `RuntimeError` on failure so API endpoints return 500
+instead of silently losing the tracking data. Callers in deletion paths and
+daemons catch this exception to ensure cleanup always proceeds.
+
 ### Protocol Buffers and gRPC
 
 The gRPC interface is defined in `protos/*.proto` files. Generated Python code

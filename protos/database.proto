@@ -167,6 +167,7 @@ service DatabaseService {
   rpc GetNetworkInterface (GetNetworkInterfaceRequest) returns (GetNetworkInterfaceReply) {}
   rpc GetNetworkInterfacesByInstance (GetNetworkInterfacesByInstanceRequest) returns (GetNetworkInterfacesReply) {}
   rpc GetNetworkInterfacesByNetwork (GetNetworkInterfacesByNetworkRequest) returns (GetNetworkInterfacesReply) {}
+  rpc GetAllNetworkInterfaces (GetAllNetworkInterfacesRequest) returns (GetNetworkInterfacesReply) {}
   rpc DeleteNetworkInterface (DeleteNetworkInterfaceRequest) returns (StatusReply) {}
   rpc UpdateNetworkInterface (UpdateNetworkInterfaceRequest) returns (StatusReply) {}
 
@@ -220,6 +221,7 @@ service DatabaseService {
   rpc CreateInstance (CreateInstanceRequest) returns (StatusReply) {}
   rpc GetInstance (GetInstanceRequest) returns (GetInstanceReply) {}
   rpc GetAllInstances (GetAllInstancesRequest) returns (GetAllInstancesReply) {}
+  rpc GetAllInstanceUuids (GetAllInstanceUuidsRequest) returns (GetAllInstanceUuidsReply) {}
   rpc DeleteInstance (DeleteInstanceRequest) returns (StatusReply) {}
 
   // Instance Attributes Operations (MariaDB)
@@ -229,13 +231,14 @@ service DatabaseService {
   rpc GetInstanceAttributes (GetInstanceAttributesRequest) returns (GetInstanceAttributesReply) {}
   rpc UpdateInstanceAttributes (UpdateInstanceAttributesRequest) returns (StatusReply) {}
   rpc DeleteInstanceAttributes (DeleteInstanceAttributesRequest) returns (StatusReply) {}
+  rpc GetConsumedPortsForNode (GetConsumedPortsForNodeRequest) returns (GetConsumedPortsForNodeReply) {}
+  rpc IsVsockCidInUse (IsVsockCidInUseRequest) returns (IsVsockCidInUseReply) {}
 
   // Object Metadata Operations (MariaDB)
   // These store user-defined metadata and last_cluster_operation for all
   // object types in a single shared table (like object_states).
   rpc GetObjectMetadata (GetObjectMetadataRequest) returns (GetObjectMetadataReply) {}
   rpc SetMetadata (SetMetadataRequest) returns (StatusReply) {}
-  rpc SetLastClusterOperation (SetLastClusterOperationRequest) returns (StatusReply) {}
   rpc DeleteObjectMetadata (DeleteObjectMetadataRequest) returns (StatusReply) {}
 
   // Cluster Operation Target Operations (MariaDB)
@@ -1219,6 +1222,10 @@ message GetNetworkInterfacesReply {
   repeated NetworkInterfaceStaticData network_interfaces = 1;
 }
 
+message GetAllNetworkInterfacesRequest {
+  // No filters - returns all network interfaces
+}
+
 message DeleteNetworkInterfaceRequest {
   string uuid = 1;
 }
@@ -1466,6 +1473,13 @@ message GetAllInstancesReply {
   repeated InstanceStaticData instances = 1;
 }
 
+message GetAllInstanceUuidsRequest {
+}
+
+message GetAllInstanceUuidsReply {
+  repeated string uuids = 1;
+}
+
 message DeleteInstanceRequest {
   string uuid = 1;
 }
@@ -1487,6 +1501,7 @@ message InstanceAttributesProto {
   string agent_operations_json = 10;   // JSON: {queue, queued, running, completed}
   int32 kvm_pid = 11;                  // KVM process PID (0 = not running)
   string error_message = 12;           // Error message (or empty)
+  string vsock_cids_json = 13;         // JSON: {channel_name: cid_value}
 }
 
 message CreateInstanceAttributesRequest {
@@ -1510,6 +1525,22 @@ message DeleteInstanceAttributesRequest {
   string uuid = 1;
 }
 
+message GetConsumedPortsForNodeRequest {
+  string node_uuid = 1;
+}
+
+message GetConsumedPortsForNodeReply {
+  repeated int32 ports = 1;
+}
+
+message IsVsockCidInUseRequest {
+  int64 cid = 1;
+}
+
+message IsVsockCidInUseReply {
+  bool in_use = 1;
+}
+
 // Object Metadata Operations
 
 message GetObjectMetadataRequest {
@@ -1527,12 +1558,6 @@ message SetMetadataRequest {
   ObjectType object_type = 1;
   string object_uuid = 2;
   string metadata_json = 3;                  // JSON dict or empty
-}
-
-message SetLastClusterOperationRequest {
-  ObjectType object_type = 1;
-  string object_uuid = 2;
-  string last_cluster_operation_json = 3;    // JSON dict or empty
 }
 
 message DeleteObjectMetadataRequest {

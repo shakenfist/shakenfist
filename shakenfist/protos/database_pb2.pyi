@@ -3494,6 +3494,18 @@ class GetNetworkInterfacesReply(google.protobuf.message.Message):
 global___GetNetworkInterfacesReply = GetNetworkInterfacesReply
 
 @typing.final
+class GetAllNetworkInterfacesRequest(google.protobuf.message.Message):
+    """No filters - returns all network interfaces"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllNetworkInterfacesRequest = GetAllNetworkInterfacesRequest
+
+@typing.final
 class DeleteNetworkInterfaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4407,6 +4419,32 @@ class GetAllInstancesReply(google.protobuf.message.Message):
 global___GetAllInstancesReply = GetAllInstancesReply
 
 @typing.final
+class GetAllInstanceUuidsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllInstanceUuidsRequest = GetAllInstanceUuidsRequest
+
+@typing.final
+class GetAllInstanceUuidsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUIDS_FIELD_NUMBER: builtins.int
+    @property
+    def uuids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuids: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuids", b"uuids"]) -> None: ...
+
+global___GetAllInstanceUuidsReply = GetAllInstanceUuidsReply
+
+@typing.final
 class DeleteInstanceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4442,6 +4480,7 @@ class InstanceAttributesProto(google.protobuf.message.Message):
     AGENT_OPERATIONS_JSON_FIELD_NUMBER: builtins.int
     KVM_PID_FIELD_NUMBER: builtins.int
     ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+    VSOCK_CIDS_JSON_FIELD_NUMBER: builtins.int
     uuid: builtins.str
     """References instances.uuid"""
     placement_json: builtins.str
@@ -4466,6 +4505,8 @@ class InstanceAttributesProto(google.protobuf.message.Message):
     """KVM process PID (0 = not running)"""
     error_message: builtins.str
     """Error message (or empty)"""
+    vsock_cids_json: builtins.str
+    """JSON: {channel_name: cid_value}"""
     def __init__(
         self,
         *,
@@ -4481,8 +4522,9 @@ class InstanceAttributesProto(google.protobuf.message.Message):
         agent_operations_json: builtins.str = ...,
         kvm_pid: builtins.int = ...,
         error_message: builtins.str = ...,
+        vsock_cids_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["agent_attributes_json", b"agent_attributes_json", "agent_operations_json", b"agent_operations_json", "agent_state_json", b"agent_state_json", "block_devices_json", b"block_devices_json", "enforced_deletes_json", b"enforced_deletes_json", "error_message", b"error_message", "interfaces_json", b"interfaces_json", "kvm_pid", b"kvm_pid", "placement_json", b"placement_json", "ports_json", b"ports_json", "power_state_json", b"power_state_json", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_attributes_json", b"agent_attributes_json", "agent_operations_json", b"agent_operations_json", "agent_state_json", b"agent_state_json", "block_devices_json", b"block_devices_json", "enforced_deletes_json", b"enforced_deletes_json", "error_message", b"error_message", "interfaces_json", b"interfaces_json", "kvm_pid", b"kvm_pid", "placement_json", b"placement_json", "ports_json", b"ports_json", "power_state_json", b"power_state_json", "uuid", b"uuid", "vsock_cids_json", b"vsock_cids_json"]) -> None: ...
 
 global___InstanceAttributesProto = InstanceAttributesProto
 
@@ -4571,6 +4613,67 @@ class DeleteInstanceAttributesRequest(google.protobuf.message.Message):
 global___DeleteInstanceAttributesRequest = DeleteInstanceAttributesRequest
 
 @typing.final
+class GetConsumedPortsForNodeRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["node_uuid", b"node_uuid"]) -> None: ...
+
+global___GetConsumedPortsForNodeRequest = GetConsumedPortsForNodeRequest
+
+@typing.final
+class GetConsumedPortsForNodeReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PORTS_FIELD_NUMBER: builtins.int
+    @property
+    def ports(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def __init__(
+        self,
+        *,
+        ports: collections.abc.Iterable[builtins.int] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["ports", b"ports"]) -> None: ...
+
+global___GetConsumedPortsForNodeReply = GetConsumedPortsForNodeReply
+
+@typing.final
+class IsVsockCidInUseRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CID_FIELD_NUMBER: builtins.int
+    cid: builtins.int
+    def __init__(
+        self,
+        *,
+        cid: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["cid", b"cid"]) -> None: ...
+
+global___IsVsockCidInUseRequest = IsVsockCidInUseRequest
+
+@typing.final
+class IsVsockCidInUseReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IN_USE_FIELD_NUMBER: builtins.int
+    in_use: builtins.bool
+    def __init__(
+        self,
+        *,
+        in_use: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["in_use", b"in_use"]) -> None: ...
+
+global___IsVsockCidInUseReply = IsVsockCidInUseReply
+
+@typing.final
 class GetObjectMetadataRequest(google.protobuf.message.Message):
     """Object Metadata Operations"""
 
@@ -4634,28 +4737,6 @@ class SetMetadataRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["metadata_json", b"metadata_json", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
 
 global___SetMetadataRequest = SetMetadataRequest
-
-@typing.final
-class SetLastClusterOperationRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    OBJECT_TYPE_FIELD_NUMBER: builtins.int
-    OBJECT_UUID_FIELD_NUMBER: builtins.int
-    LAST_CLUSTER_OPERATION_JSON_FIELD_NUMBER: builtins.int
-    object_type: shakenfist_enums_pb2.ObjectType.ValueType
-    object_uuid: builtins.str
-    last_cluster_operation_json: builtins.str
-    """JSON dict or empty"""
-    def __init__(
-        self,
-        *,
-        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
-        object_uuid: builtins.str = ...,
-        last_cluster_operation_json: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["last_cluster_operation_json", b"last_cluster_operation_json", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
-
-global___SetLastClusterOperationRequest = SetLastClusterOperationRequest
 
 @typing.final
 class DeleteObjectMetadataRequest(google.protobuf.message.Message):

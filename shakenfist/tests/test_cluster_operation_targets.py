@@ -31,57 +31,24 @@ class LastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
         mock_get_latest.assert_called_once_with(
             d.object_type, TEST_UUID)
 
-    @mock.patch(
-        'shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-        return_value={'op_type': 'etcd_op', 'op_uuid': 'from-etcd'})
-    @mock.patch('shakenfist.mariadb.get_object_metadata',
-                return_value=None)
     @mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
                 return_value=None)
-    def test_lco_falls_back_to_etcd_when_no_targets(
-            self, mock_get_latest, mock_get_meta, mock_etcd_get):
+    def test_lco_returns_none_when_no_targets(self, mock_get_latest):
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
         result = d.last_cluster_operation
-        self.assertEqual(result, {
-            'op_type': 'etcd_op', 'op_uuid': 'from-etcd'
-        })
-        mock_etcd_get.assert_called_once_with('last_cluster_operation')
-
-    @mock.patch('shakenfist.mariadb.get_object_metadata')
-    @mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
-                return_value=ClusterOperationTargetData(
-                    operation_uuid=OP_UUID,
-                    operation_type='net_op',
-                    target_object_type='unknown',
-                    target_uuid=TEST_UUID,
-                    sequence_number=5,
-                    created_at=2000.0
-                ))
-    def test_lco_skips_object_metadata_when_target_found(
-            self, mock_get_latest, mock_get_meta):
-        """When cluster_operation_targets has data, don't query object_metadata."""
-        d = DatabaseBackedObjectWithOperations(TEST_UUID)
-        result = d.last_cluster_operation
-        self.assertEqual(result, {
-            'op_type': 'net_op',
-            'op_uuid': OP_UUID
-        })
-        mock_get_meta.assert_not_called()
+        self.assertIsNone(result)
+        mock_get_latest.assert_called_once_with(
+            d.object_type, TEST_UUID)
 
 
 class SetLastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
     """Test set_last_cluster_operation writes to cluster_operation_targets."""
 
-    @mock.patch(
-        'shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
-    @mock.patch('shakenfist.mariadb.set_last_cluster_operation',
-                return_value=True)
     @mock.patch('shakenfist.mariadb.create_cluster_operation_target',
                 return_value=True)
     @mock.patch('shakenfist.baseobject.time')
-    def test_set_lco_writes_to_targets_and_dual_writes(
-            self, mock_time, mock_create_target,
-            mock_set_lco, mock_etcd_set):
+    def test_set_lco_writes_to_targets_only(
+            self, mock_time, mock_create_target):
         mock_time.time.return_value = 1234.5
 
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
@@ -96,31 +63,14 @@ class SetLastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
             created_at=1234.5
         )
 
-        # Verify dual-write to object_metadata
-        expected_lco = {
-            'op_type': 'instance_preflight',
-            'op_uuid': OP_UUID
-        }
-        mock_set_lco.assert_called_once_with(
-            d.object_type, TEST_UUID, expected_lco)
-
-        # Verify dual-write to etcd
-        mock_etcd_set.assert_called_once_with(
-            'last_cluster_operation', expected_lco)
-
-    @mock.patch(
-        'shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
-    @mock.patch('shakenfist.mariadb.set_last_cluster_operation')
     @mock.patch('shakenfist.mariadb.create_cluster_operation_target')
     def test_set_lco_in_memory_skips_mariadb(
-            self, mock_create_target, mock_set_lco, mock_etcd_set):
+            self, mock_create_target):
         d = DatabaseBackedObjectWithOperations(
             TEST_UUID, in_memory_only=True)
         d.set_last_cluster_operation('net_op', OP_UUID)
 
         mock_create_target.assert_not_called()
-        mock_set_lco.assert_not_called()
-        mock_etcd_set.assert_called_once()
 
 
 class HardDeleteWithTargetsTestCase(base.ShakenFistTestCase):

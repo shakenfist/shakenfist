@@ -122,7 +122,10 @@ class Job(util_concurrency.Job):
                                 n.uuid,
                                 [net_tasks.network_destroy],
                                 PRIORITY.user_facing)
-                            n.set_last_cluster_operation(op_type, op_uuid)
+                            try:
+                                n.set_last_cluster_operation(op_type, op_uuid)
+                            except RuntimeError:
+                                pass  # Cleanup must proceed
 
                         # We skip maintenance on all delete_wait networks
                         continue

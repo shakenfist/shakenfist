@@ -668,6 +668,13 @@ class MockEtcd():
         self.mariadb_get_all_instances.start()
         self.test_obj.addCleanup(self.mariadb_get_all_instances.stop)
 
+        self.mariadb_get_all_instance_uuids = mock.patch(
+            'shakenfist.mariadb.get_all_instance_uuids',
+            side_effect=self._mariadb_get_all_instance_uuids)
+        self.mariadb_get_all_instance_uuids.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_all_instance_uuids.stop)
+
         self.mariadb_delete_instance = mock.patch(
             'shakenfist.mariadb.delete_instance',
             side_effect=self._mariadb_delete_instance)
@@ -717,13 +724,6 @@ class MockEtcd():
         self.mariadb_set_metadata.start()
         self.test_obj.addCleanup(
             self.mariadb_set_metadata.stop)
-
-        self.mariadb_set_last_cluster_operation = mock.patch(
-            'shakenfist.mariadb.set_last_cluster_operation',
-            side_effect=self._mariadb_set_last_cluster_operation)
-        self.mariadb_set_last_cluster_operation.start()
-        self.test_obj.addCleanup(
-            self.mariadb_set_last_cluster_operation.stop)
 
         self.mariadb_delete_object_metadata = mock.patch(
             'shakenfist.mariadb.delete_object_metadata',
@@ -868,6 +868,12 @@ class MockEtcd():
                 'update_time': data['update_time']
             }
         return None
+
+    def get_mariadb_instance_attributes(
+            self, object_uuid: str) -> Optional[InstanceAttributesData]:
+        """Get instance attributes from the mock MariaDB store for test assertions."""
+        key = str(object_uuid)
+        return self.instance_attributes.get(key)
 
     #
     # MariaDB IPAM mock operations
@@ -1766,6 +1772,11 @@ class MockEtcd():
         self._trace('MockMariaDB.get_all_instances()')
         return list(self.instance_objects.values())
 
+    def _mariadb_get_all_instance_uuids(self) -> list[str]:
+        """Mock implementation of mariadb.get_all_instance_uuids()"""
+        self._trace('MockMariaDB.get_all_instance_uuids()')
+        return list(self.instance_objects.keys())
+
     def _mariadb_delete_instance(self, inst_uuid) -> bool:
         """Mock implementation of mariadb.delete_instance()"""
         key = str(inst_uuid)
@@ -1865,19 +1876,6 @@ class MockEtcd():
         self.object_metadata[key]['metadata'] = metadata_dict
         self._trace(
             f'MockMariaDB.set_metadata({key}): stored')
-        return True
-
-    def _mariadb_set_last_cluster_operation(
-            self, object_type, object_uuid, lco_dict):
-        """Mock implementation of mariadb.set_last_cluster_operation()"""
-        key = f'{object_type}/{object_uuid}'
-        if key not in self.object_metadata:
-            self.object_metadata[key] = {}
-        self.object_metadata[key][
-            'last_cluster_operation'] = lco_dict
-        self._trace(
-            f'MockMariaDB.set_last_cluster_operation({key}): '
-            f'stored')
         return True
 
     def _mariadb_delete_object_metadata(self, object_type,
@@ -2169,7 +2167,8 @@ class MockEtcd():
                             )
 
         if metadata:
-            inst._db_set_attribute('metadata', metadata)
+            for k, v in metadata.items():
+                inst.add_metadata_key(k, v)
 
         # We just smash the requested state into the object, we don't attempt
         # to find a valid path to that state.
@@ -2206,7 +2205,8 @@ class MockEtcd():
                               )
 
         if metadata:
-            network._db_set_attribute('metadata', metadata)
+            for k, v in metadata.items():
+                network.add_metadata_key(k, v)
 
         state_path = defaultdict(set)
         for initial, allowed in Network.state_targets.items():

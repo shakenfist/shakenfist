@@ -128,7 +128,7 @@ def get(object_type, subtype, name):
         subtype=subtype or '',
         name=name or ''
     )
-    response = stub.Get(request)
+    response = stub.Get(request, timeout=30, wait_for_ready=True)
     if not response.found:
         return None
     return json.loads(response.value)
@@ -148,7 +148,7 @@ def get_all(object_type, subtype, prefix=None, limit=0):
         prefix=prefix or '',
         limit=limit
     )
-    response = stub.GetPrefix(request)
+    response = stub.GetPrefix(request, timeout=30, wait_for_ready=True)
     for kv in response.results:
         yield kv.key, json.loads(kv.value)
 
@@ -167,7 +167,7 @@ def put(object_type, subtype, name, data):
         name=name or '',
         data=util_json.json_dump(data)
     )
-    response = stub.Put(request)
+    response = stub.Put(request, timeout=30, wait_for_ready=True)
     if not response.success:
         LOG.error(f'Database put failed: {response.error}')
 
@@ -186,7 +186,7 @@ def create(object_type, subtype, name, data):
         name=name or '',
         data=util_json.json_dump(data)
     )
-    response = stub.Create(request)
+    response = stub.Create(request, timeout=30, wait_for_ready=True)
     return response.success
 
 
@@ -203,7 +203,7 @@ def delete(object_type, subtype, name):
         subtype=subtype or '',
         name=name or ''
     )
-    response = stub.Delete(request)
+    response = stub.Delete(request, timeout=30, wait_for_ready=True)
     if not response.success:
         LOG.error(f'Database delete failed: {response.error}')
 
@@ -217,7 +217,7 @@ def delete_prefix(path):
 
     stub = database_pb2_grpc.DatabaseServiceStub(channel)
     request = database_pb2.DeletePrefixRequest(path=path)
-    response = stub.DeletePrefix(request)
+    response = stub.DeletePrefix(request, timeout=30, wait_for_ready=True)
     if not response.success:
         LOG.error(f'Database delete_prefix failed: {response.error}')
 
@@ -250,7 +250,7 @@ def replace_many_raw(mutations, suppress_failure_audit=False):
             mutation.new_is_none = False
             mutation.new_data = util_json.json_dump(m['new_data'])
 
-    response = stub.ReplaceMany(request)
+    response = stub.ReplaceMany(request, timeout=30, wait_for_ready=True)
 
     failures = []
     for f in response.failures:
@@ -279,7 +279,7 @@ def enqueue(queue_name, workitem, delay=0):
         work_item=util_json.json_dump(workitem),
         delay=delay
     )
-    response = stub.Enqueue(request)
+    response = stub.Enqueue(request, timeout=30, wait_for_ready=True)
     if not response.success:
         LOG.error(f'Database enqueue failed: {response.error}')
 
@@ -293,7 +293,7 @@ def dequeue(queue_name):
 
     stub = database_pb2_grpc.DatabaseServiceStub(channel)
     request = database_pb2.DequeueRequest(queue_name=queue_name)
-    response = stub.Dequeue(request)
+    response = stub.Dequeue(request, timeout=30, wait_for_ready=True)
     if not response.found:
         return None
     return response.job_name, json.loads(response.work_item)
@@ -311,7 +311,7 @@ def resolve(queue_name, job_name):
         queue_name=queue_name,
         job_name=job_name
     )
-    response = stub.Resolve(request)
+    response = stub.Resolve(request, timeout=30, wait_for_ready=True)
     if not response.success:
         LOG.error(f'Database resolve failed: {response.error}')
 
@@ -325,7 +325,7 @@ def get_queue_length(queue_name):
 
     stub = database_pb2_grpc.DatabaseServiceStub(channel)
     request = database_pb2.QueueLengthRequest(queue_name=queue_name)
-    response = stub.GetQueueLength(request)
+    response = stub.GetQueueLength(request, timeout=30, wait_for_ready=True)
     return response.processing, response.queued, response.deferred
 
 
@@ -338,7 +338,7 @@ def restart_queue(queue_name):
 
     stub = database_pb2_grpc.DatabaseServiceStub(channel)
     request = database_pb2.RestartQueueRequest(queue_name=queue_name)
-    response = stub.RestartQueue(request)
+    response = stub.RestartQueue(request, timeout=30, wait_for_ready=True)
     if not response.success:
         LOG.error(f'Database restart_queue failed: {response.error}')
 
@@ -359,7 +359,7 @@ def acquire_lock(object_type, subtype, name, lock_data):
         name=name,
         lock_data=util_json.json_dump(lock_data)
     )
-    response = stub.AcquireLock(request)
+    response = stub.AcquireLock(request, timeout=30, wait_for_ready=True)
     return response.acquired
 
 
@@ -377,7 +377,7 @@ def release_lock(object_type, subtype, name, lock_data):
         name=name,
         lock_data=util_json.json_dump(lock_data)
     )
-    response = stub.ReleaseLock(request)
+    response = stub.ReleaseLock(request, timeout=30, wait_for_ready=True)
     return response.success
 
 
@@ -394,7 +394,7 @@ def get_lock_holder(object_type, subtype, name):
         subtype=subtype or '',
         name=name
     )
-    response = stub.GetLockHolder(request)
+    response = stub.GetLockHolder(request, timeout=30, wait_for_ready=True)
     if not response.held:
         return {'holder': None}
     return json.loads(response.holder)
@@ -411,7 +411,7 @@ def clear_stale_locks():
     request = database_pb2.ClusterClearStaleLocksRequest(
         node_name=config.NODE_NAME
     )
-    response = stub.ClearStaleLocks(request)
+    response = stub.ClearStaleLocks(request, timeout=30, wait_for_ready=True)
     if not response.success:
         LOG.error(f'Database clear_stale_locks failed: {response.error}')
 
@@ -425,7 +425,7 @@ def get_existing_locks():
 
     stub = database_pb2_grpc.DatabaseServiceStub(channel)
     request = database_pb2.ClusterGetExistingLocksRequest()
-    response = stub.GetExistingLocks(request)
+    response = stub.GetExistingLocks(request, timeout=30, wait_for_ready=True)
 
     locks = {}
     for lock in response.locks:
@@ -444,6 +444,6 @@ def compact(revision):
 
     stub = database_pb2_grpc.DatabaseServiceStub(channel)
     request = database_pb2.CompactRequest(revision=revision)
-    response = stub.Compact(request)
+    response = stub.Compact(request, timeout=30, wait_for_ready=True)
     if not response.success:
         LOG.error(f'Database compact failed: {response.error}')

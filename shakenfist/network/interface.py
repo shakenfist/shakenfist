@@ -88,7 +88,22 @@ class NetworkInterface(dbo):
             model=metadata['model'],
             version=metadata['version']
         )
-        mariadb.create_network_interface(data)
+        if not mariadb.create_network_interface(data):
+            raise RuntimeError(f'Failed to create network interface {object_uuid} in MariaDB')
+
+    @staticmethod
+    def _static_values_to_dict(data):
+        """Convert NetworkInterfaceData to the dict format used internally."""
+        return {
+            'uuid': str(data.uuid),
+            'network_uuid': str(data.network_uuid),
+            'instance_uuid': str(data.instance_uuid),
+            'macaddr': data.macaddr,
+            'ipv4': data.ipv4,
+            'order': data.order,
+            'model': data.model,
+            'version': data.version,
+        }
 
     @classmethod
     def _db_get(cls, object_uuid) -> Optional[dict]:
@@ -251,7 +266,10 @@ class NetworkInterface(dbo):
                 priority=PRIORITY.user_facing)
             n = network.Network.from_db(self.network_uuid)
             if n:
-                n.set_last_cluster_operation(op_type, op_uuid)
+                try:
+                    n.set_last_cluster_operation(op_type, op_uuid)
+                except RuntimeError:
+                    pass  # Delete must proceed even if LCO tracking fails
 
             fn = network.floating_network()
             fn.ipam.release(floating_address)
@@ -274,6 +292,45 @@ class NetworkInterface(dbo):
 
 class NetworkInterfaces(dbo_iter):
     base_object = NetworkInterface
+
+    def get_iterator(self):
+        if self.prefilter:
+            if self.prefilter == 'active':
+                target_states = NetworkInterface.ACTIVE_STATES
+            elif self.prefilter == 'deleted':
+                target_states = [dbo.STATE_DELETED]
+            elif self.prefilter == 'healthy':
+                target_states = NetworkInterface.HEALTHY_STATES
+            elif self.prefilter == 'inactive':
+                target_states = NetworkInterface.INACTIVE_STATES
+            else:
+                raise exceptions.InvalidObjectPrefilter(
+                    self.prefilter)
+
+            matching_uuids_list = mariadb.get_objects_by_state(
+                NetworkInterface.object_type, list(target_states))
+
+            if matching_uuids_list is None:
+                LOG.warning('get_objects_by_state returned None for '
+                            'network_interfaces, falling back to full scan')
+                for data in mariadb.get_all_network_interfaces():
+                    yield (str(data.uuid),
+                           NetworkInterface._static_values_to_dict(data))
+                return
+
+            matching_uuids = set(matching_uuids_list)
+
+            results = []
+            for data in mariadb.get_all_network_interfaces():
+                if str(data.uuid) in matching_uuids:
+                    results.append(
+                        (str(data.uuid),
+                         NetworkInterface._static_values_to_dict(data)))
+            yield from results
+        else:
+            for data in mariadb.get_all_network_interfaces():
+                yield (str(data.uuid),
+                       NetworkInterface._static_values_to_dict(data))
 
     def __iter__(self):
         for _, static_values in self.get_iterator():

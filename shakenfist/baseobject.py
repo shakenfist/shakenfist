@@ -408,7 +408,6 @@ class DatabaseBackedObject:
     @classmethod
     def _db_create(cls, object_uuid, metadata):
         metadata['uuid'] = object_uuid
-        etcd.create(cls.object_type, None, object_uuid, metadata)
         eventlog.add_event(EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
                            'db record created', extra=metadata)
 
@@ -460,24 +459,26 @@ class DatabaseBackedObject:
                                           str(self.__uuid), prefix=attribute_prefix):
                 yield key, data
 
-    def _db_set_attribute(self, attribute, value):
-        # Some attributes are simply too frequently changed to have much meaning
-        # as an event.
+    def _log_attribute_mutation(self, attribute, value):
+        """Log an EVENT_TYPE_MUTATE event for an attribute change.
+
+        Some attributes are too frequently changed to have much meaning
+        as an event and are excluded.
+        """
         if (self.object_type, attribute) not in [('node', 'blobs'),
                                                  ('node', 'observed'),
                                                  ('blob', 'last_used')]:
-            # Coerce the value into a dictionary.
             if isinstance(value, State):
                 event_values = value.obj_dict()
             elif isinstance(value, dict):
                 event_values = value.copy()
             else:
                 event_values = {'value': value}
-
-            # Add the attribute we're setting to the event so we're not confused
-            # later.
             event_values['attribute'] = attribute
             self.add_event(EVENT_TYPE_MUTATE, 'set attribute', extra=event_values)
+
+    def _db_set_attribute(self, attribute, value):
+        self._log_attribute_mutation(attribute, value)
 
         if self.__in_memory_only:
             self.__in_memory_values[attribute] = util_json.json_dump(value)
@@ -595,7 +596,17 @@ class DatabaseBackedObject:
 
         # Primary state is stored in MariaDB
         if state_attribute_name == 'state':
-            mariadb.set_state(self.object_type, str(self.uuid), new_state)
+            if not mariadb.set_state(self.object_type, str(self.uuid), new_state):
+                LOG.with_fields({
+                    'object_type': self.object_type,
+                    'object_uuid': str(self.uuid),
+                    'new_state': new_value,
+                }).error('Failed to write state to MariaDB')
+                raise RuntimeError(
+                    f'Failed to write state {new_value} for '
+                    f'{self.object_type}/{self.uuid} to MariaDB'
+                )
+            self._log_attribute_mutation('state', new_state)
         else:
             # Secondary state attributes (like 'power_state') go to etcd
             self._db_set_attribute(state_attribute_name, new_state)
@@ -621,34 +632,34 @@ class DatabaseBackedObject:
 
     @property
     def metadata(self):
-        if not self.in_memory_only:
-            obj_meta = mariadb.get_object_metadata(
-                self.object_type, str(self.uuid))
-            if obj_meta and obj_meta.metadata is not None:
-                return obj_meta.metadata
-            # Fallback to etcd for unmigrated objects
-        return self._db_get_attribute('metadata', {})
+        if self.in_memory_only:
+            return self._db_get_attribute('metadata', {})
+        obj_meta = mariadb.get_object_metadata(
+            self.object_type, str(self.uuid))
+        if obj_meta and obj_meta.metadata is not None:
+            return obj_meta.metadata
+        return {}
 
     def add_metadata_key(self, key, value):
         with self.get_lock_attr('metadata', 'Add metadata key'):
             md = self.metadata
             md[key] = value
-            if not self.in_memory_only:
+            if self.in_memory_only:
+                self._db_set_attribute('metadata', md)
+            else:
                 mariadb.set_metadata(
                     self.object_type, str(self.uuid), md)
-            # Dual-write to etcd during migration period
-            self._db_set_attribute('metadata', md)
 
     def remove_metadata_key(self, key):
         with self.get_lock_attr('metadata', 'Remove metadata key'):
             md = self.metadata
             if key in md:
                 del md[key]
-                if not self.in_memory_only:
+                if self.in_memory_only:
+                    self._db_set_attribute('metadata', md)
+                else:
                     mariadb.set_metadata(
                         self.object_type, str(self.uuid), md)
-                # Dual-write to etcd during migration period
-                self._db_set_attribute('metadata', md)
 
     def _external_view(self):
         # Import here to avoid circular imports during module loading
@@ -680,46 +691,40 @@ class DatabaseBackedObject:
 class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
     @property
     def last_cluster_operation(self):
-        if not self.in_memory_only:
-            # Try cluster_operation_targets table first (new table)
-            latest = mariadb.get_latest_cluster_operation_target(
-                self.object_type, str(self.uuid))
-            if latest is not None:
-                return {
-                    'op_type': latest.operation_type,
-                    'op_uuid': latest.operation_uuid
-                }
-
-            # Fallback to object_metadata for dual-write migration
-            obj_meta = mariadb.get_object_metadata(
-                self.object_type, str(self.uuid))
-            if obj_meta and obj_meta.last_cluster_operation is not None:
-                return obj_meta.last_cluster_operation
-
-        # Fallback to etcd for unmigrated objects
-        return self._db_get_attribute('last_cluster_operation')
+        if self.in_memory_only:
+            return None
+        latest = mariadb.get_latest_cluster_operation_target(
+            self.object_type, str(self.uuid))
+        if latest is not None:
+            return {
+                'op_type': latest.operation_type,
+                'op_uuid': latest.operation_uuid
+            }
+        return None
 
     def set_last_cluster_operation(self, op_type, op_uuid):
-        lco = {
-            'op_type': str(op_type),
-            'op_uuid': str(op_uuid)
-        }
         if not self.in_memory_only:
-            # Write to cluster_operation_targets (new table)
-            mariadb.create_cluster_operation_target(
+            success = mariadb.create_cluster_operation_target(
                 operation_uuid=str(op_uuid),
                 operation_type=str(op_type),
                 target_object_type=self.object_type,
                 target_uuid=str(self.uuid),
                 created_at=time.time()
             )
-
-            # Dual-write to object_metadata during migration period
-            mariadb.set_last_cluster_operation(
-                self.object_type, str(self.uuid), lco)
-
-        # Dual-write to etcd during migration period
-        self._db_set_attribute('last_cluster_operation', lco)
+            if not success:
+                LOG.with_fields({
+                    'object_type': self.object_type,
+                    'object_uuid': str(self.uuid),
+                    'op_type': str(op_type),
+                    'op_uuid': str(op_uuid),
+                }).error(
+                    'Failed to write cluster operation target '
+                    'to MariaDB'
+                )
+                raise RuntimeError(
+                    f'Failed to write cluster operation target for '
+                    f'{self.object_type}/{self.uuid} op {op_type}/{op_uuid}'
+                )
 
     def get_cluster_operations(self, outstanding_only=True):
         last_op = self.last_cluster_operation
@@ -785,8 +790,21 @@ class DatabaseBackedObjectIterator:
             raise exceptions.InvalidObjectPrefilter(self.prefilter)
 
         # Use MariaDB for efficient state-based filtering
-        matching_uuids = set(mariadb.get_objects_by_state(
-            self.base_object.object_type, list(target_states)))
+        matching_uuids_list = mariadb.get_objects_by_state(
+            self.base_object.object_type, list(target_states))
+
+        if matching_uuids_list is None:
+            # MariaDB/gRPC query failed; fall back to yielding all
+            # objects from etcd so callers still find their targets.
+            LOG.warning('get_objects_by_state returned None for '
+                        f'{self.base_object.object_type}, falling '
+                        'back to full etcd scan')
+            for objuuid, objdata in etcd.get_all(
+                    self.base_object.object_type, None):
+                yield objuuid, objdata
+            return
+
+        matching_uuids = set(matching_uuids_list)
 
         # Fetch static values only for objects in the target states
         # We fetch all results in a block before yielding to avoid inconsistency

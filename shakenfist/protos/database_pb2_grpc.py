@@ -579,6 +579,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetNetworkInterfacesByNetworkRequest.SerializeToString,
                 response_deserializer=database__pb2.GetNetworkInterfacesReply.FromString,
                 _registered_method=True)
+        self.GetAllNetworkInterfaces = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllNetworkInterfaces',
+                request_serializer=database__pb2.GetAllNetworkInterfacesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNetworkInterfacesReply.FromString,
+                _registered_method=True)
         self.DeleteNetworkInterface = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteNetworkInterface',
                 request_serializer=database__pb2.DeleteNetworkInterfaceRequest.SerializeToString,
@@ -719,6 +724,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetAllInstancesRequest.SerializeToString,
                 response_deserializer=database__pb2.GetAllInstancesReply.FromString,
                 _registered_method=True)
+        self.GetAllInstanceUuids = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllInstanceUuids',
+                request_serializer=database__pb2.GetAllInstanceUuidsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllInstanceUuidsReply.FromString,
+                _registered_method=True)
         self.DeleteInstance = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteInstance',
                 request_serializer=database__pb2.DeleteInstanceRequest.SerializeToString,
@@ -744,6 +754,16 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteInstanceAttributesRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.GetConsumedPortsForNode = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetConsumedPortsForNode',
+                request_serializer=database__pb2.GetConsumedPortsForNodeRequest.SerializeToString,
+                response_deserializer=database__pb2.GetConsumedPortsForNodeReply.FromString,
+                _registered_method=True)
+        self.IsVsockCidInUse = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/IsVsockCidInUse',
+                request_serializer=database__pb2.IsVsockCidInUseRequest.SerializeToString,
+                response_deserializer=database__pb2.IsVsockCidInUseReply.FromString,
+                _registered_method=True)
         self.GetObjectMetadata = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/GetObjectMetadata',
                 request_serializer=database__pb2.GetObjectMetadataRequest.SerializeToString,
@@ -752,11 +772,6 @@ class DatabaseServiceStub(object):
         self.SetMetadata = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/SetMetadata',
                 request_serializer=database__pb2.SetMetadataRequest.SerializeToString,
-                response_deserializer=database__pb2.StatusReply.FromString,
-                _registered_method=True)
-        self.SetLastClusterOperation = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/SetLastClusterOperation',
-                request_serializer=database__pb2.SetLastClusterOperationRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
         self.DeleteObjectMetadata = channel.unary_unary(
@@ -1486,6 +1501,12 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetAllNetworkInterfaces(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteNetworkInterface(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1672,6 +1693,12 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetAllInstanceUuids(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteInstance(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1705,6 +1732,18 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetConsumedPortsForNode(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def IsVsockCidInUse(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetObjectMetadata(self, request, context):
         """Object Metadata Operations (MariaDB)
         These store user-defined metadata and last_cluster_operation for all
@@ -1715,12 +1754,6 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def SetMetadata(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SetLastClusterOperation(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2318,6 +2351,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.GetNetworkInterfacesByNetworkRequest.FromString,
                     response_serializer=database__pb2.GetNetworkInterfacesReply.SerializeToString,
             ),
+            'GetAllNetworkInterfaces': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllNetworkInterfaces,
+                    request_deserializer=database__pb2.GetAllNetworkInterfacesRequest.FromString,
+                    response_serializer=database__pb2.GetNetworkInterfacesReply.SerializeToString,
+            ),
             'DeleteNetworkInterface': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteNetworkInterface,
                     request_deserializer=database__pb2.DeleteNetworkInterfaceRequest.FromString,
@@ -2458,6 +2496,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.GetAllInstancesRequest.FromString,
                     response_serializer=database__pb2.GetAllInstancesReply.SerializeToString,
             ),
+            'GetAllInstanceUuids': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllInstanceUuids,
+                    request_deserializer=database__pb2.GetAllInstanceUuidsRequest.FromString,
+                    response_serializer=database__pb2.GetAllInstanceUuidsReply.SerializeToString,
+            ),
             'DeleteInstance': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteInstance,
                     request_deserializer=database__pb2.DeleteInstanceRequest.FromString,
@@ -2483,6 +2526,16 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.DeleteInstanceAttributesRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
+            'GetConsumedPortsForNode': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetConsumedPortsForNode,
+                    request_deserializer=database__pb2.GetConsumedPortsForNodeRequest.FromString,
+                    response_serializer=database__pb2.GetConsumedPortsForNodeReply.SerializeToString,
+            ),
+            'IsVsockCidInUse': grpc.unary_unary_rpc_method_handler(
+                    servicer.IsVsockCidInUse,
+                    request_deserializer=database__pb2.IsVsockCidInUseRequest.FromString,
+                    response_serializer=database__pb2.IsVsockCidInUseReply.SerializeToString,
+            ),
             'GetObjectMetadata': grpc.unary_unary_rpc_method_handler(
                     servicer.GetObjectMetadata,
                     request_deserializer=database__pb2.GetObjectMetadataRequest.FromString,
@@ -2491,11 +2544,6 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'SetMetadata': grpc.unary_unary_rpc_method_handler(
                     servicer.SetMetadata,
                     request_deserializer=database__pb2.SetMetadataRequest.FromString,
-                    response_serializer=database__pb2.StatusReply.SerializeToString,
-            ),
-            'SetLastClusterOperation': grpc.unary_unary_rpc_method_handler(
-                    servicer.SetLastClusterOperation,
-                    request_deserializer=database__pb2.SetLastClusterOperationRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'DeleteObjectMetadata': grpc.unary_unary_rpc_method_handler(
@@ -5488,6 +5536,33 @@ class DatabaseService(object):
             _registered_method=True)
 
     @staticmethod
+    def GetAllNetworkInterfaces(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllNetworkInterfaces',
+            database__pb2.GetAllNetworkInterfacesRequest.SerializeToString,
+            database__pb2.GetNetworkInterfacesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def DeleteNetworkInterface(request,
             target,
             options=(),
@@ -6244,6 +6319,33 @@ class DatabaseService(object):
             _registered_method=True)
 
     @staticmethod
+    def GetAllInstanceUuids(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllInstanceUuids',
+            database__pb2.GetAllInstanceUuidsRequest.SerializeToString,
+            database__pb2.GetAllInstanceUuidsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def DeleteInstance(request,
             target,
             options=(),
@@ -6379,6 +6481,60 @@ class DatabaseService(object):
             _registered_method=True)
 
     @staticmethod
+    def GetConsumedPortsForNode(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetConsumedPortsForNode',
+            database__pb2.GetConsumedPortsForNodeRequest.SerializeToString,
+            database__pb2.GetConsumedPortsForNodeReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def IsVsockCidInUse(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/IsVsockCidInUse',
+            database__pb2.IsVsockCidInUseRequest.SerializeToString,
+            database__pb2.IsVsockCidInUseReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def GetObjectMetadata(request,
             target,
             options=(),
@@ -6421,33 +6577,6 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/SetMetadata',
             database__pb2.SetMetadataRequest.SerializeToString,
-            database__pb2.StatusReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def SetLastClusterOperation(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/SetLastClusterOperation',
-            database__pb2.SetLastClusterOperationRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

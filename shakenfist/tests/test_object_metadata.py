@@ -2,7 +2,6 @@
 from unittest import mock
 
 from shakenfist.baseobject import DatabaseBackedObject
-from shakenfist.baseobject import DatabaseBackedObjectWithOperations
 from shakenfist.schema.object_metadata import ObjectMetadataData
 from shakenfist.tests import base
 
@@ -10,7 +9,7 @@ TEST_UUID = '12345678-1234-4321-8234-123456789012'
 
 
 class MetadataPropertyTestCase(base.ShakenFistTestCase):
-    """Test metadata property routing: MariaDB first, etcd fallback."""
+    """Test metadata property reads from MariaDB only."""
 
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -24,34 +23,26 @@ class MetadataPropertyTestCase(base.ShakenFistTestCase):
         self.assertEqual(result, {'key1': 'val1', 'key2': 'val2'})
         mock_get.assert_called_once_with(d.object_type, TEST_UUID)
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-                return_value={'etcd_key': 'etcd_val'})
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=None)
-    def test_metadata_falls_back_to_etcd(self, mock_get, mock_etcd_get):
+    def test_metadata_returns_empty_when_no_record(self, mock_get):
         d = DatabaseBackedObject(TEST_UUID)
         result = d.metadata
-        self.assertEqual(result, {'etcd_key': 'etcd_val'})
-        mock_etcd_get.assert_called_once_with('metadata', {})
+        self.assertEqual(result, {})
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-                return_value={'etcd_key': 'etcd_val'})
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
                     object_type='unknown',
                     object_uuid=TEST_UUID,
                     metadata=None
                 ))
-    def test_metadata_falls_back_when_mariadb_metadata_is_none(
-            self, mock_get, mock_etcd_get):
+    def test_metadata_returns_empty_when_column_is_none(
+            self, mock_get):
         """MariaDB row exists but metadata column is NULL."""
         d = DatabaseBackedObject(TEST_UUID)
         result = d.metadata
-        self.assertEqual(result, {'etcd_key': 'etcd_val'})
-        mock_etcd_get.assert_called_once_with('metadata', {})
+        self.assertEqual(result, {})
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-                return_value={})
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
                     object_type='unknown',
@@ -59,14 +50,13 @@ class MetadataPropertyTestCase(base.ShakenFistTestCase):
                     metadata={}
                 ))
     def test_metadata_returns_empty_dict_from_mariadb(
-            self, mock_get, mock_etcd_get):
-        """Empty dict is a valid value, should not fall back to etcd."""
+            self, mock_get):
+        """Empty dict is a valid value."""
         d = DatabaseBackedObject(TEST_UUID)
         result = d.metadata
         self.assertEqual(result, {})
-        mock_etcd_get.assert_not_called()
 
-    def test_metadata_in_memory_only_uses_etcd(self):
+    def test_metadata_in_memory_only_uses_in_memory_store(self):
         d = DatabaseBackedObject(TEST_UUID, in_memory_only=True)
         # In-memory values are stored as JSON strings
         d._DatabaseBackedObject__in_memory_values = {
@@ -77,9 +67,8 @@ class MetadataPropertyTestCase(base.ShakenFistTestCase):
 
 
 class AddMetadataKeyTestCase(base.ShakenFistTestCase):
-    """Test add_metadata_key dual-write behavior."""
+    """Test add_metadata_key writes to MariaDB only."""
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.mariadb.set_metadata', return_value=True)
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -88,8 +77,8 @@ class AddMetadataKeyTestCase(base.ShakenFistTestCase):
                     metadata={'existing': 'val'}
                 ))
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
-    def test_add_metadata_key_dual_writes(
-            self, mock_lock, mock_get, mock_set, mock_etcd_set):
+    def test_add_metadata_key_writes_to_mariadb(
+            self, mock_lock, mock_get, mock_set):
         mock_lock.return_value.__enter__ = mock.Mock()
         mock_lock.return_value.__exit__ = mock.Mock(return_value=False)
 
@@ -98,9 +87,7 @@ class AddMetadataKeyTestCase(base.ShakenFistTestCase):
 
         expected = {'existing': 'val', 'new_key': 'new_val'}
         mock_set.assert_called_once_with(d.object_type, TEST_UUID, expected)
-        mock_etcd_set.assert_called_once_with('metadata', expected)
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.mariadb.set_metadata', return_value=True)
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -110,7 +97,7 @@ class AddMetadataKeyTestCase(base.ShakenFistTestCase):
                 ))
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
     def test_add_metadata_key_overwrites_existing(
-            self, mock_lock, mock_get, mock_set, mock_etcd_set):
+            self, mock_lock, mock_get, mock_set):
         mock_lock.return_value.__enter__ = mock.Mock()
         mock_lock.return_value.__exit__ = mock.Mock(return_value=False)
 
@@ -119,13 +106,11 @@ class AddMetadataKeyTestCase(base.ShakenFistTestCase):
 
         expected = {'key': 'new'}
         mock_set.assert_called_once_with(d.object_type, TEST_UUID, expected)
-        mock_etcd_set.assert_called_once_with('metadata', expected)
 
 
 class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
-    """Test remove_metadata_key dual-write behavior."""
+    """Test remove_metadata_key writes to MariaDB only."""
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.mariadb.set_metadata', return_value=True)
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -134,8 +119,8 @@ class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
                     metadata={'keep': 'yes', 'remove': 'me'}
                 ))
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
-    def test_remove_metadata_key_dual_writes(
-            self, mock_lock, mock_get, mock_set, mock_etcd_set):
+    def test_remove_metadata_key_writes_to_mariadb(
+            self, mock_lock, mock_get, mock_set):
         mock_lock.return_value.__enter__ = mock.Mock()
         mock_lock.return_value.__exit__ = mock.Mock(return_value=False)
 
@@ -144,9 +129,7 @@ class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
 
         expected = {'keep': 'yes'}
         mock_set.assert_called_once_with(d.object_type, TEST_UUID, expected)
-        mock_etcd_set.assert_called_once_with('metadata', expected)
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.mariadb.set_metadata')
     @mock.patch('shakenfist.mariadb.get_object_metadata',
                 return_value=ObjectMetadataData(
@@ -156,7 +139,7 @@ class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
                 ))
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
     def test_remove_nonexistent_key_is_noop(
-            self, mock_lock, mock_get, mock_set, mock_etcd_set):
+            self, mock_lock, mock_get, mock_set):
         mock_lock.return_value.__enter__ = mock.Mock()
         mock_lock.return_value.__exit__ = mock.Mock(return_value=False)
 
@@ -164,7 +147,6 @@ class RemoveMetadataKeyTestCase(base.ShakenFistTestCase):
         d.remove_metadata_key('nonexistent')
 
         mock_set.assert_not_called()
-        mock_etcd_set.assert_not_called()
 
 
 class HardDeleteMetadataTestCase(base.ShakenFistTestCase):
@@ -185,97 +167,6 @@ class HardDeleteMetadataTestCase(base.ShakenFistTestCase):
         mock_del_state.assert_called_once_with(d.object_type, TEST_UUID)
         mock_etcd_del.assert_called_once()
         mock_etcd_del_all.assert_called_once()
-
-
-class LastClusterOperationTestCase(base.ShakenFistTestCase):
-    """Test last_cluster_operation property routing via object_metadata fallback.
-
-    The primary path now uses cluster_operation_targets (tested in
-    test_cluster_operation_targets.py). These tests verify the
-    object_metadata fallback when no targets exist.
-    """
-
-    @mock.patch('shakenfist.mariadb.get_object_metadata',
-                return_value=ObjectMetadataData(
-                    object_type='unknown',
-                    object_uuid=TEST_UUID,
-                    last_cluster_operation={
-                        'op_type': 'instance_preflight',
-                        'op_uuid': 'abcd1234-0000-0000-0000-000000000000'
-                    }
-                ))
-    @mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
-                return_value=None)
-    def test_lco_reads_from_object_metadata_fallback(
-            self, mock_get_latest, mock_get):
-        d = DatabaseBackedObjectWithOperations(TEST_UUID)
-        result = d.last_cluster_operation
-        self.assertEqual(result, {
-            'op_type': 'instance_preflight',
-            'op_uuid': 'abcd1234-0000-0000-0000-000000000000'
-        })
-
-    @mock.patch(
-        'shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-        return_value={'op_type': 'etcd_op', 'op_uuid': 'from-etcd'})
-    @mock.patch('shakenfist.mariadb.get_object_metadata',
-                return_value=None)
-    @mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
-                return_value=None)
-    def test_lco_falls_back_to_etcd(
-            self, mock_get_latest, mock_get, mock_etcd_get):
-        d = DatabaseBackedObjectWithOperations(TEST_UUID)
-        result = d.last_cluster_operation
-        self.assertEqual(result, {
-            'op_type': 'etcd_op', 'op_uuid': 'from-etcd'
-        })
-        mock_etcd_get.assert_called_once_with('last_cluster_operation')
-
-    @mock.patch(
-        'shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-        return_value={'op_type': 'etcd_op', 'op_uuid': 'from-etcd'})
-    @mock.patch('shakenfist.mariadb.get_object_metadata',
-                return_value=ObjectMetadataData(
-                    object_type='unknown',
-                    object_uuid=TEST_UUID,
-                    last_cluster_operation=None
-                ))
-    @mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
-                return_value=None)
-    def test_lco_falls_back_when_mariadb_lco_is_none(
-            self, mock_get_latest, mock_get, mock_etcd_get):
-        d = DatabaseBackedObjectWithOperations(TEST_UUID)
-        result = d.last_cluster_operation
-        self.assertEqual(result, {
-            'op_type': 'etcd_op', 'op_uuid': 'from-etcd'
-        })
-
-
-class SetLastClusterOperationTestCase(base.ShakenFistTestCase):
-    """Test set_last_cluster_operation dual-write behavior."""
-
-    @mock.patch(
-        'shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
-    @mock.patch('shakenfist.mariadb.set_last_cluster_operation',
-                return_value=True)
-    @mock.patch('shakenfist.mariadb.create_cluster_operation_target',
-                return_value=True)
-    @mock.patch('shakenfist.baseobject.time')
-    def test_set_lco_dual_writes(self, mock_time, mock_create_target,
-                                 mock_set_lco, mock_etcd_set):
-        mock_time.time.return_value = 9999.0
-        d = DatabaseBackedObjectWithOperations(TEST_UUID)
-        d.set_last_cluster_operation('instance_preflight', 'op-uuid-1')
-
-        expected = {
-            'op_type': 'instance_preflight',
-            'op_uuid': 'op-uuid-1'
-        }
-        mock_create_target.assert_called_once()
-        mock_set_lco.assert_called_once_with(
-            d.object_type, TEST_UUID, expected)
-        mock_etcd_set.assert_called_once_with(
-            'last_cluster_operation', expected)
 
 
 class ObjectMetadataDataTestCase(base.ShakenFistTestCase):

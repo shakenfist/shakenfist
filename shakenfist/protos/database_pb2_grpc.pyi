@@ -606,6 +606,11 @@ class DatabaseServiceStub:
         database_pb2.GetNetworkInterfacesReply,
     ]
 
+    GetAllNetworkInterfaces: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNetworkInterfacesRequest,
+        database_pb2.GetNetworkInterfacesReply,
+    ]
+
     DeleteNetworkInterface: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteNetworkInterfaceRequest,
         database_pb2.StatusReply,
@@ -771,6 +776,11 @@ class DatabaseServiceStub:
         database_pb2.GetAllInstancesReply,
     ]
 
+    GetAllInstanceUuids: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllInstanceUuidsRequest,
+        database_pb2.GetAllInstanceUuidsReply,
+    ]
+
     DeleteInstance: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteInstanceRequest,
         database_pb2.StatusReply,
@@ -800,6 +810,16 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    GetConsumedPortsForNode: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetConsumedPortsForNodeRequest,
+        database_pb2.GetConsumedPortsForNodeReply,
+    ]
+
+    IsVsockCidInUse: grpc.UnaryUnaryMultiCallable[
+        database_pb2.IsVsockCidInUseRequest,
+        database_pb2.IsVsockCidInUseReply,
+    ]
+
     GetObjectMetadata: grpc.UnaryUnaryMultiCallable[
         database_pb2.GetObjectMetadataRequest,
         database_pb2.GetObjectMetadataReply,
@@ -811,11 +831,6 @@ class DatabaseServiceStub:
 
     SetMetadata: grpc.UnaryUnaryMultiCallable[
         database_pb2.SetMetadataRequest,
-        database_pb2.StatusReply,
-    ]
-
-    SetLastClusterOperation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.SetLastClusterOperationRequest,
         database_pb2.StatusReply,
     ]
 
@@ -1445,6 +1460,11 @@ class DatabaseServiceAsyncStub:
         database_pb2.GetNetworkInterfacesReply,
     ]
 
+    GetAllNetworkInterfaces: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNetworkInterfacesRequest,
+        database_pb2.GetNetworkInterfacesReply,
+    ]
+
     DeleteNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteNetworkInterfaceRequest,
         database_pb2.StatusReply,
@@ -1610,6 +1630,11 @@ class DatabaseServiceAsyncStub:
         database_pb2.GetAllInstancesReply,
     ]
 
+    GetAllInstanceUuids: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllInstanceUuidsRequest,
+        database_pb2.GetAllInstanceUuidsReply,
+    ]
+
     DeleteInstance: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteInstanceRequest,
         database_pb2.StatusReply,
@@ -1639,6 +1664,16 @@ class DatabaseServiceAsyncStub:
         database_pb2.StatusReply,
     ]
 
+    GetConsumedPortsForNode: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetConsumedPortsForNodeRequest,
+        database_pb2.GetConsumedPortsForNodeReply,
+    ]
+
+    IsVsockCidInUse: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.IsVsockCidInUseRequest,
+        database_pb2.IsVsockCidInUseReply,
+    ]
+
     GetObjectMetadata: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetObjectMetadataRequest,
         database_pb2.GetObjectMetadataReply,
@@ -1650,11 +1685,6 @@ class DatabaseServiceAsyncStub:
 
     SetMetadata: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.SetMetadataRequest,
-        database_pb2.StatusReply,
-    ]
-
-    SetLastClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.SetLastClusterOperationRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2503,6 +2533,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.GetNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfacesReply]]: ...
 
     @abc.abstractmethod
+    def GetAllNetworkInterfaces(
+        self,
+        request: database_pb2.GetAllNetworkInterfacesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfacesReply]]: ...
+
+    @abc.abstractmethod
     def DeleteNetworkInterface(
         self,
         request: database_pb2.DeleteNetworkInterfaceRequest,
@@ -2724,6 +2761,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.GetAllInstancesReply, collections.abc.Awaitable[database_pb2.GetAllInstancesReply]]: ...
 
     @abc.abstractmethod
+    def GetAllInstanceUuids(
+        self,
+        request: database_pb2.GetAllInstanceUuidsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllInstanceUuidsReply, collections.abc.Awaitable[database_pb2.GetAllInstanceUuidsReply]]: ...
+
+    @abc.abstractmethod
     def DeleteInstance(
         self,
         request: database_pb2.DeleteInstanceRequest,
@@ -2763,6 +2807,20 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
     @abc.abstractmethod
+    def GetConsumedPortsForNode(
+        self,
+        request: database_pb2.GetConsumedPortsForNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetConsumedPortsForNodeReply, collections.abc.Awaitable[database_pb2.GetConsumedPortsForNodeReply]]: ...
+
+    @abc.abstractmethod
+    def IsVsockCidInUse(
+        self,
+        request: database_pb2.IsVsockCidInUseRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.IsVsockCidInUseReply, collections.abc.Awaitable[database_pb2.IsVsockCidInUseReply]]: ...
+
+    @abc.abstractmethod
     def GetObjectMetadata(
         self,
         request: database_pb2.GetObjectMetadataRequest,
@@ -2777,13 +2835,6 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def SetMetadata(
         self,
         request: database_pb2.SetMetadataRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
-
-    @abc.abstractmethod
-    def SetLastClusterOperation(
-        self,
-        request: database_pb2.SetLastClusterOperationRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

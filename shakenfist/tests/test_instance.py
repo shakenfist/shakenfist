@@ -78,33 +78,24 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
             },
             self.mock_etcd.get_mariadb_state(
                 'instance', '42424242-4242-4242-8242-424242424242'))
+        # power_state is now written to MariaDB only (no etcd dual-write)
+        inst_attrs = self.mock_etcd.get_mariadb_instance_attributes(
+            '42424242-4242-4242-8242-424242424242')
+        self.assertIsNotNone(inst_attrs)
         self.assertEqual(
-            ('attribute/instance', '42424242-4242-4242-8242-424242424242',
-             'power_state', {'power_state': instance.Instance.STATE_INITIAL}),
-            mock_put.mock_calls[0][1])
+            {'power_state': instance.Instance.STATE_INITIAL},
+            inst_attrs.power_state)
 
-        self.assertEqual(
-            ('instance', None, '42424242-4242-4242-8242-424242424242',
-             {
-                 'cpus': 1,
-                 'disk_spec': [{}],
-                 'machine_type': 'pc',
-                 'memory': 2048,
-                 'name': 'barry',
-                 'namespace': 'namespace',
-                 'requested_placement': None,
-                 'ssh_key': 'sshkey',
-                 'user_data': 'userdata',
-                 'uuid': '42424242-4242-4242-8242-424242424242',
-                 'version': 19,
-                 'video': {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
-                 'uefi': False,
-                 'configdrive': 'openstack-disk',
-                 'nvram_template': None,
-                 'secure_boot': False,
-                 'side_channels': None
-             }),
-            mock_create.mock_calls[0][1])
+        # etcd.create is no longer called (base class no longer writes
+        # to etcd). Instance static values are written to MariaDB via
+        # mariadb.create_instance() which is mocked by mock_etcd.
+        inst_data = self.mock_etcd.instance_objects.get(
+            '42424242-4242-4242-8242-424242424242')
+        self.assertIsNotNone(inst_data)
+        self.assertEqual(1, inst_data.cpus)
+        self.assertEqual(2048, inst_data.memory)
+        self.assertEqual('barry', inst_data.name)
+        self.assertEqual('namespace', inst_data.namespace)
 
 
 class InstanceTestCase(base.ShakenFistTestCase):

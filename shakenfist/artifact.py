@@ -127,25 +127,22 @@ class Artifact(dbowo):
 
     @classmethod
     def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
-        """Create an artifact record in MariaDB instead of etcd."""
-        mariadb.create_artifact(
+        """Create an artifact record in MariaDB."""
+        if not mariadb.create_artifact(
             uuid_mod.UUID(object_uuid),
             metadata['artifact_type'],
             metadata['source_url'],
             metadata['name'],
             metadata['namespace'],
             metadata['version']
-        )
+        ):
+            raise RuntimeError(f'Failed to create artifact {object_uuid} in MariaDB')
         # Create default attributes record
-        mariadb.create_artifact_attributes(
-            ArtifactAttributesData(uuid=uuid_mod.UUID(object_uuid)))
-        add_event(EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
-                  'db record created', extra=metadata)
-
-        if 'namespace' in metadata and metadata['namespace']:
-            add_event(
-                EVENT_TYPE_AUDIT, 'namespace', metadata['namespace'],
-                'object created', extra=metadata, suppress_event_logging=True)
+        if not mariadb.create_artifact_attributes(
+            ArtifactAttributesData(uuid=uuid_mod.UUID(object_uuid))
+        ):
+            raise RuntimeError(f'Failed to create artifact attributes {object_uuid} in MariaDB')
+        super()._db_create(object_uuid, metadata)
 
     @classmethod
     def _db_get(cls, object_uuid: Union[str, uuid_mod.UUID]) -> Optional[ArtifactData]:

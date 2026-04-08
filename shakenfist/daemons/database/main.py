@@ -520,7 +520,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 return database_pb2.GetObjectsByStateReply(object_uuids=[])
             uuids = mariadb.get_objects_by_state(
                 object_type, list(request.state_values))
-            return database_pb2.GetObjectsByStateReply(object_uuids=uuids)
+            return database_pb2.GetObjectsByStateReply(
+                object_uuids=uuids or [])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetObjectsByState failed', e)
@@ -2372,6 +2373,25 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetNetworkInterfacesByNetwork failed', e)
             return database_pb2.GetNetworkInterfacesReply(network_interfaces=[])
 
+    def GetAllNetworkInterfaces(
+        self,
+        request: database_pb2.GetAllNetworkInterfacesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNetworkInterfacesReply:
+        """Get all NetworkInterface records from MariaDB."""
+        try:
+            self.monitor.counters['get_all_network_interfaces'].inc()
+            nis = mariadb._direct_get_all_network_interfaces()
+            return database_pb2.GetNetworkInterfacesReply(
+                network_interfaces=[self._ni_to_proto(d) for d in nis])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllNetworkInterfaces failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNetworkInterfacesReply(
+                network_interfaces=[])
+
     def DeleteNetworkInterface(
         self,
         request: database_pb2.DeleteNetworkInterfaceRequest,
@@ -3437,6 +3457,25 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetAllInstancesReply(
                 instances=[])
 
+    def GetAllInstanceUuids(
+        self,
+        request: database_pb2.GetAllInstanceUuidsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllInstanceUuidsReply:
+        """Get all instance UUIDs from MariaDB."""
+        try:
+            self.monitor.counters['get_all_instance_uuids'].inc()
+            uuids = mariadb._direct_get_all_instance_uuids()
+            return database_pb2.GetAllInstanceUuidsReply(
+                uuids=uuids)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllInstanceUuids failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetAllInstanceUuidsReply(
+                uuids=[])
+
     def DeleteInstance(
         self,
         request: database_pb2.DeleteInstanceRequest,
@@ -3621,6 +3660,52 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def GetConsumedPortsForNode(
+        self,
+        request: database_pb2.GetConsumedPortsForNodeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetConsumedPortsForNodeReply:
+        """Get consumed console/VDI ports for instances on a node."""
+        try:
+            self.monitor.counters[
+                'get_consumed_ports_for_node'].inc()
+            ports = (
+                mariadb._direct_get_consumed_ports_for_node(
+                    request.node_uuid))
+            return database_pb2.GetConsumedPortsForNodeReply(
+                ports=ports)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetConsumedPortsForNode failed',
+                e)
+            return database_pb2.GetConsumedPortsForNodeReply(
+                ports=[])
+
+    def IsVsockCidInUse(
+        self,
+        request: database_pb2.IsVsockCidInUseRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.IsVsockCidInUseReply:
+        """Check if a vsock CID is in use by any instance.
+
+        Returns in_use=True on error as a fail-safe so the caller
+        picks another CID from the 4-billion-wide range rather than
+        risking a duplicate allocation on a transient query failure.
+        """
+        try:
+            self.monitor.counters[
+                'is_vsock_cid_in_use'].inc()
+            in_use = (
+                mariadb._direct_is_vsock_cid_in_use(
+                    request.cid))
+            return database_pb2.IsVsockCidInUseReply(
+                in_use=in_use)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database IsVsockCidInUse failed', e)
+            return database_pb2.IsVsockCidInUseReply(
+                in_use=True)
+
     # Object Metadata Operations
 
     def GetObjectMetadata(
@@ -3686,40 +3771,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database SetMetadata failed', e)
-            return database_pb2.StatusReply(
-                success=False, error=str(e))
-
-    def SetLastClusterOperation(
-        self,
-        request: database_pb2.SetLastClusterOperationRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Set last_cluster_operation for an object in MariaDB."""
-        try:
-            self.monitor.counters[
-                'set_last_cluster_operation'].inc()
-            object_type = ObjectType.from_proto_id(
-                request.object_type)
-            if object_type is None:
-                return database_pb2.StatusReply(
-                    success=False,
-                    error='Invalid object_type')
-            lco_dict = (
-                json.loads(
-                    request.last_cluster_operation_json)
-                if request.last_cluster_operation_json
-                else None)
-            success = (
-                mariadb._direct_set_last_cluster_operation(
-                    object_type,
-                    request.object_uuid,
-                    lco_dict))
-            return database_pb2.StatusReply(
-                success=success, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database SetLastClusterOperation failed',
-                e)
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
@@ -3976,6 +4027,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 d.agent_operations_json),
             kvm_pid=d.kvm_pid or None,
             error_message=d.error_message or None,
+            vsock_cids=_parse(d.vsock_cids_json),
         )
 
     def _instance_attrs_to_proto(
@@ -4001,7 +4053,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             agent_operations_json=json.dumps(
                 data.agent_operations),
             kvm_pid=data.kvm_pid or 0,
-            error_message=data.error_message or '')
+            error_message=data.error_message or '',
+            vsock_cids_json=json.dumps(data.vsock_cids))
 
 
 class Monitor(daemon.WorkerPoolDaemon):
@@ -4075,6 +4128,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_network_interface', 'get_network_interface',
             'get_network_interfaces_by_instance',
             'get_network_interfaces_by_network',
+            'get_all_network_interfaces',
             'delete_network_interface', 'update_network_interface',
             # MariaDB network interface attributes operations
             'create_network_interface_attributes',
@@ -4112,15 +4166,17 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_agent_operation_attributes',
             # MariaDB instance operations
             'create_instance', 'get_instance',
-            'get_all_instances', 'delete_instance',
+            'get_all_instances', 'get_all_instance_uuids',
+            'delete_instance',
             # MariaDB instance attributes operations
             'create_instance_attributes',
             'get_instance_attributes',
             'update_instance_attributes',
             'delete_instance_attributes',
+            'get_consumed_ports_for_node',
+            'is_vsock_cid_in_use',
             # MariaDB object metadata operations
             'get_object_metadata', 'set_metadata',
-            'set_last_cluster_operation',
             'delete_object_metadata',
             # MariaDB cluster operation target operations
             'create_cluster_operation_target',
@@ -4215,7 +4271,7 @@ def main() -> None:
     mariadb.ensure_data_migrations()
 
     # Create the gRPC server
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
     server.add_insecure_port(
         f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
 

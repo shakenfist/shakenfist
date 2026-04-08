@@ -437,7 +437,7 @@ performance. This is required for all deployments - MariaDB must be configured.
   nvram_template, secure_boot, machine_type, side_channels) and mutable
   attributes (placement, power_state, ports, enforced_deletes,
   block_devices, interfaces, agent_state, agent_attributes,
-  agent_operations, kvm_pid, error_message). Complex fields stored as
+  agent_operations, kvm_pid, error_message, vsock_cids). Complex fields stored as
   JSON. Dual-write with etcd fallback for unmigrated objects.
 - **Object Metadata** (`object_metadata` table): User-defined metadata
   key-value pairs and last_cluster_operation for all object types.
@@ -448,7 +448,8 @@ performance. This is required for all deployments - MariaDB must be configured.
   Artifact, Network, Blob) with AUTO_INCREMENT sequence numbering
   for ordering. Replaces the single-pointer `last_cluster_operation`
   in `object_metadata` with a full append-only history. Primary key
-  is `operation_uuid`, indexed on `(target_object_type, target_uuid)`
+  is `sequence_number` (AUTO_INCREMENT), with a UNIQUE constraint on
+  `operation_uuid`. Indexed on `(target_object_type, target_uuid)`
   and `created_at`. Dual-write with object_metadata fallback.
 
 ### Migrating Existing Deployments

@@ -12,9 +12,7 @@ import shutil
 import socket
 import time
 import xml.etree.ElementTree as ET
-from collections import defaultdict
 from functools import partial
-import uuid
 from uuid import UUID
 from uuid import uuid4
 
@@ -157,6 +155,7 @@ class ConnectedVSockChannel():
 
 class Instance(dbowo):
     object_type = ObjectType.INSTANCE
+    initial_version = 19
     current_version = 19
 
     # Attributes stored in MariaDB (everything else stays in etcd)
@@ -164,6 +163,7 @@ class Instance(dbowo):
         'placement', 'power_state', 'ports', 'enforced_deletes',
         'block_devices', 'interfaces', 'agent_state',
         'agent_attributes', 'agent_operations', 'kvm_pid', 'error',
+        'vsock_cids',
     }
 
     # docs/developer_guide/state_machine.md has a description of these states.
@@ -251,116 +251,6 @@ class Instance(dbowo):
             raise exceptions.InstanceBadDiskSpecification()
 
     @classmethod
-    def _upgrade_step_3_to_4(cls, static_values):
-        static_values['configdrive'] = 'openstack-disk'
-
-    @classmethod
-    def _upgrade_step_4_to_5(cls, static_values):
-        static_values['nvram_template'] = None
-        static_values['secure_boot'] = False
-
-    @classmethod
-    def _upgrade_step_5_to_6(cls, static_values):
-        static_values['machine_type'] = 'pc'
-
-    @classmethod
-    def _upgrade_step_6_to_7(cls, static_values):
-        static_values['side_channels'] = []
-
-    @classmethod
-    def _upgrade_step_7_to_8(cls, static_values):
-        cls._upgrade_metadata_to_attribute(static_values['uuid'])
-
-    @classmethod
-    def _upgrade_step_8_to_9(cls, static_values):
-        static_values['vdi_type'] = 'vnc'
-
-    @classmethod
-    def _upgrade_step_9_to_10(cls, static_values):
-        static_values['spice_concurrent'] = False
-
-    @classmethod
-    def _upgrade_step_10_to_11(cls, static_values):
-        video = static_values['video']
-        video['vdi'] = static_values.get('vdi_type', 'vnc')
-        if 'vdi_type' in static_values:
-            del static_values['vdi_type']
-
-    @classmethod
-    def _upgrade_step_11_to_12(cls, static_values):
-        blob_refs = defaultdict(int)
-
-        # We don't have a block devices structure until _initialize_block_devices()
-        # has been called as part of instance creation.
-        bd = etcd.get('attribute/instance', static_values['uuid'], 'block_devices')
-        if bd:
-            for d in bd.get('devices', []):
-                blob_uuid = d.get('blob_uuid')
-                if blob_uuid:
-                    blob_refs[blob_uuid] += 1
-
-        if static_values['nvram_template']:
-            blob_refs[static_values['nvram_template']] += 1
-
-        etcd.put('attribute/instance', static_values['uuid'], 'blob_references',
-                 blob_refs)
-
-    @classmethod
-    def _upgrade_step_12_to_13(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_13_to_14(cls, static_values):
-        if static_values.get('configdrive', 'openstack-disk') == 'openstack-disk':
-            bd = etcd.get(
-                'attribute/instance', static_values['uuid'], 'block_devices')
-            if bd:
-                devices = bd.get('devices', [])
-                if len(devices) > 1:
-                    bd['devices'][1]['is_configdrive'] = True
-                    etcd.put(
-                        'attribute/instance', static_values['uuid'],
-                        'block_devices', bd)
-
-    @classmethod
-    def _upgrade_step_14_to_15(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_15_to_16(cls, static_values):
-        ...
-
-    @classmethod
-    def _upgrade_step_16_to_17(cls, static_values):
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
-        ...
-
-    @classmethod
-    def _upgrade_step_17_to_18(cls, static_values):
-        # Convert placement['node'] from FQDN to node UUID. The scheduler
-        # and queue system now use node UUIDs instead of FQDNs.
-        placement = etcd.get('attribute/instance', static_values['uuid'], 'placement')
-        if not placement or not placement.get('node'):
-            return
-
-        node_value = placement['node']
-        try:
-            uuid.UUID(node_value)
-            # Already a UUID, nothing to do
-        except ValueError:
-            # It's an FQDN, look up the node to get its UUID
-            n = Node.from_db(node_value)
-            if n:
-                placement['node'] = str(n.uuid)
-                etcd.put('attribute/instance', static_values['uuid'], 'placement', placement)
-
-    @classmethod
-    def _upgrade_step_18_to_19(cls, static_values):
-        # Static values migration to MariaDB is handled by the
-        # database daemon data migrations.
-        ...
-
-    @classmethod
     def _db_create(cls, object_uuid, metadata):
         """Create an Instance record in both etcd and MariaDB."""
         # Write to etcd (base class behavior)
@@ -401,74 +291,91 @@ class Instance(dbowo):
             side_channels=side_channels,
             version=metadata.get('version', cls.current_version)
         )
-        mariadb.create_instance(data)
+        if not mariadb.create_instance(data):
+            raise RuntimeError(f'Failed to create instance {object_uuid} in MariaDB')
 
         # Create initial attributes record
         attrs = InstanceAttributesData(uuid=_uuid)
-        mariadb.create_instance_attributes(attrs)
+        if not mariadb.create_instance_attributes(attrs):
+            raise RuntimeError(f'Failed to create instance attributes {object_uuid} in MariaDB')
+
+    @staticmethod
+    def _static_values_to_dict(data):
+        """Convert InstanceData to the dict format used internally."""
+        return {
+            'uuid': str(data.uuid),
+            'cpus': data.cpus,
+            'disk_spec': data.disk_spec,
+            'memory': data.memory,
+            'name': data.name,
+            'namespace': data.namespace,
+            'requested_placement': data.requested_placement,
+            'ssh_key': data.ssh_key,
+            'user_data': data.user_data,
+            'video': data.video,
+            'uefi': data.uefi,
+            'configdrive': data.configdrive,
+            'nvram_template': data.nvram_template,
+            'secure_boot': data.secure_boot,
+            'machine_type': data.machine_type,
+            'side_channels': data.side_channels,
+            'version': data.version,
+        }
 
     @classmethod
     def _db_get(cls, object_uuid):
-        """Get Instance static values, trying MariaDB first."""
+        """Get Instance static values from MariaDB."""
         _uuid = object_uuid if isinstance(object_uuid, UUID) else UUID(object_uuid)
         data = mariadb.get_instance(_uuid)
-        if data:
-            result = {
-                'uuid': str(data.uuid),
-                'cpus': data.cpus,
-                'disk_spec': data.disk_spec,
-                'memory': data.memory,
-                'name': data.name,
-                'namespace': data.namespace,
-                'requested_placement': data.requested_placement,
-                'ssh_key': data.ssh_key,
-                'user_data': data.user_data,
-                'video': data.video,
-                'uefi': data.uefi,
-                'configdrive': data.configdrive,
-                'nvram_template': data.nvram_template,
-                'secure_boot': data.secure_boot,
-                'machine_type': data.machine_type,
-                'side_channels': data.side_channels,
-                'version': data.version
-            }
-            if result.get('version', 0) != cls.current_version:
-                if not cls.upgrade_supported:
-                    raise exceptions.BadObjectVersion(
-                        f'Unsupported object version - {cls.object_type}: {result}')
-            return result
+        if not data:
+            return None
 
-        # Fall back to etcd for unmigrated objects
-        return super()._db_get(object_uuid)
+        result = cls._static_values_to_dict(data)
+        if result.get('version', 0) != cls.current_version:
+            if not cls.upgrade_supported:
+                raise exceptions.BadObjectVersion(
+                    f'Unsupported object version - {cls.object_type}: {result}')
+        return result
+
+    @classmethod
+    def filter(cls, filters):
+        """Override base class to use MariaDB instead of etcd."""
+        for data in mariadb.get_all_instances():
+            obj = cls(cls._static_values_to_dict(data))
+            if all(f(obj) for f in filters):
+                yield obj
 
     def _db_get_attribute(self, attribute, default=None):
         """Get an attribute, routing MariaDB-stored attributes appropriately."""
         if attribute in self.MARIADB_ATTRIBUTES:
             _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
             attrs = mariadb.get_instance_attributes(_uuid)
-            if attrs:
-                # Map the attribute name to the model field
-                field_name = attribute
-                if attribute == 'error':
-                    field_name = 'error_message'
+            if not attrs:
+                attrs = InstanceAttributesData(uuid=_uuid)
+                mariadb.create_instance_attributes(attrs)
 
-                val = getattr(attrs, field_name, None)
+            # Map the attribute name to the model field
+            field_name = attribute
+            if attribute == 'error':
+                field_name = 'error_message'
 
-                # Handle special cases for compatibility with etcd format
-                if attribute == 'kvm_pid':
-                    if val is not None:
-                        return {'pid': val}
-                    return default if default is not None else {}
-                if attribute == 'error':
-                    if val:
-                        return {'message': val}
-                    return default if default is not None else {}
-                if attribute == 'interfaces':
-                    return val if val else (default if default is not None else [])
+            val = getattr(attrs, field_name, None)
 
+            # Handle special cases for compatibility with etcd format
+            if attribute == 'kvm_pid':
                 if val is not None:
-                    return val
+                    return {'pid': val}
                 return default if default is not None else {}
+            if attribute == 'error':
+                if val:
+                    return {'message': val}
+                return default if default is not None else {}
+            if attribute == 'interfaces':
+                return val if val else (default if default is not None else [])
+
+            if val is not None:
+                return val
+            return default if default is not None else {}
 
         # Fall through to etcd for non-MariaDB attributes
         # (metadata, last_cluster_operation, vsock_cid:*, etc.)
@@ -479,27 +386,28 @@ class Instance(dbowo):
         if attribute in self.MARIADB_ATTRIBUTES:
             _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
             attrs = mariadb.get_instance_attributes(_uuid)
-            if attrs:
-                # Map the attribute name to the model field
-                if attribute == 'kvm_pid':
-                    attrs.kvm_pid = value.get('pid') if isinstance(value, dict) else value
-                elif attribute == 'error':
-                    attrs.error_message = value.get('message', '') if isinstance(value, dict) else str(value)
-                elif attribute == 'interfaces':
-                    attrs.interfaces = value if isinstance(value, list) else value
-                elif attribute == 'agent_state':
-                    if hasattr(value, 'model_dump'):
-                        attrs.agent_state = value.model_dump()
-                    else:
-                        attrs.agent_state = value
+            if not attrs:
+                attrs = InstanceAttributesData(uuid=_uuid)
+                mariadb.create_instance_attributes(attrs)
+
+            # Map the attribute name to the model field
+            if attribute == 'kvm_pid':
+                attrs.kvm_pid = value.get('pid') if isinstance(value, dict) else value
+            elif attribute == 'error':
+                attrs.error_message = value.get('message', '') if isinstance(value, dict) else str(value)
+            elif attribute == 'interfaces':
+                attrs.interfaces = value if isinstance(value, list) else value
+            elif attribute == 'agent_state':
+                if hasattr(value, 'model_dump'):
+                    attrs.agent_state = value.model_dump()
                 else:
-                    setattr(attrs, attribute, value)
+                    attrs.agent_state = value
+            else:
+                setattr(attrs, attribute, value)
 
-                mariadb.update_instance_attributes(attrs)
-
-                # Preserve event logging from base class
-                super()._db_set_attribute(attribute, value)
-                return
+            mariadb.update_instance_attributes(attrs)
+            self._log_attribute_mutation(attribute, value)
+            return
 
         # Fall through to etcd for non-MariaDB attributes
         super()._db_set_attribute(attribute, value)
@@ -825,10 +733,16 @@ class Instance(dbowo):
         self._db_set_attribute('kvm_pid', {'pid': pid})
 
     def vsock_cid(self, channel):
-        return self._db_get_attribute(f'vsock_cid:{channel}')
+        cids = self._db_get_attribute('vsock_cids')
+        if not cids:
+            return None
+        return cids.get(channel)
 
     def set_vsock_cid(self, channel, cid):
-        self._db_set_attribute(f'vsock_cid:{channel}', cid)
+        with self.get_lock_attr('vsock_cids', 'Set vsock CID'):
+            cids = self._db_get_attribute('vsock_cids') or {}
+            cids[channel] = cid
+            self._db_set_attribute('vsock_cids', cids)
 
     # Implementation
     def _initialize_block_devices(self):
@@ -1065,11 +979,6 @@ class Instance(dbowo):
                 suppress_failure_audit=True):
             agentop.delete()
 
-        # Clean up MariaDB records
-        _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
-        mariadb.delete_instance_attributes(_uuid)
-        mariadb.delete_instance(_uuid)
-
         if self.state.value.endswith(f'-{self.STATE_ERROR}'):
             self.state = self.STATE_ERROR
         else:
@@ -1079,39 +988,32 @@ class Instance(dbowo):
         self._delete_on_hypervisor()
         self._delete_globally()
 
+    def hard_delete(self):
+        _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
+        mariadb.delete_instance_attributes(_uuid)
+        mariadb.delete_instance(_uuid)
+        super().hard_delete()
+
     def _allocate_console_port(self):
-        node = config.NODE_NAME
-        consumed = [value['port']
-                    for _, value in etcd.get_all('console', node)]
+        consumed = mariadb.get_consumed_ports_for_node(
+            config.NODE_UUID)
         while True:
             port = random.randint(30000, 50000)
-            # avoid hitting etcd if it's probably in use
             if port in consumed:
                 continue
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                # We hold this port open until it's in etcd to prevent
-                # anyone else needing to hit etcd to find out they can't
-                # use it as well as to verify we can use it
+                # Bind to verify the port is available locally.
+                # This prevents races between concurrent allocations
+                # on the same node.
                 s.bind(('0.0.0.0', port))
-                allocatedPort = etcd.create(
-                    'console', node, port,
-                    {
-                        'instance_uuid': self.uuid,
-                        'port': port,
-                    })
-                if allocatedPort:
-                    return port
+                return port
             except OSError:
                 LOG.with_fields({'instance': self.uuid}).info(
                     f'Collided with in use port {port}, selecting another')
                 consumed.append(port)
             finally:
                 s.close()
-
-    def _free_console_port(self, port):
-        if port:
-            etcd.delete('console', config.NODE_NAME, port)
 
     def allocate_instance_ports(self):
         with self.get_lock_attr('ports', 'Instance port allocation'):
@@ -1127,11 +1029,7 @@ class Instance(dbowo):
                 self.ports = p
 
     def deallocate_instance_ports(self):
-        ports = self.ports
-        self._free_console_port(ports.get('console_port'))
-        self._free_console_port(ports.get('vdi_port'))
-        self._free_console_port(ports.get('vdi_tls_port'))
-        self._db_delete_attribute('ports')
+        self._db_set_attribute('ports', None)
 
     def _configure_block_devices(self):
         with self.get_lock_attr(
@@ -1447,16 +1345,21 @@ class Instance(dbowo):
         iso.close()
 
     def _allocate_vsock_cid(self, channel_name):
-        reservation = {
-            'instance_uuid': self.uuid,
-            'channel_name': channel_name,
-            'when': time.time()
-            }
-
-        cid = random.randint(3, 4294967295)
-        while not etcd.create('cid', None, cid, reservation):
+        # Hold a global cluster lock for the duration of the
+        # check-then-act sequence. Without this, two concurrent
+        # allocations (potentially on different nodes) could both
+        # observe the same CID as unused via is_vsock_cid_in_use()
+        # and then both write it via set_vsock_cid(), since the
+        # set_vsock_cid lock is per-instance and so does not
+        # serialise allocations across instances.
+        with etcd.ClusterLock(
+                'vsock_cids', None, 'global',
+                op='Allocate vsock CID', timeout=30):
             cid = random.randint(3, 4294967295)
-        return cid
+            while mariadb.is_vsock_cid_in_use(cid):
+                cid = random.randint(3, 4294967295)
+            self.set_vsock_cid(channel_name, cid)
+            return cid
 
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
@@ -1523,7 +1426,6 @@ class Instance(dbowo):
                     extradevices.append("</channel>")
                 elif channel == 'sf-agent2':
                     cid = self._allocate_vsock_cid(channel)
-                    self.set_vsock_cid(channel, cid)
                     extradevices.append("<vsock model='virtio'>")
                     extradevices.append(f"    <cid auto='no' address='{cid}'/>")
                     extradevices.append('</vsock>')
@@ -1859,7 +1761,10 @@ class Instance(dbowo):
             PRIORITY.user_facing,
             runs_after=[self.last_cluster_operation],
             request_id=util_general.get_request_id())
-        self.set_last_cluster_operation(op_type, op_uuid)
+        try:
+            self.set_last_cluster_operation(op_type, op_uuid)
+        except RuntimeError:
+            pass  # Delete must proceed even if LCO tracking fails
 
     def enqueue_delete_due_error(self, error_msg):
         # Error needs to be set immediately so that API clients get
@@ -2085,6 +1990,11 @@ class Instance(dbowo):
         n.ensure_mesh()
 
         with util_libvirt.LibvirtConnection() as lc:
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
+            if not inst or not inst.isActive():
+                raise exceptions.InvalidLifecycleState(
+                    'instance is not running, cannot hot plug interface')
+
             bridge = n.subst_dict()['vx_bridge']
             mtu = config.MAX_HYPERVISOR_MTU - 50
             device_xml = f'''    <interface type="bridge">
@@ -2097,8 +2007,16 @@ class Instance(dbowo):
 
             flags = (lc.libvirt.VIR_DOMAIN_AFFECT_CONFIG |
                      lc.libvirt.VIR_DOMAIN_AFFECT_LIVE)
-            inst = lc.get_domain_from_sf_uuid(self.uuid)
-            inst.attachDeviceFlags(device_xml, flags=flags)
+            try:
+                inst.attachDeviceFlags(device_xml, flags=flags)
+            except lc.libvirt.libvirtError as e:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, [self, n, ni],
+                    'hot plug interface failed',
+                    extra={'error': str(e)})
+                raise exceptions.InvalidLifecycleState(
+                    f'hot plug interface failed: {e}')
+
             add_event_multi(
                 EVENT_TYPE_AUDIT, [self, n, ni], 'hot plugged interface')
             self._record_domain_xml()
@@ -2113,6 +2031,47 @@ class Instance(dbowo):
 
 class Instances(dbo_iter):
     base_object = Instance
+
+    def get_iterator(self):
+        if self.prefilter:
+            if self.prefilter == 'active':
+                target_states = Instance.ACTIVE_STATES
+            elif self.prefilter == 'deleted':
+                target_states = [dbo.STATE_DELETED]
+            elif self.prefilter == 'healthy':
+                target_states = Instance.HEALTHY_STATES
+            elif self.prefilter == 'inactive':
+                target_states = Instance.INACTIVE_STATES
+            else:
+                raise exceptions.InvalidObjectPrefilter(
+                    self.prefilter)
+
+            matching_uuids_list = mariadb.get_objects_by_state(
+                Instance.object_type, list(target_states))
+
+            if matching_uuids_list is None:
+                # State query failed; yield all and let caller
+                # filters handle correctness.
+                LOG.warning('get_objects_by_state returned None for '
+                            'instances, falling back to full scan')
+                for data in mariadb.get_all_instances():
+                    yield (str(data.uuid),
+                           Instance._static_values_to_dict(data))
+                return
+
+            matching_uuids = set(matching_uuids_list)
+
+            results = []
+            for data in mariadb.get_all_instances():
+                if str(data.uuid) in matching_uuids:
+                    results.append(
+                        (str(data.uuid),
+                         Instance._static_values_to_dict(data)))
+            yield from results
+        else:
+            for data in mariadb.get_all_instances():
+                yield (str(data.uuid),
+                       Instance._static_values_to_dict(data))
 
     def __iter__(self):
         for _, static_values in self.get_iterator():
@@ -2146,9 +2105,7 @@ def instances_in_namespace(namespace):
 
 
 def all_instances():
-    for object_key, _ in etcd.get_all(Instance.object_type, None):
-        # object_key is the full etcd path like /sf/instance/{uuid}
-        object_uuid = object_key.split('/')[-1]
+    for object_uuid in mariadb.get_all_instance_uuids():
         i = Instance.from_db(object_uuid, suppress_failure_audit=True)
         if i:
             yield i

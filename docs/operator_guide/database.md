@@ -617,7 +617,7 @@ dedicated attribute tables:
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
 | `network_attributes` | Network | uuid, floating_gateway, networkinterfaces (JSON list), networkinterfaces_initialized, hosteddns (JSON dict) |
 | `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict) |
-| `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), interfaces (JSON list), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message |
+| `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), interfaces (JSON list), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message, vsock_cids (JSON dict) |
 
 Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.

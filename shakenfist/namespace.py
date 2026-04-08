@@ -278,9 +278,11 @@ class Namespaces(dbo_iter):
                 from shakenfist import exceptions
                 raise exceptions.InvalidObjectPrefilter(self.prefilter)
 
-            matching = set(mariadb.get_objects_by_state(
-                ObjectType.NAMESPACE, list(target_states)))
-            all_names = [n for n in all_names if n in matching]
+            matching = mariadb.get_objects_by_state(
+                ObjectType.NAMESPACE, list(target_states))
+            if matching is not None:
+                matching = set(matching)
+                all_names = [n for n in all_names if n in matching]
 
         for name in all_names:
             n = Namespace.from_db(name)

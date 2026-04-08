@@ -19,7 +19,7 @@ performance suffered too much for very large blobs:
 * snapshotting a disk.
 
 Additionally, all blob replicas are regularly checksummed and compared with what
-the record in etcd believes the correct value should be. These comparisons are
+the record in the database believes the correct value should be. These comparisons are
 rate limited, but should happen with a maximum frequency of
 CHECKSUM_VERIFICATION_FREQUENCY seconds, which defaults to every 24 hours. It is
 possible if you have a large number of blob replicas on a given node that the node

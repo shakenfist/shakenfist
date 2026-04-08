@@ -71,7 +71,8 @@ class IPAM(dbo):
             ipblock=metadata['ipblock'],
             version=metadata['version']
         )
-        mariadb.create_ipam(data)
+        if not mariadb.create_ipam(data):
+            raise RuntimeError(f'Failed to create IPAM {object_uuid} in MariaDB')
 
     @classmethod
     def _db_get(cls, object_uuid: str) -> Optional[dict]:

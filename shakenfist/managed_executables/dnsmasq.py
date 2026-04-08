@@ -85,9 +85,9 @@ class DnsMasq(managedexecutable.ManagedExecutable):
             provide_dhcp=metadata['provide_dhcp'],
             provide_dns=metadata['provide_dns']
         )
-        mariadb.create_dnsmasq(data)
-        eventlog.add_event(EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
-                           'db record created', extra=metadata)
+        if not mariadb.create_dnsmasq(data):
+            raise RuntimeError(f'Failed to create dnsmasq {object_uuid} in MariaDB')
+        super()._db_create(object_uuid, metadata)
 
     @classmethod
     def _db_get(cls, object_uuid: UUID) -> Optional[DnsMasqData]:
