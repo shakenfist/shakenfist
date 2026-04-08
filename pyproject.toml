@@ -97,7 +97,7 @@ dependencies = [
     "itsdangerous==2.2.0",
     "linux-utils==0.7",
     "MarkupSafe==3.0.3",
-    "marshmallow==4.2.4",
+    "marshmallow==4.3.0",
     "mistune==3.2.0",
     "mixed-methods==1.1.1",
     "named==1.4.2",
