@@ -23,28 +23,29 @@ forward to the app via a new `CursorShape` channel event.
 ```
 Offset  Size  Field
 ------  ----  -----------
-0       4     flags (u32 LE)
-                bit 0: (unused)
+0       2     flags (u16 LE)
+                bit 0: NONE — no cursor data follows
                 bit 1: CACHE_ME — client should cache this
                 bit 2: FROM_CACHE — no pixel data follows;
                         look up by unique_id
-4       8     unique_id (u64 LE)
-12      2     cursor_type (u16 LE)
-14      2     width (u16 LE)
-16      2     height (u16 LE)
-18      2     hot_spot_x (u16 LE)
-20      2     hot_spot_y (u16 LE)
-22      var   pixel_data (only if FROM_CACHE is NOT set)
+2       8     unique_id (u64 LE)
+10      1     cursor_type (u8)
+11      2     width (u16 LE)
+13      2     height (u16 LE)
+15      2     hot_spot_x (u16 LE)
+17      2     hot_spot_y (u16 LE)
+19      var   pixel_data (only if FROM_CACHE is NOT set)
 ```
 
-Total header size: 22 bytes.
+Total header size: 19 bytes (flags + header fields).
+When FLAG_NONE is set, only the 2-byte flags field is present.
 
 ### Where SpiceCursor appears
 
 - **CURSOR_INIT** (opcode 101): 9 bytes of position/trail/
-  visible, then SpiceCursor if payload > 9 + 22 bytes.
+  visible, then SpiceCursor if payload > 9 + 2 bytes.
 - **CURSOR_SET** (opcode 103): 5 bytes of position/visible,
-  then SpiceCursor if payload > 5 + 22 bytes.
+  then SpiceCursor if payload > 5 + 2 bytes.
 
 ### Pixel data formats (by cursor_type)
 
@@ -65,9 +66,9 @@ In `protocol/messages.rs`, add:
 
 ```rust
 pub struct SpiceCursorHeader {
-    pub flags: u32,
+    pub flags: u16,
     pub unique_id: u64,
-    pub cursor_type: u16,
+    pub cursor_type: u8,
     pub width: u16,
     pub height: u16,
     pub hot_spot_x: u16,
@@ -75,12 +76,14 @@ pub struct SpiceCursorHeader {
 }
 ```
 
-With `const SIZE: usize = 22` and a standard `read()`
-method. Define flag constants:
+With `const FLAGS_SIZE: usize = 2`, `const SIZE: usize = 19`,
+and a `read()` method that returns `Option<Self>` (None when
+FLAG_NONE is set). Define flag constants:
 
 ```rust
-pub const CURSOR_FLAG_CACHE_ME: u32 = 1 << 1;
-pub const CURSOR_FLAG_FROM_CACHE: u32 = 1 << 2;
+pub const FLAG_NONE: u16 = 1 << 0;
+pub const FLAG_CACHE_ME: u16 = 1 << 1;
+pub const FLAG_FROM_CACHE: u16 = 1 << 2;
 ```
 
 ### Step 2: Add CursorImage type and CursorShape event
@@ -114,10 +117,12 @@ cursor_cache: HashMap<u64, CursorImage>,
 ### Step 4: Parse SpiceCursor in INIT and SET handlers
 
 After reading the position/visible fields, check whether
-the payload is large enough to contain a SpiceCursor
-header (22 more bytes). If so:
+the payload is large enough to contain the SpiceCursor
+flags (2 more bytes). If so:
 
 1. Parse `SpiceCursorHeader` from the remaining payload.
+   If `read()` returns `None` (FLAG_NONE set), there is no
+   cursor data — return early.
 2. If `FROM_CACHE` flag is set: look up `unique_id` in
    `cursor_cache` and emit `CursorShape` with the cached
    image. If not found, log a warning.
