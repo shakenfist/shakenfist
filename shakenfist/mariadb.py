@@ -14103,28 +14103,41 @@ def _direct_delete_instance_attributes(
 
 def _direct_get_consumed_ports_for_node(
         node_uuid: str) -> list[int]:
-    """Get all consumed console/VDI ports for instances on a node."""
+    """Get all consumed console/VDI ports for instances on a node.
+
+    Pushes both the placement filter and the port extraction into
+    MariaDB. JSON_VALUE(placement, '$.node') is compared against
+    the target node UUID in the WHERE clause so we never load rows
+    for instances on other nodes, and the three port fields are
+    extracted directly from the ports JSON column rather than
+    being parsed in Python. Per the project guidance in CLAUDE.md,
+    object/attribute filtering is pushed down to the SQL layer so
+    it can later benefit from a generated-column index if port
+    allocation becomes a hotspot.
+    """
     engine = _get_engine()
-    table = _get_instance_attributes_table()
     consumed: list[int] = []
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(
-                table.c.ports, table.c.placement
-            ).where(table.c.placement.is_not(None))
-            for row in conn.execute(stmt):
-                placement = json.loads(row.placement) if isinstance(
-                    row.placement, str) else row.placement
-                if not placement or placement.get('node') != node_uuid:
-                    continue
-                ports = json.loads(row.ports) if isinstance(
-                    row.ports, str) else row.ports
-                if ports:
-                    for key in ('console_port', 'vdi_port',
-                                'vdi_tls_port'):
-                        if key in ports and ports[key]:
-                            consumed.append(ports[key])
+            stmt = sa.text('''
+                SELECT
+                    CAST(JSON_VALUE(ports, '$.console_port')
+                         AS UNSIGNED) AS console_port,
+                    CAST(JSON_VALUE(ports, '$.vdi_port')
+                         AS UNSIGNED) AS vdi_port,
+                    CAST(JSON_VALUE(ports, '$.vdi_tls_port')
+                         AS UNSIGNED) AS vdi_tls_port
+                FROM instance_attributes
+                WHERE ports IS NOT NULL
+                  AND placement IS NOT NULL
+                  AND JSON_VALUE(placement, '$.node') = :node_uuid
+            ''')
+            for row in conn.execute(stmt, {'node_uuid': node_uuid}):
+                for value in (row.console_port, row.vdi_port,
+                              row.vdi_tls_port):
+                    if value:
+                        consumed.append(int(value))
     except OperationalError as e:
         LOG.warning(
             f'MariaDB query failed for consumed ports '
