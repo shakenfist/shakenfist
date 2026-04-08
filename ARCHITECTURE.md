@@ -89,6 +89,12 @@ matches). All object iterators handle this by falling back to unfiltered
 scans, ensuring that transient gRPC failures do not silently drop objects
 from iteration results (e.g. interfaces during instance deletion).
 
+Object types with static values in MariaDB (`Instances`, `Networks`,
+`NetworkInterfaces`) override `get_iterator()` in their iterator classes
+to read from MariaDB via `get_all_*()` functions instead of etcd. This
+is essential because new objects are written to MariaDB as the primary
+store and may not exist in etcd.
+
 #### Cluster Operation Tracking
 
 `set_last_cluster_operation()` records which cluster operation was most recently

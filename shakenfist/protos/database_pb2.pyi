@@ -3494,6 +3494,18 @@ class GetNetworkInterfacesReply(google.protobuf.message.Message):
 global___GetNetworkInterfacesReply = GetNetworkInterfacesReply
 
 @typing.final
+class GetAllNetworkInterfacesRequest(google.protobuf.message.Message):
+    """No filters - returns all network interfaces"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllNetworkInterfacesRequest = GetAllNetworkInterfacesRequest
+
+@typing.final
 class DeleteNetworkInterfaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

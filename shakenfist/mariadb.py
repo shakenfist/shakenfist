@@ -11332,6 +11332,38 @@ def _direct_get_network_interfaces_by_network(
         return []
 
 
+def _direct_get_all_network_interfaces() -> list[NetworkInterfaceData]:
+    """Get all NetworkInterface records from MariaDB.
+
+    Returns:
+        List of NetworkInterfaceData objects.
+    """
+    engine = _get_engine()
+    table = _get_network_interfaces_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table)
+            result = conn.execute(stmt).fetchall()
+
+            return [
+                NetworkInterfaceData(
+                    uuid=row.uuid,
+                    network_uuid=row.network_uuid,
+                    instance_uuid=row.instance_uuid,
+                    macaddr=row.macaddr,
+                    ipv4=row.ipv4,
+                    order=row.order,
+                    model=row.model,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for all network_interfaces: {e}')
+        return []
+
+
 def _direct_delete_network_interface(ni_uuid: UUID) -> bool:
     """Delete a NetworkInterface record from MariaDB.
 
@@ -11607,6 +11639,30 @@ def _grpc_get_network_interfaces_by_network(
         return []
 
 
+def _grpc_get_all_network_interfaces() -> list[NetworkInterfaceData]:
+    """Get all NetworkInterface records via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllNetworkInterfacesRequest()
+        reply = _grpc_call(stub.GetAllNetworkInterfaces, request)
+        return [
+            NetworkInterfaceData(
+                uuid=d.uuid,
+                network_uuid=d.network_uuid,
+                instance_uuid=d.instance_uuid,
+                macaddr=d.macaddr,
+                ipv4=d.ipv4,
+                order=d.order,
+                model=d.model or None,
+                version=d.version
+            )
+            for d in reply.network_interfaces
+        ]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetAllNetworkInterfaces failed: {e}')
+        return []
+
+
 def _grpc_delete_network_interface(ni_uuid: UUID) -> bool:
     """Delete a NetworkInterface record via the database
     microservice."""
@@ -11795,6 +11851,17 @@ def get_network_interfaces_by_network(
     if _use_database_service():
         return _grpc_get_network_interfaces_by_network(network_uuid)
     return _direct_get_network_interfaces_by_network(network_uuid)
+
+
+def get_all_network_interfaces() -> list[NetworkInterfaceData]:
+    """Get all NetworkInterface records.
+
+    Returns:
+        List of NetworkInterfaceData objects.
+    """
+    if _use_database_service():
+        return _grpc_get_all_network_interfaces()
+    return _direct_get_all_network_interfaces()
 
 
 def delete_network_interface(ni_uuid: UUID) -> bool:

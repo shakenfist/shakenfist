@@ -2373,6 +2373,25 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetNetworkInterfacesByNetwork failed', e)
             return database_pb2.GetNetworkInterfacesReply(network_interfaces=[])
 
+    def GetAllNetworkInterfaces(
+        self,
+        request: database_pb2.GetAllNetworkInterfacesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNetworkInterfacesReply:
+        """Get all NetworkInterface records from MariaDB."""
+        try:
+            self.monitor.counters['get_all_network_interfaces'].inc()
+            nis = mariadb._direct_get_all_network_interfaces()
+            return database_pb2.GetNetworkInterfacesReply(
+                network_interfaces=[self._ni_to_proto(d) for d in nis])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllNetworkInterfaces failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNetworkInterfacesReply(
+                network_interfaces=[])
+
     def DeleteNetworkInterface(
         self,
         request: database_pb2.DeleteNetworkInterfaceRequest,
@@ -4104,6 +4123,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_network_interface', 'get_network_interface',
             'get_network_interfaces_by_instance',
             'get_network_interfaces_by_network',
+            'get_all_network_interfaces',
             'delete_network_interface', 'update_network_interface',
             # MariaDB network interface attributes operations
             'create_network_interface_attributes',
