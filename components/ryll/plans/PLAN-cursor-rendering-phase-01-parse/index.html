@@ -3024,6 +3024,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-display-iteration-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Display Iteration Follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-crate-extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extract reusable crates from ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-usb-ui/" class="md-nav__link">
         
   
@@ -6568,26 +6624,27 @@ forward to the app via a new <code>CursorShape</code> channel event.</p>
 <h3 id="spicecursor-structure-follows-position-data">SpiceCursor structure (follows position data)<a class="headerlink" href="#spicecursor-structure-follows-position-data" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Offset  Size  Field
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>------  ----  -----------
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>0       4     flags (u32 LE)
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                bit 0: (unused)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>0       2     flags (u16 LE)
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                bit 0: NONE — no cursor data follows
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                bit 1: CACHE_ME — client should cache this
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                bit 2: FROM_CACHE — no pixel data follows;
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                        look up by unique_id
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>4       8     unique_id (u64 LE)
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>12      2     cursor_type (u16 LE)
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>14      2     width (u16 LE)
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>16      2     height (u16 LE)
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>18      2     hot_spot_x (u16 LE)
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>20      2     hot_spot_y (u16 LE)
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>22      var   pixel_data (only if FROM_CACHE is NOT set)
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>2       8     unique_id (u64 LE)
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>10      1     cursor_type (u8)
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>11      2     width (u16 LE)
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>13      2     height (u16 LE)
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>15      2     hot_spot_x (u16 LE)
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>17      2     hot_spot_y (u16 LE)
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>19      var   pixel_data (only if FROM_CACHE is NOT set)
 </code></pre></div>
-<p>Total header size: 22 bytes.</p>
+<p>Total header size: 19 bytes (flags + header fields).
+When FLAG_NONE is set, only the 2-byte flags field is present.</p>
 <h3 id="where-spicecursor-appears">Where SpiceCursor appears<a class="headerlink" href="#where-spicecursor-appears" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>CURSOR_INIT</strong> (opcode 101): 9 bytes of position/trail/
-  visible, then SpiceCursor if payload &gt; 9 + 22 bytes.</li>
+  visible, then SpiceCursor if payload &gt; 9 + 2 bytes.</li>
 <li><strong>CURSOR_SET</strong> (opcode 103): 5 bytes of position/visible,
-  then SpiceCursor if payload &gt; 5 + 22 bytes.</li>
+  then SpiceCursor if payload &gt; 5 + 2 bytes.</li>
 </ul>
 <h3 id="pixel-data-formats-by-cursor_type">Pixel data formats (by cursor_type)<a class="headerlink" href="#pixel-data-formats-by-cursor_type" title="Permanent link">&para;</a></h3>
 <table>
@@ -6631,19 +6688,21 @@ forward to the app via a new <code>CursorShape</code> channel event.</p>
 <h3 id="step-1-add-spicecursorheader-struct">Step 1: Add SpiceCursorHeader struct<a class="headerlink" href="#step-1-add-spicecursorheader-struct" title="Permanent link">&para;</a></h3>
 <p>In <code>protocol/messages.rs</code>, add:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">SpiceCursorHeader</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">flags</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">flags</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">unique_id</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">cursor_type</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">cursor_type</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">,</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">width</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">height</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">hot_spot_x</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">hot_spot_y</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">}</span>
 </code></pre></div>
-<p>With <code>const SIZE: usize = 22</code> and a standard <code>read()</code>
-method. Define flag constants:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">CURSOR_FLAG_CACHE_ME</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">pub</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">CURSOR_FLAG_FROM_CACHE</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<p>With <code>const FLAGS_SIZE: usize = 2</code>, <code>const SIZE: usize = 19</code>,
+and a <code>read()</code> method that returns <code>Option&lt;Self&gt;</code> (None when
+FLAG_NONE is set). Define flag constants:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">FLAG_NONE</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">pub</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">FLAG_CACHE_ME</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">pub</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">FLAG_FROM_CACHE</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
 </code></pre></div>
 <h3 id="step-2-add-cursorimage-type-and-cursorshape-event">Step 2: Add CursorImage type and CursorShape event<a class="headerlink" href="#step-2-add-cursorimage-type-and-cursorshape-event" title="Permanent link">&para;</a></h3>
 <p>In <code>channels/mod.rs</code>, add:</p>
@@ -6664,10 +6723,12 @@ method. Define flag constants:</p>
 </code></pre></div>
 <h3 id="step-4-parse-spicecursor-in-init-and-set-handlers">Step 4: Parse SpiceCursor in INIT and SET handlers<a class="headerlink" href="#step-4-parse-spicecursor-in-init-and-set-handlers" title="Permanent link">&para;</a></h3>
 <p>After reading the position/visible fields, check whether
-the payload is large enough to contain a SpiceCursor
-header (22 more bytes). If so:</p>
+the payload is large enough to contain the SpiceCursor
+flags (2 more bytes). If so:</p>
 <ol>
-<li>Parse <code>SpiceCursorHeader</code> from the remaining payload.</li>
+<li>Parse <code>SpiceCursorHeader</code> from the remaining payload.
+   If <code>read()</code> returns <code>None</code> (FLAG_NONE set), there is no
+   cursor data — return early.</li>
 <li>If <code>FROM_CACHE</code> flag is set: look up <code>unique_id</code> in
    <code>cursor_cache</code> and emit <code>CursorShape</code> with the cached
    image. If not found, log a warning.</li>

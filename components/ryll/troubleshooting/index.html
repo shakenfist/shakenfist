@@ -3213,6 +3213,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#replay-draw_copy-regions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replay draw_copy regions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#monitor-network-traffic" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3449,6 +3460,62 @@
     
   
     Cross-Platform Packaging for Ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-display-iteration-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Display Iteration Follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-crate-extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extract reusable crates from ryll
   
 
     
@@ -6841,6 +6908,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#replay-draw_copy-regions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replay draw_copy regions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#monitor-network-traffic" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7041,8 +7119,7 @@ insecure port.</p>
 <p><strong>Symptom:</strong> Window appears but content is black or garbled.</p>
 <p><strong>Causes:</strong>
 - Image decompression failing (check for WARN lines in log)
-- Unsupported image type (QUIC and JPEG_ALPHA are not yet
-  implemented)
+- Unsupported image type (JPEG_ALPHA is not yet implemented)
 - GLZ cross-frame dictionary corruption</p>
 <p><strong>Solutions:</strong>
 1. Enable verbose logging (<code>-v</code>) and check <code>/tmp/ryll.log</code> for
@@ -7179,13 +7256,22 @@ compatibility.</p>
 <a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>INFO Connected to inputs channel successfully
 <a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>INFO Connected to cursor channel successfully
 </code></pre></div></p>
+<h3 id="replay-draw_copy-regions">Replay draw_copy regions<a class="headerlink" href="#replay-draw_copy-regions" title="Permanent link">&para;</a></h3>
+<p>The <code>scripts/replay_draw_copy.py</code> script parses verbose ryll logs
+and generates an HTML animation showing where each <code>draw_copy</code>
+operation landed on the surface. This is useful for diagnosing
+rendering issues like misplaced tiles or missing regions.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tee<span class="w"> </span>debug.log
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>python3<span class="w"> </span>scripts/replay_draw_copy.py<span class="w"> </span>debug.log<span class="w"> </span>-o<span class="w"> </span>replay.html
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1"># Open replay.html in a browser — use Play/Step to animate</span>
+</code></pre></div>
 <h3 id="monitor-network-traffic">Monitor network traffic<a class="headerlink" href="#monitor-network-traffic" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># See SPICE traffic (unencrypted only)</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>tcpdump<span class="w"> </span>-i<span class="w"> </span>any<span class="w"> </span>port<span class="w"> </span><span class="m">5900</span><span class="w"> </span>-w<span class="w"> </span>spice.pcap
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># See SPICE traffic (unencrypted only)</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>tcpdump<span class="w"> </span>-i<span class="w"> </span>any<span class="w"> </span>port<span class="w"> </span><span class="m">5900</span><span class="w"> </span>-w<span class="w"> </span>spice.pcap
 </code></pre></div>
 <h3 id="test-with-headless-mode-first">Test with headless mode first<a class="headerlink" href="#test-with-headless-mode-first" title="Permanent link">&para;</a></h3>
 <p>Headless mode eliminates GUI-related issues:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>-v
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>-v
 </code></pre></div></p>
 <p>If headless works but GUI doesn't, the issue is in the rendering layer.</p>
 <h2 id="bug-reports">Bug Reports<a class="headerlink" href="#bug-reports" title="Permanent link">&para;</a></h2>
@@ -7217,13 +7303,13 @@ selection mode</strong>: drag a rectangle over the area of corruption.
 A red overlay shows your selection.  Press <strong>Escape</strong> to skip and
 capture without highlighting a specific region.</p>
 <h3 id="what-the-zip-file-contains">What the zip file contains<a class="headerlink" href="#what-the-zip-file-contains" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>├── metadata.json       — report type, description, ryll version,
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>│                         platform, target host/port, timestamp
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>├── session.json        — FPS, bandwidth, surfaces, uptime
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>├── channel-state.json  — snapshot of the affected channel
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>├── traffic.pcap        — recent protocol traffic (pcap format)
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>└── screenshot.png      — full display surface (Display reports only)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>├── metadata.json       — report type, description, ryll version,
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>│                         platform, target host/port, timestamp
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>├── session.json        — FPS, bandwidth, surfaces, uptime
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>├── channel-state.json  — snapshot of the affected channel
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>├── traffic.pcap        — recent protocol traffic (pcap format)
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>└── screenshot.png      — full display surface (Display reports only)
 </code></pre></div>
 <h3 id="where-reports-are-saved">Where reports are saved<a class="headerlink" href="#where-reports-are-saved" title="Permanent link">&para;</a></h3>
 <ul>
