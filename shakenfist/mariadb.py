@@ -14155,6 +14155,11 @@ def _direct_is_vsock_cid_in_use(cid: int) -> bool:
     the '$.*' path returns a JSON array of all top-level values,
     which JSON_CONTAINS can then test for the candidate CID.
 
+    The candidate CID is passed as its decimal string form, which
+    is itself valid JSON for a number. MariaDB does not implement
+    CAST(... AS JSON) (its JSON type is an alias for LONGTEXT), so
+    we hand JSON_CONTAINS a pre-serialised JSON literal directly.
+
     Returns True on database error as a fail-safe: a false positive
     just means the caller picks another CID from a 4-billion-wide
     range, while a false negative could allow two instances to grab
@@ -14169,10 +14174,10 @@ def _direct_is_vsock_cid_in_use(cid: int) -> bool:
                 WHERE vsock_cids IS NOT NULL
                   AND JSON_CONTAINS(
                           JSON_EXTRACT(vsock_cids, '$.*'),
-                          CAST(:cid AS JSON))
+                          :cid_json)
                 LIMIT 1
             ''')
-            result = conn.execute(stmt, {'cid': cid}).first()
+            result = conn.execute(stmt, {'cid_json': str(cid)}).first()
             return result is not None
     except OperationalError as e:
         LOG.warning(
