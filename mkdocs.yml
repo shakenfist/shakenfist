@@ -156,6 +156,8 @@ nav:
                 - "Bug reporting mode for ryll": components/ryll/plans/PLAN-bug-reports.md
                 - "Capture mode for protocol and display debugging": components/ryll/plans/PLAN-capture.md
                 - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
+                - "Display Iteration Follow-ups": components/ryll/plans/PLAN-display-iteration-followups.md
+                - "Extract reusable crates from ryll": components/ryll/plans/PLAN-crate-extraction.md
                 - "Interactive USB device management UI": components/ryll/plans/PLAN-usb-ui.md
                 - "Phase 10: Testing and QEMU setup": components/ryll/plans/PLAN-usb-redir-phase-10-testing.md
                 - "Phase 1: Capture infrastructure": components/ryll/plans/PLAN-capture-phase-01-infra.md

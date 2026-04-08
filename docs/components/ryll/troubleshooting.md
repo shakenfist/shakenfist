@@ -102,8 +102,7 @@ Error: invalid peer certificate: UnknownIssuer
 
 **Causes:**
 - Image decompression failing (check for WARN lines in log)
-- Unsupported image type (QUIC and JPEG_ALPHA are not yet
-  implemented)
+- Unsupported image type (JPEG_ALPHA is not yet implemented)
 - GLZ cross-frame dictionary corruption
 
 **Solutions:**
@@ -288,6 +287,19 @@ INFO Connected to main channel successfully
 INFO Connected to display channel successfully
 INFO Connected to inputs channel successfully
 INFO Connected to cursor channel successfully
+```
+
+### Replay draw_copy regions
+
+The `scripts/replay_draw_copy.py` script parses verbose ryll logs
+and generates an HTML animation showing where each `draw_copy`
+operation landed on the surface. This is useful for diagnosing
+rendering issues like misplaced tiles or missing regions.
+
+```bash
+ryll --file test.vv -v 2>&1 | tee debug.log
+python3 scripts/replay_draw_copy.py debug.log -o replay.html
+# Open replay.html in a browser — use Play/Step to animate
 ```
 
 ### Monitor network traffic
