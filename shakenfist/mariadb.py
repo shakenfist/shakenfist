@@ -2072,6 +2072,70 @@ def _cleanup_etcd_blob_transfers(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _cleanup_legacy_port_reservation_keys() -> tuple[int, int]:
+    """Clean up legacy etcd port and vsock CID reservation keys.
+
+    Earlier versions of shakenfist tracked allocated console/VDI
+    ports under /sf/console/{node}/{port} via etcd.create('console',
+    ...) and allocated vsock CIDs under /sf/cid/{cid} via
+    etcd.create('cid', ...). Both allocators have moved to MariaDB
+    (the instance_attributes.ports and .vsock_cids columns
+    respectively), but those etcd keys are not touched by any of
+    the per-object attribute migrations and so leak indefinitely on
+    upgraded clusters.
+
+    Called from _migrate_etcd_instance_attributes (which is the
+    natural home for instance-port-related cleanup) so that it
+    runs once on the same upgrade where the underlying allocator
+    moved to MariaDB. The reservations themselves are no longer
+    authoritative for any allocation decision, so dropping them is
+    safe.
+
+    Returns (deleted_console, deleted_cid).
+    """
+    from shakenfist import etcd
+
+    deleted_console = 0
+    deleted_cid = 0
+
+    # /sf/console/{node}/{port} -> port reservation per node
+    LOG.info(
+        'Cleaning up legacy etcd console port reservations...')
+    try:
+        for objkey, _data in etcd.get_all('console', None):
+            # objkey looks like /sf/console/{node}/{port}
+            parts = objkey.split('/')
+            if len(parts) >= 4:
+                node = parts[-2]
+                port = parts[-1]
+                etcd.delete('console', node, port)
+                deleted_console += 1
+    except Exception as e:
+        LOG.warning(
+            f'Error cleaning up console reservations: {e}')
+
+    # /sf/cid/{cid} -> per-CID vsock reservation
+    LOG.info(
+        'Cleaning up legacy etcd vsock CID reservations...')
+    try:
+        for objkey, _data in etcd.get_all('cid', None):
+            # objkey looks like /sf/cid/{cid}
+            parts = objkey.split('/')
+            if len(parts) >= 3:
+                cid = parts[-1]
+                etcd.delete('cid', None, cid)
+                deleted_cid += 1
+    except Exception as e:
+        LOG.warning(
+            f'Error cleaning up vsock CID reservations: {e}')
+
+    LOG.info(
+        f'Port reservation cleanup: {deleted_console} console '
+        f'records deleted, {deleted_cid} vsock CID records '
+        f'deleted')
+    return deleted_console, deleted_cid
+
+
 def _migrate_etcd_blob_attributes(engine: sa.Engine) -> dict[str, Any]:
     """Migrate blob attributes from etcd to MariaDB blob_attributes table.
 
@@ -3379,7 +3443,22 @@ def _migrate_etcd_instance_attributes(
     LOG.info(
         f'Instance attributes migration: {migrated_count} '
         f'migrated, {skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+    # Once instance attributes are in MariaDB, the legacy
+    # /sf/console/* and /sf/cid/* reservation keys (used by the
+    # old etcd-backed port and vsock CID allocators) are no
+    # longer referenced by anything. Clean them up here so the
+    # cleanup is gated on the same version bump as the migration
+    # that obsoletes them.
+    deleted_console, deleted_cid = (
+        _cleanup_legacy_port_reservation_keys())
+
+    return {
+        'migrated_count': migrated_count,
+        'error_count': error_count,
+        'deleted_console_reservations': deleted_console,
+        'deleted_vsock_cid_reservations': deleted_cid,
+    }
 
 
 def _migrate_etcd_object_metadata(
@@ -14054,24 +14133,39 @@ def _direct_get_consumed_ports_for_node(
 
 
 def _direct_is_vsock_cid_in_use(cid: int) -> bool:
-    """Check if a vsock CID is in use by any instance."""
+    """Check if a vsock CID is in use by any instance.
+
+    Pushes the search into MariaDB using JSON_CONTAINS over the
+    extracted top-level values, so we don't need to deserialize and
+    scan every vsock_cids row in Python. The vsock_cids column is a
+    JSON object of the form {channel: cid, ...}; JSON_EXTRACT with
+    the '$.*' path returns a JSON array of all top-level values,
+    which JSON_CONTAINS can then test for the candidate CID.
+
+    Returns True on database error as a fail-safe: a false positive
+    just means the caller picks another CID from a 4-billion-wide
+    range, while a false negative could allow two instances to grab
+    the same CID.
+    """
     engine = _get_engine()
-    table = _get_instance_attributes_table()
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(table.c.vsock_cids).where(
-                table.c.vsock_cids.is_not(None))
-            for row in conn.execute(stmt):
-                cids = json.loads(row.vsock_cids) if isinstance(
-                    row.vsock_cids, str) else row.vsock_cids
-                if cids and cid in cids.values():
-                    return True
+            stmt = sa.text('''
+                SELECT 1 FROM instance_attributes
+                WHERE vsock_cids IS NOT NULL
+                  AND JSON_CONTAINS(
+                          JSON_EXTRACT(vsock_cids, '$.*'),
+                          CAST(:cid AS JSON))
+                LIMIT 1
+            ''')
+            result = conn.execute(stmt, {'cid': cid}).first()
+            return result is not None
     except OperationalError as e:
         LOG.warning(
             f'MariaDB query failed for vsock CID '
-            f'{cid}: {e}')
-    return False
+            f'{cid}: {e} (returning in_use=True as fail-safe)')
+        return True
 
 
 # =============================================================================
@@ -14393,7 +14487,12 @@ def _grpc_get_consumed_ports_for_node(
 
 
 def _grpc_is_vsock_cid_in_use(cid: int) -> bool:
-    """Check if a vsock CID is in use via the database service."""
+    """Check if a vsock CID is in use via the database service.
+
+    Returns True on RPC failure as a fail-safe so the caller picks
+    another CID from the 4-billion-wide range rather than risking a
+    duplicate allocation.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.IsVsockCidInUseRequest(cid=cid)
@@ -14401,8 +14500,9 @@ def _grpc_is_vsock_cid_in_use(cid: int) -> bool:
         return bool(reply.in_use)
     except grpc.RpcError as e:
         LOG.error(
-            f'gRPC IsVsockCidInUse failed for CID {cid}: {e}')
-        return False
+            f'gRPC IsVsockCidInUse failed for CID {cid}: {e} '
+            f'(returning in_use=True as fail-safe)')
+        return True
 
 
 # =============================================================================

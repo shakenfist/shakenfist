@@ -25,6 +25,7 @@ from shakenfist import baseobject
 from shakenfist import blob
 from shakenfist import constants
 from shakenfist.constants import get_object_class
+from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.instance_attributes import InstanceAttributesData
 from shakenfist.schema.instance_data import InstanceData
@@ -1344,10 +1345,21 @@ class Instance(dbowo):
         iso.close()
 
     def _allocate_vsock_cid(self, channel_name):
-        cid = random.randint(3, 4294967295)
-        while mariadb.is_vsock_cid_in_use(cid):
+        # Hold a global cluster lock for the duration of the
+        # check-then-act sequence. Without this, two concurrent
+        # allocations (potentially on different nodes) could both
+        # observe the same CID as unused via is_vsock_cid_in_use()
+        # and then both write it via set_vsock_cid(), since the
+        # set_vsock_cid lock is per-instance and so does not
+        # serialise allocations across instances.
+        with etcd.ClusterLock(
+                'vsock_cids', None, 'global',
+                op='Allocate vsock CID', timeout=30):
             cid = random.randint(3, 4294967295)
-        return cid
+            while mariadb.is_vsock_cid_in_use(cid):
+                cid = random.randint(3, 4294967295)
+            self.set_vsock_cid(channel_name, cid)
+            return cid
 
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
@@ -1414,7 +1426,6 @@ class Instance(dbowo):
                     extradevices.append("</channel>")
                 elif channel == 'sf-agent2':
                     cid = self._allocate_vsock_cid(channel)
-                    self.set_vsock_cid(channel, cid)
                     extradevices.append("<vsock model='virtio'>")
                     extradevices.append(f"    <cid auto='no' address='{cid}'/>")
                     extradevices.append('</vsock>')

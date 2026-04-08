@@ -3686,7 +3686,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.IsVsockCidInUseRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.IsVsockCidInUseReply:
-        """Check if a vsock CID is in use by any instance."""
+        """Check if a vsock CID is in use by any instance.
+
+        Returns in_use=True on error as a fail-safe so the caller
+        picks another CID from the 4-billion-wide range rather than
+        risking a duplicate allocation on a transient query failure.
+        """
         try:
             self.monitor.counters[
                 'is_vsock_cid_in_use'].inc()
@@ -3699,7 +3704,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database IsVsockCidInUse failed', e)
             return database_pb2.IsVsockCidInUseReply(
-                in_use=False)
+                in_use=True)
 
     # Object Metadata Operations
 
