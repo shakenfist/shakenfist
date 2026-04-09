@@ -8191,6 +8191,16 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 <li><strong>Indexed queries</strong>: Efficient lookups for "latest operation on this instance"
   and "all operations on this object in order"</li>
 </ul>
+<p>Because the table is append-only, it is bounded by a periodic prune in the
+cluster daemon (alongside the existing <code>delete_stale_transfers</code> cleanup).
+The cluster daemon runs cluster-wide cleanup under <code>ClusterLock</code> election,
+so the prune naturally runs from a single node at a time. The prune
+removes rows whose <code>created_at</code> is older than
+<code>CLUSTER_OPERATION_TARGET_RETENTION</code> seconds <strong>and</strong> whose operation is not
+currently in an active state (<code>queued</code>, <code>preflight</code>, or <code>executing</code>) in
+<code>object_states</code>. Operations still in flight are never pruned regardless of
+age. Set <code>CLUSTER_OPERATION_TARGET_RETENTION</code> to 0 to disable pruning
+entirely (the default is 7 days).</p>
 <h4 id="per-type-static-value-tables">Per-Type Static Value Tables<a class="headerlink" href="#per-type-static-value-tables" title="Permanent link">&para;</a></h4>
 <p>Each concrete object type that is migrated gets its own table for static
 values (immutable data set at creation time):</p>
