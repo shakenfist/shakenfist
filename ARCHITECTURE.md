@@ -108,10 +108,13 @@ table -- one append-only row per (operation, target object) pair, with an
 AUTO_INCREMENT `sequence_number` providing total ordering per target.
 `last_cluster_operation` reads the highest-sequence row for the target.
 Because the table is append-only it is bounded by a periodic prune in the
-cleaner daemon, which runs from the etcd master only and removes rows older
-than `CLUSTER_OPERATION_TARGET_RETENTION` seconds whose operation has
-already reached a terminal state. In-flight operations
-(`queued`/`preflight`/`executing`) are never pruned regardless of age.
+cluster daemon, alongside the existing `delete_stale_transfers` cleanup.
+The prune removes rows older than `CLUSTER_OPERATION_TARGET_RETENTION`
+seconds whose operation has already reached a terminal state. In-flight
+operations (`queued`/`preflight`/`executing`) are never pruned regardless
+of age. Because the cluster daemon already runs cluster-wide cleanup
+under `ClusterLock` election, no additional locking or master-node
+gating is required.
 
 ### Protocol Buffers and gRPC
 

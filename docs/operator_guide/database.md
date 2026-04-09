@@ -581,8 +581,10 @@ Cluster operation targets are stored separately because:
   and "all operations on this object in order"
 
 Because the table is append-only, it is bounded by a periodic prune in the
-cleaner daemon. The prune runs from the etcd master node only (to avoid
-duplicated work) and removes rows whose `created_at` is older than
+cluster daemon (alongside the existing `delete_stale_transfers` cleanup).
+The cluster daemon runs cluster-wide cleanup under `ClusterLock` election,
+so the prune naturally runs from a single node at a time. The prune
+removes rows whose `created_at` is older than
 `CLUSTER_OPERATION_TARGET_RETENTION` seconds **and** whose operation is not
 currently in an active state (`queued`, `preflight`, or `executing`) in
 `object_states`. Operations still in flight are never pruned regardless of

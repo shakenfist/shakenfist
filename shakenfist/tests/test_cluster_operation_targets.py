@@ -4,7 +4,6 @@ from unittest import mock
 
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations
-from shakenfist.daemons.cleaner import scheduled_tasks
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.object_state import State
 from shakenfist.tests import base
@@ -166,39 +165,122 @@ class ClusterOperationTargetDataTestCase(base.ShakenFistTestCase):
         self.assertEqual(view['created_at'], 1000.0)
 
 
-class PruneClusterOperationTargetsTestCase(base.ShakenFistTestCase):
-    """Test the cleaner-side pruning of cluster_operation_targets."""
+class DirectDeleteStaleClusterOperationTargetsTestCase(
+        base.ShakenFistTestCase):
+    """Test the SQL-level _direct_delete_stale_cluster_operation_targets."""
 
-    @mock.patch('shakenfist.daemons.cleaner.scheduled_tasks.mariadb'
-                '.delete_stale_cluster_operation_targets',
-                return_value=3)
-    def test_prune_invokes_mariadb_with_configured_age(
-            self, mock_delete):
-        with mock.patch.object(
-                scheduled_tasks.config,
-                'CLUSTER_OPERATION_TARGET_RETENTION', 60):
-            scheduled_tasks.prune_cluster_operation_targets()
-        mock_delete.assert_called_once_with(60)
+    def setUp(self):
+        super().setUp()
+        from shakenfist.config import BaseSettings
 
-    @mock.patch('shakenfist.daemons.cleaner.scheduled_tasks.mariadb'
-                '.delete_stale_cluster_operation_targets',
-                return_value=0)
-    def test_prune_skipped_when_retention_zero(self, mock_delete):
-        with mock.patch.object(
-                scheduled_tasks.config,
-                'CLUSTER_OPERATION_TARGET_RETENTION', 0):
-            scheduled_tasks.prune_cluster_operation_targets()
-        mock_delete.assert_not_called()
+        class _FakeConfig(BaseSettings):
+            DATABASE_NODE_IP: str = '192.168.1.1'
+            DATABASE_API_PORT: int = 13005
+            DATABASE_USE_DIRECT_ETCD: bool = False
+            MARIADB_HOST: str = 'localhost'
+            NODE_NAME: str = 'testnode'
 
-    @mock.patch('shakenfist.daemons.cleaner.scheduled_tasks.mariadb'
-                '.delete_stale_cluster_operation_targets',
-                return_value=0)
-    def test_prune_skipped_when_retention_negative(self, mock_delete):
-        with mock.patch.object(
-                scheduled_tasks.config,
-                'CLUSTER_OPERATION_TARGET_RETENTION', -1):
-            scheduled_tasks.prune_cluster_operation_targets()
-        mock_delete.assert_not_called()
+        self.config_patch = mock.patch(
+            'shakenfist.mariadb.config', _FakeConfig())
+        self.config_patch.start()
+        self.addCleanup(self.config_patch.stop)
+
+    @mock.patch('shakenfist.mariadb._get_object_states_table')
+    @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_delete_stale_returns_rowcount(
+            self, mock_get_engine, mock_get_table, mock_get_states):
+        # Build a real table object so SQLAlchemy can build the WHERE
+        # clause without complaining about missing columns. We do not
+        # care what SQL is generated -- just that the function returns
+        # the rowcount the engine reports.
+        import sqlalchemy as sa
+        metadata = sa.MetaData()
+        targets_table = sa.Table(
+            'cluster_operation_targets',
+            metadata,
+            sa.Column('operation_uuid', sa.String(36), primary_key=True),
+            sa.Column('created_at', sa.Double()),
+        )
+        states_table = sa.Table(
+            'object_states',
+            metadata,
+            sa.Column('object_uuid', sa.String(36)),
+            sa.Column('state_value', sa.String(32)),
+        )
+        mock_get_table.return_value = targets_table
+        mock_get_states.return_value = states_table
+
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_result = mock.MagicMock()
+        mock_result.rowcount = 4
+        mock_conn.execute.return_value = mock_result
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_delete_stale_cluster_operation_targets(
+            older_than=1234567890.0)
+
+        self.assertEqual(result, 4)
+        mock_conn.execute.assert_called_once()
+        mock_conn.commit.assert_called_once()
+
+        # Verify the SQL is a DELETE with both an age predicate and a
+        # NOT IN subquery referencing object_states. We compile to a
+        # string and assert on its shape rather than its exact text.
+        executed_stmt = mock_conn.execute.call_args[0][0]
+        compiled = str(executed_stmt.compile(
+            compile_kwargs={'literal_binds': True}))
+        self.assertIn('DELETE FROM cluster_operation_targets', compiled)
+        self.assertIn('created_at < 1234567890', compiled)
+        self.assertIn('NOT IN', compiled)
+        self.assertIn('object_states', compiled)
+        self.assertIn("'queued'", compiled)
+        self.assertIn("'preflight'", compiled)
+        self.assertIn("'executing'", compiled)
+
+    @mock.patch('shakenfist.mariadb._get_object_states_table')
+    @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_delete_stale_returns_zero_on_operational_error(
+            self, mock_get_engine, mock_get_table, mock_get_states):
+        from sqlalchemy.exc import OperationalError
+        import sqlalchemy as sa
+
+        metadata = sa.MetaData()
+        targets_table = sa.Table(
+            'cluster_operation_targets',
+            metadata,
+            sa.Column('operation_uuid', sa.String(36), primary_key=True),
+            sa.Column('created_at', sa.Double()),
+        )
+        states_table = sa.Table(
+            'object_states',
+            metadata,
+            sa.Column('object_uuid', sa.String(36)),
+            sa.Column('state_value', sa.String(32)),
+        )
+        mock_get_table.return_value = targets_table
+        mock_get_states.return_value = states_table
+
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.side_effect = OperationalError(
+            'stmt', {}, Exception('boom'))
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_delete_stale_cluster_operation_targets(
+            older_than=1234567890.0)
+
+        self.assertEqual(result, 0)
 
 
 class MockDeleteStaleClusterOperationTargetsTestCase(
