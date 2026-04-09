@@ -4907,7 +4907,7 @@ def delete_cluster_operation_targets_for_object(
 def delete_stale_cluster_operation_targets(max_age: float) -> int:
     """Prune cluster_operation_targets rows for completed operations.
 
-    Used by the cleaner daemon to bound the size of the
+    Used by the cluster daemon to bound the size of the
     cluster_operation_targets history table on long-lived deployments.
     Only rows whose operation has reached a terminal state (or been
     hard-deleted entirely) are removed -- in-flight operations are
