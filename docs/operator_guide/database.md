@@ -580,6 +580,17 @@ Cluster operation targets are stored separately because:
 - **Indexed queries**: Efficient lookups for "latest operation on this instance"
   and "all operations on this object in order"
 
+Because the table is append-only, it is bounded by a periodic prune in the
+cluster daemon (alongside the existing `delete_stale_transfers` cleanup).
+The cluster daemon runs cluster-wide cleanup under `ClusterLock` election,
+so the prune naturally runs from a single node at a time. The prune
+removes rows whose `created_at` is older than
+`CLUSTER_OPERATION_TARGET_RETENTION` seconds **and** whose operation is not
+currently in an active state (`queued`, `preflight`, or `executing`) in
+`object_states`. Operations still in flight are never pruned regardless of
+age. Set `CLUSTER_OPERATION_TARGET_RETENTION` to 0 to disable pruning
+entirely (the default is 7 days).
+
 #### Per-Type Static Value Tables
 
 Each concrete object type that is migrated gets its own table for static

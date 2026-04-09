@@ -103,6 +103,19 @@ The write now raises `RuntimeError` on failure so API endpoints return 500
 instead of silently losing the tracking data. Callers in deletion paths and
 daemons catch this exception to ensure cleanup always proceeds.
 
+The history is stored in the dedicated `cluster_operation_targets` MariaDB
+table -- one append-only row per (operation, target object) pair, with an
+AUTO_INCREMENT `sequence_number` providing total ordering per target.
+`last_cluster_operation` reads the highest-sequence row for the target.
+Because the table is append-only it is bounded by a periodic prune in the
+cluster daemon, alongside the existing `delete_stale_transfers` cleanup.
+The prune removes rows older than `CLUSTER_OPERATION_TARGET_RETENTION`
+seconds whose operation has already reached a terminal state. In-flight
+operations (`queued`/`preflight`/`executing`) are never pruned regardless
+of age. Because the cluster daemon already runs cluster-wide cleanup
+under `ClusterLock` election, no additional locking or master-node
+gating is required.
+
 ### Protocol Buffers and gRPC
 
 The gRPC interface is defined in `protos/*.proto` files. Generated Python code

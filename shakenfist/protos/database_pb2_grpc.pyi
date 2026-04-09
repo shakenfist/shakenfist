@@ -872,6 +872,11 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    DeleteStaleClusterOperationTargets: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteStaleClusterOperationTargetsRequest,
+        database_pb2.DeleteCountReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1724,6 +1729,11 @@ class DatabaseServiceAsyncStub:
     DeleteClusterOperationTargetsForObject: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteClusterOperationTargetsForObjectRequest,
         database_pb2.StatusReply,
+    ]
+
+    DeleteStaleClusterOperationTargets: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteStaleClusterOperationTargetsRequest,
+        database_pb2.DeleteCountReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -2889,5 +2899,12 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteClusterOperationTargetsForObjectRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteStaleClusterOperationTargets(
+        self,
+        request: database_pb2.DeleteStaleClusterOperationTargetsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

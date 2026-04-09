@@ -4581,6 +4581,55 @@ def _direct_delete_cluster_operation_targets_for_object(
         return False
 
 
+def _direct_delete_stale_cluster_operation_targets(
+    older_than: float
+) -> int:
+    """Prune cluster_operation_targets rows for completed operations.
+
+    Deletes rows where:
+      * created_at is older than the supplied unix timestamp, AND
+      * the operation referenced by operation_uuid is not currently in
+        an active state (queued/preflight/executing) in object_states.
+
+    Operations that have been hard-deleted leave no row in object_states
+    and so are also pruned by this query.
+
+    Args:
+        older_than: Unix timestamp. Targets created before this are
+            eligible for pruning.
+
+    Returns:
+        Number of rows deleted.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+    states_table = _get_object_states_table()
+
+    # States that mean an operation is still in flight. Anything else
+    # (complete, abort, error, deleted, ...) is considered terminal.
+    active_states = ['queued', 'preflight', 'executing']
+
+    try:
+        with engine.connect() as conn:
+            active_subq = sa.select(states_table.c.object_uuid).where(
+                states_table.c.state_value.in_(active_states)
+            )
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.created_at < older_than,
+                    ~table.c.operation_uuid.in_(active_subq)
+                )
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete_stale_cluster_operation_targets '
+            f'failed: {e}')
+        return 0
+
+
 # gRPC client functions for cluster operation targets
 
 def _grpc_create_cluster_operation_target(
@@ -4732,6 +4781,23 @@ def _grpc_delete_cluster_operation_targets_for_object(
         return False
 
 
+def _grpc_delete_stale_cluster_operation_targets(max_age: float) -> int:
+    """Prune stale cluster_operation_targets via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        older_than = time.time() - max_age
+        request = database_pb2.DeleteStaleClusterOperationTargetsRequest(
+            older_than=older_than
+        )
+        reply = _grpc_call(
+            stub.DeleteStaleClusterOperationTargets, request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC DeleteStaleClusterOperationTargets failed: {e}')
+        return 0
+
+
 # Public API functions for cluster operation targets
 
 def create_cluster_operation_target(
@@ -4836,6 +4902,28 @@ def delete_cluster_operation_targets_for_object(
             target_object_type, target_uuid)
     return _direct_delete_cluster_operation_targets_for_object(
         target_object_type, target_uuid)
+
+
+def delete_stale_cluster_operation_targets(max_age: float) -> int:
+    """Prune cluster_operation_targets rows for completed operations.
+
+    Used by the cluster daemon to bound the size of the
+    cluster_operation_targets history table on long-lived deployments.
+    Only rows whose operation has reached a terminal state (or been
+    hard-deleted entirely) are removed -- in-flight operations are
+    always preserved regardless of age.
+
+    Args:
+        max_age: Maximum age in seconds. Targets older than this whose
+            operation is no longer active are deleted.
+
+    Returns:
+        Number of rows deleted.
+    """
+    if _use_database_service():
+        return _grpc_delete_stale_cluster_operation_targets(max_age)
+    older_than = time.time() - max_age
+    return _direct_delete_stale_cluster_operation_targets(older_than)
 
 
 # =============================================================================

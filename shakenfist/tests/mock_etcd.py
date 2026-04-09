@@ -775,6 +775,13 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_delete_cluster_operation_targets_for_object.stop)
 
+        self.mariadb_delete_stale_cluster_operation_targets = mock.patch(
+            'shakenfist.mariadb.delete_stale_cluster_operation_targets',
+            side_effect=self._mariadb_delete_stale_cluster_operation_targets)
+        self.mariadb_delete_stale_cluster_operation_targets.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_stale_cluster_operation_targets.stop)
+
         # Setup basic DB data
         self.node_uuids = {}
         for n in self.nodes:
@@ -1984,6 +1991,31 @@ class MockEtcd():
             f'({target_object_type}/{target_uuid}): '
             f'{len(to_delete)} deleted')
         return True
+
+    def _mariadb_delete_stale_cluster_operation_targets(
+            self, max_age):
+        """Mock implementation of mariadb.delete_stale_cluster_operation_targets()"""
+        active_states = ('queued', 'preflight', 'executing')
+        cutoff = time.time() - max_age
+
+        # Operation UUIDs that are still active in any object_states row.
+        active_operation_uuids = {
+            data['object_uuid']
+            for data in self.mariadb_states.values()
+            if data['state_value'] in active_states
+        }
+
+        to_delete = [
+            k for k, d in self.cluster_operation_targets.items()
+            if (d.created_at < cutoff
+                and d.operation_uuid not in active_operation_uuids)
+        ]
+        for k in to_delete:
+            del self.cluster_operation_targets[k]
+        self._trace(
+            f'MockMariaDB.delete_stale_cluster_operation_targets'
+            f'(max_age={max_age}): {len(to_delete)} deleted')
+        return len(to_delete)
 
     #
     # DB operations - Low level
