@@ -141,7 +141,7 @@ class SFConfig(BaseSettings):
     CLEANER_DELAY: int = Field(
         3600,
         description=(
-            'How long to wait before removing old data from the  database.'
+            'How long to wait before removing old data from the database.'
         )
     )
     CLUSTER_OPERATION_TARGET_RETENTION: int = Field(
