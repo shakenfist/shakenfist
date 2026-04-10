@@ -67,7 +67,7 @@ dependencies = [
 
     "requests==2.33.1",                   # apache2
     "requests-toolbelt==1.0.0",           # apache2
-    "chardet==5.2.0",                     # lgpl
+    "chardet==7.4.1",                     # lgpl
     "urllib3==2.6.3",                     # mit
 
     # These must move as a set
