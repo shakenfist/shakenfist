@@ -4020,6 +4020,106 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 e)
             return database_pb2.DeleteCountReply(count=0)
 
+    # Node Metrics Operations (MariaDB)
+
+    def UpsertNodeMetrics(
+        self,
+        request: database_pb2.UpsertNodeMetricsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Upsert a node metrics record in MariaDB."""
+        try:
+            self.monitor.counters['upsert_node_metrics'].inc()
+            success = mariadb._direct_upsert_node_metrics(
+                UUID(request.data.node_uuid),
+                request.data.fqdn,
+                request.data.timestamp,
+                json.loads(request.data.metrics_json)
+                if request.data.metrics_json else {}
+            )
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpsertNodeMetrics failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetNodeMetrics(
+        self,
+        request: database_pb2.GetNodeMetricsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNodeMetricsReply:
+        """Get node metrics from MariaDB."""
+        try:
+            self.monitor.counters['get_node_metrics'].inc()
+            data = mariadb._direct_get_node_metrics(
+                UUID(request.node_uuid))
+            if data is None:
+                return database_pb2.GetNodeMetricsReply(
+                    found=False)
+            return database_pb2.GetNodeMetricsReply(
+                found=True,
+                data=database_pb2.NodeMetricsData(
+                    node_uuid=data['node_uuid'],
+                    fqdn=data['fqdn'],
+                    timestamp=data['timestamp'],
+                    metrics_json=json.dumps(data['metrics'])
+                )
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNodeMetrics failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNodeMetricsReply(
+                found=False)
+
+    def GetAllNodeMetrics(
+        self,
+        request: database_pb2.GetAllNodeMetricsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllNodeMetricsReply:
+        """Get all node metrics from MariaDB."""
+        try:
+            self.monitor.counters['get_all_node_metrics'].inc()
+            items = mariadb._direct_get_all_node_metrics()
+            return database_pb2.GetAllNodeMetricsReply(
+                items=[
+                    database_pb2.NodeMetricsData(
+                        node_uuid=d['node_uuid'],
+                        fqdn=d['fqdn'],
+                        timestamp=d['timestamp'],
+                        metrics_json=json.dumps(
+                            d['metrics'])
+                    )
+                    for d in items
+                ]
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllNodeMetrics failed', e)
+            return database_pb2.GetAllNodeMetricsReply(
+                items=[])
+
+    def DeleteNodeMetrics(
+        self,
+        request: database_pb2.DeleteNodeMetricsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a node metrics record from MariaDB."""
+        try:
+            self.monitor.counters['delete_node_metrics'].inc()
+            success = mariadb._direct_delete_node_metrics(
+                UUID(request.node_uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNodeMetrics failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     def _instance_attrs_from_proto(
             self,
             d: database_pb2.InstanceAttributesProto
@@ -4205,7 +4305,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_latest_cluster_operation_target',
             'delete_cluster_operation_target',
             'delete_cluster_operation_targets_for_object',
-            'delete_stale_cluster_operation_targets'
+            'delete_stale_cluster_operation_targets',
+            # MariaDB node metrics operations
+            'upsert_node_metrics', 'get_node_metrics',
+            'get_all_node_metrics', 'delete_node_metrics',
         ]
         for op in operations:
             self.counters[op] = Counter(

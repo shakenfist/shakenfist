@@ -7,7 +7,6 @@ from typing import Any, Optional, Union
 import semver
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -670,9 +669,9 @@ def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
         intention = '_%s' % intention
 
     for n in Nodes([], prefilter='active'):
-        metrics = etcd.get('metrics', str(n.uuid), None)
-        if metrics:
-            metrics = metrics.get('metrics', {})
+        metrics_data = mariadb.get_node_metrics(str(n.uuid))
+        if metrics_data:
+            metrics = metrics_data.get('metrics', {})
         else:
             metrics = {}
 

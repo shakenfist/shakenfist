@@ -5,7 +5,6 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.operations import node_blob_op as schema
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
@@ -112,9 +111,12 @@ class NodeBlobOp(BaseClusterOperation):
         if config.NODE_NAME in locations and os.path.exists(Blob.filepath(str(b.uuid))):
             return
 
-        metrics = etcd.get('metrics', config.NODE_UUID, None)
-        if metrics:
-            metrics = metrics.get('metrics', {})
+        if config.NODE_UUID:
+            metrics_data = mariadb.get_node_metrics(config.NODE_UUID)
+        else:
+            metrics_data = None
+        if metrics_data:
+            metrics = metrics_data.get('metrics', {})
         else:
             metrics = {}
 

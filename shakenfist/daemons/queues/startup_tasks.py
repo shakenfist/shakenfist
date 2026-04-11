@@ -8,6 +8,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import instance
+from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.blob import Blob
 from shakenfist.config import config
@@ -178,13 +179,9 @@ def startup_tasks():
     for obj in OBJECT_NAMES_TO_CLASSES:
         stats['object_version_%s' % obj] = \
             get_object_class(obj).current_version
-    etcd.put(
-        'metrics', config.NODE_NAME, None,
-        {
-            'fqdn': config.NODE_NAME,
-            'timestamp': time.time(),
-            'metrics': stats
-        })
+    mariadb.upsert_node_metrics(
+        config.NODE_UUID, config.NODE_NAME,
+        time.time(), stats)
 
     version = util_general.get_version()
     util_concurrency.set_thread_name('main-v%s' % version)

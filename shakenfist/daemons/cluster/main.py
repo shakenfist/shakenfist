@@ -36,7 +36,6 @@ from shakenfist.upload import remove_abandoned_uploads
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
-from shakenfist.util import json as util_json
 
 
 LOG, _ = logs.setup(__name__)
@@ -87,49 +86,6 @@ class Monitor(daemon.Daemon):
             if deleted > 0:
                 LOG.info(
                     f'Deleted {deleted} stale cluster_operation_targets rows')
-
-        # Cleanup vxids which specify a missing network. We ignore allocations
-        # less than five minutes old to let the network setup complete.
-        for k, objdata in etcd.get_all('vxlan', None):
-            when = objdata.get('when')
-            if not when:
-                objdata['when'] = time.time()
-                etcd.get_etcd_client().put(k, util_json.json_dump(objdata))
-                continue
-
-            if time.time() - when < 300:
-                continue
-
-            network_uuid = objdata.get('network_uuid')
-            if network_uuid:
-                n = network.Network.from_db(
-                    network_uuid, suppress_failure_audit=True)
-                if not n:
-                    etcd.get_etcd_client().delete(k)
-                    LOG.with_fields({
-                        'network': network_uuid,
-                        'vxid record': k
-                    }).warning('Cleaning up leaked vxlan')
-
-        # Cleanup ipmanagers whose network is absent
-        # TODO(mikal): remove in v0.9
-        for k, objdata in etcd.get_all('ipmanager', None):
-            when = time.time()
-            if 'ipmanager.v3' in objdata:
-                for reservation in objdata['ipmanager.v3']['in_use']:
-                    when = objdata['ipmanager.v3']['in_use'][reservation]['when']
-                    break
-            if time.time() - when < 300:
-                continue
-
-            network_uuid = objdata.get('uuid')
-            if network_uuid:
-                n = network.Network.from_db(network_uuid)
-                if not n:
-                    etcd.get_etcd_client().delete(k)
-                    LOG.with_fields({
-                        'ipmanager': network_uuid
-                    }).warning('Cleaning up leaked ipmanager')
 
         # Cleanup IPAMs whose network is absent
         for ipm in ipam.IPAMs([], prefilter='active'):

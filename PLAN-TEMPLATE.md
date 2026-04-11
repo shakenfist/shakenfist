@@ -5,20 +5,19 @@
 Before responding to questions or discussion points in this
 document, explore the shakenfist codebase thoroughly. Read relevant
 source files, understand existing patterns (object lifecycle, state
-machines, database access via etcd/MariaDB, gRPC microservices,
-daemon architecture, operation queue system, event logging), and
-ground your answers in what the code actually does today. Do not
-speculate about the codebase when you could read it instead. Where
-a question touches on external concepts (KVM/libvirt, VXLAN
-networking, etcd, MariaDB/Galera, gRPC/protobuf), research as
-needed to give a confident answer. Flag any uncertainty explicitly
-rather than guessing.
+machines, MariaDB storage via the three-layer direct/gRPC/public
+pattern, Pydantic schemas, daemon architecture, operation queue
+system, event logging), and ground your answers in what the code
+actually does today. Do not speculate about the codebase when you
+could read it instead. Where a question touches on external concepts
+(KVM/libvirt, VXLAN networking, MariaDB/Galera, gRPC/protobuf),
+research as needed to give a confident answer. Flag any uncertainty
+explicitly rather than guessing.
 
 Consult `ARCHITECTURE.md` for the system architecture overview,
 object types, and daemon structure. Consult `CLAUDE.md` for build
-commands, project conventions, database access patterns, and the
-MariaDB migration approach. Consult `GOALS.md` for current
-development priorities.
+commands, project conventions, and database access patterns.
+Consult `GOALS.md` for current development priorities.
 
 When we get to detailed planning, I prefer a separate plan file
 per detailed phase. These separate files should be named for the

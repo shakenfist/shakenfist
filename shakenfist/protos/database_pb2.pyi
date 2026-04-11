@@ -4952,3 +4952,128 @@ class DeleteStaleClusterOperationTargetsRequest(google.protobuf.message.Message)
     def ClearField(self, field_name: typing.Literal["older_than", b"older_than"]) -> None: ...
 
 global___DeleteStaleClusterOperationTargetsRequest = DeleteStaleClusterOperationTargetsRequest
+
+@typing.final
+class NodeMetricsData(google.protobuf.message.Message):
+    """Node Metrics Operations (MariaDB)
+    Ephemeral per-node resource metrics, upserted every 60s.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    FQDN_FIELD_NUMBER: builtins.int
+    TIMESTAMP_FIELD_NUMBER: builtins.int
+    METRICS_JSON_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    """UUID as string"""
+    fqdn: builtins.str
+    """Node fully qualified domain name"""
+    timestamp: builtins.float
+    """Unix timestamp of metrics collection"""
+    metrics_json: builtins.str
+    """JSON-encoded metrics dict"""
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+        fqdn: builtins.str = ...,
+        timestamp: builtins.float = ...,
+        metrics_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["fqdn", b"fqdn", "metrics_json", b"metrics_json", "node_uuid", b"node_uuid", "timestamp", b"timestamp"]) -> None: ...
+
+global___NodeMetricsData = NodeMetricsData
+
+@typing.final
+class UpsertNodeMetricsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NodeMetricsData: ...
+    def __init__(
+        self,
+        *,
+        data: global___NodeMetricsData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___UpsertNodeMetricsRequest = UpsertNodeMetricsRequest
+
+@typing.final
+class GetNodeMetricsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["node_uuid", b"node_uuid"]) -> None: ...
+
+global___GetNodeMetricsRequest = GetNodeMetricsRequest
+
+@typing.final
+class GetNodeMetricsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___NodeMetricsData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___NodeMetricsData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetNodeMetricsReply = GetNodeMetricsReply
+
+@typing.final
+class GetAllNodeMetricsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetAllNodeMetricsRequest = GetAllNodeMetricsRequest
+
+@typing.final
+class GetAllNodeMetricsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEMS_FIELD_NUMBER: builtins.int
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NodeMetricsData]: ...
+    def __init__(
+        self,
+        *,
+        items: collections.abc.Iterable[global___NodeMetricsData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
+
+global___GetAllNodeMetricsReply = GetAllNodeMetricsReply
+
+@typing.final
+class DeleteNodeMetricsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["node_uuid", b"node_uuid"]) -> None: ...
+
+global___DeleteNodeMetricsRequest = DeleteNodeMetricsRequest
