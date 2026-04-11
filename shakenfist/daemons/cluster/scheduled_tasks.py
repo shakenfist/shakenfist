@@ -16,7 +16,6 @@ from shakenfist.schema.operations import baseclusteroperation as bco_schema
 from shakenfist.schema.operations import node_blob_op as nbo_schema
 from shakenfist.schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
-from shakenfist.network.network import Network
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_general_background_node_queues
 from shakenfist.operations.baseoperation import get_general_user_facing_node_queues
@@ -27,7 +26,6 @@ LOG, _ = logs.setup(__name__)
 BLOB_CHECKS_QUEUE = queue.Queue()
 INSTANCE_CHECKS_QUEUE = queue.Queue()
 DELETED_OBJECTS_QUEUE = queue.Queue()
-IPAM_RESERVATIONS = queue.Queue()
 
 
 @util_general.recorded_method
@@ -272,52 +270,3 @@ def _process_per_deleted_object_queue(execution_limit=10):
 
         if time.time() - obj.state.update_time > delay:
             obj.hard_delete()
-
-
-@util_general.recorded_method
-def per_ipam_reservations_checks():
-    start_time = time.time()
-    if IPAM_RESERVATIONS.empty():
-        _fill_ipam_reservations_queue()
-        LOG.info(
-            'Refreshed ipam reservations queue with '
-            f'{IPAM_RESERVATIONS.qsize()} items')
-
-    queue_fill_cost = time.time() - start_time
-    if queue_fill_cost > 10:
-        return
-
-    processed = _process_ipam_reservations_queue(
-        execution_limit=(10 - queue_fill_cost))
-    LOG.info(f'Processed {processed} items from ipam reservations queue')
-
-
-def _fill_ipam_reservations_queue():
-    seen = {}
-
-    for key, _ in etcd.get_prefix_raw('/sf/ipam_reservations'):
-        network_uuid = key.split('/')[3]
-        if network_uuid not in seen:
-            IPAM_RESERVATIONS.put(network_uuid)
-            seen[network_uuid] = True
-
-
-def _process_ipam_reservations_queue(execution_limit=10):
-    processed = 0
-    start_time = time.time()
-    while True:
-        # Limit how long we spend in this loop
-        if time.time() - start_time > execution_limit:
-            return processed
-
-        try:
-            network_uuid = IPAM_RESERVATIONS.get(block=False)
-        except queue.Empty:
-            return processed
-
-        processed += 1
-        n = Network.from_db(network_uuid, suppress_failure_audit=True)
-        if not n:
-            LOG.error(
-                f'Deleting leaked IPAM reservations for {network_uuid}')
-            etcd.delete_prefix(f'/sf/ipam_reservations/{network_uuid}')
