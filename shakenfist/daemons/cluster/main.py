@@ -87,26 +87,6 @@ class Monitor(daemon.Daemon):
                 LOG.info(
                     f'Deleted {deleted} stale cluster_operation_targets rows')
 
-        # Cleanup ipmanagers whose network is absent
-        # TODO(mikal): remove in v0.9
-        for k, objdata in etcd.get_all('ipmanager', None):
-            when = time.time()
-            if 'ipmanager.v3' in objdata:
-                for reservation in objdata['ipmanager.v3']['in_use']:
-                    when = objdata['ipmanager.v3']['in_use'][reservation]['when']
-                    break
-            if time.time() - when < 300:
-                continue
-
-            network_uuid = objdata.get('uuid')
-            if network_uuid:
-                n = network.Network.from_db(network_uuid)
-                if not n:
-                    etcd.get_etcd_client().delete(k)
-                    LOG.with_fields({
-                        'ipmanager': network_uuid
-                    }).warning('Cleaning up leaked ipmanager')
-
         # Cleanup IPAMs whose network is absent
         for ipm in ipam.IPAMs([], prefilter='active'):
             if time.time() - ipm.state.update_time < 300:
