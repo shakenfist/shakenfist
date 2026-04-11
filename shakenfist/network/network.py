@@ -1,7 +1,6 @@
 # Copyright 2020 Michael Still
 import os
 import random
-import time
 from functools import partial
 from typing import Optional
 from uuid import UUID
@@ -12,7 +11,6 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import baseobject
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.constants import get_object_class
-from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import mariadb
@@ -215,19 +213,11 @@ class Network(dbowo):
 
     @staticmethod
     def allocate_vxid(net_id):
-        # VXLAN ID uniqueness is now enforced by the UNIQUE constraint
-        # on the networks.vxid column. We still generate random IDs here
-        # but the actual uniqueness check happens at insert time in
-        # _db_create. If there's a collision, the caller retries.
-        reservation = {
-            'network_uuid': net_id,
-            'when': time.time()
-            }
-
-        vxid = random.randint(1, 16777215)
-        while not etcd.create('vxlan', None, vxid, reservation):
-            vxid = random.randint(1, 16777215)
-        return vxid
+        # VXLAN ID uniqueness is enforced by the UNIQUE constraint on
+        # the networks.vxid column. We just generate a random ID here;
+        # the actual uniqueness check happens at insert time in
+        # _db_create. If there's a collision, Network.new() retries.
+        return random.randint(1, 16777215)
 
     @classmethod
     def new(cls, name, namespace, netblock, provide_dhcp=False,
@@ -244,19 +234,30 @@ class Network(dbowo):
         # Pre-create the IPAM
         ipam.IPAM.new(network_uuid, namespace, network_uuid, netblock)
 
-        Network._db_create(
-            network_uuid,
-            {
-                'vxid': vxid,
-                'name': name,
-                'namespace': namespace,
-                'netblock': netblock,
-                'provide_dhcp': provide_dhcp,
-                'provide_nat': provide_nat,
-                'provide_dns': provide_dns,
-                'version': cls.current_version
-            }
-        )
+        # Retry _db_create if the vxid collides with an existing network
+        # (the UNIQUE constraint on networks.vxid causes an IntegrityError
+        # which _db_create surfaces as a RuntimeError).
+        max_vxid_attempts = 10
+        for attempt in range(max_vxid_attempts):
+            try:
+                Network._db_create(
+                    network_uuid,
+                    {
+                        'vxid': vxid,
+                        'name': name,
+                        'namespace': namespace,
+                        'netblock': netblock,
+                        'provide_dhcp': provide_dhcp,
+                        'provide_nat': provide_nat,
+                        'provide_dns': provide_dns,
+                        'version': cls.current_version
+                    }
+                )
+                break
+            except RuntimeError:
+                if attempt >= max_vxid_attempts - 1:
+                    raise
+                vxid = Network.allocate_vxid(network_uuid)
 
         n = Network.from_db(network_uuid)
         n.state = Network.STATE_INITIAL
@@ -690,7 +691,6 @@ class Network(dbowo):
         self.remove_nat()
 
     def hard_delete(self):
-        etcd.delete('vxlan', None, self.vxid)
         mariadb.delete_network_attributes(UUID(str(self.uuid)))
         mariadb.delete_network(UUID(str(self.uuid)))
         super().hard_delete()
