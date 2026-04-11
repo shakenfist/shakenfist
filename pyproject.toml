@@ -34,7 +34,7 @@ dependencies = [
     "click==8.3.2",                       # bsd
     "werkzeug==3.1.8",                    # bsd
     "prometheus-client==0.24.1",          # apache2
-    "etcd3gw==2.5.0",                     # apache2
+    "etcd3gw==2.6.0",                     # apache2
     "bcrypt==5.0.0",                      # apache2
     "python-magic==0.4.27",               # mit
     "webargs==8.7.1",                     # mit
