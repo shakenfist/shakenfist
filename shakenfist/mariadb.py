@@ -123,6 +123,7 @@ _instances_table: Optional[sa.Table] = None
 _instance_attributes_table: Optional[sa.Table] = None
 _object_metadata_table: Optional[sa.Table] = None
 _cluster_operation_targets_table: Optional[sa.Table] = None
+_node_metrics_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -156,6 +157,7 @@ INSTANCES_VERSION = 2
 INSTANCE_ATTRIBUTES_VERSION = 2
 OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
+NODE_METRICS_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -559,6 +561,54 @@ def _ensure_cluster_operation_targets_schema(
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': CLUSTER_OPERATION_TARGETS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_node_metrics_table() -> sa.Table:
+    """Get or create the node_metrics table definition.
+
+    This table stores ephemeral per-node resource metrics (CPU, memory, disk,
+    network, queue depths, etc.) updated every 60 seconds by the resources
+    daemon. The metrics payload is stored as a JSON column because it is
+    inherently schemaless (~50+ fields, new ones added as needed). Individual
+    metrics are already exposed as Prometheus gauges for monitoring, so SQL
+    queryability of individual fields is not needed.
+
+    One row per node, upserted each update cycle.
+    """
+    global _node_metrics_table
+    if _node_metrics_table is None:
+        metadata = _get_metadata()
+        _node_metrics_table = sa.Table(
+            'node_metrics',
+            metadata,
+            sa.Column('node_uuid', sa.Uuid(), primary_key=True),
+            sa.Column('fqdn', sa.String(255), nullable=False),
+            sa.Column('timestamp', sa.Double(), nullable=False),
+            sa.Column('metrics_json', sa.JSON(), nullable=True),
+        )
+    return _node_metrics_table
+
+
+def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the node_metrics table schema is up to date."""
+    table_name = 'node_metrics'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_node_metrics_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NODE_METRICS_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1289,6 +1339,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_instance_attributes_schema(engine))
     results.append(_ensure_object_metadata_schema(engine))
     results.append(_ensure_cluster_operation_targets_schema(engine))
+    results.append(_ensure_node_metrics_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -3557,6 +3608,48 @@ def _migrate_etcd_object_metadata(
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _migrate_etcd_node_metrics(engine: sa.Engine) -> dict[str, Any]:
+    """Migrate node metrics from etcd to MariaDB.
+
+    Reads all /sf/metrics/ entries from etcd, upserts them into the
+    node_metrics table, then deletes the etcd entries. This is a one-time
+    migration that runs automatically on database daemon startup.
+    """
+    migrated_count = 0
+    error_count = 0
+
+    try:
+        from shakenfist import etcd as etcd_module
+        for k, d in etcd_module.get_all('metrics', None):
+            try:
+                node_uuid_str = d.get('node_uuid')
+                if not node_uuid_str:
+                    # Legacy FQDN-keyed entry without node_uuid, skip
+                    etcd_module.delete_raw(k)
+                    continue
+
+                _direct_upsert_node_metrics(
+                    UUID(node_uuid_str),
+                    d.get('fqdn', ''),
+                    d.get('timestamp', 0.0),
+                    d.get('metrics', {})
+                )
+                etcd_module.delete_raw(k)
+                migrated_count += 1
+            except Exception as e:
+                LOG.warning(
+                    f'Failed to migrate node_metrics entry {k}: {e}')
+                error_count += 1
+    except Exception as e:
+        LOG.warning(f'Node metrics migration failed: {e}')
+        error_count += 1
+
+    LOG.info(
+        f'Node metrics migration: {migrated_count} '
+        f'migrated, {error_count} errors')
+    return {'migrated_count': migrated_count, 'error_count': error_count}
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -3637,6 +3730,9 @@ DATA_MIGRATIONS.update({
     },
     'object_metadata': {
         2: _migrate_etcd_object_metadata,
+    },
+    'node_metrics': {
+        2: _migrate_etcd_node_metrics,
     },
 })
 
@@ -14766,3 +14862,261 @@ def is_vsock_cid_in_use(cid: int) -> bool:
     if _use_database_service():
         return _grpc_is_vsock_cid_in_use(cid)
     return _direct_is_vsock_cid_in_use(cid)
+
+
+# =============================================================================
+# Node Metrics Direct Access Functions
+# Ephemeral per-node resource metrics, upserted every 60s.
+# =============================================================================
+
+def _direct_upsert_node_metrics(
+        node_uuid: UUID, fqdn: str, timestamp: float,
+        metrics: dict[str, Any]) -> bool:
+    """Upsert a node metrics record in MariaDB.
+
+    Uses INSERT ... ON DUPLICATE KEY UPDATE because metrics are
+    updated every 60 seconds — there is no separate create path.
+    """
+    engine = _get_engine()
+    table = _get_node_metrics_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                node_uuid=node_uuid,
+                fqdn=fqdn,
+                timestamp=timestamp,
+                metrics_json=metrics
+            )
+            stmt = stmt.on_duplicate_key_update(
+                fqdn=fqdn,
+                timestamp=timestamp,
+                metrics_json=metrics
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(f'MariaDB upsert failed for node_metrics {node_uuid}: {e}')
+        return False
+
+
+def _direct_get_node_metrics(node_uuid: UUID) -> Optional[dict[str, Any]]:
+    """Get node metrics from MariaDB.
+
+    Returns a dict matching the legacy etcd structure:
+    {'node_uuid': ..., 'fqdn': ..., 'timestamp': ..., 'metrics': {...}}
+    """
+    engine = _get_engine()
+    table = _get_node_metrics_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.node_uuid == node_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return {
+                'node_uuid': str(result.node_uuid),
+                'fqdn': result.fqdn,
+                'timestamp': result.timestamp,
+                'metrics': result.metrics_json or {}
+            }
+    except OperationalError as e:
+        LOG.warning(f'MariaDB get failed for node_metrics {node_uuid}: {e}')
+        return None
+
+
+def _direct_get_all_node_metrics() -> list[dict[str, Any]]:
+    """Get all node metrics from MariaDB."""
+    engine = _get_engine()
+    table = _get_node_metrics_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table)
+            result = conn.execute(stmt).fetchall()
+
+            return [
+                {
+                    'node_uuid': str(row.node_uuid),
+                    'fqdn': row.fqdn,
+                    'timestamp': row.timestamp,
+                    'metrics': row.metrics_json or {}
+                }
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for all node_metrics: {e}')
+        return []
+
+
+def _direct_delete_node_metrics(node_uuid: UUID) -> bool:
+    """Delete a node metrics record from MariaDB."""
+    engine = _get_engine()
+    table = _get_node_metrics_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.node_uuid == node_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete failed for node_metrics {node_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Node Metrics gRPC Client Functions
+# =============================================================================
+
+def _grpc_upsert_node_metrics(
+        node_uuid: UUID, fqdn: str, timestamp: float,
+        metrics: dict[str, Any]) -> bool:
+    """Upsert a node metrics record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpsertNodeMetricsRequest(
+            data=database_pb2.NodeMetricsData(
+                node_uuid=str(node_uuid),
+                fqdn=fqdn,
+                timestamp=timestamp,
+                metrics_json=_json_dumps(metrics)
+            )
+        )
+        reply = _grpc_call(stub.UpsertNodeMetrics, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC UpsertNodeMetrics failed for {node_uuid}: {e}')
+        return False
+
+
+def _grpc_get_node_metrics(node_uuid: UUID) -> Optional[dict[str, Any]]:
+    """Get node metrics via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNodeMetricsRequest(
+            node_uuid=str(node_uuid))
+        reply = _grpc_call(stub.GetNodeMetrics, request)
+        if not reply.found:
+            return None
+        return {
+            'node_uuid': reply.data.node_uuid,
+            'fqdn': reply.data.fqdn,
+            'timestamp': reply.data.timestamp,
+            'metrics': json.loads(reply.data.metrics_json)
+            if reply.data.metrics_json else {}
+        }
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetNodeMetrics failed for {node_uuid}: {e}')
+        return None
+
+
+def _grpc_get_all_node_metrics() -> list[dict[str, Any]]:
+    """Get all node metrics via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllNodeMetricsRequest()
+        reply = _grpc_call(stub.GetAllNodeMetrics, request)
+        return [
+            {
+                'node_uuid': item.node_uuid,
+                'fqdn': item.fqdn,
+                'timestamp': item.timestamp,
+                'metrics': json.loads(item.metrics_json)
+                if item.metrics_json else {}
+            }
+            for item in reply.items
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC GetAllNodeMetrics failed: {e}')
+        return []
+
+
+def _grpc_delete_node_metrics(node_uuid: UUID) -> bool:
+    """Delete a node metrics record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNodeMetricsRequest(
+            node_uuid=str(node_uuid))
+        reply = _grpc_call(stub.DeleteNodeMetrics, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(f'gRPC DeleteNodeMetrics failed for {node_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Node Metrics Public API Functions
+# =============================================================================
+
+def _ensure_uuid(value: 'str | UUID') -> UUID:
+    """Convert a string to UUID if needed."""
+    if isinstance(value, UUID):
+        return value
+    return UUID(value)
+
+
+def upsert_node_metrics(
+        node_uuid: 'str | UUID', fqdn: str, timestamp: float,
+        metrics: dict[str, Any]) -> bool:
+    """Upsert a node metrics record.
+
+    Args:
+        node_uuid: The UUID of the node (str or UUID).
+        fqdn: The node's fully qualified domain name.
+        timestamp: Unix timestamp of the metrics collection.
+        metrics: Dict of metric name -> value pairs.
+
+    Returns:
+        True if upserted successfully, False on error.
+    """
+    u = _ensure_uuid(node_uuid)
+    if _use_database_service():
+        return _grpc_upsert_node_metrics(u, fqdn, timestamp, metrics)
+    return _direct_upsert_node_metrics(u, fqdn, timestamp, metrics)
+
+
+def get_node_metrics(node_uuid: 'str | UUID') -> Optional[dict[str, Any]]:
+    """Get node metrics.
+
+    Args:
+        node_uuid: The UUID of the node (str or UUID).
+
+    Returns:
+        Dict with keys node_uuid, fqdn, timestamp, metrics; or None.
+    """
+    u = _ensure_uuid(node_uuid)
+    if _use_database_service():
+        return _grpc_get_node_metrics(u)
+    return _direct_get_node_metrics(u)
+
+
+def get_all_node_metrics() -> list[dict[str, Any]]:
+    """Get all node metrics.
+
+    Returns:
+        List of dicts, each with keys node_uuid, fqdn, timestamp,
+        metrics.
+    """
+    if _use_database_service():
+        return _grpc_get_all_node_metrics()
+    return _direct_get_all_node_metrics()
+
+
+def delete_node_metrics(node_uuid: 'str | UUID') -> bool:
+    """Delete a node metrics record.
+
+    Args:
+        node_uuid: The UUID of the node (str or UUID).
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    u = _ensure_uuid(node_uuid)
+    if _use_database_service():
+        return _grpc_delete_node_metrics(u)
+    return _direct_delete_node_metrics(u)

@@ -877,6 +877,30 @@ class DatabaseServiceStub:
         database_pb2.DeleteCountReply,
     ]
 
+    UpsertNodeMetrics: grpc.UnaryUnaryMultiCallable[
+        database_pb2.UpsertNodeMetricsRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Metrics Operations (MariaDB)
+    Ephemeral per-node resource metrics, upserted every 60s by the resources
+    daemon. The metrics payload is a JSON string (~50+ fields, schemaless).
+    """
+
+    GetNodeMetrics: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeMetricsRequest,
+        database_pb2.GetNodeMetricsReply,
+    ]
+
+    GetAllNodeMetrics: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNodeMetricsRequest,
+        database_pb2.GetAllNodeMetricsReply,
+    ]
+
+    DeleteNodeMetrics: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeMetricsRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1734,6 +1758,30 @@ class DatabaseServiceAsyncStub:
     DeleteStaleClusterOperationTargets: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteStaleClusterOperationTargetsRequest,
         database_pb2.DeleteCountReply,
+    ]
+
+    UpsertNodeMetrics: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.UpsertNodeMetricsRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Metrics Operations (MariaDB)
+    Ephemeral per-node resource metrics, upserted every 60s by the resources
+    daemon. The metrics payload is a JSON string (~50+ fields, schemaless).
+    """
+
+    GetNodeMetrics: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeMetricsRequest,
+        database_pb2.GetNodeMetricsReply,
+    ]
+
+    GetAllNodeMetrics: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNodeMetricsRequest,
+        database_pb2.GetAllNodeMetricsReply,
+    ]
+
+    DeleteNodeMetrics: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeMetricsRequest,
+        database_pb2.StatusReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -2906,5 +2954,37 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteStaleClusterOperationTargetsRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
+
+    @abc.abstractmethod
+    def UpsertNodeMetrics(
+        self,
+        request: database_pb2.UpsertNodeMetricsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Node Metrics Operations (MariaDB)
+        Ephemeral per-node resource metrics, upserted every 60s by the resources
+        daemon. The metrics payload is a JSON string (~50+ fields, schemaless).
+        """
+
+    @abc.abstractmethod
+    def GetNodeMetrics(
+        self,
+        request: database_pb2.GetNodeMetricsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNodeMetricsReply, collections.abc.Awaitable[database_pb2.GetNodeMetricsReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllNodeMetrics(
+        self,
+        request: database_pb2.GetAllNodeMetricsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllNodeMetricsReply, collections.abc.Awaitable[database_pb2.GetAllNodeMetricsReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNodeMetrics(
+        self,
+        request: database_pb2.DeleteNodeMetricsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

@@ -535,6 +535,7 @@ The migration is happening in phases:
 | 13 | Instance objects | Complete - `instances`, `instance_attributes` tables |
 | 14 | Object metadata | Complete - `object_metadata` table (metadata + last_cluster_operation) |
 | 15 | Cluster operation targets | Complete - `cluster_operation_targets` table (operation ordering per object) |
+| 16 | Node metrics | Complete - `node_metrics` table (ephemeral per-node resource metrics, JSON payload) |
 
 ### Table Architecture
 
@@ -563,6 +564,7 @@ constraints. These get dedicated tables optimized for their access patterns:
 |-------|---------|
 | `ipam_reservations` | IP address allocations with uniqueness constraints |
 | `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
+| `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload |
 
 IPAM reservations are stored separately because:
 

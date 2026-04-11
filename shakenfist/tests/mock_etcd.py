@@ -73,6 +73,7 @@ class MockEtcd():
         self.object_metadata = {}  # Mock MariaDB object metadata storage
         self.cluster_operation_targets = {}  # Mock MariaDB cluster op targets
         self._cot_sequence = count(1)  # AUTO_INCREMENT mock
+        self.node_metrics_store = {}  # Mock MariaDB node metrics
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -781,6 +782,35 @@ class MockEtcd():
         self.mariadb_delete_stale_cluster_operation_targets.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_stale_cluster_operation_targets.stop)
+
+        # Mock MariaDB node metrics operations
+        self.mariadb_upsert_node_metrics = mock.patch(
+            'shakenfist.mariadb.upsert_node_metrics',
+            side_effect=self._mariadb_upsert_node_metrics)
+        self.mariadb_upsert_node_metrics.start()
+        self.test_obj.addCleanup(
+            self.mariadb_upsert_node_metrics.stop)
+
+        self.mariadb_get_node_metrics = mock.patch(
+            'shakenfist.mariadb.get_node_metrics',
+            side_effect=self._mariadb_get_node_metrics)
+        self.mariadb_get_node_metrics.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_node_metrics.stop)
+
+        self.mariadb_get_all_node_metrics = mock.patch(
+            'shakenfist.mariadb.get_all_node_metrics',
+            side_effect=self._mariadb_get_all_node_metrics)
+        self.mariadb_get_all_node_metrics.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_all_node_metrics.stop)
+
+        self.mariadb_delete_node_metrics = mock.patch(
+            'shakenfist.mariadb.delete_node_metrics',
+            side_effect=self._mariadb_delete_node_metrics)
+        self.mariadb_delete_node_metrics.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_node_metrics.stop)
 
         # Setup basic DB data
         self.node_uuids = {}
@@ -2017,6 +2047,50 @@ class MockEtcd():
             f'(max_age={max_age}): {len(to_delete)} deleted')
         return len(to_delete)
 
+    # MariaDB Node Metrics mock operations
+
+    def _mariadb_upsert_node_metrics(
+            self, node_uuid, fqdn, timestamp, metrics):
+        """Mock implementation of mariadb.upsert_node_metrics()"""
+        key = str(node_uuid)
+        self.node_metrics_store[key] = {
+            'node_uuid': key,
+            'fqdn': fqdn,
+            'timestamp': timestamp,
+            'metrics': metrics
+        }
+        self._trace(
+            f'MockMariaDB.upsert_node_metrics({key}): upserted')
+        return True
+
+    def _mariadb_get_node_metrics(self, node_uuid):
+        """Mock implementation of mariadb.get_node_metrics()"""
+        key = str(node_uuid)
+        data = self.node_metrics_store.get(key)
+        self._trace(
+            f'MockMariaDB.get_node_metrics({key}): {data}')
+        return data
+
+    def _mariadb_get_all_node_metrics(self):
+        """Mock implementation of mariadb.get_all_node_metrics()"""
+        result = list(self.node_metrics_store.values())
+        self._trace(
+            f'MockMariaDB.get_all_node_metrics(): '
+            f'{len(result)} items')
+        return result
+
+    def _mariadb_delete_node_metrics(self, node_uuid):
+        """Mock implementation of mariadb.delete_node_metrics()"""
+        key = str(node_uuid)
+        if key in self.node_metrics_store:
+            del self.node_metrics_store[key]
+            self._trace(
+                f'MockMariaDB.delete_node_metrics({key}): deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_node_metrics({key}): not found')
+        return False
+
     #
     # DB operations - Low level
     #
@@ -2146,15 +2220,13 @@ class MockEtcd():
 
         for n in self.nodes:
             node_uuid = self.node_uuids[n[0]]
-            key = '/sf/metrics/%s/' % node_uuid
             metrics['is_hypervisor'] = 'hypervisor' in n[2]
-            data = {
+            self.node_metrics_store[node_uuid] = {
                 'node_uuid': node_uuid,
                 'fqdn': n[0],
                 'timestamp': time.time(),
-                'metrics': metrics,
+                'metrics': dict(metrics),
             }
-            self.db[key] = util_json.json_dump(data).encode()
 
     #
     # Database backed objects

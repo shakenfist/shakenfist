@@ -10,6 +10,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist import instance
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -48,7 +49,7 @@ class Monitor(daemon.Daemon):
     def _get_stats(self):
         n = Node.from_db(config.NODE_NAME)
 
-        old_metrics = etcd.get('metrics', config.NODE_UUID, {})
+        old_metrics = mariadb.get_node_metrics(config.NODE_UUID) or {}
         timestamp = time.time()
 
         with util_libvirt.LibvirtConnection() as lc:
@@ -414,13 +415,11 @@ class Monitor(daemon.Daemon):
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
 
-        # Clear out any old metrics entries for this node. We check both
-        # UUID-keyed and FQDN-keyed entries to clean up legacy data.
-        for k, d in etcd.get_all('metrics', None):
-            if d.get('node_uuid') == config.NODE_UUID:
-                etcd.delete_raw(k)
-            elif d.get('fqdn') == config.NODE_NAME:
-                etcd.delete_raw(k)
+        # Clear out any old metrics entries for this node.
+        for d in mariadb.get_all_node_metrics():
+            if (d.get('node_uuid') == config.NODE_UUID
+                    or d.get('fqdn') == config.NODE_NAME):
+                mariadb.delete_node_metrics(d['node_uuid'])
 
         # Some versions are static and only looked up at startup
         n = Node.from_db(config.NODE_NAME)
@@ -440,14 +439,9 @@ class Monitor(daemon.Daemon):
                     gauges[metric] = Gauge(metric, '')
                 gauges[metric].set(stats[metric])
 
-            etcd.put(
-                'metrics', config.NODE_UUID, None,
-                {
-                    'node_uuid': config.NODE_UUID,
-                    'fqdn': config.NODE_NAME,
-                    'timestamp': time.time(),
-                    'metrics': stats
-                })
+            mariadb.upsert_node_metrics(
+                config.NODE_UUID, config.NODE_NAME,
+                time.time(), stats)
             gauges['updated_at'].set_to_current_time()
 
         def emit_billing_statistics():

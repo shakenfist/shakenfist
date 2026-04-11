@@ -7,9 +7,9 @@ from collections import defaultdict
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist import instance
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -51,7 +51,7 @@ def get_active_node_metrics():
         try:
             # Metrics are stored under the node UUID
             node_uuid = str(n.uuid)
-            new_metrics = etcd.get('metrics', node_uuid, None)
+            new_metrics = mariadb.get_node_metrics(node_uuid)
             if new_metrics:
                 if (time.time()
                         - new_metrics.get('timestamp', 0)
