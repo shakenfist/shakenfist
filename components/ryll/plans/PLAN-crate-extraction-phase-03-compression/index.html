@@ -1,0 +1,8178 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A minimal cloud aimed at small and edge deployments">
+      
+      
+      
+        <link rel="canonical" href="https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-03-compression/">
+      
+      
+        <link rel="prev" href="../PLAN-webdav-phase-03-webdav-server/">
+      
+      
+        <link rel="next" href="../PLAN-usb-ui-phase-03-panel/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Phase 3: Extract shakenfist-spice-compression - Shaken Fist</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+  
+  
+    
+      
+      
+    
+  
+    
+      
+      
+    
+  
+  
+  <style>:root{--md-admonition-icon--puzzle:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M22%2013.5c0%201.76-1.3%203.22-3%203.46V20a2%202%200%200%201-2%202h-3.8v-.3a2.7%202.7%200%200%200-2.7-2.7c-1.5%200-2.7%201.21-2.7%202.7v.3H4a2%202%200%200%201-2-2v-3.8h.3C3.79%2016.2%205%2015%205%2013.5s-1.21-2.7-2.7-2.7H2V7a2%202%200%200%201%202-2h3.04c.24-1.7%201.7-3%203.46-3s3.22%201.3%203.46%203H17a2%202%200%200%201%202%202v3.04c1.7.24%203%201.7%203%203.46M17%2015h1.5a1.5%201.5%200%200%200%201.5-1.5%201.5%201.5%200%200%200-1.5-1.5H17V7h-5V5.5A1.5%201.5%200%200%200%2010.5%204%201.5%201.5%200%200%200%209%205.5V7H4v2.12c1.76.68%203%202.38%203%204.38s-1.25%203.7-3%204.38V20h2.12a4.7%204.7%200%200%201%204.38-3c2%200%203.7%201.25%204.38%203H17z%22/%3E%3C/svg%3E');--md-admonition-icon--foreshadow:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M13%203c3.9%200%207%203.1%207%207%200%202.8-1.6%205.2-4%206.3V21H9v-3H8c-1.1%200-2-.9-2-2v-3H4.5c-.4%200-.7-.5-.4-.8L6%209.7C6.2%205.9%209.2%203%2013%203m0-2C8.4%201%204.6%204.4%204.1%208.9L2.5%2011c-.6.8-.6%201.8-.2%202.6.4.7%201%201.2%201.7%201.3V16c0%201.9%201.3%203.4%203%203.9V23h11v-5.5c2.5-1.7%204-4.4%204-7.5%200-5-4-9-9-9m1%2013h-2v-1h2zm1.6-4.5c-.3.4-.6.8-1.1%201.1V12h-3v-1.4c-1.4-.8-1.9-2.7-1.1-4.1s2.7-1.9%204.1-1.1%201.9%202.7%201.1%204.1%22/%3E%3C/svg%3E');}</style>
+
+
+  
+  
+  
+  
+  <style>:root{--md-annotation-icon:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M22%2012a10%2010%200%200%201-10%2010A10%2010%200%200%201%202%2012%2010%2010%200%200%201%2012%202a10%2010%200%200%201%2010%2010M6%2013h8l-3.5%203.5%201.42%201.42L17.84%2012l-5.92-5.92L10.5%207.5%2014%2011H6z%22/%3E%3C/svg%3E');}</style>
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#phase-3-extract-shakenfist-spice-compression" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Shaken Fist
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Phase 3: Extract shakenfist-spice-compression
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/shakenfist/shakenfist" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shakenfist/shakenfist
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Shaken Fist
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/shakenfist/shakenfist" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shakenfist/shakenfist
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../manifesto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manifesto
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cloudgood
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cloudgood
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/technology-primer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Technology primer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/fundamentals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fundamentals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/virtualization-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtualization history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/memory-mapped-devices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory mapped devices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/instance-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instance video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/virtual-networking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtual networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/networking-shakenfist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shaken Fist networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/neutron-linuxbridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neutron with Linux bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/neutron-legacy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neutron legacy routers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    In guest agent (python)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    In guest agent (python)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../agent-python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../agent-python/developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../agent-python/protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clingwrap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Clingwrap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/command-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/automated-pr-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated PR Review with Claude Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/ci-review-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI Review Automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/release-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5_5" id="__nav_3_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Title for the plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kerbside
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuring Kerbside
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/console-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Console Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/proxy-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside Proxy Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/scancodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Scancodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/channel-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Channel Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/compression-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Compression Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/spice-link-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Link Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/protocol-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Protocol Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/usb-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    USB Redirection Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/vd-agent-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Occystrap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Occystrap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/command-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/docker-tarball-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Tarball Format Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/tar-format-selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tar Format Selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7_9" id="__nav_3_7_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A more structured and less verbose approach to logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementing `info` and `check` subcommands for occystrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make the speed: occystrap performance overhaul
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Quay.io API client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Replace requests with httpx
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Verification framework and DirWriter verifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Parallel Quay API resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: quay:// URI parsing and multi-image resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: TarWriter and DockerWriter verifiers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Concurrent multi-image processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: info and process multi-image support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: RegistryWriter verifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Documentation and functional tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Functional tests and documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Parallel and async output I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: Benchmarking and tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: Filter by tag age (`since` parameter)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Post-write verification for output integrity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quay.io tag-based bulk image discovery and download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registry Proxy Mode (dockerpush as persistent registry)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ryll
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Ryll
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../portability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Binary Portability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development-macos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building and Testing on macOS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_8_8" id="__nav_3_8_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_8_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_8_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bug-reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug reporting mode for ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capture mode for protocol and display debugging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-packaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Platform Packaging for Ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-display-iteration-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Display Iteration Follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-crate-extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extract reusable crates from ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive USB device management UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-10-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 10: Testing and QEMU setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-capture-phase-01-infra/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Capture infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-crate-extraction-phase-01-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Convert ryll to a Cargo workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui-phase-01-bus-fix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Fix enumerate_physical bus field
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-cursor-rendering-phase-01-parse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Parse SpiceCursor image data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-packaging-phase-01-portability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Platform Portability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bug-reports-phase-01-ring-buffer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Ring buffer infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-01-vmc-channel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: SpiceVMC channel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-webdav-phase-01-port-channel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: SpiceVMC port channel transport for WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bug-reports-phase-02-channel-state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Channel state snapshots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-packaging-phase-02-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: GitHub Actions CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-webdav-phase-02-mux-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Mux protocol (demux and remux)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-capture-phase-02-pcap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Pcap packet capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-cursor-rendering-phase-02-render/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Render cursor as egui overlay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-crate-extraction-phase-02-reserve-names/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Reserve crate names on crates.io
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-02-usbredir-parser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: usbredir protocol parser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui-phase-02-wire-tx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Wire usb_tx and channel events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bug-reports-phase-03-zip-output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Bug report assembly and zip output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-packaging-phase-03-debian/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Debian Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-03-device-backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Device backend trait
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-webdav-phase-03-webdav-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Embedded WebDAV server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Extract shakenfist-spice-compression
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Extract shakenfist-spice-compression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission and problem statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approach
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-flight-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-flight verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#crate-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crate layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Crate layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shakenfist-spice-compressioncargotoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shakenfist-spice-compression/Cargo.toml
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shakenfist-spice-compressionsrclibrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shakenfist-spice-compression/src/lib.rs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shakenfist-spice-compressionreadmemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shakenfist-spice-compression/README.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ryllcargotoml-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ryll/Cargo.toml change
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ryllsrcchannelsdisplayrs-import-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ryll/src/channels/display.rs import update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ryllsrc-module-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ryll/src/ module changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-move-lz4-into-the-decompression-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Move LZ4 into the decompression module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-extract-shakenfist-spice-compression-from-ryll" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Extract shakenfist-spice-compression from ryll
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration-and-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discoveries-during-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discoveries during execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui-phase-03-panel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: USB panel and status bar button
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-capture-phase-03-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Video frame capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui-phase-04-enumerate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Device enumeration display
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-crate-extraction-phase-04-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Extract shakenfist-spice-protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bug-reports-phase-04-gui-button/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: GUI report button and description dialog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-webdav-phase-04-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Integration (mux ↔ WebDAV server)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-04-real-devices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Real device enumeration and passthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-packaging-phase-04-rpm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: RPM Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui-phase-05-connect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: Connect and disconnect controls
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-05-device-connect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: Device connection lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-crate-extraction-phase-05-usbredir/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: Extract shakenfist-spice-usbredir
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bug-reports-phase-05-region-select/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: GUI display region selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-packaging-phase-05-macos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: macOS Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-webdav-phase-05-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: UI panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui-phase-06-add-disk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 6: Add virtual disk at runtime
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-06-transfers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 6: Control and bulk transfers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bug-reports-phase-06-traffic-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 6: GUI live traffic viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-crate-extraction-phase-06-client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 6: Introduce ConnectionConfig and move SpiceClient
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-webdav-phase-06-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 6: Testing and documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-packaging-phase-06-windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 6: Windows Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bug-reports-phase-07-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: Documentation and testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-packaging-phase-07-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: Release Automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui-phase-07-polish/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: Status feedback and polish
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-07-virtual-msc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: Virtual mass storage device (RAW images)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui-phase-08-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 8: Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-08-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 8: UI integration and CLI flags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir-phase-09-interrupt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 9: Interrupt transfers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-initial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: Port Ryll SPICE Client to Rust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-pr20-followup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PR #20 follow-up fixes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-pr23-followup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PR 23 follow-up: audio playback channel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-remaining-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remaining issues after initial bring-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-cursor-rendering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Render SPICE cursor on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-opus-decoder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replace audiopus with pure-Rust opus-decoder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-redir/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    USB device redirection via the SPICE usbredir channel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV folder sharing via the SPICE port channel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../release_notes/v07-v08/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.7 to v0.8 (unreleased)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../community/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Community
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ansible module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/affinity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affinity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/consoles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consoles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin (/admin/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Operations (/agentoperations/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts (/artifacts/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication (/auth/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blob Checksums (/blob_checksums/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/blobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blobs (/blobs/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/instances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instances (/instances/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/label/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Label (/label/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks (/networks/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Interfaces (/interfaces/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/nodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes (/nodes/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload (/upload/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/agent_protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/ci_api_coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI API coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/mypy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mypy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/release_process/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/standards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/state_machine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State machine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/updating_docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Updating docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../plans/api-query-batching-roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Query Batching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../plans/blob-storage-roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blob Storage Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operator Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operator Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/exception_tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exception Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/locks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/networking/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/power_states/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power States
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/python_versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/threads/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission and problem statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approach
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-flight-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-flight verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#crate-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crate layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Crate layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shakenfist-spice-compressioncargotoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shakenfist-spice-compression/Cargo.toml
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shakenfist-spice-compressionsrclibrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shakenfist-spice-compression/src/lib.rs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shakenfist-spice-compressionreadmemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shakenfist-spice-compression/README.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ryllcargotoml-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ryll/Cargo.toml change
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ryllsrcchannelsdisplayrs-import-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ryll/src/channels/display.rs import update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ryllsrc-module-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ryll/src/ module changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-move-lz4-into-the-decompression-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Move LZ4 into the decompression module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-extract-shakenfist-spice-compression-from-ryll" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Extract shakenfist-spice-compression from ryll
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration-and-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discoveries-during-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discoveries during execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+
+                  
+
+
+  
+  
+
+
+<h1 id="phase-3-extract-shakenfist-spice-compression">Phase 3: Extract shakenfist-spice-compression<a class="headerlink" href="#phase-3-extract-shakenfist-spice-compression" title="Permanent link">&para;</a></h1>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before executing any step of this plan, back brief the operator
+as to your understanding of the plan and how the work you intend
+to do aligns with the master plan
+(<a href="/components/ryll/plans/PLAN-crate-extraction/">PLAN-crate-extraction.md</a>) and
+Decisions #1, #2, #5, #6, and #7 it records.</p>
+<p>This phase is the first piece of Phase-2+ work where we actually
+move source code between crates. The placeholder
+<code>shakenfist-spice-compression</code> crate from Phase 2 gets replaced
+with real decompression code. The invariant to preserve is that
+all 99 existing ryll tests continue to pass, and ryll's
+end-to-end SPICE client behaviour is bit-for-bit unchanged.</p>
+<p>Per Decision #6, the crate is named "compression" but the
+initial code it contains is <strong>decompression-only</strong>, matching
+ryll's current scope. The broader crate name reserves
+namespace for future compression implementations of the same
+codecs (which a SPICE proxy will eventually want) without a
+crate rename. This phase does not add any compression code.</p>
+<p>I prefer one commit per logical change. Each commit must leave
+the tree in a working state: <code>cargo build</code>, <code>cargo test
+--workspace</code>, <code>pre-commit run --all-files</code>, and the CI workflow
+must all pass after every commit.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>After Phases 1 and 2, the repository is a four-member Cargo
+workspace:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ryll-repo/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── Cargo.toml                         # workspace manifest
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── ryll/                              # the application
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── Cargo.toml
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   └── src/
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│       ├── channels/display.rs        # consumes decompression
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│       ├── decompression/             # QUIC, GLZ, LZ
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│       │   ├── mod.rs                 # DecompressedImage + re-exports
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│       │   ├── glz.rs                 # 306 lines
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│       │   ├── lz.rs                  # 218 lines
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│       │   └── quic.rs                # 1606 lines
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│       └── ...
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>├── shakenfist-spice-compression/      # v0.0.0 placeholder (from Phase 2)
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│   ├── Cargo.toml
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│   ├── README.md
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   └── src/lib.rs                     # 4-line doc-comment
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>├── shakenfist-spice-protocol/         # v0.0.0 placeholder
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>└── shakenfist-spice-usbredir/         # v0.0.0 placeholder
+</code></pre></div>
+<p><strong>Current state of the decompression code</strong> (from the Phase 3
+research pass):</p>
+<ul>
+<li>
+<p><a href="../../ryll/src/decompression/mod.rs">ryll/src/decompression/mod.rs</a>
+  defines <code>pub struct DecompressedImage { pub width: u32, pub
+  height: u32, pub pixels: Vec&lt;u8&gt;, pub image_id: u64 }</code> and
+  re-exports <code>decompress_glz</code>, <code>decompress_lz</code>, and
+  <code>quic_decode</code> from the three sub-modules. Not
+  <code>#[non_exhaustive]</code>. ~16 lines total.</p>
+</li>
+<li>
+<p><a href="../../ryll/src/decompression/glz.rs#L19-L22">ryll/src/decompression/glz.rs:19-22</a>:
+  <code>pub async fn decompress_glz(data: &amp;[u8], previous_images:
+  &amp;Arc&lt;Mutex&lt;HashMap&lt;u64, Vec&lt;u8&gt;&gt;&gt;&gt;) -&gt; Result&lt;DecompressedImage&gt;</code>.
+  Cross-channel retry loop with
+  <code>tokio::time::sleep(Duration::from_millis(5)).await</code> at
+  <a href="../../ryll/src/decompression/glz.rs#L214-L236">glz.rs:214-236</a>,
+  retrying up to 20 times to let another display channel finish
+  populating the shared GLZ dictionary. This is the only thing
+  forcing the <code>tokio</code> dependency on the crate, and per Decision
+  #2 we accept it. One unit test at
+  <a href="../../ryll/src/decompression/glz.rs#L275">glz.rs:275</a>.</p>
+</li>
+<li>
+<p><a href="../../ryll/src/decompression/lz.rs#L21">ryll/src/decompression/lz.rs:21</a>:
+  <code>pub fn decompress_lz(data: &amp;[u8]) -&gt; Result&lt;DecompressedImage&gt;</code>.
+  Pure sync. One unit test at
+  <a href="../../ryll/src/decompression/lz.rs#L189">lz.rs:189</a>.</p>
+</li>
+<li>
+<p><a href="../../ryll/src/decompression/quic.rs#L1539">ryll/src/decompression/quic.rs:1539</a>:
+  <code>pub fn quic_decode(data: &amp;[u8], width: u32, height: u32) -&gt;
+  Option&lt;Vec&lt;u8&gt;&gt;</code>. Note the <strong>asymmetric return type</strong>:
+  returns <code>Option&lt;Vec&lt;u8&gt;&gt;</code> rather than
+  <code>Result&lt;DecompressedImage&gt;</code>. The caller at
+  <a href="../../ryll/src/channels/display.rs#L921">display.rs:921</a>
+  wraps the raw <code>Vec&lt;u8&gt;</code> into a <code>DecompressedImage</code> using the
+  <code>img_desc</code> metadata. No unit tests. The file starts with
+  <code>#![allow(dead_code, clippy::needless_range_loop)]</code> at
+  <a href="../../ryll/src/decompression/quic.rs#L1">quic.rs:1</a>,
+  suggesting latent cleanup work.</p>
+</li>
+<li>
+<p><a href="../../ryll/src/channels/display.rs#L30">ryll/src/channels/display.rs:30</a>:
+  <code>fn decompress_spice_lz4(data: &amp;[u8], width: usize, height:
+  usize) -&gt; Option&lt;DecompressedImage&gt;</code>. <strong>Private</strong> to
+  <code>display.rs</code> (not <code>pub</code>). This is the fourth decoder that
+  currently lives outside the <code>decompression/</code> module for
+  historical reasons. ~115 lines. Internally calls
+  <code>lz4_flex::decompress</code> at line 90. Returns
+  <code>Option&lt;DecompressedImage&gt;</code> — a third asymmetric return type.
+  Single caller at
+  <a href="../../ryll/src/channels/display.rs#L863">display.rs:863</a>.</p>
+</li>
+</ul>
+<p><strong>Decompression dispatch in display.rs</strong> (summary of the
+research findings):</p>
+<table>
+<thead>
+<tr>
+<th><code>ImageType</code></th>
+<th>Handler</th>
+<th>Decoder call</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GlzRgb</code></td>
+<td><code>decompress_glz(&amp;image_data[4..], &amp;self.glz_dictionary).await</code></td>
+<td><a href="../../ryll/src/channels/display.rs#L790">display.rs:790</a></td>
+</tr>
+<tr>
+<td><code>LzRgb</code></td>
+<td><code>decompress_lz(&amp;image_data[4..])</code></td>
+<td><a href="../../ryll/src/channels/display.rs#L805">display.rs:805</a></td>
+</tr>
+<tr>
+<td><code>ZlibGlzRgb</code></td>
+<td>zlib then <code>decompress_glz</code></td>
+<td><a href="../../ryll/src/channels/display.rs#L838">display.rs:838</a></td>
+</tr>
+<tr>
+<td><code>Lz4</code></td>
+<td><code>decompress_spice_lz4(image_data, width, height)</code></td>
+<td><a href="../../ryll/src/channels/display.rs#L863">display.rs:863</a></td>
+</tr>
+<tr>
+<td><code>Quic</code></td>
+<td><code>quic_decode(quic_data, img_desc.width, img_desc.height)</code></td>
+<td><a href="../../ryll/src/channels/display.rs#L921">display.rs:921</a></td>
+</tr>
+<tr>
+<td><code>Pixmap</code>, <code>FromCache</code>, <code>Jpeg</code></td>
+<td>(non-decompression paths)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Import from decompression in display.rs</strong> is exactly one
+line at
+<a href="../../ryll/src/channels/display.rs#L13">display.rs:13</a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">use</span><span class="w"> </span><span class="k">crate</span><span class="p">::</span><span class="n">decompression</span><span class="p">::{</span><span class="n">decompress_glz</span><span class="p">,</span><span class="w"> </span><span class="n">decompress_lz</span><span class="p">,</span><span class="w"> </span><span class="n">quic_decode</span><span class="p">,</span><span class="w"> </span><span class="n">DecompressedImage</span><span class="p">};</span>
+</code></pre></div>
+<p><strong>External dependencies</strong> each algorithm uses (all already
+present in ryll's <code>Cargo.toml</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Deps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>QUIC</td>
+<td><code>tracing</code></td>
+</tr>
+<tr>
+<td>GLZ</td>
+<td><code>anyhow</code>, <code>byteorder</code>, <code>tokio</code> (sync + time features)</td>
+</tr>
+<tr>
+<td>LZ</td>
+<td><code>anyhow</code>, <code>byteorder</code></td>
+</tr>
+<tr>
+<td>LZ4</td>
+<td><code>anyhow</code>, <code>tracing</code>, <code>lz4_flex</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Coupling to ryll internals</strong>: <strong>none</strong>, except for LZ4's
+current location inside <code>channels/display.rs</code>. The three
+existing <code>decompression/*.rs</code> files import only from
+<code>super::DecompressedImage</code>, <code>std::*</code>, and their external deps.
+No <code>crate::config::*</code>, no logging helpers, no mock channels.</p>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Replace the Phase 2 <code>shakenfist-spice-compression v0.0.0</code>
+placeholder with a real crate containing the four SPICE image
+decompression algorithms (QUIC, GLZ, LZ, LZ4), feature-gated
+per Decision #6, and switch ryll to consume the extracted
+crate via its workspace path. After this phase completes:</p>
+<ul>
+<li>The <code>shakenfist-spice-compression</code> crate exists at
+  <code>shakenfist-spice-compression/</code> as a real (not placeholder)
+  workspace member, with <code>DecompressedImage</code>, <code>decompress_glz</code>,
+  <code>decompress_lz</code>, <code>quic_decode</code>, and <code>decompress_spice_lz4</code>
+  as its public API, each gated behind a cargo feature
+  (<code>glz</code>, <code>lz</code>, <code>quic</code>, <code>lz4</code> respectively).</li>
+<li>Ryll's <a href="../../ryll/src/channels/display.rs">channels/display.rs</a>
+  no longer has a local <code>decompress_spice_lz4</code> function, and
+  its decompression imports come from
+  <code>shakenfist_spice_compression::*</code> instead of
+  <code>crate::decompression::*</code>.</li>
+<li><code>ryll/src/decompression/</code> is deleted; <code>ryll/src/lib.rs</code>'s
+  mod declaration for it is removed.</li>
+<li>All 99 existing ryll tests continue to pass.</li>
+<li>The two existing unit tests in the decompression module
+  (<code>test_glz_header_parse</code>, <code>test_lz_header_parse</code>) are moved
+  to the new crate and continue to pass there.</li>
+<li><code>cargo test --workspace</code> now exercises both ryll and the
+  new compression crate.</li>
+<li>The crate is still at version <code>0.0.0</code> on its local
+  <code>Cargo.toml</code> — <strong>no <code>0.1.0</code> publish happens in this phase</strong>.
+  Publishing the real crate to crates.io is future work per
+  the master plan's Future Work section, and requires
+  additional polish (README rewrite, categories, keywords,
+  dependency review, possibly the return-type normalisation
+  flagged in Open Question #1 below).</li>
+</ul>
+<p>There must be no behavioural changes to ryll. Every SPICE
+message that currently renders correctly must continue to
+render correctly; every pixel must be bit-identical. This is
+a pure refactor.</p>
+<h2 id="approach">Approach<a class="headerlink" href="#approach" title="Permanent link">&para;</a></h2>
+<p>The phase splits into two discrete commits, each independently
+buildable, testable, and CI-green:</p>
+<ol>
+<li>
+<p><strong>Prerequisite commit</strong> (move LZ4 within ryll, no
+   cross-crate movement). Extract <code>decompress_spice_lz4</code> from
+   <code>ryll/src/channels/display.rs</code> into a new
+   <code>ryll/src/decompression/lz4.rs</code> file. Make it <code>pub</code>.
+   Update <code>ryll/src/decompression/mod.rs</code> to declare the new
+   module and re-export the function. Update <code>display.rs</code> to
+   import it from <code>crate::decompression::decompress_spice_lz4</code>
+   instead of calling the local function. This commit
+   establishes <code>lz4</code> as a peer of <code>glz</code>, <code>lz</code>, and <code>quic</code>
+   inside the existing decompression module, so that the
+   subsequent extraction commit can move all four decoders
+   as a single symmetric group. No behavioural change; ~115
+   lines of code move one file to the left.</p>
+</li>
+<li>
+<p><strong>Extraction commit</strong> (the real work). Replace the
+   <code>shakenfist-spice-compression/</code> placeholder contents with
+   the real crate implementation:</p>
+</li>
+<li>Rewrite <code>shakenfist-spice-compression/Cargo.toml</code> with
+     dependencies (<code>anyhow</code>, <code>byteorder</code>, <code>tracing</code>, optional
+     <code>tokio</code>, optional <code>lz4_flex</code>) and feature flags (<code>glz</code>,
+     <code>lz</code>, <code>quic</code>, <code>lz4</code> all enabled by default).</li>
+<li>Rewrite <code>shakenfist-spice-compression/src/lib.rs</code> to
+     declare the four feature-gated modules and re-export the
+     public items. Move <code>DecompressedImage</code> definition into
+     <code>lib.rs</code> (where it currently lives in ryll's <code>mod.rs</code>).</li>
+<li>Move <code>ryll/src/decompression/{glz,lz,quic,lz4}.rs</code> into
+     <code>shakenfist-spice-compression/src/</code> via <code>git mv</code>.</li>
+<li>Update each moved file's <code>use super::DecompressedImage</code>
+     to <code>use crate::DecompressedImage</code> (or similar) to match
+     the new crate-relative paths.</li>
+<li>Update ryll's
+     <a href="../../ryll/src/channels/display.rs#L13">channels/display.rs:13</a>
+     import from <code>crate::decompression::...</code> to
+     <code>shakenfist_spice_compression::...</code> (add the missing
+     <code>decompress_spice_lz4</code> to the import list since it
+     moved).</li>
+<li>Delete <code>ryll/src/decompression/</code> entirely (after the
+     <code>git mv</code>s, only <code>mod.rs</code> should remain — delete it).</li>
+<li>Remove the <code>pub mod decompression;</code> declaration from
+     <code>ryll/src/lib.rs</code> (or wherever it currently lives — the
+     research did not explicitly identify which file carries
+     the <code>mod decompression;</code> declaration, so it may also be
+     in <code>main.rs</code> if ryll is binary-only).</li>
+<li>Add <code>shakenfist-spice-compression = { path =
+     "../shakenfist-spice-compression" }</code> to ryll's
+     <code>[dependencies]</code> in <code>ryll/Cargo.toml</code>.</li>
+<li>Update the README for the extracted crate to describe it
+     as the real crate (not a placeholder), but keep the
+     <code>version = "0.0.0"</code> and keep the "not published" status.
+     Publishing <code>0.1.0</code> is future work.</li>
+</ol>
+<p>The README update in the extraction commit is debatable: we
+could also leave the placeholder README in place until the
+future-work polish phase. I prefer to update it now so the
+README accurately reflects what the crate contains at every
+commit, even if the crate isn't yet published.</p>
+<h2 id="pre-flight-verification">Pre-flight verification<a class="headerlink" href="#pre-flight-verification" title="Permanent link">&para;</a></h2>
+<p>Before starting Commit 1, Claude verifies:</p>
+<ol>
+<li><strong>Working tree is clean</strong> on <code>display-iteration</code>, and
+   Phase 2 is fully committed
+   (<code>git log --oneline -15</code> should show <code>a74d14a</code> near the
+   top and <code>42c8e8a</code> among the recent commits).</li>
+<li><strong>CI is green</strong> on the most recent pushed commit
+   (<code>ci-status shakenfist/ryll runs --branch display-iteration
+   --limit 3</code>). If CI has not been run on Phase 1/2 yet
+   because nothing has been pushed, note this and consider
+   whether to push before proceeding — stacking Phase 3 on
+   top of 13 unverified commits is riskier than pushing first.</li>
+<li><strong>All 99 ryll tests pass currently</strong> via
+   <code>make test</code> or a direct
+   <code>docker run ... cargo test --workspace</code>. This is the
+   baseline we must not regress.</li>
+<li><strong><code>cargo clippy --workspace --all-targets -- -D warnings</code>
+   passes</strong>. If new lints have surfaced since Phase 2 for any
+   reason, fix them in a separate commit before starting
+   Phase 3.</li>
+<li><strong>The decompression module structure matches the research
+   findings above</strong>: <code>ls ryll/src/decompression/</code> shows
+   exactly <code>mod.rs</code>, <code>glz.rs</code>, <code>lz.rs</code>, <code>quic.rs</code> (no stray
+   files). <code>grep -c '#\[test\]' ryll/src/decompression/*.rs</code>
+   shows 1 test in <code>glz.rs</code>, 1 test in <code>lz.rs</code>, 0 in
+   <code>quic.rs</code>, 0 in <code>mod.rs</code>. If these counts differ, stop and
+   re-plan.</li>
+<li><strong>The <code>decompress_spice_lz4</code> function in display.rs is
+   still private</strong> and has a single caller. If it has been
+   made public or picked up additional callers since the
+   research pass, the prerequisite commit needs re-planning.</li>
+</ol>
+<p>If any of these checks fail, stop and re-plan rather than
+improvising.</p>
+<h2 id="crate-layout">Crate layout<a class="headerlink" href="#crate-layout" title="Permanent link">&para;</a></h2>
+<h3 id="shakenfist-spice-compressioncargotoml"><code>shakenfist-spice-compression/Cargo.toml</code><a class="headerlink" href="#shakenfist-spice-compressioncargotoml" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[package]</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shakenfist-spice-compression&quot;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.0.0&quot;</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">edition</span><span class="p">.</span><span class="n">workspace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">license</span><span class="p">.</span><span class="n">workspace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">authors</span><span class="p">.</span><span class="n">workspace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">repository</span><span class="p">.</span><span class="n">workspace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Pure-Rust SPICE image decompression algorithms (QUIC, GLZ, LZ, LZ4), extracted from the ryll SPICE client. Reserved crate name; the first published release will follow as 0.1.0 once the API has stabilised.&quot;</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">readme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;README.md&quot;</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="k">[features]</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;quic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;glz&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;lz&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;lz4&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">quic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">glz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;dep:tokio&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">lz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">lz4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;dep:lz4_flex&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="k">[dependencies]</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="n">anyhow</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;1&quot;</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="n">byteorder</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;1&quot;</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="n">tracing</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.1&quot;</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="n">tokio</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sync&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">],</span><span class="w"> </span><span class="n">optional</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="n">lz4_flex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;0.11&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">optional</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>Notes:</p>
+<ul>
+<li>The <code>version</code> stays at <code>0.0.0</code>. <strong>This phase does not
+  publish.</strong> Bumping to <code>0.1.0</code> is the future-work polish
+  task.</li>
+<li><code>anyhow</code>, <code>byteorder</code>, and <code>tracing</code> are unconditional
+  because <code>quic.rs</code> uses <code>tracing</code> and the other modules use
+  <code>anyhow</code> + <code>byteorder</code>; they are all cheap. The feature
+  flags gate the <em>modules</em>, not their transitive dependencies.
+  Even a <code>default-features = false, features = ["quic"]</code>
+  consumer still pulls <code>anyhow</code> and <code>byteorder</code>, which is
+  acceptable given how small those crates are.</li>
+<li>The <code>glz</code> feature gates the <code>tokio</code> dependency via
+  <code>dep:tokio</code>. A consumer who doesn't need GLZ pays nothing
+  for tokio.</li>
+<li>The <code>lz4</code> feature gates <code>lz4_flex</code> similarly.</li>
+<li>No <code>[dev-dependencies]</code>. The existing unit tests
+  (<code>test_glz_header_parse</code>, <code>test_lz_header_parse</code>) don't
+  need any.</li>
+</ul>
+<h3 id="shakenfist-spice-compressionsrclibrs"><code>shakenfist-spice-compression/src/lib.rs</code><a class="headerlink" href="#shakenfist-spice-compressionsrclibrs" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="sd">//! Pure-Rust implementations of the SPICE image-stream</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="sd">//! decompression algorithms: QUIC (the SPICE wavelet</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="sd">//! /arithmetic codec, not the QUIC transport protocol), GLZ</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="sd">//! (dictionary-based cross-frame LZ), LZ (single-frame LZ),</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="sd">//! and LZ4.</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="sd">//!</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="sd">//! Each algorithm is gated behind a cargo feature (`quic`,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="sd">//! `glz`, `lz`, `lz4`) with all four enabled by default.</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="sd">//! Consumers who only need a subset can disable default</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="sd">//! features and opt in to the ones they need.</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="sd">//!</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="sd">//! All four decoders return a [`DecompressedImage`] on</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="sd">//! success. The struct is marked `#[non_exhaustive]` to</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="sd">//! allow adding metadata fields in future minor releases</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="sd">//! without breaking consumers.</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="sd">//!</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="sd">//! Extracted from the</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="sd">//! [ryll](https://github.com/shakenfist/ryll) SPICE client.</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="cp">#[cfg(feature = </span><span class="s">&quot;glz&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="k">pub</span><span class="w"> </span><span class="k">mod</span><span class="w"> </span><span class="nn">glz</span><span class="p">;</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="cp">#[cfg(feature = </span><span class="s">&quot;lz&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="k">pub</span><span class="w"> </span><span class="k">mod</span><span class="w"> </span><span class="nn">lz</span><span class="p">;</span>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="cp">#[cfg(feature = </span><span class="s">&quot;quic&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="k">pub</span><span class="w"> </span><span class="k">mod</span><span class="w"> </span><span class="nn">quic</span><span class="p">;</span>
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="cp">#[cfg(feature = </span><span class="s">&quot;lz4&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="k">pub</span><span class="w"> </span><span class="k">mod</span><span class="w"> </span><span class="nn">lz4</span><span class="p">;</span>
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="cp">#[cfg(feature = </span><span class="s">&quot;glz&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="k">pub</span><span class="w"> </span><span class="k">use</span><span class="w"> </span><span class="n">glz</span><span class="p">::</span><span class="n">decompress_glz</span><span class="p">;</span>
+<a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>
+<a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a><span class="cp">#[cfg(feature = </span><span class="s">&quot;lz&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a><span class="k">pub</span><span class="w"> </span><span class="k">use</span><span class="w"> </span><span class="n">lz</span><span class="p">::</span><span class="n">decompress_lz</span><span class="p">;</span>
+<a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>
+<a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="cp">#[cfg(feature = </span><span class="s">&quot;quic&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a><span class="k">pub</span><span class="w"> </span><span class="k">use</span><span class="w"> </span><span class="n">quic</span><span class="p">::</span><span class="n">quic_decode</span><span class="p">;</span>
+<a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>
+<a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a><span class="cp">#[cfg(feature = </span><span class="s">&quot;lz4&quot;</span><span class="cp">)]</span>
+<a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a><span class="k">pub</span><span class="w"> </span><span class="k">use</span><span class="w"> </span><span class="n">lz4</span><span class="p">::</span><span class="n">decompress_spice_lz4</span><span class="p">;</span>
+<a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a>
+<a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a><span class="sd">/// A decompressed SPICE image: raw RGBA pixels plus their</span>
+<a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a><span class="sd">/// dimensions and an image id used for cross-frame GLZ</span>
+<a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a><span class="sd">/// dictionary lookup.</span>
+<a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a><span class="cp">#[derive(Debug)]</span>
+<a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a><span class="cp">#[non_exhaustive]</span>
+<a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">DecompressedImage</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">width</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
+<a id="__codelineno-3-51" name="__codelineno-3-51" href="#__codelineno-3-51"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">height</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
+<a id="__codelineno-3-52" name="__codelineno-3-52" href="#__codelineno-3-52"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">pixels</span><span class="p">:</span><span class="w"> </span><span class="nb">Vec</span><span class="o">&lt;</span><span class="kt">u8</span><span class="o">&gt;</span><span class="p">,</span>
+<a id="__codelineno-3-53" name="__codelineno-3-53" href="#__codelineno-3-53"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">image_id</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span>
+<a id="__codelineno-3-54" name="__codelineno-3-54" href="#__codelineno-3-54"></a><span class="p">}</span>
+<a id="__codelineno-3-55" name="__codelineno-3-55" href="#__codelineno-3-55"></a>
+<a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a><span class="k">impl</span><span class="w"> </span><span class="n">DecompressedImage</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-57" name="__codelineno-3-57" href="#__codelineno-3-57"></a><span class="w">    </span><span class="sd">/// Construct a new [`DecompressedImage`] with no</span>
+<a id="__codelineno-3-58" name="__codelineno-3-58" href="#__codelineno-3-58"></a><span class="w">    </span><span class="sd">/// metadata beyond the four core fields. Exists because</span>
+<a id="__codelineno-3-59" name="__codelineno-3-59" href="#__codelineno-3-59"></a><span class="w">    </span><span class="sd">/// the struct is `#[non_exhaustive]`, which prevents</span>
+<a id="__codelineno-3-60" name="__codelineno-3-60" href="#__codelineno-3-60"></a><span class="w">    </span><span class="sd">/// external crates from using struct literal syntax.</span>
+<a id="__codelineno-3-61" name="__codelineno-3-61" href="#__codelineno-3-61"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">new</span><span class="p">(</span><span class="n">width</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">pixels</span><span class="p">:</span><span class="w"> </span><span class="nb">Vec</span><span class="o">&lt;</span><span class="kt">u8</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">image_id</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Self</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-62" name="__codelineno-3-62" href="#__codelineno-3-62"></a><span class="w">        </span><span class="bp">Self</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-63" name="__codelineno-3-63" href="#__codelineno-3-63"></a><span class="w">            </span><span class="n">width</span><span class="p">,</span>
+<a id="__codelineno-3-64" name="__codelineno-3-64" href="#__codelineno-3-64"></a><span class="w">            </span><span class="n">height</span><span class="p">,</span>
+<a id="__codelineno-3-65" name="__codelineno-3-65" href="#__codelineno-3-65"></a><span class="w">            </span><span class="n">pixels</span><span class="p">,</span>
+<a id="__codelineno-3-66" name="__codelineno-3-66" href="#__codelineno-3-66"></a><span class="w">            </span><span class="n">image_id</span><span class="p">,</span>
+<a id="__codelineno-3-67" name="__codelineno-3-67" href="#__codelineno-3-67"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-3-68" name="__codelineno-3-68" href="#__codelineno-3-68"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-3-69" name="__codelineno-3-69" href="#__codelineno-3-69"></a><span class="p">}</span>
+</code></pre></div>
+<p>A constructor is needed because <code>#[non_exhaustive]</code> prevents
+external crates from using struct literal syntax. Without the
+constructor, <code>ryll/src/channels/display.rs</code> would not compile
+after the extraction — it currently builds <code>DecompressedImage</code>
+via struct literal syntax (confirmed at
+<a href="../../ryll/src/channels/display.rs#L921-L927">display.rs:921-927</a>
+in the QUIC wrapping code, though this needs rechecking during
+execution). The constructor is a minimal, non-breaking add.</p>
+<h3 id="shakenfist-spice-compressionreadmemd"><code>shakenfist-spice-compression/README.md</code><a class="headerlink" href="#shakenfist-spice-compressionreadmemd" title="Permanent link">&para;</a></h3>
+<p>Rewrite the Phase 2 placeholder README to reflect reality at
+this point in the extraction. The new README should:</p>
+<ul>
+<li>Explicitly state the crate is still at <code>0.0.0</code> and not yet
+  published, pointing at the Future Work section of the
+  master plan for the publish polish list.</li>
+<li>List the four algorithms and their features.</li>
+<li>Link to <code>ryll</code> as the reference consumer / source of the
+  code.</li>
+<li>Include a one-paragraph usage example (the GLZ dictionary
+  pattern is the least obvious).</li>
+<li>Link to the extraction plan for context.</li>
+</ul>
+<p>Full README text is drafted in the execution section below.</p>
+<h3 id="ryllcargotoml-change"><code>ryll/Cargo.toml</code> change<a class="headerlink" href="#ryllcargotoml-change" title="Permanent link">&para;</a></h3>
+<p>Add the new path-dependency to <code>[dependencies]</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">shakenfist-spice-compression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;../shakenfist-spice-compression&quot;</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>This is a pure path-dependency. Per Decision #1 in the master
+plan, the published form would use <code>{ path = "...", version =
+"0.1" }</code> (the dual-spec idiom) so that ryll's own future
+publish carries a semver requirement. Since Phase 3 does not
+publish anything, the <code>version</code> qualifier can be omitted and
+added later when ryll is being prepared for its real first
+crates.io release. Alternatively, add the <code>version = "0.1"</code>
+qualifier now as forward preparation — since the extracted
+crate will be <code>0.1.0</code> when it publishes, the qualifier is
+accurate for the future state even if it has no effect
+today. <strong>Decision: add the version qualifier now</strong>, because it
+costs nothing and documents intent. The line in
+<code>ryll/Cargo.toml</code> will read:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">shakenfist-spice-compression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;../shakenfist-spice-compression&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;0.1&quot;</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>Which means that while 0.0.0 is what cargo resolves today (via
+<code>path</code>), any publish of ryll would expect <code>shakenfist-spice-
+compression</code> to be on crates.io as <code>0.1.x</code>. Ryll is also not
+yet published on crates.io (Decision #7's future-work item),
+so the <code>version</code> qualifier is currently documentary only.</p>
+<h3 id="ryllsrcchannelsdisplayrs-import-update"><code>ryll/src/channels/display.rs</code> import update<a class="headerlink" href="#ryllsrcchannelsdisplayrs-import-update" title="Permanent link">&para;</a></h3>
+<p>Replace the existing line 13:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">use</span><span class="w"> </span><span class="k">crate</span><span class="p">::</span><span class="n">decompression</span><span class="p">::{</span><span class="n">decompress_glz</span><span class="p">,</span><span class="w"> </span><span class="n">decompress_lz</span><span class="p">,</span><span class="w"> </span><span class="n">quic_decode</span><span class="p">,</span><span class="w"> </span><span class="n">DecompressedImage</span><span class="p">};</span>
+</code></pre></div>
+<p>With:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">use</span><span class="w"> </span><span class="n">shakenfist_spice_compression</span><span class="p">::{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="n">decompress_glz</span><span class="p">,</span><span class="w"> </span><span class="n">decompress_lz</span><span class="p">,</span><span class="w"> </span><span class="n">decompress_spice_lz4</span><span class="p">,</span><span class="w"> </span><span class="n">quic_decode</span><span class="p">,</span><span class="w"> </span><span class="n">DecompressedImage</span><span class="p">,</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="p">};</span>
+</code></pre></div>
+<p>Note the addition of <code>decompress_spice_lz4</code> which moved out of
+<code>display.rs</code> in the prerequisite commit and is now imported
+from the crate. The local <code>fn decompress_spice_lz4</code> definition
+is gone (deleted in the prerequisite commit), so the import is
+the only change to the dispatch logic.</p>
+<h3 id="ryllsrc-module-changes"><code>ryll/src/</code> module changes<a class="headerlink" href="#ryllsrc-module-changes" title="Permanent link">&para;</a></h3>
+<p>After the prerequisite commit, <code>ryll/src/decompression/</code>
+contains <code>mod.rs</code>, <code>glz.rs</code>, <code>lz.rs</code>, <code>quic.rs</code>, <code>lz4.rs</code>.
+After the extraction commit, this entire directory is gone.</p>
+<p>The <code>mod decompression;</code> declaration also needs to be removed
+from wherever it currently lives in ryll (likely <code>main.rs</code> or
+<code>lib.rs</code> — confirm during execution).</p>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>Each step below is one commit.</p>
+<h3 id="step-1-move-lz4-into-the-decompression-module">Step 1: Move LZ4 into the decompression module<a class="headerlink" href="#step-1-move-lz4-into-the-decompression-module" title="Permanent link">&para;</a></h3>
+<p>Prerequisite commit. No cross-crate movement; pure
+reorganisation within ryll. The goal is to establish <code>lz4</code> as
+a peer of <code>glz</code>, <code>lz</code>, and <code>quic</code> inside
+<code>ryll/src/decompression/</code>, so the subsequent extraction commit
+can move all four decoders as a single symmetric group.</p>
+<p>Concrete steps within the commit:</p>
+<ol>
+<li>Create <code>ryll/src/decompression/lz4.rs</code> containing the
+   current <code>decompress_spice_lz4</code> function from
+   <code>ryll/src/channels/display.rs</code>. Change the visibility
+   from <code>fn</code> to <code>pub fn</code>. The function takes <code>data: &amp;[u8],
+   width: usize, height: usize</code> and returns
+   <code>Option&lt;DecompressedImage&gt;</code>; keep these signatures
+   unchanged. Also move its inline <code>tracing</code> calls and its
+   use of <code>lz4_flex::decompress</code> — these become module-level
+   imports in the new file.</li>
+<li>Add <code>use super::DecompressedImage;</code> at the top of the new
+   <code>lz4.rs</code> so it can refer to the shared struct.</li>
+<li>Update <code>ryll/src/decompression/mod.rs</code>:</li>
+<li>Add <code>pub mod lz4;</code> alongside the existing <code>pub mod {glz,
+     lz, quic};</code> declarations.</li>
+<li>Add <code>pub use lz4::decompress_spice_lz4;</code> alongside the
+     existing re-exports.</li>
+<li>Update <code>ryll/src/channels/display.rs</code>:</li>
+<li>Remove the <code>fn decompress_spice_lz4(...) -&gt; ...</code>
+     definition entirely (currently at
+     <a href="../../ryll/src/channels/display.rs#L30-L144">display.rs:30-144</a>
+     or thereabouts).</li>
+<li>Add <code>decompress_spice_lz4</code> to the import list at line 13:
+     <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">use</span><span class="w"> </span><span class="k">crate</span><span class="p">::</span><span class="n">decompression</span><span class="p">::{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="n">decompress_glz</span><span class="p">,</span><span class="w"> </span><span class="n">decompress_lz</span><span class="p">,</span><span class="w"> </span><span class="n">decompress_spice_lz4</span><span class="p">,</span><span class="w"> </span><span class="n">quic_decode</span><span class="p">,</span><span class="w"> </span><span class="n">DecompressedImage</span><span class="p">,</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="p">};</span>
+</code></pre></div></li>
+<li>Remove any imports that are now unused in <code>display.rs</code>
+     (specifically <code>lz4_flex::*</code> if it was imported at module
+     level). <code>tracing</code> stays because <code>display.rs</code> uses it for
+     other logging.</li>
+<li>Verify locally (all inside the devcontainer):</li>
+<li><code>cargo fmt --all --check</code></li>
+<li><code>cargo clippy --workspace --all-targets -- -D warnings</code></li>
+<li><code>cargo build --workspace</code></li>
+<li><code>cargo test --workspace</code> — all 99 ryll tests plus 2
+     decompression tests (GLZ + LZ) pass.</li>
+<li><code>cargo build --release -p ryll</code> produces a binary that
+     still handles <code>ImageType::Lz4</code> correctly. No runtime
+     verification is possible without a real SPICE server,
+     so the test suite is our safety net.</li>
+<li><code>pre-commit run --all-files</code></li>
+<li>Commit.</li>
+</ol>
+<p><strong>Commit message (subject ≤ 50 chars):</strong></p>
+<blockquote>
+<p>Move LZ4 decoder into decompression module.</p>
+</blockquote>
+<p>The commit is ~115 lines of code moving one file to the left
+(from <code>channels/display.rs</code> to <code>decompression/lz4.rs</code>), plus
+~3 lines of module-declaration additions in <code>mod.rs</code>, plus
+~2 lines of import updates in <code>display.rs</code>.</p>
+<h3 id="step-2-extract-shakenfist-spice-compression-from-ryll">Step 2: Extract shakenfist-spice-compression from ryll<a class="headerlink" href="#step-2-extract-shakenfist-spice-compression-from-ryll" title="Permanent link">&para;</a></h3>
+<p>The real work. This commit is larger than Step 1 because it
+touches all four decoder files, the placeholder crate, ryll's
+<code>Cargo.toml</code>, ryll's <code>channels/display.rs</code>, and deletes
+<code>ryll/src/decompression/</code>. It must all happen in one commit
+because the intermediate states are not buildable.</p>
+<p>Concrete steps within the commit:</p>
+<ol>
+<li><strong>Delete the Phase 2 placeholder contents</strong>:</li>
+<li>Delete <code>shakenfist-spice-compression/src/lib.rs</code> (the
+     4-line placeholder).</li>
+<li>Delete <code>shakenfist-spice-compression/README.md</code> (the
+     placeholder README) — will be rewritten.</li>
+<li>
+<p>Keep <code>shakenfist-spice-compression/Cargo.toml</code> — will be
+     rewritten in-place rather than deleted.</p>
+</li>
+<li>
+<p><strong>Move the four decoder files</strong> via <code>git mv</code> to preserve
+   rename history:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>git<span class="w"> </span>mv<span class="w"> </span>ryll/src/decompression/glz.rs<span class="w">   </span>shakenfist-spice-compression/src/glz.rs
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>git<span class="w"> </span>mv<span class="w"> </span>ryll/src/decompression/lz.rs<span class="w">    </span>shakenfist-spice-compression/src/lz.rs
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>git<span class="w"> </span>mv<span class="w"> </span>ryll/src/decompression/quic.rs<span class="w">  </span>shakenfist-spice-compression/src/quic.rs
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>git<span class="w"> </span>mv<span class="w"> </span>ryll/src/decompression/lz4.rs<span class="w">   </span>shakenfist-spice-compression/src/lz4.rs
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Delete</strong> <code>ryll/src/decompression/mod.rs</code>. The
+   <code>DecompressedImage</code> struct it currently holds will be
+   re-defined in the new crate's <code>lib.rs</code>.</p>
+</li>
+<li>
+<p><strong>Delete the now-empty</strong> <code>ryll/src/decompression/</code>
+   directory (git will do this automatically when the four
+   files have moved and <code>mod.rs</code> is deleted; no explicit step
+   needed).</p>
+</li>
+<li>
+<p><strong>Write the new <code>shakenfist-spice-compression/src/lib.rs</code></strong>
+   from the template in the "Crate layout" section above.
+   Note: <code>DecompressedImage</code> is now defined in <code>lib.rs</code> with
+   <code>#[non_exhaustive]</code> and a <code>new()</code> constructor.</p>
+</li>
+<li>
+<p><strong>Write the new <code>shakenfist-spice-compression/Cargo.toml</code></strong>
+   from the template in the "Crate layout" section above.</p>
+</li>
+<li>
+<p><strong>Write the new <code>shakenfist-spice-compression/README.md</code></strong>
+   following the text below:</p>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="gh"># shakenfist-spice-compression</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>Pure-Rust implementations of the SPICE image-stream
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>decompression algorithms:
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="k">-</span><span class="w"> </span><span class="gs">**QUIC**</span> — the SPICE wavelet/arithmetic codec (not the
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>  QUIC transport protocol). Feature <span class="sb">`quic`</span> (default).
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="k">-</span><span class="w"> </span><span class="gs">**GLZ**</span> — dictionary-based cross-frame LZ with a shared
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>  previous-images dictionary. Async because of a
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>  cross-channel retry loop. Feature <span class="sb">`glz`</span> (default), pulls
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>  in <span class="sb">`tokio`</span>.
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="k">-</span><span class="w"> </span><span class="gs">**LZ**</span> — single-frame LZ. Feature <span class="sb">`lz`</span> (default).
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="k">-</span><span class="w"> </span><span class="gs">**LZ4**</span> — SPICE&#39;s per-row LZ4 image format (each row is
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>  independently compressed with <span class="sb">`lz4_flex`</span> and a 4-byte
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>  length prefix). Feature <span class="sb">`lz4`</span> (default), pulls in
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>  <span class="sb">`lz4_flex`</span>.
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>All four decoders return a `DecompressedImage { width,
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>height, pixels: Vec&lt;u8&gt;, image_id }` on success. The
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>struct is <span class="sb">`#[non_exhaustive]`</span>; construct via
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a><span class="sb">`DecompressedImage::new(...)`</span>.
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a>
+<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a><span class="gu">## Status</span>
+<a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a>
+<a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a>This crate is not yet published to crates.io. The
+<a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a><span class="sb">`0.0.0`</span> entry there is a Phase 2 name reservation; the
+<a id="__codelineno-10-27" name="__codelineno-10-27" href="#__codelineno-10-27"></a>real <span class="sb">`0.1.0`</span> release will follow once API polish is
+<a id="__codelineno-10-28" name="__codelineno-10-28" href="#__codelineno-10-28"></a>complete (see the
+<a id="__codelineno-10-29" name="__codelineno-10-29" href="#__codelineno-10-29"></a>[<span class="nt">extraction plan</span>](<span class="na">https://github.com/shakenfist/ryll/blob/develop/docs/plans/PLAN-crate-extraction.md</span>)
+<a id="__codelineno-10-30" name="__codelineno-10-30" href="#__codelineno-10-30"></a>for what that involves).
+<a id="__codelineno-10-31" name="__codelineno-10-31" href="#__codelineno-10-31"></a>
+<a id="__codelineno-10-32" name="__codelineno-10-32" href="#__codelineno-10-32"></a>Internal consumers (ryll itself and the planned Rust
+<a id="__codelineno-10-33" name="__codelineno-10-33" href="#__codelineno-10-33"></a>rewrite of the shakenfist kerbside SPICE proxy) should
+<a id="__codelineno-10-34" name="__codelineno-10-34" href="#__codelineno-10-34"></a>depend on this crate via a workspace path or a git
+<a id="__codelineno-10-35" name="__codelineno-10-35" href="#__codelineno-10-35"></a>dependency until <span class="sb">`0.1.0`</span> ships.
+<a id="__codelineno-10-36" name="__codelineno-10-36" href="#__codelineno-10-36"></a>
+<a id="__codelineno-10-37" name="__codelineno-10-37" href="#__codelineno-10-37"></a><span class="gu">## Usage</span>
+<a id="__codelineno-10-38" name="__codelineno-10-38" href="#__codelineno-10-38"></a>
+<a id="__codelineno-10-39" name="__codelineno-10-39" href="#__codelineno-10-39"></a>```rust,ignore
+<a id="__codelineno-10-40" name="__codelineno-10-40" href="#__codelineno-10-40"></a>use shakenfist_spice_compression::{decompress_glz, DecompressedImage};
+<a id="__codelineno-10-41" name="__codelineno-10-41" href="#__codelineno-10-41"></a>use std::collections::HashMap;
+<a id="__codelineno-10-42" name="__codelineno-10-42" href="#__codelineno-10-42"></a>use std::sync::{Arc, Mutex};
+<a id="__codelineno-10-43" name="__codelineno-10-43" href="#__codelineno-10-43"></a>
+<a id="__codelineno-10-44" name="__codelineno-10-44" href="#__codelineno-10-44"></a>// Shared GLZ dictionary across all display channels.
+<a id="__codelineno-10-45" name="__codelineno-10-45" href="#__codelineno-10-45"></a>let dict: Arc&lt;Mutex&lt;HashMap&lt;u64, Vec&lt;u8&gt;&gt;&gt;&gt; =
+<a id="__codelineno-10-46" name="__codelineno-10-46" href="#__codelineno-10-46"></a>    Arc::new(Mutex::new(HashMap::new()));
+<a id="__codelineno-10-47" name="__codelineno-10-47" href="#__codelineno-10-47"></a>
+<a id="__codelineno-10-48" name="__codelineno-10-48" href="#__codelineno-10-48"></a>// Decompress a GLZ image from wire bytes.
+<a id="__codelineno-10-49" name="__codelineno-10-49" href="#__codelineno-10-49"></a>let image: DecompressedImage =
+<a id="__codelineno-10-50" name="__codelineno-10-50" href="#__codelineno-10-50"></a>    decompress_glz(glz_bytes, &amp;dict).await?;
+<a id="__codelineno-10-51" name="__codelineno-10-51" href="#__codelineno-10-51"></a><span class="gh"># Ok::&lt;(), anyhow::Error&gt;(())</span>
+</code></pre></div>
+<p>## Source</p>
+<p>Extracted from the
+   <a href="https://github.com/shakenfist/ryll">ryll</a> SPICE client.
+   ```</p>
+<ol>
+<li><strong>Update each moved file's <code>DecompressedImage</code> reference</strong>:</li>
+<li><code>glz.rs</code>: change <code>use super::DecompressedImage;</code> to
+     <code>use crate::DecompressedImage;</code>.</li>
+<li><code>lz.rs</code>: same.</li>
+<li><code>quic.rs</code>: <code>quic.rs</code> doesn't currently use
+     <code>DecompressedImage</code> directly (it returns <code>Option&lt;Vec&lt;u8&gt;&gt;</code>
+     — the caller wraps). No change needed in <code>quic.rs</code>
+     itself, but the caller wrapping code in <code>ryll/src/
+     channels/display.rs</code> will need to switch to
+     <code>DecompressedImage::new(...)</code> because of the new
+     <code>#[non_exhaustive]</code> attribute.</li>
+<li>
+<p><code>lz4.rs</code>: change <code>use super::DecompressedImage;</code> to
+     <code>use crate::DecompressedImage;</code>.</p>
+</li>
+<li>
+<p><strong>Update the two unit tests</strong> in <code>glz.rs</code> and <code>lz.rs</code> to
+   still reference <code>DecompressedImage</code> via the crate root
+   (should be automatic if step 8 is done correctly — the
+   tests are inside a <code>#[cfg(test)] mod tests</code> inside the
+   module file, so they see <code>super::*</code> which still resolves
+   correctly).</p>
+</li>
+<li>
+<p><strong>Audit <code>quic.rs</code>'s top-level attributes</strong>. The existing
+    file has <code>#![allow(dead_code, clippy::needless_range_loop)]</code>
+    at <a href="../../ryll/src/decompression/quic.rs#L1">quic.rs:1</a>.
+    When the file becomes part of a public crate, it's worth
+    asking whether this allow is still appropriate. Options:</p>
+<ul>
+<li>Keep it as-is (minimal change, can be revisited in
+  future polish).</li>
+<li>Drop <code>dead_code</code> and fix whatever clippy complains
+  about (may be non-trivial if there really is dead code).</li>
+<li>Drop both and see what breaks.
+<strong>Decision for this phase: keep it as-is.</strong> Touching
+<code>quic.rs</code> internals is out of scope; the
+<code>#![allow]</code> travels with the file to the new crate
+unchanged. If future polish wants to clean it up, that's
+a separate commit on the path to <code>0.1.0</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Update <code>ryll/Cargo.toml</code></strong> to add the new dependency:
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">shakenfist-spice-compression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;../shakenfist-spice-compression&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;0.1&quot;</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+    The exact position in the <code>[dependencies]</code> block is
+    stylistic; alphabetical ordering would place it after
+    <code>serde_json</code> and before <code>socket2</code>, but the existing
+    file groups deps by purpose rather than alphabetically
+    (e.g. "GUI framework" comments). Place it in its own
+    group with a comment like <code># Extracted SPICE codecs</code>.</p>
+</li>
+<li>
+<p><strong>Update <code>ryll/src/channels/display.rs</code></strong>:</p>
+<ul>
+<li>Replace the <code>use crate::decompression::{...}</code> line with
+  <code>use shakenfist_spice_compression::{...}</code> as described
+  in the "Crate layout" section above.</li>
+<li>Find the QUIC handler wrapping code (around
+  <a href="../../ryll/src/channels/display.rs#L921">display.rs:921</a>)
+  that wraps the <code>Option&lt;Vec&lt;u8&gt;&gt;</code> from <code>quic_decode</code> into
+  a <code>DecompressedImage</code>. This currently uses struct literal
+  syntax like <code>Some(DecompressedImage { width: ..., ... })</code>.
+  Switch to <code>DecompressedImage::new(...)</code> because of the
+  new <code>#[non_exhaustive]</code> attribute. <strong>This is the most
+  likely source of a compile break during the extraction
+  commit — verify carefully.</strong></li>
+<li>Check the LZ4 handler at
+  <a href="../../ryll/src/channels/display.rs#L863">display.rs:863</a>
+  — it shouldn't need changes because
+  <code>decompress_spice_lz4</code> already returns
+  <code>Option&lt;DecompressedImage&gt;</code> which the dispatch code
+  matches on. But double-check.</li>
+<li>Check whether any other code in <code>display.rs</code> constructs
+  <code>DecompressedImage</code> directly via struct literal; if so,
+  update those too.</li>
+</ul>
+</li>
+<li>
+<p><strong>Remove the <code>mod decompression;</code> declaration</strong> from
+    wherever in <code>ryll/src/</code> it currently lives. The research
+    pass didn't identify the declaration's exact location —
+    during execution, <code>grep -rn 'mod decompression' ryll/src/</code>
+    will find it.</p>
+</li>
+<li>
+<p><strong>Verify locally</strong> (same suite as Step 1, plus some new
+    checks):</p>
+<ul>
+<li><code>cargo fmt --all --check</code></li>
+<li><code>cargo clippy --workspace --all-targets -- -D warnings</code></li>
+<li><code>cargo build --workspace</code></li>
+<li><code>cargo test --workspace</code> — all 99 ryll tests must still
+  pass; the 2 decompression unit tests must now appear
+  under <code>shakenfist_spice_compression</code> in the test
+  output, not under <code>ryll::decompression</code>.</li>
+<li><code>cargo build --release -p ryll</code> produces a working
+  binary.</li>
+<li><code>cargo build -p shakenfist-spice-compression</code> (with
+  default features) succeeds.</li>
+<li><code>cargo build -p shakenfist-spice-compression
+  --no-default-features --features quic</code> succeeds (tests
+  the feature-gating).</li>
+<li><code>cargo build -p shakenfist-spice-compression
+  --no-default-features --features lz</code> succeeds.</li>
+<li><code>cargo build -p shakenfist-spice-compression
+  --no-default-features --features glz</code> succeeds and
+  pulls in tokio.</li>
+<li><code>cargo build -p shakenfist-spice-compression
+  --no-default-features --features lz4</code> succeeds and
+  pulls in lz4_flex.</li>
+<li><code>cargo build -p shakenfist-spice-compression
+  --no-default-features</code> succeeds with no features —
+  verifying that <code>lib.rs</code> compiles even when none of the
+  modules are included.</li>
+<li><code>cargo deb --no-build -p ryll</code> and
+  <code>cargo generate-rpm -p ryll</code> still produce the same
+  artefacts.</li>
+<li><code>pre-commit run --all-files</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Inspect git diff stats</strong> before committing. Expected
+    shape:</p>
+<ul>
+<li>4 file renames from <code>ryll/src/decompression/*.rs</code> to
+  <code>shakenfist-spice-compression/src/*.rs</code> (100%
+  similarity except for the <code>super::DecompressedImage</code>
+  imports in 3 of them).</li>
+<li><code>ryll/src/decompression/mod.rs</code> deleted.</li>
+<li><code>shakenfist-spice-compression/src/lib.rs</code> rewritten
+  (was a 4-line placeholder, now ~40 lines).</li>
+<li><code>shakenfist-spice-compression/Cargo.toml</code> rewritten
+  (was minimal placeholder, now has features and deps).</li>
+<li><code>shakenfist-spice-compression/README.md</code> rewritten.</li>
+<li><code>ryll/Cargo.toml</code> modified (+1 dep line).</li>
+<li><code>ryll/src/channels/display.rs</code> modified (1 import line,
+  ~6 lines for the <code>DecompressedImage::new</code> conversion).</li>
+<li>Wherever <code>mod decompression;</code> lives: that line
+  removed (-1 line).</li>
+<li><code>Cargo.lock</code> updated with the new dependency edge.
+If the diff includes anything outside that list, stop and
+investigate before committing.</li>
+</ul>
+</li>
+<li>
+<p>Commit.</p>
+</li>
+</ol>
+<p><strong>Commit message (subject ≤ 50 chars):</strong></p>
+<blockquote>
+<p>Extract shakenfist-spice-compression crate.</p>
+</blockquote>
+<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Should <code>quic_decode</code> be normalised to return
+   <code>Result&lt;DecompressedImage&gt;</code> during extraction?</strong> Currently
+   it returns <code>Option&lt;Vec&lt;u8&gt;&gt;</code>, which is asymmetric with
+   <code>decompress_glz</code>/<code>decompress_lz</code> (which return
+   <code>Result&lt;DecompressedImage&gt;</code>) and
+   <code>decompress_spice_lz4</code> (which returns
+   <code>Option&lt;DecompressedImage&gt;</code>). A public crate should have
+   symmetric return types across its decoder functions.</li>
+</ol>
+<p><strong>Decision for this phase: no, leave them as-is.</strong>
+   Normalising <code>quic_decode</code> means constructing a
+   <code>DecompressedImage</code> inside the decoder, which requires
+   threading an <code>image_id</code> parameter through (because
+   <code>DecompressedImage::image_id</code> is currently populated by
+   the caller from the SPICE message, not by the decoder
+   from the compressed bytes). That's a real API change and
+   a small amount of logic movement, and it's exactly the
+   kind of API polish that belongs in the eventual <code>0.1.0</code>
+   release work, not in the extraction refactor. Document
+   this as a <code>0.1.0</code> polish item in the crate README's
+   "Status" section. Flag as issue for future cleanup.</p>
+<ol>
+<li><strong>Should <code>decompress_spice_lz4</code> be renamed to just
+   <code>decompress_lz4</code>?</strong> The <code>_spice_</code> infix is a legacy of
+   the function living in <code>display.rs</code> where it needed a
+   distinctive name; in the new crate where there's only one
+   LZ4 decoder, the infix is noise. Renaming it requires
+   updating the one caller in
+   <code>ryll/src/channels/display.rs</code>.</li>
+</ol>
+<p><strong>Decision for this phase: keep <code>decompress_spice_lz4</code>.</strong>
+   The rename is pure cosmetic, and mixing it into the
+   extraction commit obscures the structural change. This
+   can happen later as a one-line polish commit in the
+   <code>0.1.0</code> preparation phase.</p>
+<ol>
+<li><strong>Should <code>DecompressedImage</code> really be
+   <code>#[non_exhaustive]</code>?</strong> This forces external consumers to
+   use <code>DecompressedImage::new(...)</code> instead of struct
+   literal syntax, which is slightly more verbose. But it
+   allows adding fields later (e.g. a <code>format: PixelFormat</code>
+   enum for when compression is added) without breaking
+   consumers.</li>
+</ol>
+<p><strong>Decision for this phase: yes, use <code>#[non_exhaustive]</code>
+   and provide <code>new()</code>.</strong> The small ergonomic cost is
+   outweighed by the forward-compatibility win for a public
+   API. Internal consumers (only ryll's <code>display.rs</code> today)
+   are easy to update.</p>
+<ol>
+<li>
+<p><strong>Where does <code>mod decompression;</code> live in ryll?</strong> Not
+   identified by the research pass. Likely candidates:
+   <code>ryll/src/main.rs</code>, <code>ryll/src/lib.rs</code>, or (less likely)
+   <code>ryll/src/app.rs</code>. During execution, <code>grep -rn 'mod
+   decompression' ryll/src/</code> will find it in seconds. If
+   it's in <code>main.rs</code> that's fine; if it's in a <code>lib.rs</code>
+   that tells us ryll has a library crate as well as a
+   binary, which may have other implications.</p>
+</li>
+<li>
+<p><strong>Should this phase push to <code>develop</code>?</strong> The master plan
+   says each phase should produce CI-green commits. As of
+   the start of Phase 3, 13 commits from Phases 1-2 are
+   still unpushed. Running Phase 3 on top of 13 unverified
+   commits is riskier than running it after a push-and-CI
+   cycle. Recommend pushing and confirming CI before
+   starting Phase 3 implementation work. The operator can
+   decide.</p>
+</li>
+</ol>
+<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
+<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<p>We will know Phase 3 has been successfully implemented when:</p>
+<ul>
+<li><code>ryll/src/decompression/</code> no longer exists.</li>
+<li><code>shakenfist-spice-compression/</code> is a real workspace member
+  with the four decoder modules feature-gated per Decision
+  #6.</li>
+<li>The crate's <code>Cargo.toml</code> still has <code>version = "0.0.0"</code>.
+  No publish has happened.</li>
+<li>The crate's <code>README.md</code> describes the real crate, not a
+  placeholder.</li>
+<li><code>cargo build --workspace</code>, <code>cargo test --workspace</code>, and
+  <code>cargo clippy --workspace --all-targets -- -D warnings</code>
+  all pass.</li>
+<li>All 99 existing ryll tests pass unchanged.</li>
+<li>The 2 existing decompression unit tests (GLZ and LZ header
+  parse) pass as tests of
+  <code>shakenfist_spice_compression::{glz, lz}</code> instead of
+  <code>ryll::decompression::{glz, lz}</code>.</li>
+<li>Feature-gated builds of the new crate succeed for every
+  singleton subset (<code>--no-default-features --features quic</code>,
+  <code>... --features glz</code>, etc.), plus the <code>--no-default-features</code>
+  empty build.</li>
+<li>Ryll's <code>channels/display.rs</code> imports from
+  <code>shakenfist_spice_compression::*</code> rather than
+  <code>crate::decompression::*</code>.</li>
+<li>The <code>mod decompression;</code> declaration is removed from
+  wherever it lives in <code>ryll/src/</code>.</li>
+<li><code>cargo deb --no-build -p ryll</code> and
+  <code>cargo generate-rpm -p ryll</code> still produce working
+  artefacts at the same paths.</li>
+<li>CI is green on the branch after Step 2 is pushed.</li>
+<li><code>git log --follow</code> on each of the four decoder files
+  (<code>glz.rs</code>, <code>lz.rs</code>, <code>quic.rs</code>, <code>lz4.rs</code>) shows an
+  unbroken history back to their original locations.</li>
+</ul>
+<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Publish <code>shakenfist-spice-compression v0.1.0</code></strong> —
+  listed in the master plan's Future Work. Involves the API
+  polish items flagged in the open questions (normalising
+  <code>quic_decode</code> return type, renaming
+  <code>decompress_spice_lz4</code>, cleaning up <code>quic.rs</code>'s latent
+  <code>#![allow(dead_code)]</code>, potentially the kerbside-driven
+  compression additions), plus the usual first-publish
+  metadata (categories, keywords, homepage, documentation
+  URL), plus a more substantial README with example code
+  and benchmarks.</li>
+<li><strong>Compression (encoder) implementations</strong> — the whole
+  reason the crate is named "compression" rather than
+  "decompression". Adding encoders for QUIC, GLZ, LZ, and
+  LZ4 will be driven by the kerbside proxy rewrite's needs.
+  New cargo features like <code>quic-encode</code>, <code>glz-encode</code>, etc.
+  can gate the encoder code without affecting the existing
+  decoder feature set.</li>
+<li><strong>Fuzz-testing</strong> the extracted decoders (master plan's
+  existing future-work item). QUIC in particular has a
+  large decoder state machine and is an ideal fuzz target.
+  Now that the decoders are in their own crate with
+  well-defined byte-slice inputs, adding <code>cargo-fuzz</code>
+  targets is straightforward.</li>
+<li><strong>Consider removing the GLZ retry loop and tokio
+  dependency</strong> — Decision #2 accepted the tokio dep, but
+  the retry loop is genuinely ryll-specific concurrency
+  adaptation rather than part of the GLZ algorithm. The
+  cleaner long-term design is for the caller to ensure the
+  dictionary is populated before calling <code>decompress_glz</code>,
+  which would allow dropping the <code>tokio</code> dep entirely. This
+  is a bigger change than Phase 3 should take on, but worth
+  revisiting once the kerbside rewrite informs what the
+  other consumers actually want.</li>
+</ul>
+<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<p>(None expected. Phase 3 is purely a refactor — moving code
+between crates with no behavioural changes. If a bug is
+discovered during execution, record it here and fix it in
+a separate commit before Step 2 lands, so the extraction
+commit remains a pure refactor.)</p>
+<h3 id="discoveries-during-execution">Discoveries during execution<a class="headerlink" href="#discoveries-during-execution" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p><strong>Open Question #4 answered.</strong> The <code>mod decompression;</code>
+  declaration was at <a href="../../ryll/src/main.rs#L22">ryll/src/main.rs:22</a>.
+  Ryll is binary-only with no <code>lib.rs</code>, so the declaration
+  lived in <code>main.rs</code> rather than a library root. Removed
+  cleanly as part of Step 2.</p>
+</li>
+<li>
+<p><strong>The dual-spec idiom does not work when the local crate is
+  at 0.0.0 (unanticipated).</strong> The plan recommended adding the
+  <code>version = "0.1"</code> qualifier to ryll's path-dependency on
+  <code>shakenfist-spice-compression</code> "as forward preparation",
+  expecting it to be a no-op while the local crate stayed at
+  <code>0.0.0</code>. In practice, cargo refuses to resolve <code>^0.1</code>
+  against <code>0.0.0</code>:</p>
+</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>error: failed to select a version for the requirement
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>`shakenfist-spice-compression = &quot;^0.1&quot;`
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>candidate versions found which didn&#39;t match: 0.0.0
+</code></pre></div>
+<p>The dual-spec idiom only becomes usable once the local
+  version reaches <code>0.1.0</code>. The fix in Step 2 was to drop the
+  <code>version</code> qualifier entirely until the eventual <code>0.1.0</code>
+  release; the <code>Cargo.toml</code> comment explains why. The plan's
+  recommendation was wrong on this point — added a note to
+  the master plan's Decision #1 in a follow-up commit so
+  future phases (Phases 4, 5) don't repeat the same mistake
+  for the protocol and usbredir crates.</p>
+<ul>
+<li>
+<p><strong>All four moved files registered as proper git renames.</strong>
+  Three (<code>glz.rs</code>, <code>lz.rs</code>, <code>lz4.rs</code>) registered at 99%
+  similarity because of the one-line <code>super::DecompressedImage</code>
+  → <code>crate::DecompressedImage</code> change. <code>quic.rs</code> registered at
+  100% because it doesn't reference <code>DecompressedImage</code>
+  directly (it returns <code>Option&lt;Vec&lt;u8&gt;&gt;</code> and the caller
+  wraps). <code>git log --follow</code> walks back through Phase 3 to
+  the original locations cleanly. For <code>lz4.rs</code> it walks back
+  through Step 1's move from <code>ryll/src/channels/display.rs</code>,
+  which is exactly the rationale for the prerequisite commit
+  structure.</p>
+</li>
+<li>
+<p><strong><code>display.rs</code> had four <code>DecompressedImage</code> struct literal
+  sites, not one.</strong> The plan flagged the QUIC handler as the
+  most likely break point under <code>#[non_exhaustive]</code>, but the
+  full count was four: the GlzRgb path (line 656), the
+  FromCache path (line 749), the JPEG path (line 776), and
+  the QUIC path (line 803). All four were updated to
+  <code>DecompressedImage::new(...)</code> in the same commit. The
+  total <code>display.rs</code> diff was ~50 lines because of the
+  per-site reformatting, larger than the plan's "~6 lines"
+  estimate.</p>
+</li>
+<li>
+<p><strong>Rustfmt enforces a strict import-block grouping.</strong> The
+  initial placement of the <code>use shakenfist_spice_compression::*</code>
+  import in <code>display.rs</code> (between the <code>use crate::*</code> lines
+  and the <code>use crate::protocol::*</code> lines) tripped rustfmt's
+  group-ordering check, which wants external-crate imports
+  after all <code>use crate::*</code> imports in the same block.
+  Re-ordered to put the new import at the end of the block,
+  after <code>use crate::settings;</code>.</p>
+</li>
+<li>
+<p><strong><code>lz4_flex</code> stays as a direct ryll dependency</strong> even after
+  the LZ4 decoder moves to the new crate. Ryll's webdav
+  channel (<a href="../../ryll/src/channels/webdav.rs#L482">webdav.rs:482, 585</a>)
+  and usbredir channel
+  (<a href="../../ryll/src/channels/usbredir.rs#L296">usbredir.rs:296</a>)
+  still use <code>lz4_flex</code> for general data
+  compression/decompression (not for SPICE images). The
+  Cargo.toml comment was updated to clarify this. The new
+  crate has its own optional <code>lz4_flex</code> dep gated behind the
+  <code>lz4</code> feature; cargo dedups the two via the lockfile.</p>
+</li>
+<li>
+<p><strong>All five feature-matrix builds succeed.</strong> Verified
+  <code>--no-default-features</code> (empty crate, only <code>tracing</code>
+  pulled in unconditionally), <code>--features quic</code>,
+  <code>--features glz</code> (pulls <code>tokio</code>), <code>--features lz</code>, and
+  <code>--features lz4</code> (pulls <code>lz4_flex</code>). The
+  <code>--no-default-features</code> build of <code>shakenfist-spice-compression</code>
+  with all features off compiles a crate that exports only
+  <code>DecompressedImage</code> and <code>DecompressedImage::new</code> — useful
+  for consumers who want the type but provide their own
+  decoders.</p>
+</li>
+<li>
+<p><strong>Test count is exactly preserved.</strong> Pre-Phase-3 baseline
+  was 99 ryll tests; post-Phase-3 is 97 ryll + 2
+  <code>shakenfist-spice-compression</code> (the <code>test_glz_header_parse</code>
+  and <code>test_lz_header_parse</code> unit tests that travelled with
+  their files). 99 total, no regression. The
+  <code>cargo test --workspace</code> output shows them under their new
+  crate.</p>
+</li>
+</ul>
+<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<p>Before executing any step of this plan, back brief the
+operator as to your understanding of the plan and how the
+work you intend to do aligns with the master plan.
+Specifically confirm:</p>
+<ol>
+<li>The two-commit sequence: (Step 1) move LZ4 within ryll
+   to establish it as a peer of GLZ/LZ/QUIC, then (Step 2)
+   extract all four into the shakenfist-spice-compression
+   crate.</li>
+<li>That Phase 3 does <strong>not</strong> publish anything to crates.io —
+   the placeholder stays at <code>0.0.0</code>, and a real <code>0.1.0</code>
+   publish is deferred future work.</li>
+<li>That the API asymmetry between <code>quic_decode</code> (returns
+   <code>Option&lt;Vec&lt;u8&gt;&gt;</code>), <code>decompress_spice_lz4</code> (returns
+   <code>Option&lt;DecompressedImage&gt;</code>), and the other two (return
+   <code>Result&lt;DecompressedImage&gt;</code>) is <strong>preserved as-is</strong> in
+   this phase, with normalisation deferred to <code>0.1.0</code>
+   polish.</li>
+<li>That <code>DecompressedImage</code> is being made <code>#[non_exhaustive]</code>
+   with a <code>new()</code> constructor, and that this will force a
+   small update to ryll's QUIC wrapping code in
+   <code>display.rs</code>.</li>
+<li>The pre-flight checks will be run, and any failure will
+   stop execution rather than being worked around.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+
+
+
+
+
+
+<p class="md-content__report-issue">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/ryll/plans/PLAN-crate-extraction-phase-03-compression.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/ryll/plans/PLAN-crate-extraction-phase-03-compression.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-03-compression/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+    📝 Report an issue with this page
+  </a>
+</p>
+
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
