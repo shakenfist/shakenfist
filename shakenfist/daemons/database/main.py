@@ -241,7 +241,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['enqueue'].inc()
             workitem = json.loads(request.work_item)
-            etcd.enqueue(request.queue_name, workitem, delay=request.delay)
+            mariadb._direct_work_queue_enqueue(
+                request.queue_name, workitem, delay=request.delay)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database Enqueue failed', e)
@@ -255,7 +256,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Claim the next available job from a queue."""
         try:
             self.monitor.counters['dequeue'].inc()
-            result = etcd.dequeue(request.queue_name)
+            result = mariadb._direct_work_queue_dequeue(
+                request.queue_name, config.NODE_NAME)
             if result is None:
                 return database_pb2.DequeueReply(
                     found=False, job_name='', work_item='')
@@ -278,7 +280,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Mark a job as complete."""
         try:
             self.monitor.counters['resolve'].inc()
-            etcd.resolve(request.queue_name, request.job_name)
+            mariadb._direct_work_queue_resolve(
+                request.queue_name, request.job_name)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database Resolve failed', e)
@@ -292,8 +295,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get queue statistics."""
         try:
             self.monitor.counters['get_queue_length'].inc()
-            processing, queued, deferred = etcd.get_queue_length(
-                request.queue_name)
+            processing, queued, deferred = (
+                mariadb._direct_work_queue_length(
+                    request.queue_name))
             return database_pb2.QueueLengthReply(
                 processing=processing,
                 queued=queued,
@@ -309,10 +313,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.RestartQueueRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.StatusReply:
-        """Move jobs from processing back to queue."""
+        """Clear claims on a queue so workers re-pick up the jobs."""
         try:
             self.monitor.counters['restart_queue'].inc()
-            etcd.restart_queue(request.queue_name)
+            mariadb._direct_work_queue_restart(request.queue_name)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database RestartQueue failed', e)
