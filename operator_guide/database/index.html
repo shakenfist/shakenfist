@@ -8378,6 +8378,11 @@ of the cluster through Galera replication.</p>
 <td>Cluster operation targets</td>
 <td>Complete - <code>cluster_operation_targets</code> table (operation ordering per object)</td>
 </tr>
+<tr>
+<td>16</td>
+<td>Node metrics</td>
+<td>Complete - <code>node_metrics</code> table (ephemeral per-node resource metrics, JSON payload)</td>
+</tr>
 </tbody>
 </table>
 <h3 id="table-architecture">Table Architecture<a class="headerlink" href="#table-architecture" title="Permanent link">&para;</a></h3>
@@ -8424,6 +8429,10 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 <tr>
 <td><code>cluster_operation_targets</code></td>
 <td>Operation-to-object targeting with AUTO_INCREMENT ordering</td>
+</tr>
+<tr>
+<td><code>node_metrics</code></td>
+<td>Ephemeral per-node resource metrics with semi-schemaless JSON payload</td>
 </tr>
 </tbody>
 </table>
