@@ -124,6 +124,7 @@ _instance_attributes_table: Optional[sa.Table] = None
 _object_metadata_table: Optional[sa.Table] = None
 _cluster_operation_targets_table: Optional[sa.Table] = None
 _node_metrics_table: Optional[sa.Table] = None
+_cluster_operations_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -158,6 +159,7 @@ INSTANCE_ATTRIBUTES_VERSION = 2
 OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
+CLUSTER_OPERATIONS_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -609,6 +611,65 @@ def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': NODE_METRICS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_cluster_operations_table() -> sa.Table:
+    """Get or create the cluster_operations table definition.
+
+    This table stores cluster operation headers (one row per operation).
+    The full metadata dict is persisted in metadata_json; commonly
+    filtered fields are extracted into their own indexed columns at
+    insert time by _direct_create_cluster_operation(). State lives in
+    the separate object_states table keyed on (object_type, uuid), and
+    per-target tracking lives in cluster_operation_targets.
+
+    Rows are insert-only: cluster operations are not mutated after
+    creation, only deleted when the operation finishes and is cleaned
+    up.
+    """
+    global _cluster_operations_table
+    if _cluster_operations_table is None:
+        metadata = _get_metadata()
+        _cluster_operations_table = sa.Table(
+            'cluster_operations',
+            metadata,
+            sa.Column('uuid', sa.Uuid(), primary_key=True),
+            sa.Column('operation_type', sa.String(64), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('node_uuid', sa.Uuid(), nullable=True),
+            sa.Column('instance_uuid', sa.Uuid(), nullable=True),
+            sa.Column('network_uuid', sa.Uuid(), nullable=True),
+            sa.Column('priority', sa.String(32), nullable=True),
+            sa.Column('metadata_json', sa.JSON(), nullable=False),
+            sa.Index('ix_cluster_ops_node', 'node_uuid'),
+            sa.Index('ix_cluster_ops_instance', 'instance_uuid'),
+            sa.Index('ix_cluster_ops_network', 'network_uuid'),
+            sa.Index('ix_cluster_ops_type_created',
+                     'operation_type', 'created_at'),
+        )
+    return _cluster_operations_table
+
+
+def _ensure_cluster_operations_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the cluster_operations table schema is up to date."""
+    table_name = 'cluster_operations'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_operations_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_OPERATIONS_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1340,6 +1401,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_object_metadata_schema(engine))
     results.append(_ensure_cluster_operation_targets_schema(engine))
     results.append(_ensure_node_metrics_schema(engine))
+    results.append(_ensure_cluster_operations_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -15120,3 +15182,134 @@ def delete_node_metrics(node_uuid: 'str | UUID') -> bool:
     if _use_database_service():
         return _grpc_delete_node_metrics(u)
     return _direct_delete_node_metrics(u)
+
+
+# =============================================================================
+# Cluster Operations Direct Access Functions
+# Operation headers, insert-only. State lives in object_states, per-target
+# tracking lives in cluster_operation_targets.
+# =============================================================================
+
+def _maybe_uuid(value: Any) -> Optional[UUID]:
+    """Convert an optional string/UUID to UUID, returning None for missing."""
+    if value is None:
+        return None
+    if isinstance(value, UUID):
+        return value
+    return UUID(value)
+
+
+def _cluster_operation_row_to_dict(row: Any) -> dict[str, Any]:
+    """Convert a cluster_operations row into the legacy-etcd payload shape.
+
+    Phase 5's from_db() switch depends on this shape being identical
+    to the dict previously stored at /sf/{operation_type}/{uuid} in
+    etcd. The full metadata dict is flattened into the top level,
+    with uuid/operation_type/created_at overlaid from the columnar
+    fields.
+    """
+    md = dict(row.metadata_json or {})
+    md['uuid'] = str(row.uuid)
+    md['operation_type'] = row.operation_type
+    md['created_at'] = row.created_at
+    return md
+
+
+def _direct_create_cluster_operation(
+        uuid: UUID, operation_type: str, metadata: dict[str, Any],
+        created_at: float) -> bool:
+    """Insert a cluster operation header in MariaDB.
+
+    Insert-only — returns False if a row with the same uuid already
+    exists. Extracts node_uuid, instance_uuid, network_uuid and
+    priority from the metadata dict into their own columns for
+    indexed lookups. The full metadata dict is stored in
+    metadata_json.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=uuid,
+                operation_type=operation_type,
+                created_at=created_at,
+                node_uuid=_maybe_uuid(metadata.get('node_uuid')),
+                instance_uuid=_maybe_uuid(metadata.get('instance_uuid')),
+                network_uuid=_maybe_uuid(metadata.get('network_uuid')),
+                priority=metadata.get('priority'),
+                metadata_json=metadata,
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        LOG.warning(
+            f'MariaDB insert refused duplicate cluster_operation {uuid}')
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB insert failed for cluster_operation {uuid}: {e}')
+        return False
+
+
+def _direct_get_cluster_operation(
+        uuid: UUID) -> Optional[dict[str, Any]]:
+    """Get a cluster operation header from MariaDB.
+
+    Returns the full metadata dict with uuid/operation_type/created_at
+    overlaid, matching the legacy etcd payload shape. Returns None if
+    not found.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == uuid)
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return None
+            return _cluster_operation_row_to_dict(result)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for cluster_operation {uuid}: {e}')
+        return None
+
+
+def _direct_get_cluster_operations_by_node(
+        node_uuid: UUID) -> list[dict[str, Any]]:
+    """Get all cluster operation headers targeting a specific node."""
+    engine = _get_engine()
+    table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.node_uuid == node_uuid
+            ).order_by(table.c.created_at)
+            result = conn.execute(stmt).fetchall()
+            return [_cluster_operation_row_to_dict(row) for row in result]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for cluster_operations '
+            f'by node {node_uuid}: {e}')
+        return []
+
+
+def _direct_delete_cluster_operation(uuid: UUID) -> bool:
+    """Delete a cluster operation header from MariaDB."""
+    engine = _get_engine()
+    table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for cluster_operation {uuid}: {e}')
+        return False
