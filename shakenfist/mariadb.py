@@ -125,6 +125,7 @@ _object_metadata_table: Optional[sa.Table] = None
 _cluster_operation_targets_table: Optional[sa.Table] = None
 _node_metrics_table: Optional[sa.Table] = None
 _cluster_operations_table: Optional[sa.Table] = None
+_work_queue_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -160,6 +161,7 @@ OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 1
+WORK_QUEUE_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -670,6 +672,68 @@ def _ensure_cluster_operations_schema(engine: sa.Engine) -> dict[str, Any]:
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': CLUSTER_OPERATIONS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_work_queue_table() -> sa.Table:
+    """Get or create the work_queue table definition.
+
+    This table stores queued work items and their claim state in a
+    single row per job. The claim fields (claimed_at, claimed_by)
+    replace the old etcd two-prefix design where a claim was
+    represented by moving a key from /sf/queue/... to /sf/processing/...
+    MariaDB row locking lets us use a single table instead.
+
+    scheduled_at supports deferred jobs: dequeue uses
+    UNIX_TIMESTAMP(NOW(6)) >= scheduled_at so a future timestamp
+    defers the job past its eligibility point.
+
+    attempts is incremented on each successful claim. Phase 7's
+    reaper will use it to enforce max_attempts (the "job of death"
+    guard) when clearing stale claims.
+    """
+    global _work_queue_table
+    if _work_queue_table is None:
+        metadata = _get_metadata()
+        _work_queue_table = sa.Table(
+            'work_queue',
+            metadata,
+            sa.Column('id', sa.BigInteger(),
+                      primary_key=True, autoincrement=True),
+            sa.Column('queue_name', sa.String(255), nullable=False),
+            sa.Column('scheduled_at', sa.Double(), nullable=False),
+            sa.Column('claimed_at', sa.Double(), nullable=True),
+            sa.Column('claimed_by', sa.String(255), nullable=True),
+            sa.Column('attempts', sa.Integer(),
+                      nullable=False, server_default='0'),
+            sa.Column('payload', sa.JSON(), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Index(
+                'ix_work_queue_ready',
+                'queue_name', 'claimed_at', 'scheduled_at'),
+        )
+    return _work_queue_table
+
+
+def _ensure_work_queue_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the work_queue table schema is up to date."""
+    table_name = 'work_queue'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_work_queue_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': WORK_QUEUE_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1402,6 +1466,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_cluster_operation_targets_schema(engine))
     results.append(_ensure_node_metrics_schema(engine))
     results.append(_ensure_cluster_operations_schema(engine))
+    results.append(_ensure_work_queue_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -15479,3 +15544,210 @@ def delete_cluster_operation(uuid: 'str | UUID') -> bool:
     if _use_database_service():
         return _grpc_delete_cluster_operation(u)
     return _direct_delete_cluster_operation(u)
+
+
+# =============================================================================
+# Work Queue Direct Access Functions
+# Replaces the /sf/queue/... and /sf/processing/... etcd prefixes with a
+# single row-locked table. Claim state lives on the row itself. These
+# functions are invoked by the database daemon handlers; non-daemon
+# callers go through shakenfist.etcd / shakenfist.database unchanged.
+# =============================================================================
+
+def _direct_work_queue_enqueue(
+        queue_name: str, payload: dict[str, Any],
+        delay: float = 0.0) -> None:
+    """Insert a work item on the queue.
+
+    Raises shakenfist.exceptions.CannotEnqueueWork on unrecoverable
+    failure, matching the current etcd.enqueue() contract.
+    """
+    from shakenfist import exceptions
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    now = time.time()
+    scheduled = now + delay
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                queue_name=queue_name,
+                scheduled_at=scheduled,
+                claimed_at=None,
+                claimed_by=None,
+                attempts=0,
+                payload=payload,
+                created_at=now,
+            )
+            conn.execute(stmt)
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB insert failed for work_queue {queue_name}: {e}')
+        raise exceptions.CannotEnqueueWork(
+            f'work_queue insert failed for {queue_name}') from e
+
+
+def _direct_work_queue_dequeue(
+        queue_name: str,
+        worker_id: str) -> Optional[tuple[str, dict[str, Any]]]:
+    """Claim the next eligible job on a queue.
+
+    Uses SELECT ... FOR UPDATE SKIP LOCKED so two simultaneous
+    callers either get distinct rows or at least one gets None.
+    Increments attempts on the claim.
+
+    Returns (jobname, payload_dict) on success, None if the queue
+    is empty or every eligible row is locked by another worker.
+    The returned jobname is the stringified autoincrement id;
+    callers treat it as opaque and pass it back to resolve().
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            select_stmt = (
+                sa.select(table.c.id, table.c.payload)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_(None))
+                .where(
+                    table.c.scheduled_at
+                    <= sa.func.unix_timestamp(sa.func.now(6)))
+                .order_by(table.c.scheduled_at.asc())
+                .limit(1)
+                .with_for_update(skip_locked=True)
+            )
+            row = conn.execute(select_stmt).fetchone()
+            if row is None:
+                return None
+
+            update_stmt = (
+                sa.update(table)
+                .where(table.c.id == row.id)
+                .values(
+                    claimed_at=sa.func.unix_timestamp(
+                        sa.func.now(6)),
+                    claimed_by=worker_id,
+                    attempts=table.c.attempts + 1,
+                )
+            )
+            conn.execute(update_stmt)
+            conn.commit()
+            return str(row.id), dict(row.payload or {})
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB dequeue failed for work_queue '
+            f'{queue_name}: {e}')
+        return None
+
+
+def _direct_work_queue_resolve(
+        queue_name: str, job_name: str) -> None:
+    """Mark a claimed job as complete by deleting the row.
+
+    queue_name is accepted for parity with etcd.resolve() and for
+    logging / safety; the id in job_name is already unique across
+    queues.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        job_id = int(job_name)
+    except ValueError:
+        LOG.warning(
+            f'work_queue resolve: non-numeric job_name '
+            f'{job_name!r} for queue {queue_name}')
+        return
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                (table.c.id == job_id)
+                & (table.c.queue_name == queue_name))
+            conn.execute(stmt)
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB resolve failed for work_queue '
+            f'{queue_name}/{job_name}: {e}')
+
+
+def _direct_work_queue_length(
+        queue_name: str) -> tuple[int, int, int]:
+    """Return (processing, queued, deferred) counts for a queue.
+
+    - processing: claimed rows (claimed_at IS NOT NULL)
+    - queued: unclaimed rows whose scheduled_at is now or in the past
+    - deferred: unclaimed rows whose scheduled_at is in the future
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            now_expr = sa.func.unix_timestamp(sa.func.now(6))
+
+            processing_stmt = (
+                sa.select(sa.func.count())
+                .select_from(table)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_not(None))
+            )
+            queued_stmt = (
+                sa.select(sa.func.count())
+                .select_from(table)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_(None))
+                .where(table.c.scheduled_at <= now_expr)
+            )
+            deferred_stmt = (
+                sa.select(sa.func.count())
+                .select_from(table)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_(None))
+                .where(table.c.scheduled_at > now_expr)
+            )
+
+            processing = int(
+                conn.execute(processing_stmt).scalar() or 0)
+            queued = int(conn.execute(queued_stmt).scalar() or 0)
+            deferred = int(
+                conn.execute(deferred_stmt).scalar() or 0)
+            return processing, queued, deferred
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB length query failed for work_queue '
+            f'{queue_name}: {e}')
+        return 0, 0, 0
+
+
+def _direct_work_queue_restart(queue_name: str) -> int:
+    """Clear all claims on a queue so workers re-pick up the jobs.
+
+    Used by the queues daemon at startup to recover in-flight work
+    after a crash. Does NOT reset attempts -- phase 7's reaper
+    still needs to notice persistently-failing jobs eventually.
+
+    Returns the number of rows whose claim was cleared.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = (
+                sa.update(table)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_not(None))
+                .values(claimed_at=None, claimed_by=None)
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return int(result.rowcount or 0)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB restart failed for work_queue '
+            f'{queue_name}: {e}')
+        return 0
