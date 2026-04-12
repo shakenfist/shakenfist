@@ -4120,6 +4120,115 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    # Cluster Operations (MariaDB)
+
+    def CreateClusterOperation(
+        self,
+        request: database_pb2.CreateClusterOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Insert a cluster operation header in MariaDB."""
+        try:
+            self.monitor.counters['create_cluster_operation'].inc()
+            metadata = (
+                json.loads(request.data.metadata_json)
+                if request.data.metadata_json else {}
+            )
+            success = mariadb._direct_create_cluster_operation(
+                UUID(request.data.uuid),
+                request.data.operation_type,
+                metadata,
+                request.data.created_at,
+            )
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateClusterOperation failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetClusterOperation(
+        self,
+        request: database_pb2.GetClusterOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterOperationReply:
+        """Get a cluster operation header from MariaDB."""
+        try:
+            self.monitor.counters['get_cluster_operation'].inc()
+            data = mariadb._direct_get_cluster_operation(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetClusterOperationReply(
+                    found=False)
+            return database_pb2.GetClusterOperationReply(
+                found=True,
+                data=self._cluster_operation_to_proto(data),
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterOperation failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetClusterOperationReply(
+                found=False)
+
+    def GetClusterOperationsByNode(
+        self,
+        request: database_pb2.GetClusterOperationsByNodeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterOperationsByNodeReply:
+        """Get all cluster operation headers targeting a node."""
+        try:
+            self.monitor.counters[
+                'get_cluster_operations_by_node'].inc()
+            items = mariadb._direct_get_cluster_operations_by_node(
+                UUID(request.node_uuid))
+            return database_pb2.GetClusterOperationsByNodeReply(
+                items=[
+                    self._cluster_operation_to_proto(d)
+                    for d in items
+                ]
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterOperationsByNode failed', e)
+            return database_pb2.GetClusterOperationsByNodeReply(
+                items=[])
+
+    def DeleteClusterOperation(
+        self,
+        request: database_pb2.DeleteClusterOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a cluster operation header from MariaDB."""
+        try:
+            self.monitor.counters['delete_cluster_operation'].inc()
+            success = mariadb._direct_delete_cluster_operation(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteClusterOperation failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def _cluster_operation_to_proto(
+            self,
+            data: dict[str, Any]
+    ) -> 'database_pb2.ClusterOperationData':
+        """Build a ClusterOperationData proto from a cluster_operations
+        row dict. The full dict is JSON-serialized into metadata_json so
+        the client sees exactly the same shape _direct_get_cluster_operation
+        returned."""
+        return database_pb2.ClusterOperationData(
+            uuid=data['uuid'],
+            operation_type=data['operation_type'],
+            created_at=data['created_at'],
+            metadata_json=json.dumps(data),
+        )
+
     def _instance_attrs_from_proto(
             self,
             d: database_pb2.InstanceAttributesProto

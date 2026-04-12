@@ -258,6 +258,15 @@ service DatabaseService {
   rpc GetNodeMetrics (GetNodeMetricsRequest) returns (GetNodeMetricsReply) {}
   rpc GetAllNodeMetrics (GetAllNodeMetricsRequest) returns (GetAllNodeMetricsReply) {}
   rpc DeleteNodeMetrics (DeleteNodeMetricsRequest) returns (StatusReply) {}
+
+  // Cluster Operations (MariaDB)
+  // Operation headers, keyed by operation uuid. State lives separately in
+  // object_states; per-target tracking lives in cluster_operation_targets.
+  // Insert-only: rows are never mutated after creation.
+  rpc CreateClusterOperation (CreateClusterOperationRequest) returns (StatusReply) {}
+  rpc GetClusterOperation (GetClusterOperationRequest) returns (GetClusterOperationReply) {}
+  rpc GetClusterOperationsByNode (GetClusterOperationsByNodeRequest) returns (GetClusterOperationsByNodeReply) {}
+  rpc DeleteClusterOperation (DeleteClusterOperationRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1662,4 +1671,39 @@ message GetAllNodeMetricsReply {
 
 message DeleteNodeMetricsRequest {
   string node_uuid = 1;
+}
+
+// Cluster Operations (MariaDB)
+// Operation headers, keyed by operation uuid. State lives separately.
+
+message ClusterOperationData {
+  string uuid = 1;           // Operation UUID as string
+  string operation_type = 2; // e.g. "instance_preflight"
+  double created_at = 3;     // Unix timestamp of operation creation
+  string metadata_json = 4;  // Full operation metadata dict as JSON
+}
+
+message CreateClusterOperationRequest {
+  ClusterOperationData data = 1;
+}
+
+message GetClusterOperationRequest {
+  string uuid = 1;
+}
+
+message GetClusterOperationReply {
+  bool found = 1;
+  ClusterOperationData data = 2;
+}
+
+message GetClusterOperationsByNodeRequest {
+  string node_uuid = 1;
+}
+
+message GetClusterOperationsByNodeReply {
+  repeated ClusterOperationData items = 1;
+}
+
+message DeleteClusterOperationRequest {
+  string uuid = 1;
 }

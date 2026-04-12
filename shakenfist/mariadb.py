@@ -15313,3 +15313,169 @@ def _direct_delete_cluster_operation(uuid: UUID) -> bool:
         LOG.warning(
             f'MariaDB delete failed for cluster_operation {uuid}: {e}')
         return False
+
+
+# =============================================================================
+# Cluster Operations gRPC Client Functions
+# =============================================================================
+
+def _grpc_create_cluster_operation(
+        uuid: UUID, operation_type: str, metadata: dict[str, Any],
+        created_at: float) -> bool:
+    """Insert a cluster operation header via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateClusterOperationRequest(
+            data=database_pb2.ClusterOperationData(
+                uuid=str(uuid),
+                operation_type=operation_type,
+                created_at=created_at,
+                metadata_json=_json_dumps(metadata),
+            )
+        )
+        reply = _grpc_call(stub.CreateClusterOperation, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateClusterOperation failed for {uuid}: {e}')
+        return False
+
+
+def _grpc_get_cluster_operation(
+        uuid: UUID) -> Optional[dict[str, Any]]:
+    """Get a cluster operation header via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetClusterOperationRequest(
+            uuid=str(uuid))
+        reply = _grpc_call(stub.GetClusterOperation, request)
+        if not reply.found:
+            return None
+        return (
+            json.loads(reply.data.metadata_json)
+            if reply.data.metadata_json else {}
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetClusterOperation failed for {uuid}: {e}')
+        return None
+
+
+def _grpc_get_cluster_operations_by_node(
+        node_uuid: UUID) -> list[dict[str, Any]]:
+    """Get all cluster operation headers for a node via gRPC."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetClusterOperationsByNodeRequest(
+            node_uuid=str(node_uuid))
+        reply = _grpc_call(
+            stub.GetClusterOperationsByNode, request)
+        return [
+            json.loads(item.metadata_json)
+            if item.metadata_json else {}
+            for item in reply.items
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetClusterOperationsByNode failed '
+            f'for {node_uuid}: {e}')
+        return []
+
+
+def _grpc_delete_cluster_operation(uuid: UUID) -> bool:
+    """Delete a cluster operation header via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteClusterOperationRequest(
+            uuid=str(uuid))
+        reply = _grpc_call(stub.DeleteClusterOperation, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteClusterOperation failed for {uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Cluster Operations Public API Functions
+# =============================================================================
+
+def create_cluster_operation(
+        uuid: 'str | UUID', operation_type: str,
+        metadata: dict[str, Any], created_at: float) -> bool:
+    """Insert a cluster operation header.
+
+    Insert-only semantics: returns False if a row with the same uuid
+    already exists (no update). State lives in the separate
+    object_states table and is not touched by this function.
+
+    Args:
+        uuid: The operation's UUID (str or UUID).
+        operation_type: Operation type name, e.g. 'instance_preflight'.
+        metadata: The full operation metadata dict. node_uuid,
+            instance_uuid, network_uuid and priority (if present) are
+            extracted into indexed columns at insert time.
+        created_at: Unix timestamp of operation creation.
+
+    Returns:
+        True if inserted, False on duplicate or error.
+    """
+    u = _ensure_uuid(uuid)
+    if _use_database_service():
+        return _grpc_create_cluster_operation(
+            u, operation_type, metadata, created_at)
+    return _direct_create_cluster_operation(
+        u, operation_type, metadata, created_at)
+
+
+def get_cluster_operation(
+        uuid: 'str | UUID') -> Optional[dict[str, Any]]:
+    """Get a cluster operation header.
+
+    Returns a dict shaped {**metadata_json, uuid, operation_type,
+    created_at} -- a drop-in replacement for the legacy etcd payload
+    that phase 5's from_db() switch relies on.
+
+    Args:
+        uuid: The operation's UUID (str or UUID).
+
+    Returns:
+        The operation dict, or None if not found.
+    """
+    u = _ensure_uuid(uuid)
+    if _use_database_service():
+        return _grpc_get_cluster_operation(u)
+    return _direct_get_cluster_operation(u)
+
+
+def get_cluster_operations_by_node(
+        node_uuid: 'str | UUID') -> list[dict[str, Any]]:
+    """Get all cluster operation headers targeting a specific node.
+
+    Results are ordered by created_at ascending.
+
+    Args:
+        node_uuid: The UUID of the target node (str or UUID).
+
+    Returns:
+        List of operation dicts (possibly empty).
+    """
+    u = _ensure_uuid(node_uuid)
+    if _use_database_service():
+        return _grpc_get_cluster_operations_by_node(u)
+    return _direct_get_cluster_operations_by_node(u)
+
+
+def delete_cluster_operation(uuid: 'str | UUID') -> bool:
+    """Delete a cluster operation header.
+
+    Args:
+        uuid: The operation's UUID (str or UUID).
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    u = _ensure_uuid(uuid)
+    if _use_database_service():
+        return _grpc_delete_cluster_operation(u)
+    return _direct_delete_cluster_operation(u)

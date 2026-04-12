@@ -901,6 +901,31 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateClusterOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operations (MariaDB)
+    Operation headers, keyed by operation uuid. State lives separately in
+    object_states; per-target tracking lives in cluster_operation_targets.
+    Insert-only: rows are never mutated after creation.
+    """
+
+    GetClusterOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationRequest,
+        database_pb2.GetClusterOperationReply,
+    ]
+
+    GetClusterOperationsByNode: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationsByNodeRequest,
+        database_pb2.GetClusterOperationsByNodeReply,
+    ]
+
+    DeleteClusterOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1781,6 +1806,31 @@ class DatabaseServiceAsyncStub:
 
     DeleteNodeMetrics: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteNodeMetricsRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operations (MariaDB)
+    Operation headers, keyed by operation uuid. State lives separately in
+    object_states; per-target tracking lives in cluster_operation_targets.
+    Insert-only: rows are never mutated after creation.
+    """
+
+    GetClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationRequest,
+        database_pb2.GetClusterOperationReply,
+    ]
+
+    GetClusterOperationsByNode: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationsByNodeRequest,
+        database_pb2.GetClusterOperationsByNodeReply,
+    ]
+
+    DeleteClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2984,6 +3034,39 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def DeleteNodeMetrics(
         self,
         request: database_pb2.DeleteNodeMetricsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateClusterOperation(
+        self,
+        request: database_pb2.CreateClusterOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Cluster Operations (MariaDB)
+        Operation headers, keyed by operation uuid. State lives separately in
+        object_states; per-target tracking lives in cluster_operation_targets.
+        Insert-only: rows are never mutated after creation.
+        """
+
+    @abc.abstractmethod
+    def GetClusterOperation(
+        self,
+        request: database_pb2.GetClusterOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetClusterOperationReply, collections.abc.Awaitable[database_pb2.GetClusterOperationReply]]: ...
+
+    @abc.abstractmethod
+    def GetClusterOperationsByNode(
+        self,
+        request: database_pb2.GetClusterOperationsByNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetClusterOperationsByNodeReply, collections.abc.Awaitable[database_pb2.GetClusterOperationsByNodeReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteClusterOperation(
+        self,
+        request: database_pb2.DeleteClusterOperationRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
