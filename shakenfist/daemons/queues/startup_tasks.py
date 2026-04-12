@@ -8,6 +8,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
 from shakenfist import instance
+from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.blob import Blob
 from shakenfist.config import config
@@ -171,20 +172,45 @@ def restore_instances():
     n.instances = instance_uuids
 
 
+def _resolve_node_uuid():
+    """Populate config.NODE_UUID if not already set.
+
+    This duplicates the logic from daemon.Daemon._resolve_node_uuid()
+    because startup_tasks() runs before the daemon's run() method.
+    """
+    if config.NODE_UUID:
+        return
+
+    node_uuid = Node._load_persisted_uuid()
+    if not node_uuid:
+        n = Node.from_db(config.NODE_NAME)
+        if n:
+            node_uuid = str(n.uuid)
+
+    if node_uuid:
+        config.NODE_UUID = node_uuid
+        LOG.with_fields({'node_uuid': node_uuid}).info(
+            'Resolved node UUID during startup tasks')
+
+
 def startup_tasks():
+    # Ensure NODE_UUID is resolved before we try to use it. This runs
+    # before the daemon's run() method which would normally resolve it.
+    _resolve_node_uuid()
+
     # We need to report object versions very early before the resources daemon
     # has started. This code is duplicated from the resources daemon code. Sorry.
     stats = {}
     for obj in OBJECT_NAMES_TO_CLASSES:
         stats['object_version_%s' % obj] = \
             get_object_class(obj).current_version
-    etcd.put(
-        'metrics', config.NODE_NAME, None,
-        {
-            'fqdn': config.NODE_NAME,
-            'timestamp': time.time(),
-            'metrics': stats
-        })
+    if config.NODE_UUID:
+        mariadb.upsert_node_metrics(
+            config.NODE_UUID, config.NODE_NAME,
+            time.time(), stats)
+    else:
+        LOG.warning(
+            'NODE_UUID is not set, skipping initial metrics upsert')
 
     version = util_general.get_version()
     util_concurrency.set_thread_name('main-v%s' % version)

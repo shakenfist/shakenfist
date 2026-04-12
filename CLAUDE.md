@@ -451,6 +451,11 @@ performance. This is required for all deployments - MariaDB must be configured.
   is `sequence_number` (AUTO_INCREMENT), with a UNIQUE constraint on
   `operation_uuid`. Indexed on `(target_object_type, target_uuid)`
   and `created_at`. Dual-write with object_metadata fallback.
+- **Node Metrics** (`node_metrics` table): Ephemeral per-node resource
+  metrics (CPU, memory, disk, network, queue depths) updated every 60
+  seconds by the resources daemon. Uses a JSON column (`metrics_json`)
+  for the schemaless metrics payload (~50+ fields). One row per node,
+  upserted each update cycle. Primary key is `node_uuid`.
 
 ### Migrating Existing Deployments
 

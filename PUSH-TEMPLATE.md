@@ -26,8 +26,6 @@ before I push:
      `shakenfist/schema/`).
    - gRPC conventions (proto definitions, stub generation via
      `tox -e genprotos`).
- * Does etcd/MariaDB access follow the existing patterns in
-   `mariadb.py` and `etcd.py`?
 
 ## Tests
 
@@ -57,8 +55,8 @@ before I push:
  * Review these changes as both a security reviewer and an
    experienced developer and correct any errors you find.
  * Are any user-controlled values (API inputs, namespace names,
-   instance metadata) used in file paths, SQL queries, etcd keys,
-   or shell commands without sanitization?
+   instance metadata) used in file paths, SQL queries, or shell
+   commands without sanitization?
  * Do new gRPC or REST API endpoints enforce proper authentication
    and namespace authorization?
 

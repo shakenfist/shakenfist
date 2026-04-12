@@ -18,6 +18,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
@@ -400,12 +401,11 @@ class WorkerPoolDaemon(Daemon):
         # busy. You can record more than 100% if there is more than one disk
         # in the system doing IO at the time.
         if time.time() - self.metrics_acquired_at > 30:
-            new_metrics = etcd.get('metrics', config.NODE_UUID, {})
+            new_metrics = mariadb.get_node_metrics(config.NODE_UUID)
             if new_metrics:
                 self.metrics = new_metrics
                 self.metrics_acquired_at = time.time()
             else:
-                # No metrics in etcd, let's try again next pass
                 self.metrics = {}
                 self.metrics_acquired_at = 0
 

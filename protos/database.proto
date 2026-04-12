@@ -250,6 +250,14 @@ service DatabaseService {
   rpc DeleteClusterOperationTarget (DeleteClusterOperationTargetRequest) returns (StatusReply) {}
   rpc DeleteClusterOperationTargetsForObject (DeleteClusterOperationTargetsForObjectRequest) returns (StatusReply) {}
   rpc DeleteStaleClusterOperationTargets (DeleteStaleClusterOperationTargetsRequest) returns (DeleteCountReply) {}
+
+  // Node Metrics Operations (MariaDB)
+  // Ephemeral per-node resource metrics, upserted every 60s by the resources
+  // daemon. The metrics payload is a JSON string (~50+ fields, schemaless).
+  rpc UpsertNodeMetrics (UpsertNodeMetricsRequest) returns (StatusReply) {}
+  rpc GetNodeMetrics (GetNodeMetricsRequest) returns (GetNodeMetricsReply) {}
+  rpc GetAllNodeMetrics (GetAllNodeMetricsRequest) returns (GetAllNodeMetricsReply) {}
+  rpc DeleteNodeMetrics (DeleteNodeMetricsRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1621,4 +1629,37 @@ message DeleteStaleClusterOperationTargetsRequest {
   // Unix timestamp - delete targets with created_at < this whose
   // operation is no longer in an active state.
   double older_than = 1;
+}
+
+// Node Metrics Operations (MariaDB)
+// Ephemeral per-node resource metrics, upserted every 60s.
+
+message NodeMetricsData {
+  string node_uuid = 1;    // UUID as string
+  string fqdn = 2;         // Node fully qualified domain name
+  double timestamp = 3;    // Unix timestamp of metrics collection
+  string metrics_json = 4; // JSON-encoded metrics dict
+}
+
+message UpsertNodeMetricsRequest {
+  NodeMetricsData data = 1;
+}
+
+message GetNodeMetricsRequest {
+  string node_uuid = 1;
+}
+
+message GetNodeMetricsReply {
+  bool found = 1;
+  NodeMetricsData data = 2;
+}
+
+message GetAllNodeMetricsRequest {}
+
+message GetAllNodeMetricsReply {
+  repeated NodeMetricsData items = 1;
+}
+
+message DeleteNodeMetricsRequest {
+  string node_uuid = 1;
 }

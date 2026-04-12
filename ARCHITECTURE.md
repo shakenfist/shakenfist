@@ -259,7 +259,7 @@ via the `NODE_UUID` config field or `SHAKENFIST_NODE_UUID` environment
 variable.
 
 Node UUIDs are used throughout the system:
-- **Metrics**: Stored in etcd under `metrics/{node_uuid}` with 120s TTL
+- **Metrics**: Stored in MariaDB `node_metrics` table (keyed by `node_uuid`), stale after 120s
 - **Scheduler**: Returns node UUIDs as placement candidates
 - **Instance placement**: `placement['node']` stores the node UUID
 - **Operation queues**: Queue paths use node UUIDs

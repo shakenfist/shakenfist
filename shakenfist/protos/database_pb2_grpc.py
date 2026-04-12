@@ -814,6 +814,26 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteStaleClusterOperationTargetsRequest.SerializeToString,
                 response_deserializer=database__pb2.DeleteCountReply.FromString,
                 _registered_method=True)
+        self.UpsertNodeMetrics = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/UpsertNodeMetrics',
+                request_serializer=database__pb2.UpsertNodeMetricsRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetNodeMetrics = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNodeMetrics',
+                request_serializer=database__pb2.GetNodeMetricsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNodeMetricsReply.FromString,
+                _registered_method=True)
+        self.GetAllNodeMetrics = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllNodeMetrics',
+                request_serializer=database__pb2.GetAllNodeMetricsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllNodeMetricsReply.FromString,
+                _registered_method=True)
+        self.DeleteNodeMetrics = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteNodeMetrics',
+                request_serializer=database__pb2.DeleteNodeMetricsRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -1814,6 +1834,33 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def UpsertNodeMetrics(self, request, context):
+        """Node Metrics Operations (MariaDB)
+        Ephemeral per-node resource metrics, upserted every 60s by the resources
+        daemon. The metrics payload is a JSON string (~50+ fields, schemaless).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNodeMetrics(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllNodeMetrics(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteNodeMetrics(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -2596,6 +2643,26 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.DeleteStaleClusterOperationTargets,
                     request_deserializer=database__pb2.DeleteStaleClusterOperationTargetsRequest.FromString,
                     response_serializer=database__pb2.DeleteCountReply.SerializeToString,
+            ),
+            'UpsertNodeMetrics': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpsertNodeMetrics,
+                    request_deserializer=database__pb2.UpsertNodeMetricsRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetNodeMetrics': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNodeMetrics,
+                    request_deserializer=database__pb2.GetNodeMetricsRequest.FromString,
+                    response_serializer=database__pb2.GetNodeMetricsReply.SerializeToString,
+            ),
+            'GetAllNodeMetrics': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllNodeMetrics,
+                    request_deserializer=database__pb2.GetAllNodeMetricsRequest.FromString,
+                    response_serializer=database__pb2.GetAllNodeMetricsReply.SerializeToString,
+            ),
+            'DeleteNodeMetrics': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteNodeMetrics,
+                    request_deserializer=database__pb2.DeleteNodeMetricsRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -6810,6 +6877,114 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/DeleteStaleClusterOperationTargets',
             database__pb2.DeleteStaleClusterOperationTargetsRequest.SerializeToString,
             database__pb2.DeleteCountReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpsertNodeMetrics(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/UpsertNodeMetrics',
+            database__pb2.UpsertNodeMetricsRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNodeMetrics(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNodeMetrics',
+            database__pb2.GetNodeMetricsRequest.SerializeToString,
+            database__pb2.GetNodeMetricsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllNodeMetrics(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllNodeMetrics',
+            database__pb2.GetAllNodeMetricsRequest.SerializeToString,
+            database__pb2.GetAllNodeMetricsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteNodeMetrics(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteNodeMetrics',
+            database__pb2.DeleteNodeMetricsRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
             insecure,
