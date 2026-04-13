@@ -935,6 +935,22 @@ class MockEtcd():
             f'{state_values}): {result}')
         return result
 
+    def get_work_queue_payload(self, queue_name: str) -> Optional[dict]:
+        """Return the payload of the most recent work_queue row for a queue.
+
+        Tests previously asserted on `/sf/queue/{queue_name}/{job_name}`
+        etcd paths; the new MariaDB-backed queue stores rows in
+        work_queue_store and uses an autoincrement id, so per-test queue
+        assertions look up the row by queue_name instead.
+        """
+        match = None
+        for row in self.work_queue_store:
+            if row['queue_name'] == queue_name:
+                match = row
+        if match is None:
+            return None
+        return match['payload']
+
     def get_mariadb_state(self, object_type: ObjectType,
                           object_uuid: str) -> Optional[dict]:
         """Get state from the mock MariaDB store for test assertions.
@@ -2205,9 +2221,12 @@ class MockEtcd():
         """Mock implementation of the atomic create+enqueue path.
 
         Mirrors the real function's contract: insert-only on
-        cluster_operations (returns False on duplicate), upserts
-        nothing else (tests can inspect the work_queue_store list
-        to see the enqueued row).
+        cluster_operations (returns False on duplicate), records
+        a work_queue row in work_queue_store. Until phase 5
+        switches from_db() to read cluster_operations from
+        MariaDB, this mock also writes the legacy etcd path at
+        /sf/{operation_type}/{uuid} so existing tests that load
+        operations via from_db() continue to work.
         """
         key = str(op_uuid)
         if key in self.cluster_operations_store:
@@ -2235,6 +2254,23 @@ class MockEtcd():
             },
             'created_at': created_at,
         })
+
+        # The real RPC writes an object_states row in the same
+        # transaction. Mirror that here so tests that assert on
+        # the initial 'queued' state continue to pass.
+        state_key = f'{operation_type}/{key}'
+        self.mariadb_states[state_key] = {
+            'object_type': operation_type,
+            'object_uuid': key,
+            'state_value': 'queued',
+            'update_time': created_at,
+            'message': None,
+        }
+
+        # Bridge for from_db() until phase 5: write the legacy
+        # etcd path so cls._db_get() can still find the operation.
+        legacy_path = f'/sf/{operation_type}/{key}'
+        self.db[legacy_path] = util_json.json_dump(metadata).encode()
 
         self._trace(
             f'MockMariaDB.create_and_enqueue_cluster_operation'

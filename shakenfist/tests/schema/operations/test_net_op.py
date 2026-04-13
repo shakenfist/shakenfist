@@ -139,12 +139,8 @@ class NetOpTestCase(base.ShakenFistTestCase):
                 'operation_type': 'net_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_raw(
-                (
-                    '/sf/queue/networknode-clusteroperation-user_waiting/'
-                    '123.0-asdjfhkjadsfh'
-                )
-            )
+            self.mock_etcd.get_work_queue_payload(
+                'networknode-clusteroperation-user_waiting')
         )
 
     def test_load_from_etcd(self):

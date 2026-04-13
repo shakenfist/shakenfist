@@ -136,12 +136,9 @@ class NodeInstNetIfaceOpTestCase(base.ShakenFistTestCase):
                 'operation_type': 'node_inst_net_iface_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_raw(
-                (
-                    '/sf/queue/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d-clusteroperation-user_waiting/'
-                    '123.0-asdjfhkjadsfh'
-                )
-            )
+            self.mock_etcd.get_work_queue_payload(
+                'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
+                '-clusteroperation-user_waiting')
         )
 
     def test_load_from_etcd(self):

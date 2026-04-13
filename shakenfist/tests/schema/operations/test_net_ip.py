@@ -146,12 +146,8 @@ class NetIPOpTestCase(base.ShakenFistTestCase):
                 'operation_type': 'net_ip_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_raw(
-                (
-                    '/sf/queue/networknode-clusteroperation-user_facing/'
-                    '123.0-asdjfhkjadsfh'
-                )
-            )
+            self.mock_etcd.get_work_queue_payload(
+                'networknode-clusteroperation-user_facing')
         )
 
     def test_load_from_etcd(self):
