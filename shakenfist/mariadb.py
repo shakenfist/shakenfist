@@ -15380,6 +15380,111 @@ def _direct_delete_cluster_operation(uuid: UUID) -> bool:
         return False
 
 
+def _direct_create_and_enqueue_cluster_operation(
+        op_uuid: UUID,
+        operation_type: str,
+        metadata: dict[str, Any],
+        created_at: float,
+        queue_name: str,
+        delay: float = 0.0) -> bool:
+    """Atomically create a cluster operation and enqueue its work item.
+
+    Writes three rows in a single MariaDB transaction:
+
+    1. A cluster_operations row with the full operation metadata
+       and the same indexed-column extraction as
+       _direct_create_cluster_operation.
+    2. An object_states row (INSERT ... ON DUPLICATE KEY UPDATE)
+       with state='queued' and update_time=created_at, matching
+       the _direct_set_state contract.
+    3. A work_queue row with
+       scheduled_at = created_at + delay, attempts = 0, and a
+       payload dict of
+       {'operation_type': operation_type,
+        'operation_uuid': str(op_uuid)} -- the same shape
+       phase 5's from_db() consumer will read via Dequeue.
+
+    This is the only function in mariadb.py that writes to more
+    than one table in a single transaction. The existing
+    single-table _direct_* functions each own their own commit,
+    so they cannot be composed here -- the statements are
+    duplicated inline instead. That duplication is the price of
+    getting the atomicity right.
+
+    Returns True on success. Returns False if the cluster_operations
+    insert hits a duplicate uuid (IntegrityError) or if any write
+    raises OperationalError -- in both cases the `with` context
+    rolls back the uncommitted transaction automatically. Audit
+    events are out of scope; callers emit them via eventlog after
+    the RPC returns successfully.
+    """
+    engine = _get_engine()
+    cluster_ops_table = _get_cluster_operations_table()
+    states_table = _get_object_states_table()
+    queue_table = _get_work_queue_table()
+
+    scheduled_at = created_at + delay
+    work_item = {
+        'operation_type': operation_type,
+        'operation_uuid': str(op_uuid),
+    }
+
+    try:
+        with engine.connect() as conn:
+            cluster_stmt = sa.insert(cluster_ops_table).values(
+                uuid=op_uuid,
+                operation_type=operation_type,
+                created_at=created_at,
+                node_uuid=_maybe_uuid(metadata.get('node_uuid')),
+                instance_uuid=_maybe_uuid(
+                    metadata.get('instance_uuid')),
+                network_uuid=_maybe_uuid(
+                    metadata.get('network_uuid')),
+                priority=metadata.get('priority'),
+                metadata_json=metadata,
+            )
+            conn.execute(cluster_stmt)
+
+            state_stmt = sa.dialects.mysql.insert(
+                states_table
+            ).values(
+                object_uuid=str(op_uuid),
+                object_type=operation_type,
+                state_value='queued',
+                update_time=created_at,
+                message=None,
+            ).on_duplicate_key_update(
+                state_value='queued',
+                update_time=created_at,
+                message=None,
+            )
+            conn.execute(state_stmt)
+
+            queue_stmt = sa.insert(queue_table).values(
+                queue_name=queue_name,
+                scheduled_at=scheduled_at,
+                claimed_at=None,
+                claimed_by=None,
+                attempts=0,
+                payload=work_item,
+                created_at=created_at,
+            )
+            conn.execute(queue_stmt)
+
+            conn.commit()
+            return True
+    except IntegrityError:
+        LOG.warning(
+            f'MariaDB atomic create+enqueue refused duplicate '
+            f'cluster_operation {op_uuid}')
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB atomic create+enqueue failed for '
+            f'cluster_operation {op_uuid}: {e}')
+        return False
+
+
 # =============================================================================
 # Cluster Operations gRPC Client Functions
 # =============================================================================
