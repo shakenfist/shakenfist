@@ -2,7 +2,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.schema.operations import node_inst_netdesc_op as schema
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import ImagesCannotShrinkException
@@ -263,7 +263,8 @@ class NodeInstNetdescOp(BaseClusterOperation):
 
                 # And now float any required interfaces
                 for ft in float_tasks:
-                    etcd.enqueue('networknode-clusteroperation-user_waiting', ft)
+                    mariadb.enqueue_work_item(
+                        'networknode-clusteroperation-user_waiting', ft)
 
             except InvalidStateException as e:
                 # This instance is in an error or deleted state. Given the check

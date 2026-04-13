@@ -346,7 +346,8 @@ class Monitor(daemon.Daemon):
 
                 # Clean up any lingering queue tasks
                 for queue_name in get_all_node_queues(n.fqdn):
-                    while jobname_workitem := etcd.dequeue(queue_name):
+                    while jobname_workitem := mariadb.dequeue_work_item(
+                            queue_name):
                         jobname, workitem = jobname_workitem
                         n.add_event(
                             EVENT_TYPE_AUDIT,
@@ -380,7 +381,7 @@ class Monitor(daemon.Daemon):
                                     'failed to abort operation'
                                 )
 
-                        etcd.resolve(queue_name, jobname)
+                        mariadb.resolve_work_item(queue_name, jobname)
 
         # And we're done
         LOG.info('Cluster maintenance loop complete')

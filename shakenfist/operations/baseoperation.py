@@ -5,7 +5,6 @@ from typing import Any, Optional
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -236,7 +235,8 @@ class BaseClusterOperation(BaseOperation):
             'operation_type': self.object_type,
             'operation_uuid': self.uuid
         }
-        etcd.enqueue(self.queue_name, work_item, delay=delay)
+        mariadb.enqueue_work_item(
+            self.queue_name, work_item, delay=delay)
         self.state = self.STATE_QUEUED  # type: ignore[misc]
 
     def is_outstanding(self) -> bool:

@@ -423,10 +423,9 @@ def delete_prefix(path):
 
 @retry_etcd_forever
 def enqueue(queuename, workitem, delay=0):
-    if _use_database_service():
-        from shakenfist import database
-        return database.enqueue(queuename, workitem, delay=delay)
-
+    # NOTE: all production callers now go through mariadb.enqueue_work_item
+    # directly; this function is only reachable via a direct-etcd mode that
+    # phase 8 will delete entirely.
     # This might retry if we clash with another enqueue at literally (to the
     # millisecond) the same time. It should be unlikely?
     attempts = 0
@@ -456,10 +455,9 @@ def enqueue(queuename, workitem, delay=0):
 
 
 def dequeue(queuename):
-    if _use_database_service():
-        from shakenfist import database
-        return database.dequeue(queuename)
-
+    # NOTE: all production callers now go through mariadb.dequeue_work_item
+    # directly; this function is only reachable via a direct-etcd mode that
+    # phase 8 will delete entirely.
     queue_path = _construct_key('queue', queuename, None)
     for path, workitem in get_prefix_raw(queue_path, limit=1):
         jobname = path.split('/')[-1]
@@ -502,10 +500,9 @@ def dequeue(queuename):
 
 
 def resolve(queuename, jobname):
-    if _use_database_service():
-        from shakenfist import database
-        return database.resolve(queuename, jobname)
-
+    # NOTE: all production callers now go through mariadb.resolve_work_item
+    # directly; this function is only reachable via a direct-etcd mode that
+    # phase 8 will delete entirely.
     delete('processing', queuename, jobname)
     LOG.with_fields({
         'jobname': jobname,
@@ -514,10 +511,9 @@ def resolve(queuename, jobname):
 
 
 def get_queue_length(queuename):
-    if _use_database_service():
-        from shakenfist import database
-        return database.get_queue_length(queuename)
-
+    # NOTE: all production callers now go through
+    # mariadb.get_work_queue_length directly; this function is only
+    # reachable via a direct-etcd mode that phase 8 will delete entirely.
     queued = 0
     deferred = 0
     for name, _ in get_all('queue', queuename):
@@ -531,10 +527,9 @@ def get_queue_length(queuename):
 
 
 def restart_queue(queuename):
-    if _use_database_service():
-        from shakenfist import database
-        return database.restart_queue(queuename)
-
+    # NOTE: all production callers now go through
+    # mariadb.restart_work_queue directly; this function is only
+    # reachable via a direct-etcd mode that phase 8 will delete entirely.
     queue_path = _construct_key('processing', queuename, None)
 
     for path, workitem in get_prefix_raw(queue_path):

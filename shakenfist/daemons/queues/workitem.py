@@ -3,7 +3,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
-from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.util import concurrency as util_concurrency
@@ -35,7 +35,7 @@ class Job(util_concurrency.Job):
         try:
             self._cluster_operation_execute()
         finally:
-            etcd.resolve(self.queue_name, self.jobname)
+            mariadb.resolve_work_item(self.queue_name, self.jobname)
             LOG.debug(
                 f'This worker thread is finished executing job {self.jobname}')
 
