@@ -15598,6 +15598,101 @@ def _grpc_create_and_enqueue_cluster_operation(
 
 
 # =============================================================================
+# Work Queue gRPC Client Functions
+# =============================================================================
+
+def _grpc_work_queue_enqueue(
+        queue_name: str, work_item: dict[str, Any],
+        delay: float = 0.0) -> None:
+    """Enqueue a work item via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.EnqueueRequest(
+            queue_name=queue_name,
+            work_item=_json_dumps(work_item),
+            delay=delay,
+        )
+        reply = _grpc_call(stub.Enqueue, request)
+        if not reply.success:
+            LOG.error(
+                f'gRPC Enqueue failed for {queue_name}: '
+                f'{reply.error}')
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC Enqueue failed for {queue_name}: {e}')
+
+
+def _grpc_work_queue_dequeue(
+        queue_name: str) -> Optional[tuple[str, dict[str, Any]]]:
+    """Claim the next available job via the database microservice.
+
+    The database daemon uses its own NODE_NAME as worker_id; the
+    gRPC contract does not carry a caller-supplied worker_id.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DequeueRequest(queue_name=queue_name)
+        reply = _grpc_call(stub.Dequeue, request)
+        if not reply.found:
+            return None
+        return reply.job_name, json.loads(reply.work_item)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC Dequeue failed for {queue_name}: {e}')
+        return None
+
+
+def _grpc_work_queue_resolve(
+        queue_name: str, job_name: str) -> None:
+    """Mark a job complete via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ResolveRequest(
+            queue_name=queue_name, job_name=job_name)
+        reply = _grpc_call(stub.Resolve, request)
+        if not reply.success:
+            LOG.error(
+                f'gRPC Resolve failed for {queue_name}/{job_name}: '
+                f'{reply.error}')
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC Resolve failed for {queue_name}/{job_name}: {e}')
+
+
+def _grpc_work_queue_length(
+        queue_name: str) -> tuple[int, int, int]:
+    """Get queue length statistics via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.QueueLengthRequest(queue_name=queue_name)
+        reply = _grpc_call(stub.GetQueueLength, request)
+        return (
+            int(reply.processing),
+            int(reply.queued),
+            int(reply.deferred),
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetQueueLength failed for {queue_name}: {e}')
+        return 0, 0, 0
+
+
+def _grpc_work_queue_restart(queue_name: str) -> None:
+    """Clear claims on a queue via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.RestartQueueRequest(queue_name=queue_name)
+        reply = _grpc_call(stub.RestartQueue, request)
+        if not reply.success:
+            LOG.error(
+                f'gRPC RestartQueue failed for {queue_name}: '
+                f'{reply.error}')
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC RestartQueue failed for {queue_name}: {e}')
+
+
+# =============================================================================
 # Cluster Operations Public API Functions
 # =============================================================================
 
@@ -15727,9 +15822,10 @@ def create_and_enqueue_cluster_operation(
 # =============================================================================
 # Work Queue Direct Access Functions
 # Replaces the /sf/queue/... and /sf/processing/... etcd prefixes with a
-# single row-locked table. Claim state lives on the row itself. These
-# functions are invoked by the database daemon handlers; non-daemon
-# callers go through shakenfist.etcd / shakenfist.database unchanged.
+# single row-locked table. Claim state lives on the row itself. Public
+# callers use the enqueue_work_item/dequeue_work_item/resolve_work_item/
+# get_work_queue_length/restart_work_queue wrappers at the bottom of this
+# module.
 # =============================================================================
 
 def _direct_work_queue_enqueue(
@@ -15929,3 +16025,67 @@ def _direct_work_queue_restart(queue_name: str) -> int:
             f'MariaDB restart failed for work_queue '
             f'{queue_name}: {e}')
         return 0
+
+
+# =============================================================================
+# Work Queue Public API Functions
+# =============================================================================
+
+def enqueue_work_item(
+        queue_name: str, work_item: dict[str, Any],
+        delay: float = 0.0) -> None:
+    """Insert a work item on a queue.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Raises
+    shakenfist.exceptions.CannotEnqueueWork on unrecoverable failure
+    in the direct path; the gRPC path logs and returns.
+    """
+    if _use_database_service():
+        _grpc_work_queue_enqueue(queue_name, work_item, delay)
+        return
+    _direct_work_queue_enqueue(queue_name, work_item, delay)
+
+
+def dequeue_work_item(
+        queue_name: str,
+) -> Optional[tuple[str, dict[str, Any]]]:
+    """Claim the next eligible job on a queue.
+
+    Returns (job_name, payload) on success or None if the queue is
+    empty / every eligible row is locked. The direct path uses
+    config.NODE_NAME as worker_id; the gRPC path relies on the
+    database daemon's NODE_NAME (the proto does not carry a
+    caller-supplied worker_id).
+    """
+    if _use_database_service():
+        return _grpc_work_queue_dequeue(queue_name)
+    return _direct_work_queue_dequeue(queue_name, config.NODE_NAME)
+
+
+def resolve_work_item(queue_name: str, job_name: str) -> None:
+    """Mark a claimed job complete."""
+    if _use_database_service():
+        _grpc_work_queue_resolve(queue_name, job_name)
+        return
+    _direct_work_queue_resolve(queue_name, job_name)
+
+
+def get_work_queue_length(
+        queue_name: str) -> tuple[int, int, int]:
+    """Return (processing, queued, deferred) counts for a queue."""
+    if _use_database_service():
+        return _grpc_work_queue_length(queue_name)
+    return _direct_work_queue_length(queue_name)
+
+
+def restart_work_queue(queue_name: str) -> None:
+    """Clear claims on a queue so workers re-pick up the jobs.
+
+    Called at queue daemon startup to recover in-flight work after
+    a crash.
+    """
+    if _use_database_service():
+        _grpc_work_queue_restart(queue_name)
+        return
+    _direct_work_queue_restart(queue_name)
