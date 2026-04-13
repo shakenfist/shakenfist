@@ -113,7 +113,7 @@ dependencies = [
     "verboselogs==1.7",
     "zipp==3.23.0",
     "zope.event==6.1",
-    "zope.interface==8.2",
+    "zope.interface==8.3",
     "wraps==0.15.0",
     "certifi==2026.2.25",
     "charset-normalizer==3.4.7",
