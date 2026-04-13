@@ -145,7 +145,7 @@ class NetIfaceIPOpTestCase(base.ShakenFistTestCase):
                 'request_id': None,
                 'version': 1
             },
-            self.mock_etcd.get_raw(f'/sf/net_iface_ip_op/{op_uuid}')
+            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {

@@ -96,7 +96,7 @@ class NodeNetOpTestCase(base.ShakenFistTestCase):
                 'uuid': op_uuid,
                 'version': 1
             },
-            self.mock_etcd.get_raw(f'/sf/node_net_op/{op_uuid}')
+            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {

@@ -935,6 +935,24 @@ class MockEtcd():
             f'{state_values}): {result}')
         return result
 
+    def get_cluster_operation_metadata(
+            self, op_uuid: str) -> Optional[dict]:
+        """Return the metadata dict of a stored cluster operation.
+
+        Tests previously asserted on `/sf/{operation_type}/{uuid}` etcd
+        paths; after phase 5, headers live in MariaDB via
+        cluster_operations_store. The stored row has the metadata dict
+        plus `operation_type` and `created_at` overlaid; this helper
+        returns just the metadata-shaped view tests compare against.
+        """
+        row = self.cluster_operations_store.get(str(op_uuid))
+        if row is None:
+            return None
+        return {
+            k: v for k, v in row.items()
+            if k not in ('operation_type', 'created_at')
+        }
+
     def get_work_queue_payload(self, queue_name: str) -> Optional[dict]:
         """Return the payload of the most recent work_queue row for a queue.
 
@@ -2266,11 +2284,6 @@ class MockEtcd():
             'update_time': created_at,
             'message': None,
         }
-
-        # Bridge for from_db() until phase 5: write the legacy
-        # etcd path so cls._db_get() can still find the operation.
-        legacy_path = f'/sf/{operation_type}/{key}'
-        self.db[legacy_path] = util_json.json_dump(metadata).encode()
 
         self._trace(
             f'MockMariaDB.create_and_enqueue_cluster_operation'
