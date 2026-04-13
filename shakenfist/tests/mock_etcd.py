@@ -75,6 +75,8 @@ class MockEtcd():
         self._cot_sequence = count(1)  # AUTO_INCREMENT mock
         self.node_metrics_store = {}  # Mock MariaDB node metrics
         self.cluster_operations_store = {}  # Mock MariaDB cluster op headers
+        self.work_queue_store = []  # Mock MariaDB work_queue rows (list to keep order)
+        self._work_queue_next_id = count(1)  # AUTO_INCREMENT mock
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -841,6 +843,19 @@ class MockEtcd():
         self.mariadb_delete_cluster_operation.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_cluster_operation.stop)
+
+        self.mariadb_create_and_enqueue_cluster_operation = (
+            mock.patch(
+                'shakenfist.mariadb'
+                '.create_and_enqueue_cluster_operation',
+                side_effect=(
+                    self
+                    ._mariadb_create_and_enqueue_cluster_operation)
+            )
+        )
+        self.mariadb_create_and_enqueue_cluster_operation.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_and_enqueue_cluster_operation.stop)
 
         # Setup basic DB data
         self.node_uuids = {}
@@ -2183,6 +2198,48 @@ class MockEtcd():
             f'MockMariaDB.delete_cluster_operation({key}): '
             f'not found')
         return False
+
+    def _mariadb_create_and_enqueue_cluster_operation(
+            self, op_uuid, operation_type, metadata,
+            created_at, queue_name, delay=0.0):
+        """Mock implementation of the atomic create+enqueue path.
+
+        Mirrors the real function's contract: insert-only on
+        cluster_operations (returns False on duplicate), upserts
+        nothing else (tests can inspect the work_queue_store list
+        to see the enqueued row).
+        """
+        key = str(op_uuid)
+        if key in self.cluster_operations_store:
+            self._trace(
+                f'MockMariaDB.create_and_enqueue_cluster_operation'
+                f'({key}): duplicate')
+            return False
+
+        row = dict(metadata)
+        row['uuid'] = key
+        row['operation_type'] = operation_type
+        row['created_at'] = created_at
+        self.cluster_operations_store[key] = row
+
+        self.work_queue_store.append({
+            'id': next(self._work_queue_next_id),
+            'queue_name': queue_name,
+            'scheduled_at': created_at + delay,
+            'claimed_at': None,
+            'claimed_by': None,
+            'attempts': 0,
+            'payload': {
+                'operation_type': operation_type,
+                'operation_uuid': key,
+            },
+            'created_at': created_at,
+        })
+
+        self._trace(
+            f'MockMariaDB.create_and_enqueue_cluster_operation'
+            f'({key}): created and enqueued on {queue_name}')
+        return True
 
     #
     # DB operations - Low level

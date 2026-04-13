@@ -6,7 +6,9 @@ from shakenfist_utilities import logs                 # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist import mariadb
 from shakenfist.schema.object_state import State
 from shakenfist.schema.operations.baseclusteroperation import ClusterOperation
@@ -106,3 +108,75 @@ def enqueue(
         'queue_name': queue_name,
         'work_item': work_item,
     }).info(msg)
+
+
+def enqueue_cluster_operation(
+        object_type: ClusterOperation,
+        metadata: dict[str, Any],
+        target: Optional[str] = None
+) -> None:
+    """Create a cluster operation and enqueue its work item.
+
+    Replaces the old base_mutations() + enqueue() pair with a
+    single MariaDB-backed atomic write (cluster_operations row,
+    object_states row, work_queue row) followed by an audit
+    event emission via the eventlog service. Callers are the 15
+    create_and_enqueue() wrappers in shakenfist/operations/.
+
+    The audit event fan-out mirrors the old base_mutations()
+    behaviour: one target for the operation itself, plus one
+    per metadata key ending in _uuid (other than 'uuid'
+    itself). add_event_multi() auto-generates a correlation_id
+    across those targets.
+    """
+    if not target:
+        target = metadata['node_uuid']
+
+    object_type_str = object_type.name.lower()
+    creation_time = time.time()
+    queue_name = f'{target}-clusteroperation-{metadata["priority"]}'
+
+    success = mariadb.create_and_enqueue_cluster_operation(
+        op_uuid=metadata['uuid'],
+        operation_type=object_type_str,
+        metadata=metadata,
+        created_at=creation_time,
+        queue_name=queue_name,
+    )
+
+    if not success:
+        LOG.with_fields({
+            'operation_uuid': metadata['uuid'],
+            'queue_name': queue_name,
+        }).error('Failed to enqueue cluster operation')
+        return
+
+    LOG.with_fields({
+        'operation_uuid': metadata['uuid'],
+        'queue_name': queue_name,
+    }).info('Enqueued cluster operation')
+
+    # Build the audit event targets: the operation itself plus
+    # every object referenced in the metadata via an _uuid key.
+    targets: list[tuple[str, str]] = [
+        (object_type_str, metadata['uuid'])
+    ]
+    for key in metadata:
+        if key == 'uuid':
+            continue
+        if key.endswith('_uuid') and metadata[key] is not None:
+            targets.append(
+                (key.replace('_uuid', ''), metadata[key]))
+
+    extra = copy.deepcopy(metadata)
+    extra['op_uuid'] = extra['uuid']
+    del extra['uuid']
+    extra['op_type'] = object_type_str
+
+    tasks_str = ', '.join(metadata['tasks'])
+    msg = (
+        f'{object_type_str} operation created with tasks '
+        f'{tasks_str}'
+    )
+    eventlog.add_event_multi(
+        EVENT_TYPE_AUDIT, targets, msg, extra=extra)
