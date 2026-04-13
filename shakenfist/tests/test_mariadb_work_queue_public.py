@@ -147,6 +147,79 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
         direct.assert_called_once_with('q')
         grpc.assert_not_called()
 
+    @mock.patch('shakenfist.mariadb._grpc_work_queue_list_stuck')
+    @mock.patch('shakenfist.mariadb._direct_work_queue_list_stuck')
+    @mock.patch(
+        'shakenfist.mariadb._use_database_service',
+        return_value=True)
+    def test_list_stuck_service_mode_goes_to_grpc(
+            self, _svc, direct, grpc):
+        grpc.return_value = [{'id': 1}]
+        self.assertEqual(
+            [{'id': 1}], mariadb.list_stuck_work_queue_rows(60.0))
+        grpc.assert_called_once_with(60.0)
+        direct.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._grpc_work_queue_list_stuck')
+    @mock.patch('shakenfist.mariadb._direct_work_queue_list_stuck')
+    @mock.patch(
+        'shakenfist.mariadb._use_database_service',
+        return_value=False)
+    def test_list_stuck_direct_mode_goes_to_direct(
+            self, _svc, direct, grpc):
+        direct.return_value = []
+        self.assertEqual([], mariadb.list_stuck_work_queue_rows(30.0))
+        direct.assert_called_once_with(30.0)
+        grpc.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._grpc_work_queue_clear_claim')
+    @mock.patch('shakenfist.mariadb._direct_work_queue_clear_claim')
+    @mock.patch(
+        'shakenfist.mariadb._use_database_service',
+        return_value=True)
+    def test_clear_claim_service_mode_goes_to_grpc(
+            self, _svc, direct, grpc):
+        grpc.return_value = True
+        self.assertTrue(mariadb.clear_work_queue_claim(42))
+        grpc.assert_called_once_with(42)
+        direct.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._grpc_work_queue_clear_claim')
+    @mock.patch('shakenfist.mariadb._direct_work_queue_clear_claim')
+    @mock.patch(
+        'shakenfist.mariadb._use_database_service',
+        return_value=False)
+    def test_clear_claim_direct_mode_goes_to_direct(
+            self, _svc, direct, grpc):
+        direct.return_value = False
+        self.assertFalse(mariadb.clear_work_queue_claim(42))
+        direct.assert_called_once_with(42)
+        grpc.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._grpc_work_queue_delete_row')
+    @mock.patch('shakenfist.mariadb._direct_work_queue_delete_row')
+    @mock.patch(
+        'shakenfist.mariadb._use_database_service',
+        return_value=True)
+    def test_delete_row_service_mode_goes_to_grpc(
+            self, _svc, direct, grpc):
+        grpc.return_value = True
+        self.assertTrue(mariadb.delete_work_queue_row(42))
+        grpc.assert_called_once_with(42)
+        direct.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._grpc_work_queue_delete_row')
+    @mock.patch('shakenfist.mariadb._direct_work_queue_delete_row')
+    @mock.patch(
+        'shakenfist.mariadb._use_database_service',
+        return_value=False)
+    def test_delete_row_direct_mode_goes_to_direct(
+            self, _svc, direct, grpc):
+        direct.return_value = True
+        self.assertTrue(mariadb.delete_work_queue_row(42))
+        direct.assert_called_once_with(42)
+        grpc.assert_not_called()
+
 
 class MockEtcdWorkQueueTestCase(base.ShakenFistTestCase):
     """Verify the MockEtcd work_queue_store round trip.

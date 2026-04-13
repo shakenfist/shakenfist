@@ -20,6 +20,9 @@ service DatabaseService {
   rpc Resolve (ResolveRequest) returns (StatusReply) {}
   rpc GetQueueLength (QueueLengthRequest) returns (QueueLengthReply) {}
   rpc RestartQueue (RestartQueueRequest) returns (StatusReply) {}
+  rpc ListStuckWorkQueueRows (ListStuckWorkQueueRowsRequest) returns (ListStuckWorkQueueRowsReply) {}
+  rpc ClearWorkQueueClaim (ClearWorkQueueClaimRequest) returns (StatusReply) {}
+  rpc DeleteWorkQueueRow (DeleteWorkQueueRowRequest) returns (StatusReply) {}
 
   // Lock Operations
   rpc AcquireLock (ClusterLockRequest) returns (ClusterLockReply) {}
@@ -394,6 +397,31 @@ message QueueLengthReply {
 
 message RestartQueueRequest {
   string queue_name = 1;
+}
+
+message ListStuckWorkQueueRowsRequest {
+  double threshold_seconds = 1;
+}
+
+message StuckWorkQueueRow {
+  int64 id = 1;
+  string queue_name = 2;
+  double claimed_at = 3;
+  string claimed_by = 4;
+  int64 attempts = 5;
+  string payload_json = 6;
+}
+
+message ListStuckWorkQueueRowsReply {
+  repeated StuckWorkQueueRow rows = 1;
+}
+
+message ClearWorkQueueClaimRequest {
+  int64 row_id = 1;
+}
+
+message DeleteWorkQueueRowRequest {
+  int64 row_id = 1;
 }
 
 // Lock Operations

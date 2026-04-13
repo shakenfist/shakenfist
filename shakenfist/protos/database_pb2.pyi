@@ -442,6 +442,97 @@ class RestartQueueRequest(google.protobuf.message.Message):
 global___RestartQueueRequest = RestartQueueRequest
 
 @typing.final
+class ListStuckWorkQueueRowsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    THRESHOLD_SECONDS_FIELD_NUMBER: builtins.int
+    threshold_seconds: builtins.float
+    def __init__(
+        self,
+        *,
+        threshold_seconds: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["threshold_seconds", b"threshold_seconds"]) -> None: ...
+
+global___ListStuckWorkQueueRowsRequest = ListStuckWorkQueueRowsRequest
+
+@typing.final
+class StuckWorkQueueRow(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    QUEUE_NAME_FIELD_NUMBER: builtins.int
+    CLAIMED_AT_FIELD_NUMBER: builtins.int
+    CLAIMED_BY_FIELD_NUMBER: builtins.int
+    ATTEMPTS_FIELD_NUMBER: builtins.int
+    PAYLOAD_JSON_FIELD_NUMBER: builtins.int
+    id: builtins.int
+    queue_name: builtins.str
+    claimed_at: builtins.float
+    claimed_by: builtins.str
+    attempts: builtins.int
+    payload_json: builtins.str
+    def __init__(
+        self,
+        *,
+        id: builtins.int = ...,
+        queue_name: builtins.str = ...,
+        claimed_at: builtins.float = ...,
+        claimed_by: builtins.str = ...,
+        attempts: builtins.int = ...,
+        payload_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["attempts", b"attempts", "claimed_at", b"claimed_at", "claimed_by", b"claimed_by", "id", b"id", "payload_json", b"payload_json", "queue_name", b"queue_name"]) -> None: ...
+
+global___StuckWorkQueueRow = StuckWorkQueueRow
+
+@typing.final
+class ListStuckWorkQueueRowsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROWS_FIELD_NUMBER: builtins.int
+    @property
+    def rows(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___StuckWorkQueueRow]: ...
+    def __init__(
+        self,
+        *,
+        rows: collections.abc.Iterable[global___StuckWorkQueueRow] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["rows", b"rows"]) -> None: ...
+
+global___ListStuckWorkQueueRowsReply = ListStuckWorkQueueRowsReply
+
+@typing.final
+class ClearWorkQueueClaimRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROW_ID_FIELD_NUMBER: builtins.int
+    row_id: builtins.int
+    def __init__(
+        self,
+        *,
+        row_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["row_id", b"row_id"]) -> None: ...
+
+global___ClearWorkQueueClaimRequest = ClearWorkQueueClaimRequest
+
+@typing.final
+class DeleteWorkQueueRowRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROW_ID_FIELD_NUMBER: builtins.int
+    row_id: builtins.int
+    def __init__(
+        self,
+        *,
+        row_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["row_id", b"row_id"]) -> None: ...
+
+global___DeleteWorkQueueRowRequest = DeleteWorkQueueRowRequest
+
+@typing.final
 class ClusterLockRequest(google.protobuf.message.Message):
     """Lock Operations"""
 

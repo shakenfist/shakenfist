@@ -15692,6 +15692,63 @@ def _grpc_work_queue_restart(queue_name: str) -> None:
             f'gRPC RestartQueue failed for {queue_name}: {e}')
 
 
+def _grpc_work_queue_list_stuck(
+        threshold_seconds: float) -> list[dict[str, Any]]:
+    """List stuck work_queue rows via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ListStuckWorkQueueRowsRequest(
+            threshold_seconds=threshold_seconds)
+        reply = _grpc_call(stub.ListStuckWorkQueueRows, request)
+        return [
+            {
+                'id': int(row.id),
+                'queue_name': row.queue_name,
+                'claimed_at': float(row.claimed_at),
+                'claimed_by': row.claimed_by,
+                'attempts': int(row.attempts),
+                'payload': (
+                    json.loads(row.payload_json)
+                    if row.payload_json else {}),
+            }
+            for row in reply.rows
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ListStuckWorkQueueRows failed: {e}')
+        return []
+
+
+def _grpc_work_queue_clear_claim(row_id: int) -> bool:
+    """Clear a stuck claim via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ClearWorkQueueClaimRequest(
+            row_id=row_id)
+        reply = _grpc_call(stub.ClearWorkQueueClaim, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ClearWorkQueueClaim failed for row '
+            f'{row_id}: {e}')
+        return False
+
+
+def _grpc_work_queue_delete_row(row_id: int) -> bool:
+    """Delete a stuck work_queue row via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteWorkQueueRowRequest(
+            row_id=row_id)
+        reply = _grpc_call(stub.DeleteWorkQueueRow, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteWorkQueueRow failed for row '
+            f'{row_id}: {e}')
+        return False
+
+
 # =============================================================================
 # Cluster Operations Public API Functions
 # =============================================================================
@@ -16027,6 +16084,106 @@ def _direct_work_queue_restart(queue_name: str) -> int:
         return 0
 
 
+def _direct_work_queue_list_stuck(
+        threshold_seconds: float) -> list[dict[str, Any]]:
+    """Return rows whose claim is older than threshold_seconds.
+
+    Used by the cluster daemon reaper. Each returned dict has id,
+    queue_name, claimed_at, claimed_by, attempts, payload. Rows
+    are ordered by claimed_at ascending so the oldest stuck row
+    is handled first.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            cutoff = sa.func.unix_timestamp(
+                sa.func.now(6)) - threshold_seconds
+            stmt = (
+                sa.select(
+                    table.c.id,
+                    table.c.queue_name,
+                    table.c.claimed_at,
+                    table.c.claimed_by,
+                    table.c.attempts,
+                    table.c.payload,
+                )
+                .where(table.c.claimed_at.is_not(None))
+                .where(table.c.claimed_at <= cutoff)
+                .order_by(table.c.claimed_at.asc())
+            )
+            rows = conn.execute(stmt).fetchall()
+            return [
+                {
+                    'id': int(r.id),
+                    'queue_name': r.queue_name,
+                    'claimed_at': float(r.claimed_at),
+                    'claimed_by': r.claimed_by,
+                    'attempts': int(r.attempts or 0),
+                    'payload': dict(r.payload or {}),
+                }
+                for r in rows
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB list_stuck query failed for work_queue: {e}')
+        return []
+
+
+def _direct_work_queue_clear_claim(row_id: int) -> bool:
+    """Clear claimed_at/claimed_by on one row.
+
+    Returns True if the row existed and was still claimed (i.e.
+    the UPDATE actually changed something). attempts is not
+    reset so the reaper can still notice a persistently failing
+    job via the attempts ceiling.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = (
+                sa.update(table)
+                .where(table.c.id == row_id)
+                .where(table.c.claimed_at.is_not(None))
+                .values(claimed_at=None, claimed_by=None)
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return bool(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB clear_claim failed for work_queue '
+            f'row {row_id}: {e}')
+        return False
+
+
+def _direct_work_queue_delete_row(row_id: int) -> bool:
+    """Delete a single work_queue row by id.
+
+    Returns True if the row existed and was deleted. Used by the
+    reaper's reject branch; the caller is responsible for
+    transitioning the corresponding cluster operation to the
+    error state after a successful delete.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.id == row_id)
+            result = conn.execute(stmt)
+            conn.commit()
+            return bool(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete_row failed for work_queue '
+            f'row {row_id}: {e}')
+        return False
+
+
 # =============================================================================
 # Work Queue Public API Functions
 # =============================================================================
@@ -16089,3 +16246,41 @@ def restart_work_queue(queue_name: str) -> None:
         _grpc_work_queue_restart(queue_name)
         return
     _direct_work_queue_restart(queue_name)
+
+
+def list_stuck_work_queue_rows(
+        threshold_seconds: float) -> list[dict[str, Any]]:
+    """Return rows whose claim is older than threshold_seconds.
+
+    Used by the cluster daemon reaper to find work items stuck
+    in flight. Each dict carries id, queue_name, claimed_at,
+    claimed_by, attempts and payload. Rows are ordered oldest
+    claim first.
+    """
+    if _use_database_service():
+        return _grpc_work_queue_list_stuck(threshold_seconds)
+    return _direct_work_queue_list_stuck(threshold_seconds)
+
+
+def clear_work_queue_claim(row_id: int) -> bool:
+    """Clear claimed_at/claimed_by on one work_queue row.
+
+    Returns True if the row existed and was still claimed.
+    attempts is not reset, so a persistently-failing job
+    eventually trips CLUSTER_OP_MAX_ATTEMPTS.
+    """
+    if _use_database_service():
+        return _grpc_work_queue_clear_claim(row_id)
+    return _direct_work_queue_clear_claim(row_id)
+
+
+def delete_work_queue_row(row_id: int) -> bool:
+    """Delete a single work_queue row by id.
+
+    Returns True if the row existed and was deleted. Used by
+    the reaper's reject branch; the caller flips the
+    corresponding cluster operation to error afterwards.
+    """
+    if _use_database_service():
+        return _grpc_work_queue_delete_row(row_id)
+    return _direct_work_queue_delete_row(row_id)

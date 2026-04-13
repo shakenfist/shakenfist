@@ -329,3 +329,148 @@ class WorkQueueRestartTestCase(base.ShakenFistTestCase):
         result = mariadb._direct_work_queue_restart('my-queue')
 
         self.assertEqual(result, 0)
+
+
+class WorkQueueListStuckTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_work_queue_list_stuck()."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_list_stuck_returns_rows(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        row1 = mock.Mock(
+            id=1, queue_name='q', claimed_at=500.0,
+            claimed_by='worker-a', attempts=2,
+            payload={'op': 'x'})
+        row2 = mock.Mock(
+            id=2, queue_name='q', claimed_at=600.0,
+            claimed_by='worker-b', attempts=5,
+            payload={'op': 'y'})
+        mock_conn.execute.return_value.fetchall.return_value = [
+            row1, row2]
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_work_queue_list_stuck(1800.0)
+
+        self.assertEqual(2, len(result))
+        self.assertEqual(1, result[0]['id'])
+        self.assertEqual('q', result[0]['queue_name'])
+        self.assertEqual(500.0, result[0]['claimed_at'])
+        self.assertEqual('worker-a', result[0]['claimed_by'])
+        self.assertEqual(2, result[0]['attempts'])
+        self.assertEqual({'op': 'x'}, result[0]['payload'])
+        self.assertEqual(5, result[1]['attempts'])
+
+        stmt = mock_conn.execute.call_args[0][0]
+        compiled_sql = str(stmt.compile()).replace(
+            '`', '').replace(' ', '')
+        self.assertIn('claimed_atISNOTNULL', compiled_sql)
+        self.assertIn('ORDERBYwork_queue.claimed_atASC', compiled_sql)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_list_stuck_returns_empty_on_error(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = OperationalError(
+            'select', {}, Exception('DB down'))
+        mock_get_engine.return_value = mock_engine
+
+        self.assertEqual([], mariadb._direct_work_queue_list_stuck(1.0))
+
+
+class WorkQueueClearClaimTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_work_queue_clear_claim()."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_clear_claim_updates_row(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_result = mock.Mock()
+        mock_result.rowcount = 1
+        mock_conn.execute.return_value = mock_result
+        mock_get_engine.return_value = mock_engine
+
+        self.assertTrue(
+            mariadb._direct_work_queue_clear_claim(42))
+
+        stmt = mock_conn.execute.call_args[0][0]
+        compiled = stmt.compile()
+        self.assertEqual(compiled.params['claimed_at'], None)
+        self.assertEqual(compiled.params['claimed_by'], None)
+        self.assertNotIn('attempts', compiled.params)
+        mock_conn.commit.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_clear_claim_returns_false_when_no_match(
+            self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_result = mock.Mock()
+        mock_result.rowcount = 0
+        mock_conn.execute.return_value = mock_result
+        mock_get_engine.return_value = mock_engine
+
+        self.assertFalse(
+            mariadb._direct_work_queue_clear_claim(99))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_clear_claim_returns_false_on_error(
+            self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = OperationalError(
+            'update', {}, Exception('DB down'))
+        mock_get_engine.return_value = mock_engine
+
+        self.assertFalse(
+            mariadb._direct_work_queue_clear_claim(1))
+
+
+class WorkQueueDeleteRowTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_work_queue_delete_row()."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_delete_row_true_when_removed(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_result = mock.Mock()
+        mock_result.rowcount = 1
+        mock_conn.execute.return_value = mock_result
+        mock_get_engine.return_value = mock_engine
+
+        self.assertTrue(
+            mariadb._direct_work_queue_delete_row(42))
+        mock_conn.commit.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_delete_row_false_when_missing(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_result = mock.Mock()
+        mock_result.rowcount = 0
+        mock_conn.execute.return_value = mock_result
+        mock_get_engine.return_value = mock_engine
+
+        self.assertFalse(
+            mariadb._direct_work_queue_delete_row(99))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_delete_row_false_on_error(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = OperationalError(
+            'delete', {}, Exception('DB down'))
+        mock_get_engine.return_value = mock_engine
+
+        self.assertFalse(
+            mariadb._direct_work_queue_delete_row(1))

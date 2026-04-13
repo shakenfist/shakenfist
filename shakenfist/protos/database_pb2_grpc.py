@@ -94,6 +94,21 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.RestartQueueRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.ListStuckWorkQueueRows = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ListStuckWorkQueueRows',
+                request_serializer=database__pb2.ListStuckWorkQueueRowsRequest.SerializeToString,
+                response_deserializer=database__pb2.ListStuckWorkQueueRowsReply.FromString,
+                _registered_method=True)
+        self.ClearWorkQueueClaim = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ClearWorkQueueClaim',
+                request_serializer=database__pb2.ClearWorkQueueClaimRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DeleteWorkQueueRow = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteWorkQueueRow',
+                request_serializer=database__pb2.DeleteWorkQueueRowRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.AcquireLock = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/AcquireLock',
                 request_serializer=database__pb2.ClusterLockRequest.SerializeToString,
@@ -933,6 +948,24 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def RestartQueue(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListStuckWorkQueueRows(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ClearWorkQueueClaim(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteWorkQueueRow(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1985,6 +2018,21 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'RestartQueue': grpc.unary_unary_rpc_method_handler(
                     servicer.RestartQueue,
                     request_deserializer=database__pb2.RestartQueueRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'ListStuckWorkQueueRows': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListStuckWorkQueueRows,
+                    request_deserializer=database__pb2.ListStuckWorkQueueRowsRequest.FromString,
+                    response_serializer=database__pb2.ListStuckWorkQueueRowsReply.SerializeToString,
+            ),
+            'ClearWorkQueueClaim': grpc.unary_unary_rpc_method_handler(
+                    servicer.ClearWorkQueueClaim,
+                    request_deserializer=database__pb2.ClearWorkQueueClaimRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DeleteWorkQueueRow': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteWorkQueueRow,
+                    request_deserializer=database__pb2.DeleteWorkQueueRowRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'AcquireLock': grpc.unary_unary_rpc_method_handler(
@@ -3076,6 +3124,87 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/RestartQueue',
             database__pb2.RestartQueueRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListStuckWorkQueueRows(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ListStuckWorkQueueRows',
+            database__pb2.ListStuckWorkQueueRowsRequest.SerializeToString,
+            database__pb2.ListStuckWorkQueueRowsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ClearWorkQueueClaim(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ClearWorkQueueClaim',
+            database__pb2.ClearWorkQueueClaimRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteWorkQueueRow(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteWorkQueueRow',
+            database__pb2.DeleteWorkQueueRowRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

@@ -893,6 +893,27 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_restart_work_queue.stop)
 
+        self.mariadb_list_stuck_work_queue_rows = mock.patch(
+            'shakenfist.mariadb.list_stuck_work_queue_rows',
+            side_effect=self._mariadb_list_stuck_work_queue_rows)
+        self.mariadb_list_stuck_work_queue_rows.start()
+        self.test_obj.addCleanup(
+            self.mariadb_list_stuck_work_queue_rows.stop)
+
+        self.mariadb_clear_work_queue_claim = mock.patch(
+            'shakenfist.mariadb.clear_work_queue_claim',
+            side_effect=self._mariadb_clear_work_queue_claim)
+        self.mariadb_clear_work_queue_claim.start()
+        self.test_obj.addCleanup(
+            self.mariadb_clear_work_queue_claim.stop)
+
+        self.mariadb_delete_work_queue_row = mock.patch(
+            'shakenfist.mariadb.delete_work_queue_row',
+            side_effect=self._mariadb_delete_work_queue_row)
+        self.mariadb_delete_work_queue_row.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_work_queue_row.stop)
+
         # Setup basic DB data
         self.node_uuids = {}
         for n in self.nodes:
@@ -2426,6 +2447,60 @@ class MockEtcd():
         self._trace(
             f'MockMariaDB.restart_work_queue({queue_name}): '
             f'cleared {cleared}')
+
+    def _mariadb_list_stuck_work_queue_rows(self, threshold_seconds):
+        """Mock implementation of mariadb.list_stuck_work_queue_rows().
+
+        Returns rows whose claim age exceeds threshold_seconds,
+        ordered by claimed_at ascending so the caller processes
+        the oldest stuck row first (matches the real SQL ORDER BY).
+        """
+        now = time.time()
+        stuck = []
+        for r in self.work_queue_store:
+            if r['claimed_at'] is None:
+                continue
+            if now - r['claimed_at'] < threshold_seconds:
+                continue
+            stuck.append({
+                'id': int(r['id']),
+                'queue_name': r['queue_name'],
+                'claimed_at': float(r['claimed_at']),
+                'claimed_by': r['claimed_by'],
+                'attempts': int(r.get('attempts', 0)),
+                'payload': dict(r['payload'] or {}),
+            })
+        stuck.sort(key=lambda s: s['claimed_at'])
+        self._trace(
+            f'MockMariaDB.list_stuck_work_queue_rows'
+            f'({threshold_seconds}): {len(stuck)}')
+        return stuck
+
+    def _mariadb_clear_work_queue_claim(self, row_id):
+        """Mock implementation of mariadb.clear_work_queue_claim()."""
+        for r in self.work_queue_store:
+            if r['id'] == row_id and r['claimed_at'] is not None:
+                r['claimed_at'] = None
+                r['claimed_by'] = None
+                self._trace(
+                    f'MockMariaDB.clear_work_queue_claim'
+                    f'({row_id}): cleared')
+                return True
+        self._trace(
+            f'MockMariaDB.clear_work_queue_claim({row_id}): no-op')
+        return False
+
+    def _mariadb_delete_work_queue_row(self, row_id):
+        """Mock implementation of mariadb.delete_work_queue_row()."""
+        before = len(self.work_queue_store)
+        self.work_queue_store = [
+            r for r in self.work_queue_store if r['id'] != row_id
+        ]
+        removed = before != len(self.work_queue_store)
+        self._trace(
+            f'MockMariaDB.delete_work_queue_row({row_id}): '
+            f'{"removed" if removed else "not found"}')
+        return removed
 
     #
     # DB operations - Low level

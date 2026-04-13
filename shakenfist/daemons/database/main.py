@@ -322,6 +322,71 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception('database RestartQueue failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
+    def ListStuckWorkQueueRows(
+        self,
+        request: database_pb2.ListStuckWorkQueueRowsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ListStuckWorkQueueRowsReply:
+        """List work_queue rows whose claim exceeds the threshold."""
+        try:
+            self.monitor.counters['list_stuck_work_queue_rows'].inc()
+            rows = mariadb._direct_work_queue_list_stuck(
+                request.threshold_seconds)
+            return database_pb2.ListStuckWorkQueueRowsReply(
+                rows=[
+                    database_pb2.StuckWorkQueueRow(
+                        id=row['id'],
+                        queue_name=row['queue_name'],
+                        claimed_at=row['claimed_at'],
+                        claimed_by=row['claimed_by'] or '',
+                        attempts=row['attempts'],
+                        payload_json=util_json.json_dump(
+                            row['payload']),
+                    )
+                    for row in rows
+                ]
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ListStuckWorkQueueRows failed', e)
+            return database_pb2.ListStuckWorkQueueRowsReply(rows=[])
+
+    def ClearWorkQueueClaim(
+        self,
+        request: database_pb2.ClearWorkQueueClaimRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Clear the claim on a stuck work_queue row."""
+        try:
+            self.monitor.counters['clear_work_queue_claim'].inc()
+            cleared = mariadb._direct_work_queue_clear_claim(
+                request.row_id)
+            return database_pb2.StatusReply(
+                success=cleared, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ClearWorkQueueClaim failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DeleteWorkQueueRow(
+        self,
+        request: database_pb2.DeleteWorkQueueRowRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a single work_queue row by id."""
+        try:
+            self.monitor.counters['delete_work_queue_row'].inc()
+            deleted = mariadb._direct_work_queue_delete_row(
+                request.row_id)
+            return database_pb2.StatusReply(
+                success=deleted, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteWorkQueueRow failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     # Lock Operations
 
     def AcquireLock(
@@ -4345,7 +4410,9 @@ class Monitor(daemon.WorkerPoolDaemon):
         operations = [
             'get', 'get_prefix', 'put', 'create', 'delete', 'delete_prefix',
             'replace_many', 'enqueue', 'dequeue', 'resolve', 'get_queue_length',
-            'restart_queue', 'acquire_lock', 'release_lock', 'get_lock_holder',
+            'restart_queue', 'list_stuck_work_queue_rows',
+            'clear_work_queue_claim', 'delete_work_queue_row',
+            'acquire_lock', 'release_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks', 'compact',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',

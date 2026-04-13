@@ -81,6 +81,21 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    ListStuckWorkQueueRows: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ListStuckWorkQueueRowsRequest,
+        database_pb2.ListStuckWorkQueueRowsReply,
+    ]
+
+    ClearWorkQueueClaim: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ClearWorkQueueClaimRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteWorkQueueRow: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteWorkQueueRowRequest,
+        database_pb2.StatusReply,
+    ]
+
     AcquireLock: grpc.UnaryUnaryMultiCallable[
         database_pb2.ClusterLockRequest,
         database_pb2.ClusterLockReply,
@@ -996,6 +1011,21 @@ class DatabaseServiceAsyncStub:
 
     RestartQueue: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.RestartQueueRequest,
+        database_pb2.StatusReply,
+    ]
+
+    ListStuckWorkQueueRows: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ListStuckWorkQueueRowsRequest,
+        database_pb2.ListStuckWorkQueueRowsReply,
+    ]
+
+    ClearWorkQueueClaim: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ClearWorkQueueClaimRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteWorkQueueRow: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteWorkQueueRowRequest,
         database_pb2.StatusReply,
     ]
 
@@ -1938,6 +1968,27 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def RestartQueue(
         self,
         request: database_pb2.RestartQueueRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def ListStuckWorkQueueRows(
+        self,
+        request: database_pb2.ListStuckWorkQueueRowsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.ListStuckWorkQueueRowsReply, collections.abc.Awaitable[database_pb2.ListStuckWorkQueueRowsReply]]: ...
+
+    @abc.abstractmethod
+    def ClearWorkQueueClaim(
+        self,
+        request: database_pb2.ClearWorkQueueClaimRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteWorkQueueRow(
+        self,
+        request: database_pb2.DeleteWorkQueueRowRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
