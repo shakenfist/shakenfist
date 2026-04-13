@@ -6,6 +6,7 @@ from collections import defaultdict
 import os
 import time
 
+from prometheus_client import start_http_server
 import schedule
 from shakenfist_utilities import logs  # noreorder
 
@@ -46,6 +47,7 @@ class Monitor(daemon.Daemon):
         super().__init__(name)
         self.lock = None
         self.is_elected = False
+        start_http_server(config.CLUSTER_METRICS_PORT)
 
     def _await_election(self):
         # Attempt to acquire the cluster maintenance lock forever. We never
@@ -407,6 +409,8 @@ class Monitor(daemon.Daemon):
             # Setup a schedule of things to do
             schedule.every(1).minutes.do(
                 scheduled_tasks.log_cluster_queue_lengths)
+            schedule.every(1).minutes.do(
+                scheduled_tasks.reap_stuck_cluster_operation_jobs)
             schedule.every(5).minutes.do(
                 scheduled_tasks.per_blob_checks)
             schedule.every(5).minutes.do(
