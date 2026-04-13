@@ -15566,6 +15566,37 @@ def _grpc_delete_cluster_operation(uuid: UUID) -> bool:
         return False
 
 
+def _grpc_create_and_enqueue_cluster_operation(
+        op_uuid: UUID,
+        operation_type: str,
+        metadata: dict[str, Any],
+        created_at: float,
+        queue_name: str,
+        delay: float = 0.0) -> bool:
+    """Atomic create+enqueue via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = (
+            database_pb2
+            .CreateAndEnqueueClusterOperationRequest(
+                uuid=str(op_uuid),
+                operation_type=operation_type,
+                created_at=created_at,
+                queue_name=queue_name,
+                delay=delay,
+                metadata_json=_json_dumps(metadata),
+            )
+        )
+        reply = _grpc_call(
+            stub.CreateAndEnqueueClusterOperation, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateAndEnqueueClusterOperation failed for '
+            f'{op_uuid}: {e}')
+        return False
+
+
 # =============================================================================
 # Cluster Operations Public API Functions
 # =============================================================================
@@ -15649,6 +15680,48 @@ def delete_cluster_operation(uuid: 'str | UUID') -> bool:
     if _use_database_service():
         return _grpc_delete_cluster_operation(u)
     return _direct_delete_cluster_operation(u)
+
+
+def create_and_enqueue_cluster_operation(
+        op_uuid: 'str | UUID',
+        operation_type: str,
+        metadata: dict[str, Any],
+        created_at: float,
+        queue_name: str,
+        delay: float = 0.0) -> bool:
+    """Atomically create a cluster operation and enqueue its job.
+
+    Writes the cluster_operations header, an object_states row
+    (state='queued'), and a work_queue row in a single MariaDB
+    transaction. Replaces the legacy
+    shakenfist/schema/operations/util.py:enqueue() path that used
+    etcd.replace_many_raw.
+
+    Audit events are NOT written by this function; callers should
+    emit them via shakenfist.eventlog.add_event_multi() after this
+    call returns True.
+
+    Args:
+        op_uuid: The operation's UUID (str or UUID).
+        operation_type: Operation type name, e.g. 'node_net_op'.
+        metadata: The full operation metadata dict.
+        created_at: Unix timestamp of operation creation.
+        queue_name: Target work queue name, e.g.
+            '{target}-clusteroperation-{priority}'.
+        delay: Seconds to defer the job (default 0).
+
+    Returns:
+        True on success. False if the operation uuid already
+        exists (duplicate) or on MariaDB error.
+    """
+    u = _ensure_uuid(op_uuid)
+    if _use_database_service():
+        return _grpc_create_and_enqueue_cluster_operation(
+            u, operation_type, metadata, created_at,
+            queue_name, delay)
+    return _direct_create_and_enqueue_cluster_operation(
+        u, operation_type, metadata, created_at,
+        queue_name, delay)
 
 
 # =============================================================================

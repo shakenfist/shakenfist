@@ -926,6 +926,16 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateAndEnqueueClusterOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateAndEnqueueClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """Atomic create + enqueue for cluster operations (MariaDB).
+    Writes cluster_operations, object_states and work_queue in a single
+    transaction. Audit events are emitted separately by the caller via
+    the eventlog service after this RPC succeeds.
+    """
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -1833,6 +1843,16 @@ class DatabaseServiceAsyncStub:
         database_pb2.DeleteClusterOperationRequest,
         database_pb2.StatusReply,
     ]
+
+    CreateAndEnqueueClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateAndEnqueueClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """Atomic create + enqueue for cluster operations (MariaDB).
+    Writes cluster_operations, object_states and work_queue in a single
+    transaction. Audit events are emitted separately by the caller via
+    the eventlog service after this RPC succeeds.
+    """
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -3069,5 +3089,17 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteClusterOperationRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateAndEnqueueClusterOperation(
+        self,
+        request: database_pb2.CreateAndEnqueueClusterOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Atomic create + enqueue for cluster operations (MariaDB).
+        Writes cluster_operations, object_states and work_queue in a single
+        transaction. Audit events are emitted separately by the caller via
+        the eventlog service after this RPC succeeds.
+        """
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

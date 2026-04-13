@@ -4218,6 +4218,45 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def CreateAndEnqueueClusterOperation(
+        self,
+        request: database_pb2.CreateAndEnqueueClusterOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Atomically create a cluster operation and enqueue its work item.
+
+        Writes cluster_operations, object_states and work_queue in a
+        single MariaDB transaction. Audit events are not written by
+        this RPC -- callers emit them via the eventlog service after
+        the RPC returns successfully.
+        """
+        try:
+            self.monitor.counters[
+                'create_and_enqueue_cluster_operation'].inc()
+            metadata = (
+                json.loads(request.metadata_json)
+                if request.metadata_json else {}
+            )
+            success = (
+                mariadb
+                ._direct_create_and_enqueue_cluster_operation(
+                    UUID(request.uuid),
+                    request.operation_type,
+                    metadata,
+                    request.created_at,
+                    request.queue_name,
+                    request.delay,
+                )
+            )
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateAndEnqueueClusterOperation failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     def _cluster_operation_to_proto(
             self,
             data: dict[str, Any]

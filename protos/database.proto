@@ -267,6 +267,12 @@ service DatabaseService {
   rpc GetClusterOperation (GetClusterOperationRequest) returns (GetClusterOperationReply) {}
   rpc GetClusterOperationsByNode (GetClusterOperationsByNodeRequest) returns (GetClusterOperationsByNodeReply) {}
   rpc DeleteClusterOperation (DeleteClusterOperationRequest) returns (StatusReply) {}
+
+  // Atomic create + enqueue for cluster operations (MariaDB).
+  // Writes cluster_operations, object_states and work_queue in a single
+  // transaction. Audit events are emitted separately by the caller via
+  // the eventlog service after this RPC succeeds.
+  rpc CreateAndEnqueueClusterOperation (CreateAndEnqueueClusterOperationRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1706,4 +1712,13 @@ message GetClusterOperationsByNodeReply {
 
 message DeleteClusterOperationRequest {
   string uuid = 1;
+}
+
+message CreateAndEnqueueClusterOperationRequest {
+  string uuid = 1;           // Operation UUID as string
+  string operation_type = 2; // e.g. "node_net_op"
+  double created_at = 3;     // Unix timestamp of operation creation
+  string queue_name = 4;     // Target work queue name
+  double delay = 5;          // Seconds to defer before the job is eligible
+  string metadata_json = 6;  // Full operation metadata dict as JSON
 }

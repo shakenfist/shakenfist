@@ -5207,3 +5207,39 @@ class DeleteClusterOperationRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
 
 global___DeleteClusterOperationRequest = DeleteClusterOperationRequest
+
+@typing.final
+class CreateAndEnqueueClusterOperationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    QUEUE_NAME_FIELD_NUMBER: builtins.int
+    DELAY_FIELD_NUMBER: builtins.int
+    METADATA_JSON_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """Operation UUID as string"""
+    operation_type: builtins.str
+    """e.g. "node_net_op" """
+    created_at: builtins.float
+    """Unix timestamp of operation creation"""
+    queue_name: builtins.str
+    """Target work queue name"""
+    delay: builtins.float
+    """Seconds to defer before the job is eligible"""
+    metadata_json: builtins.str
+    """Full operation metadata dict as JSON"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        operation_type: builtins.str = ...,
+        created_at: builtins.float = ...,
+        queue_name: builtins.str = ...,
+        delay: builtins.float = ...,
+        metadata_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "queue_name", b"queue_name", "uuid", b"uuid"]) -> None: ...
+
+global___CreateAndEnqueueClusterOperationRequest = CreateAndEnqueueClusterOperationRequest

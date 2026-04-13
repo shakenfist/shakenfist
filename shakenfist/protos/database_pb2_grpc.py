@@ -854,6 +854,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.DeleteClusterOperationRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.CreateAndEnqueueClusterOperation = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CreateAndEnqueueClusterOperation',
+                request_serializer=database__pb2.CreateAndEnqueueClusterOperationRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -1909,6 +1914,16 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateAndEnqueueClusterOperation(self, request, context):
+        """Atomic create + enqueue for cluster operations (MariaDB).
+        Writes cluster_operations, object_states and work_queue in a single
+        transaction. Audit events are emitted separately by the caller via
+        the eventlog service after this RPC succeeds.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -2730,6 +2745,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'DeleteClusterOperation': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteClusterOperation,
                     request_deserializer=database__pb2.DeleteClusterOperationRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'CreateAndEnqueueClusterOperation': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateAndEnqueueClusterOperation,
+                    request_deserializer=database__pb2.CreateAndEnqueueClusterOperationRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
     }
@@ -7160,6 +7180,33 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/DeleteClusterOperation',
             database__pb2.DeleteClusterOperationRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateAndEnqueueClusterOperation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CreateAndEnqueueClusterOperation',
+            database__pb2.CreateAndEnqueueClusterOperationRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
