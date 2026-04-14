@@ -81,6 +81,21 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    ListStuckWorkQueueRows: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ListStuckWorkQueueRowsRequest,
+        database_pb2.ListStuckWorkQueueRowsReply,
+    ]
+
+    ClearWorkQueueClaim: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ClearWorkQueueClaimRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteWorkQueueRow: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteWorkQueueRowRequest,
+        database_pb2.StatusReply,
+    ]
+
     AcquireLock: grpc.UnaryUnaryMultiCallable[
         database_pb2.ClusterLockRequest,
         database_pb2.ClusterLockReply,
@@ -901,6 +916,41 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    CreateClusterOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operations (MariaDB)
+    Operation headers, keyed by operation uuid. State lives separately in
+    object_states; per-target tracking lives in cluster_operation_targets.
+    Insert-only: rows are never mutated after creation.
+    """
+
+    GetClusterOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationRequest,
+        database_pb2.GetClusterOperationReply,
+    ]
+
+    GetClusterOperationsByNode: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationsByNodeRequest,
+        database_pb2.GetClusterOperationsByNodeReply,
+    ]
+
+    DeleteClusterOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateAndEnqueueClusterOperation: grpc.UnaryUnaryMultiCallable[
+        database_pb2.CreateAndEnqueueClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """Atomic create + enqueue for cluster operations (MariaDB).
+    Writes cluster_operations, object_states and work_queue in a single
+    transaction. Audit events are emitted separately by the caller via
+    the eventlog service after this RPC succeeds.
+    """
+
 class DatabaseServiceAsyncStub:
     Get: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetRequest,
@@ -961,6 +1011,21 @@ class DatabaseServiceAsyncStub:
 
     RestartQueue: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.RestartQueueRequest,
+        database_pb2.StatusReply,
+    ]
+
+    ListStuckWorkQueueRows: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ListStuckWorkQueueRowsRequest,
+        database_pb2.ListStuckWorkQueueRowsReply,
+    ]
+
+    ClearWorkQueueClaim: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ClearWorkQueueClaimRequest,
+        database_pb2.StatusReply,
+    ]
+
+    DeleteWorkQueueRow: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteWorkQueueRowRequest,
         database_pb2.StatusReply,
     ]
 
@@ -1784,6 +1849,41 @@ class DatabaseServiceAsyncStub:
         database_pb2.StatusReply,
     ]
 
+    CreateClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operations (MariaDB)
+    Operation headers, keyed by operation uuid. State lives separately in
+    object_states; per-target tracking lives in cluster_operation_targets.
+    Insert-only: rows are never mutated after creation.
+    """
+
+    GetClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationRequest,
+        database_pb2.GetClusterOperationReply,
+    ]
+
+    GetClusterOperationsByNode: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationsByNodeRequest,
+        database_pb2.GetClusterOperationsByNodeReply,
+    ]
+
+    DeleteClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+
+    CreateAndEnqueueClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.CreateAndEnqueueClusterOperationRequest,
+        database_pb2.StatusReply,
+    ]
+    """Atomic create + enqueue for cluster operations (MariaDB).
+    Writes cluster_operations, object_states and work_queue in a single
+    transaction. Audit events are emitted separately by the caller via
+    the eventlog service after this RPC succeeds.
+    """
+
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def Get(
@@ -1868,6 +1968,27 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def RestartQueue(
         self,
         request: database_pb2.RestartQueueRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def ListStuckWorkQueueRows(
+        self,
+        request: database_pb2.ListStuckWorkQueueRowsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.ListStuckWorkQueueRowsReply, collections.abc.Awaitable[database_pb2.ListStuckWorkQueueRowsReply]]: ...
+
+    @abc.abstractmethod
+    def ClearWorkQueueClaim(
+        self,
+        request: database_pb2.ClearWorkQueueClaimRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteWorkQueueRow(
+        self,
+        request: database_pb2.DeleteWorkQueueRowRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
@@ -2986,5 +3107,50 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteNodeMetricsRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateClusterOperation(
+        self,
+        request: database_pb2.CreateClusterOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Cluster Operations (MariaDB)
+        Operation headers, keyed by operation uuid. State lives separately in
+        object_states; per-target tracking lives in cluster_operation_targets.
+        Insert-only: rows are never mutated after creation.
+        """
+
+    @abc.abstractmethod
+    def GetClusterOperation(
+        self,
+        request: database_pb2.GetClusterOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetClusterOperationReply, collections.abc.Awaitable[database_pb2.GetClusterOperationReply]]: ...
+
+    @abc.abstractmethod
+    def GetClusterOperationsByNode(
+        self,
+        request: database_pb2.GetClusterOperationsByNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetClusterOperationsByNodeReply, collections.abc.Awaitable[database_pb2.GetClusterOperationsByNodeReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteClusterOperation(
+        self,
+        request: database_pb2.DeleteClusterOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def CreateAndEnqueueClusterOperation(
+        self,
+        request: database_pb2.CreateAndEnqueueClusterOperationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Atomic create + enqueue for cluster operations (MariaDB).
+        Writes cluster_operations, object_states and work_queue in a single
+        transaction. Audit events are emitted separately by the caller via
+        the eventlog service after this RPC succeeds.
+        """
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

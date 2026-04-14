@@ -11,7 +11,7 @@ from shakenfist.daemons.network import stray_nics
 from shakenfist.daemons.network import workitem
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.node import Node
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
@@ -44,8 +44,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                 self.reap_workers()
 
                 if time.time() - last_length > 10:
-                    processing, queued, deferred = etcd.get_queue_length(
-                        config.NODE_NAME)
+                    processing, queued, deferred = (
+                        mariadb.get_work_queue_length(config.NODE_NAME))
                     LOG.with_fields({
                         'processing': processing,
                         'queued': queued,

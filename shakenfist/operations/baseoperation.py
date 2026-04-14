@@ -5,7 +5,8 @@ from typing import Any, Optional
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
-from shakenfist import etcd
+from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 
 
@@ -97,6 +98,19 @@ class BaseClusterOperation(BaseOperation):
     # Note that cluster operations are created in etcd transactions and don't
     # have .new() methods. They therefore jump straight to queued as an initial
     # state.
+    @classmethod
+    def _db_get(cls, object_uuid: str) -> Optional[dict[str, Any]]:
+        o = mariadb.get_cluster_operation(object_uuid)
+        if not o:
+            return None
+
+        if o.get('version', 0) != cls.current_version:
+            if not cls.upgrade_supported:
+                raise exceptions.BadObjectVersion(
+                    f'Unsupported object version - '
+                    f'{cls.object_type}: {o}')
+        return o
+
     state_targets: dict[Optional[str], Optional[tuple[str, ...]]] = {  # type: ignore[assignment]
         None: (BaseOperation.STATE_QUEUED,),
         BaseOperation.STATE_QUEUED: (BaseOperation.STATE_EXECUTING,
@@ -221,7 +235,8 @@ class BaseClusterOperation(BaseOperation):
             'operation_type': self.object_type,
             'operation_uuid': self.uuid
         }
-        etcd.enqueue(self.queue_name, work_item, delay=delay)
+        mariadb.enqueue_work_item(
+            self.queue_name, work_item, delay=delay)
         self.state = self.STATE_QUEUED  # type: ignore[misc]
 
     def is_outstanding(self) -> bool:

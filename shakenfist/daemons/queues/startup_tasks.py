@@ -230,8 +230,8 @@ def startup_tasks():
 
     # Reset queues
     for queue in get_all_node_queues(config.NODE_NAME):
-        etcd.restart_queue(queue)
-        processing, queued, deferred = etcd.get_queue_length(
+        mariadb.restart_work_queue(queue)
+        processing, queued, deferred = mariadb.get_work_queue_length(
             queue)
         LOG.with_fields({
             'processing': processing,

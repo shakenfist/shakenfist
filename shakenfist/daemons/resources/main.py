@@ -230,7 +230,8 @@ class Monitor(daemon.Daemon):
 
             def _log_and_update_metrics_for_queue(
                     queue, log_prefix):
-                processing, queued, deferred = etcd.get_queue_length(queue)
+                processing, queued, deferred = mariadb.get_work_queue_length(
+                    queue)
                 LOG.with_fields({
                     'processing': processing,
                     'queued': queued,

@@ -17,7 +17,6 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
-from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import ProcessExecutionError
@@ -386,7 +385,7 @@ class WorkerPoolDaemon(Daemon):
             return False
 
         for queue_name in get_all_user_facing_node_queues(config.NODE_UUID):
-            jobname_workitem = etcd.dequeue(queue_name)
+            jobname_workitem = mariadb.dequeue_work_item(queue_name)
             if jobname_workitem:
                 args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
                 self.start_job(processing_class, args, jobname_workitem[0])
@@ -417,7 +416,7 @@ class WorkerPoolDaemon(Daemon):
                 LOG.debug('Skipping {queue_name} queue as local disk is busy')
                 continue
 
-            jobname_workitem = etcd.dequeue(queue_name)
+            jobname_workitem = mariadb.dequeue_work_item(queue_name)
             if jobname_workitem:
                 args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
                 self.start_job(processing_class, args, jobname_workitem[0])

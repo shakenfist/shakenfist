@@ -139,7 +139,7 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
                 'uuid': op_uuid,
                 'version': 1
             },
-            self.mock_etcd.get_raw(f'/sf/artifact_fetch_op/{op_uuid}')
+            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {
@@ -153,12 +153,8 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
                 'operation_type': 'artifact_fetch_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_raw(
-                (
-                    '/sf/queue/any-clusteroperation-user_facing/'
-                    '123.0-asdjfhkjadsfh'
-                )
-            )
+            self.mock_etcd.get_work_queue_payload(
+                'any-clusteroperation-user_facing')
         )
 
     def test_load_from_etcd(self):
