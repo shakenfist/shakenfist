@@ -23,8 +23,15 @@ etcd is the primary database for Shaken Fist and is used for:
   state.
 - **Distributed locking**: See the [Locks](locks.md) documentation.
 - **Configuration**: Cluster-wide configuration stored at `/sf/config`.
-- **Event logs**: Audit trails and operational events for objects.
-- **Queues**: Work queues for cluster operations.
+- **Event log DLQ**: Dead-letter storage for event log entries that could
+  not be delivered to the eventlog gRPC service.
+
+Cluster operation headers and the per-node work queues were originally
+stored in etcd under `/sf/{op_type}/{uuid}`, `/sf/queue/{queue}/...`
+and `/sf/processing/{queue}/...`. They have been moved to the
+`cluster_operations` and `work_queue` MariaDB tables; the
+corresponding data migrations run automatically on database daemon
+startup and drain any residual etcd keys into MariaDB.
 
 ### Key Structure
 
@@ -35,7 +42,6 @@ etcd keys follow a hierarchical structure:
 /sf/object/{type}/{uuid}      # Object definitions
 /sf/attribute/{type}/{uuid}/  # Object attributes (state, placement, etc.)
 /sf/event/{type}/{uuid}/      # Event logs for objects
-/sf/queue/                    # Work queues
 /sflocks/                     # Distributed locks
 ```
 
@@ -536,6 +542,8 @@ The migration is happening in phases:
 | 14 | Object metadata | Complete - `object_metadata` table (metadata + last_cluster_operation) |
 | 15 | Cluster operation targets | Complete - `cluster_operation_targets` table (operation ordering per object) |
 | 16 | Node metrics | Complete - `node_metrics` table (ephemeral per-node resource metrics, JSON payload) |
+| 17 | Cluster operations | Complete - `cluster_operations` table (full operation metadata with indexed node/instance/network/priority columns) |
+| 18 | Work queues | Complete - `work_queue` table (per-job row with claim state, replacing etcd two-prefix design) |
 
 ### Table Architecture
 
@@ -563,6 +571,8 @@ constraints. These get dedicated tables optimized for their access patterns:
 | Table | Purpose |
 |-------|---------|
 | `ipam_reservations` | IP address allocations with uniqueness constraints |
+| `cluster_operations` | Full cluster operation metadata with indexed `node_uuid`, `instance_uuid`, `network_uuid` and `priority` columns extracted from JSON for dispatch-time filtering |
+| `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
 | `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
 | `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload |
 
@@ -572,6 +582,31 @@ IPAM reservations are stored separately because:
 - **High churn**: Addresses are frequently reserved and released
 - **Cross-object queries**: Need to find all addresses for an IPAM, not just
   one object
+
+Cluster operation headers (`cluster_operations`) and work queue rows
+(`work_queue`) are stored in MariaDB so the create-and-enqueue step
+can run in a single transaction (header row + state row + queue
+row). The old etcd design split queued and claimed work items across
+`/sf/queue/` and `/sf/processing/` prefixes; MariaDB row locking
+allows a single table with claim fields instead, and
+`SELECT ... FOR UPDATE SKIP LOCKED` gives race-safe dequeue.
+
+The cluster daemon runs
+`reap_stuck_cluster_operation_jobs()` from
+`shakenfist/daemons/cluster/scheduled_tasks.py` on a one-minute
+schedule. It re-queues or rejects rows whose claim has gone stale:
+
+- **`CLUSTER_OP_STUCK_THRESHOLD`** — seconds before a claimed row is
+  considered stuck (default `1800`). Lower values detect crashed
+  workers faster at the cost of possibly re-queuing merely slow jobs.
+- **`CLUSTER_OP_MAX_ATTEMPTS`** — maximum claim attempts before the
+  reaper stops re-queuing and transitions the underlying cluster
+  operation to `STATE_ERROR` (default `5`). Protects the queue from
+  a "job of death" that crashes every worker.
+- **`CLUSTER_METRICS_PORT`** — Prometheus scrape port exposed by the
+  cluster daemon (default `13007`). Metrics
+  `cluster_op_reaper_requeued_total` and
+  `cluster_op_reaper_rejected_total` record reaper activity.
 
 Cluster operation targets are stored separately because:
 
