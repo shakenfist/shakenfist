@@ -111,7 +111,7 @@ class ImageCacheOpTestCase(base.ShakenFistTestCase):
                 'uuid': op_uuid,
                 'version': 1
             },
-            self.mock_etcd.get_raw(f'/sf/imgcache_op/{op_uuid}')
+            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {
@@ -125,12 +125,8 @@ class ImageCacheOpTestCase(base.ShakenFistTestCase):
                 'operation_type': 'imgcache_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_raw(
-                (
-                    f'/sf/queue/{u1}-clusteroperation-background_high_io/'
-                    '123.0-asdjfhkjadsfh'
-                )
-            )
+            self.mock_etcd.get_work_queue_payload(
+                f'{u1}-clusteroperation-background_high_io')
         )
 
     def test_load_from_etcd(self):

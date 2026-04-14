@@ -74,6 +74,9 @@ class MockEtcd():
         self.cluster_operation_targets = {}  # Mock MariaDB cluster op targets
         self._cot_sequence = count(1)  # AUTO_INCREMENT mock
         self.node_metrics_store = {}  # Mock MariaDB node metrics
+        self.cluster_operations_store = {}  # Mock MariaDB cluster op headers
+        self.work_queue_store = []  # Mock MariaDB work_queue rows (list to keep order)
+        self._work_queue_next_id = count(1)  # AUTO_INCREMENT mock
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -812,6 +815,105 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_delete_node_metrics.stop)
 
+        # Mock MariaDB cluster_operations operations
+        self.mariadb_create_cluster_operation = mock.patch(
+            'shakenfist.mariadb.create_cluster_operation',
+            side_effect=self._mariadb_create_cluster_operation)
+        self.mariadb_create_cluster_operation.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_cluster_operation.stop)
+
+        self.mariadb_get_cluster_operation = mock.patch(
+            'shakenfist.mariadb.get_cluster_operation',
+            side_effect=self._mariadb_get_cluster_operation)
+        self.mariadb_get_cluster_operation.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_cluster_operation.stop)
+
+        self.mariadb_get_cluster_operations_by_node = mock.patch(
+            'shakenfist.mariadb.get_cluster_operations_by_node',
+            side_effect=self._mariadb_get_cluster_operations_by_node)
+        self.mariadb_get_cluster_operations_by_node.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_cluster_operations_by_node.stop)
+
+        self.mariadb_delete_cluster_operation = mock.patch(
+            'shakenfist.mariadb.delete_cluster_operation',
+            side_effect=self._mariadb_delete_cluster_operation)
+        self.mariadb_delete_cluster_operation.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_cluster_operation.stop)
+
+        self.mariadb_create_and_enqueue_cluster_operation = (
+            mock.patch(
+                'shakenfist.mariadb'
+                '.create_and_enqueue_cluster_operation',
+                side_effect=(
+                    self
+                    ._mariadb_create_and_enqueue_cluster_operation)
+            )
+        )
+        self.mariadb_create_and_enqueue_cluster_operation.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_and_enqueue_cluster_operation.stop)
+
+        # Mock MariaDB work queue public API
+        self.mariadb_enqueue_work_item = mock.patch(
+            'shakenfist.mariadb.enqueue_work_item',
+            side_effect=self._mariadb_enqueue_work_item)
+        self.mariadb_enqueue_work_item.start()
+        self.test_obj.addCleanup(
+            self.mariadb_enqueue_work_item.stop)
+
+        self.mariadb_dequeue_work_item = mock.patch(
+            'shakenfist.mariadb.dequeue_work_item',
+            side_effect=self._mariadb_dequeue_work_item)
+        self.mariadb_dequeue_work_item.start()
+        self.test_obj.addCleanup(
+            self.mariadb_dequeue_work_item.stop)
+
+        self.mariadb_resolve_work_item = mock.patch(
+            'shakenfist.mariadb.resolve_work_item',
+            side_effect=self._mariadb_resolve_work_item)
+        self.mariadb_resolve_work_item.start()
+        self.test_obj.addCleanup(
+            self.mariadb_resolve_work_item.stop)
+
+        self.mariadb_get_work_queue_length = mock.patch(
+            'shakenfist.mariadb.get_work_queue_length',
+            side_effect=self._mariadb_get_work_queue_length)
+        self.mariadb_get_work_queue_length.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_work_queue_length.stop)
+
+        self.mariadb_restart_work_queue = mock.patch(
+            'shakenfist.mariadb.restart_work_queue',
+            side_effect=self._mariadb_restart_work_queue)
+        self.mariadb_restart_work_queue.start()
+        self.test_obj.addCleanup(
+            self.mariadb_restart_work_queue.stop)
+
+        self.mariadb_list_stuck_work_queue_rows = mock.patch(
+            'shakenfist.mariadb.list_stuck_work_queue_rows',
+            side_effect=self._mariadb_list_stuck_work_queue_rows)
+        self.mariadb_list_stuck_work_queue_rows.start()
+        self.test_obj.addCleanup(
+            self.mariadb_list_stuck_work_queue_rows.stop)
+
+        self.mariadb_clear_work_queue_claim = mock.patch(
+            'shakenfist.mariadb.clear_work_queue_claim',
+            side_effect=self._mariadb_clear_work_queue_claim)
+        self.mariadb_clear_work_queue_claim.start()
+        self.test_obj.addCleanup(
+            self.mariadb_clear_work_queue_claim.stop)
+
+        self.mariadb_delete_work_queue_row = mock.patch(
+            'shakenfist.mariadb.delete_work_queue_row',
+            side_effect=self._mariadb_delete_work_queue_row)
+        self.mariadb_delete_work_queue_row.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_work_queue_row.stop)
+
         # Setup basic DB data
         self.node_uuids = {}
         for n in self.nodes:
@@ -889,6 +991,40 @@ class MockEtcd():
             f'MockMariaDB.get_objects_by_state({object_type}, '
             f'{state_values}): {result}')
         return result
+
+    def get_cluster_operation_metadata(
+            self, op_uuid: str) -> Optional[dict]:
+        """Return the metadata dict of a stored cluster operation.
+
+        Tests previously asserted on `/sf/{operation_type}/{uuid}` etcd
+        paths; after phase 5, headers live in MariaDB via
+        cluster_operations_store. The stored row has the metadata dict
+        plus `operation_type` and `created_at` overlaid; this helper
+        returns just the metadata-shaped view tests compare against.
+        """
+        row = self.cluster_operations_store.get(str(op_uuid))
+        if row is None:
+            return None
+        return {
+            k: v for k, v in row.items()
+            if k not in ('operation_type', 'created_at')
+        }
+
+    def get_work_queue_payload(self, queue_name: str) -> Optional[dict]:
+        """Return the payload of the most recent work_queue row for a queue.
+
+        Tests previously asserted on `/sf/queue/{queue_name}/{job_name}`
+        etcd paths; the new MariaDB-backed queue stores rows in
+        work_queue_store and uses an autoincrement id, so per-test queue
+        assertions look up the row by queue_name instead.
+        """
+        match = None
+        for row in self.work_queue_store:
+            if row['queue_name'] == queue_name:
+                match = row
+        if match is None:
+            return None
+        return match['payload']
 
     def get_mariadb_state(self, object_type: ObjectType,
                           object_uuid: str) -> Optional[dict]:
@@ -2090,6 +2226,281 @@ class MockEtcd():
         self._trace(
             f'MockMariaDB.delete_node_metrics({key}): not found')
         return False
+
+    # MariaDB Cluster Operations mock operations
+
+    def _mariadb_create_cluster_operation(
+            self, uuid, operation_type, metadata, created_at):
+        """Mock implementation of mariadb.create_cluster_operation()
+
+        Insert-only: refuses to overwrite an existing key and returns
+        False on duplicate. Mirrors the real direct-layer contract.
+        """
+        key = str(uuid)
+        if key in self.cluster_operations_store:
+            self._trace(
+                f'MockMariaDB.create_cluster_operation({key}): '
+                f'duplicate')
+            return False
+        row = dict(metadata)
+        row['uuid'] = key
+        row['operation_type'] = operation_type
+        row['created_at'] = created_at
+        self.cluster_operations_store[key] = row
+        self._trace(
+            f'MockMariaDB.create_cluster_operation({key}): '
+            f'created')
+        return True
+
+    def _mariadb_get_cluster_operation(self, uuid):
+        """Mock implementation of mariadb.get_cluster_operation()"""
+        key = str(uuid)
+        data = self.cluster_operations_store.get(key)
+        self._trace(
+            f'MockMariaDB.get_cluster_operation({key}): {data}')
+        return dict(data) if data is not None else None
+
+    def _mariadb_get_cluster_operations_by_node(self, node_uuid):
+        """Mock implementation of mariadb.get_cluster_operations_by_node()"""
+        key = str(node_uuid)
+        result = sorted(
+            (
+                dict(row)
+                for row in self.cluster_operations_store.values()
+                if str(row.get('node_uuid', '')) == key
+            ),
+            key=lambda r: r['created_at']
+        )
+        self._trace(
+            f'MockMariaDB.get_cluster_operations_by_node({key}): '
+            f'{len(result)} items')
+        return result
+
+    def _mariadb_delete_cluster_operation(self, uuid):
+        """Mock implementation of mariadb.delete_cluster_operation()"""
+        key = str(uuid)
+        if key in self.cluster_operations_store:
+            del self.cluster_operations_store[key]
+            self._trace(
+                f'MockMariaDB.delete_cluster_operation({key}): '
+                f'deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_cluster_operation({key}): '
+            f'not found')
+        return False
+
+    def _mariadb_create_and_enqueue_cluster_operation(
+            self, op_uuid, operation_type, metadata,
+            created_at, queue_name, delay=0.0):
+        """Mock implementation of the atomic create+enqueue path.
+
+        Mirrors the real function's contract: insert-only on
+        cluster_operations (returns False on duplicate), records
+        a work_queue row in work_queue_store. Until phase 5
+        switches from_db() to read cluster_operations from
+        MariaDB, this mock also writes the legacy etcd path at
+        /sf/{operation_type}/{uuid} so existing tests that load
+        operations via from_db() continue to work.
+        """
+        key = str(op_uuid)
+        if key in self.cluster_operations_store:
+            self._trace(
+                f'MockMariaDB.create_and_enqueue_cluster_operation'
+                f'({key}): duplicate')
+            return False
+
+        row = dict(metadata)
+        row['uuid'] = key
+        row['operation_type'] = operation_type
+        row['created_at'] = created_at
+        self.cluster_operations_store[key] = row
+
+        self.work_queue_store.append({
+            'id': next(self._work_queue_next_id),
+            'queue_name': queue_name,
+            'scheduled_at': created_at + delay,
+            'claimed_at': None,
+            'claimed_by': None,
+            'attempts': 0,
+            'payload': {
+                'operation_type': operation_type,
+                'operation_uuid': key,
+            },
+            'created_at': created_at,
+        })
+
+        # The real RPC writes an object_states row in the same
+        # transaction. Mirror that here so tests that assert on
+        # the initial 'queued' state continue to pass.
+        state_key = f'{operation_type}/{key}'
+        self.mariadb_states[state_key] = {
+            'object_type': operation_type,
+            'object_uuid': key,
+            'state_value': 'queued',
+            'update_time': created_at,
+            'message': None,
+        }
+
+        self._trace(
+            f'MockMariaDB.create_and_enqueue_cluster_operation'
+            f'({key}): created and enqueued on {queue_name}')
+        return True
+
+    def _mariadb_enqueue_work_item(
+            self, queue_name, work_item, delay=0.0):
+        """Mock implementation of mariadb.enqueue_work_item()."""
+        now = time.time()
+        row = {
+            'id': next(self._work_queue_next_id),
+            'queue_name': queue_name,
+            'scheduled_at': now + delay,
+            'claimed_at': None,
+            'claimed_by': None,
+            'attempts': 0,
+            'payload': dict(work_item),
+            'created_at': now,
+        }
+        self.work_queue_store.append(row)
+        self._trace(
+            f'MockMariaDB.enqueue_work_item({queue_name}, '
+            f'{work_item}, delay={delay}): id={row["id"]}')
+
+    def _mariadb_dequeue_work_item(self, queue_name):
+        """Mock implementation of mariadb.dequeue_work_item().
+
+        Returns (job_name, payload) for the earliest eligible row
+        in queue_name or None. 'Eligible' means claimed_at is None
+        and scheduled_at <= now. Iterates in insertion order, which
+        matches the SQL ORDER BY scheduled_at ASC for ties created
+        at the same logical moment.
+        """
+        now = time.time()
+        eligible = [
+            r for r in self.work_queue_store
+            if r['queue_name'] == queue_name
+            and r['claimed_at'] is None
+            and r['scheduled_at'] <= now
+        ]
+        if not eligible:
+            self._trace(
+                f'MockMariaDB.dequeue_work_item({queue_name}): empty')
+            return None
+        eligible.sort(key=lambda r: r['scheduled_at'])
+        row = eligible[0]
+        row['claimed_at'] = now
+        row['claimed_by'] = 'mock'
+        row['attempts'] = row.get('attempts', 0) + 1
+        self._trace(
+            f'MockMariaDB.dequeue_work_item({queue_name}): '
+            f'id={row["id"]}')
+        return str(row['id']), dict(row['payload'] or {})
+
+    def _mariadb_resolve_work_item(self, queue_name, job_name):
+        """Mock implementation of mariadb.resolve_work_item()."""
+        try:
+            job_id = int(job_name)
+        except (TypeError, ValueError):
+            self._trace(
+                f'MockMariaDB.resolve_work_item({queue_name}, '
+                f'{job_name!r}): non-numeric job name, ignoring')
+            return
+        before = len(self.work_queue_store)
+        self.work_queue_store = [
+            r for r in self.work_queue_store
+            if not (r['id'] == job_id and r['queue_name'] == queue_name)
+        ]
+        self._trace(
+            f'MockMariaDB.resolve_work_item({queue_name}, '
+            f'{job_name}): removed {before - len(self.work_queue_store)}')
+
+    def _mariadb_get_work_queue_length(self, queue_name):
+        """Mock implementation of mariadb.get_work_queue_length()."""
+        now = time.time()
+        processing = 0
+        queued = 0
+        deferred = 0
+        for r in self.work_queue_store:
+            if r['queue_name'] != queue_name:
+                continue
+            if r['claimed_at'] is not None:
+                processing += 1
+            elif r['scheduled_at'] <= now:
+                queued += 1
+            else:
+                deferred += 1
+        self._trace(
+            f'MockMariaDB.get_work_queue_length({queue_name}): '
+            f'processing={processing} queued={queued} '
+            f'deferred={deferred}')
+        return processing, queued, deferred
+
+    def _mariadb_restart_work_queue(self, queue_name):
+        """Mock implementation of mariadb.restart_work_queue()."""
+        cleared = 0
+        for r in self.work_queue_store:
+            if (r['queue_name'] == queue_name
+                    and r['claimed_at'] is not None):
+                r['claimed_at'] = None
+                r['claimed_by'] = None
+                cleared += 1
+        self._trace(
+            f'MockMariaDB.restart_work_queue({queue_name}): '
+            f'cleared {cleared}')
+
+    def _mariadb_list_stuck_work_queue_rows(self, threshold_seconds):
+        """Mock implementation of mariadb.list_stuck_work_queue_rows().
+
+        Returns rows whose claim age exceeds threshold_seconds,
+        ordered by claimed_at ascending so the caller processes
+        the oldest stuck row first (matches the real SQL ORDER BY).
+        """
+        now = time.time()
+        stuck = []
+        for r in self.work_queue_store:
+            if r['claimed_at'] is None:
+                continue
+            if now - r['claimed_at'] < threshold_seconds:
+                continue
+            stuck.append({
+                'id': int(r['id']),
+                'queue_name': r['queue_name'],
+                'claimed_at': float(r['claimed_at']),
+                'claimed_by': r['claimed_by'],
+                'attempts': int(r.get('attempts', 0)),
+                'payload': dict(r['payload'] or {}),
+            })
+        stuck.sort(key=lambda s: s['claimed_at'])
+        self._trace(
+            f'MockMariaDB.list_stuck_work_queue_rows'
+            f'({threshold_seconds}): {len(stuck)}')
+        return stuck
+
+    def _mariadb_clear_work_queue_claim(self, row_id):
+        """Mock implementation of mariadb.clear_work_queue_claim()."""
+        for r in self.work_queue_store:
+            if r['id'] == row_id and r['claimed_at'] is not None:
+                r['claimed_at'] = None
+                r['claimed_by'] = None
+                self._trace(
+                    f'MockMariaDB.clear_work_queue_claim'
+                    f'({row_id}): cleared')
+                return True
+        self._trace(
+            f'MockMariaDB.clear_work_queue_claim({row_id}): no-op')
+        return False
+
+    def _mariadb_delete_work_queue_row(self, row_id):
+        """Mock implementation of mariadb.delete_work_queue_row()."""
+        before = len(self.work_queue_store)
+        self.work_queue_store = [
+            r for r in self.work_queue_store if r['id'] != row_id
+        ]
+        removed = before != len(self.work_queue_store)
+        self._trace(
+            f'MockMariaDB.delete_work_queue_row({row_id}): '
+            f'{"removed" if removed else "not found"}')
+        return removed
 
     #
     # DB operations - Low level

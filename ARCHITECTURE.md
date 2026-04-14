@@ -48,9 +48,9 @@ Shaken Fist runs several daemons on each cluster node:
        |    etcd     |                   |   MariaDB   |
        | (objects,   |                   | (state,     |
        |  locks,     |                   |  IPAM,      |
-       |  queues)    |                   |  uploads,   |
-       +-------------+                   |  blobs,     |
-                                         |  nodes,     |
+       |  eventlog   |                   |  uploads,   |
+       |  DLQ)       |                   |  blobs,     |
+       +-------------+                   |  nodes,     |
                                          |  namespaces,|
                                          |  artifacts, |
                                          |  networks,  |
@@ -60,6 +60,10 @@ Shaken Fist runs several daemons on each cluster node:
                                          |  references,|
                                          |  object_    |
                                          |  metadata,  |
+                                         |  cluster_   |
+                                         |  operations,|
+                                         |  work_      |
+                                         |  queue,     |
                                          |  cluster_op_|
                                          |  targets)   |
                                          +-------------+
@@ -115,6 +119,38 @@ operations (`queued`/`preflight`/`executing`) are never pruned regardless
 of age. Because the cluster daemon already runs cluster-wide cleanup
 under `ClusterLock` election, no additional locking or master-node
 gating is required.
+
+#### Cluster Operation Storage and Work Queues
+
+Cluster operation headers and the per-node work queues both live in
+MariaDB. The `cluster_operations` table stores the full operation
+metadata as JSON in `metadata_json`, with `node_uuid`,
+`instance_uuid`, `network_uuid` and `priority` extracted into indexed
+columns for dispatch-time filtering. The `work_queue` table stores
+one row per queued job with claim fields (`claimed_at`, `claimed_by`,
+`attempts`) on the same row -- MariaDB row locking replaces the
+old etcd two-prefix (`/sf/queue/`, `/sf/processing/`) design. Dequeue
+uses `SELECT ... FOR UPDATE SKIP LOCKED` so concurrent workers
+either claim distinct rows or one gets nothing.
+
+Creating a cluster operation is atomic: the `CreateAndEnqueueCluster`
+gRPC RPC writes the `cluster_operations` row, the `object_states`
+row, and the `work_queue` row in a single MariaDB transaction.
+Audit events are published out-of-band through the normal eventlog
+gRPC service path, which retains its etcd DLQ for failure recovery.
+
+The cluster daemon runs
+`reap_stuck_cluster_operation_jobs()` from
+`daemons/cluster/scheduled_tasks.py` on a one-minute schedule.
+For every row whose `claimed_at` is older than
+`CLUSTER_OP_STUCK_THRESHOLD` seconds, the reaper either clears the
+claim so a fresh worker picks the job up or -- if `attempts`
+has reached `CLUSTER_OP_MAX_ATTEMPTS` -- deletes the row and
+transitions the underlying cluster operation to `STATE_ERROR`.
+Reaper activity is exported on
+`cluster_op_reaper_requeued_total` and
+`cluster_op_reaper_rejected_total`, scraped from
+`CLUSTER_METRICS_PORT` on the cluster daemon.
 
 ### Protocol Buffers and gRPC
 

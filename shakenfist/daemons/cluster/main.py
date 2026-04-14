@@ -6,6 +6,7 @@ from collections import defaultdict
 import os
 import time
 
+from prometheus_client import start_http_server
 import schedule
 from shakenfist_utilities import logs  # noreorder
 
@@ -46,6 +47,7 @@ class Monitor(daemon.Daemon):
         super().__init__(name)
         self.lock = None
         self.is_elected = False
+        start_http_server(config.CLUSTER_METRICS_PORT)
 
     def _await_election(self):
         # Attempt to acquire the cluster maintenance lock forever. We never
@@ -346,7 +348,8 @@ class Monitor(daemon.Daemon):
 
                 # Clean up any lingering queue tasks
                 for queue_name in get_all_node_queues(n.fqdn):
-                    while jobname_workitem := etcd.dequeue(queue_name):
+                    while jobname_workitem := mariadb.dequeue_work_item(
+                            queue_name):
                         jobname, workitem = jobname_workitem
                         n.add_event(
                             EVENT_TYPE_AUDIT,
@@ -380,7 +383,7 @@ class Monitor(daemon.Daemon):
                                     'failed to abort operation'
                                 )
 
-                        etcd.resolve(queue_name, jobname)
+                        mariadb.resolve_work_item(queue_name, jobname)
 
         # And we're done
         LOG.info('Cluster maintenance loop complete')
@@ -406,6 +409,8 @@ class Monitor(daemon.Daemon):
             # Setup a schedule of things to do
             schedule.every(1).minutes.do(
                 scheduled_tasks.log_cluster_queue_lengths)
+            schedule.every(1).minutes.do(
+                scheduled_tasks.reap_stuck_cluster_operation_jobs)
             schedule.every(5).minutes.do(
                 scheduled_tasks.per_blob_checks)
             schedule.every(5).minutes.do(

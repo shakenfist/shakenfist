@@ -138,7 +138,7 @@ class NetIfaceOpTestCase(base.ShakenFistTestCase):
                 'request_id': None,
                 'version': 1
             },
-            self.mock_etcd.get_raw(f'/sf/net_iface_op/{op_uuid}')
+            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {
@@ -152,12 +152,8 @@ class NetIfaceOpTestCase(base.ShakenFistTestCase):
                 'operation_type': 'net_iface_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_raw(
-                (
-                    '/sf/queue/networknode-clusteroperation-user_facing/'
-                    '123.0-asdjfhkjadsfh'
-                )
-            )
+            self.mock_etcd.get_work_queue_payload(
+                'networknode-clusteroperation-user_facing')
         )
 
     def test_load_from_etcd(self):

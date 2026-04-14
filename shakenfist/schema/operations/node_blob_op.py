@@ -16,8 +16,7 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import _convert_deps
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.baseclusteroperation import dependency
-from shakenfist.schema.operations.util import base_mutations
-from shakenfist.schema.operations.util import enqueue
+from shakenfist.schema.operations.util import enqueue_cluster_operation
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -84,9 +83,7 @@ def create_and_enqueue(node_uuid, blob_uuid, tasks, priority, request_id=None,
         }).error(f'schema validation error: {exc}')
         raise exc
 
-    mutations, job_name, queue_name, work_item = \
-        base_mutations(object_type, m.model_dump(mode='json'))
-    enqueue(mutations, job_name, queue_name, work_item)
+    enqueue_cluster_operation(object_type, m.model_dump(mode='json'))
 
     # Record that this operation targets the blob in MariaDB so that
     # scheduled_tasks can discover pending blob operations without etcd.

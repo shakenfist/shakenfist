@@ -241,7 +241,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['enqueue'].inc()
             workitem = json.loads(request.work_item)
-            etcd.enqueue(request.queue_name, workitem, delay=request.delay)
+            mariadb._direct_work_queue_enqueue(
+                request.queue_name, workitem, delay=request.delay)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database Enqueue failed', e)
@@ -255,7 +256,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Claim the next available job from a queue."""
         try:
             self.monitor.counters['dequeue'].inc()
-            result = etcd.dequeue(request.queue_name)
+            result = mariadb._direct_work_queue_dequeue(
+                request.queue_name, config.NODE_NAME)
             if result is None:
                 return database_pb2.DequeueReply(
                     found=False, job_name='', work_item='')
@@ -278,7 +280,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Mark a job as complete."""
         try:
             self.monitor.counters['resolve'].inc()
-            etcd.resolve(request.queue_name, request.job_name)
+            mariadb._direct_work_queue_resolve(
+                request.queue_name, request.job_name)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database Resolve failed', e)
@@ -292,8 +295,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get queue statistics."""
         try:
             self.monitor.counters['get_queue_length'].inc()
-            processing, queued, deferred = etcd.get_queue_length(
-                request.queue_name)
+            processing, queued, deferred = (
+                mariadb._direct_work_queue_length(
+                    request.queue_name))
             return database_pb2.QueueLengthReply(
                 processing=processing,
                 queued=queued,
@@ -309,14 +313,79 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.RestartQueueRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.StatusReply:
-        """Move jobs from processing back to queue."""
+        """Clear claims on a queue so workers re-pick up the jobs."""
         try:
             self.monitor.counters['restart_queue'].inc()
-            etcd.restart_queue(request.queue_name)
+            mariadb._direct_work_queue_restart(request.queue_name)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database RestartQueue failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
+
+    def ListStuckWorkQueueRows(
+        self,
+        request: database_pb2.ListStuckWorkQueueRowsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ListStuckWorkQueueRowsReply:
+        """List work_queue rows whose claim exceeds the threshold."""
+        try:
+            self.monitor.counters['list_stuck_work_queue_rows'].inc()
+            rows = mariadb._direct_work_queue_list_stuck(
+                request.threshold_seconds)
+            return database_pb2.ListStuckWorkQueueRowsReply(
+                rows=[
+                    database_pb2.StuckWorkQueueRow(
+                        id=row['id'],
+                        queue_name=row['queue_name'],
+                        claimed_at=row['claimed_at'],
+                        claimed_by=row['claimed_by'] or '',
+                        attempts=row['attempts'],
+                        payload_json=util_json.json_dump(
+                            row['payload']),
+                    )
+                    for row in rows
+                ]
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ListStuckWorkQueueRows failed', e)
+            return database_pb2.ListStuckWorkQueueRowsReply(rows=[])
+
+    def ClearWorkQueueClaim(
+        self,
+        request: database_pb2.ClearWorkQueueClaimRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Clear the claim on a stuck work_queue row."""
+        try:
+            self.monitor.counters['clear_work_queue_claim'].inc()
+            cleared = mariadb._direct_work_queue_clear_claim(
+                request.row_id)
+            return database_pb2.StatusReply(
+                success=cleared, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ClearWorkQueueClaim failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DeleteWorkQueueRow(
+        self,
+        request: database_pb2.DeleteWorkQueueRowRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a single work_queue row by id."""
+        try:
+            self.monitor.counters['delete_work_queue_row'].inc()
+            deleted = mariadb._direct_work_queue_delete_row(
+                request.row_id)
+            return database_pb2.StatusReply(
+                success=deleted, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteWorkQueueRow failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
 
     # Lock Operations
 
@@ -4120,6 +4189,154 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    # Cluster Operations (MariaDB)
+
+    def CreateClusterOperation(
+        self,
+        request: database_pb2.CreateClusterOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Insert a cluster operation header in MariaDB."""
+        try:
+            self.monitor.counters['create_cluster_operation'].inc()
+            metadata = (
+                json.loads(request.data.metadata_json)
+                if request.data.metadata_json else {}
+            )
+            success = mariadb._direct_create_cluster_operation(
+                UUID(request.data.uuid),
+                request.data.operation_type,
+                metadata,
+                request.data.created_at,
+            )
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateClusterOperation failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetClusterOperation(
+        self,
+        request: database_pb2.GetClusterOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterOperationReply:
+        """Get a cluster operation header from MariaDB."""
+        try:
+            self.monitor.counters['get_cluster_operation'].inc()
+            data = mariadb._direct_get_cluster_operation(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetClusterOperationReply(
+                    found=False)
+            return database_pb2.GetClusterOperationReply(
+                found=True,
+                data=self._cluster_operation_to_proto(data),
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterOperation failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetClusterOperationReply(
+                found=False)
+
+    def GetClusterOperationsByNode(
+        self,
+        request: database_pb2.GetClusterOperationsByNodeRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterOperationsByNodeReply:
+        """Get all cluster operation headers targeting a node."""
+        try:
+            self.monitor.counters[
+                'get_cluster_operations_by_node'].inc()
+            items = mariadb._direct_get_cluster_operations_by_node(
+                UUID(request.node_uuid))
+            return database_pb2.GetClusterOperationsByNodeReply(
+                items=[
+                    self._cluster_operation_to_proto(d)
+                    for d in items
+                ]
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterOperationsByNode failed', e)
+            return database_pb2.GetClusterOperationsByNodeReply(
+                items=[])
+
+    def DeleteClusterOperation(
+        self,
+        request: database_pb2.DeleteClusterOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a cluster operation header from MariaDB."""
+        try:
+            self.monitor.counters['delete_cluster_operation'].inc()
+            success = mariadb._direct_delete_cluster_operation(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteClusterOperation failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def CreateAndEnqueueClusterOperation(
+        self,
+        request: database_pb2.CreateAndEnqueueClusterOperationRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Atomically create a cluster operation and enqueue its work item.
+
+        Writes cluster_operations, object_states and work_queue in a
+        single MariaDB transaction. Audit events are not written by
+        this RPC -- callers emit them via the eventlog service after
+        the RPC returns successfully.
+        """
+        try:
+            self.monitor.counters[
+                'create_and_enqueue_cluster_operation'].inc()
+            metadata = (
+                json.loads(request.metadata_json)
+                if request.metadata_json else {}
+            )
+            success = (
+                mariadb
+                ._direct_create_and_enqueue_cluster_operation(
+                    UUID(request.uuid),
+                    request.operation_type,
+                    metadata,
+                    request.created_at,
+                    request.queue_name,
+                    request.delay,
+                )
+            )
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateAndEnqueueClusterOperation failed',
+                e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def _cluster_operation_to_proto(
+            self,
+            data: dict[str, Any]
+    ) -> 'database_pb2.ClusterOperationData':
+        """Build a ClusterOperationData proto from a cluster_operations
+        row dict. The full dict is JSON-serialized into metadata_json so
+        the client sees exactly the same shape _direct_get_cluster_operation
+        returned."""
+        return database_pb2.ClusterOperationData(
+            uuid=data['uuid'],
+            operation_type=data['operation_type'],
+            created_at=data['created_at'],
+            metadata_json=json.dumps(data),
+        )
+
     def _instance_attrs_from_proto(
             self,
             d: database_pb2.InstanceAttributesProto
@@ -4193,7 +4410,9 @@ class Monitor(daemon.WorkerPoolDaemon):
         operations = [
             'get', 'get_prefix', 'put', 'create', 'delete', 'delete_prefix',
             'replace_many', 'enqueue', 'dequeue', 'resolve', 'get_queue_length',
-            'restart_queue', 'acquire_lock', 'release_lock', 'get_lock_holder',
+            'restart_queue', 'list_stuck_work_queue_rows',
+            'clear_work_queue_claim', 'delete_work_queue_row',
+            'acquire_lock', 'release_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks', 'compact',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',

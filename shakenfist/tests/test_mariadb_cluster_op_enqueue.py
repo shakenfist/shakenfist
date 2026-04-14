@@ -1,0 +1,298 @@
+# Copyright 2026 Michael Still and contributors
+#
+# Tests for _direct_create_and_enqueue_cluster_operation() from
+# phase 3 of the etcd-removal ops-queues plan. This is the only
+# multi-table atomic write in mariadb.py, so the tests focus on
+# proving the three inserts run inside a single connection
+# context and commit exactly once -- and that any failure rolls
+# the whole transaction back.
+
+from unittest import mock
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import OperationalError
+
+from shakenfist import mariadb
+from shakenfist.config import BaseSettings
+from shakenfist.tests import base
+
+
+class FakeConfig(BaseSettings):
+    DATABASE_NODE_IP: str = '192.168.1.1'
+    DATABASE_API_PORT: int = 13005
+    DATABASE_USE_DIRECT_ETCD: bool = False
+    MARIADB_HOST: str = 'localhost'
+    NODE_NAME: str = 'testnode'
+
+
+fake_config = FakeConfig()
+
+
+OP_UUID_STR = '11111111-1111-4111-8111-111111111111'
+NODE_UUID_STR = 'aaaa1111-1111-4111-8111-111111111111'
+INSTANCE_UUID_STR = 'bbbb1111-1111-4111-8111-111111111111'
+NETWORK_UUID_STR = 'cccc1111-1111-4111-8111-111111111111'
+
+
+def _make_mock_engine():
+    """Build a mock engine whose connect() works as a context manager."""
+    mock_engine = mock.MagicMock()
+    mock_conn = mock.MagicMock()
+    mock_engine.connect.return_value.__enter__ = mock.Mock(
+        return_value=mock_conn)
+    mock_engine.connect.return_value.__exit__ = mock.Mock(
+        return_value=False)
+    return mock_engine, mock_conn
+
+
+def _make_metadata(**overrides):
+    metadata = {
+        'uuid': OP_UUID_STR,
+        'node_uuid': NODE_UUID_STR,
+        'instance_uuid': INSTANCE_UUID_STR,
+        'network_uuid': NETWORK_UUID_STR,
+        'priority': 'user_waiting',
+        'tasks': ['fetch_image', 'provision_interfaces'],
+    }
+    metadata.update(overrides)
+    return metadata
+
+
+class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_create_and_enqueue_cluster_operation()."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch(
+            'shakenfist.mariadb.config', fake_config)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_happy_path_writes_three_rows_and_commits_once(
+            self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_get_engine.return_value = mock_engine
+
+        from uuid import UUID
+        result = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'node_net_op',
+                _make_metadata(),
+                1000.0,
+                'node-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertTrue(result)
+        # Three inserts (cluster_operations, object_states,
+        # work_queue) then one commit.
+        self.assertEqual(mock_conn.execute.call_count, 3)
+        mock_conn.commit.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_duplicate_cluster_operation_rolls_back(
+            self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        # First execute (cluster_operations insert) raises duplicate.
+        mock_conn.execute.side_effect = IntegrityError(
+            'insert', {}, Exception('duplicate'))
+        mock_get_engine.return_value = mock_engine
+
+        from uuid import UUID
+        result = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'node_net_op',
+                _make_metadata(),
+                1000.0,
+                'node-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertFalse(result)
+        # Only the first execute was attempted; no commit.
+        self.assertEqual(mock_conn.execute.call_count, 1)
+        mock_conn.commit.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_on_state_rolls_back(
+            self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        # First insert succeeds, second (state upsert) raises.
+        mock_conn.execute.side_effect = [
+            mock.Mock(),
+            OperationalError('upsert', {}, Exception('DB down')),
+        ]
+        mock_get_engine.return_value = mock_engine
+
+        from uuid import UUID
+        result = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'node_net_op',
+                _make_metadata(),
+                1000.0,
+                'node-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertFalse(result)
+        # Only two executes attempted (third would be work_queue).
+        self.assertEqual(mock_conn.execute.call_count, 2)
+        mock_conn.commit.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_on_work_queue_rolls_back(
+            self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = [
+            mock.Mock(),
+            mock.Mock(),
+            OperationalError('insert', {}, Exception('DB down')),
+        ]
+        mock_get_engine.return_value = mock_engine
+
+        from uuid import UUID
+        result = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'node_net_op',
+                _make_metadata(),
+                1000.0,
+                'node-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertFalse(result)
+        self.assertEqual(mock_conn.execute.call_count, 3)
+        mock_conn.commit.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_delay_sets_scheduled_at(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_get_engine.return_value = mock_engine
+
+        from uuid import UUID
+        mariadb._direct_create_and_enqueue_cluster_operation(
+            UUID(OP_UUID_STR),
+            'node_net_op',
+            _make_metadata(),
+            1000.0,
+            'node-clusteroperation-user_waiting',
+            delay=60.0,
+        )
+
+        # Third insert is the work_queue row.
+        queue_stmt = mock_conn.execute.call_args_list[2][0][0]
+        params = queue_stmt.compile().params
+        self.assertEqual(params['scheduled_at'], 1060.0)
+        self.assertEqual(params['created_at'], 1000.0)
+        self.assertEqual(params['attempts'], 0)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_metadata_columns_are_extracted(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_get_engine.return_value = mock_engine
+
+        from uuid import UUID
+        mariadb._direct_create_and_enqueue_cluster_operation(
+            UUID(OP_UUID_STR),
+            'node_net_op',
+            _make_metadata(),
+            1000.0,
+            'node-clusteroperation-user_waiting',
+        )
+
+        # First insert is the cluster_operations row.
+        cluster_stmt = mock_conn.execute.call_args_list[0][0][0]
+        params = cluster_stmt.compile().params
+        self.assertEqual(
+            str(params['uuid']), OP_UUID_STR)
+        self.assertEqual(params['operation_type'], 'node_net_op')
+        self.assertEqual(params['created_at'], 1000.0)
+        self.assertEqual(str(params['node_uuid']), NODE_UUID_STR)
+        self.assertEqual(
+            str(params['instance_uuid']), INSTANCE_UUID_STR)
+        self.assertEqual(
+            str(params['network_uuid']), NETWORK_UUID_STR)
+        self.assertEqual(params['priority'], 'user_waiting')
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_missing_optional_uuids_become_null(
+            self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_get_engine.return_value = mock_engine
+
+        metadata = {
+            'uuid': OP_UUID_STR,
+            'node_uuid': NODE_UUID_STR,
+            'priority': 'background',
+            'tasks': ['x'],
+        }
+
+        from uuid import UUID
+        mariadb._direct_create_and_enqueue_cluster_operation(
+            UUID(OP_UUID_STR),
+            'net_op',
+            metadata,
+            1000.0,
+            'node-clusteroperation-background',
+        )
+
+        cluster_stmt = mock_conn.execute.call_args_list[0][0][0]
+        params = cluster_stmt.compile().params
+        self.assertIsNone(params['instance_uuid'])
+        self.assertIsNone(params['network_uuid'])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_work_queue_payload_shape(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_get_engine.return_value = mock_engine
+
+        from uuid import UUID
+        mariadb._direct_create_and_enqueue_cluster_operation(
+            UUID(OP_UUID_STR),
+            'node_net_op',
+            _make_metadata(),
+            1000.0,
+            'node-clusteroperation-user_waiting',
+        )
+
+        queue_stmt = mock_conn.execute.call_args_list[2][0][0]
+        params = queue_stmt.compile().params
+        self.assertEqual(
+            params['payload'],
+            {
+                'operation_type': 'node_net_op',
+                'operation_uuid': OP_UUID_STR,
+            })
+        self.assertEqual(
+            params['queue_name'],
+            'node-clusteroperation-user_waiting')
+        self.assertIsNone(params['claimed_at'])
+        self.assertIsNone(params['claimed_by'])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_state_row_shape(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_get_engine.return_value = mock_engine
+
+        from uuid import UUID
+        mariadb._direct_create_and_enqueue_cluster_operation(
+            UUID(OP_UUID_STR),
+            'node_net_op',
+            _make_metadata(),
+            1000.0,
+            'node-clusteroperation-user_waiting',
+        )
+
+        # Second insert is the object_states upsert.
+        state_stmt = mock_conn.execute.call_args_list[1][0][0]
+        params = state_stmt.compile().params
+        self.assertEqual(params['object_uuid'], OP_UUID_STR)
+        self.assertEqual(params['object_type'], 'node_net_op')
+        self.assertEqual(params['state_value'], 'queued')
+        self.assertEqual(params['update_time'], 1000.0)
+        self.assertIsNone(params['message'])

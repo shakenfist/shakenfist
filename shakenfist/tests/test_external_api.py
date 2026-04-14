@@ -516,7 +516,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-    @mock.patch('shakenfist.etcd.enqueue')
+    @mock.patch('shakenfist.mariadb.enqueue_work_item')
     @mock.patch('shakenfist.instance.Instances',
                 return_value=[
                     FakeInstance(

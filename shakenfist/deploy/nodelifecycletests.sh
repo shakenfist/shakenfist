@@ -181,6 +181,11 @@ other_victim=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cl
 
 log "Will hard stop the cluster maintainer, ${maintainer}"
 
+# Capture node UUIDs while sf-client can still resolve the names; we need
+# these later to query the work_queue table, which is keyed on node UUID.
+maintainer_uuid=$(sf-client --json node show ${maintainer} | jq --raw-output ".uuid")
+other_victim_uuid=$(sf-client --json node show ${other_victim} | jq --raw-output ".uuid")
+
 # Terminate the node uncleanly for ${maintainer}, with extra flags so we don't hang
 sudo ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=1 \
     -o ServerAliveCountMax=1 debian@${maintainer} "sudo halt --force --force"
@@ -333,16 +338,29 @@ if [ $(sf-client instance list | grep -c ${other_victim}) -gt 0 ]; then
 fi
 log "Instances in expected state"
 
-# Ensure there are no queued jobs for ${maintainer} and ${other_victim}
+# Ensure there are no queued jobs for ${maintainer} and ${other_victim}.
+# Node-scoped queue names are '{node_uuid}-clusteroperation-{priority}' so
+# we match by the UUID prefix we captured before the nodes were deleted.
+# Cluster operation headers live in cluster_operations, keyed by node_uuid.
 echo
 log "=== Queue checks ==="
-log "Ensure there node queues have been cleared for ${maintainer}"
-if [ $(etcdctl get --prefix /sf/queue/${maintainer} | wc -l) -gt 0 ]; then
+log "Ensure node queues have been cleared for ${maintainer}"
+if [ $(sudo mysql -N shakenfist -e \
+        "SELECT COUNT(*) FROM work_queue WHERE queue_name LIKE '${maintainer_uuid}-%'") -gt 0 ]; then
     log "Queue jobs remain for ${maintainer}"
 fi
-log "Ensure there node queues have been cleared for ${other_victim}"
-if [ $(etcdctl get --prefix /sf/queue/${other_victim} | wc -l) -gt 0 ]; then
+if [ $(sudo mysql -N shakenfist -e \
+        "SELECT COUNT(*) FROM cluster_operations WHERE node_uuid='${maintainer_uuid}'") -gt 0 ]; then
+    log "Cluster operations remain for ${maintainer}"
+fi
+log "Ensure node queues have been cleared for ${other_victim}"
+if [ $(sudo mysql -N shakenfist -e \
+        "SELECT COUNT(*) FROM work_queue WHERE queue_name LIKE '${other_victim_uuid}-%'") -gt 0 ]; then
     log "Queue jobs remain for ${other_victim}"
+fi
+if [ $(sudo mysql -N shakenfist -e \
+        "SELECT COUNT(*) FROM cluster_operations WHERE node_uuid='${other_victim_uuid}'") -gt 0 ]; then
+    log "Cluster operations remain for ${other_victim}"
 fi
 log "Queue jobs in expected state"
 

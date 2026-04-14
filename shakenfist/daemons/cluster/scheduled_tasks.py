@@ -1,6 +1,7 @@
 import queue
 import time
 
+from prometheus_client import Counter
 from shakenfist_utilities import logs                 # noreorder
 
 from shakenfist.config import config
@@ -8,6 +9,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FINAL_OBJECT_STATES
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
+from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.blob import Blob
 from shakenfist import etcd
@@ -17,6 +19,7 @@ from shakenfist.schema.operations import node_blob_op as nbo_schema
 from shakenfist.schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
 from shakenfist.node import Node
+from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_general_background_node_queues
 from shakenfist.operations.baseoperation import get_general_user_facing_node_queues
 from shakenfist.util import general as util_general
@@ -26,6 +29,14 @@ LOG, _ = logs.setup(__name__)
 BLOB_CHECKS_QUEUE = queue.Queue()
 INSTANCE_CHECKS_QUEUE = queue.Queue()
 DELETED_OBJECTS_QUEUE = queue.Queue()
+
+REAPER_REQUEUED = Counter(
+    'cluster_op_reaper_requeued_total',
+    'Stuck cluster operation work items that were re-queued.')
+REAPER_REJECTED = Counter(
+    'cluster_op_reaper_rejected_total',
+    'Stuck cluster operation work items that exceeded '
+    'max_attempts and were rejected.')
 
 
 @util_general.recorded_method
@@ -201,7 +212,7 @@ def _process_per_instance_queue(execution_limit=10):
 
 
 def _log_and_update_metrics_for_queue(queue, log_prefix):
-    processing, queued, deferred = etcd.get_queue_length(queue)
+    processing, queued, deferred = mariadb.get_work_queue_length(queue)
     LOG.with_fields({
         'processing': processing,
         'queued': queued,
@@ -216,6 +227,101 @@ def log_cluster_queue_lengths():
 
     for queuename in get_general_background_node_queues():
         _log_and_update_metrics_for_queue(queuename, 'Cluster background')
+
+
+@util_general.recorded_method
+def reap_stuck_cluster_operation_jobs():
+    """Re-queue or reject work_queue rows whose claim has gone stale.
+
+    Runs only on the elected cluster node via the scheduled task
+    loop in daemons/cluster/main.py. For every row whose
+    claimed_at is older than CLUSTER_OP_STUCK_THRESHOLD:
+
+    - If attempts < CLUSTER_OP_MAX_ATTEMPTS, clear the claim so a
+      fresh worker re-picks up the job. attempts is left in place
+      so the next failure still counts toward the ceiling.
+    - Otherwise delete the row, flip the cluster operation to
+      STATE_ERROR, and log an audit event. This is the 'job of
+      death' guard.
+
+    Races with another freshly-elected cluster daemon are
+    harmless: the row-level delete / update wins exactly once,
+    and the loser's helper returns False so the loser skips the
+    state transition.
+    """
+    threshold = config.CLUSTER_OP_STUCK_THRESHOLD
+    max_attempts = config.CLUSTER_OP_MAX_ATTEMPTS
+
+    stuck = mariadb.list_stuck_work_queue_rows(threshold)
+    if not stuck:
+        return
+
+    LOG.info(
+        f'Reaper found {len(stuck)} stuck work queue rows '
+        f'(threshold={threshold}s, max_attempts={max_attempts})')
+
+    for row in stuck:
+        row_id = row['id']
+        queue_name = row['queue_name']
+        payload = row.get('payload') or {}
+        op_type = payload.get('operation_type')
+        op_uuid = payload.get('operation_uuid')
+        attempts = row['attempts']
+
+        if attempts >= max_attempts:
+            if not mariadb.delete_work_queue_row(row_id):
+                continue
+            REAPER_REJECTED.inc()
+            LOG.with_fields({
+                'row_id': row_id,
+                'queue_name': queue_name,
+                'attempts': attempts,
+                'claimed_by': row.get('claimed_by'),
+                'claimed_at': row.get('claimed_at'),
+                'operation_type': op_type,
+                'operation_uuid': op_uuid,
+            }).warning(
+                'Reaper rejected stuck work item: '
+                'exceeded max_attempts')
+
+            if not op_type or not op_uuid:
+                continue
+            try:
+                cls = get_object_class(op_type)
+            except KeyError:
+                continue
+            op = cls.from_db(op_uuid)
+            if op is None:
+                continue
+            try:
+                op.state = BaseClusterOperation.STATE_ERROR
+                op.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'rejected by reaper: exceeded '
+                    f'{max_attempts} claim attempts',
+                    extra={
+                        'queue_name': queue_name,
+                        'attempts': attempts,
+                        'claimed_by': row.get('claimed_by'),
+                        'claimed_at': row.get('claimed_at'),
+                    })
+            except InvalidStateException as e:
+                LOG.with_fields({
+                    'operation_type': op_type,
+                    'operation_uuid': op_uuid,
+                }).warning(
+                    f'Reaper cannot transition op to error: {e}')
+            continue
+
+        if mariadb.clear_work_queue_claim(row_id):
+            REAPER_REQUEUED.inc()
+            LOG.with_fields({
+                'row_id': row_id,
+                'queue_name': queue_name,
+                'attempts': attempts,
+                'claimed_by': row.get('claimed_by'),
+                'claimed_at': row.get('claimed_at'),
+            }).info('Reaper re-queued stuck work item')
 
 
 @util_general.recorded_method

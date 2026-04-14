@@ -84,6 +84,10 @@ class SFConfig(BaseSettings):
         13001,
         description='Where to expose internal metrics from the resources daemon.'
     )
+    CLUSTER_METRICS_PORT: int = Field(
+        13007,
+        description='Where to expose internal metrics from the cluster daemon.'
+    )
 
     # Scheduler Options
     SCHEDULER_CACHE_TIMEOUT: int = Field(
@@ -152,6 +156,23 @@ class SFConfig(BaseSettings):
             'aborted operations. Active (queued/preflight/executing) '
             'operations are never pruned regardless of age. Set to 0 '
             'to disable pruning.'
+        )
+    )
+    CLUSTER_OP_STUCK_THRESHOLD: int = Field(
+        30 * 60,
+        description=(
+            'Seconds a cluster operation work queue row may remain '
+            'claimed before the cluster daemon reaper considers it '
+            'stuck. Stuck rows are re-queued, or rejected if they '
+            'have exceeded CLUSTER_OP_MAX_ATTEMPTS claims.'
+        )
+    )
+    CLUSTER_OP_MAX_ATTEMPTS: int = Field(
+        5,
+        description=(
+            'Maximum number of times a cluster operation work queue '
+            'row may be claimed before the reaper rejects it and '
+            'marks the underlying operation as errored.'
         )
     )
     NODE_CHECKIN_MAXIMUM: int = Field(

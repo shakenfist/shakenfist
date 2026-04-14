@@ -124,6 +124,8 @@ _instance_attributes_table: Optional[sa.Table] = None
 _object_metadata_table: Optional[sa.Table] = None
 _cluster_operation_targets_table: Optional[sa.Table] = None
 _node_metrics_table: Optional[sa.Table] = None
+_cluster_operations_table: Optional[sa.Table] = None
+_work_queue_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -158,6 +160,8 @@ INSTANCE_ATTRIBUTES_VERSION = 2
 OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
+CLUSTER_OPERATIONS_VERSION = 2
+WORK_QUEUE_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -609,6 +613,127 @@ def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': NODE_METRICS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_cluster_operations_table() -> sa.Table:
+    """Get or create the cluster_operations table definition.
+
+    This table stores cluster operation headers (one row per operation).
+    The full metadata dict is persisted in metadata_json; commonly
+    filtered fields are extracted into their own indexed columns at
+    insert time by _direct_create_cluster_operation(). State lives in
+    the separate object_states table keyed on (object_type, uuid), and
+    per-target tracking lives in cluster_operation_targets.
+
+    Rows are insert-only: cluster operations are not mutated after
+    creation, only deleted when the operation finishes and is cleaned
+    up.
+    """
+    global _cluster_operations_table
+    if _cluster_operations_table is None:
+        metadata = _get_metadata()
+        _cluster_operations_table = sa.Table(
+            'cluster_operations',
+            metadata,
+            sa.Column('uuid', sa.Uuid(), primary_key=True),
+            sa.Column('operation_type', sa.String(64), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('node_uuid', sa.Uuid(), nullable=True),
+            sa.Column('instance_uuid', sa.Uuid(), nullable=True),
+            sa.Column('network_uuid', sa.Uuid(), nullable=True),
+            sa.Column('priority', sa.String(32), nullable=True),
+            sa.Column('metadata_json', sa.JSON(), nullable=False),
+            sa.Index('ix_cluster_ops_node', 'node_uuid'),
+            sa.Index('ix_cluster_ops_instance', 'instance_uuid'),
+            sa.Index('ix_cluster_ops_network', 'network_uuid'),
+            sa.Index('ix_cluster_ops_type_created',
+                     'operation_type', 'created_at'),
+        )
+    return _cluster_operations_table
+
+
+def _ensure_cluster_operations_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the cluster_operations table schema is up to date."""
+    table_name = 'cluster_operations'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_operations_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_OPERATIONS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_work_queue_table() -> sa.Table:
+    """Get or create the work_queue table definition.
+
+    This table stores queued work items and their claim state in a
+    single row per job. The claim fields (claimed_at, claimed_by)
+    replace the old etcd two-prefix design where a claim was
+    represented by moving a key from /sf/queue/... to /sf/processing/...
+    MariaDB row locking lets us use a single table instead.
+
+    scheduled_at supports deferred jobs: dequeue uses
+    UNIX_TIMESTAMP(NOW(6)) >= scheduled_at so a future timestamp
+    defers the job past its eligibility point.
+
+    attempts is incremented on each successful claim. Phase 7's
+    reaper will use it to enforce max_attempts (the "job of death"
+    guard) when clearing stale claims.
+    """
+    global _work_queue_table
+    if _work_queue_table is None:
+        metadata = _get_metadata()
+        _work_queue_table = sa.Table(
+            'work_queue',
+            metadata,
+            sa.Column('id', sa.BigInteger(),
+                      primary_key=True, autoincrement=True),
+            sa.Column('queue_name', sa.String(255), nullable=False),
+            sa.Column('scheduled_at', sa.Double(), nullable=False),
+            sa.Column('claimed_at', sa.Double(), nullable=True),
+            sa.Column('claimed_by', sa.String(255), nullable=True),
+            sa.Column('attempts', sa.Integer(),
+                      nullable=False, server_default='0'),
+            sa.Column('payload', sa.JSON(), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Index(
+                'ix_work_queue_ready',
+                'queue_name', 'claimed_at', 'scheduled_at'),
+        )
+    return _work_queue_table
+
+
+def _ensure_work_queue_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the work_queue table schema is up to date."""
+    table_name = 'work_queue'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_work_queue_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': WORK_QUEUE_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1340,6 +1465,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_object_metadata_schema(engine))
     results.append(_ensure_cluster_operation_targets_schema(engine))
     results.append(_ensure_node_metrics_schema(engine))
+    results.append(_ensure_cluster_operations_schema(engine))
+    results.append(_ensure_work_queue_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -3650,6 +3777,150 @@ def _migrate_etcd_node_metrics(engine: sa.Engine) -> dict[str, Any]:
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _migrate_etcd_cluster_operations(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Drain residual /sf/{op_type}/{uuid} etcd keys into the
+    cluster_operations table.
+
+    One-shot migration used when a pre-phase-6 cluster is upgraded
+    and may have leftover cluster-operation header keys. Iterates
+    the authoritative OPERATION_NAMES_TO_CLASSES list from
+    constants.py and walks each type's etcd prefix. Idempotent on
+    re-run: a duplicate uuid returns False from the insert and the
+    etcd key is deleted anyway.
+    """
+    from shakenfist import etcd
+    from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating cluster operation headers from etcd...')
+
+    for op_type in OPERATION_NAMES_TO_CLASSES:
+        for key, data in etcd.get_all(op_type, None):
+            op_uuid_str = key.split('/')[-1]
+            try:
+                op_uuid = UUID(op_uuid_str)
+            except ValueError:
+                LOG.warning(
+                    f'Cluster operation migration: invalid uuid '
+                    f'in key {key}; leaving in place')
+                error_count += 1
+                continue
+
+            if not isinstance(data, dict):
+                LOG.warning(
+                    f'Cluster operation migration: malformed '
+                    f'payload at {key}; leaving in place')
+                error_count += 1
+                continue
+
+            created_at = data.get('created_at') or time.time()
+            try:
+                inserted = _direct_create_cluster_operation(
+                    op_uuid, op_type, data, created_at)
+            except Exception as e:
+                LOG.warning(
+                    f'Cluster operation migration: insert raised '
+                    f'for {key}: {e}')
+                error_count += 1
+                continue
+
+            etcd.delete_raw(key)
+            if inserted:
+                migrated_count += 1
+            else:
+                skipped_count += 1
+
+    LOG.info(
+        f'Cluster operation migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped, {error_count} errors')
+    return {
+        'migrated_count': migrated_count,
+        'error_count': error_count,
+        'skipped_count': skipped_count,
+    }
+
+
+def _migrate_etcd_work_queue(engine: sa.Engine) -> dict[str, Any]:
+    """Drain residual /sf/queue/* and /sf/processing/* etcd keys
+    into the work_queue table.
+
+    Queue rows are inserted via _direct_work_queue_enqueue with a
+    delay computed from the legacy {timestamp}-{random} job name.
+    Processing rows (rows that were in flight when the old cluster
+    stopped) are re-queued with claimed_at=None so a worker picks
+    them up again -- the old worker is gone and we cannot preserve
+    attempt count across the etcd->MariaDB boundary.
+
+    If the legacy job name's timestamp prefix cannot be parsed the
+    migration falls back to scheduled_at=now (the row becomes
+    immediately eligible). Malformed JSON payloads are skipped and
+    the etcd key is left in place for the operator to investigate.
+    """
+    from shakenfist import etcd
+    from shakenfist import exceptions
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating work queue rows from etcd...')
+
+    for source_prefix in ('/sf/queue/', '/sf/processing/'):
+        for key, workitem in etcd.get_prefix_raw(source_prefix):
+            parts = key.split('/')
+            # /sf/{queue|processing}/{queue_name}/{jobname}
+            if len(parts) < 5:
+                LOG.warning(
+                    f'Work queue migration: malformed key {key}; '
+                    f'leaving in place')
+                error_count += 1
+                continue
+
+            queue_name = parts[3]
+            jobname = '/'.join(parts[4:])
+
+            if not isinstance(workitem, dict):
+                LOG.warning(
+                    f'Work queue migration: malformed payload at '
+                    f'{key}; leaving in place')
+                error_count += 1
+                continue
+
+            try:
+                legacy_ts = float(jobname.split('-')[0])
+            except (ValueError, IndexError):
+                LOG.warning(
+                    f'Work queue migration: cannot parse timestamp '
+                    f'from {jobname}; scheduling immediately')
+                legacy_ts = time.time()
+
+            delay = max(0.0, legacy_ts - time.time())
+            try:
+                _direct_work_queue_enqueue(queue_name, workitem, delay)
+            except exceptions.CannotEnqueueWork as e:
+                LOG.warning(
+                    f'Work queue migration: enqueue failed for '
+                    f'{key}: {e}')
+                error_count += 1
+                continue
+
+            etcd.delete_raw(key)
+            migrated_count += 1
+
+    LOG.info(
+        f'Work queue migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped, {error_count} errors')
+    return {
+        'migrated_count': migrated_count,
+        'error_count': error_count,
+        'skipped_count': skipped_count,
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -3733,6 +4004,12 @@ DATA_MIGRATIONS.update({
     },
     'node_metrics': {
         2: _migrate_etcd_node_metrics,
+    },
+    'cluster_operations': {
+        2: _migrate_etcd_cluster_operations,
+    },
+    'work_queue': {
+        2: _migrate_etcd_work_queue,
     },
 })
 
@@ -15120,3 +15397,1040 @@ def delete_node_metrics(node_uuid: 'str | UUID') -> bool:
     if _use_database_service():
         return _grpc_delete_node_metrics(u)
     return _direct_delete_node_metrics(u)
+
+
+# =============================================================================
+# Cluster Operations Direct Access Functions
+# Operation headers, insert-only. State lives in object_states, per-target
+# tracking lives in cluster_operation_targets.
+# =============================================================================
+
+def _maybe_uuid(value: Any) -> Optional[UUID]:
+    """Convert an optional string/UUID to UUID, returning None for missing."""
+    if value is None:
+        return None
+    if isinstance(value, UUID):
+        return value
+    return UUID(value)
+
+
+def _cluster_operation_row_to_dict(row: Any) -> dict[str, Any]:
+    """Convert a cluster_operations row into the legacy-etcd payload shape.
+
+    Phase 5's from_db() switch depends on this shape being identical
+    to the dict previously stored at /sf/{operation_type}/{uuid} in
+    etcd. The full metadata dict is flattened into the top level,
+    with uuid/operation_type/created_at overlaid from the columnar
+    fields.
+    """
+    md = dict(row.metadata_json or {})
+    md['uuid'] = str(row.uuid)
+    md['operation_type'] = row.operation_type
+    md['created_at'] = row.created_at
+    return md
+
+
+def _direct_create_cluster_operation(
+        uuid: UUID, operation_type: str, metadata: dict[str, Any],
+        created_at: float) -> bool:
+    """Insert a cluster operation header in MariaDB.
+
+    Insert-only — returns False if a row with the same uuid already
+    exists. Extracts node_uuid, instance_uuid, network_uuid and
+    priority from the metadata dict into their own columns for
+    indexed lookups. The full metadata dict is stored in
+    metadata_json.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=uuid,
+                operation_type=operation_type,
+                created_at=created_at,
+                node_uuid=_maybe_uuid(metadata.get('node_uuid')),
+                instance_uuid=_maybe_uuid(metadata.get('instance_uuid')),
+                network_uuid=_maybe_uuid(metadata.get('network_uuid')),
+                priority=metadata.get('priority'),
+                metadata_json=metadata,
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        LOG.warning(
+            f'MariaDB insert refused duplicate cluster_operation {uuid}')
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB insert failed for cluster_operation {uuid}: {e}')
+        return False
+
+
+def _direct_get_cluster_operation(
+        uuid: UUID) -> Optional[dict[str, Any]]:
+    """Get a cluster operation header from MariaDB.
+
+    Returns the full metadata dict with uuid/operation_type/created_at
+    overlaid, matching the legacy etcd payload shape. Returns None if
+    not found.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == uuid)
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return None
+            return _cluster_operation_row_to_dict(result)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for cluster_operation {uuid}: {e}')
+        return None
+
+
+def _direct_get_cluster_operations_by_node(
+        node_uuid: UUID) -> list[dict[str, Any]]:
+    """Get all cluster operation headers targeting a specific node."""
+    engine = _get_engine()
+    table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                table.c.node_uuid == node_uuid
+            ).order_by(table.c.created_at)
+            result = conn.execute(stmt).fetchall()
+            return [_cluster_operation_row_to_dict(row) for row in result]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for cluster_operations '
+            f'by node {node_uuid}: {e}')
+        return []
+
+
+def _direct_delete_cluster_operation(uuid: UUID) -> bool:
+    """Delete a cluster operation header from MariaDB."""
+    engine = _get_engine()
+    table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for cluster_operation {uuid}: {e}')
+        return False
+
+
+def _direct_create_and_enqueue_cluster_operation(
+        op_uuid: UUID,
+        operation_type: str,
+        metadata: dict[str, Any],
+        created_at: float,
+        queue_name: str,
+        delay: float = 0.0) -> bool:
+    """Atomically create a cluster operation and enqueue its work item.
+
+    Writes three rows in a single MariaDB transaction:
+
+    1. A cluster_operations row with the full operation metadata
+       and the same indexed-column extraction as
+       _direct_create_cluster_operation.
+    2. An object_states row (INSERT ... ON DUPLICATE KEY UPDATE)
+       with state='queued' and update_time=created_at, matching
+       the _direct_set_state contract.
+    3. A work_queue row with
+       scheduled_at = created_at + delay, attempts = 0, and a
+       payload dict of
+       {'operation_type': operation_type,
+        'operation_uuid': str(op_uuid)} -- the same shape
+       phase 5's from_db() consumer will read via Dequeue.
+
+    This is the only function in mariadb.py that writes to more
+    than one table in a single transaction. The existing
+    single-table _direct_* functions each own their own commit,
+    so they cannot be composed here -- the statements are
+    duplicated inline instead. That duplication is the price of
+    getting the atomicity right.
+
+    Returns True on success. Returns False if the cluster_operations
+    insert hits a duplicate uuid (IntegrityError) or if any write
+    raises OperationalError -- in both cases the `with` context
+    rolls back the uncommitted transaction automatically. Audit
+    events are out of scope; callers emit them via eventlog after
+    the RPC returns successfully.
+    """
+    engine = _get_engine()
+    cluster_ops_table = _get_cluster_operations_table()
+    states_table = _get_object_states_table()
+    queue_table = _get_work_queue_table()
+
+    scheduled_at = created_at + delay
+    work_item = {
+        'operation_type': operation_type,
+        'operation_uuid': str(op_uuid),
+    }
+
+    try:
+        with engine.connect() as conn:
+            cluster_stmt = sa.insert(cluster_ops_table).values(
+                uuid=op_uuid,
+                operation_type=operation_type,
+                created_at=created_at,
+                node_uuid=_maybe_uuid(metadata.get('node_uuid')),
+                instance_uuid=_maybe_uuid(
+                    metadata.get('instance_uuid')),
+                network_uuid=_maybe_uuid(
+                    metadata.get('network_uuid')),
+                priority=metadata.get('priority'),
+                metadata_json=metadata,
+            )
+            conn.execute(cluster_stmt)
+
+            state_stmt = sa.dialects.mysql.insert(
+                states_table
+            ).values(
+                object_uuid=str(op_uuid),
+                object_type=operation_type,
+                state_value='queued',
+                update_time=created_at,
+                message=None,
+            ).on_duplicate_key_update(
+                state_value='queued',
+                update_time=created_at,
+                message=None,
+            )
+            conn.execute(state_stmt)
+
+            queue_stmt = sa.insert(queue_table).values(
+                queue_name=queue_name,
+                scheduled_at=scheduled_at,
+                claimed_at=None,
+                claimed_by=None,
+                attempts=0,
+                payload=work_item,
+                created_at=created_at,
+            )
+            conn.execute(queue_stmt)
+
+            conn.commit()
+            return True
+    except IntegrityError:
+        LOG.warning(
+            f'MariaDB atomic create+enqueue refused duplicate '
+            f'cluster_operation {op_uuid}')
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB atomic create+enqueue failed for '
+            f'cluster_operation {op_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Cluster Operations gRPC Client Functions
+# =============================================================================
+
+def _grpc_create_cluster_operation(
+        uuid: UUID, operation_type: str, metadata: dict[str, Any],
+        created_at: float) -> bool:
+    """Insert a cluster operation header via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateClusterOperationRequest(
+            data=database_pb2.ClusterOperationData(
+                uuid=str(uuid),
+                operation_type=operation_type,
+                created_at=created_at,
+                metadata_json=_json_dumps(metadata),
+            )
+        )
+        reply = _grpc_call(stub.CreateClusterOperation, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateClusterOperation failed for {uuid}: {e}')
+        return False
+
+
+def _grpc_get_cluster_operation(
+        uuid: UUID) -> Optional[dict[str, Any]]:
+    """Get a cluster operation header via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetClusterOperationRequest(
+            uuid=str(uuid))
+        reply = _grpc_call(stub.GetClusterOperation, request)
+        if not reply.found:
+            return None
+        return (
+            json.loads(reply.data.metadata_json)
+            if reply.data.metadata_json else {}
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetClusterOperation failed for {uuid}: {e}')
+        return None
+
+
+def _grpc_get_cluster_operations_by_node(
+        node_uuid: UUID) -> list[dict[str, Any]]:
+    """Get all cluster operation headers for a node via gRPC."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetClusterOperationsByNodeRequest(
+            node_uuid=str(node_uuid))
+        reply = _grpc_call(
+            stub.GetClusterOperationsByNode, request)
+        return [
+            json.loads(item.metadata_json)
+            if item.metadata_json else {}
+            for item in reply.items
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetClusterOperationsByNode failed '
+            f'for {node_uuid}: {e}')
+        return []
+
+
+def _grpc_delete_cluster_operation(uuid: UUID) -> bool:
+    """Delete a cluster operation header via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteClusterOperationRequest(
+            uuid=str(uuid))
+        reply = _grpc_call(stub.DeleteClusterOperation, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteClusterOperation failed for {uuid}: {e}')
+        return False
+
+
+def _grpc_create_and_enqueue_cluster_operation(
+        op_uuid: UUID,
+        operation_type: str,
+        metadata: dict[str, Any],
+        created_at: float,
+        queue_name: str,
+        delay: float = 0.0) -> bool:
+    """Atomic create+enqueue via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = (
+            database_pb2
+            .CreateAndEnqueueClusterOperationRequest(
+                uuid=str(op_uuid),
+                operation_type=operation_type,
+                created_at=created_at,
+                queue_name=queue_name,
+                delay=delay,
+                metadata_json=_json_dumps(metadata),
+            )
+        )
+        reply = _grpc_call(
+            stub.CreateAndEnqueueClusterOperation, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC CreateAndEnqueueClusterOperation failed for '
+            f'{op_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# Work Queue gRPC Client Functions
+# =============================================================================
+
+def _grpc_work_queue_enqueue(
+        queue_name: str, work_item: dict[str, Any],
+        delay: float = 0.0) -> None:
+    """Enqueue a work item via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.EnqueueRequest(
+            queue_name=queue_name,
+            work_item=_json_dumps(work_item),
+            delay=delay,
+        )
+        reply = _grpc_call(stub.Enqueue, request)
+        if not reply.success:
+            LOG.error(
+                f'gRPC Enqueue failed for {queue_name}: '
+                f'{reply.error}')
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC Enqueue failed for {queue_name}: {e}')
+
+
+def _grpc_work_queue_dequeue(
+        queue_name: str) -> Optional[tuple[str, dict[str, Any]]]:
+    """Claim the next available job via the database microservice.
+
+    The database daemon uses its own NODE_NAME as worker_id; the
+    gRPC contract does not carry a caller-supplied worker_id.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DequeueRequest(queue_name=queue_name)
+        reply = _grpc_call(stub.Dequeue, request)
+        if not reply.found:
+            return None
+        return reply.job_name, json.loads(reply.work_item)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC Dequeue failed for {queue_name}: {e}')
+        return None
+
+
+def _grpc_work_queue_resolve(
+        queue_name: str, job_name: str) -> None:
+    """Mark a job complete via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ResolveRequest(
+            queue_name=queue_name, job_name=job_name)
+        reply = _grpc_call(stub.Resolve, request)
+        if not reply.success:
+            LOG.error(
+                f'gRPC Resolve failed for {queue_name}/{job_name}: '
+                f'{reply.error}')
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC Resolve failed for {queue_name}/{job_name}: {e}')
+
+
+def _grpc_work_queue_length(
+        queue_name: str) -> tuple[int, int, int]:
+    """Get queue length statistics via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.QueueLengthRequest(queue_name=queue_name)
+        reply = _grpc_call(stub.GetQueueLength, request)
+        return (
+            int(reply.processing),
+            int(reply.queued),
+            int(reply.deferred),
+        )
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetQueueLength failed for {queue_name}: {e}')
+        return 0, 0, 0
+
+
+def _grpc_work_queue_restart(queue_name: str) -> None:
+    """Clear claims on a queue via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.RestartQueueRequest(queue_name=queue_name)
+        reply = _grpc_call(stub.RestartQueue, request)
+        if not reply.success:
+            LOG.error(
+                f'gRPC RestartQueue failed for {queue_name}: '
+                f'{reply.error}')
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC RestartQueue failed for {queue_name}: {e}')
+
+
+def _grpc_work_queue_list_stuck(
+        threshold_seconds: float) -> list[dict[str, Any]]:
+    """List stuck work_queue rows via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ListStuckWorkQueueRowsRequest(
+            threshold_seconds=threshold_seconds)
+        reply = _grpc_call(stub.ListStuckWorkQueueRows, request)
+        return [
+            {
+                'id': int(row.id),
+                'queue_name': row.queue_name,
+                'claimed_at': float(row.claimed_at),
+                'claimed_by': row.claimed_by,
+                'attempts': int(row.attempts),
+                'payload': (
+                    json.loads(row.payload_json)
+                    if row.payload_json else {}),
+            }
+            for row in reply.rows
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ListStuckWorkQueueRows failed: {e}')
+        return []
+
+
+def _grpc_work_queue_clear_claim(row_id: int) -> bool:
+    """Clear a stuck claim via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ClearWorkQueueClaimRequest(
+            row_id=row_id)
+        reply = _grpc_call(stub.ClearWorkQueueClaim, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ClearWorkQueueClaim failed for row '
+            f'{row_id}: {e}')
+        return False
+
+
+def _grpc_work_queue_delete_row(row_id: int) -> bool:
+    """Delete a stuck work_queue row via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteWorkQueueRowRequest(
+            row_id=row_id)
+        reply = _grpc_call(stub.DeleteWorkQueueRow, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteWorkQueueRow failed for row '
+            f'{row_id}: {e}')
+        return False
+
+
+# =============================================================================
+# Cluster Operations Public API Functions
+# =============================================================================
+
+def create_cluster_operation(
+        uuid: 'str | UUID', operation_type: str,
+        metadata: dict[str, Any], created_at: float) -> bool:
+    """Insert a cluster operation header.
+
+    Insert-only semantics: returns False if a row with the same uuid
+    already exists (no update). State lives in the separate
+    object_states table and is not touched by this function.
+
+    Args:
+        uuid: The operation's UUID (str or UUID).
+        operation_type: Operation type name, e.g. 'instance_preflight'.
+        metadata: The full operation metadata dict. node_uuid,
+            instance_uuid, network_uuid and priority (if present) are
+            extracted into indexed columns at insert time.
+        created_at: Unix timestamp of operation creation.
+
+    Returns:
+        True if inserted, False on duplicate or error.
+    """
+    u = _ensure_uuid(uuid)
+    if _use_database_service():
+        return _grpc_create_cluster_operation(
+            u, operation_type, metadata, created_at)
+    return _direct_create_cluster_operation(
+        u, operation_type, metadata, created_at)
+
+
+def get_cluster_operation(
+        uuid: 'str | UUID') -> Optional[dict[str, Any]]:
+    """Get a cluster operation header.
+
+    Returns a dict shaped {**metadata_json, uuid, operation_type,
+    created_at} -- a drop-in replacement for the legacy etcd payload
+    that phase 5's from_db() switch relies on.
+
+    Args:
+        uuid: The operation's UUID (str or UUID).
+
+    Returns:
+        The operation dict, or None if not found.
+    """
+    u = _ensure_uuid(uuid)
+    if _use_database_service():
+        return _grpc_get_cluster_operation(u)
+    return _direct_get_cluster_operation(u)
+
+
+def get_cluster_operations_by_node(
+        node_uuid: 'str | UUID') -> list[dict[str, Any]]:
+    """Get all cluster operation headers targeting a specific node.
+
+    Results are ordered by created_at ascending.
+
+    Args:
+        node_uuid: The UUID of the target node (str or UUID).
+
+    Returns:
+        List of operation dicts (possibly empty).
+    """
+    u = _ensure_uuid(node_uuid)
+    if _use_database_service():
+        return _grpc_get_cluster_operations_by_node(u)
+    return _direct_get_cluster_operations_by_node(u)
+
+
+def delete_cluster_operation(uuid: 'str | UUID') -> bool:
+    """Delete a cluster operation header.
+
+    Args:
+        uuid: The operation's UUID (str or UUID).
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    u = _ensure_uuid(uuid)
+    if _use_database_service():
+        return _grpc_delete_cluster_operation(u)
+    return _direct_delete_cluster_operation(u)
+
+
+def create_and_enqueue_cluster_operation(
+        op_uuid: 'str | UUID',
+        operation_type: str,
+        metadata: dict[str, Any],
+        created_at: float,
+        queue_name: str,
+        delay: float = 0.0) -> bool:
+    """Atomically create a cluster operation and enqueue its job.
+
+    Writes the cluster_operations header, an object_states row
+    (state='queued'), and a work_queue row in a single MariaDB
+    transaction. Replaces the legacy
+    shakenfist/schema/operations/util.py:enqueue() path that used
+    etcd.replace_many_raw.
+
+    Audit events are NOT written by this function; callers should
+    emit them via shakenfist.eventlog.add_event_multi() after this
+    call returns True.
+
+    Args:
+        op_uuid: The operation's UUID (str or UUID).
+        operation_type: Operation type name, e.g. 'node_net_op'.
+        metadata: The full operation metadata dict.
+        created_at: Unix timestamp of operation creation.
+        queue_name: Target work queue name, e.g.
+            '{target}-clusteroperation-{priority}'.
+        delay: Seconds to defer the job (default 0).
+
+    Returns:
+        True on success. False if the operation uuid already
+        exists (duplicate) or on MariaDB error.
+    """
+    u = _ensure_uuid(op_uuid)
+    if _use_database_service():
+        return _grpc_create_and_enqueue_cluster_operation(
+            u, operation_type, metadata, created_at,
+            queue_name, delay)
+    return _direct_create_and_enqueue_cluster_operation(
+        u, operation_type, metadata, created_at,
+        queue_name, delay)
+
+
+# =============================================================================
+# Work Queue Direct Access Functions
+# Replaces the /sf/queue/... and /sf/processing/... etcd prefixes with a
+# single row-locked table. Claim state lives on the row itself. Public
+# callers use the enqueue_work_item/dequeue_work_item/resolve_work_item/
+# get_work_queue_length/restart_work_queue wrappers at the bottom of this
+# module.
+# =============================================================================
+
+def _direct_work_queue_enqueue(
+        queue_name: str, payload: dict[str, Any],
+        delay: float = 0.0) -> None:
+    """Insert a work item on the queue.
+
+    Raises shakenfist.exceptions.CannotEnqueueWork on unrecoverable
+    failure, matching the current etcd.enqueue() contract.
+    """
+    from shakenfist import exceptions
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    now = time.time()
+    scheduled = now + delay
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                queue_name=queue_name,
+                scheduled_at=scheduled,
+                claimed_at=None,
+                claimed_by=None,
+                attempts=0,
+                payload=payload,
+                created_at=now,
+            )
+            conn.execute(stmt)
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB insert failed for work_queue {queue_name}: {e}')
+        raise exceptions.CannotEnqueueWork(
+            f'work_queue insert failed for {queue_name}') from e
+
+
+def _direct_work_queue_dequeue(
+        queue_name: str,
+        worker_id: str) -> Optional[tuple[str, dict[str, Any]]]:
+    """Claim the next eligible job on a queue.
+
+    Uses SELECT ... FOR UPDATE SKIP LOCKED so two simultaneous
+    callers either get distinct rows or at least one gets None.
+    Increments attempts on the claim.
+
+    Returns (jobname, payload_dict) on success, None if the queue
+    is empty or every eligible row is locked by another worker.
+    The returned jobname is the stringified autoincrement id;
+    callers treat it as opaque and pass it back to resolve().
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            select_stmt = (
+                sa.select(table.c.id, table.c.payload)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_(None))
+                .where(
+                    table.c.scheduled_at
+                    <= sa.func.unix_timestamp(sa.func.now(6)))
+                .order_by(table.c.scheduled_at.asc())
+                .limit(1)
+                .with_for_update(skip_locked=True)
+            )
+            row = conn.execute(select_stmt).fetchone()
+            if row is None:
+                return None
+
+            update_stmt = (
+                sa.update(table)
+                .where(table.c.id == row.id)
+                .values(
+                    claimed_at=sa.func.unix_timestamp(
+                        sa.func.now(6)),
+                    claimed_by=worker_id,
+                    attempts=table.c.attempts + 1,
+                )
+            )
+            conn.execute(update_stmt)
+            conn.commit()
+            return str(row.id), dict(row.payload or {})
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB dequeue failed for work_queue '
+            f'{queue_name}: {e}')
+        return None
+
+
+def _direct_work_queue_resolve(
+        queue_name: str, job_name: str) -> None:
+    """Mark a claimed job as complete by deleting the row.
+
+    queue_name is accepted for parity with etcd.resolve() and for
+    logging / safety; the id in job_name is already unique across
+    queues.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        job_id = int(job_name)
+    except ValueError:
+        LOG.warning(
+            f'work_queue resolve: non-numeric job_name '
+            f'{job_name!r} for queue {queue_name}')
+        return
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                (table.c.id == job_id)
+                & (table.c.queue_name == queue_name))
+            conn.execute(stmt)
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB resolve failed for work_queue '
+            f'{queue_name}/{job_name}: {e}')
+
+
+def _direct_work_queue_length(
+        queue_name: str) -> tuple[int, int, int]:
+    """Return (processing, queued, deferred) counts for a queue.
+
+    - processing: claimed rows (claimed_at IS NOT NULL)
+    - queued: unclaimed rows whose scheduled_at is now or in the past
+    - deferred: unclaimed rows whose scheduled_at is in the future
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            now_expr = sa.func.unix_timestamp(sa.func.now(6))
+
+            processing_stmt = (
+                sa.select(sa.func.count())
+                .select_from(table)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_not(None))
+            )
+            queued_stmt = (
+                sa.select(sa.func.count())
+                .select_from(table)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_(None))
+                .where(table.c.scheduled_at <= now_expr)
+            )
+            deferred_stmt = (
+                sa.select(sa.func.count())
+                .select_from(table)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_(None))
+                .where(table.c.scheduled_at > now_expr)
+            )
+
+            processing = int(
+                conn.execute(processing_stmt).scalar() or 0)
+            queued = int(conn.execute(queued_stmt).scalar() or 0)
+            deferred = int(
+                conn.execute(deferred_stmt).scalar() or 0)
+            return processing, queued, deferred
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB length query failed for work_queue '
+            f'{queue_name}: {e}')
+        return 0, 0, 0
+
+
+def _direct_work_queue_restart(queue_name: str) -> int:
+    """Clear all claims on a queue so workers re-pick up the jobs.
+
+    Used by the queues daemon at startup to recover in-flight work
+    after a crash. Does NOT reset attempts -- phase 7's reaper
+    still needs to notice persistently-failing jobs eventually.
+
+    Returns the number of rows whose claim was cleared.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = (
+                sa.update(table)
+                .where(table.c.queue_name == queue_name)
+                .where(table.c.claimed_at.is_not(None))
+                .values(claimed_at=None, claimed_by=None)
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return int(result.rowcount or 0)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB restart failed for work_queue '
+            f'{queue_name}: {e}')
+        return 0
+
+
+def _direct_work_queue_list_stuck(
+        threshold_seconds: float) -> list[dict[str, Any]]:
+    """Return rows whose claim is older than threshold_seconds.
+
+    Used by the cluster daemon reaper. Each returned dict has id,
+    queue_name, claimed_at, claimed_by, attempts, payload. Rows
+    are ordered by claimed_at ascending so the oldest stuck row
+    is handled first.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            cutoff = sa.func.unix_timestamp(
+                sa.func.now(6)) - threshold_seconds
+            stmt = (
+                sa.select(
+                    table.c.id,
+                    table.c.queue_name,
+                    table.c.claimed_at,
+                    table.c.claimed_by,
+                    table.c.attempts,
+                    table.c.payload,
+                )
+                .where(table.c.claimed_at.is_not(None))
+                .where(table.c.claimed_at <= cutoff)
+                .order_by(table.c.claimed_at.asc())
+            )
+            rows = conn.execute(stmt).fetchall()
+            return [
+                {
+                    'id': int(r.id),
+                    'queue_name': r.queue_name,
+                    'claimed_at': float(r.claimed_at),
+                    'claimed_by': r.claimed_by,
+                    'attempts': int(r.attempts or 0),
+                    'payload': dict(r.payload or {}),
+                }
+                for r in rows
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB list_stuck query failed for work_queue: {e}')
+        return []
+
+
+def _direct_work_queue_clear_claim(row_id: int) -> bool:
+    """Clear claimed_at/claimed_by on one row.
+
+    Returns True if the row existed and was still claimed (i.e.
+    the UPDATE actually changed something). attempts is not
+    reset so the reaper can still notice a persistently failing
+    job via the attempts ceiling.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = (
+                sa.update(table)
+                .where(table.c.id == row_id)
+                .where(table.c.claimed_at.is_not(None))
+                .values(claimed_at=None, claimed_by=None)
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return bool(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB clear_claim failed for work_queue '
+            f'row {row_id}: {e}')
+        return False
+
+
+def _direct_work_queue_delete_row(row_id: int) -> bool:
+    """Delete a single work_queue row by id.
+
+    Returns True if the row existed and was deleted. Used by the
+    reaper's reject branch; the caller is responsible for
+    transitioning the corresponding cluster operation to the
+    error state after a successful delete.
+    """
+    engine = _get_engine()
+    table = _get_work_queue_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.id == row_id)
+            result = conn.execute(stmt)
+            conn.commit()
+            return bool(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete_row failed for work_queue '
+            f'row {row_id}: {e}')
+        return False
+
+
+# =============================================================================
+# Work Queue Public API Functions
+# =============================================================================
+
+def enqueue_work_item(
+        queue_name: str, work_item: dict[str, Any],
+        delay: float = 0.0) -> None:
+    """Insert a work item on a queue.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Raises
+    shakenfist.exceptions.CannotEnqueueWork on unrecoverable failure
+    in the direct path; the gRPC path logs and returns.
+    """
+    if _use_database_service():
+        _grpc_work_queue_enqueue(queue_name, work_item, delay)
+        return
+    _direct_work_queue_enqueue(queue_name, work_item, delay)
+
+
+def dequeue_work_item(
+        queue_name: str,
+) -> Optional[tuple[str, dict[str, Any]]]:
+    """Claim the next eligible job on a queue.
+
+    Returns (job_name, payload) on success or None if the queue is
+    empty / every eligible row is locked. The direct path uses
+    config.NODE_NAME as worker_id; the gRPC path relies on the
+    database daemon's NODE_NAME (the proto does not carry a
+    caller-supplied worker_id).
+    """
+    if _use_database_service():
+        return _grpc_work_queue_dequeue(queue_name)
+    return _direct_work_queue_dequeue(queue_name, config.NODE_NAME)
+
+
+def resolve_work_item(queue_name: str, job_name: str) -> None:
+    """Mark a claimed job complete."""
+    if _use_database_service():
+        _grpc_work_queue_resolve(queue_name, job_name)
+        return
+    _direct_work_queue_resolve(queue_name, job_name)
+
+
+def get_work_queue_length(
+        queue_name: str) -> tuple[int, int, int]:
+    """Return (processing, queued, deferred) counts for a queue."""
+    if _use_database_service():
+        return _grpc_work_queue_length(queue_name)
+    return _direct_work_queue_length(queue_name)
+
+
+def restart_work_queue(queue_name: str) -> None:
+    """Clear claims on a queue so workers re-pick up the jobs.
+
+    Called at queue daemon startup to recover in-flight work after
+    a crash.
+    """
+    if _use_database_service():
+        _grpc_work_queue_restart(queue_name)
+        return
+    _direct_work_queue_restart(queue_name)
+
+
+def list_stuck_work_queue_rows(
+        threshold_seconds: float) -> list[dict[str, Any]]:
+    """Return rows whose claim is older than threshold_seconds.
+
+    Used by the cluster daemon reaper to find work items stuck
+    in flight. Each dict carries id, queue_name, claimed_at,
+    claimed_by, attempts and payload. Rows are ordered oldest
+    claim first.
+    """
+    if _use_database_service():
+        return _grpc_work_queue_list_stuck(threshold_seconds)
+    return _direct_work_queue_list_stuck(threshold_seconds)
+
+
+def clear_work_queue_claim(row_id: int) -> bool:
+    """Clear claimed_at/claimed_by on one work_queue row.
+
+    Returns True if the row existed and was still claimed.
+    attempts is not reset, so a persistently-failing job
+    eventually trips CLUSTER_OP_MAX_ATTEMPTS.
+    """
+    if _use_database_service():
+        return _grpc_work_queue_clear_claim(row_id)
+    return _direct_work_queue_clear_claim(row_id)
+
+
+def delete_work_queue_row(row_id: int) -> bool:
+    """Delete a single work_queue row by id.
+
+    Returns True if the row existed and was deleted. Used by
+    the reaper's reject branch; the caller flips the
+    corresponding cluster operation to error afterwards.
+    """
+    if _use_database_service():
+        return _grpc_work_queue_delete_row(row_id)
+    return _direct_work_queue_delete_row(row_id)

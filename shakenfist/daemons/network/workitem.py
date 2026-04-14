@@ -6,7 +6,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
-from shakenfist import etcd
+from shakenfist import mariadb
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_all_network_queues
@@ -34,7 +34,7 @@ class Job(util_concurrency.Job):
         # networks that much?
         while daemon.check_abort_path(self.abort_path):
             for queue_name in get_all_network_queues():
-                jobname_workitem = etcd.dequeue(queue_name)
+                jobname_workitem = mariadb.dequeue_work_item(queue_name)
                 if jobname_workitem:
                     break
 
@@ -54,7 +54,7 @@ class Job(util_concurrency.Job):
                 try:
                     self._cluster_operation_execute(queue_name, workitem)
                 finally:
-                    etcd.resolve(queue_name, jobname)
+                    mariadb.resolve_work_item(queue_name, jobname)
 
     def _cluster_operation_execute(self, queue_name, workitem):
         op_type = workitem.get('operation_type')

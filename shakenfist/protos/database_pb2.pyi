@@ -442,6 +442,97 @@ class RestartQueueRequest(google.protobuf.message.Message):
 global___RestartQueueRequest = RestartQueueRequest
 
 @typing.final
+class ListStuckWorkQueueRowsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    THRESHOLD_SECONDS_FIELD_NUMBER: builtins.int
+    threshold_seconds: builtins.float
+    def __init__(
+        self,
+        *,
+        threshold_seconds: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["threshold_seconds", b"threshold_seconds"]) -> None: ...
+
+global___ListStuckWorkQueueRowsRequest = ListStuckWorkQueueRowsRequest
+
+@typing.final
+class StuckWorkQueueRow(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    QUEUE_NAME_FIELD_NUMBER: builtins.int
+    CLAIMED_AT_FIELD_NUMBER: builtins.int
+    CLAIMED_BY_FIELD_NUMBER: builtins.int
+    ATTEMPTS_FIELD_NUMBER: builtins.int
+    PAYLOAD_JSON_FIELD_NUMBER: builtins.int
+    id: builtins.int
+    queue_name: builtins.str
+    claimed_at: builtins.float
+    claimed_by: builtins.str
+    attempts: builtins.int
+    payload_json: builtins.str
+    def __init__(
+        self,
+        *,
+        id: builtins.int = ...,
+        queue_name: builtins.str = ...,
+        claimed_at: builtins.float = ...,
+        claimed_by: builtins.str = ...,
+        attempts: builtins.int = ...,
+        payload_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["attempts", b"attempts", "claimed_at", b"claimed_at", "claimed_by", b"claimed_by", "id", b"id", "payload_json", b"payload_json", "queue_name", b"queue_name"]) -> None: ...
+
+global___StuckWorkQueueRow = StuckWorkQueueRow
+
+@typing.final
+class ListStuckWorkQueueRowsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROWS_FIELD_NUMBER: builtins.int
+    @property
+    def rows(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___StuckWorkQueueRow]: ...
+    def __init__(
+        self,
+        *,
+        rows: collections.abc.Iterable[global___StuckWorkQueueRow] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["rows", b"rows"]) -> None: ...
+
+global___ListStuckWorkQueueRowsReply = ListStuckWorkQueueRowsReply
+
+@typing.final
+class ClearWorkQueueClaimRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROW_ID_FIELD_NUMBER: builtins.int
+    row_id: builtins.int
+    def __init__(
+        self,
+        *,
+        row_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["row_id", b"row_id"]) -> None: ...
+
+global___ClearWorkQueueClaimRequest = ClearWorkQueueClaimRequest
+
+@typing.final
+class DeleteWorkQueueRowRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROW_ID_FIELD_NUMBER: builtins.int
+    row_id: builtins.int
+    def __init__(
+        self,
+        *,
+        row_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["row_id", b"row_id"]) -> None: ...
+
+global___DeleteWorkQueueRowRequest = DeleteWorkQueueRowRequest
+
+@typing.final
 class ClusterLockRequest(google.protobuf.message.Message):
     """Lock Operations"""
 
@@ -5077,3 +5168,169 @@ class DeleteNodeMetricsRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["node_uuid", b"node_uuid"]) -> None: ...
 
 global___DeleteNodeMetricsRequest = DeleteNodeMetricsRequest
+
+@typing.final
+class ClusterOperationData(google.protobuf.message.Message):
+    """Cluster Operations (MariaDB)
+    Operation headers, keyed by operation uuid. State lives separately.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    METADATA_JSON_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """Operation UUID as string"""
+    operation_type: builtins.str
+    """e.g. "instance_preflight" """
+    created_at: builtins.float
+    """Unix timestamp of operation creation"""
+    metadata_json: builtins.str
+    """Full operation metadata dict as JSON"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        operation_type: builtins.str = ...,
+        created_at: builtins.float = ...,
+        metadata_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "uuid", b"uuid"]) -> None: ...
+
+global___ClusterOperationData = ClusterOperationData
+
+@typing.final
+class CreateClusterOperationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___ClusterOperationData: ...
+    def __init__(
+        self,
+        *,
+        data: global___ClusterOperationData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___CreateClusterOperationRequest = CreateClusterOperationRequest
+
+@typing.final
+class GetClusterOperationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___GetClusterOperationRequest = GetClusterOperationRequest
+
+@typing.final
+class GetClusterOperationReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___ClusterOperationData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___ClusterOperationData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetClusterOperationReply = GetClusterOperationReply
+
+@typing.final
+class GetClusterOperationsByNodeRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["node_uuid", b"node_uuid"]) -> None: ...
+
+global___GetClusterOperationsByNodeRequest = GetClusterOperationsByNodeRequest
+
+@typing.final
+class GetClusterOperationsByNodeReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEMS_FIELD_NUMBER: builtins.int
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ClusterOperationData]: ...
+    def __init__(
+        self,
+        *,
+        items: collections.abc.Iterable[global___ClusterOperationData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
+
+global___GetClusterOperationsByNodeReply = GetClusterOperationsByNodeReply
+
+@typing.final
+class DeleteClusterOperationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uuid", b"uuid"]) -> None: ...
+
+global___DeleteClusterOperationRequest = DeleteClusterOperationRequest
+
+@typing.final
+class CreateAndEnqueueClusterOperationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    QUEUE_NAME_FIELD_NUMBER: builtins.int
+    DELAY_FIELD_NUMBER: builtins.int
+    METADATA_JSON_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    """Operation UUID as string"""
+    operation_type: builtins.str
+    """e.g. "node_net_op" """
+    created_at: builtins.float
+    """Unix timestamp of operation creation"""
+    queue_name: builtins.str
+    """Target work queue name"""
+    delay: builtins.float
+    """Seconds to defer before the job is eligible"""
+    metadata_json: builtins.str
+    """Full operation metadata dict as JSON"""
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        operation_type: builtins.str = ...,
+        created_at: builtins.float = ...,
+        queue_name: builtins.str = ...,
+        delay: builtins.float = ...,
+        metadata_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "queue_name", b"queue_name", "uuid", b"uuid"]) -> None: ...
+
+global___CreateAndEnqueueClusterOperationRequest = CreateAndEnqueueClusterOperationRequest
