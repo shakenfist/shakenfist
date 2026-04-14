@@ -196,7 +196,7 @@ jobs:
           # Post the comment
           gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr-comment.md
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage
           retention-days: 90
@@ -584,7 +584,7 @@ jobs:
           echo
           zip -rq artifacts/bundle.zip bundle/*
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bundle-functional-cluster-${{ matrix.pr.job_name }}
@@ -1077,7 +1077,7 @@ jobs:
           echo
           zip -rq artifacts/bundle.zip bundle/*
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bundle-functional-cluster-${{ matrix.merge.job_name }}
@@ -1431,7 +1431,7 @@ jobs:
           echo
           zip -rq artifacts/bundle.zip bundle/*
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bundle-functional-ansible-modules
@@ -1628,7 +1628,7 @@ jobs:
           echo
           zip -rq artifacts/bundle.zip bundle/*
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bundle-functional-node-lifecycle
