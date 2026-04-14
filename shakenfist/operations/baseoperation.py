@@ -233,7 +233,7 @@ class BaseClusterOperation(BaseOperation):
             })
         work_item = {
             'operation_type': self.object_type,
-            'operation_uuid': self.uuid
+            'operation_uuid': str(self.uuid)
         }
         mariadb.enqueue_work_item(
             self.queue_name, work_item, delay=delay)
