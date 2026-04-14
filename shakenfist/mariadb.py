@@ -160,8 +160,8 @@ INSTANCE_ATTRIBUTES_VERSION = 2
 OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
-CLUSTER_OPERATIONS_VERSION = 1
-WORK_QUEUE_VERSION = 1
+CLUSTER_OPERATIONS_VERSION = 2
+WORK_QUEUE_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -3777,6 +3777,150 @@ def _migrate_etcd_node_metrics(engine: sa.Engine) -> dict[str, Any]:
     return {'migrated_count': migrated_count, 'error_count': error_count}
 
 
+def _migrate_etcd_cluster_operations(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Drain residual /sf/{op_type}/{uuid} etcd keys into the
+    cluster_operations table.
+
+    One-shot migration used when a pre-phase-6 cluster is upgraded
+    and may have leftover cluster-operation header keys. Iterates
+    the authoritative OPERATION_NAMES_TO_CLASSES list from
+    constants.py and walks each type's etcd prefix. Idempotent on
+    re-run: a duplicate uuid returns False from the insert and the
+    etcd key is deleted anyway.
+    """
+    from shakenfist import etcd
+    from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating cluster operation headers from etcd...')
+
+    for op_type in OPERATION_NAMES_TO_CLASSES:
+        for key, data in etcd.get_all(op_type, None):
+            op_uuid_str = key.split('/')[-1]
+            try:
+                op_uuid = UUID(op_uuid_str)
+            except ValueError:
+                LOG.warning(
+                    f'Cluster operation migration: invalid uuid '
+                    f'in key {key}; leaving in place')
+                error_count += 1
+                continue
+
+            if not isinstance(data, dict):
+                LOG.warning(
+                    f'Cluster operation migration: malformed '
+                    f'payload at {key}; leaving in place')
+                error_count += 1
+                continue
+
+            created_at = data.get('created_at') or time.time()
+            try:
+                inserted = _direct_create_cluster_operation(
+                    op_uuid, op_type, data, created_at)
+            except Exception as e:
+                LOG.warning(
+                    f'Cluster operation migration: insert raised '
+                    f'for {key}: {e}')
+                error_count += 1
+                continue
+
+            etcd.delete_raw(key)
+            if inserted:
+                migrated_count += 1
+            else:
+                skipped_count += 1
+
+    LOG.info(
+        f'Cluster operation migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped, {error_count} errors')
+    return {
+        'migrated_count': migrated_count,
+        'error_count': error_count,
+        'skipped_count': skipped_count,
+    }
+
+
+def _migrate_etcd_work_queue(engine: sa.Engine) -> dict[str, Any]:
+    """Drain residual /sf/queue/* and /sf/processing/* etcd keys
+    into the work_queue table.
+
+    Queue rows are inserted via _direct_work_queue_enqueue with a
+    delay computed from the legacy {timestamp}-{random} job name.
+    Processing rows (rows that were in flight when the old cluster
+    stopped) are re-queued with claimed_at=None so a worker picks
+    them up again -- the old worker is gone and we cannot preserve
+    attempt count across the etcd->MariaDB boundary.
+
+    If the legacy job name's timestamp prefix cannot be parsed the
+    migration falls back to scheduled_at=now (the row becomes
+    immediately eligible). Malformed JSON payloads are skipped and
+    the etcd key is left in place for the operator to investigate.
+    """
+    from shakenfist import etcd
+    from shakenfist import exceptions
+
+    migrated_count = 0
+    error_count = 0
+    skipped_count = 0
+
+    LOG.info('Migrating work queue rows from etcd...')
+
+    for source_prefix in ('/sf/queue/', '/sf/processing/'):
+        for key, workitem in etcd.get_prefix_raw(source_prefix):
+            parts = key.split('/')
+            # /sf/{queue|processing}/{queue_name}/{jobname}
+            if len(parts) < 5:
+                LOG.warning(
+                    f'Work queue migration: malformed key {key}; '
+                    f'leaving in place')
+                error_count += 1
+                continue
+
+            queue_name = parts[3]
+            jobname = '/'.join(parts[4:])
+
+            if not isinstance(workitem, dict):
+                LOG.warning(
+                    f'Work queue migration: malformed payload at '
+                    f'{key}; leaving in place')
+                error_count += 1
+                continue
+
+            try:
+                legacy_ts = float(jobname.split('-')[0])
+            except (ValueError, IndexError):
+                LOG.warning(
+                    f'Work queue migration: cannot parse timestamp '
+                    f'from {jobname}; scheduling immediately')
+                legacy_ts = time.time()
+
+            delay = max(0.0, legacy_ts - time.time())
+            try:
+                _direct_work_queue_enqueue(queue_name, workitem, delay)
+            except exceptions.CannotEnqueueWork as e:
+                LOG.warning(
+                    f'Work queue migration: enqueue failed for '
+                    f'{key}: {e}')
+                error_count += 1
+                continue
+
+            etcd.delete_raw(key)
+            migrated_count += 1
+
+    LOG.info(
+        f'Work queue migration: {migrated_count} migrated, '
+        f'{skipped_count} skipped, {error_count} errors')
+    return {
+        'migrated_count': migrated_count,
+        'error_count': error_count,
+        'skipped_count': skipped_count,
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -3860,6 +4004,12 @@ DATA_MIGRATIONS.update({
     },
     'node_metrics': {
         2: _migrate_etcd_node_metrics,
+    },
+    'cluster_operations': {
+        2: _migrate_etcd_cluster_operations,
+    },
+    'work_queue': {
+        2: _migrate_etcd_work_queue,
     },
 })
 
