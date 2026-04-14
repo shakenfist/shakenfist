@@ -7786,17 +7786,22 @@ system works.</p>
   state.</li>
 <li><strong>Distributed locking</strong>: See the <a href="../locks/">Locks</a> documentation.</li>
 <li><strong>Configuration</strong>: Cluster-wide configuration stored at <code>/sf/config</code>.</li>
-<li><strong>Event logs</strong>: Audit trails and operational events for objects.</li>
-<li><strong>Queues</strong>: Work queues for cluster operations.</li>
+<li><strong>Event log DLQ</strong>: Dead-letter storage for event log entries that could
+  not be delivered to the eventlog gRPC service.</li>
 </ul>
+<p>Cluster operation headers and the per-node work queues were originally
+stored in etcd under <code>/sf/{op_type}/{uuid}</code>, <code>/sf/queue/{queue}/...</code>
+and <code>/sf/processing/{queue}/...</code>. They have been moved to the
+<code>cluster_operations</code> and <code>work_queue</code> MariaDB tables; the
+corresponding data migrations run automatically on database daemon
+startup and drain any residual etcd keys into MariaDB.</p>
 <h3 id="key-structure">Key Structure<a class="headerlink" href="#key-structure" title="Permanent link">&para;</a></h3>
 <p>etcd keys follow a hierarchical structure:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>/sf/                          # Root prefix for all Shaken Fist data
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>/sf/object/{type}/{uuid}      # Object definitions
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>/sf/attribute/{type}/{uuid}/  # Object attributes (state, placement, etc.)
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>/sf/event/{type}/{uuid}/      # Event logs for objects
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>/sf/queue/                    # Work queues
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>/sflocks/                     # Distributed locks
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>/sflocks/                     # Distributed locks
 </code></pre></div>
 <h3 id="object-types">Object Types<a class="headerlink" href="#object-types" title="Permanent link">&para;</a></h3>
 <p>Each object type has a dedicated key prefix:</p>
@@ -8383,6 +8388,16 @@ of the cluster through Galera replication.</p>
 <td>Node metrics</td>
 <td>Complete - <code>node_metrics</code> table (ephemeral per-node resource metrics, JSON payload)</td>
 </tr>
+<tr>
+<td>17</td>
+<td>Cluster operations</td>
+<td>Complete - <code>cluster_operations</code> table (full operation metadata with indexed node/instance/network/priority columns)</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Work queues</td>
+<td>Complete - <code>work_queue</code> table (per-job row with claim state, replacing etcd two-prefix design)</td>
+</tr>
 </tbody>
 </table>
 <h3 id="table-architecture">Table Architecture<a class="headerlink" href="#table-architecture" title="Permanent link">&para;</a></h3>
@@ -8427,6 +8442,14 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 <td>IP address allocations with uniqueness constraints</td>
 </tr>
 <tr>
+<td><code>cluster_operations</code></td>
+<td>Full cluster operation metadata with indexed <code>node_uuid</code>, <code>instance_uuid</code>, <code>network_uuid</code> and <code>priority</code> columns extracted from JSON for dispatch-time filtering</td>
+</tr>
+<tr>
+<td><code>work_queue</code></td>
+<td>Per-job queue row with <code>queue_name</code>, <code>scheduled_at</code>, <code>claimed_at</code>, <code>claimed_by</code>, <code>attempts</code> and <code>payload</code>. Dequeue uses <code>SELECT ... FOR UPDATE SKIP LOCKED</code></td>
+</tr>
+<tr>
 <td><code>cluster_operation_targets</code></td>
 <td>Operation-to-object targeting with AUTO_INCREMENT ordering</td>
 </tr>
@@ -8442,6 +8465,30 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 <li><strong>High churn</strong>: Addresses are frequently reserved and released</li>
 <li><strong>Cross-object queries</strong>: Need to find all addresses for an IPAM, not just
   one object</li>
+</ul>
+<p>Cluster operation headers (<code>cluster_operations</code>) and work queue rows
+(<code>work_queue</code>) are stored in MariaDB so the create-and-enqueue step
+can run in a single transaction (header row + state row + queue
+row). The old etcd design split queued and claimed work items across
+<code>/sf/queue/</code> and <code>/sf/processing/</code> prefixes; MariaDB row locking
+allows a single table with claim fields instead, and
+<code>SELECT ... FOR UPDATE SKIP LOCKED</code> gives race-safe dequeue.</p>
+<p>The cluster daemon runs
+<code>reap_stuck_cluster_operation_jobs()</code> from
+<code>shakenfist/daemons/cluster/scheduled_tasks.py</code> on a one-minute
+schedule. It re-queues or rejects rows whose claim has gone stale:</p>
+<ul>
+<li><strong><code>CLUSTER_OP_STUCK_THRESHOLD</code></strong> — seconds before a claimed row is
+  considered stuck (default <code>1800</code>). Lower values detect crashed
+  workers faster at the cost of possibly re-queuing merely slow jobs.</li>
+<li><strong><code>CLUSTER_OP_MAX_ATTEMPTS</code></strong> — maximum claim attempts before the
+  reaper stops re-queuing and transitions the underlying cluster
+  operation to <code>STATE_ERROR</code> (default <code>5</code>). Protects the queue from
+  a "job of death" that crashes every worker.</li>
+<li><strong><code>CLUSTER_METRICS_PORT</code></strong> — Prometheus scrape port exposed by the
+  cluster daemon (default <code>13007</code>). Metrics
+  <code>cluster_op_reaper_requeued_total</code> and
+  <code>cluster_op_reaper_rejected_total</code> record reaper activity.</li>
 </ul>
 <p>Cluster operation targets are stored separately because:</p>
 <ul>

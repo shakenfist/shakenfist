@@ -6876,6 +6876,20 @@
 <li>Existing deployments upgrading to v0.8 must run <code>sf-ctl migrate-state-to-mariadb</code>
   after stopping services and before starting the new version. Use <code>--dry-run</code>
   to preview what will be migrated.</li>
+<li>Cluster operation headers and the per-node work queues have been moved from
+  etcd to the new <code>cluster_operations</code> and <code>work_queue</code> MariaDB tables.
+  Create and enqueue is now a single MariaDB transaction (header + state +
+  queue row), and dequeue uses <code>SELECT ... FOR UPDATE SKIP LOCKED</code> for
+  race-safe claims. Residual <code>/sf/queue/</code>, <code>/sf/processing/</code> and
+  <code>/sf/{op_type}/</code> etcd keys left behind by older clusters are drained
+  automatically by a one-shot data migration on database daemon startup.</li>
+<li>A new stuck-job reaper in the cluster daemon reclaims work queue rows
+  whose claim has exceeded <code>CLUSTER_OP_STUCK_THRESHOLD</code> seconds (default
+  1800) and rejects jobs that have been claimed more than
+  <code>CLUSTER_OP_MAX_ATTEMPTS</code> times (default 5). Reaper activity is exposed
+  via <code>cluster_op_reaper_requeued_total</code> and
+  <code>cluster_op_reaper_rejected_total</code> on <code>CLUSTER_METRICS_PORT</code> (default
+  13007).</li>
 <li>The floating network now uses a well-known UUID (<code>f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f</code>)
   instead of the invalid string "floating". Existing deployments must run
   <code>sf-ctl migrate-floating-network-uuid</code> after stopping services to migrate.
