@@ -317,7 +317,7 @@ jobs:
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bundle-scheduled-cluster-${{ matrix.os.job_name }}
