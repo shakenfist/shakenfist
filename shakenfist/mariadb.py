@@ -164,6 +164,7 @@ CLUSTER_OPERATIONS_VERSION = 2
 WORK_QUEUE_VERSION = 2
 CLUSTER_LOCKS_VERSION = 2
 CLUSTER_CONFIG_VERSION = 2
+EVENT_DLQ_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -863,6 +864,67 @@ def _ensure_cluster_config_schema(
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': CLUSTER_CONFIG_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+_event_dlq_table: Optional[sa.Table] = None
+
+
+def _get_event_dlq_table() -> sa.Table:
+    """Get or create the event_dlq table definition.
+
+    This table stores event log dead-letter queue entries previously held
+    in etcd at /sf/event/{object_type}/{object_uuid}/{timestamp}. The
+    eventlog daemon drains this table periodically and writes events to
+    per-object SQLite files.
+    """
+    global _event_dlq_table
+    if _event_dlq_table is None:
+        metadata = _get_metadata()
+        _event_dlq_table = sa.Table(
+            'event_dlq',
+            metadata,
+            sa.Column('id', sa.BigInteger(),
+                      primary_key=True, autoincrement=True),
+            sa.Column('object_type', sa.String(32),
+                      nullable=False),
+            sa.Column('object_uuid', sa.String(36),
+                      nullable=False),
+            sa.Column('event_timestamp', sa.Double(),
+                      nullable=False),
+            sa.Column('event_json', sa.JSON(),
+                      nullable=False),
+            sa.Column('enqueued_at', sa.Double(),
+                      nullable=False),
+            sa.Index('idx_event_dlq_object',
+                     'object_type', 'object_uuid'),
+            sa.Index('idx_event_dlq_enqueued',
+                     'enqueued_at'),
+        )
+    return _event_dlq_table
+
+
+def _ensure_event_dlq_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the event_dlq table schema is up to date."""
+    table_name = 'event_dlq'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_event_dlq_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': EVENT_DLQ_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1598,6 +1660,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_work_queue_schema(engine))
     results.append(_ensure_cluster_locks_schema(engine))
     results.append(_ensure_cluster_config_schema(engine))
+    results.append(_ensure_event_dlq_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -4146,6 +4209,58 @@ def _migrate_etcd_cluster_config(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_etcd_event_dlq(engine: sa.Engine) -> dict[str, Any]:
+    """Drain residual /sf/event/* etcd keys into the event_dlq table.
+
+    Each etcd key at /sf/event/{objtype}/{objuuid}/{timestamp} holds
+    a JSON dict with the event payload. We insert each into event_dlq
+    and delete the etcd key.
+    """
+    from shakenfist import etcd
+
+    migrated = 0
+    errors = 0
+
+    LOG.info('Migrating event DLQ from etcd...')
+
+    for key, event in etcd.get_prefix_raw('/sf/event/'):
+        if not isinstance(event, dict):
+            LOG.warning(
+                f'Event DLQ migration: malformed payload '
+                f'at {key}; leaving in place')
+            errors += 1
+            continue
+
+        try:
+            parts = key.split('/')
+            # /sf/event/{objtype}/{objuuid}/{ts}
+            objtype = parts[3]
+            objuuid = parts[4]
+            ts = float(parts[5])
+        except (IndexError, ValueError) as e:
+            LOG.warning(
+                f'Event DLQ migration: bad key {key}: {e}')
+            errors += 1
+            continue
+
+        _direct_enqueue_event_dlq(
+            object_type=objtype,
+            object_uuid=objuuid,
+            event_timestamp=ts,
+            event_json=event,
+        )
+        etcd.delete_raw(key)
+        migrated += 1
+
+    LOG.info(
+        f'Event DLQ migration: {migrated} migrated, '
+        f'{errors} errors')
+    return {
+        'migrated_count': migrated,
+        'error_count': errors,
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -4241,6 +4356,9 @@ DATA_MIGRATIONS.update({
     },
     'cluster_config': {
         2: _migrate_etcd_cluster_config,
+    },
+    'event_dlq': {
+        2: _migrate_etcd_event_dlq,
     },
 })
 
@@ -16787,6 +16905,199 @@ def _direct_delete_cluster_config(
             f'MariaDB delete_cluster_config failed for '
             f'{key_name}: {e}')
         return False
+
+
+# =============================================================================
+# Event DLQ Direct Access Functions
+# =============================================================================
+
+def _direct_enqueue_event_dlq(
+        object_type: str, object_uuid: str,
+        event_timestamp: float,
+        event_json: dict[str, Any]) -> None:
+    """Insert an event into the dead-letter queue."""
+    engine = _get_engine()
+    table = _get_event_dlq_table()
+    now = time.time()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                object_type=object_type,
+                object_uuid=str(object_uuid),
+                event_timestamp=event_timestamp,
+                event_json=event_json,
+                enqueued_at=now,
+            )
+            conn.execute(stmt)
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB enqueue_event_dlq failed for '
+            f'{object_type}/{object_uuid}: {e}')
+
+
+def _direct_drain_event_dlq(
+        limit: int = 10000) -> list[dict[str, Any]]:
+    """Return up to limit DLQ rows ordered by id.
+
+    Returns list of dicts with keys: id, object_type,
+    object_uuid, event_json.
+    """
+    engine = _get_engine()
+    table = _get_event_dlq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = (
+                sa.select(
+                    table.c.id,
+                    table.c.object_type,
+                    table.c.object_uuid,
+                    table.c.event_json,
+                )
+                .order_by(table.c.id)
+                .limit(limit)
+            )
+            rows = conn.execute(stmt).fetchall()
+            return [
+                {
+                    'id': row[0],
+                    'object_type': row[1],
+                    'object_uuid': row[2],
+                    'event_json': row[3],
+                }
+                for row in rows
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB drain_event_dlq failed: {e}')
+        return []
+
+
+def _direct_delete_event_dlq(ids: list[int]) -> int:
+    """Delete DLQ rows by id. Returns count deleted."""
+    if not ids:
+        return 0
+
+    engine = _get_engine()
+    table = _get_event_dlq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.id.in_(ids))
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete_event_dlq failed: {e}')
+        return 0
+
+
+# =============================================================================
+# Event DLQ gRPC Client Functions
+# =============================================================================
+
+def _grpc_enqueue_event_dlq(
+        object_type: str, object_uuid: str,
+        event_timestamp: float,
+        event_json: dict[str, Any]) -> None:
+    """Enqueue an event via the database microservice."""
+    from shakenfist.protos import database_pb2
+
+    stub = _get_database_stub()
+    if not stub:
+        return
+
+    request = database_pb2.EnqueueEventDlqRequest(
+        object_type=object_type,
+        object_uuid=str(object_uuid),
+        event_timestamp=event_timestamp,
+        event_json=json.dumps(event_json),
+    )
+    _grpc_call(stub.EnqueueEventDlq, request)
+
+
+def _grpc_drain_event_dlq(
+        limit: int = 10000) -> list[dict[str, Any]]:
+    """Drain DLQ entries via the database microservice."""
+    from shakenfist.protos import database_pb2
+
+    stub = _get_database_stub()
+    if not stub:
+        return []
+
+    request = database_pb2.DrainEventDlqRequest(limit=limit)
+    response = _grpc_call(stub.DrainEventDlq, request)
+    if response is None:
+        return []
+
+    return [
+        {
+            'id': entry.id,
+            'object_type': entry.object_type,
+            'object_uuid': entry.object_uuid,
+            'event_json': json.loads(entry.event_json),
+        }
+        for entry in response.entries
+    ]
+
+
+def _grpc_delete_event_dlq(ids: list[int]) -> int:
+    """Delete DLQ entries via the database microservice."""
+    from shakenfist.protos import database_pb2
+
+    stub = _get_database_stub()
+    if not stub:
+        return 0
+
+    request = database_pb2.DeleteEventDlqRequest(ids=ids)
+    response = _grpc_call(stub.DeleteEventDlq, request)
+    if response is None:
+        return 0
+    return len(ids) if response.success else 0
+
+
+# =============================================================================
+# Event DLQ Public API Functions
+# =============================================================================
+
+def enqueue_event_dlq(
+        object_type: str, object_uuid: str,
+        event_timestamp: float,
+        event_json: dict[str, Any]) -> None:
+    """Insert an event into the dead-letter queue.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service().
+    """
+    if _use_database_service():
+        _grpc_enqueue_event_dlq(
+            object_type, object_uuid, event_timestamp, event_json)
+        return
+    _direct_enqueue_event_dlq(
+        object_type, object_uuid, event_timestamp, event_json)
+
+
+def drain_event_dlq(limit: int = 10000) -> list[dict[str, Any]]:
+    """Return up to limit DLQ rows for processing.
+
+    Returns list of dicts with keys: id, object_type, object_uuid,
+    event_json. Caller must call delete_event_dlq() after successful
+    processing to preserve at-least-once delivery.
+    """
+    if _use_database_service():
+        return _grpc_drain_event_dlq(limit)
+    return _direct_drain_event_dlq(limit)
+
+
+def delete_event_dlq(ids: list[int]) -> int:
+    """Delete processed DLQ rows by id. Returns count deleted."""
+    if _use_database_service():
+        return _grpc_delete_event_dlq(ids)
+    return _direct_delete_event_dlq(ids)
 
 
 # =============================================================================

@@ -77,6 +77,8 @@ class MockEtcd():
         self.cluster_operations_store = {}  # Mock MariaDB cluster op headers
         self.work_queue_store = []  # Mock MariaDB work_queue rows (list to keep order)
         self._work_queue_next_id = count(1)  # AUTO_INCREMENT mock
+        self.event_dlq_store = []  # Mock MariaDB event_dlq rows
+        self._event_dlq_next_id = count(1)  # AUTO_INCREMENT mock
         self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
@@ -913,6 +915,28 @@ class MockEtcd():
         self.mariadb_delete_work_queue_row.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_work_queue_row.stop)
+
+        # Mock MariaDB event DLQ operations
+        self.mariadb_enqueue_event_dlq = mock.patch(
+            'shakenfist.mariadb.enqueue_event_dlq',
+            side_effect=self._mariadb_enqueue_event_dlq)
+        self.mariadb_enqueue_event_dlq.start()
+        self.test_obj.addCleanup(
+            self.mariadb_enqueue_event_dlq.stop)
+
+        self.mariadb_drain_event_dlq = mock.patch(
+            'shakenfist.mariadb.drain_event_dlq',
+            side_effect=self._mariadb_drain_event_dlq)
+        self.mariadb_drain_event_dlq.start()
+        self.test_obj.addCleanup(
+            self.mariadb_drain_event_dlq.stop)
+
+        self.mariadb_delete_event_dlq = mock.patch(
+            'shakenfist.mariadb.delete_event_dlq',
+            side_effect=self._mariadb_delete_event_dlq)
+        self.mariadb_delete_event_dlq.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_event_dlq.stop)
 
         # Setup basic DB data
         self.node_uuids = {}
@@ -2501,6 +2525,40 @@ class MockEtcd():
             f'MockMariaDB.delete_work_queue_row({row_id}): '
             f'{"removed" if removed else "not found"}')
         return removed
+
+    def _mariadb_enqueue_event_dlq(
+            self, object_type, object_uuid, event_timestamp, event_json):
+        """Mock implementation of mariadb.enqueue_event_dlq()."""
+        row = {
+            'id': next(self._event_dlq_next_id),
+            'object_type': object_type,
+            'object_uuid': str(object_uuid),
+            'event_timestamp': event_timestamp,
+            'event_json': event_json,
+        }
+        self.event_dlq_store.append(row)
+        self._trace(
+            f'MockMariaDB.enqueue_event_dlq({object_type}/{object_uuid})')
+
+    def _mariadb_drain_event_dlq(self, limit=10000):
+        """Mock implementation of mariadb.drain_event_dlq()."""
+        rows = self.event_dlq_store[:limit]
+        self._trace(
+            f'MockMariaDB.drain_event_dlq(limit={limit}): '
+            f'{len(rows)} rows')
+        return rows
+
+    def _mariadb_delete_event_dlq(self, ids):
+        """Mock implementation of mariadb.delete_event_dlq()."""
+        before = len(self.event_dlq_store)
+        self.event_dlq_store = [
+            r for r in self.event_dlq_store if r['id'] not in ids
+        ]
+        deleted = before - len(self.event_dlq_store)
+        self._trace(
+            f'MockMariaDB.delete_event_dlq({ids}): '
+            f'deleted {deleted}')
+        return deleted
 
     #
     # DB operations - Low level

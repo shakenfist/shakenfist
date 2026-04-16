@@ -144,6 +144,21 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.SetClusterConfigRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.EnqueueEventDlq = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/EnqueueEventDlq',
+                request_serializer=database__pb2.EnqueueEventDlqRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.DrainEventDlq = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DrainEventDlq',
+                request_serializer=database__pb2.DrainEventDlqRequest.SerializeToString,
+                response_deserializer=database__pb2.DrainEventDlqReply.FromString,
+                _registered_method=True)
+        self.DeleteEventDlq = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteEventDlq',
+                request_serializer=database__pb2.DeleteEventDlqRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.Compact = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/Compact',
                 request_serializer=database__pb2.CompactRequest.SerializeToString,
@@ -1020,6 +1035,25 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def SetClusterConfig(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def EnqueueEventDlq(self, request, context):
+        """Event DLQ
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DrainEventDlq(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteEventDlq(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2091,6 +2125,21 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'SetClusterConfig': grpc.unary_unary_rpc_method_handler(
                     servicer.SetClusterConfig,
                     request_deserializer=database__pb2.SetClusterConfigRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'EnqueueEventDlq': grpc.unary_unary_rpc_method_handler(
+                    servicer.EnqueueEventDlq,
+                    request_deserializer=database__pb2.EnqueueEventDlqRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'DrainEventDlq': grpc.unary_unary_rpc_method_handler(
+                    servicer.DrainEventDlq,
+                    request_deserializer=database__pb2.DrainEventDlqRequest.FromString,
+                    response_serializer=database__pb2.DrainEventDlqReply.SerializeToString,
+            ),
+            'DeleteEventDlq': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteEventDlq,
+                    request_deserializer=database__pb2.DeleteEventDlqRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'Compact': grpc.unary_unary_rpc_method_handler(
@@ -3427,6 +3476,87 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/SetClusterConfig',
             database__pb2.SetClusterConfigRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def EnqueueEventDlq(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/EnqueueEventDlq',
+            database__pb2.EnqueueEventDlqRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DrainEventDlq(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DrainEventDlq',
+            database__pb2.DrainEventDlqRequest.SerializeToString,
+            database__pb2.DrainEventDlqReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteEventDlq(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteEventDlq',
+            database__pb2.DeleteEventDlqRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

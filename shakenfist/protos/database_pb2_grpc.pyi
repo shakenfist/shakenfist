@@ -133,6 +133,22 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    EnqueueEventDlq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.EnqueueEventDlqRequest,
+        database_pb2.StatusReply,
+    ]
+    """Event DLQ"""
+
+    DrainEventDlq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DrainEventDlqRequest,
+        database_pb2.DrainEventDlqReply,
+    ]
+
+    DeleteEventDlq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteEventDlqRequest,
+        database_pb2.StatusReply,
+    ]
+
     Compact: grpc.UnaryUnaryMultiCallable[
         database_pb2.CompactRequest,
         database_pb2.StatusReply,
@@ -1074,6 +1090,22 @@ class DatabaseServiceAsyncStub:
 
     SetClusterConfig: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.SetClusterConfigRequest,
+        database_pb2.StatusReply,
+    ]
+
+    EnqueueEventDlq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.EnqueueEventDlqRequest,
+        database_pb2.StatusReply,
+    ]
+    """Event DLQ"""
+
+    DrainEventDlq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DrainEventDlqRequest,
+        database_pb2.DrainEventDlqReply,
+    ]
+
+    DeleteEventDlq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteEventDlqRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2062,6 +2094,28 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def SetClusterConfig(
         self,
         request: database_pb2.SetClusterConfigRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def EnqueueEventDlq(
+        self,
+        request: database_pb2.EnqueueEventDlqRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Event DLQ"""
+
+    @abc.abstractmethod
+    def DrainEventDlq(
+        self,
+        request: database_pb2.DrainEventDlqRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.DrainEventDlqReply, collections.abc.Awaitable[database_pb2.DrainEventDlqReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteEventDlq(
+        self,
+        request: database_pb2.DeleteEventDlqRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

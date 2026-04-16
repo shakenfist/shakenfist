@@ -770,6 +770,105 @@ class SetClusterConfigRequest(google.protobuf.message.Message):
 global___SetClusterConfigRequest = SetClusterConfigRequest
 
 @typing.final
+class EnqueueEventDlqRequest(google.protobuf.message.Message):
+    """Event DLQ"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    EVENT_TIMESTAMP_FIELD_NUMBER: builtins.int
+    EVENT_JSON_FIELD_NUMBER: builtins.int
+    object_type: builtins.str
+    object_uuid: builtins.str
+    event_timestamp: builtins.float
+    event_json: builtins.str
+    """JSON-encoded event dict"""
+    def __init__(
+        self,
+        *,
+        object_type: builtins.str = ...,
+        object_uuid: builtins.str = ...,
+        event_timestamp: builtins.float = ...,
+        event_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["event_json", b"event_json", "event_timestamp", b"event_timestamp", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___EnqueueEventDlqRequest = EnqueueEventDlqRequest
+
+@typing.final
+class DrainEventDlqRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    LIMIT_FIELD_NUMBER: builtins.int
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        limit: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["limit", b"limit"]) -> None: ...
+
+global___DrainEventDlqRequest = DrainEventDlqRequest
+
+@typing.final
+class DrainEventDlqEntry(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    EVENT_JSON_FIELD_NUMBER: builtins.int
+    id: builtins.int
+    object_type: builtins.str
+    object_uuid: builtins.str
+    event_json: builtins.str
+    """JSON-encoded event dict"""
+    def __init__(
+        self,
+        *,
+        id: builtins.int = ...,
+        object_type: builtins.str = ...,
+        object_uuid: builtins.str = ...,
+        event_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["event_json", b"event_json", "id", b"id", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___DrainEventDlqEntry = DrainEventDlqEntry
+
+@typing.final
+class DrainEventDlqReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTRIES_FIELD_NUMBER: builtins.int
+    @property
+    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DrainEventDlqEntry]: ...
+    def __init__(
+        self,
+        *,
+        entries: collections.abc.Iterable[global___DrainEventDlqEntry] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
+
+global___DrainEventDlqReply = DrainEventDlqReply
+
+@typing.final
+class DeleteEventDlqRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDS_FIELD_NUMBER: builtins.int
+    @property
+    def ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def __init__(
+        self,
+        *,
+        ids: collections.abc.Iterable[builtins.int] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["ids", b"ids"]) -> None: ...
+
+global___DeleteEventDlqRequest = DeleteEventDlqRequest
+
+@typing.final
 class CompactRequest(google.protobuf.message.Message):
     """Maintenance Operations"""
 

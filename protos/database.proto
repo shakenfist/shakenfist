@@ -35,6 +35,11 @@ service DatabaseService {
   rpc GetClusterConfig (ClusterConfigRequest) returns (ClusterConfigReply) {}
   rpc SetClusterConfig (SetClusterConfigRequest) returns (StatusReply) {}
 
+  // Event DLQ
+  rpc EnqueueEventDlq (EnqueueEventDlqRequest) returns (StatusReply) {}
+  rpc DrainEventDlq (DrainEventDlqRequest) returns (DrainEventDlqReply) {}
+  rpc DeleteEventDlq (DeleteEventDlqRequest) returns (StatusReply) {}
+
   // Maintenance
   rpc Compact (CompactRequest) returns (StatusReply) {}
 
@@ -491,6 +496,34 @@ message ClusterConfigReply {
 message SetClusterConfigRequest {
   string key_name = 1;
   string value_json = 2;  // JSON-encoded config value
+}
+
+// Event DLQ
+
+message EnqueueEventDlqRequest {
+  string object_type = 1;
+  string object_uuid = 2;
+  double event_timestamp = 3;
+  string event_json = 4;  // JSON-encoded event dict
+}
+
+message DrainEventDlqRequest {
+  int32 limit = 1;
+}
+
+message DrainEventDlqEntry {
+  int64 id = 1;
+  string object_type = 2;
+  string object_uuid = 3;
+  string event_json = 4;  // JSON-encoded event dict
+}
+
+message DrainEventDlqReply {
+  repeated DrainEventDlqEntry entries = 1;
+}
+
+message DeleteEventDlqRequest {
+  repeated int64 ids = 1;
 }
 
 // Maintenance Operations

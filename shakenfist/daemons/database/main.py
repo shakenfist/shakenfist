@@ -541,6 +541,75 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    # Event DLQ Operations
+
+    def EnqueueEventDlq(
+        self,
+        request: database_pb2.EnqueueEventDlqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Enqueue an event in the dead-letter queue."""
+        try:
+            self.monitor.counters['enqueue_event_dlq'].inc()
+            event_json = json.loads(request.event_json)
+            mariadb._direct_enqueue_event_dlq(
+                object_type=request.object_type,
+                object_uuid=request.object_uuid,
+                event_timestamp=request.event_timestamp,
+                event_json=event_json,
+            )
+            return database_pb2.StatusReply(
+                success=True, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database EnqueueEventDlq failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DrainEventDlq(
+        self,
+        request: database_pb2.DrainEventDlqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DrainEventDlqReply:
+        """Return DLQ entries for processing."""
+        try:
+            self.monitor.counters['drain_event_dlq'].inc()
+            rows = mariadb._direct_drain_event_dlq(
+                limit=request.limit)
+            entries = []
+            for row in rows:
+                entries.append(
+                    database_pb2.DrainEventDlqEntry(
+                        id=row['id'],
+                        object_type=row['object_type'],
+                        object_uuid=row['object_uuid'],
+                        event_json=json.dumps(row['event_json']),
+                    ))
+            return database_pb2.DrainEventDlqReply(
+                entries=entries)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DrainEventDlq failed', e)
+            return database_pb2.DrainEventDlqReply(entries=[])
+
+    def DeleteEventDlq(
+        self,
+        request: database_pb2.DeleteEventDlqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete processed DLQ entries by id."""
+        try:
+            self.monitor.counters['delete_event_dlq'].inc()
+            mariadb._direct_delete_event_dlq(
+                ids=list(request.ids))
+            return database_pb2.StatusReply(
+                success=True, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteEventDlq failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     # Maintenance Operations
 
     def Compact(
@@ -4469,7 +4538,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             'clear_work_queue_claim', 'delete_work_queue_row',
             'acquire_lock', 'release_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
-            'get_cluster_config', 'set_cluster_config', 'compact',
+            'get_cluster_config', 'set_cluster_config',
+            'enqueue_event_dlq', 'drain_event_dlq',
+            'delete_event_dlq', 'compact',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state',
