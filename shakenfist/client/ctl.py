@@ -123,6 +123,7 @@ sf_config.verify_config(skip_auth_seed=True)
 config = sf_config.config
 
 # These imports _must_ occur after the extra config setup has run.
+from shakenfist import database as sf_database             # noqa
 from shakenfist import etcd                                # noqa
 from shakenfist import mariadb                             # noqa
 from shakenfist.namespace import Namespace                 # noqa
@@ -149,28 +150,18 @@ def bootstrap_system_key(keyname: str, key: str) -> None:
     click.echo('Done')
 
 
-@click.command()
-def show_etcd_config() -> None:
-    value = etcd.get_etcd_client().get('/sf/config', metadata=True)
-    if value is None or len(value) == 0:
-        click.echo('{}')
-    else:
-        click.echo(json.dumps(json.loads(
-            value[0][0]), indent=4, sort_keys=True))
+@click.command(name='show-config')
+def show_config() -> None:
+    """Show cluster-wide configuration."""
+    config_data = sf_database.get_cluster_config()
+    click.echo(json.dumps(config_data, indent=4, sort_keys=True))
 
 
-@click.command()
+@click.command(name='set-config')
 @click.argument('flag')
 @click.argument('value')
-def set_etcd_config(flag: str, value: str) -> None:
-    client = etcd.get_etcd_client()
-    etcd_config: dict[str, Any] = {}
-    current_config = client.get('/sf/config', metadata=True)
-    if current_config is None or len(current_config) == 0:
-        etcd_config = {}
-    else:
-        etcd_config = json.loads(current_config[0][0])
-
+def set_config(flag: str, value: str) -> None:
+    """Set a cluster-wide configuration value."""
     # Convert values if possible
     converted_value: Any = value
     if value in ['t', 'true', 'True']:
@@ -187,8 +178,24 @@ def set_etcd_config(flag: str, value: str) -> None:
             pass
 
     click.echo(f'Setting {flag} to {type(converted_value)}({converted_value})')
-    etcd_config[flag] = converted_value
-    client.put('/sf/config', json.dumps(etcd_config, indent=4, sort_keys=True))
+    sf_database.set_cluster_config(flag, converted_value)
+
+
+# Backward compatibility aliases
+@click.command(name='show-etcd-config', hidden=True)
+def show_etcd_config() -> None:
+    """Deprecated: use show-config instead."""
+    config_data = sf_database.get_cluster_config()
+    click.echo(json.dumps(config_data, indent=4, sort_keys=True))
+
+
+@click.command(name='set-etcd-config', hidden=True)
+@click.argument('flag')
+@click.argument('value')
+def set_etcd_config(flag: str, value: str) -> None:
+    """Deprecated: use set-config instead."""
+    ctx = click.get_current_context()
+    ctx.invoke(set_config, flag=flag, value=value)
 
 
 @click.command()
@@ -426,6 +433,8 @@ def migrate_floating_network_uuid(dry_run: bool) -> None:
 
 cli.add_command(bootstrap_system_key)
 cli.add_command(migrate_floating_network_uuid)
+cli.add_command(show_config)
+cli.add_command(set_config)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
 cli.add_command(verify_config)

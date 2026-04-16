@@ -163,6 +163,7 @@ NODE_METRICS_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 2
 WORK_QUEUE_VERSION = 2
 CLUSTER_LOCKS_VERSION = 2
+CLUSTER_CONFIG_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -811,6 +812,57 @@ def _ensure_cluster_locks_schema(engine: sa.Engine) -> dict[str, Any]:
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': CLUSTER_LOCKS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+_cluster_config_table: Optional[sa.Table] = None
+
+
+def _get_cluster_config_table() -> sa.Table:
+    """Get or create the cluster_config table definition.
+
+    This table stores cluster-wide configuration previously held in etcd
+    at /sf/config as a single JSON blob. Each top-level key in that blob
+    becomes a row here, so concurrent writes to different keys don't
+    conflict.
+    """
+    global _cluster_config_table
+    if _cluster_config_table is None:
+        metadata = _get_metadata()
+        _cluster_config_table = sa.Table(
+            'cluster_config',
+            metadata,
+            sa.Column('key_name', sa.String(128),
+                      primary_key=True),
+            sa.Column('value_json', sa.JSON(),
+                      nullable=False),
+            sa.Column('updated_at', sa.Double(),
+                      nullable=False),
+        )
+    return _cluster_config_table
+
+
+def _ensure_cluster_config_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the cluster_config table schema is up to date."""
+    table_name = 'cluster_config'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_config_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_CONFIG_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1545,6 +1597,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_cluster_operations_schema(engine))
     results.append(_ensure_work_queue_schema(engine))
     results.append(_ensure_cluster_locks_schema(engine))
+    results.append(_ensure_cluster_config_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -4054,6 +4107,45 @@ def _migrate_etcd_cluster_locks(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_etcd_cluster_config(engine: sa.Engine) -> dict[str, Any]:
+    """Drain /sf/config from etcd into the cluster_config table.
+
+    The etcd key is a single JSON blob. We split it into one row
+    per top-level key and delete the etcd key.
+    """
+    from shakenfist import etcd
+
+    migrated = 0
+    errors = 0
+
+    LOG.info('Migrating cluster config from etcd...')
+
+    raw = etcd.get_raw('/sf/config')
+    if raw is None or raw == {}:
+        LOG.info('No /sf/config in etcd; nothing to migrate')
+        return {'migrated_count': 0, 'error_count': 0}
+
+    if not isinstance(raw, dict):
+        LOG.warning(
+            'Cluster config migration: /sf/config is not a '
+            'dict; leaving in place')
+        return {'migrated_count': 0, 'error_count': 1}
+
+    for key_name, value in raw.items():
+        _direct_set_cluster_config(key_name, value)
+        migrated += 1
+
+    etcd.delete_raw('/sf/config')
+
+    LOG.info(
+        f'Cluster config migration: {migrated} keys migrated, '
+        f'{errors} errors')
+    return {
+        'migrated_count': migrated,
+        'error_count': errors,
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -4146,6 +4238,9 @@ DATA_MIGRATIONS.update({
     },
     'cluster_locks': {
         2: _migrate_etcd_cluster_locks,
+    },
+    'cluster_config': {
+        2: _migrate_etcd_cluster_config,
     },
 })
 
@@ -16618,6 +16713,80 @@ def _direct_get_all_cluster_locks() -> dict[str, dict[str, Any]]:
         LOG.warning(
             f'MariaDB get_all_cluster_locks failed: {e}')
         return {}
+
+
+# =============================================================================
+# Cluster Config Direct Access Functions
+# =============================================================================
+
+def _direct_get_all_cluster_config() -> dict[str, Any]:
+    """Return all cluster config as {key_name: value}.
+
+    value is the raw JSON-decoded value (str, int, float, bool).
+    """
+    engine = _get_engine()
+    table = _get_cluster_config_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(
+                table.c.key_name, table.c.value_json)
+            rows = conn.execute(stmt).fetchall()
+            return {row[0]: row[1] for row in rows}
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_all_cluster_config failed: {e}')
+        return {}
+
+
+def _direct_set_cluster_config(
+        key_name: str, value: Any) -> None:
+    """Upsert a single config key.
+
+    Uses INSERT ... ON DUPLICATE KEY UPDATE so concurrent
+    writes to different keys don't conflict.
+    """
+    engine = _get_engine()
+    table = _get_cluster_config_table()
+    now = time.time()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                key_name=key_name,
+                value_json=value,
+                updated_at=now,
+            )
+            stmt = stmt.on_duplicate_key_update(
+                value_json=value,
+                updated_at=now,
+            )
+            conn.execute(stmt)
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB set_cluster_config failed for '
+            f'{key_name}: {e}')
+
+
+def _direct_delete_cluster_config(
+        key_name: str) -> bool:
+    """Delete a single config key. Returns True if deleted."""
+    engine = _get_engine()
+    table = _get_cluster_config_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.key_name == key_name)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount == 1
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete_cluster_config failed for '
+            f'{key_name}: {e}')
+        return False
 
 
 # =============================================================================

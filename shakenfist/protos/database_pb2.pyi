@@ -704,6 +704,72 @@ class ClusterGetExistingLocksReply(google.protobuf.message.Message):
 global___ClusterGetExistingLocksReply = ClusterGetExistingLocksReply
 
 @typing.final
+class ClusterConfigRequest(google.protobuf.message.Message):
+    """Cluster Config"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ClusterConfigRequest = ClusterConfigRequest
+
+@typing.final
+class ClusterConfigEntry(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_NAME_FIELD_NUMBER: builtins.int
+    VALUE_JSON_FIELD_NUMBER: builtins.int
+    key_name: builtins.str
+    value_json: builtins.str
+    """JSON-encoded config value"""
+    def __init__(
+        self,
+        *,
+        key_name: builtins.str = ...,
+        value_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["key_name", b"key_name", "value_json", b"value_json"]) -> None: ...
+
+global___ClusterConfigEntry = ClusterConfigEntry
+
+@typing.final
+class ClusterConfigReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTRIES_FIELD_NUMBER: builtins.int
+    @property
+    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ClusterConfigEntry]: ...
+    def __init__(
+        self,
+        *,
+        entries: collections.abc.Iterable[global___ClusterConfigEntry] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
+
+global___ClusterConfigReply = ClusterConfigReply
+
+@typing.final
+class SetClusterConfigRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_NAME_FIELD_NUMBER: builtins.int
+    VALUE_JSON_FIELD_NUMBER: builtins.int
+    key_name: builtins.str
+    value_json: builtins.str
+    """JSON-encoded config value"""
+    def __init__(
+        self,
+        *,
+        key_name: builtins.str = ...,
+        value_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["key_name", b"key_name", "value_json", b"value_json"]) -> None: ...
+
+global___SetClusterConfigRequest = SetClusterConfigRequest
+
+@typing.final
 class CompactRequest(google.protobuf.message.Message):
     """Maintenance Operations"""
 

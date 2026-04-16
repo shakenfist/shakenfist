@@ -31,6 +31,10 @@ service DatabaseService {
   rpc ClearStaleLocks (ClusterClearStaleLocksRequest) returns (StatusReply) {}
   rpc GetExistingLocks (ClusterGetExistingLocksRequest) returns (ClusterGetExistingLocksReply) {}
 
+  // Cluster Config
+  rpc GetClusterConfig (ClusterConfigRequest) returns (ClusterConfigReply) {}
+  rpc SetClusterConfig (SetClusterConfigRequest) returns (StatusReply) {}
+
   // Maintenance
   rpc Compact (CompactRequest) returns (StatusReply) {}
 
@@ -469,6 +473,24 @@ message ClusterLockEntry {
 
 message ClusterGetExistingLocksReply {
   repeated ClusterLockEntry locks = 1;
+}
+
+// Cluster Config
+
+message ClusterConfigRequest {}
+
+message ClusterConfigEntry {
+  string key_name = 1;
+  string value_json = 2;  // JSON-encoded config value
+}
+
+message ClusterConfigReply {
+  repeated ClusterConfigEntry entries = 1;
+}
+
+message SetClusterConfigRequest {
+  string key_name = 1;
+  string value_json = 2;  // JSON-encoded config value
 }
 
 // Maintenance Operations

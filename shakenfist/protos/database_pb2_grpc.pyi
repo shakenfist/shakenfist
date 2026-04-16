@@ -122,6 +122,17 @@ class DatabaseServiceStub:
         database_pb2.ClusterGetExistingLocksReply,
     ]
 
+    GetClusterConfig: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ClusterConfigRequest,
+        database_pb2.ClusterConfigReply,
+    ]
+    """Cluster Config"""
+
+    SetClusterConfig: grpc.UnaryUnaryMultiCallable[
+        database_pb2.SetClusterConfigRequest,
+        database_pb2.StatusReply,
+    ]
+
     Compact: grpc.UnaryUnaryMultiCallable[
         database_pb2.CompactRequest,
         database_pb2.StatusReply,
@@ -1053,6 +1064,17 @@ class DatabaseServiceAsyncStub:
     GetExistingLocks: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.ClusterGetExistingLocksRequest,
         database_pb2.ClusterGetExistingLocksReply,
+    ]
+
+    GetClusterConfig: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ClusterConfigRequest,
+        database_pb2.ClusterConfigReply,
+    ]
+    """Cluster Config"""
+
+    SetClusterConfig: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.SetClusterConfigRequest,
+        database_pb2.StatusReply,
     ]
 
     Compact: grpc.aio.UnaryUnaryMultiCallable[
@@ -2027,6 +2049,21 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.ClusterGetExistingLocksRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.ClusterGetExistingLocksReply, collections.abc.Awaitable[database_pb2.ClusterGetExistingLocksReply]]: ...
+
+    @abc.abstractmethod
+    def GetClusterConfig(
+        self,
+        request: database_pb2.ClusterConfigRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.ClusterConfigReply, collections.abc.Awaitable[database_pb2.ClusterConfigReply]]:
+        """Cluster Config"""
+
+    @abc.abstractmethod
+    def SetClusterConfig(
+        self,
+        request: database_pb2.SetClusterConfigRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
     @abc.abstractmethod
     def Compact(

@@ -241,8 +241,8 @@
   roles:
     - role: primary
       vars:
-        role_action: "etcd_config"
-        etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
+        role_action: "cluster_config"
+        database_node_ip: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         auth_secret: "{{ hostvars['localhost']['auth_secret'] }}"
         ram_system_reservation: "{{ hostvars['localhost']['ram_system_reservation'] }}"
         lowest_mtu: "{{ hostvars[groups['primary_node'][0]]['lowest_mtu'] }}"

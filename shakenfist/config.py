@@ -6,9 +6,6 @@ import sys
 from typing import NoReturn
 from typing import Optional
 
-from etcd3gw.client import Etcd3Client
-from etcd3gw.exceptions import ConnectionFailedError
-from etcd3gw.exceptions import Etcd3Exception
 from pydantic import AnyHttpUrl
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -18,26 +15,41 @@ def get_node_name() -> str:
     return socket.getfqdn()
 
 
-def load_etcd_settings() -> None:
-    if not os.getenv('SHAKENFIST_ETCD_HOST'):
+def load_cluster_config() -> None:
+    """Load cluster-wide config from the database service.
+
+    Builds a gRPC channel directly to avoid circular imports
+    (database.py imports config.py). Falls back silently if the
+    database service is unreachable, matching the old etcd
+    tolerance.
+    """
+    db_ip = os.getenv('SHAKENFIST_DATABASE_NODE_IP')
+    if not db_ip:
         return
 
+    db_port = os.getenv('SHAKENFIST_DATABASE_API_PORT', '13005')
+
     try:
-        value = Etcd3Client(
-            host=os.getenv('SHAKENFIST_ETCD_HOST'), port=2379, protocol='http',
-            api_path='/v3beta/').get('/sf/config', metadata=True)
-        if value is None or len(value) == 0:
-            return
+        import grpc
+        from shakenfist.protos import database_pb2
+        from shakenfist.protos import database_pb2_grpc
 
-        c = json.loads(value[0][0])
-        for key in c:
-            os.environ['SHAKENFIST_%s' % key] = str(c[key])
+        channel = grpc.insecure_channel(f'{db_ip}:{db_port}')
+        stub = database_pb2_grpc.DatabaseServiceStub(channel)
+        request = database_pb2.ClusterConfigRequest()
 
-    except (Etcd3Exception, ConnectionFailedError):
-        # NOTE(mikal): I'm not sure this is the right approach, as it might cause
-        # us to silently ignore config errors. However, I can't just mock this away
-        # in tests because this code runs before the mocking occurs. And yes, the
-        # "not found" exception is really a generic Etcd3Exception.
+        response = stub.GetClusterConfig(request, timeout=5)
+
+        for entry in response.entries:
+            value = json.loads(entry.value_json)
+            os.environ['SHAKENFIST_%s' % entry.key_name] = str(value)
+
+        channel.close()
+
+    except Exception:
+        # Match current behavior: silently ignore unavailable
+        # database service. On fresh installs the database
+        # service may not be running yet.
         return
 
 
@@ -468,7 +480,7 @@ class SFConfig(BaseSettings):
         env_prefix = 'SHAKENFIST_'
 
 
-load_etcd_settings()
+load_cluster_config()
 config = SFConfig()
 
 

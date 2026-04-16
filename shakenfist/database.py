@@ -357,6 +357,47 @@ def get_existing_locks():
     return locks
 
 
+# Cluster Config Operations
+
+@_retry_database
+def get_cluster_config():
+    """Get all cluster config as a dict."""
+    channel = get_database_client()
+    if not channel:
+        return {}
+
+    stub = database_pb2_grpc.DatabaseServiceStub(channel)
+    request = database_pb2.ClusterConfigRequest()
+    response = stub.GetClusterConfig(
+        request, timeout=30, wait_for_ready=True)
+
+    config_data = {}
+    for entry in response.entries:
+        config_data[entry.key_name] = json.loads(
+            entry.value_json)
+    return config_data
+
+
+@_retry_database
+def set_cluster_config(key_name, value):
+    """Set a single cluster config key."""
+    channel = get_database_client()
+    if not channel:
+        return
+
+    stub = database_pb2_grpc.DatabaseServiceStub(channel)
+    request = database_pb2.SetClusterConfigRequest(
+        key_name=key_name,
+        value_json=json.dumps(value),
+    )
+    response = stub.SetClusterConfig(
+        request, timeout=30, wait_for_ready=True)
+    if not response.success:
+        LOG.error(
+            f'Database set_cluster_config failed: '
+            f'{response.error}')
+
+
 # Maintenance Operations
 
 @_retry_database

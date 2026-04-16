@@ -134,6 +134,16 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.ClusterGetExistingLocksRequest.SerializeToString,
                 response_deserializer=database__pb2.ClusterGetExistingLocksReply.FromString,
                 _registered_method=True)
+        self.GetClusterConfig = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetClusterConfig',
+                request_serializer=database__pb2.ClusterConfigRequest.SerializeToString,
+                response_deserializer=database__pb2.ClusterConfigReply.FromString,
+                _registered_method=True)
+        self.SetClusterConfig = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/SetClusterConfig',
+                request_serializer=database__pb2.SetClusterConfigRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.Compact = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/Compact',
                 request_serializer=database__pb2.CompactRequest.SerializeToString,
@@ -997,6 +1007,19 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetExistingLocks(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetClusterConfig(self, request, context):
+        """Cluster Config
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetClusterConfig(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2059,6 +2082,16 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetExistingLocks,
                     request_deserializer=database__pb2.ClusterGetExistingLocksRequest.FromString,
                     response_serializer=database__pb2.ClusterGetExistingLocksReply.SerializeToString,
+            ),
+            'GetClusterConfig': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetClusterConfig,
+                    request_deserializer=database__pb2.ClusterConfigRequest.FromString,
+                    response_serializer=database__pb2.ClusterConfigReply.SerializeToString,
+            ),
+            'SetClusterConfig': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetClusterConfig,
+                    request_deserializer=database__pb2.SetClusterConfigRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'Compact': grpc.unary_unary_rpc_method_handler(
                     servicer.Compact,
@@ -3341,6 +3374,60 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetExistingLocks',
             database__pb2.ClusterGetExistingLocksRequest.SerializeToString,
             database__pb2.ClusterGetExistingLocksReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetClusterConfig(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetClusterConfig',
+            database__pb2.ClusterConfigRequest.SerializeToString,
+            database__pb2.ClusterConfigReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetClusterConfig(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/SetClusterConfig',
+            database__pb2.SetClusterConfigRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
             insecure,

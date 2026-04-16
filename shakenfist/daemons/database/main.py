@@ -497,6 +497,50 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetExistingLocks failed', e)
             return database_pb2.ClusterGetExistingLocksReply(locks=[])
 
+    # Cluster Config Operations
+
+    def GetClusterConfig(
+        self,
+        request: database_pb2.ClusterConfigRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ClusterConfigReply:
+        """Get all cluster config entries."""
+        try:
+            self.monitor.counters['get_cluster_config'].inc()
+            config_data = mariadb._direct_get_all_cluster_config()
+            entries = []
+            for key_name, value in config_data.items():
+                entries.append(
+                    database_pb2.ClusterConfigEntry(
+                        key_name=key_name,
+                        value_json=json.dumps(value),
+                    ))
+            return database_pb2.ClusterConfigReply(
+                entries=entries)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterConfig failed', e)
+            return database_pb2.ClusterConfigReply(entries=[])
+
+    def SetClusterConfig(
+        self,
+        request: database_pb2.SetClusterConfigRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Set a single cluster config key."""
+        try:
+            self.monitor.counters['set_cluster_config'].inc()
+            value = json.loads(request.value_json)
+            mariadb._direct_set_cluster_config(
+                request.key_name, value)
+            return database_pb2.StatusReply(
+                success=True, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database SetClusterConfig failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     # Maintenance Operations
 
     def Compact(
@@ -4424,7 +4468,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'restart_queue', 'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
             'acquire_lock', 'release_lock', 'get_lock_holder',
-            'clear_stale_locks', 'get_existing_locks', 'compact',
+            'clear_stale_locks', 'get_existing_locks',
+            'get_cluster_config', 'set_cluster_config', 'compact',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state',
