@@ -324,13 +324,16 @@ def get_lock_holder(object_type, subtype, name):
 @_retry_database
 def clear_stale_locks():
     """Clear locks held by dead processes on this node."""
+    import psutil
+
     channel = get_database_client()
     if not channel:
         return
 
     stub = database_pb2_grpc.DatabaseServiceStub(channel)
     request = database_pb2.ClusterClearStaleLocksRequest(
-        node_name=config.NODE_NAME
+        node_name=config.NODE_NAME,
+        live_pids=list(psutil.pids()),
     )
     response = stub.ClearStaleLocks(request, timeout=30, wait_for_ready=True)
     if not response.success:

@@ -644,13 +644,17 @@ class ClusterClearStaleLocksRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NODE_NAME_FIELD_NUMBER: builtins.int
+    LIVE_PIDS_FIELD_NUMBER: builtins.int
     node_name: builtins.str
+    @property
+    def live_pids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
     def __init__(
         self,
         *,
         node_name: builtins.str = ...,
+        live_pids: collections.abc.Iterable[builtins.int] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["node_name", b"node_name"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["live_pids", b"live_pids", "node_name", b"node_name"]) -> None: ...
 
 global___ClusterClearStaleLocksRequest = ClusterClearStaleLocksRequest
 

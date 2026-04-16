@@ -457,6 +457,7 @@ message ClusterLockHolderReply {
 
 message ClusterClearStaleLocksRequest {
   string node_name = 1;
+  repeated int32 live_pids = 2;
 }
 
 message ClusterGetExistingLocksRequest {}

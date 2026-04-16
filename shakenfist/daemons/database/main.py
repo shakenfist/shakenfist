@@ -11,6 +11,7 @@ enable future migration to other database backends.
 from concurrent import futures
 from ipaddress import IPv4Address
 import json
+import time
 from typing import Any
 from typing import cast
 from uuid import UUID
@@ -398,11 +399,17 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['acquire_lock'].inc()
             lock_data = json.loads(request.lock_data)
-            path = etcd._construct_key(
-                request.object_type, request.subtype, request.name,
-                prefix='sflocks'
+            lock_key = mariadb._cluster_lock_key(
+                request.object_type, request.subtype,
+                request.name)
+            acquired = mariadb._direct_acquire_cluster_lock(
+                lock_key=lock_key,
+                holder_json=lock_data,
+                node_uuid=lock_data.get('node', ''),
+                pid=int(lock_data.get('pid', 0)),
+                lock_id=lock_data.get('id', ''),
+                now=time.time(),
             )
-            acquired = etcd.create_raw(path, lock_data)
             return database_pb2.ClusterLockReply(acquired=acquired)
         except Exception as e:
             util_exceptions.ignore_exception('database AcquireLock failed', e)
@@ -417,11 +424,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['release_lock'].inc()
             lock_data = json.loads(request.lock_data)
-            path = etcd._construct_key(
-                request.object_type, request.subtype, request.name,
-                prefix='sflocks'
+            lock_key = mariadb._cluster_lock_key(
+                request.object_type, request.subtype,
+                request.name)
+            released = mariadb._direct_release_cluster_lock(
+                lock_key=lock_key,
+                lock_id=lock_data.get('id', ''),
             )
-            released = etcd.transactional_delete_raw(path, lock_data)
             return database_pb2.StatusReply(success=released, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database ReleaseLock failed', e)
@@ -435,12 +444,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get the current holder of a lock."""
         try:
             self.monitor.counters['get_lock_holder'].inc()
-            path = etcd._construct_key(
-                request.object_type, request.subtype, request.name,
-                prefix='sflocks'
-            )
-            holder = etcd.get_raw(path)
-            if holder is None or holder == {}:
+            lock_key = mariadb._cluster_lock_key(
+                request.object_type, request.subtype,
+                request.name)
+            holder = mariadb._direct_get_cluster_lock(lock_key)
+            if holder is None:
                 return database_pb2.ClusterLockHolderReply(held=False, holder='')
             return database_pb2.ClusterLockHolderReply(
                 held=True,
@@ -458,7 +466,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Clear locks held by dead processes on a node."""
         try:
             self.monitor.counters['clear_stale_locks'].inc()
-            etcd.clear_stale_locks()
+            mariadb._direct_clear_stale_cluster_locks(
+                node_uuid=request.node_name,
+                live_pids=list(request.live_pids),
+            )
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -473,7 +484,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get all existing locks in the cluster."""
         try:
             self.monitor.counters['get_existing_locks'].inc()
-            locks = etcd.get_existing_locks()
+            locks = mariadb._direct_get_all_cluster_locks()
             lock_entries = []
             for key, holder in locks.items():
                 lock_entries.append(database_pb2.ClusterLockEntry(
