@@ -4,7 +4,6 @@
 # ansible playbook contain tags, but not all. Currently available tags are:
 #
 #   bootstrap: bootstrap the installer, you must always run this tag.
-#   etcd: tasks associated with setup or upgrade of etcd itself.
 #   pki: tasks associated with setup of certifying authorities or PKI certificates
 #     (for example those for the SPICE console).
 
@@ -186,24 +185,6 @@
         role_action: "syslog"
         syslog_target: "{{ hostvars[groups['primary_node'][0]]['node_mesh_ip'] }}"
 
-### etcd
-
-#    ETCD_MAX_REQUEST_BYTES is from https://github.com/etcd-io/etcd/issues/9043
-- hosts: etcd_master
-  tags: etcd
-  roles:
-    - role: andrewrothstein.etcd-cluster
-      vars:
-        etcd_secure: False
-        etcd_cluster_name: shakenfist
-        etcd_enable_v2: False
-        etcd_master_group_name: etcd_master
-        etcd_iface_public: "{{node_mesh_nic}}"
-        etcd_iface_cluster: "{{node_mesh_nic}}"
-        etcd_address_cluster: "{{node_mesh_ip}}"
-        etcd_additional_envvars:
-          ETCD_MAX_REQUEST_BYTES: 100000000
-
 ### MariaDB
 
 - hosts: etcd_master
@@ -250,7 +231,7 @@
         http_proxy: "{{ hostvars['localhost']['http_proxy'] }}"
         extra_config: "{{ extra_config }}"
 
-# Register all nodes in etcd (init-node creates the node object)
+# Register all nodes in the database (init-node creates the node object).
 - hosts: allsf
   become: yes
   become_method: sudo
@@ -260,12 +241,11 @@
     - role: base
       vars:
         role_action: "register"
-        etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         node_name: "{{ node_name }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
 
 # Create the admin namespace. This only needs to run once, so we run it on the
-# first etcd_master node.
+# first database node.
 - hosts: etcd_master
   become: yes
   become_method: sudo
@@ -276,7 +256,6 @@
       vars:
         role_action: "create_admin_namespace"
         system_key: "{{ admin_password }}"
-        etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
         eventlog_node_ip: "{{hostvars[groups['eventlog_node'][0]]['node_mesh_ip']}}"
       when: inventory_hostname == groups['etcd_master'][0]

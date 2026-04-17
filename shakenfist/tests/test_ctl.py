@@ -25,7 +25,6 @@ class MockConfig:
     MARIADB_HOST = ''
     DATABASE_NODE_IP = '192.168.1.1'
     DATABASE_API_PORT = 13005
-    DATABASE_USE_DIRECT_ETCD = False
 
 
 def _import_ctl_module():

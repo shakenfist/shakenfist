@@ -34,41 +34,6 @@ class DatabaseServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.Get = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/Get',
-                request_serializer=database__pb2.GetRequest.SerializeToString,
-                response_deserializer=database__pb2.GetReply.FromString,
-                _registered_method=True)
-        self.GetPrefix = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/GetPrefix',
-                request_serializer=database__pb2.GetPrefixRequest.SerializeToString,
-                response_deserializer=database__pb2.GetPrefixReply.FromString,
-                _registered_method=True)
-        self.Put = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/Put',
-                request_serializer=database__pb2.PutRequest.SerializeToString,
-                response_deserializer=database__pb2.StatusReply.FromString,
-                _registered_method=True)
-        self.Create = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/Create',
-                request_serializer=database__pb2.CreateRequest.SerializeToString,
-                response_deserializer=database__pb2.StatusReply.FromString,
-                _registered_method=True)
-        self.Delete = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/Delete',
-                request_serializer=database__pb2.DeleteRequest.SerializeToString,
-                response_deserializer=database__pb2.StatusReply.FromString,
-                _registered_method=True)
-        self.DeletePrefix = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/DeletePrefix',
-                request_serializer=database__pb2.DeletePrefixRequest.SerializeToString,
-                response_deserializer=database__pb2.StatusReply.FromString,
-                _registered_method=True)
-        self.ReplaceMany = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/ReplaceMany',
-                request_serializer=database__pb2.ReplaceManyRequest.SerializeToString,
-                response_deserializer=database__pb2.ReplaceManyReply.FromString,
-                _registered_method=True)
         self.Enqueue = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/Enqueue',
                 request_serializer=database__pb2.EnqueueRequest.SerializeToString,
@@ -157,11 +122,6 @@ class DatabaseServiceStub(object):
         self.DeleteEventDlq = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteEventDlq',
                 request_serializer=database__pb2.DeleteEventDlqRequest.SerializeToString,
-                response_deserializer=database__pb2.StatusReply.FromString,
-                _registered_method=True)
-        self.Compact = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/Compact',
-                request_serializer=database__pb2.CompactRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
         self.GetObjectState = channel.unary_unary(
@@ -904,49 +864,6 @@ class DatabaseServiceStub(object):
 class DatabaseServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def Get(self, request, context):
-        """Key-Value Operations
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetPrefix(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def Put(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def Create(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def Delete(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def DeletePrefix(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ReplaceMany(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def Enqueue(self, request, context):
         """Queue Operations
         """
@@ -1055,13 +972,6 @@ class DatabaseServiceServicer(object):
 
     def DeleteEventDlq(self, request, context):
         """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def Compact(self, request, context):
-        """Maintenance
-        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -2017,41 +1927,6 @@ class DatabaseServiceServicer(object):
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'Get': grpc.unary_unary_rpc_method_handler(
-                    servicer.Get,
-                    request_deserializer=database__pb2.GetRequest.FromString,
-                    response_serializer=database__pb2.GetReply.SerializeToString,
-            ),
-            'GetPrefix': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetPrefix,
-                    request_deserializer=database__pb2.GetPrefixRequest.FromString,
-                    response_serializer=database__pb2.GetPrefixReply.SerializeToString,
-            ),
-            'Put': grpc.unary_unary_rpc_method_handler(
-                    servicer.Put,
-                    request_deserializer=database__pb2.PutRequest.FromString,
-                    response_serializer=database__pb2.StatusReply.SerializeToString,
-            ),
-            'Create': grpc.unary_unary_rpc_method_handler(
-                    servicer.Create,
-                    request_deserializer=database__pb2.CreateRequest.FromString,
-                    response_serializer=database__pb2.StatusReply.SerializeToString,
-            ),
-            'Delete': grpc.unary_unary_rpc_method_handler(
-                    servicer.Delete,
-                    request_deserializer=database__pb2.DeleteRequest.FromString,
-                    response_serializer=database__pb2.StatusReply.SerializeToString,
-            ),
-            'DeletePrefix': grpc.unary_unary_rpc_method_handler(
-                    servicer.DeletePrefix,
-                    request_deserializer=database__pb2.DeletePrefixRequest.FromString,
-                    response_serializer=database__pb2.StatusReply.SerializeToString,
-            ),
-            'ReplaceMany': grpc.unary_unary_rpc_method_handler(
-                    servicer.ReplaceMany,
-                    request_deserializer=database__pb2.ReplaceManyRequest.FromString,
-                    response_serializer=database__pb2.ReplaceManyReply.SerializeToString,
-            ),
             'Enqueue': grpc.unary_unary_rpc_method_handler(
                     servicer.Enqueue,
                     request_deserializer=database__pb2.EnqueueRequest.FromString,
@@ -2140,11 +2015,6 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'DeleteEventDlq': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteEventDlq,
                     request_deserializer=database__pb2.DeleteEventDlqRequest.FromString,
-                    response_serializer=database__pb2.StatusReply.SerializeToString,
-            ),
-            'Compact': grpc.unary_unary_rpc_method_handler(
-                    servicer.Compact,
-                    request_deserializer=database__pb2.CompactRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'GetObjectState': grpc.unary_unary_rpc_method_handler(
@@ -2894,195 +2764,6 @@ class DatabaseService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def Get(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/Get',
-            database__pb2.GetRequest.SerializeToString,
-            database__pb2.GetReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def GetPrefix(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/GetPrefix',
-            database__pb2.GetPrefixRequest.SerializeToString,
-            database__pb2.GetPrefixReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def Put(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/Put',
-            database__pb2.PutRequest.SerializeToString,
-            database__pb2.StatusReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def Create(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/Create',
-            database__pb2.CreateRequest.SerializeToString,
-            database__pb2.StatusReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def Delete(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/Delete',
-            database__pb2.DeleteRequest.SerializeToString,
-            database__pb2.StatusReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def DeletePrefix(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/DeletePrefix',
-            database__pb2.DeletePrefixRequest.SerializeToString,
-            database__pb2.StatusReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def ReplaceMany(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/ReplaceMany',
-            database__pb2.ReplaceManyRequest.SerializeToString,
-            database__pb2.ReplaceManyReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
     def Enqueue(request,
             target,
             options=(),
@@ -3557,33 +3238,6 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/DeleteEventDlq',
             database__pb2.DeleteEventDlqRequest.SerializeToString,
-            database__pb2.StatusReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def Compact(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/Compact',
-            database__pb2.CompactRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

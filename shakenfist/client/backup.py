@@ -1,10 +1,7 @@
 # Copyright 2020 Michael Still
 import importlib
-import io
-import json
 import logging
 import os
-import tarfile
 
 import click
 from shakenfist_utilities import logs  # noreorder
@@ -35,9 +32,6 @@ if os.path.exists('/etc/sf/config'):
 sf_config = importlib.import_module('shakenfist.config')
 config = sf_config.config
 
-# These imports _must_ occur after the extra config setup has run.
-from shakenfist import etcd                  # noqa
-
 
 @click.group()
 @click.option('--verbose/--no-verbose', default=False)
@@ -53,17 +47,9 @@ def cli(ctx, verbose=None):
               help='Remove authentication details from backup')
 @click.pass_context
 def backup(ctx, output, anonymise=False):
-    with tarfile.open(output, 'w:gz') as tar:
-        for data, metadata in etcd.get_etcd_client().get_prefix('/'):
-            if metadata['key'].startswith(b'/sf/namespace'):
-                d = json.loads(data)
-                for k in d['keys']:
-                    d['keys'][k] = '...'
-                data = json.dumps(d, indent=4, sort_keys=True).encode('utf-8')
-
-            info = tarfile.TarInfo(metadata['key'].decode('utf-8').rstrip('/'))
-            info.size = len(data)
-            tar.addfile(info, io.BytesIO(data))
+    click.echo(
+        'sf-backup has not yet been reimplemented against MariaDB. '
+        'Use mariadb-dump for now.')
 
 
 cli.add_command(backup)
@@ -73,12 +59,9 @@ cli.add_command(backup)
 @click.argument('input', type=click.Path(exists=True))
 @click.pass_context
 def restore(ctx, input):
-    with tarfile.open(input, 'r:gz') as tar:
-        for tarinfo in tar:
-            key = tarinfo.name
-            data = tar.extractfile(key).read()
-
-            etcd.get_etcd_client().put(key, data)
+    click.echo(
+        'sf-backup has not yet been reimplemented against MariaDB. '
+        'Use mariadb restore tooling for now.')
 
 
 cli.add_command(restore)

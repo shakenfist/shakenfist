@@ -278,14 +278,6 @@ class SFConfig(BaseSettings):
         13006,
         description='Prometheus metrics port for the database daemon.'
     )
-    DATABASE_USE_DIRECT_ETCD: bool = Field(
-        True,
-        description=(
-            'Bypass the database service and use etcd directly. Set to False '
-            'to use the database microservice.'
-        )
-    )
-
     USAGE_EVENT_FREQUENCY: int = Field(
         60,
         description='How frequently to collect usage events.'
@@ -360,13 +352,6 @@ class SFConfig(BaseSettings):
     # Node Specific #
     #################
 
-    NODE_IS_ETCD_MASTER: bool = Field(
-        False,
-        description=(
-            'True if this node is an etcd master. This controls attempts to '
-            'compact the master database.'
-        )
-    )
     NODE_IS_HYPERVISOR: bool = Field(
         False,
         description=(
@@ -444,14 +429,13 @@ class SFConfig(BaseSettings):
     LOGLEVEL_SIDECHANNEL: str = 'info'
     LOGLEVEL_QUEUES: str = 'info'
 
-    # etcd
+    # etcd (retained only for DATA_MIGRATIONS drain — remove in next release)
     ETCD_HOST: str = Field(
         '',
-        description='Hostname or IP of the etcd host to query.'
-    )
-    LOG_ETCD_CONNECTIONS: bool = Field(
-        False,
-        description='Log when a new etcd connection is created, only useful in CI.'
+        description=(
+            'Hostname or IP of the etcd host to query for drain migrations. '
+            'Retained only for one-time migration of legacy clusters.'
+        )
     )
 
     # MariaDB
@@ -499,8 +483,6 @@ def _config_failure(failures: list[str]) -> NoReturn:
 
 def verify_config(skip_auth_seed: bool = False) -> None:
     failures: list[str] = []
-    if config.ETCD_HOST == '':
-        failures.append('You must configure ETCD_HOST')
 
     if not skip_auth_seed:
         if config.AUTH_SECRET_SEED == '~~unconfigured~~':

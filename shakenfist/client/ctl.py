@@ -124,7 +124,6 @@ config = sf_config.config
 
 # These imports _must_ occur after the extra config setup has run.
 from shakenfist import database as sf_database             # noqa
-from shakenfist import etcd                                # noqa
 from shakenfist import mariadb                             # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
@@ -346,93 +345,7 @@ OBJECT_TYPES_WITH_STATE = [
 ]
 
 
-@click.command()
-@click.option('--dry-run', is_flag=True, default=False,
-              help='Show what would be migrated without making changes')
-def migrate_floating_network_uuid(dry_run: bool) -> None:
-    """Migrate the floating network from legacy UUID to well-known UUID.
-
-    The floating network previously used the string "floating" as its UUID,
-    which is not a valid UUID4. This command migrates it to use the well-known
-    UUID f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f (containing "F10A7" = FLOAT).
-
-    This command should be run once during an upgrade. All Shaken Fist
-    services should be stopped before running this command.
-    """
-    from shakenfist.constants import FLOATING_NETWORK_UUID
-
-    # Check if legacy floating network exists
-    legacy_network = etcd.get('network', None, 'floating')
-    if not legacy_network:
-        click.echo('No legacy floating network found (UUID "floating").')
-        click.echo('Either already migrated or never created.')
-        return
-
-    # Check if new UUID already exists
-    new_network = etcd.get('network', None, str(FLOATING_NETWORK_UUID))
-    if new_network:
-        click.echo(f'Network with new UUID {FLOATING_NETWORK_UUID} already exists.')
-        click.echo('Cannot migrate - would overwrite existing network.')
-        return
-
-    click.echo('Found legacy floating network with UUID "floating"')
-    click.echo(f'Will migrate to UUID: {FLOATING_NETWORK_UUID}')
-
-    if dry_run:
-        click.echo('\nDry run - no changes made.')
-        return
-
-    # Migrate the network object
-    click.echo('\nMigrating network object...')
-    legacy_network['uuid'] = FLOATING_NETWORK_UUID
-    etcd.put('network', None, FLOATING_NETWORK_UUID, legacy_network)
-    etcd.delete('network', None, 'floating')
-    click.echo('  Network object migrated.')
-
-    # Migrate the IPAM object
-    click.echo('Migrating IPAM object...')
-    legacy_ipam = etcd.get('ipam', None, 'floating')
-    if legacy_ipam:
-        legacy_ipam['uuid'] = FLOATING_NETWORK_UUID
-        etcd.put('ipam', None, FLOATING_NETWORK_UUID, legacy_ipam)
-        etcd.delete('ipam', None, 'floating')
-        click.echo('  IPAM object migrated.')
-    else:
-        click.echo('  No legacy IPAM object found.')
-
-    # Migrate network state in MariaDB if it exists
-    click.echo('Migrating state in MariaDB...')
-    try:
-        state_data = mariadb.get_state(ObjectType.NETWORK, 'floating')
-        if state_data:
-            mariadb.set_state(
-                ObjectType.NETWORK, str(FLOATING_NETWORK_UUID), state_data)
-            mariadb.delete_state(ObjectType.NETWORK, 'floating')
-            click.echo('  Network state migrated.')
-        else:
-            click.echo('  No network state found in MariaDB.')
-    except Exception as e:
-        click.echo(f'  Could not migrate MariaDB state: {e}')
-
-    # Migrate IPAM state in MariaDB if it exists
-    try:
-        ipam_state = mariadb.get_state(ObjectType.IPAM, 'floating')
-        if ipam_state:
-            mariadb.set_state(
-                ObjectType.IPAM, str(FLOATING_NETWORK_UUID), ipam_state)
-            mariadb.delete_state(ObjectType.IPAM, 'floating')
-            click.echo('  IPAM state migrated.')
-        else:
-            click.echo('  No IPAM state found in MariaDB.')
-    except Exception as e:
-        click.echo(f'  Could not migrate IPAM MariaDB state: {e}')
-
-    click.echo('\nMigration complete.')
-    click.echo('You can now start Shaken Fist services.')
-
-
 cli.add_command(bootstrap_system_key)
-cli.add_command(migrate_floating_network_uuid)
 cli.add_command(show_config)
 cli.add_command(set_config)
 cli.add_command(show_etcd_config)

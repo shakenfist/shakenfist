@@ -173,19 +173,11 @@ def _use_database_service() -> bool:
     Returns True if the database service is configured and we should use it.
     Returns False if we should use direct MariaDB access (database daemon mode).
 
-    The logic is:
-    1. If DATABASE_USE_DIRECT_ETCD is True AND MARIADB_HOST is configured,
-       use direct access (this is the database daemon on an etcd_master node).
-    2. If DATABASE_NODE_IP is configured, use the database service.
-    3. Otherwise we have no way to access the database.
+    Only the database daemon has MARIADB_HOST configured directly. All other
+    daemons access MariaDB via the database service gRPC interface.
     """
-    # The database daemon sets DATABASE_USE_DIRECT_ETCD=true. When this is true
-    # AND we have MariaDB configured, we use direct MariaDB access. This only
-    # happens on etcd_master nodes which have the MariaDB credentials.
-    if config.DATABASE_USE_DIRECT_ETCD and config.MARIADB_HOST:
+    if config.MARIADB_HOST:
         return False
-
-    # For all other cases, try to use the database service via gRPC
     if not config.DATABASE_NODE_IP:
         return False
     return True
