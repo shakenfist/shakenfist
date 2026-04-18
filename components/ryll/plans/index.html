@@ -3014,6 +3014,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-deferred-debt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deferred debt: collating and paying down outstanding work
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-display-iteration-followups/" class="md-nav__link">
         
   
@@ -3182,6 +3210,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-deferred-debt-phase-01-display/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Display correctness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-usb-ui-phase-01-bus-fix/" class="md-nav__link">
         
   
@@ -3330,6 +3386,34 @@
     
   
     Phase 1: SpiceVMC port channel transport for WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-deferred-debt-phase-02-audio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Audio correctness
   
 
     
@@ -3714,6 +3798,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-deferred-debt-phase-03-session/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Input and session correctness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-usb-ui-phase-03-panel/" class="md-nav__link">
         
   
@@ -3910,6 +4022,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-deferred-debt-phase-04-robustness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Robustness and safety
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-packaging-phase-04-rpm/" class="md-nav__link">
         
   
@@ -3918,6 +4058,34 @@
     
   
     Phase 4: RPM Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-deferred-debt-phase-05-cleanup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: Code quality and cleanup
   
 
     
@@ -4198,6 +4366,34 @@
     
   
     Phase 6: Introduce ConnectionConfig and move SpiceClient
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-deferred-debt-phase-06-tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 6: Test coverage
   
 
     
@@ -6425,6 +6621,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#consolidation-plans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consolidation plans
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6451,6 +6658,9 @@
 plans decompose work into numbered phases, each with its own detailed plan
 file. Standalone plans track issues, follow-ups, or design decisions that
 do not require phased execution.</p>
+<p>New plans should follow the structure in <code>PLAN-TEMPLATE.md</code> at the repo
+root. For pre-push audits of our own work see <code>PUSH-TEMPLATE.md</code>; for
+reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code>.</p>
 <h2 id="master-plans">Master plans<a class="headerlink" href="#master-plans" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -6559,6 +6769,29 @@ execution.</p>
 <td>2026-04-11</td>
 <td><a href="/components/ryll/plans/PLAN-pr23-followup/">PR #23 follow-up</a></td>
 <td>Follow-up fixes from audio playback channel integration</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consolidation-plans">Consolidation plans<a class="headerlink" href="#consolidation-plans" title="Permanent link">&para;</a></h2>
+<p>These plans collate deferred work from multiple sources into
+a single execution sequence.</p>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Plan</th>
+<th>Intent</th>
+<th>Status</th>
+<th>Phases</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-04-16</td>
+<td><a href="/components/ryll/plans/PLAN-deferred-debt/">Deferred debt</a></td>
+<td>Pay down correctness bugs, robustness gaps, code quality, tests, and docs across all completed plans</td>
+<td>Complete</td>
+<td><a href="/components/ryll/plans/PLAN-deferred-debt-phase-01-display/">1. Display</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-02-audio/">2. Audio</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-03-session/">3. Session</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-04-robustness/">4. Robustness</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup/">5. Cleanup</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-06-tests/">6. Tests</a>, 7. Docs (inline)</td>
 </tr>
 </tbody>
 </table>
