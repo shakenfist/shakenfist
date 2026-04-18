@@ -156,18 +156,21 @@ nav:
                 - "Bug reporting mode for ryll": components/ryll/plans/PLAN-bug-reports.md
                 - "Capture mode for protocol and display debugging": components/ryll/plans/PLAN-capture.md
                 - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
+                - "Deferred debt: collating and paying down outstanding work": components/ryll/plans/PLAN-deferred-debt.md
                 - "Display Iteration Follow-ups": components/ryll/plans/PLAN-display-iteration-followups.md
                 - "Extract reusable crates from ryll": components/ryll/plans/PLAN-crate-extraction.md
                 - "Interactive USB device management UI": components/ryll/plans/PLAN-usb-ui.md
                 - "Phase 10: Testing and QEMU setup": components/ryll/plans/PLAN-usb-redir-phase-10-testing.md
                 - "Phase 1: Capture infrastructure": components/ryll/plans/PLAN-capture-phase-01-infra.md
                 - "Phase 1: Convert ryll to a Cargo workspace": components/ryll/plans/PLAN-crate-extraction-phase-01-workspace.md
+                - "Phase 1: Display correctness": components/ryll/plans/PLAN-deferred-debt-phase-01-display.md
                 - "Phase 1: Fix enumerate_physical bus field": components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix.md
                 - "Phase 1: Parse SpiceCursor image data": components/ryll/plans/PLAN-cursor-rendering-phase-01-parse.md
                 - "Phase 1: Platform Portability": components/ryll/plans/PLAN-packaging-phase-01-portability.md
                 - "Phase 1: Ring buffer infrastructure": components/ryll/plans/PLAN-bug-reports-phase-01-ring-buffer.md
                 - "Phase 1: SpiceVMC channel transport": components/ryll/plans/PLAN-usb-redir-phase-01-vmc-channel.md
                 - "Phase 1: SpiceVMC port channel transport for WebDAV": components/ryll/plans/PLAN-webdav-phase-01-port-channel.md
+                - "Phase 2: Audio correctness": components/ryll/plans/PLAN-deferred-debt-phase-02-audio.md
                 - "Phase 2: Channel state snapshots": components/ryll/plans/PLAN-bug-reports-phase-02-channel-state.md
                 - "Phase 2: GitHub Actions CI": components/ryll/plans/PLAN-packaging-phase-02-ci.md
                 - "Phase 2: Mux protocol (demux and remux)": components/ryll/plans/PLAN-webdav-phase-02-mux-protocol.md
@@ -181,6 +184,7 @@ nav:
                 - "Phase 3: Device backend trait": components/ryll/plans/PLAN-usb-redir-phase-03-device-backend.md
                 - "Phase 3: Embedded WebDAV server": components/ryll/plans/PLAN-webdav-phase-03-webdav-server.md
                 - "Phase 3: Extract shakenfist-spice-compression": components/ryll/plans/PLAN-crate-extraction-phase-03-compression.md
+                - "Phase 3: Input and session correctness": components/ryll/plans/PLAN-deferred-debt-phase-03-session.md
                 - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
                 - "Phase 4: Device enumeration display": components/ryll/plans/PLAN-usb-ui-phase-04-enumerate.md
@@ -188,7 +192,9 @@ nav:
                 - "Phase 4: GUI report button and description dialog": components/ryll/plans/PLAN-bug-reports-phase-04-gui-button.md
                 - "Phase 4: Integration (mux ↔ WebDAV server)": components/ryll/plans/PLAN-webdav-phase-04-integration.md
                 - "Phase 4: Real device enumeration and passthrough": components/ryll/plans/PLAN-usb-redir-phase-04-real-devices.md
+                - "Phase 4: Robustness and safety": components/ryll/plans/PLAN-deferred-debt-phase-04-robustness.md
                 - "Phase 4: RPM Packaging": components/ryll/plans/PLAN-packaging-phase-04-rpm.md
+                - "Phase 5: Code quality and cleanup": components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup.md
                 - "Phase 5: Connect and disconnect controls": components/ryll/plans/PLAN-usb-ui-phase-05-connect.md
                 - "Phase 5: Device connection lifecycle": components/ryll/plans/PLAN-usb-redir-phase-05-device-connect.md
                 - "Phase 5: Extract shakenfist-spice-usbredir": components/ryll/plans/PLAN-crate-extraction-phase-05-usbredir.md
@@ -199,6 +205,7 @@ nav:
                 - "Phase 6: Control and bulk transfers": components/ryll/plans/PLAN-usb-redir-phase-06-transfers.md
                 - "Phase 6: GUI live traffic viewer": components/ryll/plans/PLAN-bug-reports-phase-06-traffic-viewer.md
                 - "Phase 6: Introduce ConnectionConfig and move SpiceClient": components/ryll/plans/PLAN-crate-extraction-phase-06-client.md
+                - "Phase 6: Test coverage": components/ryll/plans/PLAN-deferred-debt-phase-06-tests.md
                 - "Phase 6: Testing and documentation": components/ryll/plans/PLAN-webdav-phase-06-testing.md
                 - "Phase 6: Windows Packaging": components/ryll/plans/PLAN-packaging-phase-06-windows.md
                 - "Phase 7: Documentation and testing": components/ryll/plans/PLAN-bug-reports-phase-07-docs.md

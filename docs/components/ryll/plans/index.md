@@ -5,6 +5,10 @@ plans decompose work into numbered phases, each with its own detailed plan
 file. Standalone plans track issues, follow-ups, or design decisions that
 do not require phased execution.
 
+New plans should follow the structure in `PLAN-TEMPLATE.md` at the repo
+root. For pre-push audits of our own work see `PUSH-TEMPLATE.md`; for
+reviewing and merging external contributor PRs see `MERGE-TEMPLATE.md`.
+
 ## Master plans
 
 | Date | Plan | Intent | Status | Phases |
@@ -30,3 +34,12 @@ execution.
 | 2026-04-08 | [Display iteration follow-ups](/components/ryll/plans/PLAN-display-iteration-followups/) | Deferred work from display rendering, QUIC decode, and multi-monitor PRs |
 | 2026-04-11 | [PR #20 follow-up](/components/ryll/plans/PLAN-pr20-followup/) | Follow-up fixes from clipboard, MJPEG, and disconnect handling |
 | 2026-04-11 | [PR #23 follow-up](/components/ryll/plans/PLAN-pr23-followup/) | Follow-up fixes from audio playback channel integration |
+
+## Consolidation plans
+
+These plans collate deferred work from multiple sources into
+a single execution sequence.
+
+| Date | Plan | Intent | Status | Phases |
+|------|------|--------|--------|--------|
+| 2026-04-16 | [Deferred debt](/components/ryll/plans/PLAN-deferred-debt/) | Pay down correctness bugs, robustness gaps, code quality, tests, and docs across all completed plans | Complete | [1. Display](/components/ryll/plans/PLAN-deferred-debt-phase-01-display/), [2. Audio](/components/ryll/plans/PLAN-deferred-debt-phase-02-audio/), [3. Session](/components/ryll/plans/PLAN-deferred-debt-phase-03-session/), [4. Robustness](/components/ryll/plans/PLAN-deferred-debt-phase-04-robustness/), [5. Cleanup](/components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup/), [6. Tests](/components/ryll/plans/PLAN-deferred-debt-phase-06-tests/), 7. Docs (inline) |
