@@ -47,6 +47,24 @@ jobs:
                 'runs_on': 'debian-12'
             },
             {
+                'name': 'debian-12-docker',
+                'baseimage': 'debian:12',
+                'baseuser': 'debian',
+                'outputlabel': 'ci-images/debian-12',
+                'scheduled': True,
+                'runs_on': 'debian-12',
+                'extras': 'docker'
+            },
+            {
+                'name': 'debian-13-docker',
+                'baseimage': 'debian:13',
+                'baseuser': 'debian',
+                'outputlabel': 'ci-images/debian-13',
+                'scheduled': True,
+                'runs_on': 'debian-12',
+                'extras': 'docker'
+            },
+            {
                 'name': 'rocky-9',
                 'baseimage': 'rocky:9',
                 'baseuser': 'cloud-user',
@@ -125,7 +143,7 @@ jobs:
             cd ${GITHUB_WORKSPACE}/actions
             ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
-                base_image=${{ matrix.os.baseimage }} base_image_user=${{ matrix.os.baseuser }} label=${{ matrix.os.outputlabel }}" \
+                base_image=${{ matrix.os.baseimage }} base_image_user=${{ matrix.os.baseuser }} label=${{ matrix.os.outputlabel }} extras=${{ matrix.os.extras || '' }}" \
               ${{ matrix.os.playbook || 'ansible/ci-image.yml' }}
 
         - uses: JasonEtco/create-an-issue@v2
