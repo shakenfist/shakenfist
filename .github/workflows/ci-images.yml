@@ -50,7 +50,7 @@ jobs:
                 'name': 'debian-12-docker',
                 'baseimage': 'debian:12',
                 'baseuser': 'debian',
-                'outputlabel': 'ci-images/debian-12',
+                'outputlabel': 'ci-images/debian-12-docker',
                 'scheduled': True,
                 'runs_on': 'debian-12',
                 'extras': 'docker'
@@ -59,7 +59,7 @@ jobs:
                 'name': 'debian-13-docker',
                 'baseimage': 'debian:13',
                 'baseuser': 'debian',
-                'outputlabel': 'ci-images/debian-13',
+                'outputlabel': 'ci-images/debian-13-docker',
                 'scheduled': True,
                 'runs_on': 'debian-12',
                 'extras': 'docker'
