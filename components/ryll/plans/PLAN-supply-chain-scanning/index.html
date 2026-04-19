@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/operator_guide/exception_tracking/">
+        <link rel="canonical" href="https://shakenfist.com/components/ryll/plans/PLAN-supply-chain-scanning/">
       
       
-        <link rel="prev" href="../database/">
+        <link rel="prev" href="../PLAN-opus-decoder/">
       
       
-        <link rel="next" href="../locks/">
+        <link rel="next" href="../PLAN-supply-chain-followups/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Exception Tracking - Shaken Fist</title>
+        <title>Supply-chain and prompt-injection scanning - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
   
@@ -74,9 +74,9 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#exception-tracking" class="md-skip">
+        <a href="#supply-chain-and-prompt-injection-scanning" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Exception Tracking
+              Supply-chain and prompt-injection scanning
             
           </span>
         </div>
@@ -253,7 +253,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -283,7 +283,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href="../../../.." class="md-nav__link">
         
   
   
@@ -310,7 +310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manifesto/" class="md-nav__link">
+      <a href="../../../../manifesto/" class="md-nav__link">
         
   
   
@@ -334,18 +334,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -366,7 +368,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -384,7 +386,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/overview/" class="md-nav__link">
+      <a href="../../../overview/" class="md-nav__link">
         
   
   
@@ -459,7 +461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/" class="md-nav__link">
+      <a href="../../../cloudgood/" class="md-nav__link">
         
   
   
@@ -487,7 +489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/technology-primer/" class="md-nav__link">
+      <a href="../../../cloudgood/technology-primer/" class="md-nav__link">
         
   
   
@@ -515,7 +517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/fundamentals/" class="md-nav__link">
+      <a href="../../../cloudgood/fundamentals/" class="md-nav__link">
         
   
   
@@ -543,7 +545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/virtualization-history/" class="md-nav__link">
+      <a href="../../../cloudgood/virtualization-history/" class="md-nav__link">
         
   
   
@@ -571,7 +573,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/memory-mapped-devices/" class="md-nav__link">
+      <a href="../../../cloudgood/memory-mapped-devices/" class="md-nav__link">
         
   
   
@@ -599,7 +601,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/instance-video/" class="md-nav__link">
+      <a href="../../../cloudgood/instance-video/" class="md-nav__link">
         
   
   
@@ -627,7 +629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/virtual-networking/" class="md-nav__link">
+      <a href="../../../cloudgood/virtual-networking/" class="md-nav__link">
         
   
   
@@ -655,7 +657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/networking-shakenfist/" class="md-nav__link">
+      <a href="../../../cloudgood/networking-shakenfist/" class="md-nav__link">
         
   
   
@@ -683,7 +685,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/neutron-linuxbridge/" class="md-nav__link">
+      <a href="../../../cloudgood/neutron-linuxbridge/" class="md-nav__link">
         
   
   
@@ -711,7 +713,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/cloudgood/neutron-legacy/" class="md-nav__link">
+      <a href="../../../cloudgood/neutron-legacy/" class="md-nav__link">
         
   
   
@@ -794,7 +796,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/agent-python/" class="md-nav__link">
+      <a href="../../../agent-python/" class="md-nav__link">
         
   
   
@@ -822,7 +824,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/agent-python/developer-guide/" class="md-nav__link">
+      <a href="../../../agent-python/developer-guide/" class="md-nav__link">
         
   
   
@@ -850,7 +852,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/agent-python/protocol/" class="md-nav__link">
+      <a href="../../../agent-python/protocol/" class="md-nav__link">
         
   
   
@@ -933,7 +935,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/" class="md-nav__link">
+      <a href="../../../clingwrap/" class="md-nav__link">
         
   
   
@@ -961,7 +963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/command-types/" class="md-nav__link">
+      <a href="../../../clingwrap/command-types/" class="md-nav__link">
         
   
   
@@ -989,7 +991,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/configuration/" class="md-nav__link">
+      <a href="../../../clingwrap/configuration/" class="md-nav__link">
         
   
   
@@ -1017,7 +1019,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/examples/" class="md-nav__link">
+      <a href="../../../clingwrap/examples/" class="md-nav__link">
         
   
   
@@ -1045,7 +1047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/clingwrap/installation/" class="md-nav__link">
+      <a href="../../../clingwrap/installation/" class="md-nav__link">
         
   
   
@@ -1128,7 +1130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/development/index.md" class="md-nav__link">
+      <a href="../../../development/index.md" class="md-nav__link">
         
   
   
@@ -1156,7 +1158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/development/automated-pr-review/" class="md-nav__link">
+      <a href="../../../development/automated-pr-review/" class="md-nav__link">
         
   
   
@@ -1184,7 +1186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/development/ci-review-automation/" class="md-nav__link">
+      <a href="../../../development/ci-review-automation/" class="md-nav__link">
         
   
   
@@ -1212,7 +1214,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/development/release-automation/" class="md-nav__link">
+      <a href="../../../development/release-automation/" class="md-nav__link">
         
   
   
@@ -1287,7 +1289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
         
   
   
@@ -1378,7 +1380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/" class="md-nav__link">
+      <a href="../../../kerbside/" class="md-nav__link">
         
   
   
@@ -1406,7 +1408,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/configuration/" class="md-nav__link">
+      <a href="../../../kerbside/configuration/" class="md-nav__link">
         
   
   
@@ -1434,7 +1436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/console-sources/" class="md-nav__link">
+      <a href="../../../kerbside/console-sources/" class="md-nav__link">
         
   
   
@@ -1462,7 +1464,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/schema/" class="md-nav__link">
+      <a href="../../../kerbside/schema/" class="md-nav__link">
         
   
   
@@ -1490,7 +1492,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/proxy-architecture/" class="md-nav__link">
+      <a href="../../../kerbside/proxy-architecture/" class="md-nav__link">
         
   
   
@@ -1518,7 +1520,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/scancodes/" class="md-nav__link">
+      <a href="../../../kerbside/scancodes/" class="md-nav__link">
         
   
   
@@ -1546,7 +1548,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/capabilities/" class="md-nav__link">
+      <a href="../../../kerbside/capabilities/" class="md-nav__link">
         
   
   
@@ -1574,7 +1576,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/channel-protocols/" class="md-nav__link">
+      <a href="../../../kerbside/channel-protocols/" class="md-nav__link">
         
   
   
@@ -1602,7 +1604,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/compression-protocols/" class="md-nav__link">
+      <a href="../../../kerbside/compression-protocols/" class="md-nav__link">
         
   
   
@@ -1630,7 +1632,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/spice-link-protocol/" class="md-nav__link">
+      <a href="../../../kerbside/spice-link-protocol/" class="md-nav__link">
         
   
   
@@ -1658,7 +1660,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/protocol-overview/" class="md-nav__link">
+      <a href="../../../kerbside/protocol-overview/" class="md-nav__link">
         
   
   
@@ -1686,7 +1688,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/usb-redirection/" class="md-nav__link">
+      <a href="../../../kerbside/usb-redirection/" class="md-nav__link">
         
   
   
@@ -1714,7 +1716,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/kerbside/vd-agent-protocol/" class="md-nav__link">
+      <a href="../../../kerbside/vd-agent-protocol/" class="md-nav__link">
         
   
   
@@ -1797,7 +1799,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/" class="md-nav__link">
+      <a href="../../../occystrap/" class="md-nav__link">
         
   
   
@@ -1825,7 +1827,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/command-reference/" class="md-nav__link">
+      <a href="../../../occystrap/command-reference/" class="md-nav__link">
         
   
   
@@ -1853,7 +1855,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/docker-tarball-formats/" class="md-nav__link">
+      <a href="../../../occystrap/docker-tarball-formats/" class="md-nav__link">
         
   
   
@@ -1881,7 +1883,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/installation/" class="md-nav__link">
+      <a href="../../../occystrap/installation/" class="md-nav__link">
         
   
   
@@ -1909,7 +1911,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/performance/" class="md-nav__link">
+      <a href="../../../occystrap/performance/" class="md-nav__link">
         
   
   
@@ -1937,7 +1939,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/pipeline/" class="md-nav__link">
+      <a href="../../../occystrap/pipeline/" class="md-nav__link">
         
   
   
@@ -1965,7 +1967,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/tar-format-selection/" class="md-nav__link">
+      <a href="../../../occystrap/tar-format-selection/" class="md-nav__link">
         
   
   
@@ -1993,7 +1995,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/use-cases/" class="md-nav__link">
+      <a href="../../../occystrap/use-cases/" class="md-nav__link">
         
   
   
@@ -2068,7 +2070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
         
   
   
@@ -2096,7 +2098,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-info-check/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
         
   
   
@@ -2124,7 +2126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
         
   
   
@@ -2152,7 +2154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
         
   
   
@@ -2180,7 +2182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
         
   
   
@@ -2208,7 +2210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
         
   
   
@@ -2236,7 +2238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
         
   
   
@@ -2264,7 +2266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
         
   
   
@@ -2292,7 +2294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
         
   
   
@@ -2320,7 +2322,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
         
   
   
@@ -2348,7 +2350,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
         
   
   
@@ -2376,7 +2378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
         
   
   
@@ -2404,7 +2406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
         
   
   
@@ -2432,7 +2434,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
         
   
   
@@ -2460,7 +2462,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
         
   
   
@@ -2488,7 +2490,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
         
   
   
@@ -2516,7 +2518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
         
   
   
@@ -2544,7 +2546,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
         
   
   
@@ -2572,7 +2574,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
         
   
   
@@ -2600,7 +2602,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
         
   
   
@@ -2641,18 +2643,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" checked>
         
           
           <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
@@ -2673,7 +2677,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2691,7 +2695,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/" class="md-nav__link">
+      <a href="../../" class="md-nav__link">
         
   
   
@@ -2719,7 +2723,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/portability/" class="md-nav__link">
+      <a href="../../portability/" class="md-nav__link">
         
   
   
@@ -2747,7 +2751,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/development-macos/" class="md-nav__link">
+      <a href="../../development-macos/" class="md-nav__link">
         
   
   
@@ -2775,7 +2779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/configuration/" class="md-nav__link">
+      <a href="../../configuration/" class="md-nav__link">
         
   
   
@@ -2803,7 +2807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/installation/" class="md-nav__link">
+      <a href="../../installation/" class="md-nav__link">
         
   
   
@@ -2831,7 +2835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/releasing/" class="md-nav__link">
+      <a href="../../releasing/" class="md-nav__link">
         
   
   
@@ -2859,7 +2863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/troubleshooting/" class="md-nav__link">
+      <a href="../../troubleshooting/" class="md-nav__link">
         
   
   
@@ -2884,18 +2888,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_8" checked>
         
           
           <label class="md-nav__link" for="__nav_3_8_8" id="__nav_3_8_8_label" tabindex="0">
@@ -2916,7 +2922,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_8_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_8_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_8_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2934,7 +2940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-bug-reports/" class="md-nav__link">
+      <a href="../PLAN-bug-reports/" class="md-nav__link">
         
   
   
@@ -2962,7 +2968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-capture/" class="md-nav__link">
+      <a href="../PLAN-capture/" class="md-nav__link">
         
   
   
@@ -2990,7 +2996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-packaging/" class="md-nav__link">
+      <a href="../PLAN-packaging/" class="md-nav__link">
         
   
   
@@ -3018,7 +3024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
+      <a href="../PLAN-deferred-debt/" class="md-nav__link">
         
   
   
@@ -3046,7 +3052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
+      <a href="../PLAN-display-iteration-followups/" class="md-nav__link">
         
   
   
@@ -3074,7 +3080,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
+      <a href="../PLAN-crate-extraction/" class="md-nav__link">
         
   
   
@@ -3102,7 +3108,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-ui/" class="md-nav__link">
+      <a href="../PLAN-usb-ui/" class="md-nav__link">
         
   
   
@@ -3130,7 +3136,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-10-testing/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-10-testing/" class="md-nav__link">
         
   
   
@@ -3158,7 +3164,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-capture-phase-01-infra/" class="md-nav__link">
+      <a href="../PLAN-capture-phase-01-infra/" class="md-nav__link">
         
   
   
@@ -3186,7 +3192,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-crate-extraction-phase-01-workspace/" class="md-nav__link">
+      <a href="../PLAN-crate-extraction-phase-01-workspace/" class="md-nav__link">
         
   
   
@@ -3214,7 +3220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-deferred-debt-phase-01-display/" class="md-nav__link">
+      <a href="../PLAN-deferred-debt-phase-01-display/" class="md-nav__link">
         
   
   
@@ -3242,7 +3248,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix/" class="md-nav__link">
+      <a href="../PLAN-usb-ui-phase-01-bus-fix/" class="md-nav__link">
         
   
   
@@ -3270,7 +3276,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-cursor-rendering-phase-01-parse/" class="md-nav__link">
+      <a href="../PLAN-cursor-rendering-phase-01-parse/" class="md-nav__link">
         
   
   
@@ -3298,7 +3304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-packaging-phase-01-portability/" class="md-nav__link">
+      <a href="../PLAN-packaging-phase-01-portability/" class="md-nav__link">
         
   
   
@@ -3326,7 +3332,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-bug-reports-phase-01-ring-buffer/" class="md-nav__link">
+      <a href="../PLAN-bug-reports-phase-01-ring-buffer/" class="md-nav__link">
         
   
   
@@ -3354,7 +3360,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-01-vmc-channel/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-01-vmc-channel/" class="md-nav__link">
         
   
   
@@ -3382,7 +3388,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-webdav-phase-01-port-channel/" class="md-nav__link">
+      <a href="../PLAN-webdav-phase-01-port-channel/" class="md-nav__link">
         
   
   
@@ -3410,7 +3416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-deferred-debt-phase-02-audio/" class="md-nav__link">
+      <a href="../PLAN-deferred-debt-phase-02-audio/" class="md-nav__link">
         
   
   
@@ -3438,7 +3444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-bug-reports-phase-02-channel-state/" class="md-nav__link">
+      <a href="../PLAN-bug-reports-phase-02-channel-state/" class="md-nav__link">
         
   
   
@@ -3466,7 +3472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-packaging-phase-02-ci/" class="md-nav__link">
+      <a href="../PLAN-packaging-phase-02-ci/" class="md-nav__link">
         
   
   
@@ -3494,7 +3500,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-webdav-phase-02-mux-protocol/" class="md-nav__link">
+      <a href="../PLAN-webdav-phase-02-mux-protocol/" class="md-nav__link">
         
   
   
@@ -3522,7 +3528,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-capture-phase-02-pcap/" class="md-nav__link">
+      <a href="../PLAN-capture-phase-02-pcap/" class="md-nav__link">
         
   
   
@@ -3550,7 +3556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-cursor-rendering-phase-02-render/" class="md-nav__link">
+      <a href="../PLAN-cursor-rendering-phase-02-render/" class="md-nav__link">
         
   
   
@@ -3578,7 +3584,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names/" class="md-nav__link">
+      <a href="../PLAN-crate-extraction-phase-02-reserve-names/" class="md-nav__link">
         
   
   
@@ -3606,7 +3612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-02-usbredir-parser/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-02-usbredir-parser/" class="md-nav__link">
         
   
   
@@ -3634,7 +3640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-ui-phase-02-wire-tx/" class="md-nav__link">
+      <a href="../PLAN-usb-ui-phase-02-wire-tx/" class="md-nav__link">
         
   
   
@@ -3662,7 +3668,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-bug-reports-phase-03-zip-output/" class="md-nav__link">
+      <a href="../PLAN-bug-reports-phase-03-zip-output/" class="md-nav__link">
         
   
   
@@ -3690,7 +3696,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-packaging-phase-03-debian/" class="md-nav__link">
+      <a href="../PLAN-packaging-phase-03-debian/" class="md-nav__link">
         
   
   
@@ -3718,7 +3724,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-03-device-backend/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-03-device-backend/" class="md-nav__link">
         
   
   
@@ -3746,7 +3752,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-webdav-phase-03-webdav-server/" class="md-nav__link">
+      <a href="../PLAN-webdav-phase-03-webdav-server/" class="md-nav__link">
         
   
   
@@ -3774,7 +3780,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-crate-extraction-phase-03-compression/" class="md-nav__link">
+      <a href="../PLAN-crate-extraction-phase-03-compression/" class="md-nav__link">
         
   
   
@@ -3802,7 +3808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-deferred-debt-phase-03-session/" class="md-nav__link">
+      <a href="../PLAN-deferred-debt-phase-03-session/" class="md-nav__link">
         
   
   
@@ -3830,7 +3836,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-ui-phase-03-panel/" class="md-nav__link">
+      <a href="../PLAN-usb-ui-phase-03-panel/" class="md-nav__link">
         
   
   
@@ -3858,7 +3864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-capture-phase-03-video/" class="md-nav__link">
+      <a href="../PLAN-capture-phase-03-video/" class="md-nav__link">
         
   
   
@@ -3886,7 +3892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-ui-phase-04-enumerate/" class="md-nav__link">
+      <a href="../PLAN-usb-ui-phase-04-enumerate/" class="md-nav__link">
         
   
   
@@ -3914,7 +3920,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-crate-extraction-phase-04-protocol/" class="md-nav__link">
+      <a href="../PLAN-crate-extraction-phase-04-protocol/" class="md-nav__link">
         
   
   
@@ -3942,7 +3948,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-bug-reports-phase-04-gui-button/" class="md-nav__link">
+      <a href="../PLAN-bug-reports-phase-04-gui-button/" class="md-nav__link">
         
   
   
@@ -3970,7 +3976,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-webdav-phase-04-integration/" class="md-nav__link">
+      <a href="../PLAN-webdav-phase-04-integration/" class="md-nav__link">
         
   
   
@@ -3998,7 +4004,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-04-real-devices/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-04-real-devices/" class="md-nav__link">
         
   
   
@@ -4026,7 +4032,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-deferred-debt-phase-04-robustness/" class="md-nav__link">
+      <a href="../PLAN-deferred-debt-phase-04-robustness/" class="md-nav__link">
         
   
   
@@ -4054,7 +4060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-packaging-phase-04-rpm/" class="md-nav__link">
+      <a href="../PLAN-packaging-phase-04-rpm/" class="md-nav__link">
         
   
   
@@ -4082,7 +4088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup/" class="md-nav__link">
+      <a href="../PLAN-deferred-debt-phase-05-cleanup/" class="md-nav__link">
         
   
   
@@ -4110,7 +4116,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-ui-phase-05-connect/" class="md-nav__link">
+      <a href="../PLAN-usb-ui-phase-05-connect/" class="md-nav__link">
         
   
   
@@ -4138,7 +4144,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-05-device-connect/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-05-device-connect/" class="md-nav__link">
         
   
   
@@ -4166,7 +4172,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-crate-extraction-phase-05-usbredir/" class="md-nav__link">
+      <a href="../PLAN-crate-extraction-phase-05-usbredir/" class="md-nav__link">
         
   
   
@@ -4194,7 +4200,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-bug-reports-phase-05-region-select/" class="md-nav__link">
+      <a href="../PLAN-bug-reports-phase-05-region-select/" class="md-nav__link">
         
   
   
@@ -4222,7 +4228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-packaging-phase-05-macos/" class="md-nav__link">
+      <a href="../PLAN-packaging-phase-05-macos/" class="md-nav__link">
         
   
   
@@ -4250,7 +4256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-webdav-phase-05-ui/" class="md-nav__link">
+      <a href="../PLAN-webdav-phase-05-ui/" class="md-nav__link">
         
   
   
@@ -4278,7 +4284,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-ui-phase-06-add-disk/" class="md-nav__link">
+      <a href="../PLAN-usb-ui-phase-06-add-disk/" class="md-nav__link">
         
   
   
@@ -4306,7 +4312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-06-transfers/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-06-transfers/" class="md-nav__link">
         
   
   
@@ -4334,7 +4340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-bug-reports-phase-06-traffic-viewer/" class="md-nav__link">
+      <a href="../PLAN-bug-reports-phase-06-traffic-viewer/" class="md-nav__link">
         
   
   
@@ -4362,7 +4368,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-crate-extraction-phase-06-client/" class="md-nav__link">
+      <a href="../PLAN-crate-extraction-phase-06-client/" class="md-nav__link">
         
   
   
@@ -4390,7 +4396,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-deferred-debt-phase-06-tests/" class="md-nav__link">
+      <a href="../PLAN-deferred-debt-phase-06-tests/" class="md-nav__link">
         
   
   
@@ -4418,7 +4424,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-webdav-phase-06-testing/" class="md-nav__link">
+      <a href="../PLAN-webdav-phase-06-testing/" class="md-nav__link">
         
   
   
@@ -4446,7 +4452,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-packaging-phase-06-windows/" class="md-nav__link">
+      <a href="../PLAN-packaging-phase-06-windows/" class="md-nav__link">
         
   
   
@@ -4474,7 +4480,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-bug-reports-phase-07-docs/" class="md-nav__link">
+      <a href="../PLAN-bug-reports-phase-07-docs/" class="md-nav__link">
         
   
   
@@ -4502,7 +4508,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-packaging-phase-07-release/" class="md-nav__link">
+      <a href="../PLAN-packaging-phase-07-release/" class="md-nav__link">
         
   
   
@@ -4530,7 +4536,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-ui-phase-07-polish/" class="md-nav__link">
+      <a href="../PLAN-usb-ui-phase-07-polish/" class="md-nav__link">
         
   
   
@@ -4558,7 +4564,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-07-virtual-msc/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-07-virtual-msc/" class="md-nav__link">
         
   
   
@@ -4586,7 +4592,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-ui-phase-08-docs/" class="md-nav__link">
+      <a href="../PLAN-usb-ui-phase-08-docs/" class="md-nav__link">
         
   
   
@@ -4614,7 +4620,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-08-ui/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-08-ui/" class="md-nav__link">
         
   
   
@@ -4642,7 +4648,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir-phase-09-interrupt/" class="md-nav__link">
+      <a href="../PLAN-usb-redir-phase-09-interrupt/" class="md-nav__link">
         
   
   
@@ -4670,7 +4676,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-initial/" class="md-nav__link">
+      <a href="../PLAN-initial/" class="md-nav__link">
         
   
   
@@ -4698,7 +4704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
+      <a href="../PLAN-pr20-followup/" class="md-nav__link">
         
   
   
@@ -4726,7 +4732,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
+      <a href="../PLAN-pr23-followup/" class="md-nav__link">
         
   
   
@@ -4754,7 +4760,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
+      <a href="../PLAN-remaining-issues/" class="md-nav__link">
         
   
   
@@ -4782,7 +4788,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-cursor-rendering/" class="md-nav__link">
+      <a href="../PLAN-cursor-rendering/" class="md-nav__link">
         
   
   
@@ -4810,7 +4816,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
+      <a href="../PLAN-opus-decoder/" class="md-nav__link">
         
   
   
@@ -4835,10 +4841,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-supply-chain-scanning/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supply-chain and prompt-injection scanning
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -4854,6 +4887,220 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission and problem statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#files-to-add-or-modify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files to add or modify
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent guidance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execution-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification-before-proposing-the-commit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification before proposing the commit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration-and-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation-index-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation index maintenance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -4866,7 +5113,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-supply-chain-followups/" class="md-nav__link">
+      <a href="../PLAN-supply-chain-followups/" class="md-nav__link">
         
   
   
@@ -4894,7 +5141,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-usb-redir/" class="md-nav__link">
+      <a href="../PLAN-usb-redir/" class="md-nav__link">
         
   
   
@@ -4922,7 +5169,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/ryll/plans/PLAN-webdav/" class="md-nav__link">
+      <a href="../PLAN-webdav/" class="md-nav__link">
         
   
   
@@ -4973,7 +5220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../features/" class="md-nav__link">
+      <a href="../../../../features/" class="md-nav__link">
         
   
   
@@ -5047,7 +5294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -5082,7 +5329,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../community/" class="md-nav__link">
+      <a href="../../../../community/" class="md-nav__link">
         
   
   
@@ -5156,7 +5403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/usage/" class="md-nav__link">
+      <a href="../../../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -5184,7 +5431,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/authentication/" class="md-nav__link">
+      <a href="../../../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -5212,7 +5459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/ansible/" class="md-nav__link">
+      <a href="../../../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -5240,7 +5487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../../../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -5268,7 +5515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/affinity/" class="md-nav__link">
+      <a href="../../../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -5296,7 +5543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/consoles/" class="md-nav__link">
+      <a href="../../../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -5324,7 +5571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/events/" class="md-nav__link">
+      <a href="../../../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -5352,7 +5599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/objects/" class="md-nav__link">
+      <a href="../../../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -5380,7 +5627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/metadata/" class="md-nav__link">
+      <a href="../../../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -5509,7 +5756,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/admin/" class="md-nav__link">
         
   
   
@@ -5537,7 +5784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -5565,7 +5812,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -5593,7 +5840,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -5621,7 +5868,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -5649,7 +5896,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/blobs/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -5677,7 +5924,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -5705,7 +5952,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/instances/" class="md-nav__link">
         
   
   
@@ -5733,7 +5980,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/label/" class="md-nav__link">
         
   
   
@@ -5761,7 +6008,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/networks/" class="md-nav__link">
         
   
   
@@ -5789,7 +6036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -5817,7 +6064,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -5845,7 +6092,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/upload/" class="md-nav__link">
         
   
   
@@ -5881,7 +6128,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../../../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
   
@@ -5909,7 +6156,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/authentication/" class="md-nav__link">
         
   
   
@@ -5937,7 +6184,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../../../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -5965,7 +6212,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/mypy/" class="md-nav__link">
+      <a href="../../../../developer_guide/mypy/" class="md-nav__link">
         
   
   
@@ -5993,7 +6240,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/release_process/" class="md-nav__link">
+      <a href="../../../../developer_guide/release_process/" class="md-nav__link">
         
   
   
@@ -6021,7 +6268,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/standards/" class="md-nav__link">
+      <a href="../../../../developer_guide/standards/" class="md-nav__link">
         
   
   
@@ -6049,7 +6296,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/state_machine/" class="md-nav__link">
+      <a href="../../../../developer_guide/state_machine/" class="md-nav__link">
         
   
   
@@ -6077,7 +6324,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../../../../developer_guide/updating_docs/" class="md-nav__link">
         
   
   
@@ -6105,7 +6352,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/workflow/" class="md-nav__link">
+      <a href="../../../../developer_guide/workflow/" class="md-nav__link">
         
   
   
@@ -6187,7 +6434,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/" class="md-nav__link">
+      <a href="../../../../plans/" class="md-nav__link">
         
   
   
@@ -6215,7 +6462,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -6243,7 +6490,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -6275,20 +6522,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
         
           
           <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
@@ -6309,7 +6554,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
@@ -6327,7 +6572,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation/" class="md-nav__link">
+      <a href="../../../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -6355,7 +6600,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../artifacts/" class="md-nav__link">
+      <a href="../../../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -6383,7 +6628,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication/" class="md-nav__link">
+      <a href="../../../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -6411,7 +6656,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../database/" class="md-nav__link">
+      <a href="../../../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -6436,37 +6681,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Exception Tracking
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -6482,70 +6700,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How It Works
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-gets-tracked" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What Gets Tracked
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#viewing-exceptions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Viewing Exceptions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cleanup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cleanup
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -6558,7 +6712,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../locks/" class="md-nav__link">
+      <a href="../../../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -6586,7 +6740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../networking/overview/" class="md-nav__link">
+      <a href="../../../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -6614,7 +6768,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../power_states/" class="md-nav__link">
+      <a href="../../../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -6642,7 +6796,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../python_versions/" class="md-nav__link">
+      <a href="../../../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -6670,7 +6824,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../threads/" class="md-nav__link">
+      <a href="../../../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -6698,7 +6852,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../upgrades/" class="md-nav__link">
+      <a href="../../../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -6753,10 +6907,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
+  <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How It Works
+        Prompt
       
     </span>
   </a>
@@ -6764,10 +6918,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-gets-tracked" class="md-nav__link">
+  <a href="#situation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What Gets Tracked
+        Situation
       
     </span>
   </a>
@@ -6775,10 +6929,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#viewing-exceptions" class="md-nav__link">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Viewing Exceptions
+        Mission and problem statement
       
     </span>
   </a>
@@ -6786,13 +6940,163 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cleanup" class="md-nav__link">
+  <a href="#open-questions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Cleanup
+        Open questions
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#files-to-add-or-modify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files to add or modify
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent guidance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execution-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification-before-proposing-the-commit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification before proposing the commit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration-and-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation-index-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation index maintenance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -6817,56 +7121,342 @@
   
 
 
-<h1 id="exception-tracking">Exception Tracking<a class="headerlink" href="#exception-tracking" title="Permanent link">&para;</a></h1>
-<p>Shaken Fist includes an exception tracking system that records unhandled
-exceptions to disk for later analysis. This helps operators identify and
-debug recurring issues in production clusters.</p>
-<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
-<p>When an exception occurs, it is recorded to <code>/srv/shakenfist/exceptions/</code> as
-a JSON file. Each unique exception traceback is hashed (using SHA-256) and
-stored in a file named after the last 8 characters of that hash. This means
-identical exceptions are deduplicated automatically.</p>
-<p>Each JSON file contains:</p>
+<h1 id="supply-chain-and-prompt-injection-scanning">Supply-chain and prompt-injection scanning<a class="headerlink" href="#supply-chain-and-prompt-injection-scanning" title="Permanent link">&para;</a></h1>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before responding to questions or discussion points in this
+document, explore the ryll codebase thoroughly. Read relevant
+CI workflow files, pre-commit config, <code>scripts/check-rust.sh</code>,
+and <code>AGENTS.md</code>. Understand how CI currently runs, what
+pre-commit already covers, and which runner labels are in
+use. Do not speculate when you could read the file instead.</p>
+<p>When researching external tooling (<code>cargo audit</code>,
+<code>cargo deny</code>, <code>gitleaks</code>, unicode bidi detection), ground
+recommendations in the upstream documentation rather than
+memory, and flag any uncertainty explicitly.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>While formalising our merge process for external PRs (see
+<code>MERGE-TEMPLATE.md</code> on branch <code>pr-31</code>), we identified a set
+of deterministic, non-LLM scanners that would catch
+supply-chain risk, credential leaks, known-vulnerable
+dependencies, and Trojan Source / prompt-injection patterns.
+These scanners have two properties that make them worth
+adopting beyond the PR-merge context:</p>
+<ol>
+<li>They run in milliseconds to seconds, not minutes.</li>
+<li>They are pattern- or database-driven, not LLM-driven, so
+   they cannot be manipulated by adversarial content in the
+   code they inspect.</li>
+</ol>
+<p>A license audit of the 670 crates in <code>Cargo.lock</code> via
+<code>cargo metadata</code> (run inside the <code>ryll-dev</code> Docker image)
+returned the following unusual license declarations:</p>
 <ul>
-<li><code>traceback</code>: The full exception traceback</li>
-<li><code>count</code>: The number of times this exception has occurred</li>
-<li><code>events</code>: A list of Unix timestamps for each occurrence</li>
+<li><code>epaint_default_fonts 0.29.1</code> —
+  <code>(MIT OR Apache-2.0) AND OFL-1.1 AND LicenseRef-UFL-1.0</code>.
+  This is the embedded-fonts crate used by <code>egui</code>/<code>epaint</code>.
+  The <code>AND</code> clause forces us to accept both OFL-1.1 and
+  UFL-1.0. UFL is the Ubuntu Font Licence; it is permissive
+  for redistribution and embedding but is non-SPDX-standard,
+  so <code>cargo deny</code> requires an explicit exception.</li>
+<li><code>configparser 3.1.0</code> — <code>MIT OR LGPL-3.0-or-later</code>.</li>
+<li><code>htmlescape 0.3.1</code> — <code>Apache-2.0 / MIT / MPL-2.0</code>
+  (deprecated <code>/</code> separator, semantically OR).</li>
+<li><code>r-efi 5.3.0</code> and <code>6.0.0</code> —
+  <code>MIT OR Apache-2.0 OR LGPL-2.1-or-later</code>.</li>
 </ul>
-<p>For example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">&quot;traceback&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;\nTraceback (most recent call last):\n  File ...&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">&quot;events&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">1703692800.123</span><span class="p">,</span><span class="w"> </span><span class="mf">1703693100.456</span><span class="p">,</span><span class="w"> </span><span class="mf">1703693400.789</span><span class="p">]</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">}</span>
-</code></pre></div>
-<h2 id="what-gets-tracked">What Gets Tracked<a class="headerlink" href="#what-gets-tracked" title="Permanent link">&para;</a></h2>
-<p>The exception tracking system captures:</p>
+<p>The last three all offer a permissive option via the <code>OR</code>
+clauses, so they resolve automatically against a
+permissive-only allowlist. Only <code>epaint_default_fonts</code>
+requires an exception.</p>
+<p>A review of <code>.github/workflows/ci.yml</code> confirmed that the
+existing pre-commit hooks are covered in CI as follows:</p>
 <ul>
-<li>Unhandled exceptions in the main thread via <code>sys.excepthook</code></li>
-<li>Unhandled exceptions in worker threads via <code>threading.excepthook</code></li>
-<li>Exceptions passed to <code>ignore_exception()</code>, which are caught but logged</li>
+<li><code>rust-check</code> (rustfmt + clippy): covered
+  by the <code>lint</code> job (<code>cargo fmt --all --check</code> and
+  <code>cargo clippy ... -D warnings</code>).</li>
+<li><code>shellcheck</code>: <strong>not covered in CI</strong>. A contributor who
+  skips pre-commit locally can land shell-script changes
+  that fail shellcheck.</li>
 </ul>
-<h2 id="viewing-exceptions">Viewing Exceptions<a class="headerlink" href="#viewing-exceptions" title="Permanent link">&para;</a></h2>
-<p>To list all recorded exceptions:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ls<span class="w"> </span>-la<span class="w"> </span>/srv/shakenfist/exceptions/
-</code></pre></div>
-<p>To view the details of a specific exception:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cat<span class="w"> </span>/srv/shakenfist/exceptions/&lt;hash&gt;.json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
-</code></pre></div>
-<p>To find the most frequently occurring exceptions:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">for</span><span class="w"> </span>f<span class="w"> </span><span class="k">in</span><span class="w"> </span>/srv/shakenfist/exceptions/*.json<span class="p">;</span><span class="w"> </span><span class="k">do</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>jq<span class="w"> </span>-r<span class="w"> </span>.count<span class="w"> </span><span class="nv">$f</span><span class="k">)</span><span class="s2"> </span><span class="nv">$f</span><span class="s2">&quot;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-rn<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-10
-</code></pre></div>
-<h2 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h2>
-<p>Exception files accumulate over time. You may wish to periodically clean up
-old exception files, particularly after addressing the underlying issues:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Remove all exception files</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>rm<span class="w"> </span>/srv/shakenfist/exceptions/*.json
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Or remove files older than 7 days</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>find<span class="w"> </span>/srv/shakenfist/exceptions/<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;*.json&quot;</span><span class="w"> </span>-mtime<span class="w"> </span>+7<span class="w"> </span>-delete
-</code></pre></div>
+<p>This plan closes that gap as a side-effect of adding the
+new scanners.</p>
+<p>The existing workflows use <code>[self-hosted, static]</code> for all
+non-matrix jobs; only the cross-platform <code>build</code> matrix in
+<code>ci.yml</code> uses GitHub-hosted runners because we do not have
+macOS or Windows self-hosted runners. New jobs in this plan
+all run on <code>[self-hosted, static]</code>.</p>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Add deterministic security tooling to ryll's CI and
+pre-commit pipeline so that:</p>
+<ol>
+<li>Known-vulnerable dependencies (RustSec advisories) are
+   detected automatically on every PR and weekly for drift.</li>
+<li>Dependency policy (licenses, sources, bans, duplicates)
+   is enforced on every PR.</li>
+<li>Accidental credential commits are caught before push and
+   in CI.</li>
+<li>Trojan Source and other unicode-based attacks on source
+   code are detected before push and in CI.</li>
+<li>Every existing pre-commit hook has a matching CI job so
+   that skipping pre-commit does not bypass enforcement.</li>
+</ol>
+<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<p>None open. Decisions made during planning:</p>
+<ul>
+<li><strong>License allowlist</strong>: permissive only. MIT, Apache-2.0,
+  BSD-2-Clause, BSD-3-Clause, ISC, Zlib, Unicode-3.0,
+  Unlicense, BSL-1.0, CC0-1.0, MIT-0, 0BSD,
+  CDLA-Permissive-2.0, OFL-1.1.</li>
+<li><strong>License exception</strong>: <code>epaint_default_fonts</code> allowed
+  <code>LicenseRef-UFL-1.0</code> via <code>[[licenses.exceptions]]</code>.</li>
+<li><strong><code>cargo audit</code> cadence</strong>: on every PR push plus a weekly
+  cron to detect drift from DB updates.</li>
+<li><strong><code>cargo deny check</code></strong>: on every PR.</li>
+<li><strong>Runner choice</strong>: <code>[self-hosted, static]</code> everywhere we
+  can (all new jobs).</li>
+<li><strong><code>semgrep</code></strong>: deferred. The Rust rulesets are thinner
+  than other languages and clippy already covers most
+  custom-pattern enforcement we care about.</li>
+<li><strong><code>cargo vet</code> / <code>cargo crev</code></strong>: deferred as
+  heavier-than-needed for a solo-maintainer project.</li>
+<li><strong><code>trufflehog</code></strong>: rejected in favour of <code>gitleaks</code>
+  (overlapping coverage, <code>gitleaks</code> is leaner).</li>
+</ul>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>This is a standalone plan, not a phased master plan. The
+work is one PR, roughly seven files.</p>
+<h3 id="files-to-add-or-modify">Files to add or modify<a class="headerlink" href="#files-to-add-or-modify" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong><code>deny.toml</code></strong> (new, repo root)</li>
+<li><code>[graph]</code> targets Linux/macOS/Windows so we scan the
+     full dependency set.</li>
+<li><code>[advisories]</code> — deny unmaintained + vulnerability
+     advisories; <code>yanked = "deny"</code>.</li>
+<li><code>[licenses]</code> allowlist as decided above.</li>
+<li><code>[[licenses.exceptions]]</code> entry for
+     <code>epaint_default_fonts</code> allowing <code>LicenseRef-UFL-1.0</code>.</li>
+<li><code>[bans]</code> — <code>multiple-versions = "warn"</code>, no specific
+     bans yet (start permissive, tighten later if we see
+     patterns).</li>
+<li>
+<p><code>[sources]</code> — <code>unknown-registry = "deny"</code>,
+     <code>unknown-git = "deny"</code>, only <code>crates.io</code> allowed.</p>
+</li>
+<li>
+<p><strong><code>.github/workflows/supply-chain.yml</code></strong> (new)</p>
+</li>
+<li><code>runs-on: [self-hosted, static]</code>.</li>
+<li>Triggers: <code>pull_request</code> to <code>develop</code>, <code>push</code> to
+     <code>develop</code>, <code>schedule</code> weekly (Monday 09:00 UTC),
+     <code>workflow_dispatch</code>.</li>
+<li>Jobs:<ul>
+<li><code>cargo-audit</code> — <code>rustsec/audit-check@v2.0.0</code> or
+   equivalent.</li>
+<li><code>cargo-deny</code> — <code>EmbarkStudios/cargo-deny-action@v2</code>.</li>
+<li><code>gitleaks</code> — <code>gitleaks/gitleaks-action@v2</code> with
+   <code>config-path: .gitleaks.toml</code> if we add a config
+   (skip unless we need exceptions).</li>
+<li><code>shellcheck</code> — fills the CI gap we identified; run
+   <code>shellcheck -x scripts/*.sh tools/*.sh</code>.</li>
+<li><code>bidi-check</code> — calls <code>./tools/check-bidi.sh</code>
+   against the diff.</li>
+</ul>
+</li>
+<li>
+<p>All jobs run in parallel; no dependencies between
+     them.</p>
+</li>
+<li>
+<p><strong><code>.pre-commit-config.yaml</code></strong> (modify)</p>
+</li>
+<li>Add <code>gitleaks</code> hook from
+     <code>github.com/gitleaks/gitleaks</code> (pinned rev).</li>
+<li>Add local <code>bidi-check</code> hook calling
+     <code>tools/check-bidi.sh</code>.</li>
+<li>
+<p>Existing hooks (<code>rust-check</code>, <code>shellcheck</code>) unchanged.</p>
+</li>
+<li>
+<p><strong><code>tools/check-bidi.sh</code></strong> (new)</p>
+</li>
+<li>Per <code>~/.claude/CLAUDE.md</code> rule: CI logic longer than
+     ~5 lines goes into a script in <code>tools/</code> so CI YAML
+     just invokes it.</li>
+<li>Behaviour: read each file path from <code>$@</code>; grep for
+     bidi control codepoints (U+202A–U+202E,
+     U+2066–U+2069), zero-width chars (U+200B–U+200F,
+     U+FEFF); exit 1 with a clear error if any are found.</li>
+<li>
+<p>When invoked with no args, scan the whole tree.</p>
+</li>
+<li>
+<p><strong><code>AGENTS.md</code></strong> (modify)</p>
+</li>
+<li>Add a short "Security scanners" section documenting:<ul>
+<li>What <code>deny.toml</code> controls and how to update the
+   allowlist or add exceptions.</li>
+<li>What <code>cargo audit</code> checks and how to respond to
+   alerts.</li>
+<li>What <code>gitleaks</code> checks and where to add
+   <code>.gitleaksignore</code> exceptions.</li>
+<li>What <code>tools/check-bidi.sh</code> checks.</li>
+</ul>
+</li>
+<li>
+<p>Note that all five pre-commit hooks are also enforced
+     in CI so skipping pre-commit locally is not a way to
+     avoid the checks.</p>
+</li>
+<li>
+<p><strong><code>docs/plans/index.md</code></strong> (modify)</p>
+</li>
+<li>
+<p>Add a row under "Standalone plans":
+     <code>| 2026-04-18 | [Supply-chain scanning](/components/ryll/plans/PLAN-supply-chain-scanning/) | Deterministic scanners for dependencies, secrets, and unicode-based attacks |</code></p>
+</li>
+<li>
+<p><strong><code>docs/plans/order.yml</code></strong> (modify)</p>
+</li>
+<li>Add this plan to the navigation.</li>
+</ol>
+<h3 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>semgrep</code>, <code>cargo vet</code>, <code>cargo crev</code>, <code>trufflehog</code> —
+  deferred as noted in Open questions.</li>
+<li>Tightening <code>multiple-versions</code> from warn to deny. Defer
+  until we see the baseline noise.</li>
+<li>Enabling <code>cargo deny</code> to block on unmaintained crates. We
+  have at least one (<code>audiopus</code>) and the migration is
+  tracked separately in <code>PLAN-opus-decoder.md</code>.</li>
+<li>Extending self-hosted coverage to the macOS/Windows
+  build matrix. Requires hardware we don't have.</li>
+</ul>
+<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
+<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
+<p>This plan is small enough that the management session can
+drive execution directly, but each sub-step is well suited
+to a sub-agent with a concrete brief. Recommended:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Write <code>deny.toml</code> with the allowlist, UFL exception for <code>epaint_default_fonts</code>, advisories/bans/sources per plan. Verify by running <code>cargo deny check</code> in the <code>ryll-dev</code> container and iterating until clean.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Write <code>.github/workflows/supply-chain.yml</code> with the five jobs on <code>[self-hosted, static]</code>. Triggers per plan. Use pinned action versions.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>low</td>
+<td>haiku</td>
+<td>none</td>
+<td>Add <code>gitleaks</code> and <code>bidi-check</code> hooks to <code>.pre-commit-config.yaml</code>. Pin revs.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Write <code>tools/check-bidi.sh</code>. POSIX-ish bash, shellcheck-clean, handles no-arg (full tree) and file-list invocation.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Update <code>AGENTS.md</code> with a "Security scanners" section per the bullets in the plan.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>low</td>
+<td>haiku</td>
+<td>none</td>
+<td>Update <code>docs/plans/index.md</code> and <code>order.yml</code> with the new entry.</td>
+</tr>
+</tbody>
+</table>
+<p>Each step should be a separate commit. The management
+session reviews each sub-agent's output (reading the
+actual file) before moving on.</p>
+<h3 id="verification-before-proposing-the-commit">Verification before proposing the commit<a class="headerlink" href="#verification-before-proposing-the-commit" title="Permanent link">&para;</a></h3>
+<p>Run all of these in order. They must all pass:</p>
+<ul>
+<li><code>cargo audit</code> — clean or findings triaged.</li>
+<li><code>cargo deny check</code> — clean against the new <code>deny.toml</code>.</li>
+<li><code>pre-commit run --all-files</code> — clean with new hooks.</li>
+<li><code>./tools/check-bidi.sh</code> — clean against the current
+  tree.</li>
+<li>Re-run <code>pre-commit run --all-files</code> one more time
+  immediately before proposing the commit (per
+  <code>~/.claude/CLAUDE.md</code>).</li>
+</ul>
+<p>If any fail that we can't quickly fix, stop and escalate to
+the operator.</p>
+<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
+<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<p>We will know this plan has been successfully implemented
+when:</p>
+<ul>
+<li><code>cargo audit</code> runs on every PR and weekly on a cron
+  against <code>develop</code>.</li>
+<li><code>cargo deny check</code> runs on every PR and enforces the
+  allowlist, source policy, and advisories.</li>
+<li><code>gitleaks</code> runs on every PR and catches credential-like
+  patterns.</li>
+<li><code>tools/check-bidi.sh</code> runs on every PR and catches bidi
+  / zero-width unicode in the diff.</li>
+<li><code>shellcheck</code> runs on every PR (closing the existing
+  gap).</li>
+<li>The matching pre-commit hooks all still work locally for
+  developers who have run <code>pre-commit install</code>.</li>
+<li><code>AGENTS.md</code> documents the scanners and where to update
+  policy.</li>
+<li><code>docs/plans/index.md</code> and <code>order.yml</code> reference this
+  plan.</li>
+<li><code>pre-commit run --all-files</code> passes cleanly on the
+  proposed branch.</li>
+</ul>
+<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Revisit <code>semgrep</code> if we start seeing recurring patterns
+  that clippy can't catch.</li>
+<li>Tighten <code>multiple-versions</code> from <code>warn</code> to <code>deny</code> once
+  we've cleaned up the baseline.</li>
+<li>Consider <code>cargo vet</code> if ryll attracts enough maintainers
+  to justify the trust-graph setup.</li>
+<li>If we start getting gitleaks false positives, introduce
+  a <code>.gitleaksignore</code> with clear comments for each
+  exception.</li>
+</ul>
+<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<p>(To be filled in as we go.)</p>
+<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
+<p>This plan is a standalone plan (no phases) so it only
+requires:</p>
+<ul>
+<li>A row in <code>docs/plans/index.md</code> under "Standalone plans".</li>
+<li>An entry in <code>docs/plans/order.yml</code> for navigation.</li>
+</ul>
+<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<p>Before executing any step of this plan, please back brief
+the operator as to your understanding of the plan and how
+the work you intend to do aligns with that plan.</p>
 
 
 
@@ -6887,7 +7477,7 @@ old exception files, particularly after addressing the underlying issues:</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20operator_guide/exception_tracking.md&body=%2A%2ASource%20file%3A%2A%2A%20%60operator_guide/exception_tracking.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/operator_guide/exception_tracking/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/ryll/plans/PLAN-supply-chain-scanning.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/ryll/plans/PLAN-supply-chain-scanning.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/ryll/plans/PLAN-supply-chain-scanning/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
@@ -6928,10 +7518,10 @@ old exception files, particularly after addressing the underlying issues:</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
