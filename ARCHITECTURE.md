@@ -130,7 +130,8 @@ Creating a cluster operation is atomic: the `CreateAndEnqueueCluster`
 gRPC RPC writes the `cluster_operations` row, the `object_states`
 row, and the `work_queue` row in a single MariaDB transaction.
 Audit events are published out-of-band through the normal eventlog
-gRPC service path, which retains its etcd DLQ for failure recovery.
+gRPC service path, which falls back to the MariaDB ``event_dlq``
+table for failure recovery.
 
 The cluster daemon runs
 `reap_stuck_cluster_operation_jobs()` from

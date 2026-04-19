@@ -50,10 +50,11 @@ EVENTLOG_UNAVAILABLE_COOLDOWN = 60  # seconds
 
 
 def set_force_event_dlq(value: bool) -> None:
-    """Force events to go directly to the dead letter queue (etcd).
+    """Force events to go directly to the dead letter queue (MariaDB).
 
     This is used during daemon startup when the eventlog daemon may not be
-    available yet. Events will be queued in etcd and processed later.
+    available yet. Events will be queued in the ``event_dlq`` table and
+    processed later.
     """
     local.sf_force_event_dlq = value
 
