@@ -221,6 +221,8 @@ nav:
                 - "Remaining issues after initial bring-up": components/ryll/plans/PLAN-remaining-issues.md
                 - "Render SPICE cursor on screen": components/ryll/plans/PLAN-cursor-rendering.md
                 - "Replace audiopus with pure-Rust opus-decoder": components/ryll/plans/PLAN-opus-decoder.md
+                - "Supply-chain and prompt-injection scanning": components/ryll/plans/PLAN-supply-chain-scanning.md
+                - "Supply-chain follow-ups": components/ryll/plans/PLAN-supply-chain-followups.md
                 - "USB device redirection via the SPICE usbredir channel": components/ryll/plans/PLAN-usb-redir.md
                 - "WebDAV folder sharing via the SPICE port channel": components/ryll/plans/PLAN-webdav.md
     - Features: features.md
