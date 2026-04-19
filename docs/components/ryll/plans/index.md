@@ -34,6 +34,8 @@ execution.
 | 2026-04-08 | [Display iteration follow-ups](/components/ryll/plans/PLAN-display-iteration-followups/) | Deferred work from display rendering, QUIC decode, and multi-monitor PRs |
 | 2026-04-11 | [PR #20 follow-up](/components/ryll/plans/PLAN-pr20-followup/) | Follow-up fixes from clipboard, MJPEG, and disconnect handling |
 | 2026-04-11 | [PR #23 follow-up](/components/ryll/plans/PLAN-pr23-followup/) | Follow-up fixes from audio playback channel integration |
+| 2026-04-18 | [Supply-chain scanning](/components/ryll/plans/PLAN-supply-chain-scanning/) | Deterministic scanners for dependencies, secrets, and Unicode-based attacks |
+| 2026-04-18 | [Supply-chain follow-ups](/components/ryll/plans/PLAN-supply-chain-followups/) | Tracked advisory ignores and unmaintained-crate debt surfaced when landing scanners |
 
 ## Consolidation plans
 
