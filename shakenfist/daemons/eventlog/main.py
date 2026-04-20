@@ -16,7 +16,6 @@ from shakenfist_utilities.random import random_id  # noreorder
 from shakenfist import eventlog
 from shakenfist import mariadb
 from shakenfist import node
-from shakenfist.etcd import set_force_direct_etcd
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_HISTORIC
@@ -196,26 +195,20 @@ class Monitor(daemon.WorkerPoolDaemon):
         start_http_server(config.EVENTLOG_METRICS_PORT)
 
     def record_start(self):
-        # Override to use direct etcd and force events to the dead letter
-        # queue. The eventlog daemon can't use the database microservice
-        # during startup because we might not be running yet, and we can't
-        # use ourselves for event logging because WE ARE the eventlog service.
-        set_force_direct_etcd(True)
+        # Force events to the DLQ because we can't use ourselves for
+        # event logging during startup (WE ARE the eventlog service).
         eventlog.set_force_event_dlq(True)
         try:
             n = Node.from_db(config.NODE_NAME)
             n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_RUNNING)
             n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon starting')
         finally:
-            set_force_direct_etcd(False)
             eventlog.set_force_event_dlq(False)
         send_systemd_ready()
 
     def record_exit(self):
-        # Override to use direct etcd and force events to the dead letter
-        # queue. The database microservice may have already stopped, and we
-        # can't use ourselves for event logging during shutdown.
-        set_force_direct_etcd(True)
+        # Force events to the DLQ because we can't use ourselves for
+        # event logging during shutdown.
         eventlog.set_force_event_dlq(True)
         try:
             n = Node.from_db(config.NODE_NAME)
@@ -227,7 +220,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                     raise e
             n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon stopped')
         finally:
-            set_force_direct_etcd(False)
             eventlog.set_force_event_dlq(False)
         send_systemd_status('Terminated')
 
