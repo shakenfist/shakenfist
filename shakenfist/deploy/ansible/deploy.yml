@@ -214,6 +214,21 @@
         mariadb_password: "{{ mariadb_password }}"
         sf_config_template_path: "{{ playbook_dir }}/roles/base/templates"
 
+# Register all nodes in the database (init-node creates the node object).
+# Register must run before cluster_config because register starts the
+# sf-database daemon, and cluster_config writes via the database gRPC API.
+- hosts: allsf
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  roles:
+    - role: base
+      vars:
+        role_action: "register"
+        node_name: "{{ node_name }}"
+        node_mesh_ip: "{{ node_mesh_ip }}"
+
 - hosts: primary_node
   become: yes
   become_method: sudo
@@ -230,19 +245,6 @@
         dns_server: "{{ hostvars['localhost']['dns_server'] }}"
         http_proxy: "{{ hostvars['localhost']['http_proxy'] }}"
         extra_config: "{{ extra_config }}"
-
-# Register all nodes in the database (init-node creates the node object).
-- hosts: allsf
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-  roles:
-    - role: base
-      vars:
-        role_action: "register"
-        node_name: "{{ node_name }}"
-        node_mesh_ip: "{{ node_mesh_ip }}"
 
 # Create the admin namespace. This only needs to run once, so we run it on the
 # first database node.

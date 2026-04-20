@@ -123,7 +123,6 @@ sf_config.verify_config(skip_auth_seed=True)
 config = sf_config.config
 
 # These imports _must_ occur after the extra config setup has run.
-from shakenfist import database as sf_database             # noqa
 from shakenfist import mariadb                             # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
@@ -152,7 +151,7 @@ def bootstrap_system_key(keyname: str, key: str) -> None:
 @click.command(name='show-config')
 def show_config() -> None:
     """Show cluster-wide configuration."""
-    config_data = sf_database.get_cluster_config()
+    config_data = mariadb.get_cluster_config()
     click.echo(json.dumps(config_data, indent=4, sort_keys=True))
 
 
@@ -177,14 +176,14 @@ def set_config(flag: str, value: str) -> None:
             pass
 
     click.echo(f'Setting {flag} to {type(converted_value)}({converted_value})')
-    sf_database.set_cluster_config(flag, converted_value)
+    mariadb.set_cluster_config(flag, converted_value)
 
 
 # Backward compatibility aliases
 @click.command(name='show-etcd-config', hidden=True)
 def show_etcd_config() -> None:
     """Deprecated: use show-config instead."""
-    config_data = sf_database.get_cluster_config()
+    config_data = mariadb.get_cluster_config()
     click.echo(json.dumps(config_data, indent=4, sort_keys=True))
 
 

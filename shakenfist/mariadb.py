@@ -17053,6 +17053,74 @@ def _grpc_delete_event_dlq(ids: list[int]) -> int:
 
 
 # =============================================================================
+# Cluster Config gRPC Functions
+# =============================================================================
+
+def _grpc_get_all_cluster_config() -> dict[str, Any]:
+    """Fetch all cluster config via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return {}
+
+    request = database_pb2.ClusterConfigRequest()
+    response = _grpc_call(stub.GetClusterConfig, request)
+    if response is None:
+        return {}
+
+    return {
+        entry.key_name: json.loads(entry.value_json)
+        for entry in response.entries
+    }
+
+
+def _grpc_set_cluster_config(key_name: str, value: Any) -> None:
+    """Set a cluster config key via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return
+
+    request = database_pb2.SetClusterConfigRequest(
+        key_name=key_name,
+        value_json=json.dumps(value),
+    )
+    response = _grpc_call(stub.SetClusterConfig, request)
+    if response is not None and not response.success:
+        LOG.error(
+            f'Database set_cluster_config failed: {response.error}')
+
+
+# =============================================================================
+# Cluster Config Public API Functions
+# =============================================================================
+
+def get_cluster_config() -> dict[str, Any]:
+    """Return all cluster config as {key_name: value}.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Callers running on the database node
+    (MARIADB_HOST set) use direct access so that bootstrap-time
+    commands work before the database daemon is started.
+    """
+    if _use_database_service():
+        return _grpc_get_all_cluster_config()
+    return _direct_get_all_cluster_config()
+
+
+def set_cluster_config(key_name: str, value: Any) -> None:
+    """Upsert a single cluster config key.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Callers running on the database node
+    (MARIADB_HOST set) use direct access so that bootstrap-time
+    commands work before the database daemon is started.
+    """
+    if _use_database_service():
+        _grpc_set_cluster_config(key_name, value)
+        return
+    _direct_set_cluster_config(key_name, value)
+
+
+# =============================================================================
 # Event DLQ Public API Functions
 # =============================================================================
 

@@ -118,6 +118,66 @@ class DirectSetClusterConfigTestCase(base.ShakenFistTestCase):
         mariadb._direct_set_cluster_config('key', 'val')
 
 
+class PublicClusterConfigRoutingTestCase(base.ShakenFistTestCase):
+    """Tests for the public get_cluster_config / set_cluster_config wrappers.
+
+    These exercise only the routing decision between direct MariaDB access
+    and the database microservice gRPC path.
+    """
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_get_all_cluster_config')
+    @mock.patch('shakenfist.mariadb._grpc_get_all_cluster_config')
+    def test_get_routes_to_direct_when_mariadb_host_set(
+            self, mock_grpc, mock_direct, mock_use_service):
+        mock_use_service.return_value = False
+        mock_direct.return_value = {'DNS_SERVER': '8.8.8.8'}
+
+        result = mariadb.get_cluster_config()
+
+        self.assertEqual(result, {'DNS_SERVER': '8.8.8.8'})
+        mock_direct.assert_called_once_with()
+        mock_grpc.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_get_all_cluster_config')
+    @mock.patch('shakenfist.mariadb._grpc_get_all_cluster_config')
+    def test_get_routes_to_grpc_otherwise(
+            self, mock_grpc, mock_direct, mock_use_service):
+        mock_use_service.return_value = True
+        mock_grpc.return_value = {'DNS_SERVER': '1.1.1.1'}
+
+        result = mariadb.get_cluster_config()
+
+        self.assertEqual(result, {'DNS_SERVER': '1.1.1.1'})
+        mock_grpc.assert_called_once_with()
+        mock_direct.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_set_cluster_config')
+    @mock.patch('shakenfist.mariadb._grpc_set_cluster_config')
+    def test_set_routes_to_direct_when_mariadb_host_set(
+            self, mock_grpc, mock_direct, mock_use_service):
+        mock_use_service.return_value = False
+
+        mariadb.set_cluster_config('DNS_SERVER', '8.8.8.8')
+
+        mock_direct.assert_called_once_with('DNS_SERVER', '8.8.8.8')
+        mock_grpc.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_set_cluster_config')
+    @mock.patch('shakenfist.mariadb._grpc_set_cluster_config')
+    def test_set_routes_to_grpc_otherwise(
+            self, mock_grpc, mock_direct, mock_use_service):
+        mock_use_service.return_value = True
+
+        mariadb.set_cluster_config('DNS_SERVER', '8.8.8.8')
+
+        mock_grpc.assert_called_once_with('DNS_SERVER', '8.8.8.8')
+        mock_direct.assert_not_called()
+
+
 class DirectDeleteClusterConfigTestCase(base.ShakenFistTestCase):
     """Tests for _direct_delete_cluster_config."""
 
