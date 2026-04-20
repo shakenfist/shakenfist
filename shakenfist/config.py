@@ -16,13 +16,57 @@ def get_node_name() -> str:
 
 
 def load_cluster_config() -> None:
-    """Load cluster-wide config from the database service.
+    """Load cluster-wide config into environment variables.
 
-    Builds a gRPC channel directly to avoid circular imports
-    (database.py imports config.py). Falls back silently if the
-    database service is unreachable, matching the old etcd
-    tolerance.
+    On the database node (MARIADB_HOST set), read directly from
+    MariaDB. This is important during bootstrap, when sf-database's
+    own ExecStartPre=verify-config runs before the daemon is
+    listening and therefore cannot self-loop through gRPC.
+
+    On every other node, fetch via the database microservice gRPC
+    API. Falls back silently on any failure so that fresh-install
+    nodes with no database daemon yet can still start.
+
+    Built inline to avoid circular imports (database.py and
+    mariadb.py both import config.py).
     """
+    mariadb_host = os.getenv('SHAKENFIST_MARIADB_HOST')
+    if mariadb_host:
+        try:
+            import sqlalchemy as sa
+
+            port = int(os.getenv('SHAKENFIST_MARIADB_PORT', '3306'))
+            user = os.getenv('SHAKENFIST_MARIADB_USER', 'shakenfist')
+            password = os.getenv('SHAKENFIST_MARIADB_PASSWORD', '')
+            database = os.getenv(
+                'SHAKENFIST_MARIADB_DATABASE', 'shakenfist')
+
+            url = (
+                f'mysql+pymysql://{user}:{password}'
+                f'@{mariadb_host}:{port}/{database}'
+            )
+            engine = sa.create_engine(url)
+            with engine.connect() as conn:
+                rows = conn.execute(sa.text(
+                    'SELECT key_name, value_json FROM cluster_config'
+                )).fetchall()
+
+            for key_name, value_json in rows:
+                value = value_json
+                if isinstance(value, (dict, list)):
+                    # SQLAlchemy's JSON type decodes already. For
+                    # env vars we want the raw JSON string so it
+                    # round-trips.
+                    value = json.dumps(value)
+                os.environ['SHAKENFIST_%s' % key_name] = str(value)
+            return
+
+        except Exception:
+            # Table may not exist yet on a fresh install; or
+            # MariaDB may not be reachable. Fall through silently
+            # so bootstrap keeps working.
+            return
+
     db_ip = os.getenv('SHAKENFIST_DATABASE_NODE_IP')
     if not db_ip:
         return
