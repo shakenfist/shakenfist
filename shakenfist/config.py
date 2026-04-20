@@ -42,7 +42,7 @@ def load_cluster_config() -> None:
                 'SHAKENFIST_MARIADB_DATABASE', 'shakenfist')
 
             url = (
-                f'mysql+pymysql://{user}:{password}'
+                f'mariadb+mysqldb://{user}:{password}'
                 f'@{mariadb_host}:{port}/{database}'
             )
             engine = sa.create_engine(url)
@@ -51,12 +51,14 @@ def load_cluster_config() -> None:
                     'SELECT key_name, value_json FROM cluster_config'
                 )).fetchall()
 
-            for key_name, value_json in rows:
-                value = value_json
+            for key_name, value_raw in rows:
+                # Raw SQL gets the stored string; JSON-decode so we
+                # match the gRPC path's behavior.
+                try:
+                    value = json.loads(value_raw)
+                except (TypeError, ValueError):
+                    value = value_raw
                 if isinstance(value, (dict, list)):
-                    # SQLAlchemy's JSON type decodes already. For
-                    # env vars we want the raw JSON string so it
-                    # round-trips.
                     value = json.dumps(value)
                 os.environ['SHAKENFIST_%s' % key_name] = str(value)
             return
