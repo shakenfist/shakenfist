@@ -159,7 +159,9 @@ nav:
                 - "Deferred debt: collating and paying down outstanding work": components/ryll/plans/PLAN-deferred-debt.md
                 - "Display Iteration Follow-ups": components/ryll/plans/PLAN-display-iteration-followups.md
                 - "Extract reusable crates from ryll": components/ryll/plans/PLAN-crate-extraction.md
+                - "Idle CPU reduction and real latency measurement": components/ryll/plans/PLAN-idle-cpu-and-latency.md
                 - "Interactive USB device management UI": components/ryll/plans/PLAN-usb-ui.md
+                - "Phase 01: Idle CPU profile": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile.md
                 - "Phase 10: Testing and QEMU setup": components/ryll/plans/PLAN-usb-redir-phase-10-testing.md
                 - "Phase 1: Capture infrastructure": components/ryll/plans/PLAN-capture-phase-01-infra.md
                 - "Phase 1: Convert ryll to a Cargo workspace": components/ryll/plans/PLAN-crate-extraction-phase-01-workspace.md
@@ -168,20 +170,25 @@ nav:
                 - "Phase 1: Parse SpiceCursor image data": components/ryll/plans/PLAN-cursor-rendering-phase-01-parse.md
                 - "Phase 1: Platform Portability": components/ryll/plans/PLAN-packaging-phase-01-portability.md
                 - "Phase 1: Ring buffer infrastructure": components/ryll/plans/PLAN-bug-reports-phase-01-ring-buffer.md
+                - "Phase 1: Screenshot hotkey and save dialog": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-01-screenshot.md
                 - "Phase 1: SpiceVMC channel transport": components/ryll/plans/PLAN-usb-redir-phase-01-vmc-channel.md
                 - "Phase 1: SpiceVMC port channel transport for WebDAV": components/ryll/plans/PLAN-webdav-phase-01-port-channel.md
                 - "Phase 2: Audio correctness": components/ryll/plans/PLAN-deferred-debt-phase-02-audio.md
                 - "Phase 2: Channel state snapshots": components/ryll/plans/PLAN-bug-reports-phase-02-channel-state.md
                 - "Phase 2: GitHub Actions CI": components/ryll/plans/PLAN-packaging-phase-02-ci.md
+                - "Phase 2: Latency sparkline": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-02-latency-sparkline.md
                 - "Phase 2: Mux protocol (demux and remux)": components/ryll/plans/PLAN-webdav-phase-02-mux-protocol.md
                 - "Phase 2: Pcap packet capture": components/ryll/plans/PLAN-capture-phase-02-pcap.md
                 - "Phase 2: Render cursor as egui overlay": components/ryll/plans/PLAN-cursor-rendering-phase-02-render.md
+                - "Phase 2: Repaint cadence fix": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint.md
                 - "Phase 2: Reserve crate names on crates.io": components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names.md
                 - "Phase 2: usbredir protocol parser": components/ryll/plans/PLAN-usb-redir-phase-02-usbredir-parser.md
                 - "Phase 2: Wire usb_tx and channel events": components/ryll/plans/PLAN-usb-ui-phase-02-wire-tx.md
                 - "Phase 3: Bug report assembly and zip output": components/ryll/plans/PLAN-bug-reports-phase-03-zip-output.md
                 - "Phase 3: Debian Packaging": components/ryll/plans/PLAN-packaging-phase-03-debian.md
+                - "Phase 3: Demote protocol logging": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging.md
                 - "Phase 3: Device backend trait": components/ryll/plans/PLAN-usb-redir-phase-03-device-backend.md
+                - "Phase 3: Documentation": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-03-docs.md
                 - "Phase 3: Embedded WebDAV server": components/ryll/plans/PLAN-webdav-phase-03-webdav-server.md
                 - "Phase 3: Extract shakenfist-spice-compression": components/ryll/plans/PLAN-crate-extraction-phase-03-compression.md
                 - "Phase 3: Input and session correctness": components/ryll/plans/PLAN-deferred-debt-phase-03-session.md
@@ -192,8 +199,10 @@ nav:
                 - "Phase 4: GUI report button and description dialog": components/ryll/plans/PLAN-bug-reports-phase-04-gui-button.md
                 - "Phase 4: Integration (mux ↔ WebDAV server)": components/ryll/plans/PLAN-webdav-phase-04-integration.md
                 - "Phase 4: Real device enumeration and passthrough": components/ryll/plans/PLAN-usb-redir-phase-04-real-devices.md
+                - "Phase 4: Real latency from PING/PONG": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency.md
                 - "Phase 4: Robustness and safety": components/ryll/plans/PLAN-deferred-debt-phase-04-robustness.md
                 - "Phase 4: RPM Packaging": components/ryll/plans/PLAN-packaging-phase-04-rpm.md
+                - "Phase 5: Capture runtime metrics in bug reports": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics.md
                 - "Phase 5: Code quality and cleanup": components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup.md
                 - "Phase 5: Connect and disconnect controls": components/ryll/plans/PLAN-usb-ui-phase-05-connect.md
                 - "Phase 5: Device connection lifecycle": components/ryll/plans/PLAN-usb-redir-phase-05-device-connect.md
@@ -221,6 +230,7 @@ nav:
                 - "Remaining issues after initial bring-up": components/ryll/plans/PLAN-remaining-issues.md
                 - "Render SPICE cursor on screen": components/ryll/plans/PLAN-cursor-rendering.md
                 - "Replace audiopus with pure-Rust opus-decoder": components/ryll/plans/PLAN-opus-decoder.md
+                - "Screenshot capture and latency HUD": components/ryll/plans/PLAN-screenshot-and-latency-hud.md
                 - "Supply-chain and prompt-injection scanning": components/ryll/plans/PLAN-supply-chain-scanning.md
                 - "Supply-chain follow-ups": components/ryll/plans/PLAN-supply-chain-followups.md
                 - "USB device redirection via the SPICE usbredir channel": components/ryll/plans/PLAN-usb-redir.md
