@@ -10,8 +10,8 @@ import time
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as util_random  # noreorder
 
-from shakenfist import database
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.util import callstack as util_callstack
 
@@ -46,10 +46,10 @@ class ClusterLock:
         self.log_ctx = log_ctx.with_fields(self.lock_data)
 
     def get_holder(self, key_prefix=''):
-        value = database.get_lock_holder(
+        value = mariadb.get_cluster_lock_holder(
             self.objecttype, self.subtype, self.name)
 
-        if value is None or value == {}:
+        if value == {'holder': None}:
             return {'holder': None}
 
         if key_prefix:
@@ -61,7 +61,7 @@ class ClusterLock:
         return value
 
     def acquire(self):
-        return database.acquire_lock(
+        return mariadb.acquire_cluster_lock(
             self.objecttype, self.subtype, self.name, self.lock_data)
 
     def is_acquired(self):
@@ -89,7 +89,7 @@ class ClusterLock:
             % (self.name, self.timeout))
 
     def release(self):
-        return database.release_lock(
+        return mariadb.release_cluster_lock(
             self.objecttype, self.subtype, self.name, self.lock_data)
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
@@ -108,9 +108,11 @@ class ClusterLock:
 
 def clear_stale_locks():
     """Clear locks held by dead processes on this node."""
-    database.clear_stale_locks()
+    import psutil
+    mariadb.clear_stale_cluster_locks(
+        config.NODE_NAME, list(psutil.pids()))
 
 
 def get_existing_locks():
     """Get all existing locks in the cluster."""
-    return database.get_existing_locks()
+    return mariadb.get_all_cluster_locks()

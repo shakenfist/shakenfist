@@ -916,32 +916,32 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_delete_work_queue_row.stop)
 
-        # Mock database lock operations (used by locks.ClusterLock)
+        # Mock cluster lock operations (used by locks.ClusterLock)
         self.db_acquire_lock = mock.patch(
-            'shakenfist.database.acquire_lock',
+            'shakenfist.mariadb.acquire_cluster_lock',
             return_value=True)
         self.db_acquire_lock.start()
         self.test_obj.addCleanup(self.db_acquire_lock.stop)
 
         self.db_release_lock = mock.patch(
-            'shakenfist.database.release_lock',
+            'shakenfist.mariadb.release_cluster_lock',
             return_value=True)
         self.db_release_lock.start()
         self.test_obj.addCleanup(self.db_release_lock.stop)
 
         self.db_get_lock_holder = mock.patch(
-            'shakenfist.database.get_lock_holder',
+            'shakenfist.mariadb.get_cluster_lock_holder',
             return_value={'holder': None})
         self.db_get_lock_holder.start()
         self.test_obj.addCleanup(self.db_get_lock_holder.stop)
 
         self.db_clear_stale_locks = mock.patch(
-            'shakenfist.database.clear_stale_locks')
+            'shakenfist.mariadb.clear_stale_cluster_locks')
         self.db_clear_stale_locks.start()
         self.test_obj.addCleanup(self.db_clear_stale_locks.stop)
 
         self.db_get_existing_locks = mock.patch(
-            'shakenfist.database.get_existing_locks',
+            'shakenfist.mariadb.get_all_cluster_locks',
             return_value={})
         self.db_get_existing_locks.start()
         self.test_obj.addCleanup(self.db_get_existing_locks.stop)

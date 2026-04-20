@@ -17053,6 +17053,198 @@ def _grpc_delete_event_dlq(ids: list[int]) -> int:
 
 
 # =============================================================================
+# Cluster Lock gRPC Functions
+# =============================================================================
+
+def _grpc_acquire_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_data: dict[str, Any]) -> bool:
+    """Acquire a lock via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return False
+
+    request = database_pb2.ClusterLockRequest(
+        object_type=object_type,
+        subtype=subtype or '',
+        name=name,
+        lock_data=_json_dumps(lock_data),
+    )
+    response = _grpc_call(stub.AcquireLock, request)
+    if response is None:
+        return False
+    return bool(response.acquired)
+
+
+def _grpc_release_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_data: dict[str, Any]) -> bool:
+    """Release a lock via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return False
+
+    request = database_pb2.ClusterReleaseLockRequest(
+        object_type=object_type,
+        subtype=subtype or '',
+        name=name,
+        lock_data=_json_dumps(lock_data),
+    )
+    response = _grpc_call(stub.ReleaseLock, request)
+    if response is None:
+        return False
+    return bool(response.success)
+
+
+def _grpc_get_cluster_lock_holder(
+        object_type: str, subtype: str,
+        name: str) -> Optional[dict[str, Any]]:
+    """Get the holder of a lock via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return None
+
+    request = database_pb2.ClusterGetLockHolderRequest(
+        object_type=object_type,
+        subtype=subtype or '',
+        name=name,
+    )
+    response = _grpc_call(stub.GetLockHolder, request)
+    if response is None or not response.held:
+        return None
+    return cast(dict[str, Any], json.loads(response.holder))
+
+
+def _grpc_clear_stale_cluster_locks(
+        node_name: str, live_pids: list[int]) -> None:
+    """Clear stale locks via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return
+
+    request = database_pb2.ClusterClearStaleLocksRequest(
+        node_name=node_name,
+        live_pids=live_pids,
+    )
+    response = _grpc_call(stub.ClearStaleLocks, request)
+    if response is not None and not response.success:
+        LOG.error(
+            f'Database clear_stale_locks failed: {response.error}')
+
+
+def _grpc_get_all_cluster_locks() -> dict[str, dict[str, Any]]:
+    """Return all cluster locks via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return {}
+
+    request = database_pb2.ClusterGetExistingLocksRequest()
+    response = _grpc_call(stub.GetExistingLocks, request)
+    if response is None:
+        return {}
+
+    return {
+        lock.key: json.loads(lock.holder)
+        for lock in response.locks
+    }
+
+
+# =============================================================================
+# Cluster Lock Public API Functions
+# =============================================================================
+
+def acquire_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_data: dict[str, Any]) -> bool:
+    """Attempt to acquire a distributed lock.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Callers running on the database node
+    (MARIADB_HOST set) use direct access so that bootstrap-time
+    commands work before the database daemon is started.
+    """
+    if _use_database_service():
+        return _grpc_acquire_cluster_lock(
+            object_type, subtype, name, lock_data)
+
+    lock_key = _cluster_lock_key(object_type, subtype, name)
+    return _direct_acquire_cluster_lock(
+        lock_key=lock_key,
+        holder_json=lock_data,
+        node_uuid=lock_data.get('node', ''),
+        pid=int(lock_data.get('pid', 0)),
+        lock_id=lock_data.get('id', ''),
+        now=time.time(),
+    )
+
+
+def release_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_data: dict[str, Any]) -> bool:
+    """Release a distributed lock.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service().
+    """
+    if _use_database_service():
+        return _grpc_release_cluster_lock(
+            object_type, subtype, name, lock_data)
+
+    lock_key = _cluster_lock_key(object_type, subtype, name)
+    return _direct_release_cluster_lock(
+        lock_key=lock_key,
+        lock_id=lock_data.get('id', ''),
+    )
+
+
+def get_cluster_lock_holder(
+        object_type: str, subtype: str,
+        name: str) -> dict[str, Any]:
+    """Get the current holder of a lock.
+
+    Returns {'holder': None} when the lock is free, matching the
+    contract the locks module expects. Routes to the database
+    microservice or direct MariaDB depending on
+    _use_database_service().
+    """
+    if _use_database_service():
+        holder = _grpc_get_cluster_lock_holder(
+            object_type, subtype, name)
+    else:
+        lock_key = _cluster_lock_key(object_type, subtype, name)
+        holder = _direct_get_cluster_lock(lock_key)
+
+    if holder is None:
+        return {'holder': None}
+    return holder
+
+
+def clear_stale_cluster_locks(
+        node_name: str, live_pids: list[int]) -> None:
+    """Clear locks held by dead processes on a node.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service().
+    """
+    if _use_database_service():
+        _grpc_clear_stale_cluster_locks(node_name, live_pids)
+        return
+    _direct_clear_stale_cluster_locks(
+        node_uuid=node_name, live_pids=live_pids)
+
+
+def get_all_cluster_locks() -> dict[str, dict[str, Any]]:
+    """Return every lock as {key: holder_json}.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service().
+    """
+    if _use_database_service():
+        return _grpc_get_all_cluster_locks()
+    return _direct_get_all_cluster_locks()
+
+
+# =============================================================================
 # Cluster Config gRPC Functions
 # =============================================================================
 
