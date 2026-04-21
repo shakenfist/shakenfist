@@ -7,7 +7,6 @@ from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.constants import EVENT_TYPE_MUTATE
