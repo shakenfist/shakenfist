@@ -129,8 +129,8 @@ class NetworkInterface(dbo):
                         f'Unsupported object version - {cls.object_type}: {result}')
             return result
 
-        # Fall back to etcd for unmigrated objects
-        return super()._db_get(object_uuid)
+        # Object not found in MariaDB
+        return None
 
     @classmethod
     def new(cls, interface_uuid, netdesc, instance_uuid, order):
