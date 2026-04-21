@@ -7,7 +7,6 @@ from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.constants import EVENT_TYPE_MUTATE
@@ -130,35 +129,47 @@ class NetworkInterface(dbo):
                         f'Unsupported object version - {cls.object_type}: {result}')
             return result
 
-        # Fall back to etcd for unmigrated objects
-        return super()._db_get(object_uuid)
+        # Object not found in MariaDB
+        return None
 
     @classmethod
     def new(cls, interface_uuid, netdesc, instance_uuid, order):
         if 'macaddress' not in netdesc or not netdesc['macaddress']:
-            possible_mac = util_network.random_macaddr()
-            mac_iface = {'interface_uuid': interface_uuid}
-            while not etcd.create('macaddress', None, possible_mac, mac_iface):
-                possible_mac = util_network.random_macaddr()
-            netdesc['macaddress'] = possible_mac
+            netdesc['macaddress'] = util_network.random_macaddr()
 
         if not interface_uuid:
             # uuid should only be specified in testing
             interface_uuid = str(uuid4())
 
-        NetworkInterface._db_create(
-            interface_uuid,
-            {
-                'network_uuid': netdesc['network_uuid'],
-                'instance_uuid': instance_uuid,
-                'macaddr': netdesc['macaddress'],
-                'ipv4': netdesc['address'],
-                'order': order,
-                'model': netdesc['model'],
+        # Retry _db_create if the macaddr collides with an existing
+        # interface (the UNIQUE constraint on network_interfaces.macaddr
+        # causes an IntegrityError which _db_create surfaces as a
+        # RuntimeError).
+        max_mac_attempts = 10
+        for attempt in range(max_mac_attempts):
+            try:
+                NetworkInterface._db_create(
+                    interface_uuid,
+                    {
+                        'network_uuid': netdesc['network_uuid'],
+                        'instance_uuid': instance_uuid,
+                        'macaddr': netdesc['macaddress'],
+                        'ipv4': netdesc['address'],
+                        'order': order,
+                        'model': netdesc['model'],
 
-                'version': cls.current_version
-            }
-        )
+                        'version': cls.current_version
+                    }
+                )
+                break
+            except RuntimeError:
+                if attempt >= max_mac_attempts - 1:
+                    raise
+                netdesc['macaddress'] = util_network.random_macaddr()
+                LOG.with_fields({
+                    'interface_uuid': interface_uuid
+                }).info('MAC address collision, retrying with %s'
+                        % netdesc['macaddress'])
 
         ni = NetworkInterface.from_db(interface_uuid)
 
@@ -284,7 +295,6 @@ class NetworkInterface(dbo):
         self.state = dbo.STATE_DELETED
 
     def hard_delete(self):
-        etcd.delete('macaddress', None, self.macaddr)
         mariadb.delete_network_interface_attributes(self.uuid)
         mariadb.delete_network_interface(self.uuid)
         super().hard_delete()

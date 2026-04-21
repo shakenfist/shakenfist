@@ -6,8 +6,8 @@ import time
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist import etcd
 from shakenfist import instance
+from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.blob import Blob
@@ -226,7 +226,7 @@ def startup_tasks():
     daemon.set_log_level(LOG, 'main')
 
     # Check in early and often
-    etcd.clear_stale_locks()
+    locks.clear_stale_locks()
 
     # Reset queues
     for queue in get_all_node_queues(config.NODE_NAME):

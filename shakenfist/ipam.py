@@ -94,8 +94,8 @@ class IPAM(dbo):
                         f'Unsupported object version - {cls.object_type}: {result}')
             return result
 
-        # Fall back to etcd for unmigrated objects
-        return super()._db_get(object_uuid)
+        # Object not found in MariaDB
+        return None
 
     def __init__(self, static_values: dict[str, Any]) -> None:
         self._in_memory_only: bool = static_values.get('in_memory_only', False)

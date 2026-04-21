@@ -30,7 +30,6 @@ TARGET_UUID = uuid4()
 class FakeConfig(BaseSettings):
     DATABASE_NODE_IP: str = '192.168.1.1'
     DATABASE_API_PORT: int = 13005
-    DATABASE_USE_DIRECT_ETCD: bool = False
     MARIADB_HOST: str = ''
     NODE_NAME: str = 'testnode'
 

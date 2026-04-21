@@ -1,5 +1,14 @@
+"""Minimal etcd access retained for DATA_MIGRATIONS drain entries.
+
+This module is kept so that operators upgrading from a previous version
+can drain residual etcd keys on first startup. It will be removed in the
+next minor version. Do NOT add new callers — use MariaDB instead.
+
+The MAC address reservation path in network/interface.py still writes
+to etcd as a temporary measure until a MariaDB-native MAC reservation
+is added.
+"""
 import json
-import os
 import threading
 import time
 from typing import Any, Generator, Optional
@@ -9,10 +18,8 @@ from etcd3gw.exceptions import InternalServerError
 from google.rpc import error_details_pb2
 import grpc
 from grpc_status import rpc_status
-import psutil
 import requests
 from shakenfist_utilities import logs  # noreorder
-from shakenfist_utilities import random as util_random  # noreorder
 
 from shakenfist import exceptions
 from shakenfist.config import config
@@ -25,23 +32,6 @@ from shakenfist.util import json as util_json
 LOG, _ = logs.setup(__name__)
 
 
-def _use_database_service():
-    """Check if we should use the database microservice instead of direct etcd.
-
-    Returns True if the database service is configured and enabled.
-    Returns False during bootstrap or if DATABASE_USE_DIRECT_ETCD is True.
-    Returns False if force_direct_etcd is set for this thread.
-    """
-    # Thread-local override for the database daemon's own operations
-    if get_force_direct_etcd():
-        return False
-    if config.DATABASE_USE_DIRECT_ETCD:
-        return False
-    if not config.DATABASE_NODE_IP:
-        return False
-    return True
-
-
 class WrappedEtcdClient(Etcd3Client):
     def __init__(self, host=None, port=2379, protocol='http',
                  ca_cert=None, cert_key=None, cert_cert=None, timeout=None,
@@ -49,31 +39,21 @@ class WrappedEtcdClient(Etcd3Client):
         if not host:
             host = config.ETCD_HOST
 
-        # Work around https://opendev.org/openstack/etcd3gw/commit/7a1a2b5a672605ae549c73ed18302b7abd9e0e30
-        # making things not work for us.
         if api_path == '/v3alpha':
             raise Exception('etcd3 v3alpha endpoint is known not to work')
 
-        # Cache config options so we can reuse them when we rebuild connections.
         self.ca_cert = ca_cert
         self.cert_key = cert_key
         self.cert_cert = cert_cert
         self.timeout = timeout
 
-        if config.LOG_ETCD_CONNECTIONS:
-            LOG.info('Building new etcd connection')
         super().__init__(
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
             api_path=api_path)
 
-        # Never use HTTP proxies for etcd connections. etcd is always on
-        # the local network and proxies cause timeouts (e.g. squid
-        # returning 503).
         self.session.trust_env = False
 
-    # Wrap post() to retry on errors. These errors are caused by our long lived
-    # connections sometimes being dropped.
     def post(self, *args, **kwargs):
         try:
             return super().post(*args, **kwargs)
@@ -91,26 +71,9 @@ class WrappedEtcdClient(Etcd3Client):
             return super().post(*args, **kwargs)
 
 
-# This module stores some state in thread local storage.
 local = threading.local()
 local.sf_etcd_client = None
 local.sf_etcd_native_client = None
-local.force_direct_etcd = False
-
-
-def set_force_direct_etcd(value):
-    """Force direct etcd access for this thread.
-
-    This is used by the database daemon to avoid a chicken-and-egg problem:
-    the database daemon itself needs to use direct etcd access for its own
-    startup/shutdown recording, since it IS the database service.
-    """
-    local.force_direct_etcd = value
-
-
-def get_force_direct_etcd():
-    """Check if direct etcd access is forced for this thread."""
-    return getattr(local, 'force_direct_etcd', False)
 
 
 def get_etcd_client():
@@ -121,33 +84,23 @@ def get_etcd_client():
     return c
 
 
-def reset_client():
-    local.sf_etcd_client = None
-
-
 def get_etcd_native_client():
-    # If your eventlog server isn't setup, we get cranky. Note that this
-    # happens during unit test discovery for py3 unit tests.
     if not config.ETCD_HOST:
         caller = util_callstack.generate_traceback()
         LOG.error('Cannot communicate with etcd, no configured server! Caller was:\n'
                   f'{caller}')
-        return
+        raise exceptions.gRPCException(
+            'etcd is not configured (ETCD_HOST is not set)'
+        )
 
     c = getattr(local, 'sf_etcd_native_client', None)
     if c:
-        # Ensure the channel is ready
         try:
             grpc.channel_ready_future(c).result(timeout=0.5)
         except grpc.FutureTimeoutError:
-            # We do not close the channel here because this cause grpc to sometimes
-            # throw a traceback from another thread trying to monitor a now closed
-            # channel.
             c = None
 
     if not c:
-        if config.LOG_ETCD_CONNECTIONS:
-            LOG.info('Creating new etcd client via native protocol')
         local.sf_etcd_native_client = grpc.insecure_channel(
             '%s:2379' % config.ETCD_HOST,
             options=[
@@ -162,24 +115,11 @@ def get_etcd_native_client():
     return c
 
 
-def reset_native_client():
-    # We do not close the channel here because this cause grpc to sometimes
-    # throw a traceback from another thread trying to monitor a now closed
-    # channel.
+def _reset_native_client():
     local.sf_etcd_native_client = None
 
 
 def retry_etcd_forever(func):
-    """Retry the Etcd server forever.
-
-    If the DB is unable to process the request then SF cannot operate,
-    therefore wait until it comes back online. If the DB falls out of sync with
-    the system then we will have bigger problems than a small delay.
-
-    If the etcd server is not running, then a ConnectionFailedError exception
-    will occur. This is deliberately allowed to cause an SF daemon failure to
-    bring attention to the deeper problem.
-    """
     def wrapper(*args, **kwargs):
         attempt = 0
         while True:
@@ -197,139 +137,6 @@ def retry_etcd_forever(func):
     return wrapper
 
 
-class ClusterLock:
-    def __init__(self, objecttype, subtype, name,
-                 timeout=120, log_ctx=LOG, op=None):
-        self.path = _construct_key(objecttype, subtype, name, prefix='sflocks')
-
-        self.objecttype = objecttype
-        self.subtype = subtype
-        self.objectname = name
-        self.name = name
-
-        self.timeout = timeout
-        self.operation = op
-        self.lockid = util_random.random_id()
-
-        self.node = config.NODE_NAME
-        self.pid = os.getpid()
-        caller = util_callstack.get_caller(offset=-3)
-
-        self.lock_data = {
-            'node': self.node,
-            'pid': self.pid,
-            'thread': threading.get_ident(),
-            'line': caller,
-            'operation': self.operation,
-            'id': self.lockid
-        }
-        self.log_ctx = log_ctx.with_fields(self.lock_data)
-
-    def get_holder(self, key_prefix=''):
-        if _use_database_service():
-            from shakenfist import database
-            value = database.get_lock_holder(
-                self.objecttype, self.subtype, self.name)
-        else:
-            value = get_raw(self.path)
-
-        if value is None or value == {}:
-            return {'holder': None}
-
-        if key_prefix:
-            new_holder = {}
-            for key in value:
-                new_holder[f'{key_prefix}-{key}'] = value[key]
-            return new_holder
-
-        return value
-
-    def acquire(self):
-        if _use_database_service():
-            from shakenfist import database
-            return database.acquire_lock(
-                self.objecttype, self.subtype, self.name, self.lock_data)
-        return create_raw(self.path, self.lock_data)
-
-    def is_acquired(self):
-        holder = self.get_holder()
-        for field in self.lock_data.keys():
-            if holder.get(field) != self.lock_data[field]:
-                return False
-        return True
-
-    def __enter__(self):
-        start_time = time.time()
-        while time.time() - start_time < self.timeout:
-            res = self.acquire()
-            if res:
-                return self
-            time.sleep(0.5)
-
-        current = self.get_holder(key_prefix='current')
-        self.log_ctx.with_fields(current).with_fields({
-            'duration': round(time.time() - start_time, 2)
-            }).info('Failed to acquire lock')
-
-        raise exceptions.LockException(
-            'Cannot acquire lock %s, timed out after %.02f seconds'
-            % (self.name, self.timeout))
-
-    def release(self):
-        if _use_database_service():
-            from shakenfist import database
-            return database.release_lock(
-                self.objecttype, self.subtype, self.name, self.lock_data)
-        return transactional_delete_raw(self.path, self.lock_data)
-
-    def __exit__(self, _exception_type, _exception_value, _traceback):
-        if self.release():
-            return
-
-        current = self.get_holder(key_prefix='current')
-        self.log_ctx.with_fields(current).error(
-            'Attempt to release a lock we were not holding')
-
-    def __str__(self):
-        return (f'ClusterLock({self.objecttype} {self.objectname}, '
-                f'lock name "{self.name}", operation {self.operation}, '
-                f'with timeout {self.timeout})')
-
-
-@retry_etcd_forever
-def clear_stale_locks():
-    if _use_database_service():
-        from shakenfist import database
-        return database.clear_stale_locks()
-
-    # Remove all locks held by former processes on this node. This is required
-    # after an unclean restart, otherwise we need to wait for these locks to
-    # timeout and that can take a long time.
-    for key, holder in get_prefix_raw('/sflocks/'):
-        lockname = key.replace('/sflocks/', '')
-        node = holder['node']
-        pid = int(holder['pid'])
-
-        if node == config.NODE_NAME and not psutil.pid_exists(pid):
-            delete_raw(key)
-            LOG.with_fields({'lock': lockname,
-                             'old-pid': pid,
-                             'old-node': node,
-                             }).warning('Removed stale lock')
-
-
-@retry_etcd_forever
-def get_existing_locks():
-    if _use_database_service():
-        from shakenfist import database
-        return database.get_existing_locks()
-
-    key_val = {}
-    for key, holder in get_prefix_raw('/sflocks/'):
-        key_val[key] = holder
-    return key_val
-
-
 def _construct_key(objecttype, subtype, name, prefix='sf'):
     if subtype and name:
         return f'/{prefix}/{objecttype}/{subtype}/{name}'
@@ -341,17 +148,11 @@ def _construct_key(objecttype, subtype, name, prefix='sf'):
 
 
 def put(objecttype, subtype, name, data):
-    if _use_database_service():
-        from shakenfist import database
-        return database.put(objecttype, subtype, name, data)
     path = _construct_key(objecttype, subtype, name)
     put_raw(path, data)
 
 
 def create(objecttype, subtype, name, data):
-    if _use_database_service():
-        from shakenfist import database
-        return database.create(objecttype, subtype, name, data)
     path = _construct_key(objecttype, subtype, name)
     return create_raw(path, data)
 
@@ -359,9 +160,6 @@ def create(objecttype, subtype, name, data):
 def get(
         objecttype: str, subtype: Optional[str], name: Optional[str]
 ) -> Optional[dict[str, Any]]:
-    if _use_database_service():
-        from shakenfist import database
-        return database.get(objecttype, subtype, name)
     path = _construct_key(objecttype, subtype, name)
     return get_raw(path)
 
@@ -370,9 +168,6 @@ def get_all(
         objecttype: str, subtype: Optional[str],
         prefix: Optional[str] = None, limit: int = 0
 ) -> Generator[tuple[str, dict[str, Any]], None, None]:
-    if _use_database_service():
-        from shakenfist import database
-        return database.get_all(objecttype, subtype, prefix=prefix, limit=limit)
     path = _construct_key(objecttype, subtype, prefix)
     return get_prefix_raw(path, limit=limit)
 
@@ -387,18 +182,7 @@ def get_all_dict(objecttype, subtype=None, limit=0):
     return key_val
 
 
-def replace(objecttype, subtype, name, original_data, new_data):
-    return replace_many_raw([{
-        'path': _construct_key(objecttype, subtype, name),
-        'original_data': original_data,
-        'new_data': new_data
-    }])[0]
-
-
 def delete(objecttype: str, subtype: Optional[str], name: str) -> bool:
-    if _use_database_service():
-        from shakenfist import database
-        return database.delete(objecttype, subtype, name)
     path = _construct_key(objecttype, subtype, name)
     return delete_raw(path)
 
@@ -406,22 +190,9 @@ def delete(objecttype: str, subtype: Optional[str], name: str) -> bool:
 @retry_etcd_forever
 def delete_all(objecttype, subtype, name=None):
     path = _construct_key(objecttype, subtype, name)
-    if _use_database_service():
-        from shakenfist import database
-        return database.delete_prefix(path)
     get_etcd_client().delete_prefix(path)
 
 
-@retry_etcd_forever
-def delete_prefix(path):
-    if _use_database_service():
-        from shakenfist import database
-        return database.delete_prefix(path)
-    get_etcd_client().delete_prefix(path)
-    LOG.info('etcd deleteprefix %s' % path)
-
-
-# Direct etcd calls via gRPC
 def _log_and_raise_error(rpc_error):
     code = None
     detail = None
@@ -448,7 +219,6 @@ def _log_and_raise_error(rpc_error):
         detail = 'no detail available'
 
     if code == grpc.StatusCode.UNAVAILABLE:
-        # Unavailable such as "sendmsg: Socket operation on non-socket"
         raise exceptions.gRPCException(f'Server unavailable: {detail}')
 
     if code == grpc.StatusCode.ABORTED:
@@ -458,8 +228,7 @@ def _log_and_raise_error(rpc_error):
         raise exceptions.gRPCException(f'Internal error: {detail}')
 
     if code == 32:
-        # "sendmsg: Broken pipe (32)"
-        raise exceptions.gRPCEXception(f'Broken pipe: {detail}')
+        raise exceptions.gRPCException(f'Broken pipe: {detail}')
 
     LOG.debug(f'Unhandled gRPC call failure: {rpc_error}')
     raise exceptions.gRPCException(rpc_error)
@@ -482,7 +251,7 @@ def _retry_etcd_native_client(func):
                     'function': func,
                     'attempt': attempt
                 }).info('Failed etcd request via native protocol')
-            reset_native_client()
+            _reset_native_client()
             time.sleep(attempt / 10.0)
             attempt += 1
 
@@ -490,31 +259,6 @@ def _retry_etcd_native_client(func):
             raise last_exception
 
     return wrapper
-
-
-@_retry_etcd_native_client
-def compact(revision):
-    if _use_database_service():
-        from shakenfist import database
-        return database.compact(revision)
-
-    channel = get_etcd_native_client()
-    stub = etcd_pb2_grpc.KVStub(channel)
-    try:
-        stub.Compact(etcd_pb2.CompactionRequest(
-            revision=revision, physical=True
-        )
-        )
-    except grpc.RpcError as rpc_error:
-        _log_and_raise_error(rpc_error)
-
-    try:
-        stub = etcd_pb2_grpc.MaintenanceStub(channel)
-        request = etcd_pb2.DefragmentRequest()
-        stub.Defragment(request, timeout=30, wait_for_ready=True)
-    except grpc.RpcError as rpc_error:
-        _log_and_raise_error(rpc_error)
-        return False
 
 
 @_retry_etcd_native_client
@@ -544,15 +288,6 @@ def get_prefix_raw(
 ) -> Generator[tuple[str, dict[str, Any]], None, None]:
     path_encoded = path.encode()
 
-    # From the etcd API docs: "If range_end is key plus one (e.g.,
-    # "aa"+1 == "ab", "a\xff"+1 == "b"), then the range represents all keys
-    # prefixed with key."
-    #
-    #     https://etcd.io/docs/v3.3/learning/api/#key-ranges
-    #
-    # Note that this implementation assumes our keys are basically ASCII, that
-    # is that we will never have a last byte of 0xFF (because we'd have to
-    # carry if we did).
     range_end = bytearray(path_encoded)
     range_end[-1] = range_end[-1] + 1
     range_end = bytes(range_end)
@@ -585,10 +320,6 @@ def put_raw(path, new_data):
     channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
 
-    # NOTE(mikal): yes, this doesn't return a meaningful result. etcd3gw
-    # simply hardcoded a "return True" here, the etcd server returns a
-    # result indicating the previous value of the key. That is, a failure
-    # will raise an exception.
     try:
         stub.Put(
             etcd_pb2.PutRequest(
@@ -619,8 +350,6 @@ def delete_raw(path: str) -> bool:
 
 
 def create_raw(path, new_data):
-    # Failure audit is suppressed here because we expect to fail if the key is
-    # already in use.
     return replace_many_raw(
         [
             {
@@ -633,30 +362,8 @@ def create_raw(path, new_data):
     )[0]
 
 
-def replace_raw(path, original_data, new_data):
-    return replace_many_raw([{
-        'path': path,
-        'original_data': original_data,
-        'new_data': new_data
-    }])[0]
-
-
-def transactional_delete_raw(path, original_data):
-    return replace_many_raw([{
-        'path': path,
-        'original_data': original_data,
-        'new_data': None
-    }])[0]
-
-
-# NOTE(mikal): note that mutations are expected to use strings in their
-# descriptions, not bytes.
 @_retry_etcd_native_client
 def replace_many_raw(mutations, suppress_failure_audit=False):
-    if _use_database_service():
-        from shakenfist import database
-        return database.replace_many_raw(mutations, suppress_failure_audit)
-
     original_values_by_path = {}
     new_values_by_path = {}
 
@@ -712,7 +419,6 @@ def replace_many_raw(mutations, suppress_failure_audit=False):
             )
             new_values_by_path[path_encoded] = new_data_encoded
 
-        # On failure, we grab all of the keys and their current values
         failures.append(
             etcd_pb2.RequestOp(
                 request_range=etcd_pb2.RangeRequest(
@@ -721,7 +427,7 @@ def replace_many_raw(mutations, suppress_failure_audit=False):
             )
         )
 
-    channel = channel = get_etcd_native_client()
+    channel = get_etcd_native_client()
     stub = etcd_pb2_grpc.KVStub(channel)
     try:
         response = stub.Txn(
@@ -737,7 +443,6 @@ def replace_many_raw(mutations, suppress_failure_audit=False):
     if response.succeeded:
         return True, []
 
-    # Determine which keys had non-matching values
     failures = []
     for resp in response.responses:
         if resp.HasField('response_range'):

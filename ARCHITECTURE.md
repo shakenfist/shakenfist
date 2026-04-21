@@ -16,7 +16,7 @@ Shaken Fist runs several daemons on each cluster node:
 | Daemon | Purpose | Port |
 |--------|---------|------|
 | `sf-api` | REST API server (Flask/Gunicorn) | 13000 |
-| `sf-database` | Database microservice (etcd/MariaDB access) | 13005 |
+| `sf-database` | Database microservice (MariaDB access) | 13005 |
 | `sf-eventlog` | Event logging service | 13009 |
 | `sf-cleaner` | Resource cleanup | - |
 | `sf-cluster` | Cluster maintenance | - |
@@ -42,35 +42,32 @@ Shaken Fist runs several daemons on each cluster node:
                     |    sf-database      |
                     +----------+----------+
                                |
-              +----------------+----------------+
-              |                                 |
-       +------+------+                   +------+------+
-       |    etcd     |                   |   MariaDB   |
-       | (objects,   |                   | (state,     |
-       |  locks,     |                   |  IPAM,      |
-       |  eventlog   |                   |  uploads,   |
-       |  DLQ)       |                   |  blobs,     |
-       +-------------+                   |  nodes,     |
-                                         |  namespaces,|
-                                         |  artifacts, |
-                                         |  networks,  |
-                                         |  instances, |
-                                         |  dnsmasq,   |
-                                         |  object_    |
-                                         |  references,|
-                                         |  object_    |
-                                         |  metadata,  |
-                                         |  cluster_   |
-                                         |  operations,|
-                                         |  work_      |
-                                         |  queue,     |
-                                         |  cluster_op_|
-                                         |  targets)   |
-                                         +-------------+
+                        +------+------+
+                        |   MariaDB   |
+                        | (state,     |
+                        |  IPAM,      |
+                        |  uploads,   |
+                        |  blobs,     |
+                        |  nodes,     |
+                        |  namespaces,|
+                        |  artifacts, |
+                        |  networks,  |
+                        |  instances, |
+                        |  dnsmasq,   |
+                        |  references,|
+                        |  metadata,  |
+                        |  cluster_   |
+                        |  operations,|
+                        |  work_queue,|
+                        |  locks,     |
+                        |  cluster    |
+                        |  config,    |
+                        |  event DLQ) |
+                        +-------------+
 ```
 
 The database microservice (`sf-database`) centralizes all database access:
-- Only the database daemon has direct access to etcd and MariaDB
+- Only the database daemon has direct access to MariaDB
 - All other daemons use the gRPC interface
 - Provides Prometheus metrics for database operations
 
@@ -83,21 +80,17 @@ calls and retries up to 3 times on UNAVAILABLE/DEADLINE_EXCEEDED errors with
 channel reset between attempts. The database gRPC channel uses HTTP/2
 keepalive (ping every 10s, 5s timeout) to detect stale connections before
 they cause failures. The database gRPC server uses a 20-thread pool to
-handle concurrent requests from all daemons. The etcd proxy in `database.py`
-also uses these settings on all stub calls, and additionally wraps calls with
-the `_retry_database` decorator for exponential backoff retries. All gRPC
-failures are logged at ERROR level.
+handle concurrent requests from all daemons. The database client in
+`database.py` uses the `_retry_database` decorator for exponential backoff
+retries on transient failures. All gRPC failures are logged at ERROR level.
 
 `get_objects_by_state()` returns `None` on error (distinct from `[]` for no
 matches). All object iterators handle this by falling back to unfiltered
 scans, ensuring that transient gRPC failures do not silently drop objects
 from iteration results (e.g. interfaces during instance deletion).
 
-Object types with static values in MariaDB (`Instances`, `Networks`,
-`NetworkInterfaces`) override `get_iterator()` in their iterator classes
-to read from MariaDB via `get_all_*()` functions instead of etcd. This
-is essential because new objects are written to MariaDB as the primary
-store and may not exist in etcd.
+Object iterators read from MariaDB via `get_all_*()` functions. All
+object static values now live in MariaDB.
 
 #### Cluster Operation Tracking
 
@@ -137,7 +130,8 @@ Creating a cluster operation is atomic: the `CreateAndEnqueueCluster`
 gRPC RPC writes the `cluster_operations` row, the `object_states`
 row, and the `work_queue` row in a single MariaDB transaction.
 Audit events are published out-of-band through the normal eventlog
-gRPC service path, which retains its etcd DLQ for failure recovery.
+gRPC service path, which falls back to the MariaDB ``event_dlq``
+table for failure recovery.
 
 The cluster daemon runs
 `reap_stuck_cluster_operation_jobs()` from
@@ -277,12 +271,14 @@ See `docs/developer_guide/state_machine.md` for complete documentation.
 
 Configuration uses Pydantic with a two-stage bootstrap:
 
-1. **Stage 1**: Environment/file configuration (for etcd connection)
-2. **Stage 2**: etcd-stored configuration (loaded after connection)
+1. **Stage 1**: Environment/file configuration (for the initial MariaDB
+   connection or database service gRPC address)
+2. **Stage 2**: Cluster configuration stored in MariaDB (loaded after the
+   database service is reachable)
 
 Key configuration sources:
 - `/etc/sf/config` - Local configuration file
-- etcd `/sf/config` - Cluster-wide configuration
+- MariaDB `cluster_config` table - Cluster-wide configuration
 - Environment variables (highest priority)
 
 ### Node Identity
@@ -358,10 +354,8 @@ CI VMs provisioned by the `shakenfist/actions` Ansible playbooks also
 get system-level config files (`/etc/apt/apt.conf.d/01proxy` and
 `/etc/pip.conf`) so that getsf and other tools use the caches.
 - **Proxy bypass**: `no_proxy`/`NO_PROXY` set to
-  `localhost,127.0.0.1,10.0.0.0/8` to prevent local service traffic
-  (e.g. etcd API calls) from being routed through the proxy.
-  Additionally, `WrappedEtcdClient` sets `trust_env = False` on its
-  requests session as defense in depth.
+  `localhost,127.0.0.1,10.0.0.0/8` to prevent local service traffic from
+  being routed through the proxy.
 
 ### Branch Protection
 

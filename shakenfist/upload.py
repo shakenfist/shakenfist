@@ -45,7 +45,9 @@ class Upload(dbo):
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
-        cls._upgrade_metadata_to_attribute(static_values['uuid'])
+        # Previous etcd metadata-to-attribute upgrade is a no-op now that
+        # etcd is gone.
+        ...
 
     @classmethod
     def _upgrade_step_3_to_4(cls, static_values: dict[str, Any]) -> None:
