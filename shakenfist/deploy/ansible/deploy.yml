@@ -4,7 +4,6 @@
 # ansible playbook contain tags, but not all. Currently available tags are:
 #
 #   bootstrap: bootstrap the installer, you must always run this tag.
-#   etcd: tasks associated with setup or upgrade of etcd itself.
 #   pki: tasks associated with setup of certifying authorities or PKI certificates
 #     (for example those for the SPICE console).
 
@@ -186,24 +185,6 @@
         role_action: "syslog"
         syslog_target: "{{ hostvars[groups['primary_node'][0]]['node_mesh_ip'] }}"
 
-### etcd
-
-#    ETCD_MAX_REQUEST_BYTES is from https://github.com/etcd-io/etcd/issues/9043
-- hosts: etcd_master
-  tags: etcd
-  roles:
-    - role: andrewrothstein.etcd-cluster
-      vars:
-        etcd_secure: False
-        etcd_cluster_name: shakenfist
-        etcd_enable_v2: False
-        etcd_master_group_name: etcd_master
-        etcd_iface_public: "{{node_mesh_nic}}"
-        etcd_iface_cluster: "{{node_mesh_nic}}"
-        etcd_address_cluster: "{{node_mesh_ip}}"
-        etcd_additional_envvars:
-          ETCD_MAX_REQUEST_BYTES: 100000000
-
 ### MariaDB
 
 - hosts: etcd_master
@@ -233,6 +214,13 @@
         mariadb_password: "{{ mariadb_password }}"
         sf_config_template_path: "{{ playbook_dir }}/roles/base/templates"
 
+# Cluster config must run before register because register starts the
+# sf-database daemon, and sf-database's ExecStartPre=verify-config
+# requires AUTH_SECRET_SEED to already be in the cluster_config table.
+# The cluster_config tasks delegate to etcd_master[0] with
+# SHAKENFIST_MARIADB_HOST=localhost so that set-config writes directly
+# to MariaDB rather than going through the not-yet-running gRPC
+# database service.
 - hosts: primary_node
   become: yes
   become_method: sudo
@@ -241,8 +229,8 @@
   roles:
     - role: primary
       vars:
-        role_action: "etcd_config"
-        etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
+        role_action: "cluster_config"
+        database_node_ip: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         auth_secret: "{{ hostvars['localhost']['auth_secret'] }}"
         ram_system_reservation: "{{ hostvars['localhost']['ram_system_reservation'] }}"
         lowest_mtu: "{{ hostvars[groups['primary_node'][0]]['lowest_mtu'] }}"
@@ -250,7 +238,7 @@
         http_proxy: "{{ hostvars['localhost']['http_proxy'] }}"
         extra_config: "{{ extra_config }}"
 
-# Register all nodes in etcd (init-node creates the node object)
+# Register all nodes in the database (init-node creates the node object).
 - hosts: allsf
   become: yes
   become_method: sudo
@@ -260,12 +248,11 @@
     - role: base
       vars:
         role_action: "register"
-        etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         node_name: "{{ node_name }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
 
 # Create the admin namespace. This only needs to run once, so we run it on the
-# first etcd_master node.
+# first database node.
 - hosts: etcd_master
   become: yes
   become_method: sudo
@@ -276,7 +263,6 @@
       vars:
         role_action: "create_admin_namespace"
         system_key: "{{ admin_password }}"
-        etcd_host: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
         eventlog_node_ip: "{{hostvars[groups['eventlog_node'][0]]['node_mesh_ip']}}"
       when: inventory_hostname == groups['etcd_master'][0]

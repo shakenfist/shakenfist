@@ -25,7 +25,7 @@ from shakenfist import baseobject
 from shakenfist import blob
 from shakenfist import constants
 from shakenfist.constants import get_object_class
-from shakenfist import etcd
+from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist.schema.instance_attributes import InstanceAttributesData
 from shakenfist.schema.instance_data import InstanceData
@@ -1352,7 +1352,7 @@ class Instance(dbowo):
         # and then both write it via set_vsock_cid(), since the
         # set_vsock_cid lock is per-instance and so does not
         # serialise allocations across instances.
-        with etcd.ClusterLock(
+        with locks.ClusterLock(
                 'vsock_cids', None, 'global',
                 op='Allocate vsock CID', timeout=30):
             cid = random.randint(3, 4294967295)

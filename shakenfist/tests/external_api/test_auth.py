@@ -507,7 +507,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
 
-    @mock.patch('shakenfist.etcd.ClusterLock')
+    @mock.patch('shakenfist.locks.ClusterLock')
     def test_put_namespace_metadata(self, mock_get_lock):
         resp = self.client.put('/auth/namespaces/system/metadata/foo',
                                headers={'Authorization': self.auth_token},
@@ -521,7 +521,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             {'foo': 'bar'},
             self.mock_etcd.object_metadata['namespace/system']['metadata'])
 
-    @mock.patch('shakenfist.etcd.ClusterLock')
+    @mock.patch('shakenfist.locks.ClusterLock')
     def test_post_namespace_metadata(self, mock_get_lock):
         resp = self.client.post('/auth/namespaces/system/metadata',
                                 headers={'Authorization': self.auth_token},
@@ -535,7 +535,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             {'foo': 'bar'},
             self.mock_etcd.object_metadata['namespace/system']['metadata'])
 
-    @mock.patch('shakenfist.etcd.ClusterLock')
+    @mock.patch('shakenfist.locks.ClusterLock')
     def test_delete_namespace_metadata(self, mock_get_lock):
         # Set up metadata in MariaDB mock
         self.mock_etcd.object_metadata['namespace/system'] = {
@@ -549,7 +549,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             {'real': 'smart'},
             self.mock_etcd.object_metadata['namespace/system']['metadata'])
 
-    @mock.patch('shakenfist.etcd.ClusterLock')
+    @mock.patch('shakenfist.locks.ClusterLock')
     def test_delete_namespace_metadata_bad_key(self, mock_get_lock):
         # We now just silently ignore deletes of things which don't exist
         resp = self.client.delete('/auth/namespaces/system/metadata/wrong',
@@ -557,7 +557,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
 
-    @mock.patch('shakenfist.etcd.ClusterLock')
+    @mock.patch('shakenfist.locks.ClusterLock')
     def test_delete_namespace_metadata_no_keys(self, mock_get_lock):
         # We now just silently ignore deletes of things which don't exist
         resp = self.client.delete('/auth/namespaces/system/metadata/wrong',
@@ -568,7 +568,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.artifact.Artifact.from_url')
     @mock.patch('shakenfist.network.network.Network._db_get_attribute',
                 return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
-    @mock.patch('shakenfist.etcd.ClusterLock')
+    @mock.patch('shakenfist.locks.ClusterLock')
     def test_post_instance_only_system_specifies_namespaces(
             self, mock_lock, mock_net_attribute, mock_get_artifact):
         resp = self.client.post(
@@ -599,14 +599,14 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             resp.get_json())
         self.assertEqual(404, resp.status_code)
 
-    @mock.patch('shakenfist.etcd.ClusterLock')
+    @mock.patch('shakenfist.locks.ClusterLock')
     @mock.patch('shakenfist.etcd.put')
     def test_delete_namespace_key(self, mock_put, mock_lock):
         resp = self.client.delete('/auth/namespaces/system/keys/key1',
                                   headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
 
-    @mock.patch('shakenfist.etcd.ClusterLock')
+    @mock.patch('shakenfist.locks.ClusterLock')
     @mock.patch('bcrypt.hashpw', return_value=b'terminator')
     def test_auth_add_key_new_namespace(self, mock_hashpw, mock_lock):
         resp = self.client.post('/auth/namespaces',

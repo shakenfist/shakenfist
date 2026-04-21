@@ -22,13 +22,13 @@ Description=Shaken Fist {{ item }} daemon
 # systemd with the current options.
 {% if item == "database" %}
 # The database service is the very first to start. It provides gRPC access to
-# both etcd and MariaDB for all other daemons. It must start before everything
-# else, including sentinel-first.
+# MariaDB for all other daemons. It must start before everything else,
+# including sentinel-first.
 After=multi-user.target mariadb.service
 Requires=mariadb.service
 {% elif item == "sentinel-first" %}
 # sentinel-first starts after database so it can use the database service for
-# etcd and MariaDB access.
+# MariaDB access.
 After=sf-database.service
 {% elif item == "privexec" %}
 After=sf-sentinel-first.service
@@ -48,14 +48,6 @@ User=root
 Group=root
 
 EnvironmentFile=/etc/sf/config
-{% if item not in ["database", "eventlog", "sentinel-last"] %}
-# Most daemons use the database microservice for etcd and MariaDB access.
-# Exceptions are:
-# - database: it IS the database service, can't use itself
-# - eventlog: uses direct etcd for its own startup/shutdown to avoid deadlock
-# - sentinel-last: marker service that doesn't need database access
-Environment=SHAKENFIST_DATABASE_USE_DIRECT_ETCD=false
-{% endif %}
 ExecStartPre=/srv/shakenfist/venv/bin/sf-ctl verify-config
 ExecStartPre=rm -f /run/sf/{{ item }}*.abort
 ExecStartPre=rm -f /run/sf/{{ item }}*.pid

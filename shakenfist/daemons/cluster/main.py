@@ -11,8 +11,8 @@ import schedule
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import artifact
-from shakenfist import etcd
 from shakenfist import eventlog
+from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist import instance
 from shakenfist import ipam
@@ -54,7 +54,7 @@ class Monitor(daemon.Daemon):
         # release the lock, it gets cleared on a crash. This is so that only
         # one node at a time is performing cluster maintenance.
         while daemon.check_abort_path(self.abort_path):
-            self.lock = etcd.ClusterLock(
+            self.lock = locks.ClusterLock(
                 'cluster', None, None, timeout=10, op='Cluster maintenance')
             result = self.lock.acquire()
             if result:

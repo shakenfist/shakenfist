@@ -14,7 +14,7 @@ class NetworkTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        self.etcd_lock = mock.patch('shakenfist.etcd.ClusterLock')
+        self.etcd_lock = mock.patch('shakenfist.locks.ClusterLock')
         self.mock_etcd_lock = self.etcd_lock.start()
         self.addCleanup(self.etcd_lock.stop)
 
