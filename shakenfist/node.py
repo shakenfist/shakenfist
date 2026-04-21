@@ -313,7 +313,7 @@ class Node(dbo):
         attrs = n._ensure_attributes()
         attrs.last_seen = time.time()
         attrs.installed_version = util_general.get_version()
-        attrs.is_etcd_master = config.NODE_IS_ETCD_MASTER
+        attrs.is_etcd_master = False
         attrs.is_hypervisor = config.NODE_IS_HYPERVISOR
         attrs.is_network_node = config.NODE_IS_NETWORK_NODE
         attrs.is_eventlog_node = config.NODE_IS_EVENTLOG_NODE

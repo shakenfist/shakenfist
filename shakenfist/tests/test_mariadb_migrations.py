@@ -19,21 +19,30 @@ from shakenfist.tests import base
 class FakeConfig(BaseSettings):
     DATABASE_NODE_IP: str = '192.168.1.1'
     DATABASE_API_PORT: int = 13005
-    DATABASE_USE_DIRECT_ETCD: bool = False
     MARIADB_HOST: str = 'localhost'
+    ETCD_HOST: str = 'localhost'
     NODE_NAME: str = 'testnode'
 
 
 class FakeConfigNoMariaDB(BaseSettings):
     DATABASE_NODE_IP: str = '192.168.1.1'
     DATABASE_API_PORT: int = 13005
-    DATABASE_USE_DIRECT_ETCD: bool = False
     MARIADB_HOST: str = ''
+    ETCD_HOST: str = 'localhost'
+    NODE_NAME: str = 'testnode'
+
+
+class FakeConfigNoEtcd(BaseSettings):
+    DATABASE_NODE_IP: str = '192.168.1.1'
+    DATABASE_API_PORT: int = 13005
+    MARIADB_HOST: str = 'localhost'
+    ETCD_HOST: str = ''
     NODE_NAME: str = 'testnode'
 
 
 fake_config = FakeConfig()
 fake_config_no_mariadb = FakeConfigNoMariaDB()
+fake_config_no_etcd = FakeConfigNoEtcd()
 
 
 class EnsureDataMigrationsEmptyRegistryTestCase(base.ShakenFistTestCase):
@@ -72,6 +81,66 @@ class EnsureDataMigrationsNoMariaDBTestCase(base.ShakenFistTestCase):
                 {'test_table': {2: dummy_migration}},
                 clear=True):
             self.assertRaises(RuntimeError, mariadb.ensure_data_migrations)
+
+
+class EnsureDataMigrationsNoEtcdTestCase(base.ShakenFistTestCase):
+    """ensure_data_migrations() short-circuits when ETCD_HOST is unset."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch(
+            'shakenfist.mariadb.config', fake_config_no_etcd)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_no_etcd_marks_pending_migrations_complete(
+            self, mock_get_engine, mock_get_version, mock_set_version):
+        mock_get_engine.return_value = mock.MagicMock()
+        mock_get_version.return_value = 1
+
+        migration_called = []
+
+        def dummy_migration(engine):
+            migration_called.append(True)
+            return {'migrated_count': 0, 'error_count': 0}
+
+        with mock.patch.dict(
+                mariadb.DATA_MIGRATIONS,
+                {'test_table': {2: dummy_migration}},
+                clear=True):
+            result = mariadb.ensure_data_migrations()
+
+        # Migration function must not run when there is no etcd to drain.
+        self.assertEqual(migration_called, [])
+        # Version is bumped so we do not retry on the next restart.
+        mock_set_version.assert_called_once_with(mock.ANY, 'test_table', 2)
+        self.assertEqual(len(result), 1)
+        self.assertTrue(result[0]['migrated'])
+        self.assertEqual(result[0]['from_version'], 1)
+        self.assertEqual(result[0]['to_version'], 2)
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_no_etcd_skips_nonexistent_tables(
+            self, mock_get_engine, mock_get_version, mock_set_version):
+        mock_get_engine.return_value = mock.MagicMock()
+        mock_get_version.return_value = 0
+
+        def dummy_migration(engine):
+            return {'migrated_count': 0, 'error_count': 0}
+
+        with mock.patch.dict(
+                mariadb.DATA_MIGRATIONS,
+                {'test_table': {2: dummy_migration}},
+                clear=True):
+            result = mariadb.ensure_data_migrations()
+
+        mock_set_version.assert_not_called()
+        self.assertEqual(result, [])
 
 
 class EnsureDataMigrationsSkipTestCase(base.ShakenFistTestCase):

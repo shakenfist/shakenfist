@@ -18,8 +18,8 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import constants
-from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.protos import event_pb2
 from shakenfist.protos import event_pb2_grpc
@@ -50,10 +50,11 @@ EVENTLOG_UNAVAILABLE_COOLDOWN = 60  # seconds
 
 
 def set_force_event_dlq(value: bool) -> None:
-    """Force events to go directly to the dead letter queue (etcd).
+    """Force events to go directly to the dead letter queue (MariaDB).
 
     This is used during daemon startup when the eventlog daemon may not be
-    available yet. Events will be queued in etcd and processed later.
+    available yet. Events will be queued in the ``event_dlq`` table and
+    processed later.
     """
     local.sf_force_event_dlq = value
 
@@ -190,22 +191,23 @@ def _add_event_dlq_inner(
         extra: Optional[dict[str, Any]] = None,
         correlation_id: Optional[str] = None
 ) -> None:
-    # We use the old eventlog mechanism as a queueing system to get the logs
-    # to the eventlog node.
     for object_type, object_uuid in simpler_objects:
-        etcd.put(
-            'event/%s' % object_type, object_uuid, timestamp,
-            {
+        mariadb.enqueue_event_dlq(
+            object_type=str(object_type),
+            object_uuid=str(object_uuid),
+            event_timestamp=timestamp,
+            event_json={
                 'timestamp': timestamp,
                 'event_type': event_type,
-                'object_type': object_type,
-                'object_uuid': object_uuid,
+                'object_type': str(object_type),
+                'object_uuid': str(object_uuid),
                 'fqdn': config.NODE_NAME,
                 'duration': duration,
                 'message': message,
                 'extra': extra,
-                'correlation_id': correlation_id
-            })
+                'correlation_id': correlation_id,
+            },
+        )
 
 
 def add_event_multi(

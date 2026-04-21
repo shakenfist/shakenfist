@@ -11,6 +11,7 @@ enable future migration to other database backends.
 from concurrent import futures
 from ipaddress import IPv4Address
 import json
+import time
 from typing import Any
 from typing import cast
 from uuid import UUID
@@ -20,7 +21,6 @@ from prometheus_client import Counter
 from prometheus_client import start_http_server
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import mariadb
 from shakenfist.config import config
@@ -29,7 +29,6 @@ from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_status
-from shakenfist.etcd import set_force_direct_etcd
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
 from shakenfist.protos import database_pb2
@@ -70,165 +69,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     def __init__(self, monitor: 'Monitor') -> None:
         super().__init__()
         self.monitor: Monitor = monitor
-
-    # Key-Value Operations
-
-    def Get(
-        self,
-        request: database_pb2.GetRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.GetReply:
-        """Get a single value by key."""
-        try:
-            self.monitor.counters['get'].inc()
-            value = etcd.get(request.object_type, request.subtype, request.name)
-            if value is None:
-                return database_pb2.GetReply(found=False, value='')
-            return database_pb2.GetReply(
-                found=True,
-                value=util_json.json_dump(value)
-            )
-        except Exception as e:
-            util_exceptions.ignore_exception('database Get failed', e)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
-            return database_pb2.GetReply(found=False, value='')
-
-    def GetPrefix(
-        self,
-        request: database_pb2.GetPrefixRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.GetPrefixReply:
-        """Get all values matching a prefix."""
-        try:
-            self.monitor.counters['get_prefix'].inc()
-            results = []
-            for key, value in etcd.get_all(
-                    request.object_type, request.subtype,
-                    prefix=request.prefix if request.prefix else None,
-                    limit=request.limit):
-                results.append(database_pb2.KeyValue(
-                    key=key,
-                    value=util_json.json_dump(value)
-                ))
-            return database_pb2.GetPrefixReply(results=results)
-        except Exception as e:
-            util_exceptions.ignore_exception('database GetPrefix failed', e)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
-            return database_pb2.GetPrefixReply(results=[])
-
-    def Put(
-        self,
-        request: database_pb2.PutRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Store a value."""
-        try:
-            self.monitor.counters['put'].inc()
-            data = json.loads(request.data)
-            etcd.put(request.object_type, request.subtype, request.name, data)
-            return database_pb2.StatusReply(success=True, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception('database Put failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
-
-    def Create(
-        self,
-        request: database_pb2.CreateRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Create a new value (fails if exists)."""
-        try:
-            self.monitor.counters['create'].inc()
-            data = json.loads(request.data)
-            success = etcd.create(
-                request.object_type, request.subtype, request.name, data)
-            return database_pb2.StatusReply(success=success, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception('database Create failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
-
-    def Delete(
-        self,
-        request: database_pb2.DeleteRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Delete a value."""
-        try:
-            self.monitor.counters['delete'].inc()
-            etcd.delete(request.object_type, request.subtype, request.name)
-            return database_pb2.StatusReply(success=True, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception('database Delete failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
-
-    def DeletePrefix(
-        self,
-        request: database_pb2.DeletePrefixRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Delete all keys with a given prefix."""
-        try:
-            self.monitor.counters['delete_prefix'].inc()
-            etcd.delete_prefix(request.path)
-            return database_pb2.StatusReply(success=True, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception('database DeletePrefix failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
-
-    def ReplaceMany(
-        self,
-        request: database_pb2.ReplaceManyRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.ReplaceManyReply:
-        """Atomic multi-key compare-and-swap operation."""
-        try:
-            self.monitor.counters['replace_many'].inc()
-            mutations = []
-            for m in request.mutations:
-                mutation = {
-                    'path': m.path,
-                    'original_data': (
-                        None if m.original_is_none
-                        else json.loads(m.original_data)
-                    ),
-                    'new_data': (
-                        None if m.new_is_none
-                        else json.loads(m.new_data)
-                    )
-                }
-                mutations.append(mutation)
-
-            success, failures = etcd.replace_many_raw(
-                mutations,
-                suppress_failure_audit=request.suppress_failure_audit
-            )
-
-            failure_msgs = []
-            for f in failures:
-                path = f['path']
-                if isinstance(path, bytes):
-                    path = path.decode()
-                failure_msgs.append(database_pb2.MutationFailure(
-                    path=path,
-                    desired=str(f.get('desired', '')),
-                    actual=str(f.get('actual', '')),
-                    replacement=str(f.get('replacement', ''))
-                ))
-
-            return database_pb2.ReplaceManyReply(
-                success=success,
-                failures=failure_msgs
-            )
-        except Exception as e:
-            util_exceptions.ignore_exception('database ReplaceMany failed', e)
-            return database_pb2.ReplaceManyReply(
-                success=False,
-                failures=[database_pb2.MutationFailure(
-                    path='', desired='', actual='', replacement=str(e)
-                )]
-            )
 
     # Queue Operations
 
@@ -398,11 +238,17 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['acquire_lock'].inc()
             lock_data = json.loads(request.lock_data)
-            path = etcd._construct_key(
-                request.object_type, request.subtype, request.name,
-                prefix='sflocks'
+            lock_key = mariadb._cluster_lock_key(
+                request.object_type, request.subtype,
+                request.name)
+            acquired = mariadb._direct_acquire_cluster_lock(
+                lock_key=lock_key,
+                holder_json=lock_data,
+                node_uuid=lock_data.get('node', ''),
+                pid=int(lock_data.get('pid', 0)),
+                lock_id=lock_data.get('id', ''),
+                now=time.time(),
             )
-            acquired = etcd.create_raw(path, lock_data)
             return database_pb2.ClusterLockReply(acquired=acquired)
         except Exception as e:
             util_exceptions.ignore_exception('database AcquireLock failed', e)
@@ -417,11 +263,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['release_lock'].inc()
             lock_data = json.loads(request.lock_data)
-            path = etcd._construct_key(
-                request.object_type, request.subtype, request.name,
-                prefix='sflocks'
+            lock_key = mariadb._cluster_lock_key(
+                request.object_type, request.subtype,
+                request.name)
+            released = mariadb._direct_release_cluster_lock(
+                lock_key=lock_key,
+                lock_id=lock_data.get('id', ''),
             )
-            released = etcd.transactional_delete_raw(path, lock_data)
             return database_pb2.StatusReply(success=released, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database ReleaseLock failed', e)
@@ -435,12 +283,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get the current holder of a lock."""
         try:
             self.monitor.counters['get_lock_holder'].inc()
-            path = etcd._construct_key(
-                request.object_type, request.subtype, request.name,
-                prefix='sflocks'
-            )
-            holder = etcd.get_raw(path)
-            if holder is None or holder == {}:
+            lock_key = mariadb._cluster_lock_key(
+                request.object_type, request.subtype,
+                request.name)
+            holder = mariadb._direct_get_cluster_lock(lock_key)
+            if holder is None:
                 return database_pb2.ClusterLockHolderReply(held=False, holder='')
             return database_pb2.ClusterLockHolderReply(
                 held=True,
@@ -458,7 +305,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Clear locks held by dead processes on a node."""
         try:
             self.monitor.counters['clear_stale_locks'].inc()
-            etcd.clear_stale_locks()
+            mariadb._direct_clear_stale_cluster_locks(
+                node_uuid=request.node_name,
+                live_pids=list(request.live_pids),
+            )
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -473,7 +323,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get all existing locks in the cluster."""
         try:
             self.monitor.counters['get_existing_locks'].inc()
-            locks = etcd.get_existing_locks()
+            locks = mariadb._direct_get_all_cluster_locks()
             lock_entries = []
             for key, holder in locks.items():
                 lock_entries.append(database_pb2.ClusterLockEntry(
@@ -486,21 +336,118 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetExistingLocks failed', e)
             return database_pb2.ClusterGetExistingLocksReply(locks=[])
 
-    # Maintenance Operations
+    # Cluster Config Operations
 
-    def Compact(
+    def GetClusterConfig(
         self,
-        request: database_pb2.CompactRequest,
+        request: database_pb2.ClusterConfigRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ClusterConfigReply:
+        """Get all cluster config entries."""
+        try:
+            self.monitor.counters['get_cluster_config'].inc()
+            config_data = mariadb._direct_get_all_cluster_config()
+            entries = []
+            for key_name, value in config_data.items():
+                entries.append(
+                    database_pb2.ClusterConfigEntry(
+                        key_name=key_name,
+                        value_json=json.dumps(value),
+                    ))
+            return database_pb2.ClusterConfigReply(
+                entries=entries)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterConfig failed', e)
+            return database_pb2.ClusterConfigReply(entries=[])
+
+    def SetClusterConfig(
+        self,
+        request: database_pb2.SetClusterConfigRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.StatusReply:
-        """Compact the etcd database."""
+        """Set a single cluster config key."""
         try:
-            self.monitor.counters['compact'].inc()
-            etcd.compact(request.revision)
-            return database_pb2.StatusReply(success=True, error='')
+            self.monitor.counters['set_cluster_config'].inc()
+            value = json.loads(request.value_json)
+            mariadb._direct_set_cluster_config(
+                request.key_name, value)
+            return database_pb2.StatusReply(
+                success=True, error='')
         except Exception as e:
-            util_exceptions.ignore_exception('database Compact failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            util_exceptions.ignore_exception(
+                'database SetClusterConfig failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    # Event DLQ Operations
+
+    def EnqueueEventDlq(
+        self,
+        request: database_pb2.EnqueueEventDlqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Enqueue an event in the dead-letter queue."""
+        try:
+            self.monitor.counters['enqueue_event_dlq'].inc()
+            event_json = json.loads(request.event_json)
+            mariadb._direct_enqueue_event_dlq(
+                object_type=request.object_type,
+                object_uuid=request.object_uuid,
+                event_timestamp=request.event_timestamp,
+                event_json=event_json,
+            )
+            return database_pb2.StatusReply(
+                success=True, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database EnqueueEventDlq failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DrainEventDlq(
+        self,
+        request: database_pb2.DrainEventDlqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DrainEventDlqReply:
+        """Return DLQ entries for processing."""
+        try:
+            self.monitor.counters['drain_event_dlq'].inc()
+            rows = mariadb._direct_drain_event_dlq(
+                limit=request.limit)
+            entries = []
+            for row in rows:
+                entries.append(
+                    database_pb2.DrainEventDlqEntry(
+                        id=row['id'],
+                        object_type=row['object_type'],
+                        object_uuid=row['object_uuid'],
+                        event_json=json.dumps(row['event_json']),
+                    ))
+            return database_pb2.DrainEventDlqReply(
+                entries=entries)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DrainEventDlq failed', e)
+            return database_pb2.DrainEventDlqReply(entries=[])
+
+    def DeleteEventDlq(
+        self,
+        request: database_pb2.DeleteEventDlqRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete processed DLQ entries by id."""
+        try:
+            self.monitor.counters['delete_event_dlq'].inc()
+            mariadb._direct_delete_event_dlq(
+                ids=list(request.ids))
+            return database_pb2.StatusReply(
+                success=True, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteEventDlq failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
 
     # Object State Operations (MariaDB)
     # These operations provide access to MariaDB state storage for all daemons.
@@ -4408,12 +4355,14 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         # Create counters for all operations
         operations = [
-            'get', 'get_prefix', 'put', 'create', 'delete', 'delete_prefix',
-            'replace_many', 'enqueue', 'dequeue', 'resolve', 'get_queue_length',
+            'enqueue', 'dequeue', 'resolve', 'get_queue_length',
             'restart_queue', 'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
             'acquire_lock', 'release_lock', 'get_lock_holder',
-            'clear_stale_locks', 'get_existing_locks', 'compact',
+            'clear_stale_locks', 'get_existing_locks',
+            'get_cluster_config', 'set_cluster_config',
+            'enqueue_event_dlq', 'drain_event_dlq',
+            'delete_event_dlq',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state',
@@ -4538,12 +4487,9 @@ class Monitor(daemon.WorkerPoolDaemon):
         start_http_server(config.DATABASE_METRICS_PORT)
 
     def record_start(self) -> None:
-        # Override to use direct etcd access. The database daemon can't use
-        # the database service for its own startup recording because WE ARE
-        # the database service. We also force events to the dead letter queue
-        # because the eventlog daemon may not be running yet (avoiding circular
-        # dependencies).
-        set_force_direct_etcd(True)
+        # The database daemon records its own startup. It forces events to
+        # the DLQ because the eventlog daemon may not be running yet (avoiding
+        # circular dependencies).
         eventlog.set_force_event_dlq(True)
         try:
             n = Node.from_db(config.NODE_NAME)
@@ -4555,14 +4501,12 @@ class Monitor(daemon.WorkerPoolDaemon):
                     EVENT_TYPE_AUDIT,
                     f'{self.daemon_name} daemon starting')
         finally:
-            set_force_direct_etcd(False)
             eventlog.set_force_event_dlq(False)
         send_systemd_ready()
 
     def record_exit(self) -> None:
-        # Override to use direct etcd access and force events to the dead
-        # letter queue (eventlog daemon may have already stopped).
-        set_force_direct_etcd(True)
+        # The database daemon records its own shutdown. It forces events to
+        # the DLQ because the eventlog daemon may have already stopped.
         eventlog.set_force_event_dlq(True)
         try:
             n = Node.from_db(config.NODE_NAME)
@@ -4580,7 +4524,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                     EVENT_TYPE_AUDIT,
                     f'{self.daemon_name} daemon stopped')
         finally:
-            set_force_direct_etcd(False)
             eventlog.set_force_event_dlq(False)
         send_systemd_status('Terminated')
 

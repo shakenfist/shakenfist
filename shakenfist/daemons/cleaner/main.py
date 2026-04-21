@@ -1,20 +1,17 @@
 import errno
 import os
 import pathlib
-import random
 import time
 
 import schedule
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import mariadb
 from shakenfist import node
 from shakenfist.blob import Blob
 from shakenfist.blob import observe_local_blobs
 from shakenfist.config import config
-from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons.cleaner import scheduled_tasks
 from shakenfist.daemons import daemon
 from shakenfist.util import exceptions as util_exceptions
@@ -140,34 +137,6 @@ class Monitor(daemon.Daemon):
                         'blob': blob_uuid}).warning('Blob missing from node')
                     b.drop_node_location(config.NODE_NAME)
 
-    def _compact_etcd(self):
-        try:
-            # We need to determine what revision to compact to, so we keep a
-            # key which stores when we last compacted and we use it's latest
-            # revision number as the revision to compact to. Note that we use
-            # command lines for compaction as etcd3gw primary library does
-            # not support it. It is possible in modern etcd to have it auto
-            # compact, but this is just as good and let's us log when it occurs.
-            etcd.put_raw('/sf/compact', {'compacted_at': time.time()})
-
-            # [(
-            #     b'{"compacted_at": 1706677554.2498026}',
-            #     {
-            #         'key': b'/sf/compact',
-            #         'create_revision': '236163240',
-            #         'mod_revision': '594066920',
-            #         'version': '13372'
-            #     }
-            # )]
-            n = node.Node.from_db(config.NODE_NAME)
-            kv = etcd.get_etcd_client().get('/sf/compact', metadata=True)[0][1]
-            etcd.compact(int(kv['mod_revision']))
-            n.add_event(EVENT_TYPE_STATUS, 'compacted etcd',
-                        extra={'mod_revision': int(kv['mod_revision'])})
-
-        except Exception as e:
-            util_exceptions.ignore_exception('etcd compaction', e)
-
     def _run_inner(self):
         schedule.every(1).minutes.do(scheduled_tasks.update_power_states)
         schedule.every(5).minutes.do(
@@ -176,8 +145,6 @@ class Monitor(daemon.Daemon):
 
         last_defer_message = 0
 
-        # Delay first compaction until system startup load has reduced
-        last_compaction = time.time() - random.randint(1, 20*60)
         last_missing_blob_check = 0
         last_libvirt_log_clean = 0
 
@@ -210,14 +177,6 @@ class Monitor(daemon.Daemon):
                                                     threshold=1):
                     self._find_missing_blobs()
                     last_missing_blob_check = time.time()
-
-            # Perform etcd maintenance, if we are an etcd master
-            if config.NODE_IS_ETCD_MASTER:
-                if time.time() - last_compaction > 1800:
-                    with util_general.RecordedOperation('compact etcd', n,
-                                                        threshold=1):
-                        self._compact_etcd()
-                        last_compaction = time.time()
 
             # Cleanup libvirt logs, but less frequently
             if time.time() - last_libvirt_log_clean > 1800:

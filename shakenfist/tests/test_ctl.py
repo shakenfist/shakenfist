@@ -25,7 +25,6 @@ class MockConfig:
     MARIADB_HOST = ''
     DATABASE_NODE_IP = '192.168.1.1'
     DATABASE_API_PORT = 13005
-    DATABASE_USE_DIRECT_ETCD = False
 
 
 def _import_ctl_module():
@@ -345,85 +344,72 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         mock_ns.add_key.assert_called_once_with('mykey', 'myvalue')
         self.assertIn('Done', result.output)
 
-    @mock.patch('shakenfist.client.ctl.etcd')
-    def test_show_etcd_config_empty(self, mock_etcd):
-        from shakenfist.client.ctl import show_etcd_config
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_show_config_empty(self, mock_mariadb):
+        from shakenfist.client.ctl import show_config
 
-        mock_client = mock.MagicMock()
-        mock_client.get.return_value = None
-        mock_etcd.get_etcd_client.return_value = mock_client
+        mock_mariadb.get_cluster_config.return_value = {}
 
-        result = self.runner.invoke(show_etcd_config)
+        result = self.runner.invoke(show_config)
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn('{}', result.output)
 
-    @mock.patch('shakenfist.client.ctl.etcd')
-    def test_show_etcd_config_with_data(self, mock_etcd):
-        from shakenfist.client.ctl import show_etcd_config
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_show_config_with_data(self, mock_mariadb):
+        from shakenfist.client.ctl import show_config
 
-        mock_client = mock.MagicMock()
-        mock_client.get.return_value = [('{"key": "value"}', None)]
-        mock_etcd.get_etcd_client.return_value = mock_client
+        mock_mariadb.get_cluster_config.return_value = {'key': 'value'}
 
-        result = self.runner.invoke(show_etcd_config)
+        result = self.runner.invoke(show_config)
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn('key', result.output)
         self.assertIn('value', result.output)
 
-    @mock.patch('shakenfist.client.ctl.etcd')
-    def test_set_etcd_config_string(self, mock_etcd):
-        from shakenfist.client.ctl import set_etcd_config
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_string(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
 
-        mock_client = mock.MagicMock()
-        mock_client.get.return_value = [('{}', None)]
-        mock_etcd.get_etcd_client.return_value = mock_client
-
-        result = self.runner.invoke(set_etcd_config, ['myflag', 'myvalue'])
+        result = self.runner.invoke(set_config, ['myflag', 'myvalue'])
 
         self.assertEqual(result.exit_code, 0)
-        mock_client.put.assert_called_once()
+        mock_mariadb.set_cluster_config.assert_called_once_with(
+            'myflag', 'myvalue')
         self.assertIn('Setting myflag', result.output)
 
-    @mock.patch('shakenfist.client.ctl.etcd')
-    def test_set_etcd_config_bool_true(self, mock_etcd):
-        from shakenfist.client.ctl import set_etcd_config
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_bool_true(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
 
-        mock_client = mock.MagicMock()
-        mock_client.get.return_value = [('{}', None)]
-        mock_etcd.get_etcd_client.return_value = mock_client
-
-        result = self.runner.invoke(set_etcd_config, ['myflag', 'true'])
+        result = self.runner.invoke(set_config, ['myflag', 'true'])
 
         self.assertEqual(result.exit_code, 0)
+        mock_mariadb.set_cluster_config.assert_called_once_with(
+            'myflag', True)
         # Verify bool conversion happened
         self.assertIn("<class 'bool'>", result.output)
 
-    @mock.patch('shakenfist.client.ctl.etcd')
-    def test_set_etcd_config_int(self, mock_etcd):
-        from shakenfist.client.ctl import set_etcd_config
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_int(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
 
-        mock_client = mock.MagicMock()
-        mock_client.get.return_value = [('{}', None)]
-        mock_etcd.get_etcd_client.return_value = mock_client
-
-        result = self.runner.invoke(set_etcd_config, ['myflag', '42'])
+        result = self.runner.invoke(set_config, ['myflag', '42'])
 
         self.assertEqual(result.exit_code, 0)
+        mock_mariadb.set_cluster_config.assert_called_once_with(
+            'myflag', 42)
         self.assertIn("<class 'int'>", result.output)
 
-    @mock.patch('shakenfist.client.ctl.etcd')
-    def test_set_etcd_config_float(self, mock_etcd):
-        from shakenfist.client.ctl import set_etcd_config
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_float(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
 
-        mock_client = mock.MagicMock()
-        mock_client.get.return_value = [('{}', None)]
-        mock_etcd.get_etcd_client.return_value = mock_client
-
-        result = self.runner.invoke(set_etcd_config, ['myflag', '3.14'])
+        result = self.runner.invoke(set_config, ['myflag', '3.14'])
 
         self.assertEqual(result.exit_code, 0)
+        mock_mariadb.set_cluster_config.assert_called_once_with(
+            'myflag', 3.14)
         self.assertIn("<class 'float'>", result.output)
 
     @mock.patch('shakenfist.client.ctl.sf_config')

@@ -158,7 +158,8 @@ shakenfist/
 │   ├── artifact.py          # Disk images and artifacts
 │   ├── blob.py              # Content-addressable blob storage
 │   ├── baseobject.py        # Base framework for all persistable objects
-│   ├── etcd.py              # etcd client wrapper and cluster locks
+│   ├── etcd.py              # Minimal etcd shim for drain migrations only
+│   ├── locks.py             # Distributed cluster locks (MariaDB-backed)
 │   ├── eventlog.py          # Event logging (gRPC)
 │   ├── cache.py             # In-memory caching layer
 │   ├── config.py            # Pydantic-based configuration
@@ -173,7 +174,7 @@ shakenfist/
 │   │   ├── api/             # External API server (Flask)
 │   │   ├── cleaner/         # Resource cleanup
 │   │   ├── cluster/         # Cluster maintenance
-│   │   ├── database/        # Database microservice (etcd wrapper)
+│   │   ├── database/        # Database microservice (MariaDB gRPC wrapper)
 │   │   ├── eventlog/        # Event logging service
 │   │   ├── network/         # Network daemon
 │   │   ├── queues/          # Job queue processing
@@ -187,7 +188,7 @@ shakenfist/
 │   ├── operations/          # Task operation definitions
 │   │   ├── baseoperation.py # Base operation class
 │   │   └── *_op.py          # Specific operations
-│   ├── etcd_schema/         # etcd data schema (Pydantic models)
+│   ├── etcd_schema/         # Legacy schema directory (Pydantic models)
 │   ├── util/                # Utility modules
 │   ├── client/              # CLI tools
 │   └── tests/               # Test suite
@@ -204,25 +205,19 @@ shakenfist/
 | `artifact.py` | Versioned disk images with labeling |
 | `blob.py` | Content-addressable binary storage with replication |
 | `baseobject.py` | State machine, versioning, DB sync for all objects |
-| `etcd.py` | Distributed state storage and locking (with database service shim) |
+| `locks.py` | Distributed cluster locks (MariaDB-backed) |
 | `database.py` | Database microservice client library |
-| `config.py` | 100+ Pydantic settings with etcd/env overrides |
+| `config.py` | 100+ Pydantic settings with env overrides |
 
-### Storage: etcd, MariaDB, and the Database Service
+### Storage: MariaDB and the Database Service
 
-Shaken Fist uses two database backends:
-- **etcd**: Object storage, cluster coordination, locks, queues
-- **MariaDB**: Object state storage (for efficient state-based queries)
+Shaken Fist uses MariaDB as its sole datastore. Object state, queues,
+locks, and cluster config all live in MariaDB.
 
-The database microservice (`sf-database`) runs on the etcd_master node and
+The database microservice (`sf-database`) runs on the database node and
 provides a gRPC interface for all database operations:
 
 ```python
-# etcd access (works with both direct and via database service)
-etcd.get('object_type', 'parent_uuid', 'object_uuid')
-etcd.put('object_type', 'parent_uuid', 'object_uuid', data)
-etcd.delete('object_type', 'parent_uuid', 'object_uuid')
-
 # MariaDB state access (automatically routed through database service)
 from shakenfist import mariadb
 mariadb.get_state('instance', 'uuid-here')
@@ -232,7 +227,7 @@ mariadb.get_objects_by_state('instance', ['created', 'error'])
 
 This abstraction layer:
 - Centralizes all database access to a single service
-- Only the database daemon has direct access to etcd and MariaDB
+- Only the database daemon has direct access to MariaDB
 - Provides prometheus metrics for all database operations
 - Enables clean separation of concerns
 
@@ -240,66 +235,37 @@ Configuration options:
 - `DATABASE_NODE_IP` - IP address of the database service node
 - `DATABASE_API_PORT` - gRPC API port (default: 13005)
 - `DATABASE_METRICS_PORT` - Prometheus metrics port (default: 13006)
-- `DATABASE_USE_DIRECT_ETCD` - Set to false for all daemons except database
+- `MARIADB_HOST` - Set only on the database daemon node; enables direct
+  MariaDB access for the daemon itself
 
-**Database daemon special case**: The database daemon uses direct etcd/MariaDB
-access (implicit `DATABASE_USE_DIRECT_ETCD=True`) and uses
-`etcd.set_force_direct_etcd(True)` during startup/shutdown to avoid a
-chicken-and-egg problem.
+**Database daemon special case**: The database daemon has `MARIADB_HOST`
+set, which causes it to use direct MariaDB access for its own startup and
+shutdown recording. All other daemons access MariaDB via the database
+service's gRPC interface.
 
-### Configuration Bootstrap Order
-
-**IMPORTANT**: Shaken Fist has a two-stage configuration system due to a
-chicken-and-egg problem: some configuration values are stored in etcd, but
-the etcd connection itself must be configured before etcd can be read.
-
-**Stage 1 - Environment/File (before etcd):**
-- `SHAKENFIST_ETCD_HOST` - **Must be set via environment variable** (cannot be
-  stored in etcd because we need it to connect to etcd)
-- `SHAKENFIST_DATABASE_USE_DIRECT_ETCD` - Should be set via environment to
-  determine how to access the database during bootstrap
-
-**Stage 2 - etcd-stored configuration:**
-- All other `SHAKENFIST_*` settings can be stored in etcd at `/sf/config`
-- These are loaded by `load_etcd_settings()` at module import time in `config.py`
-- Settings from etcd are exported as environment variables for the process
-
-**Implications for Ansible deployment:**
-- When running `sf-ctl` commands that need etcd access, always pass
-  `SHAKENFIST_ETCD_HOST` as an environment variable in the task
-- Use Jinja2 templating (e.g., `"{{ etcd_host }}"`) not literal strings
-- The database daemon registration must use `SHAKENFIST_DATABASE_USE_DIRECT_ETCD=True`
-  because the database service isn't running yet during its own registration
-
-**Implications for CLI tools (sf-ctl, sf-backup):**
-- These tools read `/etc/sf/config` at startup to populate environment variables
-- Environment variables set before running the tool take precedence over the
-  config file values
+Note: the `etcd.py` module is retained only to service DATA_MIGRATIONS
+entries which drain leftover etcd keys from older clusters. The module
+will be removed in the next minor version.
 
 ### Systemd Service Ordering
 
 Shaken Fist daemons are managed via systemd with careful ordering defined in
 `deploy/ansible/files/sf.service`. The startup order is:
 
-1. `database` - Starts first (after multi-user.target), provides gRPC access to
-   etcd and MariaDB for all other daemons
+1. `database` - Starts first (after multi-user.target), provides gRPC access
+   to MariaDB for all other daemons
 2. `sentinel-first` - Starts after database, marks node as starting
 3. `privexec`, `nodelock` - Start after sentinel-first
 4. All other daemons - Start after privexec, nodelock, and database
 5. `sentinel-last` - Starts after all other daemons, signals shutdown state
 
 **Database Access Pattern**:
-- The `sf-database` service is the **only** daemon with direct access to etcd
-  and MariaDB
-- All other daemons access databases through the database service's gRPC interface
-- The database daemon uses `DATABASE_USE_DIRECT_ETCD=True` (implicit, by not
-  setting the env var to false) to use direct database access
-- Other daemons have `SHAKENFIST_DATABASE_USE_DIRECT_ETCD=false` set, routing
-  their database operations through the gRPC interface
-
-**Exceptions**:
-- `eventlog` - Uses direct etcd for its own startup/shutdown to avoid deadlock
-- `sentinel-last` - Marker service that doesn't need database access
+- The `sf-database` service is the **only** daemon with direct access to
+  MariaDB (via `MARIADB_HOST` being set)
+- All other daemons access the database through the database service's gRPC
+  interface
+- The database daemon records its own startup/shutdown state via direct
+  MariaDB access to avoid a chicken-and-egg problem
 
 This ordering is critical because daemons like `sf-api` will hang on startup
 if they try to connect to the database microservice before it's running.
@@ -309,7 +275,7 @@ if they try to connect to the database microservice before it's running.
 Use `ClusterLock` for distributed operations:
 
 ```python
-from shakenfist.etcd import ClusterLock
+from shakenfist.locks import ClusterLock
 
 with ClusterLock('lock_name', timeout=30):
     # Critical section
@@ -376,12 +342,12 @@ Queue priorities (per-node and global):
 
 - Framework: `stestr` with `testtools.TestCase`
 - Base class: `ShakenFistTestCase`
-- Heavy use of `mock.patch` for etcd and external dependencies
+- Heavy use of `mock.patch` for MariaDB and external dependencies
 - Tests mirror module structure in `shakenfist/tests/`
 
 ## Key Dependencies
 
-- **etcd3gw** - etcd client
+- **etcd3gw** - etcd client (retained for DATA_MIGRATIONS drain only)
 - **grpcio/protobuf** - gRPC communication
 - **Flask/Flask-RESTful/Flasgger** - REST API
 - **Flask-JWT-Extended** - Authentication
@@ -391,8 +357,7 @@ Queue priorities (per-node and global):
 ## Common Pitfalls
 
 1. **Decorator order in API endpoints** - Read comments in `external_api/app.py`
-2. **etcd connection management** - Use thread-local clients from `etcd.py`
-3. **Lock timeouts** - Always specify reasonable timeouts for ClusterLock
+2. **Lock timeouts** - Always specify reasonable timeouts for ClusterLock
 4. **State machine transitions** - Follow documented state machines in
    `docs/developer_guide/state_machine.md`
 
