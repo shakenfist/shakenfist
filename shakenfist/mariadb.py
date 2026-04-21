@@ -3198,6 +3198,16 @@ def _migrate_etcd_network_interfaces(engine: sa.Engine) -> dict[str, Any]:
                 f'  ... {migrated_count + skipped_count} '
                 f'NetworkInterface objects processed')
 
+    # Clean up macaddress allocation keys — uniqueness is now enforced by
+    # the UNIQUE constraint on network_interfaces.macaddr.
+    mac_cleaned = 0
+    for objkey, _data in etcd.get_all('macaddress', None):
+        mac = objkey.split('/')[-1]
+        etcd.delete('macaddress', None, mac)
+        mac_cleaned += 1
+    if mac_cleaned:
+        LOG.info(f'Cleaned up {mac_cleaned} etcd macaddress keys')
+
     LOG.info(
         f'NetworkInterface migration: {migrated_count} migrated, '
         f'{skipped_count} skipped')
@@ -12005,6 +12015,10 @@ def _get_network_interfaces_table() -> sa.Table:
             primary_key_fields=['uuid'],
             include_id_column=False
         )
+        # Add UNIQUE constraint on macaddr for atomic MAC allocation
+        sa.UniqueConstraint(
+            _network_interfaces_table.c.macaddr,
+            name='uq_network_interfaces_macaddr')
     return _network_interfaces_table
 
 
@@ -12042,6 +12056,24 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver <= 1:
+        LOG.info(f'Upgrading {table_name} table to version 2 '
+                 '(add UNIQUE constraint on macaddr)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'ALTER TABLE network_interfaces '
+                    'ADD CONSTRAINT uq_network_interfaces_macaddr '
+                    'UNIQUE (macaddr)'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'UNIQUE constraint on macaddr already exists '
+                    f'or could not be added: {e}')
+
+        current_ver = 2
         _set_table_version(engine, table_name, current_ver)
 
     return {
