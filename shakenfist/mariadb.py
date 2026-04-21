@@ -1733,6 +1733,35 @@ def ensure_data_migrations() -> list[dict[str, Any]]:
     engine = _get_engine()
     results = []
 
+    # All registered data migrations drain residual state from etcd into
+    # MariaDB. Fresh clusters (and clusters already fully migrated) have
+    # ETCD_HOST unset, in which case there is nothing to drain: mark the
+    # pending versions as complete without touching etcd so we neither
+    # spam the log with "Cannot communicate with etcd" errors nor retry
+    # the same no-op on every database daemon restart.
+    if not config.ETCD_HOST:
+        LOG.info(
+            'No etcd server configured; marking pending data migrations '
+            'as complete without running them'
+        )
+        for table_name, migrations in DATA_MIGRATIONS.items():
+            current_ver = _get_table_version(engine, table_name)
+            if current_ver <= 0:
+                continue
+            target_ver = max(migrations.keys())
+            if current_ver >= target_ver:
+                continue
+            _set_table_version(engine, table_name, target_ver)
+            results.append({
+                'table': table_name,
+                'from_version': current_ver,
+                'to_version': target_ver,
+                'migrated': True,
+                'stats': {'migrated_count': 0, 'error_count': 0,
+                          'skipped_reason': 'no etcd configured'},
+            })
+        return results
+
     for table_name, migrations in DATA_MIGRATIONS.items():
         current_ver = _get_table_version(engine, table_name)
 
