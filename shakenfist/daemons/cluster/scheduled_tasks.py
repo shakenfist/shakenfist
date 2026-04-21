@@ -12,7 +12,6 @@ from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.blob import Blob
-from shakenfist import etcd
 from shakenfist import mariadb
 from shakenfist.schema.operations import baseclusteroperation as bco_schema
 from shakenfist.schema.operations import node_blob_op as nbo_schema
@@ -156,16 +155,12 @@ def per_instance_checks_and_usage():
 
 
 def _fill_per_instance_queue():
-    for objkey, _ in etcd.get_all(Instance.object_type, None):
-        instance_uuid = objkey.split('/')[-1]
-        state_data = etcd.get(
-            f'attribute/{Instance.object_type}', instance_uuid, 'state')
-        if not state_data or state_data.get('value') != Instance.STATE_CREATED:
-            continue
-        inst = Instance.from_db(instance_uuid)
+    instance_uuids = mariadb.get_objects_by_state(
+        ObjectType.INSTANCE, [Instance.STATE_CREATED])
+    for instance_uuid in (instance_uuids or []):
+        inst = Instance.from_db(instance_uuid, suppress_failure_audit=True)
         if not inst:
             continue
-
         INSTANCE_CHECKS_QUEUE.put(inst)
 
 
@@ -344,13 +339,15 @@ def per_deleted_object_checks():
 
 def _fill_per_deleted_object_queue():
     for objtype in OBJECT_NAMES_TO_CLASSES:
-        for objkey, _ in etcd.get_all(objtype, None):
-            obj_uuid = objkey.split('/')[-1]
-            state = mariadb.get_state(ObjectType(objtype), obj_uuid)
-            state_value = state.value if state else None
-            if state_value not in FINAL_OBJECT_STATES:
-                continue
-            obj = get_object_class(objtype).from_db(obj_uuid)
+        obj_uuids = mariadb.get_objects_by_state(
+            ObjectType(objtype), FINAL_OBJECT_STATES)
+        for obj_uuid in (obj_uuids or []):
+            # The object row may have been hard-deleted by a concurrent
+            # cleaner between the state query and this lookup; suppress
+            # the failure audit so that race does not show up as an
+            # ERROR event in the logs.
+            obj = get_object_class(objtype).from_db(
+                obj_uuid, suppress_failure_audit=True)
             if not obj:
                 continue
             DELETED_OBJECTS_QUEUE.put(obj)

@@ -414,8 +414,8 @@ For cluster bootstrap, this command can initialize any node when run from an
 etcd_master with direct database access:
 
 ```bash
-# Run on etcd_master to initialize a remote node
-SHAKENFIST_DATABASE_USE_DIRECT_ETCD=True \
+# Run on the database node to initialize a remote node
+SHAKENFIST_MARIADB_HOST=localhost \
 sf-ctl initialise-node --node-name sf-2 --node-mesh-ip 10.0.0.2
 ```
 
@@ -434,8 +434,8 @@ For cluster bootstrap, daemons can be registered on any node when run from an
 etcd_master with direct database access:
 
 ```bash
-# Run on etcd_master to register daemons on a remote node
-SHAKENFIST_DATABASE_USE_DIRECT_ETCD=True \
+# Run on the database node to register daemons on a remote node
+SHAKENFIST_MARIADB_HOST=localhost \
 sf-ctl register-daemon database --node-name sf-1
 ```
 

@@ -19,42 +19,6 @@ class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type:
 
 class DatabaseServiceStub:
     def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
-    Get: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetRequest,
-        database_pb2.GetReply,
-    ]
-    """Key-Value Operations"""
-
-    GetPrefix: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetPrefixRequest,
-        database_pb2.GetPrefixReply,
-    ]
-
-    Put: grpc.UnaryUnaryMultiCallable[
-        database_pb2.PutRequest,
-        database_pb2.StatusReply,
-    ]
-
-    Create: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateRequest,
-        database_pb2.StatusReply,
-    ]
-
-    Delete: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeletePrefix: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeletePrefixRequest,
-        database_pb2.StatusReply,
-    ]
-
-    ReplaceMany: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ReplaceManyRequest,
-        database_pb2.ReplaceManyReply,
-    ]
-
     Enqueue: grpc.UnaryUnaryMultiCallable[
         database_pb2.EnqueueRequest,
         database_pb2.StatusReply,
@@ -122,11 +86,32 @@ class DatabaseServiceStub:
         database_pb2.ClusterGetExistingLocksReply,
     ]
 
-    Compact: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CompactRequest,
+    GetClusterConfig: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ClusterConfigRequest,
+        database_pb2.ClusterConfigReply,
+    ]
+    """Cluster Config"""
+
+    SetClusterConfig: grpc.UnaryUnaryMultiCallable[
+        database_pb2.SetClusterConfigRequest,
         database_pb2.StatusReply,
     ]
-    """Maintenance"""
+
+    EnqueueEventDlq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.EnqueueEventDlqRequest,
+        database_pb2.StatusReply,
+    ]
+    """Event DLQ"""
+
+    DrainEventDlq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DrainEventDlqRequest,
+        database_pb2.DrainEventDlqReply,
+    ]
+
+    DeleteEventDlq: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteEventDlqRequest,
+        database_pb2.StatusReply,
+    ]
 
     GetObjectState: grpc.UnaryUnaryMultiCallable[
         database_pb2.GetObjectStateRequest,
@@ -952,42 +937,6 @@ class DatabaseServiceStub:
     """
 
 class DatabaseServiceAsyncStub:
-    Get: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetRequest,
-        database_pb2.GetReply,
-    ]
-    """Key-Value Operations"""
-
-    GetPrefix: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetPrefixRequest,
-        database_pb2.GetPrefixReply,
-    ]
-
-    Put: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.PutRequest,
-        database_pb2.StatusReply,
-    ]
-
-    Create: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateRequest,
-        database_pb2.StatusReply,
-    ]
-
-    Delete: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeletePrefix: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeletePrefixRequest,
-        database_pb2.StatusReply,
-    ]
-
-    ReplaceMany: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ReplaceManyRequest,
-        database_pb2.ReplaceManyReply,
-    ]
-
     Enqueue: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.EnqueueRequest,
         database_pb2.StatusReply,
@@ -1055,11 +1004,32 @@ class DatabaseServiceAsyncStub:
         database_pb2.ClusterGetExistingLocksReply,
     ]
 
-    Compact: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CompactRequest,
+    GetClusterConfig: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ClusterConfigRequest,
+        database_pb2.ClusterConfigReply,
+    ]
+    """Cluster Config"""
+
+    SetClusterConfig: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.SetClusterConfigRequest,
         database_pb2.StatusReply,
     ]
-    """Maintenance"""
+
+    EnqueueEventDlq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.EnqueueEventDlqRequest,
+        database_pb2.StatusReply,
+    ]
+    """Event DLQ"""
+
+    DrainEventDlq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DrainEventDlqRequest,
+        database_pb2.DrainEventDlqReply,
+    ]
+
+    DeleteEventDlq: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteEventDlqRequest,
+        database_pb2.StatusReply,
+    ]
 
     GetObjectState: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetObjectStateRequest,
@@ -1886,56 +1856,6 @@ class DatabaseServiceAsyncStub:
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def Get(
-        self,
-        request: database_pb2.GetRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetReply, collections.abc.Awaitable[database_pb2.GetReply]]:
-        """Key-Value Operations"""
-
-    @abc.abstractmethod
-    def GetPrefix(
-        self,
-        request: database_pb2.GetPrefixRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetPrefixReply, collections.abc.Awaitable[database_pb2.GetPrefixReply]]: ...
-
-    @abc.abstractmethod
-    def Put(
-        self,
-        request: database_pb2.PutRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
-
-    @abc.abstractmethod
-    def Create(
-        self,
-        request: database_pb2.CreateRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
-
-    @abc.abstractmethod
-    def Delete(
-        self,
-        request: database_pb2.DeleteRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
-
-    @abc.abstractmethod
-    def DeletePrefix(
-        self,
-        request: database_pb2.DeletePrefixRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
-
-    @abc.abstractmethod
-    def ReplaceMany(
-        self,
-        request: database_pb2.ReplaceManyRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.ReplaceManyReply, collections.abc.Awaitable[database_pb2.ReplaceManyReply]]: ...
-
-    @abc.abstractmethod
     def Enqueue(
         self,
         request: database_pb2.EnqueueRequest,
@@ -2029,12 +1949,41 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.ClusterGetExistingLocksReply, collections.abc.Awaitable[database_pb2.ClusterGetExistingLocksReply]]: ...
 
     @abc.abstractmethod
-    def Compact(
+    def GetClusterConfig(
         self,
-        request: database_pb2.CompactRequest,
+        request: database_pb2.ClusterConfigRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.ClusterConfigReply, collections.abc.Awaitable[database_pb2.ClusterConfigReply]]:
+        """Cluster Config"""
+
+    @abc.abstractmethod
+    def SetClusterConfig(
+        self,
+        request: database_pb2.SetClusterConfigRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def EnqueueEventDlq(
+        self,
+        request: database_pb2.EnqueueEventDlqRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
-        """Maintenance"""
+        """Event DLQ"""
+
+    @abc.abstractmethod
+    def DrainEventDlq(
+        self,
+        request: database_pb2.DrainEventDlqRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.DrainEventDlqReply, collections.abc.Awaitable[database_pb2.DrainEventDlqReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteEventDlq(
+        self,
+        request: database_pb2.DeleteEventDlqRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
     @abc.abstractmethod
     def GetObjectState(
