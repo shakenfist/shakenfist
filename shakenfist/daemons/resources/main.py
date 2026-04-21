@@ -298,7 +298,7 @@ class Monitor(daemon.Daemon):
                     'network_queue_deferred': network_deferred
                 })
 
-            if config.NODE_IS_EVENTLOG_NODE:
+            if config.NODE_IS_EVENTLOG_NODE and config.ETCD_HOST:
                 queued = len(list(etcd.get_all('event', None, limit=10000)))
                 retval.update({
                     'events_waiting': queued,

@@ -89,7 +89,9 @@ def get_etcd_native_client():
         caller = util_callstack.generate_traceback()
         LOG.error('Cannot communicate with etcd, no configured server! Caller was:\n'
                   f'{caller}')
-        return
+        raise exceptions.gRPCException(
+            'etcd is not configured (ETCD_HOST is not set)'
+        )
 
     c = getattr(local, 'sf_etcd_native_client', None)
     if c:
