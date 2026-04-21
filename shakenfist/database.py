@@ -2,9 +2,9 @@
 
 """Database client library for accessing the database microservice.
 
-This module provides a client interface to the database microservice, which
-wraps etcd access. All database operations should go through this module
-when the database service is enabled.
+This module provides a client interface to the database microservice. All
+database operations should go through this module. The underlying storage
+is MariaDB.
 """
 
 import json
@@ -108,160 +108,7 @@ def is_available():
     """Check if the database service is configured and available."""
     if not config.DATABASE_NODE_IP:
         return False
-    if config.DATABASE_USE_DIRECT_ETCD:
-        return False
     return True
-
-
-# Key-Value Operations
-
-@_retry_database
-def get(object_type, subtype, name):
-    """Get a single value by key."""
-    channel = get_database_client()
-    if not channel:
-        return None
-
-    stub = database_pb2_grpc.DatabaseServiceStub(channel)
-    request = database_pb2.GetRequest(
-        object_type=object_type,
-        subtype=subtype or '',
-        name=name or ''
-    )
-    response = stub.Get(request, timeout=30, wait_for_ready=True)
-    if not response.found:
-        return None
-    return json.loads(response.value)
-
-
-@_retry_database
-def get_all(object_type, subtype, prefix=None, limit=0):
-    """Get all values matching a prefix. Returns a generator."""
-    channel = get_database_client()
-    if not channel:
-        return
-
-    stub = database_pb2_grpc.DatabaseServiceStub(channel)
-    request = database_pb2.GetPrefixRequest(
-        object_type=object_type,
-        subtype=subtype or '',
-        prefix=prefix or '',
-        limit=limit
-    )
-    response = stub.GetPrefix(request, timeout=30, wait_for_ready=True)
-    for kv in response.results:
-        yield kv.key, json.loads(kv.value)
-
-
-@_retry_database
-def put(object_type, subtype, name, data):
-    """Store a value."""
-    channel = get_database_client()
-    if not channel:
-        return
-
-    stub = database_pb2_grpc.DatabaseServiceStub(channel)
-    request = database_pb2.PutRequest(
-        object_type=object_type,
-        subtype=subtype or '',
-        name=name or '',
-        data=util_json.json_dump(data)
-    )
-    response = stub.Put(request, timeout=30, wait_for_ready=True)
-    if not response.success:
-        LOG.error(f'Database put failed: {response.error}')
-
-
-@_retry_database
-def create(object_type, subtype, name, data):
-    """Create a new value (fails if exists)."""
-    channel = get_database_client()
-    if not channel:
-        return False
-
-    stub = database_pb2_grpc.DatabaseServiceStub(channel)
-    request = database_pb2.CreateRequest(
-        object_type=object_type,
-        subtype=subtype or '',
-        name=name or '',
-        data=util_json.json_dump(data)
-    )
-    response = stub.Create(request, timeout=30, wait_for_ready=True)
-    return response.success
-
-
-@_retry_database
-def delete(object_type, subtype, name):
-    """Delete a value."""
-    channel = get_database_client()
-    if not channel:
-        return
-
-    stub = database_pb2_grpc.DatabaseServiceStub(channel)
-    request = database_pb2.DeleteRequest(
-        object_type=object_type,
-        subtype=subtype or '',
-        name=name or ''
-    )
-    response = stub.Delete(request, timeout=30, wait_for_ready=True)
-    if not response.success:
-        LOG.error(f'Database delete failed: {response.error}')
-
-
-@_retry_database
-def delete_prefix(path):
-    """Delete all keys with a given prefix."""
-    channel = get_database_client()
-    if not channel:
-        return
-
-    stub = database_pb2_grpc.DatabaseServiceStub(channel)
-    request = database_pb2.DeletePrefixRequest(path=path)
-    response = stub.DeletePrefix(request, timeout=30, wait_for_ready=True)
-    if not response.success:
-        LOG.error(f'Database delete_prefix failed: {response.error}')
-
-
-@_retry_database
-def replace_many_raw(mutations, suppress_failure_audit=False):
-    """Atomic multi-key compare-and-swap operation."""
-    channel = get_database_client()
-    if not channel:
-        return False, []
-
-    stub = database_pb2_grpc.DatabaseServiceStub(channel)
-    request = database_pb2.ReplaceManyRequest(
-        suppress_failure_audit=suppress_failure_audit
-    )
-
-    for m in mutations:
-        mutation = request.mutations.add()
-        mutation.path = m['path']
-        if m['original_data'] is None:
-            mutation.original_is_none = True
-            mutation.original_data = ''
-        else:
-            mutation.original_is_none = False
-            mutation.original_data = util_json.json_dump(m['original_data'])
-        if m['new_data'] is None:
-            mutation.new_is_none = True
-            mutation.new_data = ''
-        else:
-            mutation.new_is_none = False
-            mutation.new_data = util_json.json_dump(m['new_data'])
-
-    response = stub.ReplaceMany(request, timeout=30, wait_for_ready=True)
-
-    failures = []
-    for f in response.failures:
-        failures.append({
-            'path': f.path,
-            'desired': f.desired,
-            'actual': f.actual,
-            'replacement': f.replacement
-        })
-
-    return response.success, failures
 
 
 # Lock Operations
@@ -324,13 +171,16 @@ def get_lock_holder(object_type, subtype, name):
 @_retry_database
 def clear_stale_locks():
     """Clear locks held by dead processes on this node."""
+    import psutil
+
     channel = get_database_client()
     if not channel:
         return
 
     stub = database_pb2_grpc.DatabaseServiceStub(channel)
     request = database_pb2.ClusterClearStaleLocksRequest(
-        node_name=config.NODE_NAME
+        node_name=config.NODE_NAME,
+        live_pids=list(psutil.pids()),
     )
     response = stub.ClearStaleLocks(request, timeout=30, wait_for_ready=True)
     if not response.success:
@@ -354,17 +204,42 @@ def get_existing_locks():
     return locks
 
 
-# Maintenance Operations
+# Cluster Config Operations
 
 @_retry_database
-def compact(revision):
-    """Compact the etcd database."""
+def get_cluster_config():
+    """Get all cluster config as a dict."""
+    channel = get_database_client()
+    if not channel:
+        return {}
+
+    stub = database_pb2_grpc.DatabaseServiceStub(channel)
+    request = database_pb2.ClusterConfigRequest()
+    response = stub.GetClusterConfig(
+        request, timeout=30, wait_for_ready=True)
+
+    config_data = {}
+    for entry in response.entries:
+        config_data[entry.key_name] = json.loads(
+            entry.value_json)
+    return config_data
+
+
+@_retry_database
+def set_cluster_config(key_name, value):
+    """Set a single cluster config key."""
     channel = get_database_client()
     if not channel:
         return
 
     stub = database_pb2_grpc.DatabaseServiceStub(channel)
-    request = database_pb2.CompactRequest(revision=revision)
-    response = stub.Compact(request, timeout=30, wait_for_ready=True)
+    request = database_pb2.SetClusterConfigRequest(
+        key_name=key_name,
+        value_json=json.dumps(value),
+    )
+    response = stub.SetClusterConfig(
+        request, timeout=30, wait_for_ready=True)
     if not response.success:
-        LOG.error(f'Database compact failed: {response.error}')
+        LOG.error(
+            f'Database set_cluster_config failed: '
+            f'{response.error}')

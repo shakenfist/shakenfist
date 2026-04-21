@@ -1030,7 +1030,6 @@ class NodeObserveThisNodeTestCase(base.ShakenFistTestCase):
         """Test observe_this_node uses this_node() for lookup."""
         mock_config.NODE_NAME = TEST_FQDN
         mock_config.NODE_MESH_IP = TEST_IP
-        mock_config.NODE_IS_ETCD_MASTER = False
         mock_config.NODE_IS_HYPERVISOR = True
         mock_config.NODE_IS_NETWORK_NODE = False
         mock_config.NODE_IS_EVENTLOG_NODE = False
@@ -1080,7 +1079,6 @@ class NodeObserveThisNodeTestCase(base.ShakenFistTestCase):
         """Test observe_this_node creates node and persists UUID."""
         mock_config.NODE_NAME = TEST_FQDN
         mock_config.NODE_MESH_IP = TEST_IP
-        mock_config.NODE_IS_ETCD_MASTER = False
         mock_config.NODE_IS_HYPERVISOR = False
         mock_config.NODE_IS_NETWORK_NODE = False
         mock_config.NODE_IS_EVENTLOG_NODE = False

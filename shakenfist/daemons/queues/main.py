@@ -5,7 +5,7 @@ import psutil
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
+from shakenfist import locks as sf_locks
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons.queues import startup_tasks
@@ -106,9 +106,9 @@ class Monitor(daemon.WorkerPoolDaemon):
                 #
                 # NOTE(mikal): this doesn't really make sense with threads, but
                 # given we want to get rid of locks anyways...
-                locks = etcd.get_existing_locks()
-                for lock in locks:
-                    lock_details = locks[lock]
+                existing_locks = sf_locks.get_existing_locks()
+                for lock in existing_locks:
+                    lock_details = existing_locks[lock]
                     if lock_details.get('node') != config.NODE_NAME:
                         continue
 

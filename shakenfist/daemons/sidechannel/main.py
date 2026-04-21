@@ -20,7 +20,6 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import send_systemd_stopping
-from shakenfist import etcd
 from shakenfist.eventlog import add_event
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import NoSuchChannel
@@ -105,7 +104,6 @@ class SideChannelJob(util_concurrency.Job):
             })
 
     def execute(self):
-        etcd.reset_client()
         util_concurrency.set_thread_name(self.thread_name)
         self.log.debug('Attempt channel connection')
 

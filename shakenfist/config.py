@@ -6,9 +6,6 @@ import sys
 from typing import NoReturn
 from typing import Optional
 
-from etcd3gw.client import Etcd3Client
-from etcd3gw.exceptions import ConnectionFailedError
-from etcd3gw.exceptions import Etcd3Exception
 from pydantic import AnyHttpUrl
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -18,26 +15,87 @@ def get_node_name() -> str:
     return socket.getfqdn()
 
 
-def load_etcd_settings() -> None:
-    if not os.getenv('SHAKENFIST_ETCD_HOST'):
-        return
+def load_cluster_config() -> None:
+    """Load cluster-wide config into environment variables.
 
-    try:
-        value = Etcd3Client(
-            host=os.getenv('SHAKENFIST_ETCD_HOST'), port=2379, protocol='http',
-            api_path='/v3beta/').get('/sf/config', metadata=True)
-        if value is None or len(value) == 0:
+    On the database node (MARIADB_HOST set), read directly from
+    MariaDB. This is important during bootstrap, when sf-database's
+    own ExecStartPre=verify-config runs before the daemon is
+    listening and therefore cannot self-loop through gRPC.
+
+    On every other node, fetch via the database microservice gRPC
+    API. Falls back silently on any failure so that fresh-install
+    nodes with no database daemon yet can still start.
+
+    Built inline to avoid circular imports (database.py and
+    mariadb.py both import config.py).
+    """
+    mariadb_host = os.getenv('SHAKENFIST_MARIADB_HOST')
+    if mariadb_host:
+        try:
+            import sqlalchemy as sa
+
+            port = int(os.getenv('SHAKENFIST_MARIADB_PORT', '3306'))
+            user = os.getenv('SHAKENFIST_MARIADB_USER', 'shakenfist')
+            password = os.getenv('SHAKENFIST_MARIADB_PASSWORD', '')
+            database = os.getenv(
+                'SHAKENFIST_MARIADB_DATABASE', 'shakenfist')
+
+            url = (
+                f'mariadb+mysqldb://{user}:{password}'
+                f'@{mariadb_host}:{port}/{database}'
+            )
+            engine = sa.create_engine(url)
+            with engine.connect() as conn:
+                rows = conn.execute(sa.text(
+                    'SELECT key_name, value_json FROM cluster_config'
+                )).fetchall()
+
+            for key_name, value_raw in rows:
+                # Raw SQL gets the stored string; JSON-decode so we
+                # match the gRPC path's behavior.
+                try:
+                    value = json.loads(value_raw)
+                except (TypeError, ValueError):
+                    value = value_raw
+                if isinstance(value, (dict, list)):
+                    value = json.dumps(value)
+                os.environ['SHAKENFIST_%s' % key_name] = str(value)
             return
 
-        c = json.loads(value[0][0])
-        for key in c:
-            os.environ['SHAKENFIST_%s' % key] = str(c[key])
+        except Exception:
+            # Table may not exist yet on a fresh install; or
+            # MariaDB may not be reachable. Fall through silently
+            # so bootstrap keeps working.
+            return
 
-    except (Etcd3Exception, ConnectionFailedError):
-        # NOTE(mikal): I'm not sure this is the right approach, as it might cause
-        # us to silently ignore config errors. However, I can't just mock this away
-        # in tests because this code runs before the mocking occurs. And yes, the
-        # "not found" exception is really a generic Etcd3Exception.
+    db_ip = os.getenv('SHAKENFIST_DATABASE_NODE_IP')
+    if not db_ip:
+        return
+
+    db_port = os.getenv('SHAKENFIST_DATABASE_API_PORT', '13005')
+
+    try:
+        import grpc
+        from shakenfist.protos import database_pb2
+        from shakenfist.protos import database_pb2_grpc
+
+        channel = grpc.insecure_channel(f'{db_ip}:{db_port}')
+        stub = database_pb2_grpc.DatabaseServiceStub(channel)
+        request = database_pb2.ClusterConfigRequest()
+
+        response = stub.GetClusterConfig(request, timeout=5)
+
+        for entry in response.entries:
+            value = json.loads(entry.value_json)
+            os.environ['SHAKENFIST_%s' % entry.key_name] = str(value)
+
+        channel.close()
+
+    except Exception:
+        # Match current behavior: silently ignore unavailable
+        # database service. On fresh installs the database
+        # service may not be running yet.
         return
 
 
@@ -266,14 +324,6 @@ class SFConfig(BaseSettings):
         13006,
         description='Prometheus metrics port for the database daemon.'
     )
-    DATABASE_USE_DIRECT_ETCD: bool = Field(
-        True,
-        description=(
-            'Bypass the database service and use etcd directly. Set to False '
-            'to use the database microservice.'
-        )
-    )
-
     USAGE_EVENT_FREQUENCY: int = Field(
         60,
         description='How frequently to collect usage events.'
@@ -348,13 +398,6 @@ class SFConfig(BaseSettings):
     # Node Specific #
     #################
 
-    NODE_IS_ETCD_MASTER: bool = Field(
-        False,
-        description=(
-            'True if this node is an etcd master. This controls attempts to '
-            'compact the master database.'
-        )
-    )
     NODE_IS_HYPERVISOR: bool = Field(
         False,
         description=(
@@ -432,14 +475,13 @@ class SFConfig(BaseSettings):
     LOGLEVEL_SIDECHANNEL: str = 'info'
     LOGLEVEL_QUEUES: str = 'info'
 
-    # etcd
+    # etcd (retained only for DATA_MIGRATIONS drain — remove in next release)
     ETCD_HOST: str = Field(
         '',
-        description='Hostname or IP of the etcd host to query.'
-    )
-    LOG_ETCD_CONNECTIONS: bool = Field(
-        False,
-        description='Log when a new etcd connection is created, only useful in CI.'
+        description=(
+            'Hostname or IP of the etcd host to query for drain migrations. '
+            'Retained only for one-time migration of legacy clusters.'
+        )
     )
 
     # MariaDB
@@ -468,7 +510,7 @@ class SFConfig(BaseSettings):
         env_prefix = 'SHAKENFIST_'
 
 
-load_etcd_settings()
+load_cluster_config()
 config = SFConfig()
 
 
@@ -487,8 +529,6 @@ def _config_failure(failures: list[str]) -> NoReturn:
 
 def verify_config(skip_auth_seed: bool = False) -> None:
     failures: list[str] = []
-    if config.ETCD_HOST == '':
-        failures.append('You must configure ETCD_HOST')
 
     if not skip_auth_seed:
         if config.AUTH_SECRET_SEED == '~~unconfigured~~':

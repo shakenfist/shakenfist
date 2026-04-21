@@ -9,7 +9,7 @@
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 
-from shakenfist import etcd
+from shakenfist import locks as sf_locks
 from shakenfist import eventlog
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
@@ -126,8 +126,8 @@ class NodesEndpoint(api_base.Resource):
     def get(self):
         # This is a little terrible. The way to work out which node is currently
         # doing cluster maintenance is to lookup the lock.
-        locks = etcd.get_existing_locks()
-        maintainer = locks.get('/sflocks/sf/cluster/', {}).get('node')
+        existing_locks = sf_locks.get_existing_locks()
+        maintainer = existing_locks.get('/sflocks/sf/cluster/', {}).get('node')
 
         out = []
         for n in Nodes([]):
