@@ -326,11 +326,15 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])
 
-        # Hot plug an interface in
+        # Hot plug an interface in. The MAC is unique to this test method
+        # so parallel or sequential runs of sibling tests on the same
+        # cluster do not collide on the UNIQUE constraint on
+        # network_interfaces.macaddr.
+        hotplug_mac = '02:00:00:ea:3a:28'
         netdesc = {
             'network_uuid': hotnet['uuid'],
             'address': '10.0.0.5',
-            'macaddress': '02:00:00:ea:3a:28'
+            'macaddress': hotplug_mac
         }
         self.test_client.add_instance_interface(inst['uuid'], netdesc)
         self._await_instance_operations_complete(inst['uuid'])
@@ -342,21 +346,21 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         _, data = self.test_client.await_agent_command(
             inst['uuid'], 'sudo lshw -class network')
         self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
+            -1, data.find(hotplug_mac),
             'Interface not found in `sudo lshw -class network` output:\n%s' % data)
 
         # List interfaces
         _, data = self.test_client.await_agent_command(
             inst['uuid'], 'ip -json link')
         self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
+            -1, data.find(hotplug_mac),
             'Interface not found in `ip -json link` output:\n%s' % data)
 
         # Determine which interface the new one was added as
         d = json.loads(data)
         new_interface = None
         for i in d:
-            if i['address'] == '02:00:00:ea:3a:28':
+            if i['address'] == hotplug_mac:
                 new_interface = i['ifname']
         self.assertNotEqual(None, new_interface)
 
@@ -430,11 +434,15 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
                    udev_rule.strip(),
                    systemd_link.strip()))
 
-        # Hot plug an interface in
+        # Hot plug an interface in. The MAC is unique to this test method
+        # so parallel or sequential runs of sibling tests on the same
+        # cluster do not collide on the UNIQUE constraint on
+        # network_interfaces.macaddr.
+        hotplug_mac = '02:00:00:ea:3a:29'
         netdesc = {
             'network_uuid': hotnet['uuid'],
             'address': '10.0.0.5',
-            'macaddress': '02:00:00:ea:3a:28'
+            'macaddress': hotplug_mac
         }
         self.test_client.add_instance_interface(inst['uuid'], netdesc)
         self._await_instance_operations_complete(inst['uuid'])
@@ -446,21 +454,21 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         _, data = self.test_client.await_agent_command(
             inst['uuid'], 'sudo lshw -class network')
         self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
+            -1, data.find(hotplug_mac),
             'Interface not found in `sudo lshw -class network` output:\n%s' % data)
 
         # List interfaces
         _, data = self.test_client.await_agent_command(
             inst['uuid'], 'ip -json link')
         self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
+            -1, data.find(hotplug_mac),
             'Interface not found in `ip -json link` output:\n%s' % data)
 
         # Determine which interface the new one was added as
         d = json.loads(data)
         new_interface = None
         for i in d:
-            if i['address'] == '02:00:00:ea:3a:28':
+            if i['address'] == hotplug_mac:
                 new_interface = i['ifname']
         self.assertNotEqual(None, new_interface)
 
@@ -475,14 +483,14 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         _, data = self.test_client.await_agent_command(
             inst['uuid'], 'ip -json link')
         self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
+            -1, data.find(hotplug_mac),
             'Interface not found in `ip -json link` output:\n%s' % data)
 
         # Determine which interface the new one is post reboot
         d = json.loads(data)
         new_interface_after_reboot = None
         for i in d:
-            if i['address'] == '02:00:00:ea:3a:28':
+            if i['address'] == hotplug_mac:
                 new_interface_after_reboot = i['ifname']
         self.assertNotEqual(None, new_interface_after_reboot)
         self.assertEqual(
@@ -500,7 +508,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             inst['uuid'], 'mount /dev/vdb /mnt', ignore_stderr=True)
         data = self.test_client.await_agent_fetch(
             inst['uuid'], '/mnt/openstack/latest/network_data.json')
-        self.assertTrue('02:00:00:ea:3a:28' in data,
+        self.assertTrue(hotplug_mac in data,
                         f'Expected mac address not present in {data}')
 
         # DHCP the new interface to ensure that works too

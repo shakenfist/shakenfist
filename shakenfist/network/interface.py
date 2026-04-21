@@ -134,18 +134,24 @@ class NetworkInterface(dbo):
 
     @classmethod
     def new(cls, interface_uuid, netdesc, instance_uuid, order):
-        if 'macaddress' not in netdesc or not netdesc['macaddress']:
+        # If the caller supplied a MAC, honour it exactly. A collision
+        # against the UNIQUE constraint on network_interfaces.macaddr
+        # must surface as an error rather than be silently replaced with
+        # a different address: the caller has no way to observe the swap
+        # and downstream config (cloud-init, test assertions, guest
+        # udev rules) expects the requested MAC.
+        caller_supplied_mac = bool(netdesc.get('macaddress'))
+        if not caller_supplied_mac:
             netdesc['macaddress'] = util_network.random_macaddr()
 
         if not interface_uuid:
             # uuid should only be specified in testing
             interface_uuid = str(uuid4())
 
-        # Retry _db_create if the macaddr collides with an existing
-        # interface (the UNIQUE constraint on network_interfaces.macaddr
-        # causes an IntegrityError which _db_create surfaces as a
-        # RuntimeError).
-        max_mac_attempts = 10
+        # Only auto-generated MACs are retried on collision. A caller-
+        # supplied MAC is attempted exactly once and the RuntimeError
+        # from the UNIQUE constraint is left to propagate.
+        max_mac_attempts = 1 if caller_supplied_mac else 10
         for attempt in range(max_mac_attempts):
             try:
                 NetworkInterface._db_create(
