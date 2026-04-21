@@ -6801,7 +6801,8 @@ def _direct_get_dnsmasq(dnsmasq_uuid: UUID) -> Optional[DnsMasqData]:
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(table).where(table.c.uuid == dnsmasq_uuid)
+            stmt = sa.select(table).where(
+                table.c.uuid == _ensure_uuid(dnsmasq_uuid))
             result = conn.execute(stmt).fetchone()
 
             if result is None:
@@ -6847,7 +6848,8 @@ def _direct_get_dnsmasqs(
             if namespace:
                 stmt = stmt.where(table.c.namespace == namespace)
             if owner_uuid:
-                stmt = stmt.where(table.c.owner_uuid == owner_uuid)
+                stmt = stmt.where(
+                    table.c.owner_uuid == _ensure_uuid(owner_uuid))
 
             result = conn.execute(stmt).fetchall()
 
@@ -6883,7 +6885,8 @@ def _direct_delete_dnsmasq(dnsmasq_uuid: UUID) -> bool:
 
     try:
         with engine.connect() as conn:
-            stmt = sa.delete(table).where(table.c.uuid == dnsmasq_uuid)
+            stmt = sa.delete(table).where(
+                table.c.uuid == _ensure_uuid(dnsmasq_uuid))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -6909,7 +6912,7 @@ def _direct_update_dnsmasq(data: DnsMasqData) -> bool:
     try:
         with engine.connect() as conn:
             stmt = sa.update(table).where(
-                table.c.uuid == data.uuid
+                table.c.uuid == _ensure_uuid(data.uuid)
             ).values(
                 namespace=data.namespace,
                 owner_type=str(data.owner_type),
