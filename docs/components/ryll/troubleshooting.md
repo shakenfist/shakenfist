@@ -309,6 +309,29 @@ python3 scripts/replay_draw_copy.py debug.log -o replay.html
 tcpdump -i any port 5900 -w spice.pcap
 ```
 
+### Inspect a `--capture` pcap
+
+`ryll --capture <dir>` writes one pcap per channel plus a
+video of the primary surface. `tools/pcap-inspect.py`
+parses those pcaps without needing tshark or scapy:
+
+```bash
+# What SPICE message types fired during the session?
+tools/pcap-inspect.py opcodes <dir>/display.pcap
+
+# Which image codecs dominate the DRAW_COPY traffic?
+tools/pcap-inspect.py draw-copy <dir>/display.pcap
+
+# What did the server send in the last 5 seconds before
+# you hit F8?
+tools/pcap-inspect.py timeline <dir>/display.pcap --since-last 5
+```
+
+Handy when the user reports a visual artefact that's too
+fast to screenshot: capture with `--capture`, reproduce,
+then use the pcap to narrow the window before diving into
+source.
+
 ### Test with headless mode first
 
 Headless mode eliminates GUI-related issues:
