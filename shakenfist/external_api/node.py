@@ -127,7 +127,7 @@ class NodesEndpoint(api_base.Resource):
         # This is a little terrible. The way to work out which node is currently
         # doing cluster maintenance is to lookup the lock.
         existing_locks = sf_locks.get_existing_locks()
-        maintainer = existing_locks.get('/sflocks/sf/cluster/', {}).get('node')
+        maintainer = existing_locks.get('cluster/', {}).get('node')
 
         out = []
         for n in Nodes([]):
