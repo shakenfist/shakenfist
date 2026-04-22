@@ -19,6 +19,85 @@ Four sub-tasks, each a separate commit:
 
 ## 1a. GLZ cross-frame image corruption
 
+### 2026-04-21 status update — three original bugs fixed, symptom persists
+
+The three dictionary-management bugs this section was
+originally written around have all landed (see
+*display.rs* line references below). AGENTS.md decision
+#8 now documents the win_head_dist eviction explicitly.
+
+Despite that, the symptom reproduces: during the early
+BIOS/GRUB/kernel-boot window, a coloured-noise band
+appears across the top portion of the primary surface
+(captured at `~/ryll-screenshot-2026-04-21T06-37-07Z.png`
+and a full session at
+`~/src/shakenfist/ryll-wt-draw-ops/static-out/` on sf-3).
+
+A `tools/pcap-inspect.py draw-copy` on the captured
+`display.pcap` shows the window is **100% DRAW_COPY** —
+zero DRAW_FILL, DRAW_BLACKNESS, COPY_BITS, etc.:
+
+```
+DRAW_COPY total: 9237
+By surface_id:   surface 0: 9237
+By image type:   107 ZLIB_GLZ_RGB : 5286
+                 102 GLZ_RGB      : 3904
+                 105 JPEG         :   35
+                   0 BITMAP       :   11
+                 101 LZ_RGB       :    1
+```
+
+So ~99% of the problem window is GLZ-family images into
+surface 0, which is exactly the signature this section
+was written for. But since the three documented bugs are
+now fixed, a **new investigation is needed**. Hypotheses
+worth examining first:
+
+* **Stride or dimension confusion** in the GLZ decoder —
+  the coloured-noise band has clear horizontal-scanline
+  structure consistent with decoded pixels being written
+  at width W while the blit reads at width W' (slightly
+  different). Check that width×height×4 matches the
+  scratch-buffer allocation and the blit stride.
+* **Cross-image reference producing stale pixels
+  *within* the current window.** Eviction keeps the
+  dictionary bounded but doesn't guarantee content
+  correctness. If our GLZ decompression picks up bytes
+  from a previously-cached image whose pixel buffer was
+  overwritten since (buffer reuse, `Vec` pointer
+  mutation), the reference would return garbled pixels.
+  Check that `GlzDictionary::insert` stores a fresh
+  owned Vec and that the dictionary values are never
+  mutated after insertion.
+* **ZLIB_GLZ_RGB specifically** — 5286 of 9237 are the
+  zlib-wrapped flavour. If the zlib output buffer size
+  estimate is short and we truncate before the GLZ
+  decoder reads the footer, we'd render the head of the
+  frame correctly and the tail as garbage, which maps to
+  "upper portion of screen looks corrupted" if the tail
+  of the decoded image corresponds to the upper half of
+  the scanline layout (top-down bit in the GLZ header).
+* **Top-down vs bottom-up flag mishandling** — if we
+  write decoded rows in reverse order compared to what
+  the server emitted, the "garbage" rows we see could be
+  uninitialized bytes being read back after the decoder
+  bailed early.
+* **Shared-dictionary data race between display
+  channels.** The dictionary is `Arc<Mutex<…>>` so the
+  critical sections are serialised, but callers that
+  hold an `&Vec<u8>` *across* mutex release points (e.g.
+  cloning vs. borrowing) could observe inconsistent
+  state. This crate uses clones, so probably not — but
+  worth verifying.
+
+For a new investigation session, `tools/pcap-inspect.py`
+is the starting point: use the `timeline --since-last N`
+subcommand against the bug-report's pcap ring buffer to
+identify the exact DRAW_COPYs that corresponded to the
+corruption, then spin up a unit test that feeds their
+image blobs to `decompress_glz` in isolation and compares
+against spice-gtk's reference output for the same input.
+
 ### Current state
 
 The GLZ decompressor lives in
@@ -31,6 +110,12 @@ The symptom is random areas of incorrect pixels after
 incremental display updates, specifically in regions
 updated by ZLIB_GLZ_RGB or GLZ_RGB draw_copy messages.
 
+### Historical investigation (pre-2026-04-21)
+
+The bugs below were identified and fixed; leaving the
+narrative so a new investigator can see what was
+eliminated rather than re-rule-out each.
+
 ### Root cause investigation
 
 Comparing the Rust implementation against the Python
@@ -41,7 +126,10 @@ decoding, and pixel copy loops all match. However, the
 investigation has revealed **three dictionary management
 bugs** that are the likely cause of corruption:
 
-**Bug 1: No dictionary eviction.** The GLZ header
+**Bug 1: No dictionary eviction.** (LANDED — see
+`evict_older_than` at glz.rs:51 and its call site at
+display.rs:1137-1147; AGENTS.md decision #8.) The GLZ
+header
 contains a `win_head_dist` field (parsed at glz.rs:61)
 that specifies the sliding window size for the
 dictionary. Images older than `image_id - win_head_dist`
@@ -69,7 +157,9 @@ eviction at all. So neither Python implementation
 evicts either, suggesting this may not be the primary
 corruption cause but is still incorrect behaviour.
 
-**Bug 2: IMAGE_FLAGS_CACHE_ME is never checked.** The
+**Bug 2: IMAGE_FLAGS_CACHE_ME is never checked.** (LANDED
+— the flag is now tested at display.rs:1152 before
+caching.) The
 SPICE protocol's `ImageDescriptor` has a `flags` field;
 bit 0 (`IMAGE_FLAGS_CACHE_ME`) tells the client whether
 to cache the decoded image. Currently display.rs caches
@@ -85,7 +175,10 @@ references to images that ARE in the dictionary, so this
 is more of a memory waste / correctness hygiene issue.
 
 **Bug 3: INVALIDATE_LIST does not clear GLZ dictionary.**
-Display channel message handlers for `INVALIDATE_LIST`
+(LANDED — both INVALIDATE_LIST at display.rs:566 and
+INVAL_ALL_PIXMAPS at display.rs:591/597 now touch the
+GLZ dictionary.) Display channel message handlers for
+`INVALIDATE_LIST`
 (display.rs:480-512) and `INVAL_ALL_PIXMAPS`
 (display.rs:514-519) only clear `self.image_cache`, not
 `self.glz_dictionary`. Server-initiated cache
