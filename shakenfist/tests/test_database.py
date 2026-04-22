@@ -107,11 +107,11 @@ class DatabaseClientTestCase(base.ShakenFistTestCase):
 
         mock_stub = mock.MagicMock()
         lock1 = database_pb2.ClusterLockEntry(
-            key='/sflocks/instance/uuid1',
+            key='instance/uuid1',
             holder='{"node": "node1", "pid": 123}'
         )
         lock2 = database_pb2.ClusterLockEntry(
-            key='/sflocks/instance/uuid2',
+            key='instance/uuid2',
             holder='{"node": "node2", "pid": 456}'
         )
         mock_stub.GetExistingLocks.return_value = \
@@ -124,8 +124,8 @@ class DatabaseClientTestCase(base.ShakenFistTestCase):
             result = database.get_existing_locks()
 
         self.assertEqual(2, len(result))
-        self.assertIn('/sflocks/instance/uuid1', result)
-        self.assertIn('/sflocks/instance/uuid2', result)
+        self.assertIn('instance/uuid1', result)
+        self.assertIn('instance/uuid2', result)
 
 
 class IsAvailableTestCase(base.ShakenFistTestCase):
