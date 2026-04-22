@@ -8,7 +8,6 @@ from prometheus_client import Gauge
 from prometheus_client import start_http_server
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist import instance
@@ -298,8 +297,8 @@ class Monitor(daemon.Daemon):
                     'network_queue_deferred': network_deferred
                 })
 
-            if config.NODE_IS_EVENTLOG_NODE and config.ETCD_HOST:
-                queued = len(list(etcd.get_all('event', None, limit=10000)))
+            if config.NODE_IS_EVENTLOG_NODE:
+                queued = len(mariadb.drain_event_dlq(limit=10000))
                 retval.update({
                     'events_waiting': queued,
                 })
