@@ -16,7 +16,7 @@ from shakenfist.external_api import base as api_base
 
 
 admin_locks_get_example = """{
-    "/sflocks/sf/cluster/": {
+    "cluster/": {
         "node": "sf-1",
         "operation": "Cluster maintenance",
         "pid": 3326781
