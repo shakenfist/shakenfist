@@ -298,9 +298,8 @@ class Monitor(daemon.Daemon):
                 })
 
             if config.NODE_IS_EVENTLOG_NODE:
-                queued = len(mariadb.drain_event_dlq(limit=10000))
                 retval.update({
-                    'events_waiting': queued,
+                    'events_waiting': mariadb.get_event_dlq_count(),
                 })
 
             # What object versions do we support?

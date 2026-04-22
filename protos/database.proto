@@ -30,6 +30,7 @@ service DatabaseService {
   rpc EnqueueEventDlq (EnqueueEventDlqRequest) returns (StatusReply) {}
   rpc DrainEventDlq (DrainEventDlqRequest) returns (DrainEventDlqReply) {}
   rpc DeleteEventDlq (DeleteEventDlqRequest) returns (StatusReply) {}
+  rpc GetEventDlqCount (GetEventDlqCountRequest) returns (GetEventDlqCountReply) {}
 
   // Object State Operations (MariaDB)
   rpc GetObjectState (GetObjectStateRequest) returns (GetObjectStateReply) {}
@@ -434,6 +435,13 @@ message DrainEventDlqReply {
 
 message DeleteEventDlqRequest {
   repeated int64 ids = 1;
+}
+
+message GetEventDlqCountRequest {
+}
+
+message GetEventDlqCountReply {
+  int64 count = 1;
 }
 
 // Object State Operations (MariaDB)

@@ -113,6 +113,11 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    GetEventDlqCount: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetEventDlqCountRequest,
+        database_pb2.GetEventDlqCountReply,
+    ]
+
     GetObjectState: grpc.UnaryUnaryMultiCallable[
         database_pb2.GetObjectStateRequest,
         database_pb2.GetObjectStateReply,
@@ -1029,6 +1034,11 @@ class DatabaseServiceAsyncStub:
     DeleteEventDlq: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteEventDlqRequest,
         database_pb2.StatusReply,
+    ]
+
+    GetEventDlqCount: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetEventDlqCountRequest,
+        database_pb2.GetEventDlqCountReply,
     ]
 
     GetObjectState: grpc.aio.UnaryUnaryMultiCallable[
@@ -1984,6 +1994,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteEventDlqRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def GetEventDlqCount(
+        self,
+        request: database_pb2.GetEventDlqCountRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetEventDlqCountReply, collections.abc.Awaitable[database_pb2.GetEventDlqCountReply]]: ...
 
     @abc.abstractmethod
     def GetObjectState(

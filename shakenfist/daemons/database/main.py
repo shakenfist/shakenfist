@@ -449,6 +449,21 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def GetEventDlqCount(
+        self,
+        request: database_pb2.GetEventDlqCountRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetEventDlqCountReply:
+        """Return the current number of rows in the event_dlq table."""
+        try:
+            self.monitor.counters['get_event_dlq_count'].inc()
+            count = mariadb._direct_get_event_dlq_count()
+            return database_pb2.GetEventDlqCountReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetEventDlqCount failed', e)
+            return database_pb2.GetEventDlqCountReply(count=0)
+
     # Object State Operations (MariaDB)
     # These operations provide access to MariaDB state storage for all daemons.
     # The database service uses direct MariaDB access; all other daemons call
@@ -4362,7 +4377,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',
             'enqueue_event_dlq', 'drain_event_dlq',
-            'delete_event_dlq',
+            'delete_event_dlq', 'get_event_dlq_count',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state',

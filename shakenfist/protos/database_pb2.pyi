@@ -591,6 +591,31 @@ class DeleteEventDlqRequest(google.protobuf.message.Message):
 global___DeleteEventDlqRequest = DeleteEventDlqRequest
 
 @typing.final
+class GetEventDlqCountRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetEventDlqCountRequest = GetEventDlqCountRequest
+
+@typing.final
+class GetEventDlqCountReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    COUNT_FIELD_NUMBER: builtins.int
+    count: builtins.int
+    def __init__(
+        self,
+        *,
+        count: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["count", b"count"]) -> None: ...
+
+global___GetEventDlqCountReply = GetEventDlqCountReply
+
+@typing.final
 class GetObjectStateRequest(google.protobuf.message.Message):
     """Object State Operations (MariaDB)
     These operations manage object state in MariaDB, which is used for

@@ -968,6 +968,13 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_delete_event_dlq.stop)
 
+        self.mariadb_get_event_dlq_count = mock.patch(
+            'shakenfist.mariadb.get_event_dlq_count',
+            side_effect=self._mariadb_get_event_dlq_count)
+        self.mariadb_get_event_dlq_count.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_event_dlq_count.stop)
+
         # Setup basic DB data
         self.node_uuids = {}
         for n in self.nodes:
@@ -2589,6 +2596,13 @@ class MockEtcd():
             f'MockMariaDB.delete_event_dlq({ids}): '
             f'deleted {deleted}')
         return deleted
+
+    def _mariadb_get_event_dlq_count(self):
+        """Mock implementation of mariadb.get_event_dlq_count()."""
+        count = len(self.event_dlq_store)
+        self._trace(
+            f'MockMariaDB.get_event_dlq_count(): {count}')
+        return count
 
     #
     # DB operations - Low level

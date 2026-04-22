@@ -17031,6 +17031,21 @@ def _direct_drain_event_dlq(
         return []
 
 
+def _direct_get_event_dlq_count() -> int:
+    """Return the current number of rows in the event_dlq table."""
+    engine = _get_engine()
+    table = _get_event_dlq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(sa.func.count()).select_from(table)
+            return int(conn.execute(stmt).scalar_one())
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_event_dlq_count failed: {e}')
+        return 0
+
+
 def _direct_delete_event_dlq(ids: list[int]) -> int:
     """Delete DLQ rows by id. Returns count deleted."""
     if not ids:
@@ -17099,6 +17114,21 @@ def _grpc_drain_event_dlq(
         }
         for entry in response.entries
     ]
+
+
+def _grpc_get_event_dlq_count() -> int:
+    """Fetch the event_dlq row count via the database microservice."""
+    from shakenfist.protos import database_pb2
+
+    stub = _get_database_stub()
+    if not stub:
+        return 0
+
+    request = database_pb2.GetEventDlqCountRequest()
+    response = _grpc_call(stub.GetEventDlqCount, request)
+    if response is None:
+        return 0
+    return int(response.count)
 
 
 def _grpc_delete_event_dlq(ids: list[int]) -> int:
@@ -17414,6 +17444,17 @@ def delete_event_dlq(ids: list[int]) -> int:
     if _use_database_service():
         return _grpc_delete_event_dlq(ids)
     return _direct_delete_event_dlq(ids)
+
+
+def get_event_dlq_count() -> int:
+    """Return the current number of rows in the event_dlq table.
+
+    This is a cheap SELECT COUNT(*) suitable for metrics; it does not
+    deserialise any event payloads, unlike drain_event_dlq.
+    """
+    if _use_database_service():
+        return _grpc_get_event_dlq_count()
+    return _direct_get_event_dlq_count()
 
 
 # =============================================================================
