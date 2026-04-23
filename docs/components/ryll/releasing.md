@@ -69,18 +69,27 @@ Two secrets must be configured in the ryll repo settings:
 
 ### Host tools
 
-Both scripts run on the operator's host (not in a container).
-Between them they require:
+Both scripts orchestrate from the operator's host. The
+workspace test compile in phase 1 is delegated to `make test`,
+which runs inside the devcontainer, so the host's rustc does
+not need to satisfy the dependency tree's MSRV. Everything
+else runs on the host and requires:
 
 - `cargo-release` — `cargo install --locked cargo-release`.
-  Used for the workspace-wide version bump in phase 1. If your
-  host toolchain is older than 1.91 (for example Debian's
-  packaged cargo 1.85), pin the last version that supports it:
+  Used for the workspace-wide version bump in phase 1. The
+  bump only edits `Cargo.toml` files and does not need to
+  match the workspace's MSRV. If your host toolchain is older
+  than 1.91 (for example Debian's packaged cargo 1.85), pin
+  the last version that supports it:
   `cargo install --locked cargo-release@0.25.18`.
+- `docker` — used by `make test` (and by `pre-commit` via
+  `scripts/check-rust.sh`) to run the Rust toolchain in the
+  devcontainer.
 - `gh` — the GitHub CLI, signed in (`gh auth login`). Used in
   phase 2 to watch the release workflow and open the release
   page on completion.
-- `jq`, `curl`, `git`, `pre-commit` — standard dev tooling.
+- `jq`, `curl`, `git`, `pre-commit`, `make` — standard dev
+  tooling.
 
 ## Release process
 
@@ -106,7 +115,8 @@ The script will:
    `version =` qualifiers on ryll's path dependencies via
    `cargo release version 0.2.0 --workspace --execute
    --no-confirm`.
-7. Run `cargo test --workspace`.
+7. Run `make test` (which runs `cargo test --workspace`
+   inside the devcontainer).
 8. Show `git diff --stat` and prompt
    `Commit and push release-0.2.0? [y/N]`.
 9. On confirmation: commit `Release 0.2.0.` and push
