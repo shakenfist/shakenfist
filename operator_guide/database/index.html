@@ -9030,8 +9030,8 @@ configuration:</p>
 </code></pre></div>
 <p>For cluster bootstrap, this command can initialize any node when run from an
 etcd_master with direct database access:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Run on etcd_master to initialize a remote node</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nv">SHAKENFIST_DATABASE_USE_DIRECT_ETCD</span><span class="o">=</span>True<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Run on the database node to initialize a remote node</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nv">SHAKENFIST_MARIADB_HOST</span><span class="o">=</span>localhost<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>sf-ctl<span class="w"> </span>initialise-node<span class="w"> </span>--node-name<span class="w"> </span>sf-2<span class="w"> </span>--node-mesh-ip<span class="w"> </span><span class="m">10</span>.0.0.2
 </code></pre></div>
 <p>This is useful during deployment when the database service isn't running yet.</p>
@@ -9042,8 +9042,8 @@ node:</p>
 </code></pre></div>
 <p>For cluster bootstrap, daemons can be registered on any node when run from an
 etcd_master with direct database access:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Run on etcd_master to register daemons on a remote node</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nv">SHAKENFIST_DATABASE_USE_DIRECT_ETCD</span><span class="o">=</span>True<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Run on the database node to register daemons on a remote node</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nv">SHAKENFIST_MARIADB_HOST</span><span class="o">=</span>localhost<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>sf-ctl<span class="w"> </span>register-daemon<span class="w"> </span>database<span class="w"> </span>--node-name<span class="w"> </span>sf-1
 </code></pre></div>
 <p>This allows all node and daemon registration to happen before the database

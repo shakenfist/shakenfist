@@ -7769,6 +7769,25 @@
   Ubuntu 22.04.</li>
 <li>The ansible modules have been rewritten to be more reliable.</li>
 <li>The ShakenFist client now uses HTTP sessions to reduce latency for requests.</li>
+<li><strong>etcd has been removed.</strong> All object storage, cluster locks, work queues,
+  cluster configuration, and the event dead letter queue now live in MariaDB.
+  The <code>etcd.py</code> module is retained as a minimal shim only so that
+  <code>DATA_MIGRATIONS</code> entries can drain residual etcd keys on first startup of
+  an upgraded cluster; it will be removed entirely in the next minor
+  release. Operators no longer need to deploy or maintain etcd. The
+  <code>SHAKENFIST_ETCD_HOST</code>, <code>SHAKENFIST_DATABASE_USE_DIRECT_ETCD</code>,
+  <code>SHAKENFIST_LOG_ETCD_CONNECTIONS</code>, and <code>SHAKENFIST_NODE_IS_ETCD_MASTER</code>
+  configuration settings have been removed. The <code>etcd_master</code> Ansible host
+  group now identifies the database node and will be renamed in a future
+  release.</li>
+<li><strong><code>sf-backup</code> and <code>sf-restore</code> have been retired.</strong> These commands previously
+  backed up and restored etcd state. With etcd removed, they are no longer
+  functional and will print a message directing you to use MariaDB tooling
+  instead. To back up your Shaken Fist cluster, use <code>mariadb-dump</code> (or
+  <code>mysqldump</code>) to export the Shaken Fist database, and separately back up
+  the event log SQLite files under <code>/srv/shakenfist/events/</code> on the eventlog
+  node. To restore, use <code>mariadb</code> (or <code>mysql</code>) to import the dump and copy
+  the SQLite files back into place.</li>
 </ul>
 
 
