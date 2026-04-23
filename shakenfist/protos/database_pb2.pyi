@@ -34,284 +34,6 @@ class StatusReply(google.protobuf.message.Message):
 global___StatusReply = StatusReply
 
 @typing.final
-class GetRequest(google.protobuf.message.Message):
-    """Key-Value Operations"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    OBJECT_TYPE_FIELD_NUMBER: builtins.int
-    SUBTYPE_FIELD_NUMBER: builtins.int
-    NAME_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
-    subtype: builtins.str
-    name: builtins.str
-    def __init__(
-        self,
-        *,
-        object_type: builtins.str = ...,
-        subtype: builtins.str = ...,
-        name: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["name", b"name", "object_type", b"object_type", "subtype", b"subtype"]) -> None: ...
-
-global___GetRequest = GetRequest
-
-@typing.final
-class GetReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    FOUND_FIELD_NUMBER: builtins.int
-    VALUE_FIELD_NUMBER: builtins.int
-    found: builtins.bool
-    value: builtins.str
-    """JSON-encoded data"""
-    def __init__(
-        self,
-        *,
-        found: builtins.bool = ...,
-        value: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["found", b"found", "value", b"value"]) -> None: ...
-
-global___GetReply = GetReply
-
-@typing.final
-class GetPrefixRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    OBJECT_TYPE_FIELD_NUMBER: builtins.int
-    SUBTYPE_FIELD_NUMBER: builtins.int
-    PREFIX_FIELD_NUMBER: builtins.int
-    LIMIT_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
-    subtype: builtins.str
-    prefix: builtins.str
-    limit: builtins.int
-    def __init__(
-        self,
-        *,
-        object_type: builtins.str = ...,
-        subtype: builtins.str = ...,
-        prefix: builtins.str = ...,
-        limit: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["limit", b"limit", "object_type", b"object_type", "prefix", b"prefix", "subtype", b"subtype"]) -> None: ...
-
-global___GetPrefixRequest = GetPrefixRequest
-
-@typing.final
-class KeyValue(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KEY_FIELD_NUMBER: builtins.int
-    VALUE_FIELD_NUMBER: builtins.int
-    key: builtins.str
-    value: builtins.str
-    """JSON-encoded data"""
-    def __init__(
-        self,
-        *,
-        key: builtins.str = ...,
-        value: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
-
-global___KeyValue = KeyValue
-
-@typing.final
-class GetPrefixReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    RESULTS_FIELD_NUMBER: builtins.int
-    @property
-    def results(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___KeyValue]: ...
-    def __init__(
-        self,
-        *,
-        results: collections.abc.Iterable[global___KeyValue] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["results", b"results"]) -> None: ...
-
-global___GetPrefixReply = GetPrefixReply
-
-@typing.final
-class PutRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    OBJECT_TYPE_FIELD_NUMBER: builtins.int
-    SUBTYPE_FIELD_NUMBER: builtins.int
-    NAME_FIELD_NUMBER: builtins.int
-    DATA_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
-    subtype: builtins.str
-    name: builtins.str
-    data: builtins.str
-    """JSON-encoded data"""
-    def __init__(
-        self,
-        *,
-        object_type: builtins.str = ...,
-        subtype: builtins.str = ...,
-        name: builtins.str = ...,
-        data: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "name", b"name", "object_type", b"object_type", "subtype", b"subtype"]) -> None: ...
-
-global___PutRequest = PutRequest
-
-@typing.final
-class CreateRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    OBJECT_TYPE_FIELD_NUMBER: builtins.int
-    SUBTYPE_FIELD_NUMBER: builtins.int
-    NAME_FIELD_NUMBER: builtins.int
-    DATA_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
-    subtype: builtins.str
-    name: builtins.str
-    data: builtins.str
-    """JSON-encoded data"""
-    def __init__(
-        self,
-        *,
-        object_type: builtins.str = ...,
-        subtype: builtins.str = ...,
-        name: builtins.str = ...,
-        data: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "name", b"name", "object_type", b"object_type", "subtype", b"subtype"]) -> None: ...
-
-global___CreateRequest = CreateRequest
-
-@typing.final
-class DeleteRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    OBJECT_TYPE_FIELD_NUMBER: builtins.int
-    SUBTYPE_FIELD_NUMBER: builtins.int
-    NAME_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
-    subtype: builtins.str
-    name: builtins.str
-    def __init__(
-        self,
-        *,
-        object_type: builtins.str = ...,
-        subtype: builtins.str = ...,
-        name: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["name", b"name", "object_type", b"object_type", "subtype", b"subtype"]) -> None: ...
-
-global___DeleteRequest = DeleteRequest
-
-@typing.final
-class DeletePrefixRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    PATH_FIELD_NUMBER: builtins.int
-    path: builtins.str
-    def __init__(
-        self,
-        *,
-        path: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["path", b"path"]) -> None: ...
-
-global___DeletePrefixRequest = DeletePrefixRequest
-
-@typing.final
-class Mutation(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    PATH_FIELD_NUMBER: builtins.int
-    ORIGINAL_DATA_FIELD_NUMBER: builtins.int
-    NEW_DATA_FIELD_NUMBER: builtins.int
-    ORIGINAL_IS_NONE_FIELD_NUMBER: builtins.int
-    NEW_IS_NONE_FIELD_NUMBER: builtins.int
-    path: builtins.str
-    original_data: builtins.str
-    """JSON-encoded, empty string for None"""
-    new_data: builtins.str
-    """JSON-encoded, empty string for None (delete)"""
-    original_is_none: builtins.bool
-    new_is_none: builtins.bool
-    def __init__(
-        self,
-        *,
-        path: builtins.str = ...,
-        original_data: builtins.str = ...,
-        new_data: builtins.str = ...,
-        original_is_none: builtins.bool = ...,
-        new_is_none: builtins.bool = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["new_data", b"new_data", "new_is_none", b"new_is_none", "original_data", b"original_data", "original_is_none", b"original_is_none", "path", b"path"]) -> None: ...
-
-global___Mutation = Mutation
-
-@typing.final
-class ReplaceManyRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    MUTATIONS_FIELD_NUMBER: builtins.int
-    SUPPRESS_FAILURE_AUDIT_FIELD_NUMBER: builtins.int
-    suppress_failure_audit: builtins.bool
-    @property
-    def mutations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Mutation]: ...
-    def __init__(
-        self,
-        *,
-        mutations: collections.abc.Iterable[global___Mutation] | None = ...,
-        suppress_failure_audit: builtins.bool = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["mutations", b"mutations", "suppress_failure_audit", b"suppress_failure_audit"]) -> None: ...
-
-global___ReplaceManyRequest = ReplaceManyRequest
-
-@typing.final
-class MutationFailure(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    PATH_FIELD_NUMBER: builtins.int
-    DESIRED_FIELD_NUMBER: builtins.int
-    ACTUAL_FIELD_NUMBER: builtins.int
-    REPLACEMENT_FIELD_NUMBER: builtins.int
-    path: builtins.str
-    desired: builtins.str
-    actual: builtins.str
-    replacement: builtins.str
-    def __init__(
-        self,
-        *,
-        path: builtins.str = ...,
-        desired: builtins.str = ...,
-        actual: builtins.str = ...,
-        replacement: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["actual", b"actual", "desired", b"desired", "path", b"path", "replacement", b"replacement"]) -> None: ...
-
-global___MutationFailure = MutationFailure
-
-@typing.final
-class ReplaceManyReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SUCCESS_FIELD_NUMBER: builtins.int
-    FAILURES_FIELD_NUMBER: builtins.int
-    success: builtins.bool
-    @property
-    def failures(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___MutationFailure]: ...
-    def __init__(
-        self,
-        *,
-        success: builtins.bool = ...,
-        failures: collections.abc.Iterable[global___MutationFailure] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["failures", b"failures", "success", b"success"]) -> None: ...
-
-global___ReplaceManyReply = ReplaceManyReply
-
-@typing.final
 class EnqueueRequest(google.protobuf.message.Message):
     """Queue Operations"""
 
@@ -644,13 +366,17 @@ class ClusterClearStaleLocksRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NODE_NAME_FIELD_NUMBER: builtins.int
+    LIVE_PIDS_FIELD_NUMBER: builtins.int
     node_name: builtins.str
+    @property
+    def live_pids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
     def __init__(
         self,
         *,
         node_name: builtins.str = ...,
+        live_pids: collections.abc.Iterable[builtins.int] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["node_name", b"node_name"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["live_pids", b"live_pids", "node_name", b"node_name"]) -> None: ...
 
 global___ClusterClearStaleLocksRequest = ClusterClearStaleLocksRequest
 
@@ -700,21 +426,194 @@ class ClusterGetExistingLocksReply(google.protobuf.message.Message):
 global___ClusterGetExistingLocksReply = ClusterGetExistingLocksReply
 
 @typing.final
-class CompactRequest(google.protobuf.message.Message):
-    """Maintenance Operations"""
+class ClusterConfigRequest(google.protobuf.message.Message):
+    """Cluster Config"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REVISION_FIELD_NUMBER: builtins.int
-    revision: builtins.int
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ClusterConfigRequest = ClusterConfigRequest
+
+@typing.final
+class ClusterConfigEntry(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_NAME_FIELD_NUMBER: builtins.int
+    VALUE_JSON_FIELD_NUMBER: builtins.int
+    key_name: builtins.str
+    value_json: builtins.str
+    """JSON-encoded config value"""
     def __init__(
         self,
         *,
-        revision: builtins.int = ...,
+        key_name: builtins.str = ...,
+        value_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["revision", b"revision"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["key_name", b"key_name", "value_json", b"value_json"]) -> None: ...
 
-global___CompactRequest = CompactRequest
+global___ClusterConfigEntry = ClusterConfigEntry
+
+@typing.final
+class ClusterConfigReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTRIES_FIELD_NUMBER: builtins.int
+    @property
+    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ClusterConfigEntry]: ...
+    def __init__(
+        self,
+        *,
+        entries: collections.abc.Iterable[global___ClusterConfigEntry] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
+
+global___ClusterConfigReply = ClusterConfigReply
+
+@typing.final
+class SetClusterConfigRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_NAME_FIELD_NUMBER: builtins.int
+    VALUE_JSON_FIELD_NUMBER: builtins.int
+    key_name: builtins.str
+    value_json: builtins.str
+    """JSON-encoded config value"""
+    def __init__(
+        self,
+        *,
+        key_name: builtins.str = ...,
+        value_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["key_name", b"key_name", "value_json", b"value_json"]) -> None: ...
+
+global___SetClusterConfigRequest = SetClusterConfigRequest
+
+@typing.final
+class EnqueueEventDlqRequest(google.protobuf.message.Message):
+    """Event DLQ"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    EVENT_TIMESTAMP_FIELD_NUMBER: builtins.int
+    EVENT_JSON_FIELD_NUMBER: builtins.int
+    object_type: builtins.str
+    object_uuid: builtins.str
+    event_timestamp: builtins.float
+    event_json: builtins.str
+    """JSON-encoded event dict"""
+    def __init__(
+        self,
+        *,
+        object_type: builtins.str = ...,
+        object_uuid: builtins.str = ...,
+        event_timestamp: builtins.float = ...,
+        event_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["event_json", b"event_json", "event_timestamp", b"event_timestamp", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___EnqueueEventDlqRequest = EnqueueEventDlqRequest
+
+@typing.final
+class DrainEventDlqRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    LIMIT_FIELD_NUMBER: builtins.int
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        limit: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["limit", b"limit"]) -> None: ...
+
+global___DrainEventDlqRequest = DrainEventDlqRequest
+
+@typing.final
+class DrainEventDlqEntry(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    EVENT_JSON_FIELD_NUMBER: builtins.int
+    id: builtins.int
+    object_type: builtins.str
+    object_uuid: builtins.str
+    event_json: builtins.str
+    """JSON-encoded event dict"""
+    def __init__(
+        self,
+        *,
+        id: builtins.int = ...,
+        object_type: builtins.str = ...,
+        object_uuid: builtins.str = ...,
+        event_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["event_json", b"event_json", "id", b"id", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___DrainEventDlqEntry = DrainEventDlqEntry
+
+@typing.final
+class DrainEventDlqReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTRIES_FIELD_NUMBER: builtins.int
+    @property
+    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DrainEventDlqEntry]: ...
+    def __init__(
+        self,
+        *,
+        entries: collections.abc.Iterable[global___DrainEventDlqEntry] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
+
+global___DrainEventDlqReply = DrainEventDlqReply
+
+@typing.final
+class DeleteEventDlqRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDS_FIELD_NUMBER: builtins.int
+    @property
+    def ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def __init__(
+        self,
+        *,
+        ids: collections.abc.Iterable[builtins.int] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["ids", b"ids"]) -> None: ...
+
+global___DeleteEventDlqRequest = DeleteEventDlqRequest
+
+@typing.final
+class GetEventDlqCountRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetEventDlqCountRequest = GetEventDlqCountRequest
+
+@typing.final
+class GetEventDlqCountReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    COUNT_FIELD_NUMBER: builtins.int
+    count: builtins.int
+    def __init__(
+        self,
+        *,
+        count: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["count", b"count"]) -> None: ...
+
+global___GetEventDlqCountReply = GetEventDlqCountReply
 
 @typing.final
 class GetObjectStateRequest(google.protobuf.message.Message):

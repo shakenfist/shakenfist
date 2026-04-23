@@ -13,16 +13,14 @@ from typing import Union
 
 from pydantic import BaseModel
 
-from etcd3gw.lock import Lock
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.constants import ETCD_ATTEMPT_TIMEOUT
 from shakenfist.constants import get_object_class
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
-from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
+from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
@@ -37,7 +35,7 @@ LOG, _ = logs.setup(__name__)
 DataT = TypeVar('DataT', bound=BaseModel)
 
 
-class NoopLock(Lock):
+class NoopLock:
     def __init__(self, *args, **kwargs):
         pass
 
@@ -220,8 +218,6 @@ class DatabaseBackedObject:
                 })
 
                 if cluster_minimum == self.current_version:
-                    etcd.put(self.object_type, None, static_values.get('uuid'),
-                             static_values)
                     upgrade_log.debug('Online upgrade committed')
                 else:
                     upgrade_log.info(
@@ -400,10 +396,8 @@ class DatabaseBackedObject:
 
     @classmethod
     def filter(cls, filters):
-        for _, o in etcd.get_all(cls.object_type, None):
-            obj = cls(o)
-            if all([f(obj) for f in filters]):
-                yield obj
+        raise NotImplementedError(
+            f'{cls.__name__} must override filter() — etcd removed')
 
     @classmethod
     def _db_create(cls, object_uuid, metadata):
@@ -418,22 +412,8 @@ class DatabaseBackedObject:
 
     @classmethod
     def _db_get(cls, object_uuid):
-        o = etcd.get(cls.object_type, None, object_uuid)
-        if not o:
-            return None
-
-        if o.get('version', 0) != cls.current_version:
-            if not cls.upgrade_supported:
-                raise exceptions.BadObjectVersion(
-                    f'Unsupported object version - {cls.object_type}: {o}')
-        return o
-
-    @classmethod
-    def _upgrade_metadata_to_attribute(cls, object_uuid):
-        md = etcd.get('metadata', cls.object_type, object_uuid)
-        if md:
-            etcd.put('attribute/%s' % cls.object_type, object_uuid, 'metadata', md)
-            etcd.delete('metadata', cls.object_type, object_uuid)
+        raise NotImplementedError(
+            f'{cls.__name__} must override _db_get() — etcd removed')
 
     # We need to force in memory values through JSON because some values require
     # a serializer to run to work when we read them.
@@ -441,8 +421,7 @@ class DatabaseBackedObject:
         if self.__in_memory_only:
             retval = json.loads(self.__in_memory_values.get(attribute, 'null'))
         else:
-            retval = etcd.get(f'attribute/{self.object_type}',
-                              str(self.__uuid), attribute)
+            retval = None
         if not retval:
             if default is None:
                 return {}
@@ -454,10 +433,8 @@ class DatabaseBackedObject:
             for key in self.__in_memory_values.keys():
                 if key.startswith(attribute_prefix):
                     yield key, json.loads(self.__in_memory_values[key])
-        else:
-            for key, data in etcd.get_all('attribute/%s' % self.object_type,
-                                          str(self.__uuid), prefix=attribute_prefix):
-                yield key, data
+        # Non-in-memory attribute iteration is handled by subclass
+        # overrides that read from MariaDB.
 
     def _log_attribute_mutation(self, attribute, value):
         """Log an EVENT_TYPE_MUTATE event for an attribute change.
@@ -483,15 +460,17 @@ class DatabaseBackedObject:
         if self.__in_memory_only:
             self.__in_memory_values[attribute] = util_json.json_dump(value)
         else:
-            etcd.put('attribute/%s' % self.object_type,
-                     str(self.__uuid), attribute, value)
+            LOG.warning(
+                f'Base class _db_set_attribute called for '
+                f'{self.object_type}/{attribute} — subclass should override')
 
     def _db_delete_attribute(self, attribute):
         if self.__in_memory_only and attribute in self.__in_memory_values:
             del self.__in_memory_values[attribute]
         else:
-            etcd.delete(
-                'attribute/%s' % self.object_type, str(self.__uuid), attribute)
+            LOG.warning(
+                f'Base class _db_delete_attribute called for '
+                f'{self.object_type}/{attribute} — subclass should override')
 
     def _add_item_in_attribute_list(self, listname, item):
         with self.get_lock_attr(listname, 'Add %s' % listname):
@@ -514,7 +493,7 @@ class DatabaseBackedObject:
                 })
 
     def get_lock(self, subtype=None, op=None, global_scope=True,
-                 timeout=ETCD_ATTEMPT_TIMEOUT):
+                 timeout=60):
         # There is no point locking in-memory objects
         if self.in_memory_only:
             return NoopLock()
@@ -522,7 +501,7 @@ class DatabaseBackedObject:
         if not global_scope:
             return util_concurrency.NodeLock(f'{self.object_type}-{self.uuid}')
 
-        return etcd.ClusterLock(
+        return locks.ClusterLock(
             self.object_type, subtype, str(self.uuid), log_ctx=self.log, op=op,
             timeout=timeout)
 
@@ -535,7 +514,7 @@ class DatabaseBackedObject:
             return util_concurrency.NodeLock(
                 f'{self.object_type}-{self.uuid}-{name}')
 
-        return etcd.ClusterLock(
+        return locks.ClusterLock(
             'attribute/%s' % self.object_type, str(self.__uuid), name, op=op,
             timeout=timeout, log_ctx=self.log)
 
@@ -681,8 +660,6 @@ class DatabaseBackedObject:
         return out
 
     def hard_delete(self):
-        etcd.delete(self.object_type, None, str(self.uuid))
-        etcd.delete_all('attribute/%s' % self.object_type, str(self.uuid))
         mariadb.delete_state(self.object_type, str(self.uuid))
         mariadb.delete_object_metadata(self.object_type, str(self.uuid))
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
@@ -773,11 +750,6 @@ class DatabaseBackedObjectIterator:
         self.suppress_failure_audit = suppress_failure_audit
 
     def get_iterator(self):
-        if not self.prefilter:
-            for objuuid, objdata in etcd.get_all(self.base_object.object_type, None):
-                yield objuuid, objdata
-            return
-
         if self.prefilter == 'active':
             target_states = self.base_object.ACTIVE_STATES
         elif self.prefilter == 'deleted':
@@ -786,38 +758,26 @@ class DatabaseBackedObjectIterator:
             target_states = self.base_object.HEALTHY_STATES
         elif self.prefilter == 'inactive':
             target_states = self.base_object.INACTIVE_STATES
+        elif self.prefilter is None:
+            # No prefilter — return all non-deleted objects
+            target_states = self.base_object.ACTIVE_STATES
         else:
             raise exceptions.InvalidObjectPrefilter(self.prefilter)
 
-        # Use MariaDB for efficient state-based filtering
+        # Use MariaDB for state-based filtering
         matching_uuids_list = mariadb.get_objects_by_state(
             self.base_object.object_type, list(target_states))
 
         if matching_uuids_list is None:
-            # MariaDB/gRPC query failed; fall back to yielding all
-            # objects from etcd so callers still find their targets.
             LOG.warning('get_objects_by_state returned None for '
-                        f'{self.base_object.object_type}, falling '
-                        'back to full etcd scan')
-            for objuuid, objdata in etcd.get_all(
-                    self.base_object.object_type, None):
-                yield objuuid, objdata
+                        f'{self.base_object.object_type}')
             return
 
-        matching_uuids = set(matching_uuids_list)
-
-        # Fetch static values only for objects in the target states
-        # We fetch all results in a block before yielding to avoid inconsistency
-        # if the caller is slow to iterate (e.g., an active instance shifting
-        # from created to delete-wait while you're iterating).
-        results = []
-        for objkey, static_values in etcd.get_all(
-                self.base_object.object_type, None):
-            objuuid = objkey.split('/')[-1]
-            if objuuid in matching_uuids:
-                results.append((objkey, static_values))
-        for objkey, static_values in results:
-            yield objkey, static_values
+        # Fetch static values from MariaDB for each matching UUID
+        for objuuid in matching_uuids_list:
+            static_values = self.base_object._db_get(objuuid)
+            if static_values is not None:
+                yield objuuid, static_values
 
     def apply_filters(self, o):
         for f in self.filters:

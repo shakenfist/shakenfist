@@ -1,5 +1,3 @@
-SHAKENFIST_ETCD_HOST="{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
-
 # It is recommended that you set the following options:
 # API_ADVERTISED_HOST="shakenfist.mycompany.com"
 # API_ADVERTISED_BASE_PATH="/api"
@@ -11,12 +9,6 @@ SHAKENFIST_NODE_MESH_IP="{{node_mesh_ip}}"
 SHAKENFIST_NODE_MESH_NIC="{{node_mesh_nic}}"
 SHAKENFIST_NODE_NAME="{{node_name}}"
 SHAKENFIST_ZONE="{{deploy_name}}"
-
-{% if inventory_hostname in groups['etcd_master'] %}
-SHAKENFIST_NODE_IS_ETCD_MASTER=True
-{% else %}
-SHAKENFIST_NODE_IS_ETCD_MASTER=False
-{% endif %}
 
 {% if inventory_hostname in groups['hypervisors'] %}
 SHAKENFIST_NODE_IS_HYPERVISOR=True
@@ -49,11 +41,10 @@ SHAKENFIST_NODE_IS_DATABASE_NODE=False
 SHAKENFIST_DATABASE_NODE_IP="{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
 SHAKENFIST_DATABASE_API_PORT=13005
 SHAKENFIST_DATABASE_METRICS_PORT=13006
-SHAKENFIST_DATABASE_USE_DIRECT_ETCD={{database_use_direct_etcd | default('True')}}
 
-# MariaDB configuration - only rendered on database nodes (etcd_master) for security.
-# Only the database service daemon needs direct MariaDB access; all other daemons
-# access MariaDB through the database service's gRPC interface.
+# MariaDB configuration - only rendered on database nodes for security.
+# Only the database service daemon needs direct MariaDB access; all other
+# daemons access MariaDB through the database service's gRPC interface.
 {% if inventory_hostname in groups['etcd_master'] %}
 SHAKENFIST_MARIADB_HOST="{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
 SHAKENFIST_MARIADB_PORT=3306

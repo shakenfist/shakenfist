@@ -5,15 +5,6 @@ package shakenfist.protos;
 import "shakenfist_enums.proto";
 
 service DatabaseService {
-  // Key-Value Operations
-  rpc Get (GetRequest) returns (GetReply) {}
-  rpc GetPrefix (GetPrefixRequest) returns (GetPrefixReply) {}
-  rpc Put (PutRequest) returns (StatusReply) {}
-  rpc Create (CreateRequest) returns (StatusReply) {}
-  rpc Delete (DeleteRequest) returns (StatusReply) {}
-  rpc DeletePrefix (DeletePrefixRequest) returns (StatusReply) {}
-  rpc ReplaceMany (ReplaceManyRequest) returns (ReplaceManyReply) {}
-
   // Queue Operations
   rpc Enqueue (EnqueueRequest) returns (StatusReply) {}
   rpc Dequeue (DequeueRequest) returns (DequeueReply) {}
@@ -31,8 +22,15 @@ service DatabaseService {
   rpc ClearStaleLocks (ClusterClearStaleLocksRequest) returns (StatusReply) {}
   rpc GetExistingLocks (ClusterGetExistingLocksRequest) returns (ClusterGetExistingLocksReply) {}
 
-  // Maintenance
-  rpc Compact (CompactRequest) returns (StatusReply) {}
+  // Cluster Config
+  rpc GetClusterConfig (ClusterConfigRequest) returns (ClusterConfigReply) {}
+  rpc SetClusterConfig (SetClusterConfigRequest) returns (StatusReply) {}
+
+  // Event DLQ
+  rpc EnqueueEventDlq (EnqueueEventDlqRequest) returns (StatusReply) {}
+  rpc DrainEventDlq (DrainEventDlqRequest) returns (DrainEventDlqReply) {}
+  rpc DeleteEventDlq (DeleteEventDlqRequest) returns (StatusReply) {}
+  rpc GetEventDlqCount (GetEventDlqCountRequest) returns (GetEventDlqCountReply) {}
 
   // Object State Operations (MariaDB)
   rpc GetObjectState (GetObjectStateRequest) returns (GetObjectStateReply) {}
@@ -284,84 +282,6 @@ message StatusReply {
   string error = 2;
 }
 
-// Key-Value Operations
-
-message GetRequest {
-  string object_type = 1;
-  string subtype = 2;
-  string name = 3;
-}
-
-message GetReply {
-  bool found = 1;
-  string value = 2;  // JSON-encoded data
-}
-
-message GetPrefixRequest {
-  string object_type = 1;
-  string subtype = 2;
-  string prefix = 3;
-  int64 limit = 4;
-}
-
-message KeyValue {
-  string key = 1;
-  string value = 2;  // JSON-encoded data
-}
-
-message GetPrefixReply {
-  repeated KeyValue results = 1;
-}
-
-message PutRequest {
-  string object_type = 1;
-  string subtype = 2;
-  string name = 3;
-  string data = 4;  // JSON-encoded data
-}
-
-message CreateRequest {
-  string object_type = 1;
-  string subtype = 2;
-  string name = 3;
-  string data = 4;  // JSON-encoded data
-}
-
-message DeleteRequest {
-  string object_type = 1;
-  string subtype = 2;
-  string name = 3;
-}
-
-message DeletePrefixRequest {
-  string path = 1;
-}
-
-message Mutation {
-  string path = 1;
-  string original_data = 2;  // JSON-encoded, empty string for None
-  string new_data = 3;       // JSON-encoded, empty string for None (delete)
-  bool original_is_none = 4;
-  bool new_is_none = 5;
-}
-
-message ReplaceManyRequest {
-  repeated Mutation mutations = 1;
-  bool suppress_failure_audit = 2;
-}
-
-message MutationFailure {
-  string path = 1;
-  string desired = 2;
-  string actual = 3;
-  string replacement = 4;
-}
-
-message ReplaceManyReply {
-  bool success = 1;
-  repeated MutationFailure failures = 2;
-}
-
 // Queue Operations
 
 message EnqueueRequest {
@@ -457,6 +377,7 @@ message ClusterLockHolderReply {
 
 message ClusterClearStaleLocksRequest {
   string node_name = 1;
+  repeated int32 live_pids = 2;
 }
 
 message ClusterGetExistingLocksRequest {}
@@ -470,10 +391,57 @@ message ClusterGetExistingLocksReply {
   repeated ClusterLockEntry locks = 1;
 }
 
-// Maintenance Operations
+// Cluster Config
 
-message CompactRequest {
-  int64 revision = 1;
+message ClusterConfigRequest {}
+
+message ClusterConfigEntry {
+  string key_name = 1;
+  string value_json = 2;  // JSON-encoded config value
+}
+
+message ClusterConfigReply {
+  repeated ClusterConfigEntry entries = 1;
+}
+
+message SetClusterConfigRequest {
+  string key_name = 1;
+  string value_json = 2;  // JSON-encoded config value
+}
+
+// Event DLQ
+
+message EnqueueEventDlqRequest {
+  string object_type = 1;
+  string object_uuid = 2;
+  double event_timestamp = 3;
+  string event_json = 4;  // JSON-encoded event dict
+}
+
+message DrainEventDlqRequest {
+  int32 limit = 1;
+}
+
+message DrainEventDlqEntry {
+  int64 id = 1;
+  string object_type = 2;
+  string object_uuid = 3;
+  string event_json = 4;  // JSON-encoded event dict
+}
+
+message DrainEventDlqReply {
+  repeated DrainEventDlqEntry entries = 1;
+}
+
+message DeleteEventDlqRequest {
+  repeated int64 ids = 1;
+}
+
+message GetEventDlqCountRequest {
+}
+
+message GetEventDlqCountReply {
+  int64 count = 1;
 }
 
 // Object State Operations (MariaDB)

@@ -102,8 +102,8 @@ class AgentOperation(BaseOperation):
                         f'Unsupported object version - {cls.object_type}: {result}')
             return result
 
-        # Fall back to etcd for unmigrated objects
-        return super()._db_get(object_uuid)
+        # Object not found in MariaDB
+        return None
 
     @classmethod
     def new(cls, operation_uuid, namespace, instance_uuid, commands):

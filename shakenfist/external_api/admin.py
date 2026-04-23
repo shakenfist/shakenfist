@@ -10,13 +10,13 @@ import os
 import flask
 from flasgger import swag_from
 
-from shakenfist import etcd
+from shakenfist import locks
 from shakenfist import scheduler
 from shakenfist.external_api import base as api_base
 
 
 admin_locks_get_example = """{
-    "/sflocks/sf/cluster/": {
+    "cluster/": {
         "node": "sf-1",
         "operation": "Cluster maintenance",
         "pid": 3326781
@@ -34,7 +34,7 @@ class AdminLocksEndpoint(api_base.Resource):
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self):
-        return etcd.get_existing_locks()
+        return locks.get_existing_locks()
 
 
 admin_cacert_get_example = """-----BEGIN CERTIFICATE-----

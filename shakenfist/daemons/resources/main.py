@@ -8,7 +8,6 @@ from prometheus_client import Gauge
 from prometheus_client import start_http_server
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist import instance
@@ -55,7 +54,7 @@ class Monitor(daemon.Daemon):
         with util_libvirt.LibvirtConnection() as lc:
             # What's special about this node?
             retval = {
-                'is_etcd_master': config.NODE_IS_ETCD_MASTER,
+                'is_etcd_master': False,
                 'is_hypervisor': config.NODE_IS_HYPERVISOR,
                 'is_network_node': config.NODE_IS_NETWORK_NODE,
                 'is_eventlog_node': config.NODE_IS_EVENTLOG_NODE,
@@ -299,9 +298,8 @@ class Monitor(daemon.Daemon):
                 })
 
             if config.NODE_IS_EVENTLOG_NODE:
-                queued = len(list(etcd.get_all('event', None, limit=10000)))
                 retval.update({
-                    'events_waiting': queued,
+                    'events_waiting': mariadb.get_event_dlq_count(),
                 })
 
             # What object versions do we support?
@@ -353,16 +351,6 @@ class Monitor(daemon.Daemon):
                                         _emit_process_metrics(subchild))
                     except (psutil.NoSuchProcess, FileNotFoundError):
                         ...
-                # Record etcd process metrics
-                if config.NODE_IS_ETCD_MASTER:
-                    for p in psutil.process_iter():
-                        try:
-                            if p.name().endswith('/etcd'):
-                                process_metrics.update(
-                                    _emit_process_metrics(p))
-                        except (psutil.NoSuchProcess, FileNotFoundError):
-                            ...
-
                 n.process_metrics = process_metrics
 
                 # What package versions do we have? Debian package versions are

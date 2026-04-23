@@ -162,6 +162,9 @@ CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 2
 WORK_QUEUE_VERSION = 2
+CLUSTER_LOCKS_VERSION = 2
+CLUSTER_CONFIG_VERSION = 2
+EVENT_DLQ_VERSION = 2
 
 
 def _use_database_service() -> bool:
@@ -170,19 +173,11 @@ def _use_database_service() -> bool:
     Returns True if the database service is configured and we should use it.
     Returns False if we should use direct MariaDB access (database daemon mode).
 
-    The logic is:
-    1. If DATABASE_USE_DIRECT_ETCD is True AND MARIADB_HOST is configured,
-       use direct access (this is the database daemon on an etcd_master node).
-    2. If DATABASE_NODE_IP is configured, use the database service.
-    3. Otherwise we have no way to access the database.
+    Only the database daemon has MARIADB_HOST configured directly. All other
+    daemons access MariaDB via the database service gRPC interface.
     """
-    # The database daemon sets DATABASE_USE_DIRECT_ETCD=true. When this is true
-    # AND we have MariaDB configured, we use direct MariaDB access. This only
-    # happens on etcd_master nodes which have the MariaDB credentials.
-    if config.DATABASE_USE_DIRECT_ETCD and config.MARIADB_HOST:
+    if config.MARIADB_HOST:
         return False
-
-    # For all other cases, try to use the database service via gRPC
     if not config.DATABASE_NODE_IP:
         return False
     return True
@@ -734,6 +729,194 @@ def _ensure_work_queue_schema(engine: sa.Engine) -> dict[str, Any]:
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': WORK_QUEUE_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+_cluster_locks_table: Optional[sa.Table] = None
+
+
+def _get_cluster_locks_table() -> sa.Table:
+    """Get or create the cluster_locks table definition.
+
+    This table stores distributed locks previously held in etcd at
+    /sflocks/{type}/{subtype}/{name}. The lock_key column stores the
+    path without the /sflocks/ prefix. Acquire uses INSERT IGNORE
+    (duplicate PK = lock already held). Release uses DELETE with a
+    lock_id CAS check.
+    """
+    global _cluster_locks_table
+    if _cluster_locks_table is None:
+        metadata = _get_metadata()
+        _cluster_locks_table = sa.Table(
+            'cluster_locks',
+            metadata,
+            sa.Column('lock_key', sa.String(255),
+                      primary_key=True),
+            sa.Column('holder_json', sa.JSON(),
+                      nullable=False),
+            sa.Column('node_uuid', sa.String(255),
+                      nullable=False),
+            sa.Column('pid', sa.Integer(), nullable=False),
+            sa.Column('lock_id', sa.String(64),
+                      nullable=False),
+            sa.Column('acquired_at', sa.Double(),
+                      nullable=False),
+            sa.Index('idx_cluster_locks_node',
+                     'node_uuid'),
+            sa.Index('idx_cluster_locks_acquired',
+                     'acquired_at'),
+        )
+    return _cluster_locks_table
+
+
+def _cluster_lock_key(
+        object_type: str, subtype: str, name: str) -> str:
+    """Build a lock key from the gRPC request fields.
+
+    Mirrors etcd._construct_key(prefix='sflocks') but without
+    the /sflocks/ prefix so we don't leak the old etcd naming
+    into MariaDB.
+    """
+    if subtype and name:
+        return f'{object_type}/{subtype}/{name}'
+    if name:
+        return f'{object_type}/{name}'
+    if subtype:
+        return f'{object_type}/{subtype}/'
+    return f'{object_type}/'
+
+
+def _ensure_cluster_locks_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the cluster_locks table schema is up to date."""
+    table_name = 'cluster_locks'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_locks_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_LOCKS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+_cluster_config_table: Optional[sa.Table] = None
+
+
+def _get_cluster_config_table() -> sa.Table:
+    """Get or create the cluster_config table definition.
+
+    This table stores cluster-wide configuration previously held in etcd
+    at /sf/config as a single JSON blob. Each top-level key in that blob
+    becomes a row here, so concurrent writes to different keys don't
+    conflict.
+    """
+    global _cluster_config_table
+    if _cluster_config_table is None:
+        metadata = _get_metadata()
+        _cluster_config_table = sa.Table(
+            'cluster_config',
+            metadata,
+            sa.Column('key_name', sa.String(128),
+                      primary_key=True),
+            sa.Column('value_json', sa.JSON(),
+                      nullable=False),
+            sa.Column('updated_at', sa.Double(),
+                      nullable=False),
+        )
+    return _cluster_config_table
+
+
+def _ensure_cluster_config_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the cluster_config table schema is up to date."""
+    table_name = 'cluster_config'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_config_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_CONFIG_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+_event_dlq_table: Optional[sa.Table] = None
+
+
+def _get_event_dlq_table() -> sa.Table:
+    """Get or create the event_dlq table definition.
+
+    This table stores event log dead-letter queue entries previously held
+    in etcd at /sf/event/{object_type}/{object_uuid}/{timestamp}. The
+    eventlog daemon drains this table periodically and writes events to
+    per-object SQLite files.
+    """
+    global _event_dlq_table
+    if _event_dlq_table is None:
+        metadata = _get_metadata()
+        _event_dlq_table = sa.Table(
+            'event_dlq',
+            metadata,
+            sa.Column('id', sa.BigInteger(),
+                      primary_key=True, autoincrement=True),
+            sa.Column('object_type', sa.String(32),
+                      nullable=False),
+            sa.Column('object_uuid', sa.String(36),
+                      nullable=False),
+            sa.Column('event_timestamp', sa.Double(),
+                      nullable=False),
+            sa.Column('event_json', sa.JSON(),
+                      nullable=False),
+            sa.Column('enqueued_at', sa.Double(),
+                      nullable=False),
+            sa.Index('idx_event_dlq_object',
+                     'object_type', 'object_uuid'),
+            sa.Index('idx_event_dlq_enqueued',
+                     'enqueued_at'),
+        )
+    return _event_dlq_table
+
+
+def _ensure_event_dlq_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the event_dlq table schema is up to date."""
+    table_name = 'event_dlq'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_event_dlq_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': EVENT_DLQ_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1467,6 +1650,9 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_node_metrics_schema(engine))
     results.append(_ensure_cluster_operations_schema(engine))
     results.append(_ensure_work_queue_schema(engine))
+    results.append(_ensure_cluster_locks_schema(engine))
+    results.append(_ensure_cluster_config_schema(engine))
+    results.append(_ensure_event_dlq_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -1546,6 +1732,35 @@ def ensure_data_migrations() -> list[dict[str, Any]]:
 
     engine = _get_engine()
     results = []
+
+    # All registered data migrations drain residual state from etcd into
+    # MariaDB. Fresh clusters (and clusters already fully migrated) have
+    # ETCD_HOST unset, in which case there is nothing to drain: mark the
+    # pending versions as complete without touching etcd so we neither
+    # spam the log with "Cannot communicate with etcd" errors nor retry
+    # the same no-op on every database daemon restart.
+    if not config.ETCD_HOST:
+        LOG.info(
+            'No etcd server configured; marking pending data migrations '
+            'as complete without running them'
+        )
+        for table_name, migrations in DATA_MIGRATIONS.items():
+            current_ver = _get_table_version(engine, table_name)
+            if current_ver <= 0:
+                continue
+            target_ver = max(migrations.keys())
+            if current_ver >= target_ver:
+                continue
+            _set_table_version(engine, table_name, target_ver)
+            results.append({
+                'table': table_name,
+                'from_version': current_ver,
+                'to_version': target_ver,
+                'migrated': True,
+                'stats': {'migrated_count': 0, 'error_count': 0,
+                          'skipped_reason': 'no etcd configured'},
+            })
+        return results
 
     for table_name, migrations in DATA_MIGRATIONS.items():
         current_ver = _get_table_version(engine, table_name)
@@ -2983,6 +3198,16 @@ def _migrate_etcd_network_interfaces(engine: sa.Engine) -> dict[str, Any]:
                 f'  ... {migrated_count + skipped_count} '
                 f'NetworkInterface objects processed')
 
+    # Clean up macaddress allocation keys — uniqueness is now enforced by
+    # the UNIQUE constraint on network_interfaces.macaddr.
+    mac_cleaned = 0
+    for objkey, _data in etcd.get_all('macaddress', None):
+        mac = objkey.split('/')[-1]
+        etcd.delete('macaddress', None, mac)
+        mac_cleaned += 1
+    if mac_cleaned:
+        LOG.info(f'Cleaned up {mac_cleaned} etcd macaddress keys')
+
     LOG.info(
         f'NetworkInterface migration: {migrated_count} migrated, '
         f'{skipped_count} skipped')
@@ -3921,6 +4146,152 @@ def _migrate_etcd_work_queue(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _migrate_etcd_cluster_locks(engine: sa.Engine) -> dict[str, Any]:
+    """Drain residual /sflocks/* etcd keys into the cluster_locks table.
+
+    Each etcd key at /sflocks/{type}/{subtype}/{name} holds a JSON dict
+    with node, pid, thread, line, operation, id. We insert each into
+    cluster_locks with INSERT IGNORE (so re-runs skip already-migrated
+    rows) and delete the etcd key on success.
+
+    Stale locks from crashed daemons are acceptable -- the queues daemon
+    reaper will clear them on its next startup.
+    """
+    from shakenfist import etcd
+
+    migrated = 0
+    errors = 0
+
+    LOG.info('Migrating cluster locks from etcd...')
+
+    for key, holder in etcd.get_prefix_raw('/sflocks/'):
+        lock_key = key.replace('/sflocks/', '', 1)
+
+        if not isinstance(holder, dict):
+            LOG.warning(
+                f'Lock migration: malformed payload at '
+                f'{key}; leaving in place')
+            errors += 1
+            continue
+
+        acquired = _direct_acquire_cluster_lock(
+            lock_key=lock_key,
+            holder_json=holder,
+            node_uuid=holder.get('node', ''),
+            pid=int(holder.get('pid', 0)),
+            lock_id=holder.get('id', ''),
+            now=time.time(),
+        )
+
+        if acquired:
+            etcd.delete_raw(key)
+            migrated += 1
+        else:
+            # Row already exists -- somebody migrated it or a live lock
+            # is held. Skip without error.
+            LOG.debug(
+                f'Lock migration: key {lock_key} already '
+                f'exists in MariaDB; skipping')
+
+    LOG.info(
+        f'Lock migration: {migrated} migrated, {errors} errors')
+    return {
+        'migrated_count': migrated,
+        'error_count': errors,
+    }
+
+
+def _migrate_etcd_cluster_config(engine: sa.Engine) -> dict[str, Any]:
+    """Drain /sf/config from etcd into the cluster_config table.
+
+    The etcd key is a single JSON blob. We split it into one row
+    per top-level key and delete the etcd key.
+    """
+    from shakenfist import etcd
+
+    migrated = 0
+    errors = 0
+
+    LOG.info('Migrating cluster config from etcd...')
+
+    raw = etcd.get_raw('/sf/config')
+    if raw is None or raw == {}:
+        LOG.info('No /sf/config in etcd; nothing to migrate')
+        return {'migrated_count': 0, 'error_count': 0}
+
+    if not isinstance(raw, dict):
+        LOG.warning(
+            'Cluster config migration: /sf/config is not a '
+            'dict; leaving in place')
+        return {'migrated_count': 0, 'error_count': 1}
+
+    for key_name, value in raw.items():
+        _direct_set_cluster_config(key_name, value)
+        migrated += 1
+
+    etcd.delete_raw('/sf/config')
+
+    LOG.info(
+        f'Cluster config migration: {migrated} keys migrated, '
+        f'{errors} errors')
+    return {
+        'migrated_count': migrated,
+        'error_count': errors,
+    }
+
+
+def _migrate_etcd_event_dlq(engine: sa.Engine) -> dict[str, Any]:
+    """Drain residual /sf/event/* etcd keys into the event_dlq table.
+
+    Each etcd key at /sf/event/{objtype}/{objuuid}/{timestamp} holds
+    a JSON dict with the event payload. We insert each into event_dlq
+    and delete the etcd key.
+    """
+    from shakenfist import etcd
+
+    migrated = 0
+    errors = 0
+
+    LOG.info('Migrating event DLQ from etcd...')
+
+    for key, event in etcd.get_prefix_raw('/sf/event/'):
+        if not isinstance(event, dict):
+            LOG.warning(
+                f'Event DLQ migration: malformed payload '
+                f'at {key}; leaving in place')
+            errors += 1
+            continue
+
+        try:
+            parts = key.split('/')
+            # /sf/event/{objtype}/{objuuid}/{ts}
+            objtype = parts[3]
+            objuuid = parts[4]
+            ts = float(parts[5])
+        except (IndexError, ValueError) as e:
+            LOG.warning(
+                f'Event DLQ migration: bad key {key}: {e}')
+            errors += 1
+            continue
+
+        _direct_enqueue_event_dlq(
+            object_type=objtype,
+            object_uuid=objuuid,
+            event_timestamp=ts,
+            event_json=event,
+        )
+        etcd.delete_raw(key)
+        migrated += 1
+
+    LOG.info(
+        f'Event DLQ migration: {migrated} migrated, '
+        f'{errors} errors')
+    return {
+        'migrated_count': migrated,
+        'error_count': errors,
+    }
+
+
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -4010,6 +4381,15 @@ DATA_MIGRATIONS.update({
     },
     'work_queue': {
         2: _migrate_etcd_work_queue,
+    },
+    'cluster_locks': {
+        2: _migrate_etcd_cluster_locks,
+    },
+    'cluster_config': {
+        2: _migrate_etcd_cluster_config,
+    },
+    'event_dlq': {
+        2: _migrate_etcd_event_dlq,
     },
 })
 
@@ -6421,7 +6801,8 @@ def _direct_get_dnsmasq(dnsmasq_uuid: UUID) -> Optional[DnsMasqData]:
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(table).where(table.c.uuid == dnsmasq_uuid)
+            stmt = sa.select(table).where(
+                table.c.uuid == _ensure_uuid(dnsmasq_uuid))
             result = conn.execute(stmt).fetchone()
 
             if result is None:
@@ -6467,7 +6848,8 @@ def _direct_get_dnsmasqs(
             if namespace:
                 stmt = stmt.where(table.c.namespace == namespace)
             if owner_uuid:
-                stmt = stmt.where(table.c.owner_uuid == owner_uuid)
+                stmt = stmt.where(
+                    table.c.owner_uuid == _ensure_uuid(owner_uuid))
 
             result = conn.execute(stmt).fetchall()
 
@@ -6503,7 +6885,8 @@ def _direct_delete_dnsmasq(dnsmasq_uuid: UUID) -> bool:
 
     try:
         with engine.connect() as conn:
-            stmt = sa.delete(table).where(table.c.uuid == dnsmasq_uuid)
+            stmt = sa.delete(table).where(
+                table.c.uuid == _ensure_uuid(dnsmasq_uuid))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -6529,7 +6912,7 @@ def _direct_update_dnsmasq(data: DnsMasqData) -> bool:
     try:
         with engine.connect() as conn:
             stmt = sa.update(table).where(
-                table.c.uuid == data.uuid
+                table.c.uuid == _ensure_uuid(data.uuid)
             ).values(
                 namespace=data.namespace,
                 owner_type=str(data.owner_type),
@@ -11635,6 +12018,10 @@ def _get_network_interfaces_table() -> sa.Table:
             primary_key_fields=['uuid'],
             include_id_column=False
         )
+        # Add UNIQUE constraint on macaddr for atomic MAC allocation
+        sa.UniqueConstraint(
+            _network_interfaces_table.c.macaddr,
+            name='uq_network_interfaces_macaddr')
     return _network_interfaces_table
 
 
@@ -11672,6 +12059,24 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver <= 1:
+        LOG.info(f'Upgrading {table_name} table to version 2 '
+                 '(add UNIQUE constraint on macaddr)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'ALTER TABLE network_interfaces '
+                    'ADD CONSTRAINT uq_network_interfaces_macaddr '
+                    'UNIQUE (macaddr)'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'UNIQUE constraint on macaddr already exists '
+                    f'or could not be added: {e}')
+
+        current_ver = 2
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -16332,6 +16737,724 @@ def _direct_work_queue_delete_row(row_id: int) -> bool:
             f'MariaDB delete_row failed for work_queue '
             f'row {row_id}: {e}')
         return False
+
+
+# =============================================================================
+# Cluster Locks Direct Access Functions
+# =============================================================================
+
+def _direct_acquire_cluster_lock(
+        lock_key: str, holder_json: dict[str, Any],
+        node_uuid: str, pid: int,
+        lock_id: str, now: float) -> bool:
+    """Attempt to acquire a lock by inserting a row.
+
+    Returns True if the row was inserted (lock acquired),
+    False if the key already exists (lock held by another).
+    Uses INSERT IGNORE so a duplicate PK is a silent failure.
+    """
+    engine = _get_engine()
+    table = _get_cluster_locks_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).prefix_with('IGNORE').values(
+                lock_key=lock_key,
+                holder_json=holder_json,
+                node_uuid=node_uuid,
+                pid=pid,
+                lock_id=lock_id,
+                acquired_at=now,
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount == 1
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB acquire_cluster_lock failed for '
+            f'{lock_key}: {e}')
+        return False
+
+
+def _direct_release_cluster_lock(
+        lock_key: str, lock_id: str) -> bool:
+    """Release a lock by deleting the row, but only if the
+    lock_id matches (CAS-equivalent).
+
+    Returns True if a row was deleted, False otherwise.
+    """
+    engine = _get_engine()
+    table = _get_cluster_locks_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.lock_key == lock_key,
+                    table.c.lock_id == lock_id,
+                )
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount == 1
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB release_cluster_lock failed for '
+            f'{lock_key}: {e}')
+        return False
+
+
+def _direct_get_cluster_lock(
+        lock_key: str) -> Optional[dict[str, Any]]:
+    """Get the current holder of a lock.
+
+    Returns the holder_json dict if the lock is held,
+    None otherwise.
+    """
+    engine = _get_engine()
+    table = _get_cluster_locks_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.holder_json).where(
+                table.c.lock_key == lock_key
+            )
+            row = conn.execute(stmt).first()
+            if row is None:
+                return None
+            holder: dict[str, Any] = row[0]
+            return holder
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_cluster_lock failed for '
+            f'{lock_key}: {e}')
+        return None
+
+
+def _direct_clear_stale_cluster_locks(
+        node_uuid: str,
+        live_pids: list[int]) -> int:
+    """Delete locks for a node whose pid is not in the live-pid set.
+
+    Returns the number of rows deleted.
+    """
+    engine = _get_engine()
+    table = _get_cluster_locks_table()
+
+    try:
+        with engine.connect() as conn:
+            if live_pids:
+                stmt = sa.delete(table).where(
+                    sa.and_(
+                        table.c.node_uuid == node_uuid,
+                        table.c.pid.not_in(live_pids),
+                    )
+                )
+            else:
+                # No live pids means all locks for this node are stale
+                stmt = sa.delete(table).where(
+                    table.c.node_uuid == node_uuid,
+                )
+            result = conn.execute(stmt)
+            conn.commit()
+            deleted = result.rowcount
+            if deleted > 0:
+                LOG.info(
+                    f'Cleared {deleted} stale lock(s) for '
+                    f'node {node_uuid}')
+            return deleted
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB clear_stale_cluster_locks failed: {e}')
+        return 0
+
+
+def _direct_get_all_cluster_locks() -> dict[str, dict[str, Any]]:
+    """Return all locks as {lock_key: holder_json}.
+
+    Used by GetExistingLocks for the admin snapshot endpoint.
+    """
+    engine = _get_engine()
+    table = _get_cluster_locks_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(
+                table.c.lock_key, table.c.holder_json)
+            rows = conn.execute(stmt).fetchall()
+            return {row[0]: row[1] for row in rows}
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_all_cluster_locks failed: {e}')
+        return {}
+
+
+# =============================================================================
+# Cluster Config Direct Access Functions
+# =============================================================================
+
+def _direct_get_all_cluster_config() -> dict[str, Any]:
+    """Return all cluster config as {key_name: value}.
+
+    value is the raw JSON-decoded value (str, int, float, bool).
+    """
+    engine = _get_engine()
+    table = _get_cluster_config_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(
+                table.c.key_name, table.c.value_json)
+            rows = conn.execute(stmt).fetchall()
+            return {row[0]: row[1] for row in rows}
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_all_cluster_config failed: {e}')
+        return {}
+
+
+def _direct_set_cluster_config(
+        key_name: str, value: Any) -> None:
+    """Upsert a single config key.
+
+    Uses INSERT ... ON DUPLICATE KEY UPDATE so concurrent
+    writes to different keys don't conflict.
+    """
+    engine = _get_engine()
+    table = _get_cluster_config_table()
+    now = time.time()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                key_name=key_name,
+                value_json=value,
+                updated_at=now,
+            )
+            stmt = stmt.on_duplicate_key_update(
+                value_json=value,
+                updated_at=now,
+            )
+            conn.execute(stmt)
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB set_cluster_config failed for '
+            f'{key_name}: {e}')
+
+
+def _direct_delete_cluster_config(
+        key_name: str) -> bool:
+    """Delete a single config key. Returns True if deleted."""
+    engine = _get_engine()
+    table = _get_cluster_config_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.key_name == key_name)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount == 1
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete_cluster_config failed for '
+            f'{key_name}: {e}')
+        return False
+
+
+# =============================================================================
+# Event DLQ Direct Access Functions
+# =============================================================================
+
+def _direct_enqueue_event_dlq(
+        object_type: str, object_uuid: str,
+        event_timestamp: float,
+        event_json: dict[str, Any]) -> None:
+    """Insert an event into the dead-letter queue."""
+    engine = _get_engine()
+    table = _get_event_dlq_table()
+    now = time.time()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                object_type=object_type,
+                object_uuid=str(object_uuid),
+                event_timestamp=event_timestamp,
+                event_json=event_json,
+                enqueued_at=now,
+            )
+            conn.execute(stmt)
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB enqueue_event_dlq failed for '
+            f'{object_type}/{object_uuid}: {e}')
+
+
+def _direct_drain_event_dlq(
+        limit: int = 10000) -> list[dict[str, Any]]:
+    """Return up to limit DLQ rows ordered by id.
+
+    Returns list of dicts with keys: id, object_type,
+    object_uuid, event_json.
+    """
+    engine = _get_engine()
+    table = _get_event_dlq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = (
+                sa.select(
+                    table.c.id,
+                    table.c.object_type,
+                    table.c.object_uuid,
+                    table.c.event_json,
+                )
+                .order_by(table.c.id)
+                .limit(limit)
+            )
+            rows = conn.execute(stmt).fetchall()
+            return [
+                {
+                    'id': row[0],
+                    'object_type': row[1],
+                    'object_uuid': row[2],
+                    'event_json': row[3],
+                }
+                for row in rows
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB drain_event_dlq failed: {e}')
+        return []
+
+
+def _direct_get_event_dlq_count() -> int:
+    """Return the current number of rows in the event_dlq table."""
+    engine = _get_engine()
+    table = _get_event_dlq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(sa.func.count()).select_from(table)
+            return int(conn.execute(stmt).scalar_one())
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_event_dlq_count failed: {e}')
+        return 0
+
+
+def _direct_delete_event_dlq(ids: list[int]) -> int:
+    """Delete DLQ rows by id. Returns count deleted."""
+    if not ids:
+        return 0
+
+    engine = _get_engine()
+    table = _get_event_dlq_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                table.c.id.in_(ids))
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete_event_dlq failed: {e}')
+        return 0
+
+
+# =============================================================================
+# Event DLQ gRPC Client Functions
+# =============================================================================
+
+def _grpc_enqueue_event_dlq(
+        object_type: str, object_uuid: str,
+        event_timestamp: float,
+        event_json: dict[str, Any]) -> None:
+    """Enqueue an event via the database microservice."""
+    from shakenfist.protos import database_pb2
+
+    stub = _get_database_stub()
+    if not stub:
+        return
+
+    request = database_pb2.EnqueueEventDlqRequest(
+        object_type=object_type,
+        object_uuid=str(object_uuid),
+        event_timestamp=event_timestamp,
+        event_json=json.dumps(event_json),
+    )
+    _grpc_call(stub.EnqueueEventDlq, request)
+
+
+def _grpc_drain_event_dlq(
+        limit: int = 10000) -> list[dict[str, Any]]:
+    """Drain DLQ entries via the database microservice."""
+    from shakenfist.protos import database_pb2
+
+    stub = _get_database_stub()
+    if not stub:
+        return []
+
+    request = database_pb2.DrainEventDlqRequest(limit=limit)
+    response = _grpc_call(stub.DrainEventDlq, request)
+    if response is None:
+        return []
+
+    return [
+        {
+            'id': entry.id,
+            'object_type': entry.object_type,
+            'object_uuid': entry.object_uuid,
+            'event_json': json.loads(entry.event_json),
+        }
+        for entry in response.entries
+    ]
+
+
+def _grpc_get_event_dlq_count() -> int:
+    """Fetch the event_dlq row count via the database microservice."""
+    from shakenfist.protos import database_pb2
+
+    stub = _get_database_stub()
+    if not stub:
+        return 0
+
+    request = database_pb2.GetEventDlqCountRequest()
+    response = _grpc_call(stub.GetEventDlqCount, request)
+    if response is None:
+        return 0
+    return int(response.count)
+
+
+def _grpc_delete_event_dlq(ids: list[int]) -> int:
+    """Delete DLQ entries via the database microservice."""
+    from shakenfist.protos import database_pb2
+
+    stub = _get_database_stub()
+    if not stub:
+        return 0
+
+    request = database_pb2.DeleteEventDlqRequest(ids=ids)
+    response = _grpc_call(stub.DeleteEventDlq, request)
+    if response is None:
+        return 0
+    return len(ids) if response.success else 0
+
+
+# =============================================================================
+# Cluster Lock gRPC Functions
+# =============================================================================
+
+def _grpc_acquire_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_data: dict[str, Any]) -> bool:
+    """Acquire a lock via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return False
+
+    request = database_pb2.ClusterLockRequest(
+        object_type=object_type,
+        subtype=subtype or '',
+        name=name,
+        lock_data=_json_dumps(lock_data),
+    )
+    response = _grpc_call(stub.AcquireLock, request)
+    if response is None:
+        return False
+    return bool(response.acquired)
+
+
+def _grpc_release_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_data: dict[str, Any]) -> bool:
+    """Release a lock via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return False
+
+    request = database_pb2.ClusterReleaseLockRequest(
+        object_type=object_type,
+        subtype=subtype or '',
+        name=name,
+        lock_data=_json_dumps(lock_data),
+    )
+    response = _grpc_call(stub.ReleaseLock, request)
+    if response is None:
+        return False
+    return bool(response.success)
+
+
+def _grpc_get_cluster_lock_holder(
+        object_type: str, subtype: str,
+        name: str) -> Optional[dict[str, Any]]:
+    """Get the holder of a lock via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return None
+
+    request = database_pb2.ClusterGetLockHolderRequest(
+        object_type=object_type,
+        subtype=subtype or '',
+        name=name,
+    )
+    response = _grpc_call(stub.GetLockHolder, request)
+    if response is None or not response.held:
+        return None
+    return cast(dict[str, Any], json.loads(response.holder))
+
+
+def _grpc_clear_stale_cluster_locks(
+        node_name: str, live_pids: list[int]) -> None:
+    """Clear stale locks via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return
+
+    request = database_pb2.ClusterClearStaleLocksRequest(
+        node_name=node_name,
+        live_pids=live_pids,
+    )
+    response = _grpc_call(stub.ClearStaleLocks, request)
+    if response is not None and not response.success:
+        LOG.error(
+            f'Database clear_stale_locks failed: {response.error}')
+
+
+def _grpc_get_all_cluster_locks() -> dict[str, dict[str, Any]]:
+    """Return all cluster locks via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return {}
+
+    request = database_pb2.ClusterGetExistingLocksRequest()
+    response = _grpc_call(stub.GetExistingLocks, request)
+    if response is None:
+        return {}
+
+    return {
+        lock.key: json.loads(lock.holder)
+        for lock in response.locks
+    }
+
+
+# =============================================================================
+# Cluster Lock Public API Functions
+# =============================================================================
+
+def acquire_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_data: dict[str, Any]) -> bool:
+    """Attempt to acquire a distributed lock.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Callers running on the database node
+    (MARIADB_HOST set) use direct access so that bootstrap-time
+    commands work before the database daemon is started.
+    """
+    if _use_database_service():
+        return _grpc_acquire_cluster_lock(
+            object_type, subtype, name, lock_data)
+
+    lock_key = _cluster_lock_key(object_type, subtype, name)
+    return _direct_acquire_cluster_lock(
+        lock_key=lock_key,
+        holder_json=lock_data,
+        node_uuid=lock_data.get('node', ''),
+        pid=int(lock_data.get('pid', 0)),
+        lock_id=lock_data.get('id', ''),
+        now=time.time(),
+    )
+
+
+def release_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_data: dict[str, Any]) -> bool:
+    """Release a distributed lock.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service().
+    """
+    if _use_database_service():
+        return _grpc_release_cluster_lock(
+            object_type, subtype, name, lock_data)
+
+    lock_key = _cluster_lock_key(object_type, subtype, name)
+    return _direct_release_cluster_lock(
+        lock_key=lock_key,
+        lock_id=lock_data.get('id', ''),
+    )
+
+
+def get_cluster_lock_holder(
+        object_type: str, subtype: str,
+        name: str) -> dict[str, Any]:
+    """Get the current holder of a lock.
+
+    Returns {'holder': None} when the lock is free, matching the
+    contract the locks module expects. Routes to the database
+    microservice or direct MariaDB depending on
+    _use_database_service().
+    """
+    if _use_database_service():
+        holder = _grpc_get_cluster_lock_holder(
+            object_type, subtype, name)
+    else:
+        lock_key = _cluster_lock_key(object_type, subtype, name)
+        holder = _direct_get_cluster_lock(lock_key)
+
+    if holder is None:
+        return {'holder': None}
+    return holder
+
+
+def clear_stale_cluster_locks(
+        node_name: str, live_pids: list[int]) -> None:
+    """Clear locks held by dead processes on a node.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service().
+    """
+    if _use_database_service():
+        _grpc_clear_stale_cluster_locks(node_name, live_pids)
+        return
+    _direct_clear_stale_cluster_locks(
+        node_uuid=node_name, live_pids=live_pids)
+
+
+def get_all_cluster_locks() -> dict[str, dict[str, Any]]:
+    """Return every lock as {key: holder_json}.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service().
+    """
+    if _use_database_service():
+        return _grpc_get_all_cluster_locks()
+    return _direct_get_all_cluster_locks()
+
+
+# =============================================================================
+# Cluster Config gRPC Functions
+# =============================================================================
+
+def _grpc_get_all_cluster_config() -> dict[str, Any]:
+    """Fetch all cluster config via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return {}
+
+    request = database_pb2.ClusterConfigRequest()
+    response = _grpc_call(stub.GetClusterConfig, request)
+    if response is None:
+        return {}
+
+    return {
+        entry.key_name: json.loads(entry.value_json)
+        for entry in response.entries
+    }
+
+
+def _grpc_set_cluster_config(key_name: str, value: Any) -> None:
+    """Set a cluster config key via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return
+
+    request = database_pb2.SetClusterConfigRequest(
+        key_name=key_name,
+        value_json=json.dumps(value),
+    )
+    response = _grpc_call(stub.SetClusterConfig, request)
+    if response is not None and not response.success:
+        LOG.error(
+            f'Database set_cluster_config failed: {response.error}')
+
+
+# =============================================================================
+# Cluster Config Public API Functions
+# =============================================================================
+
+def get_cluster_config() -> dict[str, Any]:
+    """Return all cluster config as {key_name: value}.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Callers running on the database node
+    (MARIADB_HOST set) use direct access so that bootstrap-time
+    commands work before the database daemon is started.
+    """
+    if _use_database_service():
+        return _grpc_get_all_cluster_config()
+    return _direct_get_all_cluster_config()
+
+
+def set_cluster_config(key_name: str, value: Any) -> None:
+    """Upsert a single cluster config key.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Callers running on the database node
+    (MARIADB_HOST set) use direct access so that bootstrap-time
+    commands work before the database daemon is started.
+    """
+    if _use_database_service():
+        _grpc_set_cluster_config(key_name, value)
+        return
+    _direct_set_cluster_config(key_name, value)
+
+
+# =============================================================================
+# Event DLQ Public API Functions
+# =============================================================================
+
+def enqueue_event_dlq(
+        object_type: str, object_uuid: str,
+        event_timestamp: float,
+        event_json: dict[str, Any]) -> None:
+    """Insert an event into the dead-letter queue.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service().
+    """
+    if _use_database_service():
+        _grpc_enqueue_event_dlq(
+            object_type, object_uuid, event_timestamp, event_json)
+        return
+    _direct_enqueue_event_dlq(
+        object_type, object_uuid, event_timestamp, event_json)
+
+
+def drain_event_dlq(limit: int = 10000) -> list[dict[str, Any]]:
+    """Return up to limit DLQ rows for processing.
+
+    Returns list of dicts with keys: id, object_type, object_uuid,
+    event_json. Caller must call delete_event_dlq() after successful
+    processing to preserve at-least-once delivery.
+    """
+    if _use_database_service():
+        return _grpc_drain_event_dlq(limit)
+    return _direct_drain_event_dlq(limit)
+
+
+def delete_event_dlq(ids: list[int]) -> int:
+    """Delete processed DLQ rows by id. Returns count deleted."""
+    if _use_database_service():
+        return _grpc_delete_event_dlq(ids)
+    return _direct_delete_event_dlq(ids)
+
+
+def get_event_dlq_count() -> int:
+    """Return the current number of rows in the event_dlq table.
+
+    This is a cheap SELECT COUNT(*) suitable for metrics; it does not
+    deserialise any event payloads, unlike drain_event_dlq.
+    """
+    if _use_database_service():
+        return _grpc_get_event_dlq_count()
+    return _direct_get_event_dlq_count()
 
 
 # =============================================================================
