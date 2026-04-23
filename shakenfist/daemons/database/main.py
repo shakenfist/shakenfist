@@ -4489,6 +4489,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_cluster_operation_target',
             'delete_cluster_operation_targets_for_object',
             'delete_stale_cluster_operation_targets',
+            # MariaDB cluster operation operations
+            'create_cluster_operation', 'get_cluster_operation',
+            'get_cluster_operations_by_node', 'delete_cluster_operation',
+            'create_and_enqueue_cluster_operation',
             # MariaDB node metrics operations
             'upsert_node_metrics', 'get_node_metrics',
             'get_all_node_metrics', 'delete_node_metrics',
