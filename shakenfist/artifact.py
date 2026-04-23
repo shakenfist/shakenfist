@@ -162,6 +162,14 @@ class Artifact(dbowo):
         return data
 
     @classmethod
+    def filter(cls, filters):
+        """Override base class to use MariaDB instead of etcd."""
+        for data in mariadb.get_all_artifacts():
+            obj = cls(data)
+            if all(f(obj) for f in filters):
+                yield obj
+
+    @classmethod
     def from_db(cls, object_uuid: Union[str, uuid_mod.UUID],
                 suppress_failure_audit: bool = False) -> 'Artifact | None':
         """Load an Artifact from the database.

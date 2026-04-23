@@ -397,7 +397,8 @@ class DatabaseBackedObject:
     @classmethod
     def filter(cls, filters):
         raise NotImplementedError(
-            f'{cls.__name__} must override filter() — etcd removed')
+            f'{cls.__name__} must override filter() with a MariaDB '
+            'implementation')
 
     @classmethod
     def _db_create(cls, object_uuid, metadata):
@@ -413,7 +414,8 @@ class DatabaseBackedObject:
     @classmethod
     def _db_get(cls, object_uuid):
         raise NotImplementedError(
-            f'{cls.__name__} must override _db_get() — etcd removed')
+            f'{cls.__name__} must override _db_get() with a MariaDB '
+            'implementation')
 
     # We need to force in memory values through JSON because some values require
     # a serializer to run to work when we read them.
