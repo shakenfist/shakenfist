@@ -153,6 +153,7 @@ nav:
             - "Releasing": components/ryll/releasing.md
             - "Troubleshooting": components/ryll/troubleshooting.md
             - Plans:
+                - "Android APK Port of Ryll": components/ryll/plans/PLAN-android-apk.md
                 - "Bug reporting mode for ryll": components/ryll/plans/PLAN-bug-reports.md
                 - "Capture mode for protocol and display debugging": components/ryll/plans/PLAN-capture.md
                 - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
