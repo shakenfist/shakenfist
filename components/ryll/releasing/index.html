@@ -7733,18 +7733,27 @@ Settings → Rules → Rulesets (or the older Settings → Tags):</p>
   still succeed.</li>
 </ul>
 <h3 id="host-tools">Host tools<a class="headerlink" href="#host-tools" title="Permanent link">&para;</a></h3>
-<p>Both scripts run on the operator's host (not in a container).
-Between them they require:</p>
+<p>Both scripts orchestrate from the operator's host. The
+workspace test compile in phase 1 is delegated to <code>make test</code>,
+which runs inside the devcontainer, so the host's rustc does
+not need to satisfy the dependency tree's MSRV. Everything
+else runs on the host and requires:</p>
 <ul>
 <li><code>cargo-release</code> — <code>cargo install --locked cargo-release</code>.
-  Used for the workspace-wide version bump in phase 1. If your
-  host toolchain is older than 1.91 (for example Debian's
-  packaged cargo 1.85), pin the last version that supports it:
+  Used for the workspace-wide version bump in phase 1. The
+  bump only edits <code>Cargo.toml</code> files and does not need to
+  match the workspace's MSRV. If your host toolchain is older
+  than 1.91 (for example Debian's packaged cargo 1.85), pin
+  the last version that supports it:
   <code>cargo install --locked cargo-release@0.25.18</code>.</li>
+<li><code>docker</code> — used by <code>make test</code> (and by <code>pre-commit</code> via
+  <code>scripts/check-rust.sh</code>) to run the Rust toolchain in the
+  devcontainer.</li>
 <li><code>gh</code> — the GitHub CLI, signed in (<code>gh auth login</code>). Used in
   phase 2 to watch the release workflow and open the release
   page on completion.</li>
-<li><code>jq</code>, <code>curl</code>, <code>git</code>, <code>pre-commit</code> — standard dev tooling.</li>
+<li><code>jq</code>, <code>curl</code>, <code>git</code>, <code>pre-commit</code>, <code>make</code> — standard dev
+  tooling.</li>
 </ul>
 <h2 id="release-process">Release process<a class="headerlink" href="#release-process" title="Permanent link">&para;</a></h2>
 <h3 id="phase-1-propose-the-release">Phase 1: propose the release<a class="headerlink" href="#phase-1-propose-the-release" title="Permanent link">&para;</a></h3>
@@ -7765,7 +7774,8 @@ Between them they require:</p>
    <code>version =</code> qualifiers on ryll's path dependencies via
    <code>cargo release version 0.2.0 --workspace --execute
    --no-confirm</code>.</li>
-<li>Run <code>cargo test --workspace</code>.</li>
+<li>Run <code>make test</code> (which runs <code>cargo test --workspace</code>
+   inside the devcontainer).</li>
 <li>Show <code>git diff --stat</code> and prompt
    <code>Commit and push release-0.2.0? [y/N]</code>.</li>
 <li>On confirmation: commit <code>Release 0.2.0.</code> and push
