@@ -8,3 +8,4 @@
 - index.md: Plans index
 - blob-storage-roadmap.md: Blob storage roadmap
 - api-query-batching-roadmap.md: API query batching roadmap
+- PLAN-sql-pushdown-filtering.md: SQL-pushdown filtering
