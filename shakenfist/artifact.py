@@ -22,9 +22,11 @@ from shakenfist.eventlog import add_event
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.artifact_data import ArtifactData
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import general as util_general
 
 
 LOG, _ = logs.setup(__name__)
@@ -191,6 +193,40 @@ class Artifact(dbowo):
             return None
 
         return cls(data)
+
+    @classmethod
+    def from_db_by_ref(
+            cls, object_ref: Union[str, uuid_mod.UUID],
+            namespace: Optional[str] = None) -> 'Artifact | None':
+        """Look up an artifact by UUID or by name within a namespace.
+
+        UUID lookups short-circuit to from_db. Name lookups push
+        state + namespace + name down to a single indexed SQL
+        query via mariadb.find_artifacts.
+        """
+        if object_ref and util_general.valid_uuid4(object_ref):
+            return cls.from_db(object_ref)
+
+        # namespace='system' or namespace=None means "look across
+        # all namespaces" — preserve that by omitting the namespace
+        # filter. Matches baseobject.namespace_filter semantics.
+        criteria_namespace = (
+            namespace if namespace and namespace != 'system' else None)
+
+        criteria = ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            namespace=criteria_namespace,
+            name=object_ref,
+        )
+        matches = mariadb.find_artifacts(criteria)
+
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise exceptions.MultipleObjects(
+                f'multiple artifacts have the name "{object_ref}"'
+                f' in namespace "{namespace}"')
+        return cls(matches[0])
 
     @classmethod
     def new(cls, artifact_type, source_url, name=None, max_versions=0,
