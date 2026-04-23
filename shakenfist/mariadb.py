@@ -61,6 +61,7 @@ from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_metadata import ObjectMetadataData
 from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import State
@@ -145,17 +146,17 @@ NODES_VERSION = 2
 NODE_ATTRIBUTES_VERSION = 2
 NAMESPACES_VERSION = 2
 NAMESPACE_ATTRIBUTES_VERSION = 2
-ARTIFACTS_VERSION = 2
+ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
 ARTIFACT_INDEXES_VERSION = 2
 NETWORK_INTERFACES_VERSION = 2
 NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
-NETWORKS_VERSION = 2
+NETWORKS_VERSION = 3
 NETWORK_ATTRIBUTES_VERSION = 2
 IPAMS_VERSION = 2
 AGENT_OPERATIONS_VERSION = 2
 AGENT_OPERATION_ATTRIBUTES_VERSION = 2
-INSTANCES_VERSION = 2
+INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 2
 OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
@@ -415,6 +416,42 @@ def _build_object_type_enum_values() -> str:
     ALTER TABLE statements.
     """
     return ', '.join(f"'{ot.value}'" for ot in ObjectType)
+
+
+def _build_object_filter_query(
+        table: sa.Table,
+        object_type: ObjectType,
+        criteria: ObjectFilterCriteria) -> sa.Select[Any]:
+    """Build a Select that joins a per-type table to object_states.
+
+    Produces:
+
+        SELECT <table>.* FROM <table>
+        JOIN object_states s
+          ON s.object_uuid = <table>.uuid
+         AND s.object_type = <object_type>
+        WHERE (optional) s.state_value IN criteria.states
+          AND (optional) <table>.namespace = criteria.namespace
+          AND (optional) <table>.name     = criteria.name
+
+    ``criteria.states`` of ``None`` or ``[]`` skips the state filter.
+    ``criteria.namespace`` or ``criteria.name`` of ``None`` skips that
+    filter.
+    """
+    states_table = _get_object_states_table()
+    stmt = sa.select(table).join(
+        states_table,
+        sa.and_(
+            states_table.c.object_uuid == table.c.uuid,
+            states_table.c.object_type == object_type))
+    if criteria.states:
+        stmt = stmt.where(
+            states_table.c.state_value.in_(criteria.states))
+    if criteria.namespace is not None:
+        stmt = stmt.where(table.c.namespace == criteria.namespace)
+    if criteria.name is not None:
+        stmt = stmt.where(table.c.name == criteria.name)
+    return stmt
 
 
 def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
@@ -1523,6 +1560,22 @@ def _ensure_artifacts_schema(engine: sa.Engine) -> dict[str, Any]:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver <= 2:
+        LOG.info(f'Upgrading {table_name} table to version 3 '
+                 '(add index on name column)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'CREATE INDEX idx_artifacts_name ON artifacts(name)'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'Index idx_artifacts_name already exists '
+                    f'or could not be added: {e}')
+
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -11178,6 +11231,43 @@ def _direct_get_all_artifacts() -> list[ArtifactData]:
         return []
 
 
+def _direct_find_artifacts(
+        criteria: ObjectFilterCriteria) -> list[ArtifactData]:
+    """Find artifacts matching the given filter criteria.
+
+    Joins ``artifacts`` to ``object_states`` and applies the optional
+    state/namespace/name filters from ``criteria``. On
+    ``OperationalError`` logs the full criteria at WARNING level and
+    returns an empty list.
+    """
+    engine = _get_engine()
+    table = _get_artifacts_table()
+    stmt = _build_object_filter_query(
+        table, ObjectType.ARTIFACT, criteria)
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(stmt).fetchall()
+            return [
+                ArtifactData(
+                    uuid=row.uuid,
+                    artifact_type=row.artifact_type,
+                    source_url=row.source_url,
+                    name=row.name,
+                    namespace=row.namespace,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find failed for artifacts '
+            f'(states={criteria.states!r}, '
+            f'namespace={criteria.namespace!r}, '
+            f'name={criteria.name!r}): {e}')
+        return []
+
+
 def _direct_update_artifact(data: ArtifactData) -> bool:
     """Update an artifact record in MariaDB.
 
@@ -11534,6 +11624,37 @@ def _grpc_get_all_artifacts() -> list[ArtifactData]:
         return []
 
 
+def _grpc_find_artifacts(
+        criteria: ObjectFilterCriteria) -> list[ArtifactData]:
+    """Find artifacts matching criteria via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        proto_criteria = database_pb2.ObjectFilterCriteria(
+            states=criteria.states if criteria.states is not None else []
+        )
+        if criteria.namespace is not None:
+            proto_criteria.namespace = criteria.namespace
+        if criteria.name is not None:
+            proto_criteria.name = criteria.name
+        request = database_pb2.FindArtifactsRequest(
+            criteria=proto_criteria)
+        reply = _grpc_call(stub.FindArtifacts, request)
+        return [
+            ArtifactData(
+                uuid=a.uuid,
+                artifact_type=a.artifact_type,
+                source_url=a.source_url,
+                name=a.name,
+                namespace=a.namespace,
+                version=a.version
+            )
+            for a in reply.artifacts
+        ]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC FindArtifacts failed: {e}')
+        return []
+
+
 def _grpc_update_artifact(data: ArtifactData) -> bool:
     """Update an artifact record via the database microservice."""
     try:
@@ -11817,6 +11938,21 @@ def get_all_artifacts() -> list[ArtifactData]:
     if _use_database_service():
         return _grpc_get_all_artifacts()
     return _direct_get_all_artifacts()
+
+
+def find_artifacts(
+        criteria: ObjectFilterCriteria) -> list[ArtifactData]:
+    """Find artifacts matching the given filter criteria.
+
+    Args:
+        criteria: Filter criteria (states, namespace, name).
+
+    Returns:
+        List of matching ArtifactData objects.
+    """
+    if _use_database_service():
+        return _grpc_find_artifacts(criteria)
+    return _direct_find_artifacts(criteria)
 
 
 def update_artifact(data: ArtifactData) -> bool:
@@ -13285,6 +13421,22 @@ def _ensure_networks_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver <= 2:
+        LOG.info(f'Upgrading {table_name} table to version 3 '
+                 '(add index on name column)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'CREATE INDEX idx_networks_name ON networks(name)'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'Index idx_networks_name already exists '
+                    f'or could not be added: {e}')
+
+        current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -13443,6 +13595,48 @@ def _direct_get_all_networks() -> list[NetworkData]:
             ]
     except OperationalError as e:
         LOG.warning(f'MariaDB query failed for all networks: {e}')
+        return []
+
+
+def _direct_find_networks(
+        criteria: ObjectFilterCriteria) -> list[NetworkData]:
+    """Find networks matching the given filter criteria.
+
+    Joins ``networks`` to ``object_states`` and applies the optional
+    state/namespace/name filters from ``criteria``. On
+    ``OperationalError`` logs the full criteria at WARNING level and
+    returns an empty list.
+    """
+    engine = _get_engine()
+    table = _get_networks_table()
+    stmt = _build_object_filter_query(
+        table, ObjectType.NETWORK, criteria)
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(stmt).fetchall()
+            return [
+                NetworkData(
+                    uuid=row.uuid,
+                    name=row.name,
+                    namespace=row.namespace,
+                    netblock=row.netblock,
+                    provide_dhcp=row.provide_dhcp,
+                    provide_nat=row.provide_nat,
+                    provide_dns=row.provide_dns,
+                    vxid=row.vxid,
+                    egress_nic=row.egress_nic,
+                    mesh_nic=row.mesh_nic,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find failed for networks '
+            f'(states={criteria.states!r}, '
+            f'namespace={criteria.namespace!r}, '
+            f'name={criteria.name!r}): {e}')
         return []
 
 
@@ -13673,6 +13867,42 @@ def _grpc_get_all_networks() -> list[NetworkData]:
         return []
 
 
+def _grpc_find_networks(
+        criteria: ObjectFilterCriteria) -> list[NetworkData]:
+    """Find networks matching criteria via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        proto_criteria = database_pb2.ObjectFilterCriteria(
+            states=criteria.states if criteria.states is not None else []
+        )
+        if criteria.namespace is not None:
+            proto_criteria.namespace = criteria.namespace
+        if criteria.name is not None:
+            proto_criteria.name = criteria.name
+        request = database_pb2.FindNetworksRequest(
+            criteria=proto_criteria)
+        reply = _grpc_call(stub.FindNetworks, request)
+        return [
+            NetworkData(
+                uuid=d.uuid,
+                name=d.name,
+                namespace=d.namespace or None,
+                netblock=d.netblock,
+                provide_dhcp=d.provide_dhcp,
+                provide_nat=d.provide_nat,
+                provide_dns=d.provide_dns,
+                vxid=d.vxid,
+                egress_nic=d.egress_nic or None,
+                mesh_nic=d.mesh_nic or None,
+                version=d.version
+            )
+            for d in reply.networks
+        ]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC FindNetworks failed: {e}')
+        return []
+
+
 def _grpc_delete_network(net_uuid: UUID) -> bool:
     """Delete a Network record via the database microservice."""
     try:
@@ -13820,6 +14050,21 @@ def get_all_networks() -> list[NetworkData]:
     if _use_database_service():
         return _grpc_get_all_networks()
     return _direct_get_all_networks()
+
+
+def find_networks(
+        criteria: ObjectFilterCriteria) -> list[NetworkData]:
+    """Find networks matching the given filter criteria.
+
+    Args:
+        criteria: Filter criteria (states, namespace, name).
+
+    Returns:
+        List of matching NetworkData objects.
+    """
+    if _use_database_service():
+        return _grpc_find_networks(criteria)
+    return _direct_find_networks(criteria)
 
 
 def delete_network(net_uuid: UUID) -> bool:
@@ -14524,6 +14769,22 @@ def _ensure_instances_schema(
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver <= 2:
+        LOG.info(f'Upgrading {table_name} table to version 3 '
+                 '(add index on name column)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'CREATE INDEX idx_instances_name ON instances(name)'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'Index idx_instances_name already exists '
+                    f'or could not be added: {e}')
+
+        current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -14764,6 +15025,78 @@ def _direct_get_all_instances() -> list[InstanceData]:
     except OperationalError as e:
         LOG.warning(
             f'MariaDB query failed for all instances: {e}')
+        return []
+
+
+def _direct_find_instances(
+        criteria: ObjectFilterCriteria) -> list[InstanceData]:
+    """Find instances matching the given filter criteria.
+
+    Joins ``instances`` to ``object_states`` and applies the optional
+    state/namespace/name filters from ``criteria``. On
+    ``OperationalError`` logs the full criteria at WARNING level and
+    returns an empty list.
+    """
+    engine = _get_engine()
+    table = _get_instances_table()
+    stmt = _build_object_filter_query(
+        table, ObjectType.INSTANCE, criteria)
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(stmt).fetchall()
+
+            results = []
+            for result in rows:
+                disk_spec = result.disk_spec
+                if isinstance(disk_spec, str):
+                    disk_spec = json.loads(disk_spec)
+
+                requested_placement = (
+                    result.requested_placement)
+                if isinstance(requested_placement, str):
+                    requested_placement = json.loads(
+                        requested_placement)
+                if not requested_placement:
+                    requested_placement = None
+
+                video = result.video
+                if isinstance(video, str):
+                    video = json.loads(video)
+
+                side_channels = result.side_channels
+                if isinstance(side_channels, str):
+                    side_channels = json.loads(side_channels)
+
+                results.append(InstanceData(
+                    uuid=result.uuid,
+                    cpus=result.cpus,
+                    disk_spec=disk_spec if disk_spec else [],
+                    memory=result.memory,
+                    name=result.name,
+                    namespace=result.namespace,
+                    requested_placement=requested_placement,
+                    ssh_key=result.ssh_key or None,
+                    user_data=result.user_data or None,
+                    video=video if video else {},
+                    uefi=result.uefi,
+                    configdrive=result.configdrive,
+                    nvram_template=(
+                        result.nvram_template or None),
+                    secure_boot=result.secure_boot,
+                    machine_type=result.machine_type,
+                    side_channels=(
+                        side_channels
+                        if side_channels else []),
+                    version=result.version
+                ))
+            return results
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find failed for instances '
+            f'(states={criteria.states!r}, '
+            f'namespace={criteria.namespace!r}, '
+            f'name={criteria.name!r}): {e}')
         return []
 
 
@@ -15188,6 +15521,60 @@ def _grpc_get_all_instances() -> list[InstanceData]:
         return []
 
 
+def _grpc_find_instances(
+        criteria: ObjectFilterCriteria) -> list[InstanceData]:
+    """Find instances matching criteria via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        proto_criteria = database_pb2.ObjectFilterCriteria(
+            states=criteria.states if criteria.states is not None else []
+        )
+        if criteria.namespace is not None:
+            proto_criteria.namespace = criteria.namespace
+        if criteria.name is not None:
+            proto_criteria.name = criteria.name
+        request = database_pb2.FindInstancesRequest(
+            criteria=proto_criteria)
+        reply = _grpc_call(stub.FindInstances, request)
+        results = []
+        for d in reply.instances:
+            disk_spec = (json.loads(d.disk_spec_json)
+                         if d.disk_spec_json else [])
+            requested_placement = (
+                json.loads(d.requested_placement_json)
+                if d.requested_placement_json else None)
+            if not requested_placement:
+                requested_placement = None
+            video = (json.loads(d.video_json)
+                     if d.video_json else {})
+            side_channels = (
+                json.loads(d.side_channels_json)
+                if d.side_channels_json else [])
+            results.append(InstanceData(
+                uuid=d.uuid,
+                cpus=d.cpus,
+                disk_spec=disk_spec,
+                memory=d.memory,
+                name=d.name,
+                namespace=d.namespace,
+                requested_placement=requested_placement,
+                ssh_key=d.ssh_key or None,
+                user_data=d.user_data or None,
+                video=video,
+                uefi=d.uefi,
+                configdrive=d.configdrive,
+                nvram_template=d.nvram_template or None,
+                secure_boot=d.secure_boot,
+                machine_type=d.machine_type,
+                side_channels=side_channels,
+                version=d.version
+            ))
+        return results
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC FindInstances failed: {e}')
+        return []
+
+
 def _grpc_get_all_instance_uuids() -> list[str]:
     """Get all instance UUIDs via the database service."""
     try:
@@ -15432,6 +15819,21 @@ def get_all_instances() -> list[InstanceData]:
     if _use_database_service():
         return _grpc_get_all_instances()
     return _direct_get_all_instances()
+
+
+def find_instances(
+        criteria: ObjectFilterCriteria) -> list[InstanceData]:
+    """Find instances matching the given filter criteria.
+
+    Args:
+        criteria: Filter criteria (states, namespace, name).
+
+    Returns:
+        List of matching InstanceData objects.
+    """
+    if _use_database_service():
+        return _grpc_find_instances(criteria)
+    return _direct_find_instances(criteria)
 
 
 def get_all_instance_uuids() -> list[str]:

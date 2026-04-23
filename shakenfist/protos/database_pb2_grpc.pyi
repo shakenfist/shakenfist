@@ -527,6 +527,11 @@ class DatabaseServiceStub:
         database_pb2.GetAllArtifactsReply,
     ]
 
+    FindArtifacts: grpc.UnaryUnaryMultiCallable[
+        database_pb2.FindArtifactsRequest,
+        database_pb2.FindArtifactsReply,
+    ]
+
     UpdateArtifact: grpc.UnaryUnaryMultiCallable[
         database_pb2.UpdateArtifactRequest,
         database_pb2.StatusReply,
@@ -692,6 +697,11 @@ class DatabaseServiceStub:
         database_pb2.GetAllNetworksReply,
     ]
 
+    FindNetworks: grpc.UnaryUnaryMultiCallable[
+        database_pb2.FindNetworksRequest,
+        database_pb2.FindNetworksReply,
+    ]
+
     DeleteNetwork: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteNetworkRequest,
         database_pb2.StatusReply,
@@ -779,6 +789,11 @@ class DatabaseServiceStub:
     GetAllInstances: grpc.UnaryUnaryMultiCallable[
         database_pb2.GetAllInstancesRequest,
         database_pb2.GetAllInstancesReply,
+    ]
+
+    FindInstances: grpc.UnaryUnaryMultiCallable[
+        database_pb2.FindInstancesRequest,
+        database_pb2.FindInstancesReply,
     ]
 
     GetAllInstanceUuids: grpc.UnaryUnaryMultiCallable[
@@ -1450,6 +1465,11 @@ class DatabaseServiceAsyncStub:
         database_pb2.GetAllArtifactsReply,
     ]
 
+    FindArtifacts: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.FindArtifactsRequest,
+        database_pb2.FindArtifactsReply,
+    ]
+
     UpdateArtifact: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.UpdateArtifactRequest,
         database_pb2.StatusReply,
@@ -1615,6 +1635,11 @@ class DatabaseServiceAsyncStub:
         database_pb2.GetAllNetworksReply,
     ]
 
+    FindNetworks: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.FindNetworksRequest,
+        database_pb2.FindNetworksReply,
+    ]
+
     DeleteNetwork: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteNetworkRequest,
         database_pb2.StatusReply,
@@ -1702,6 +1727,11 @@ class DatabaseServiceAsyncStub:
     GetAllInstances: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetAllInstancesRequest,
         database_pb2.GetAllInstancesReply,
+    ]
+
+    FindInstances: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.FindInstancesRequest,
+        database_pb2.FindInstancesReply,
     ]
 
     GetAllInstanceUuids: grpc.aio.UnaryUnaryMultiCallable[
@@ -2564,6 +2594,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.GetAllArtifactsReply, collections.abc.Awaitable[database_pb2.GetAllArtifactsReply]]: ...
 
     @abc.abstractmethod
+    def FindArtifacts(
+        self,
+        request: database_pb2.FindArtifactsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.FindArtifactsReply, collections.abc.Awaitable[database_pb2.FindArtifactsReply]]: ...
+
+    @abc.abstractmethod
     def UpdateArtifact(
         self,
         request: database_pb2.UpdateArtifactRequest,
@@ -2787,6 +2824,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.GetAllNetworksReply, collections.abc.Awaitable[database_pb2.GetAllNetworksReply]]: ...
 
     @abc.abstractmethod
+    def FindNetworks(
+        self,
+        request: database_pb2.FindNetworksRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.FindNetworksReply, collections.abc.Awaitable[database_pb2.FindNetworksReply]]: ...
+
+    @abc.abstractmethod
     def DeleteNetwork(
         self,
         request: database_pb2.DeleteNetworkRequest,
@@ -2904,6 +2948,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetAllInstancesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetAllInstancesReply, collections.abc.Awaitable[database_pb2.GetAllInstancesReply]]: ...
+
+    @abc.abstractmethod
+    def FindInstances(
+        self,
+        request: database_pb2.FindInstancesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.FindInstancesReply, collections.abc.Awaitable[database_pb2.FindInstancesReply]]: ...
 
     @abc.abstractmethod
     def GetAllInstanceUuids(

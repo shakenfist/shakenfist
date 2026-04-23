@@ -3042,6 +3042,74 @@ class GetAllArtifactsReply(google.protobuf.message.Message):
 global___GetAllArtifactsReply = GetAllArtifactsReply
 
 @typing.final
+class ObjectFilterCriteria(google.protobuf.message.Message):
+    """ObjectFilterCriteria is a shared filter used by Find* RPCs.
+    Empty repeated / absent optional means "don't filter on this field".
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STATES_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """absent = don't filter"""
+    name: builtins.str
+    """absent = don't filter"""
+    @property
+    def states(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """empty = don't filter"""
+
+    def __init__(
+        self,
+        *,
+        states: collections.abc.Iterable[builtins.str] | None = ...,
+        namespace: builtins.str | None = ...,
+        name: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_name", b"_name", "_namespace", b"_namespace", "name", b"name", "namespace", b"namespace"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_name", b"_name", "_namespace", b"_namespace", "name", b"name", "namespace", b"namespace", "states", b"states"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_name", b"_name"]) -> typing.Literal["name"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_namespace", b"_namespace"]) -> typing.Literal["namespace"] | None: ...
+
+global___ObjectFilterCriteria = ObjectFilterCriteria
+
+@typing.final
+class FindArtifactsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CRITERIA_FIELD_NUMBER: builtins.int
+    @property
+    def criteria(self) -> global___ObjectFilterCriteria: ...
+    def __init__(
+        self,
+        *,
+        criteria: global___ObjectFilterCriteria | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["criteria", b"criteria"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["criteria", b"criteria"]) -> None: ...
+
+global___FindArtifactsRequest = FindArtifactsRequest
+
+@typing.final
+class FindArtifactsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACTS_FIELD_NUMBER: builtins.int
+    @property
+    def artifacts(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ArtifactStaticData]: ...
+    def __init__(
+        self,
+        *,
+        artifacts: collections.abc.Iterable[global___ArtifactStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["artifacts", b"artifacts"]) -> None: ...
+
+global___FindArtifactsReply = FindArtifactsReply
+
+@typing.final
 class UpdateArtifactRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3893,6 +3961,39 @@ class GetAllNetworksReply(google.protobuf.message.Message):
 global___GetAllNetworksReply = GetAllNetworksReply
 
 @typing.final
+class FindNetworksRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CRITERIA_FIELD_NUMBER: builtins.int
+    @property
+    def criteria(self) -> global___ObjectFilterCriteria: ...
+    def __init__(
+        self,
+        *,
+        criteria: global___ObjectFilterCriteria | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["criteria", b"criteria"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["criteria", b"criteria"]) -> None: ...
+
+global___FindNetworksRequest = FindNetworksRequest
+
+@typing.final
+class FindNetworksReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORKS_FIELD_NUMBER: builtins.int
+    @property
+    def networks(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NetworkStaticData]: ...
+    def __init__(
+        self,
+        *,
+        networks: collections.abc.Iterable[global___NetworkStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["networks", b"networks"]) -> None: ...
+
+global___FindNetworksReply = FindNetworksReply
+
+@typing.final
 class DeleteNetworkRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4407,6 +4508,39 @@ class GetAllInstancesReply(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["instances", b"instances"]) -> None: ...
 
 global___GetAllInstancesReply = GetAllInstancesReply
+
+@typing.final
+class FindInstancesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CRITERIA_FIELD_NUMBER: builtins.int
+    @property
+    def criteria(self) -> global___ObjectFilterCriteria: ...
+    def __init__(
+        self,
+        *,
+        criteria: global___ObjectFilterCriteria | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["criteria", b"criteria"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["criteria", b"criteria"]) -> None: ...
+
+global___FindInstancesRequest = FindInstancesRequest
+
+@typing.final
+class FindInstancesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INSTANCES_FIELD_NUMBER: builtins.int
+    @property
+    def instances(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___InstanceStaticData]: ...
+    def __init__(
+        self,
+        *,
+        instances: collections.abc.Iterable[global___InstanceStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["instances", b"instances"]) -> None: ...
+
+global___FindInstancesReply = FindInstancesReply
 
 @typing.final
 class GetAllInstanceUuidsRequest(google.protobuf.message.Message):

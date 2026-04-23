@@ -144,6 +144,7 @@ service DatabaseService {
   rpc CreateArtifact (CreateArtifactRequest) returns (StatusReply) {}
   rpc GetArtifact (GetArtifactRequest) returns (GetArtifactReply) {}
   rpc GetAllArtifacts (GetAllArtifactsRequest) returns (GetAllArtifactsReply) {}
+  rpc FindArtifacts (FindArtifactsRequest) returns (FindArtifactsReply) {}
   rpc UpdateArtifact (UpdateArtifactRequest) returns (StatusReply) {}
   rpc DeleteArtifact (DeleteArtifactRequest) returns (StatusReply) {}
 
@@ -193,6 +194,7 @@ service DatabaseService {
   rpc CreateNetwork (CreateNetworkRequest) returns (StatusReply) {}
   rpc GetNetwork (GetNetworkRequest) returns (GetNetworkReply) {}
   rpc GetAllNetworks (GetAllNetworksRequest) returns (GetAllNetworksReply) {}
+  rpc FindNetworks (FindNetworksRequest) returns (FindNetworksReply) {}
   rpc DeleteNetwork (DeleteNetworkRequest) returns (StatusReply) {}
 
   // Network Attributes Operations (MariaDB)
@@ -222,6 +224,7 @@ service DatabaseService {
   rpc CreateInstance (CreateInstanceRequest) returns (StatusReply) {}
   rpc GetInstance (GetInstanceRequest) returns (GetInstanceReply) {}
   rpc GetAllInstances (GetAllInstancesRequest) returns (GetAllInstancesReply) {}
+  rpc FindInstances (FindInstancesRequest) returns (FindInstancesReply) {}
   rpc GetAllInstanceUuids (GetAllInstanceUuidsRequest) returns (GetAllInstanceUuidsReply) {}
   rpc DeleteInstance (DeleteInstanceRequest) returns (StatusReply) {}
 
@@ -1123,6 +1126,22 @@ message GetAllArtifactsReply {
   repeated ArtifactStaticData artifacts = 1;
 }
 
+// ObjectFilterCriteria is a shared filter used by Find* RPCs.
+// Empty repeated / absent optional means "don't filter on this field".
+message ObjectFilterCriteria {
+  repeated string states = 1;        // empty = don't filter
+  optional string namespace = 2;     // absent = don't filter
+  optional string name = 3;          // absent = don't filter
+}
+
+message FindArtifactsRequest {
+  ObjectFilterCriteria criteria = 1;
+}
+
+message FindArtifactsReply {
+  repeated ArtifactStaticData artifacts = 1;
+}
+
 message UpdateArtifactRequest {
   ArtifactStaticData artifact = 1;
 }
@@ -1352,6 +1371,14 @@ message GetAllNetworksReply {
   repeated NetworkStaticData networks = 1;
 }
 
+message FindNetworksRequest {
+  ObjectFilterCriteria criteria = 1;
+}
+
+message FindNetworksReply {
+  repeated NetworkStaticData networks = 1;
+}
+
 message DeleteNetworkRequest {
   string uuid = 1;
 }
@@ -1490,6 +1517,14 @@ message GetAllInstancesRequest {
 }
 
 message GetAllInstancesReply {
+  repeated InstanceStaticData instances = 1;
+}
+
+message FindInstancesRequest {
+  ObjectFilterCriteria criteria = 1;
+}
+
+message FindInstancesReply {
   repeated InstanceStaticData instances = 1;
 }
 

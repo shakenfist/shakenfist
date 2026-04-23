@@ -54,7 +54,7 @@ class ArtifactData(BaseModel):
     source_url: Annotated[str, SQLIndex()]
 
     # Human-readable artifact name
-    name: str
+    name: Annotated[str, SQLIndex()]
 
     # Owning namespace (required for all persisted artifacts)
     namespace: Annotated[str, SQLIndex()]
