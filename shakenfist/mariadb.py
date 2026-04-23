@@ -6745,7 +6745,7 @@ def get_active_blob_uuids() -> list[str]:
         List of blob UUID strings in active states (empty on error).
     """
     active_states = ['initial', 'created']
-    return _direct_get_objects_by_state(ObjectType.BLOB, active_states) or []
+    return get_objects_by_state(ObjectType.BLOB, active_states) or []
 
 
 # =============================================================================
