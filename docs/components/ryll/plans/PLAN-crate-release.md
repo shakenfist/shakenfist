@@ -44,32 +44,62 @@ from ryll.
 
 ### Release-cutting workflow
 
-New script [tools/cut-release.sh](../../tools/cut-release.sh), invoked
-as `make publish 0.1.4`. The script:
+The cut is split into two phases so the version bump goes through
+the same PR review gate as every other change, rather than landing
+directly on `develop`.
+
+**Phase 1** — [tools/propose-release.sh](../../tools/propose-release.sh),
+invoked as `make propose-release 0.1.4`. The script:
 
 1. Parses and validates the version argument as `X.Y.Z`.
-2. Verifies git: on `develop` (the repository default branch),
-   working tree clean, up to date with `origin/develop`.
-3. Verifies the tag `v0.1.4` does not already exist locally or on
-   `origin`.
+2. Verifies git: on `develop`, working tree clean, in sync with
+   `origin/develop`.
+3. Verifies neither the tag `v0.1.4` nor the branch
+   `release-0.1.4` already exists locally or on `origin`.
 4. Verifies crates.io does not already have `0.1.4` for any of the
    four crates (HTTP GET to the crates.io API — 404 means free).
-5. Runs `pre-commit run --all-files`.
-6. Runs `cargo release version 0.1.4 --workspace --execute --no-confirm`
+5. Creates and switches to `release-0.1.4`.
+6. Runs `pre-commit run --all-files`.
+7. Runs `cargo release version 0.1.4 --workspace --execute --no-confirm`
    to bump `[workspace.package].version` and the path-dep
    `version =` qualifiers in one pass.
-7. Runs `cargo test --workspace` as a final gate.
-8. Shows `git diff --stat`, then prompts "Release v0.1.4? [y/N]".
-9. On `y`: creates the release commit, pushes it, creates an
-   annotated tag `v0.1.4`, pushes the tag (this is what triggers
+8. Runs `cargo test --workspace` as a final gate.
+9. Shows `git diff --stat`, then prompts
+   "Commit and push release-0.1.4? [y/N]".
+10. On `y`: commits `Release 0.1.4.` and pushes
+    `release-0.1.4` to `origin`. On `n`: switches back to
+    `develop` and deletes the release branch — nothing reaches
+    `origin`.
+11. Prints the PR-creation URL so the operator can open the PR
+    manually. The script never creates PRs itself (per the
+    repository convention that PR creation stays with the
+    operator).
+
+**Phase 2** — [tools/tag-release.sh](../../tools/tag-release.sh),
+invoked as `make tag-release 0.1.4` after the phase-1 PR has been
+merged. The script:
+
+1. Fetches `origin/develop` and the latest tags.
+2. Verifies no `v0.1.4` tag exists locally or on `origin`.
+3. Reads `[workspace.package].version` from `origin/develop` and
+   checks it is `0.1.4`; bails otherwise (means the PR has not
+   merged yet or a different version landed).
+4. Shows the target SHA and subject line, spells out that pushing
+   the tag will publish all four crates to crates.io irreversibly,
+   and prompts "Create and push tag v0.1.4? [y/N]".
+5. On `y`: creates an annotated tag `v0.1.4` at the fetched
+   `origin/develop` SHA and pushes it (this is what triggers
    [release.yml](../../.github/workflows/release.yml)).
-10. Runs `gh run watch` on the triggered workflow, then
-    `gh release view v0.1.4 --web` once it completes.
+6. Runs `gh run watch` on the triggered workflow, then
+   `gh release view v0.1.4 --web` once it completes.
 
 `cargo-release` is installed on the host (not inside Docker). It is
 a pure Rust CLI and does not interact with the project's toolchain;
 running it on the host is simpler than the alternative because the
-script also needs git, gh, and SSH key access.
+scripts also need git, gh, and SSH key access. Hosts running older
+rustc (e.g. Debian's cargo 1.85) should pin
+`cargo-release@0.25.18`, which is the last release that supports
+1.85.
 
 ### Release workflow (release.yml)
 

@@ -1,7 +1,22 @@
 # Releasing
 
-Releases are cut via [tools/cut-release.sh](../tools/cut-release.sh)
-(wrapped by `make publish X.Y.Z`) and finished by GitHub Actions.
+Cutting a release is a two-phase operation so the version bump
+goes through the normal PR review gate rather than landing
+directly on `develop`:
+
+1. **Phase 1 — propose:**
+   [tools/propose-release.sh](../tools/propose-release.sh)
+   (wrapped by `make propose-release X.Y.Z`) creates a
+   `release-X.Y.Z` branch from `develop`, bumps the workspace
+   version, runs tests, and pushes the branch. You open a PR
+   from it into `develop` and get it reviewed and merged like
+   any other change.
+2. **Phase 2 — tag:** after the PR has merged,
+   [tools/tag-release.sh](../tools/tag-release.sh) (wrapped by
+   `make tag-release X.Y.Z`) fetches `develop`, verifies its
+   tip has the expected workspace version, creates an annotated
+   `vX.Y.Z` tag at that commit, and pushes the tag.
+
 The tag push triggers
 [.github/workflows/release.yml](../.github/workflows/release.yml),
 which:
@@ -52,49 +67,83 @@ Two secrets must be configured in the ryll repo settings:
   update step fails; the GitHub Release and crates.io publishes
   still succeed.
 
-### Host tools (for `make publish`)
+### Host tools
 
-`make publish` runs `tools/cut-release.sh` on the operator's
-host (not in a container). The script requires:
+Both scripts run on the operator's host (not in a container).
+Between them they require:
 
 - `cargo-release` — `cargo install --locked cargo-release`.
-  Used for the workspace-wide version bump.
-- `gh` — the GitHub CLI, signed in (`gh auth login`). Used to
-  watch the release workflow and open the release page on
-  completion.
+  Used for the workspace-wide version bump in phase 1. If your
+  host toolchain is older than 1.91 (for example Debian's
+  packaged cargo 1.85), pin the last version that supports it:
+  `cargo install --locked cargo-release@0.25.18`.
+- `gh` — the GitHub CLI, signed in (`gh auth login`). Used in
+  phase 2 to watch the release workflow and open the release
+  page on completion.
 - `jq`, `curl`, `git`, `pre-commit` — standard dev tooling.
 
 ## Release process
 
-From a clean checkout of the current default branch (`develop`):
+### Phase 1: propose the release
+
+From a clean checkout of `develop`, up to date with origin:
 
 ```bash
-make publish 0.2.0
+make propose-release 0.2.0
 ```
 
 The script will:
 
 1. Validate the version as `X.Y.Z`.
-2. Confirm the working tree is clean, the branch is up to date
-   with origin, and `v0.2.0` does not yet exist locally or on
-   origin.
+2. Confirm the working tree is clean, the branch is `develop`
+   and in sync with `origin/develop`, and neither `v0.2.0` nor
+   `release-0.2.0` exist locally or on origin.
 3. Query crates.io for `0.2.0` on all four crates; bail if any
    already exists.
-4. Run `pre-commit run --all-files`.
-5. Bump `[workspace.package].version` and the matching
+4. Create and switch to `release-0.2.0`.
+5. Run `pre-commit run --all-files`.
+6. Bump `[workspace.package].version` and the matching
    `version =` qualifiers on ryll's path dependencies via
    `cargo release version 0.2.0 --workspace --execute
    --no-confirm`.
-6. Run `cargo test --workspace`.
-7. Show `git diff --stat` and prompt `Release v0.2.0? [y/N]`.
-8. On confirmation: create `Release 0.2.0.`, push, tag
-   `v0.2.0` (annotated), push the tag.
-9. Watch the release workflow via `gh run watch` and open the
-   release page when it completes.
+7. Run `cargo test --workspace`.
+8. Show `git diff --stat` and prompt
+   `Commit and push release-0.2.0? [y/N]`.
+9. On confirmation: commit `Release 0.2.0.` and push
+   `release-0.2.0` to origin.
 
-Nothing irreversible happens before the `y/N` prompt. If you
-answer `N`, the working tree will be left with uncommitted
-version bumps; revert with `git checkout -- .`.
+Nothing goes to origin before the `y/N` prompt. If you answer
+`N`, the script switches back to `develop` and deletes the
+release branch; nothing is committed.
+
+Once the script finishes, open a PR from `release-0.2.0` into
+`develop`, get it reviewed, and merge it using the repository's
+usual merge strategy. No release artefacts are produced yet —
+this PR is the audit trail for the version bump itself.
+
+### Phase 2: tag the merged commit
+
+After the PR has merged:
+
+```bash
+make tag-release 0.2.0
+```
+
+The script will:
+
+1. Fetch `origin/develop` and the latest tags.
+2. Verify no `v0.2.0` tag exists locally or on origin.
+3. Verify the `[workspace.package].version` on
+   `origin/develop` is `0.2.0` (i.e. the release PR has
+   landed). If it still reports the previous version, the PR
+   has not merged yet — the script bails.
+4. Show the target SHA and subject line, spell out that
+   pushing the tag will publish all four crates to crates.io
+   irreversibly, and prompt `Create and push tag v0.2.0? [y/N]`.
+5. On confirmation: create the annotated tag at
+   `origin/develop` and push it.
+6. Watch the triggered release workflow via `gh run watch` and
+   open the GitHub Release page when it completes.
 
 ## Artifacts produced
 
@@ -113,14 +162,17 @@ version bumps; revert with `git checkout -- .`.
 The `check-version` job reads `[workspace.package].version`
 from the root `Cargo.toml` and compares it to the tag. A
 mismatch fails the workflow and files a GitHub issue. This
-should not happen when you release via `make publish`, since
-the script bumps and tags from a single version string. If it
-does (for example after a manual tag push):
+should not happen when you release via the `propose-release`
+→ `tag-release` flow, since `tag-release` refuses to run
+unless `origin/develop` already carries the matching
+workspace version. If it does (for example after a manual tag
+push):
 
 ```bash
 git tag -d v0.2.0
 git push origin :refs/tags/v0.2.0
-# fix the workspace version, commit, then re-tag via make publish
+# fix the workspace version on develop via a new release PR,
+# then re-run make tag-release X.Y.Z.
 ```
 
 ### crates.io publish fails
