@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix/">
+        <link rel="canonical" href="https://shakenfist.com/components/ryll/plans/PLAN-android-apk/">
       
       
-        <link rel="prev" href="../PLAN-deferred-debt-phase-01-display/">
+        <link rel="prev" href="../../troubleshooting/">
       
       
-        <link rel="next" href="../PLAN-cursor-rendering-phase-01-parse/">
+        <link rel="next" href="../PLAN-bug-reports/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Phase 1: Fix enumerate_physical bus field - Shaken Fist</title>
+        <title>Android APK Port of Ryll - Shaken Fist</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-1-fix-enumerate_physical-bus-field" class="md-skip">
+        <a href="#android-apk-port-of-ryll" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 1: Fix enumerate_physical bus field
+              Android APK Port of Ryll
             
           </span>
         </div>
@@ -2937,10 +2937,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../PLAN-android-apk/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android APK Port of Ryll
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2956,6 +2983,297 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Situation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#target-hardware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target hardware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-existing-rust-code-already-gets-us" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the existing Rust code already gets us
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-will-not-port-cleanly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What will not port cleanly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#input-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input model
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission and problem statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-toolchain-boot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Toolchain + boot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-portability-shims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Portability shims
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-android-entrypoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Android entrypoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-display-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Display + lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-6-audio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Audio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-7-tv-specific-manifest-launcher" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 7: TV-specific manifest + launcher
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-8-ci-build-release-artifact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 8: CI build + release artifact
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-9-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 9: Docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration-and-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3357,37 +3675,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Fix enumerate_physical bus field
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../PLAN-usb-ui-phase-01-bus-fix/" class="md-nav__link">
         
   
   
@@ -3403,181 +3694,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#goal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Goal
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#background" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Background
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Background">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#nusb-api" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        nusb API
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cross-platform-note" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cross-platform note
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#detailed-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Detailed steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Detailed steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-fix-the-bus-field-in-enumerate_physical" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Fix the bus field in enumerate_physical
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-verify-build" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Verify build
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-run-existing-tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Run existing tests
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-4-run-pre-commit-checks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 4: Run pre-commit checks
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#files-changed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Files changed
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-not-in-scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What is NOT in scope
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -7484,10 +7600,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#goal" class="md-nav__link">
+  <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal
+        Prompt
       
     </span>
   </a>
@@ -7495,22 +7611,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#background" class="md-nav__link">
+  <a href="#situation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Background
+        Situation
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Background">
+    <nav class="md-nav" aria-label="Situation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#nusb-api" class="md-nav__link">
+  <a href="#target-hardware" class="md-nav__link">
     <span class="md-ellipsis">
       
-        nusb API
+        Target hardware
       
     </span>
   </a>
@@ -7518,10 +7634,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cross-platform-note" class="md-nav__link">
+  <a href="#what-the-existing-rust-code-already-gets-us" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Cross-platform note
+        What the existing Rust code already gets us
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-will-not-port-cleanly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What will not port cleanly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#input-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input model
       
     </span>
   </a>
@@ -7534,22 +7672,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#detailed-steps" class="md-nav__link">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Detailed steps
+        Mission and problem statement
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Detailed steps">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#step-1-fix-the-bus-field-in-enumerate_physical" class="md-nav__link">
+  <a href="#phase-1-toolchain-boot" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1: Fix the bus field in enumerate_physical
+        Phase 1: Toolchain + boot
       
     </span>
   </a>
@@ -7557,10 +7717,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-2-verify-build" class="md-nav__link">
+  <a href="#phase-2-portability-shims" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2: Verify build
+        Phase 2: Portability shims
       
     </span>
   </a>
@@ -7568,10 +7728,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-run-existing-tests" class="md-nav__link">
+  <a href="#phase-3-android-entrypoint" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Run existing tests
+        Phase 3: Android entrypoint
       
     </span>
   </a>
@@ -7579,10 +7739,65 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-4-run-pre-commit-checks" class="md-nav__link">
+  <a href="#phase-4-display-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4: Run pre-commit checks
+        Phase 4: Display + lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-6-audio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Audio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-7-tv-specific-manifest-launcher" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 7: TV-specific manifest + launcher
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-8-ci-build-release-artifact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 8: CI build + release artifact
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-9-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 9: Docs
       
     </span>
   </a>
@@ -7595,39 +7810,51 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#files-changed" class="md-nav__link">
+  <a href="#administration-and-logistics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Files changed
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-not-in-scope" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What is NOT in scope
+        Future work
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing
+        Bugs fixed during this work
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7635,6 +7862,11 @@
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -7659,141 +7891,519 @@
   
 
 
-<h1 id="phase-1-fix-enumerate_physical-bus-field">Phase 1: Fix enumerate_physical bus field<a class="headerlink" href="#phase-1-fix-enumerate_physical-bus-field" title="Permanent link">&para;</a></h1>
-<p>Parent plan: <a href="/components/ryll/plans/PLAN-usb-ui/">PLAN-usb-ui.md</a></p>
-<h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
-<p>Fix a pre-existing bug where <code>enumerate_physical()</code> sets
-both <code>bus</code> and <code>address</code> in <code>DeviceSource::Physical</code> to
-<code>info.device_address()</code>. The <code>bus</code> field should use
-<code>info.busnum()</code> so that physical devices can be uniquely
-identified by (bus, address) in later phases.</p>
-<h2 id="background">Background<a class="headerlink" href="#background" title="Permanent link">&para;</a></h2>
-<p>In <code>src/usb/real.rs:98-100</code>, the current code is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">source</span><span class="p">:</span><span class="w"> </span><span class="nc">DeviceSource</span><span class="p">::</span><span class="n">Physical</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="n">bus</span><span class="p">:</span><span class="w"> </span><span class="nc">info</span><span class="p">.</span><span class="n">device_address</span><span class="p">(),</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="n">address</span><span class="p">:</span><span class="w"> </span><span class="nc">info</span><span class="p">.</span><span class="n">device_address</span><span class="p">(),</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">},</span>
-</code></pre></div>
-<p>Both fields get the device address. This means the <code>bus</code>
-value in <code>UsbDeviceInfo</code> is wrong, and the <code>label()</code> method
-in <code>src/usb/mod.rs:349-353</code> displays incorrect bus numbers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="fm">format!</span><span class="p">(</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="s">&quot;{} [{:04x}:{:04x}] (bus {} addr {})&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="bp">self</span><span class="p">.</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">vendor_id</span><span class="p">,</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">product_id</span><span class="p">,</span><span class="w"> </span><span class="n">bus</span><span class="p">,</span><span class="w"> </span><span class="n">address</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p">)</span>
-</code></pre></div>
-<p>Phase 5 of this plan will use <code>ConnectPhysical { bus,
-address }</code> to re-find a physical device via nusb during
-connection. If <code>bus</code> is wrong, the re-lookup will fail or
-match the wrong device.</p>
-<h3 id="nusb-api">nusb API<a class="headerlink" href="#nusb-api" title="Permanent link">&para;</a></h3>
-<p>The <code>nusb::DeviceInfo</code> struct provides:</p>
-<ul>
-<li><code>busnum() -&gt; u8</code> — Linux-only, returns the USB bus
-  number. This matches the <code>bus: u8</code> field type in
-  <code>DeviceSource::Physical</code>.</li>
-<li><code>device_address() -&gt; u8</code> — cross-platform, returns the
-  device address within its bus.</li>
-<li><code>bus_id() -&gt; &amp;str</code> — cross-platform string identifier
-  for the bus/host controller.</li>
-</ul>
-<p>Since <code>DeviceSource::Physical</code> already uses <code>u8</code> for both
-fields, and physical USB passthrough is primarily a Linux
-feature, <code>busnum()</code> is the correct fix. A cross-platform
-change to use <code>bus_id()</code> (which returns <code>&amp;str</code>) would
-require changing the field type and all consumers — that's
-out of scope for this bugfix.</p>
-<h3 id="cross-platform-note">Cross-platform note<a class="headerlink" href="#cross-platform-note" title="Permanent link">&para;</a></h3>
-<p>On macOS and Windows, <code>busnum()</code> is not available. Physical
-USB device passthrough on those platforms is already limited
-(nusb support varies, and the usbredir channel requires
-a SPICE server advertising the channel). When we reach
-cross-platform physical device support, we should revisit
-this — likely changing <code>DeviceSource::Physical</code> to use
-<code>bus_id: String</code> instead of <code>bus: u8</code>. For now, on
-non-Linux platforms <code>enumerate_physical()</code> returns whatever
-nusb provides, and <code>busnum()</code> will need a <code>#[cfg(target_os
-= "linux")]</code> guard or equivalent. However, checking the
-nusb 0.2 docs, <code>busnum()</code> appears to be available in the
-API on all platforms (it just returns the bus number where
-available). Need to verify at build time — if it's truly
-Linux-only and doesn't compile elsewhere, gate it behind
-<code>cfg</code> and default to <code>0</code> on other platforms.</p>
-<h2 id="detailed-steps">Detailed steps<a class="headerlink" href="#detailed-steps" title="Permanent link">&para;</a></h2>
-<h3 id="step-1-fix-the-bus-field-in-enumerate_physical">Step 1: Fix the bus field in enumerate_physical<a class="headerlink" href="#step-1-fix-the-bus-field-in-enumerate_physical" title="Permanent link">&para;</a></h3>
-<p>In <code>src/usb/real.rs</code>, line 100, change:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">bus</span><span class="p">:</span><span class="w"> </span><span class="nc">info</span><span class="p">.</span><span class="n">device_address</span><span class="p">(),</span>
-</code></pre></div>
-<p>to:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">bus</span><span class="p">:</span><span class="w"> </span><span class="nc">info</span><span class="p">.</span><span class="n">busnum</span><span class="p">(),</span>
-</code></pre></div>
-<p>If <code>busnum()</code> is gated behind <code>#[cfg(target_os = "linux")]</code>
-in nusb 0.2 and doesn't compile cross-platform, use:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="cp">#[cfg(target_os = </span><span class="s">&quot;linux&quot;</span><span class="cp">)]</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kd">let</span><span class="w"> </span><span class="n">bus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">info</span><span class="p">.</span><span class="n">busnum</span><span class="p">();</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="cp">#[cfg(not(target_os = </span><span class="s">&quot;linux&quot;</span><span class="cp">))]</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kd">let</span><span class="w"> </span><span class="n">bus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="k">u8</span><span class="p">;</span>
-</code></pre></div>
-<p>and then <code>bus: bus,</code> in the struct literal. However, first
-try the simple <code>info.busnum()</code> — it may compile on all
-platforms even if the value is only meaningful on Linux.</p>
-<h3 id="step-2-verify-build">Step 2: Verify build<a class="headerlink" href="#step-2-verify-build" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make imago  # (or equivalent ryll build)
-</code></pre></div>
-<p>If <code>busnum()</code> causes a compile error on the current
-platform, apply the <code>cfg</code> guard from step 1.</p>
-<h3 id="step-3-run-existing-tests">Step 3: Run existing tests<a class="headerlink" href="#step-3-run-existing-tests" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>make test
-</code></pre></div>
-<p>The existing unit test <code>device_info_label_physical</code> in
-<code>src/usb/mod.rs:460-475</code> uses synthetic data
-(<code>DeviceSource::Physical { bus: 1, address: 5 }</code>) so it
-will not be affected by this change. No test changes needed.</p>
-<h3 id="step-4-run-pre-commit-checks">Step 4: Run pre-commit checks<a class="headerlink" href="#step-4-run-pre-commit-checks" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pre-commit run --all-files
-</code></pre></div>
-<p>Fix any clippy or rustfmt issues.</p>
-<h2 id="files-changed">Files changed<a class="headerlink" href="#files-changed" title="Permanent link">&para;</a></h2>
+<h1 id="android-apk-port-of-ryll">Android APK Port of Ryll<a class="headerlink" href="#android-apk-port-of-ryll" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Status: concept plan.</strong> This is an exploratory design document.
+Phase files have not been written and no implementation work has
+begun. The execution table below is provisional. Treat the open
+questions as blockers to firming up the phase plans.</p>
+</blockquote>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before responding to questions or discussion points in this
+document, explore the ryll codebase thoroughly. Read relevant
+source files, understand existing patterns (SPICE protocol
+handling, channel architecture, async task model, image
+decompression, egui rendering), and ground your answers in
+what the code actually does today. Do not speculate about
+the codebase when you could read it instead. Where a question
+touches on external concepts (SPICE protocol, QEMU, QXL,
+TLS/RSA, LZ/GLZ compression, Android platform APIs, winit /
+android-activity / cargo-apk), research as needed to give a
+confident answer. Flag any uncertainty explicitly rather than
+guessing.</p>
+<p>All planning documents should go into <code>docs/plans/</code>.</p>
+<p>Consult <code>ARCHITECTURE.md</code> for the system architecture
+overview, channel types, and data flow. Consult <code>AGENTS.md</code>
+for build commands, project conventions, code organisation,
+and a table of protocol reference sources. Key references
+include <code>shakenfist/kerbside</code> (Python SPICE proxy with
+protocol docs and a reference client),
+<code>/srv/src-reference/spice/spice-protocol/</code> (canonical SPICE
+definitions), <code>/srv/src-reference/spice/spice-gtk/</code>
+(reference C client), and <code>/srv/src-reference/qemu/qemu/</code>
+(server-side SPICE in <code>ui/spice-*</code>).</p>
+<p>When we get to detailed planning, I prefer a separate plan
+file per detailed phase. These separate files should be named
+for the master plan, in the same directory as the master
+plan, and simply have <code>-phase-NN-descriptive</code> appended before
+the <code>.md</code> file extension. Tracking of these sub-phases should
+be done via the table in the Execution section of this
+document.</p>
+<p>I prefer one commit per logical change, and at minimum one
+commit per phase. Do not batch unrelated changes into a
+single commit. Each commit should be self-contained: it
+should build, pass tests, and have a clear commit message
+explaining what changed and why.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>Ryll is a pure-Rust SPICE VDI test client built on eframe 0.29
++ egui, with a tokio async runtime, cpal audio, and a workspace
+of protocol / compression / usbredir sub-crates. It currently
+ships as packaged binaries for Linux x86_64, macOS aarch64, and
+Windows x86_64 (see <code>PLAN-packaging.md</code>).</p>
+<p>There is no Android build today. The primary motivation for
+adding one is to turn commodity Android TV hardware — in
+particular the <strong>Google TV Streamer (2024)</strong> — into a viable
+ryll endpoint: a cheap, HDMI-attached thin client that can
+connect to a shakenfist VM or kerbside-proxied session without
+having to ship dedicated hardware.</p>
+<h3 id="target-hardware">Target hardware<a class="headerlink" href="#target-hardware" title="Permanent link">&para;</a></h3>
+<p>The <strong>Google TV Streamer (2024)</strong> is the principal target:</p>
 <table>
 <thead>
 <tr>
-<th>File</th>
-<th>Change</th>
+<th>Property</th>
+<th>Value</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>src/usb/real.rs</code></td>
-<td>Line 100: <code>info.device_address()</code> → <code>info.busnum()</code></td>
+<td>SoC</td>
+<td>MediaTek MT8696</td>
+</tr>
+<tr>
+<td>CPU</td>
+<td>4× ARM Cortex-A55 @ 2.0 GHz</td>
+</tr>
+<tr>
+<td>GPU</td>
+<td>PowerVR GE9215 @ 850 MHz</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td>4 GB</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>32 GB</td>
+</tr>
+<tr>
+<td>Hardware decode</td>
+<td>H.264 / H.265 / VP9 / AV1</td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Google TV (Android 14)</td>
+</tr>
+<tr>
+<td>Networking</td>
+<td>Wi-Fi 5, Bluetooth 5.1, Gigabit Ethernet</td>
+</tr>
+<tr>
+<td>Sideload</td>
+<td>Supported via <code>adb install</code></td>
 </tr>
 </tbody>
 </table>
-<h2 id="what-is-not-in-scope">What is NOT in scope<a class="headerlink" href="#what-is-not-in-scope" title="Permanent link">&para;</a></h2>
+<p>Secondary targets (same APK should install and run, but UX is
+a future-work concern):</p>
 <ul>
-<li>Changing <code>DeviceSource::Physical</code> field types (stays
-  <code>u8</code>).</li>
-<li>Adding <code>bus_id: String</code> for cross-platform support.</li>
-<li>Any UI changes.</li>
-<li>Any changes to <code>UsbCommand</code> or channel events.</li>
+<li>Chromecast with Google TV 4K (Amlogic S905X3, 2 GB RAM,
+  Android 10/12)</li>
+<li>Chromecast with Google TV HD (Amlogic S805X2, 2 GB RAM,
+  Android 12)</li>
+<li>Generic Android phones and tablets (arm64-v8a, Android 10+)</li>
 </ul>
-<h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
+<p>Pre-Google-TV Chromecast dongles (generations 1–3) are
+<strong>out of scope</strong> — they run a locked-down Chrome-OS-derived
+firmware with no app runtime.</p>
+<h3 id="what-the-existing-rust-code-already-gets-us">What the existing Rust code already gets us<a class="headerlink" href="#what-the-existing-rust-code-already-gets-us" title="Permanent link">&para;</a></h3>
+<p>Components that should port to Android with little or no
+change:</p>
 <ul>
-<li><code>make test</code> — existing tests pass unchanged.</li>
-<li><code>pre-commit run --all-files</code> — lint clean.</li>
-<li>If USB hardware is available, run ryll with <code>--usb-disk</code>
-  and check the status bar label shows correct bus numbers
-  for any physical devices. This is a manual visual check
-  only — no automated test exists for physical device
-  enumeration (it depends on what hardware is plugged in).</li>
+<li><strong>Rust toolchain and workspace.</strong> Pure Rust end to end.
+  <code>cargo-ndk</code> / <code>cargo-apk</code> can cross-compile to
+  <code>aarch64-linux-android</code>.</li>
+<li><strong>SPICE protocol stack.</strong>
+  <code>shakenfist-spice-protocol</code> / <code>-compression</code> / <code>-usbredir</code>
+  are pure Rust and have no platform dependencies beyond
+  <code>std</code>.</li>
+<li><strong>Network transport.</strong> Tokio + <code>tokio-rustls</code> over TCP.
+  Both support Android.</li>
+<li><strong>Audio playback.</strong> <code>cpal</code> 0.15 has an AAudio backend. The
+  existing channel in <code>src/channels/playback.rs</code> should
+  continue to work once the AAudio backend is selected.</li>
+<li><strong>USB backend.</strong> <code>nusb</code> is pure Rust and works on Android,
+  but Android's USB host API requires a Java/Kotlin
+  permission prompt we don't have infrastructure for yet.</li>
 </ul>
-<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
-<p>This phase fixes a one-line bug: <code>bus: info.device_address()</code>
-should be <code>bus: info.busnum()</code> in <code>enumerate_physical()</code>.
-The fix is a prerequisite for phase 5, which uses bus/address
-to re-find physical devices. The change is isolated to
-<code>src/usb/real.rs</code> and does not affect any other code. The
-only risk is cross-platform compilation of <code>busnum()</code> — if
-it fails, we add a <code>cfg</code> guard.</p>
+<h3 id="what-will-not-port-cleanly">What will not port cleanly<a class="headerlink" href="#what-will-not-port-cleanly" title="Permanent link">&para;</a></h3>
+<p>Platform-specific bits that will need attention:</p>
+<ul>
+<li><strong>eframe / winit entrypoint.</strong> <code>src/main.rs</code> calls
+  <code>eframe::run_native(...)</code> with desktop-shaped
+  <code>NativeOptions</code> / <code>ViewportBuilder</code>. Android needs an
+  <code>android_main(app: AndroidApp)</code> entrypoint from the
+  <code>android-activity</code> crate. How deep this rewrite goes
+  depends on whether eframe 0.29's winit integration can
+  accept an externally supplied <code>AndroidApp</code>, or whether we
+  need to bypass eframe and drive egui + winit directly.
+  This is the single biggest unknown.</li>
+<li><strong><code>/proc/self/stat</code> metrics.</strong> <code>src/metrics.rs</code> reads
+  Linux-only <code>/proc</code> paths for CPU accounting. Android's
+  <code>/proc</code> layout is similar but SELinux restrictions may
+  block access. Easiest path for MVP: gate behind
+  <code>#[cfg(not(target_os = "android"))]</code> and expose zeros.</li>
+<li><strong>Hardcoded <code>/tmp/ryll.log</code>.</strong> Replace with Android's
+  app-specific files directory via JNI, or accept an
+  env-var override injected by the activity wrapper.</li>
+<li><strong>Clipboard (<code>arboard</code>).</strong> No Android backend exists. For
+  MVP, either drop clipboard sync on Android or wire a thin
+  JNI bridge to <code>android.content.ClipboardManager</code>.</li>
+<li><strong><code>ctrlc</code> signal handler.</strong> <code>ctrlc</code> is cross-platform but
+  SIGINT-on-Android is meaningless — the activity lifecycle
+  handles termination. Gate off or repurpose to wake the
+  event loop.</li>
+<li><strong><code>--capture</code> feature.</strong> Pulls in <code>openh264</code>, <code>mp4</code>,
+  <code>pcap-file</code>, <code>etherparse</code>. Not a user-facing feature and
+  heavyweight to port. Disable via feature gate on Android
+  (same pattern as Windows in <code>PLAN-packaging.md</code>).</li>
+<li><strong><code>--headless</code> mode.</strong> Meaningless on Android. Disable
+  via <code>#[cfg]</code> gates.</li>
+</ul>
+<h3 id="input-model">Input model<a class="headerlink" href="#input-model" title="Permanent link">&para;</a></h3>
+<p>The Google TV Streamer ships with only a remote control (D-pad
++ voice + a handful of buttons). A remote is a catastrophic UX
+for a mouse-driven SPICE desktop. Realistic options:</p>
+<ol>
+<li><strong>Require a paired Bluetooth keyboard and mouse.</strong> Zero
+   engineering effort; the BT HID events arrive as normal
+   key/pointer events through winit. Clearest MVP.</li>
+<li><strong>Software pointer driven by D-pad.</strong> Acceptable last
+   resort for "oh, I forgot my keyboard" but slow and
+   unpleasant. Deferred.</li>
+<li><strong>Phone-as-trackpad.</strong> Companion app or web page; out of
+   scope.</li>
+</ol>
+<p>For phones/tablets, touch-to-pointer mapping via winit is
+free. A touch-first UI (gesture scrolling, on-screen
+keyboard integration) is future work.</p>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Produce a sideloadable APK of ryll that runs on Android 10+
+(API 29+, arm64-v8a), with primary QA on a Google TV Streamer
+running Android 14. MVP scope:</p>
+<ol>
+<li>Launch the app on a Google TV Streamer and see an egui
+   window (not a black screen, not a crash).</li>
+<li>Open a <code>.vv</code> connection file (or accept connection details
+   through an on-device UI) and connect to a SPICE server.</li>
+<li>Display the remote desktop with correct colour and cursor.</li>
+<li>Accept keyboard and pointer input from paired Bluetooth
+   peripherals and forward it through the SPICE inputs
+   channel.</li>
+<li>Play back remote audio through AAudio.</li>
+<li>Sideload cleanly via <code>adb install</code> onto a stock Google TV
+   Streamer with developer mode enabled.</li>
+</ol>
+<p>Out of MVP scope (tracked in Future work):</p>
+<ul>
+<li>USB redirection.</li>
+<li>Clipboard sync.</li>
+<li>Capture mode.</li>
+<li>WebDAV folder sharing (may work — the port channel is pure
+  Rust — but needs verification and probably UI changes).</li>
+<li>TV-specific launcher metadata, Leanback integration,
+  voice search.</li>
+<li>Google Play Store / F-Droid / Google TV catalog listings.</li>
+<li>Release signing.</li>
+<li>x86_64 Android emulator build (nice for CI; not a target
+  user platform).</li>
+</ul>
+<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<p>Each of these needs to be resolved before the corresponding
+phase plan can be written.</p>
+<ol>
+<li>
+<p><strong>Can eframe 0.29 accept an <code>AndroidApp</code>?</strong> Or do we need
+   to drop eframe and drive egui + winit + wgpu directly? The
+   difference between "add a feature flag and an
+   <code>android_main</code> shim" and "rewrite <code>main.rs</code> and the render
+   loop around raw winit" is roughly a factor of five in
+   effort. <strong>Investigate early in Phase 1.</strong></p>
+</li>
+<li>
+<p><strong>Minimum API level?</strong> AAudio requires API 26 (Android 8),
+   <code>nusb</code> needs API 28 (Android 9), <code>android-activity</code>
+   <code>GameActivity</code> wants API 28+. <strong>Proposed: 29 (Android 10)
+   min, 34 (Android 14) target.</strong> Google TV Streamer ships
+   with 14 so the target is comfortable.</p>
+</li>
+<li>
+<p><strong><code>cargo-apk</code> vs <code>xbuild</code> vs hand-written Gradle.</strong></p>
+</li>
+<li><code>cargo-apk</code> is the easy path but has been lightly
+     maintained and is stuck on older <code>ndk-glue</code>.</li>
+<li><code>xbuild</code> is more modern, handles signing, cross-platform
+     packaging, but adds a new dependency and conventions.</li>
+<li>
+<p><code>cargo-ndk</code> + a small Gradle project gives the most
+     control and matches what every "real" Android project
+     does, at the cost of having to own the Java/Kotlin side.
+   <strong>Proposed: start with <code>cargo-apk</code> for the MVP bring-up;
+   migrate to a Gradle + <code>cargo-ndk</code> project once we need
+   features <code>cargo-apk</code> can't provide (signing automation,
+   TV manifest metadata, custom <code>Activity</code> subclasses).</strong></p>
+</li>
+<li>
+<p><strong>Input model for the MVP.</strong> Require BT keyboard/mouse,
+   or ship D-pad pointer navigation in phase 1? <strong>Proposed:
+   require BT peripherals for MVP; document it loudly.
+   D-pad pointer goes into future work.</strong></p>
+</li>
+<li>
+<p><strong>Clipboard sync in MVP?</strong> <strong>Proposed: drop on Android
+   for MVP.</strong> Revisit via JNI bridge as a follow-up. The
+   SPICE agent clipboard channel is cosmetic for most test
+   scenarios.</p>
+</li>
+<li>
+<p><strong>USB redirection in MVP?</strong> Even on Android TV, USB host
+   mode is often present via a USB-A port on the device. But
+   <code>nusb</code> + the Android permission flow + the lack of
+   <code>libusb</code> means meaningful integration work. <strong>Proposed:
+   out of MVP. Revisit once the display pipeline is stable.</strong></p>
+</li>
+<li>
+<p><strong>Signing.</strong> Debug-sign the MVP APKs (Android will refuse
+   to sideload unsigned APKs). Real release signing is
+   future work when we have a distribution channel.
+   <strong>Proposed: debug sign for MVP.</strong></p>
+</li>
+<li>
+<p><strong>Distribution.</strong> Attach the APK as a GitHub Release
+   artifact, alongside the existing <code>.deb</code> / <code>.rpm</code> /
+   <code>.tar.gz</code> / <code>.zip</code>. No store listings in MVP. <strong>Proposed:
+   release artifact only.</strong></p>
+</li>
+<li>
+<p><strong>CI hardware.</strong> GitHub's <code>ubuntu-latest</code> runners can
+   cross-compile for Android fine. Do we want an emulator
+   smoke test in CI, or only a build job? Emulators on
+   GitHub runners are slow and flaky. <strong>Proposed: build job
+   only for MVP. Smoke testing is manual on real hardware.</strong></p>
+</li>
+<li>
+<p><strong>Architecture coverage.</strong> Ship arm64-v8a only (covers
+    every target Android TV device and every Android phone
+    of the last 5+ years), or also armeabi-v7a and x86_64?
+    <strong>Proposed: arm64-v8a only. Revisit if a user asks.</strong></p>
+</li>
+<li>
+<p><strong><code>/proc</code> metrics on Android.</strong> Gate off, or implement
+    via the Android-specific APIs (<code>Process.myTid()</code>,
+    <code>Debug.threadCpuTimeNanos()</code> through JNI)? <strong>Proposed:
+    gate off for MVP; reintroduce via JNI if anyone wants
+    in-app metrics on Android.</strong></p>
+</li>
+<li>
+<p><strong>Lifecycle handling.</strong> Android aggressively suspends
+    backgrounded apps. How does the SPICE connection
+    survive a screen-off / app-backgrounded event — do we
+    disconnect and reconnect, or try to keep the tokio
+    runtime alive via a foreground service? <strong>Proposed:
+    MVP disconnects on <code>onPause</code> and reconnects on
+    <code>onResume</code>.</strong> A foreground service is future work.</p>
+</li>
+</ol>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>Phase files are <strong>not yet written</strong>. The breakdown below is a
+provisional sketch; expect it to change once the open
+questions resolve.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Plan</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Toolchain + boot an empty window</td>
+<td>PLAN-android-apk-phase-01-toolchain.md</td>
+<td>Not written</td>
+</tr>
+<tr>
+<td>2. Portability shims (<code>#[cfg]</code> gating)</td>
+<td>PLAN-android-apk-phase-02-shims.md</td>
+<td>Not written</td>
+</tr>
+<tr>
+<td>3. Android entrypoint (eframe vs bare winit)</td>
+<td>PLAN-android-apk-phase-03-entrypoint.md</td>
+<td>Not written</td>
+</tr>
+<tr>
+<td>4. Display + activity lifecycle</td>
+<td>PLAN-android-apk-phase-04-display.md</td>
+<td>Not written</td>
+</tr>
+<tr>
+<td>5. Input (BT keyboard/mouse → SPICE inputs)</td>
+<td>PLAN-android-apk-phase-05-input.md</td>
+<td>Not written</td>
+</tr>
+<tr>
+<td>6. Audio (AAudio via cpal)</td>
+<td>PLAN-android-apk-phase-06-audio.md</td>
+<td>Not written</td>
+</tr>
+<tr>
+<td>7. TV-specific manifest + launcher</td>
+<td>PLAN-android-apk-phase-07-tv.md</td>
+<td>Not written</td>
+</tr>
+<tr>
+<td>8. CI build + release artifact</td>
+<td>PLAN-android-apk-phase-08-ci.md</td>
+<td>Not written</td>
+</tr>
+<tr>
+<td>9. Docs</td>
+<td>PLAN-android-apk-phase-09-docs.md</td>
+<td>Not written</td>
+</tr>
+</tbody>
+</table>
+<h3 id="phase-1-toolchain-boot">Phase 1: Toolchain + boot<a class="headerlink" href="#phase-1-toolchain-boot" title="Permanent link">&para;</a></h3>
+<p>Stand up the Android build toolchain (<code>rustup target add
+aarch64-linux-android</code>, NDK install, <code>cargo-apk</code> configured)
+and produce a minimal APK that launches, shows an egui
+"Hello, ryll" window on a Google TV Streamer, and exits
+cleanly. No SPICE, no audio — proves the eframe/winit/egui
+story works at all. <strong>This phase's answer to open question
+(1) decides everything downstream.</strong></p>
+<h3 id="phase-2-portability-shims">Phase 2: Portability shims<a class="headerlink" href="#phase-2-portability-shims" title="Permanent link">&para;</a></h3>
+<p>Audit every <code>#[cfg(unix)]</code> / <code>target_os = "linux"</code> site and
+add the corresponding <code>#[cfg(target_os = "android")]</code> arms.
+Feature-gate <code>capture</code> and <code>headless</code> off on Android. Stub
+<code>/proc</code> metrics. Replace <code>/tmp/ryll.log</code> with the activity's
+cache dir. Drop <code>arboard</code> on Android or wire a no-op
+backend. Land this as a standalone change that still builds
+on the three existing platforms.</p>
+<h3 id="phase-3-android-entrypoint">Phase 3: Android entrypoint<a class="headerlink" href="#phase-3-android-entrypoint" title="Permanent link">&para;</a></h3>
+<p>Replace (or augment) <code>main.rs</code> so that on Android the library
+exposes <code>android_main(AndroidApp)</code> from the <code>android-activity</code>
+crate, plumbs the <code>AndroidApp</code> into winit's event loop, and
+constructs the existing <code>RyllApp</code> from the normal eframe
+lifecycle callbacks. If eframe can't accommodate this, this
+phase drops eframe and replaces it with <code>egui-winit</code> +
+<code>egui-wgpu</code> on desktop <strong>and</strong> Android. That's a bigger
+change and would warrant its own sub-plan.</p>
+<h3 id="phase-4-display-lifecycle">Phase 4: Display + lifecycle<a class="headerlink" href="#phase-4-display-lifecycle" title="Permanent link">&para;</a></h3>
+<p>Wire the SPICE display channel's texture uploads into the
+wgpu surface that winit hands us. Make the connection
+survive <code>onPause</code> / <code>onResume</code> cleanly — for MVP this can
+mean "disconnect and reconnect", but the implementation has
+to not leak tokio tasks or the ring-buffer capture thread.</p>
+<h3 id="phase-5-input">Phase 5: Input<a class="headerlink" href="#phase-5-input" title="Permanent link">&para;</a></h3>
+<p>Map Android <code>KeyEvent</code> scancodes to SPICE scancodes in the
+same shape as the existing <code>key_to_scancode</code> in
+<code>src/channels/inputs.rs</code>. Map <code>MotionEvent</code> to SPICE pointer
+events. Handle BT HID mouse wheel. For touch-only devices,
+synthesise pointer events from single-finger touches, leave
+gesture handling to future work.</p>
+<h3 id="phase-6-audio">Phase 6: Audio<a class="headerlink" href="#phase-6-audio" title="Permanent link">&para;</a></h3>
+<p>Verify cpal's AAudio backend works with the existing Opus
+decode + resampler pipeline in <code>src/channels/playback.rs</code>.
+Audio is the most likely component to "just work"; this
+phase is primarily a test-and-tune pass.</p>
+<h3 id="phase-7-tv-specific-manifest-launcher">Phase 7: TV-specific manifest + launcher<a class="headerlink" href="#phase-7-tv-specific-manifest-launcher" title="Permanent link">&para;</a></h3>
+<p>Add <code>android.software.leanback</code> to <code>AndroidManifest.xml</code>,
+declare <code>CATEGORY_LEANBACK_LAUNCHER</code>, ship a TV banner
+image, and make sure the app shows up in the Google TV
+launcher's apps row. Minimal — mostly manifest edits.</p>
+<h3 id="phase-8-ci-build-release-artifact">Phase 8: CI build + release artifact<a class="headerlink" href="#phase-8-ci-build-release-artifact" title="Permanent link">&para;</a></h3>
+<p>Extend <code>.github/workflows/release.yml</code> with an
+<code>android-build</code> job on <code>ubuntu-latest</code>. Produce
+<code>ryll-{version}-arm64-v8a.apk</code> and attach it to the GitHub
+Release. Document the sideload workflow in
+<code>docs/installation.md</code>. Debug-signed for MVP.</p>
+<h3 id="phase-9-docs">Phase 9: Docs<a class="headerlink" href="#phase-9-docs" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>docs/portability.md</code> — add an Android row to the
+  supported-platforms table and a section explaining build
+  requirements and device targets.</li>
+<li><code>docs/installation.md</code> — Android section with
+  <code>adb install</code> instructions and the "enable developer
+  mode on Google TV" recipe.</li>
+<li><code>README.md</code> — mention Android in the supported-platforms
+  line.</li>
+<li><code>ARCHITECTURE.md</code> — no changes expected; the core
+  architecture is platform-agnostic.</li>
+<li><code>AGENTS.md</code> — add Android build commands.</li>
+</ul>
+<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
+<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<p>We will know the MVP has landed when:</p>
+<ul>
+<li><code>cargo apk build --release --target aarch64-linux-android</code>
+  produces a signed APK from a clean checkout.</li>
+<li><code>adb install -r ryll-*.apk</code> succeeds on a Google TV
+  Streamer running stock Google TV (Android 14).</li>
+<li>The launcher shows a ryll tile; tapping it opens the app.</li>
+<li>The app reads a <code>.vv</code> file (delivered via <code>adb push</code> and
+  an <code>Intent.ACTION_VIEW</code>) and connects to a kerbside
+  endpoint.</li>
+<li>The display channel renders the remote desktop at native
+  resolution and correct colour.</li>
+<li>A paired Bluetooth keyboard and mouse generate keystrokes
+  and pointer motion that the SPICE server sees.</li>
+<li>Remote audio plays through AAudio.</li>
+<li>Backgrounding and re-foregrounding the app reconnects
+  cleanly and does not leak tokio tasks (verified via
+  <code>adb shell dumpsys meminfo</code>).</li>
+<li><code>pre-commit run --all-files</code> still passes on the existing
+  three platforms.</li>
+<li><code>cargo test --workspace</code> still passes on the existing
+  three platforms.</li>
+<li><code>docs/portability.md</code> and <code>docs/installation.md</code> are
+  updated.</li>
+<li>The CI workflow produces a signed APK artifact on tag
+  push.</li>
+</ul>
+<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Phone and tablet UX.</strong> Touch-first controls, on-screen
+  keyboard toggle, gesture scrolling, portrait/landscape
+  rotation handling, status-bar integration.</li>
+<li><strong>D-pad pointer.</strong> For TV users without BT peripherals.</li>
+<li><strong>USB redirection on Android.</strong> <code>nusb</code> + USB host
+  permission intent + a device picker.</li>
+<li><strong>Clipboard sync.</strong> JNI bridge to
+  <code>android.content.ClipboardManager</code>.</li>
+<li><strong>MediaCodec for streaming-video.</strong> Today ryll decodes
+  MJPEG and VP8 in software. Routing streaming-video
+  through Android's hardware decoders would materially
+  help battery and performance on low-spec devices.</li>
+<li><strong>Foreground service</strong> to keep the SPICE connection
+  alive across app backgrounding.</li>
+<li><strong>Audio record channel</strong> (microphone). Needs
+  <code>RECORD_AUDIO</code> permission; defer until someone asks.</li>
+<li><strong>Play Store listing</strong>, F-Droid publishing, Google TV
+  catalog inclusion.</li>
+<li><strong>Release signing automation</strong> with a keystore held as a
+  GitHub Actions secret.</li>
+<li><strong>x86_64 Android emulator CI smoke test.</strong></li>
+<li><strong>armeabi-v7a / x86_64 architecture builds</strong> if demand
+  emerges.</li>
+<li><strong>Leanback-native UI</strong> for TV navigation instead of
+  retrofitting a desktop UI.</li>
+<li><strong>Chromecast receiver mode.</strong> A separate plan — see the
+  discussion in the chat that spawned this plan. Running a
+  ryll app that can <em>also</em> accept tab casts from Chrome on
+  the LAN (via openscreen / shanocast) on the same Google
+  TV Streamer is a natural pairing.</li>
+</ul>
+<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<p>(None yet — no implementation has started.)</p>
+<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<p>Before executing any step of this plan, please back brief
+the operator as to your understanding of the plan and how
+the work you intend to do aligns with that plan. Because
+this is a concept plan, the first "step" is to resolve the
+open questions above — especially (1), the eframe / winit
+/ Android integration question — before any phase plan is
+written.</p>
 
 
 
@@ -7814,7 +8424,7 @@ it fails, we add a <code>cfg</code> guard.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/ryll/plans/PLAN-android-apk.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/ryll/plans/PLAN-android-apk.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/ryll/plans/PLAN-android-apk/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

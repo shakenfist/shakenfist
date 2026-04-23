@@ -2940,6 +2940,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-android-apk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android APK Port of Ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-bug-reports/" class="md-nav__link">
         
   
@@ -7568,32 +7596,61 @@ rather than <code>0.1.0</code>. There is no behavioural reason to renumber
 ryll and no value in having the sub-crates at different versions
 from ryll.</p>
 <h3 id="release-cutting-workflow">Release-cutting workflow<a class="headerlink" href="#release-cutting-workflow" title="Permanent link">&para;</a></h3>
-<p>New script <a href="../../tools/cut-release.sh">tools/cut-release.sh</a>, invoked
-as <code>make publish 0.1.4</code>. The script:</p>
+<p>The cut is split into two phases so the version bump goes through
+the same PR review gate as every other change, rather than landing
+directly on <code>develop</code>.</p>
+<p><strong>Phase 1</strong> — <a href="../../tools/propose-release.sh">tools/propose-release.sh</a>,
+invoked as <code>make propose-release 0.1.4</code>. The script:</p>
 <ol>
 <li>Parses and validates the version argument as <code>X.Y.Z</code>.</li>
-<li>Verifies git: on <code>develop</code> (the repository default branch),
-   working tree clean, up to date with <code>origin/develop</code>.</li>
-<li>Verifies the tag <code>v0.1.4</code> does not already exist locally or on
-   <code>origin</code>.</li>
+<li>Verifies git: on <code>develop</code>, working tree clean, in sync with
+   <code>origin/develop</code>.</li>
+<li>Verifies neither the tag <code>v0.1.4</code> nor the branch
+   <code>release-0.1.4</code> already exists locally or on <code>origin</code>.</li>
 <li>Verifies crates.io does not already have <code>0.1.4</code> for any of the
    four crates (HTTP GET to the crates.io API — 404 means free).</li>
+<li>Creates and switches to <code>release-0.1.4</code>.</li>
 <li>Runs <code>pre-commit run --all-files</code>.</li>
 <li>Runs <code>cargo release version 0.1.4 --workspace --execute --no-confirm</code>
    to bump <code>[workspace.package].version</code> and the path-dep
    <code>version =</code> qualifiers in one pass.</li>
 <li>Runs <code>cargo test --workspace</code> as a final gate.</li>
-<li>Shows <code>git diff --stat</code>, then prompts "Release v0.1.4? [y/N]".</li>
-<li>On <code>y</code>: creates the release commit, pushes it, creates an
-   annotated tag <code>v0.1.4</code>, pushes the tag (this is what triggers
+<li>Shows <code>git diff --stat</code>, then prompts
+   "Commit and push release-0.1.4? [y/N]".</li>
+<li>On <code>y</code>: commits <code>Release 0.1.4.</code> and pushes
+    <code>release-0.1.4</code> to <code>origin</code>. On <code>n</code>: switches back to
+    <code>develop</code> and deletes the release branch — nothing reaches
+    <code>origin</code>.</li>
+<li>Prints the PR-creation URL so the operator can open the PR
+    manually. The script never creates PRs itself (per the
+    repository convention that PR creation stays with the
+    operator).</li>
+</ol>
+<p><strong>Phase 2</strong> — <a href="../../tools/tag-release.sh">tools/tag-release.sh</a>,
+invoked as <code>make tag-release 0.1.4</code> after the phase-1 PR has been
+merged. The script:</p>
+<ol>
+<li>Fetches <code>origin/develop</code> and the latest tags.</li>
+<li>Verifies no <code>v0.1.4</code> tag exists locally or on <code>origin</code>.</li>
+<li>Reads <code>[workspace.package].version</code> from <code>origin/develop</code> and
+   checks it is <code>0.1.4</code>; bails otherwise (means the PR has not
+   merged yet or a different version landed).</li>
+<li>Shows the target SHA and subject line, spells out that pushing
+   the tag will publish all four crates to crates.io irreversibly,
+   and prompts "Create and push tag v0.1.4? [y/N]".</li>
+<li>On <code>y</code>: creates an annotated tag <code>v0.1.4</code> at the fetched
+   <code>origin/develop</code> SHA and pushes it (this is what triggers
    <a href="../../.github/workflows/release.yml">release.yml</a>).</li>
 <li>Runs <code>gh run watch</code> on the triggered workflow, then
-    <code>gh release view v0.1.4 --web</code> once it completes.</li>
+   <code>gh release view v0.1.4 --web</code> once it completes.</li>
 </ol>
 <p><code>cargo-release</code> is installed on the host (not inside Docker). It is
 a pure Rust CLI and does not interact with the project's toolchain;
 running it on the host is simpler than the alternative because the
-script also needs git, gh, and SSH key access.</p>
+scripts also need git, gh, and SSH key access. Hosts running older
+rustc (e.g. Debian's cargo 1.85) should pin
+<code>cargo-release@0.25.18</code>, which is the last release that supports
+1.85.</p>
 <h3 id="release-workflow-releaseyml">Release workflow (release.yml)<a class="headerlink" href="#release-workflow-releaseyml" title="Permanent link">&para;</a></h3>
 <p>Three changes to <a href="../../.github/workflows/release.yml">release.yml</a>:</p>
 <ol>
