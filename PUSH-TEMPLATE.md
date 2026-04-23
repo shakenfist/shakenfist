@@ -1,68 +1,308 @@
-Thanks for your work on this. I appreciate it. Some final checks
-before I push:
+Thanks for your work on this. I appreciate it. Some final
+checks before I push.
 
-## Code quality
+## How to use this template
 
- * Did the changes introduce any significant amount of duplicated
-   code? Are there any missed opportunities for code reuse or
-   refactoring?
- * Should any new code be extracted into a shared module? Look for
-   logic that a second object type or daemon would likely need.
- * Are there any TODO comments we should address as part of this
-   work?
- * Please ensure all source code is wrapped at 120 characters.
- * Use single quotes for strings, double quotes for docstrings.
+The pre-push audit splits into two waves:
 
-## Style conformance
+**Wave 1 — mechanical.** Build verification, lint, unit and
+functional test suites, and the parts of style conformance
+that grep can answer. Always run wave 1 first; wave 2 is
+only worth spending on if wave 1 passes.
 
- * Does the code follow the project conventions in `CLAUDE.md`?
-   Check in particular:
-   - Python conventions (import ordering, logging pattern,
-     copyright headers).
-   - Object lifecycle conventions (state machine transitions,
-     `hard_delete()` cleanup, event logging).
-   - Database access conventions (three-layer direct/gRPC/public
-     pattern in `mariadb.py`, Pydantic schemas in
-     `shakenfist/schema/`).
-   - gRPC conventions (proto definitions, stub generation via
-     `tox -e genprotos`).
+**Wave 2 — judgment.** Code-quality, test-coverage,
+documentation, and security review. Some of this is
+mechanical (TODO/FIXME grep, dead-code detection, new
+dependencies) and the rest needs sub-agents to read code
+and apply judgment. The four judgment agents are
+independent and can be spawned in parallel.
 
-## Tests
+The management session reviews all findings, fixes any
+issues, and confirms the push.
 
- * Is there unit and functional test coverage for the changes?
-   This should include normal and adversarial cases.
- * All tests should pass. We need to fix any failing tests now
-   before we push.
- * What tests are skipped? Could we reduce that number?
- * Run `pre-commit run --all-files` and confirm all hooks pass
-   (flake8, stestr, mypy).
+## Wave 1: Mechanical checks
 
-## Documentation
+Run the following, stopping on the first failure:
 
- * Has `docs/` been updated to reflect any new or changed
-   features? In particular, has `docs/operator_guide/database.md`
-   been updated for any database schema changes?
- * Has `ARCHITECTURE.md` been updated if this change adds or
-   modifies modules, daemons, or object types?
- * Has `README.md` been updated if usage instructions, project
-   structure, or setup steps have changed?
- * Has `AGENTS.md` been updated?
- * Is all deferred work and pre-existing errors listed in a plan
-   file?
+```
+pre-commit run --all-files
+tox
+```
 
-## Security review
+`pre-commit` runs flake8, stestr unit tests, and mypy. `tox`
+runs the full test matrix including any additional envs
+configured (e.g. `genprotos`). If proto files are in the
+diff, also confirm the generated stubs are up to date:
 
- * Review these changes as both a security reviewer and an
-   experienced developer and correct any errors you find.
- * Are any user-controlled values (API inputs, namespace names,
-   instance metadata) used in file paths, SQL queries, or shell
-   commands without sanitization?
- * Do new gRPC or REST API endpoints enforce proper authentication
-   and namespace authorization?
+```
+tox -e genprotos
+git diff --exit-code shakenfist/protos
+```
 
-## Build verification
+Then a few grep-level style checks on the diff against
+`develop`:
 
- * Does `pip install -e .` succeed?
- * Does `tox` pass?
- * If proto files were modified, were stubs regenerated with
-   `tox -e genprotos`?
+```
+git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].{120,}'  # lines > 120 chars
+git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\bprint\('  # stray print()s in new code
+git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\betcd\b'  # new etcd references
+```
+
+Exit condition: wave 1 passes when pre-commit, tox, proto
+regeneration (if applicable), and the style greps all come
+back clean. If anything fails, fix the cause and re-run
+before spending on wave 2.
+
+### Style conformance — judgment portion
+
+The commands above cover what grep can prove. The remaining
+style questions need a sub-agent to read code:
+
+| Setting | Value |
+|---------|-------|
+| Model | sonnet |
+| Effort | low |
+
+**Brief for sub-agent (only if wave 1 passes):**
+
+Check `git diff develop...HEAD` for adherence to project
+conventions in `CLAUDE.md` and `AGENTS.md`:
+
+- Python conventions: import ordering, logging via the
+  `shakenfist_utilities.logs` pattern, single quotes for
+  strings and double quotes for docstrings, 120-char lines.
+- Object lifecycle conventions: state machine transitions
+  via `state_targets`, `hard_delete()` cleanup, event
+  logging via `shakenfist.eventlog.add_event` with the
+  correct `EVENT_TYPE_*` constant.
+- Database access conventions: every new MariaDB function
+  should follow the three-layer pattern — `_direct_*`,
+  `_grpc_*`, and a public wrapper that chooses between
+  them via `_use_database_service()`. Direct access from
+  non-database-daemon code paths is a bug.
+- SQL-pushdown discipline: does any new code materialise a
+  full object list with `get_all_*()` and then filter in
+  Python where a `WHERE` clause on an indexed column could
+  have done the work at the database?
+- gRPC conventions: proto edits in
+  `shakenfist/protos/database.proto`; counter registered
+  in the Monitor operations list in
+  `shakenfist/daemons/database/main.py`; stubs regenerated
+  with `tox -e genprotos`.
+- Field rename / unit-change discipline: did any field
+  silently change units (e.g. seconds → ms, bytes → KiB)
+  without a rename or doc comment?
+
+Report a short list of any violations found. If none, say
+"Style checks passed."
+
+## Wave 2: Deeper review
+
+Only run wave 2 after wave 1 passes.
+
+Start with the mechanical sweep on the diff:
+
+```
+# TODO / FIXME / HACK / XXX in changed files
+git diff develop...HEAD -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'
+
+# New `# noqa`, `# type: ignore`, or `pragma: no cover`
+git diff develop...HEAD -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'
+
+# New test functions vs files changed (sanity ratio)
+git diff develop...HEAD --stat | tail -1
+git diff develop...HEAD -- '*.py' | grep -cE '^\+\s*def test_'
+
+# Documentation files touched (warns if none — the diff may have merited doc updates)
+git diff develop...HEAD --name-only -- 'docs/*' '*.md'
+
+# New direct subprocess / shell calls — might need sanitisation review
+git diff develop...HEAD -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'
+```
+
+These report only — they do not block. Treat the output as
+input to the judgment agents below.
+
+Then spawn the judgment agents. They are independent and
+can run in parallel.
+
+### 2a. Code quality
+
+| Setting | Value |
+|---------|-------|
+| Model | sonnet |
+| Effort | medium |
+
+**Brief for sub-agent:**
+
+The mechanical sweep has already extracted TODO/FIXME
+comments, new `# noqa` / `# type: ignore`, and subprocess
+calls. Take that report as input.
+
+Add the judgment-level review on the diff
+(`git diff develop...HEAD`):
+
+- **Duplicated code:** Are there significant blocks of
+  duplicated logic that the mechanical scan can't see?
+  Look for copy-paste patterns across MariaDB accessors,
+  REST handlers, or daemon run loops.
+- **Missed abstractions:** Should any new code be extracted
+  into a shared module? Look for logic a second object type
+  or daemon would likely need.
+- **SQL pushdown:** Does any new code load objects in bulk
+  and filter in Python where a parameterised query on an
+  indexed column could have done the work? Flag these as
+  blocking unless the caller's expected cardinality is
+  clearly tiny.
+- **Three-layer pattern:** Does every new MariaDB function
+  have the direct/gRPC/public trio, with the corresponding
+  counter registered and proto definition (if needed)?
+- **Triage the mechanical findings:** for each
+  TODO / noqa / type:ignore the sweep flagged, say
+  blocking or advisory and why. Skip ones inside test
+  modules unless they disable coverage on production code.
+
+Report findings as a bullet list. For each finding, state
+the file, line, and whether it's blocking (must fix before
+push) or advisory (can address later).
+
+### 2b. Test review
+
+| Setting | Value |
+|---------|-------|
+| Model | sonnet |
+| Effort | medium |
+
+**Brief for sub-agent:**
+
+Review the diff (`git diff develop...HEAD`) for test
+coverage:
+
+- Does every new public function or significant code path
+  have unit test coverage?
+- For anything behavioural (lifecycle transitions, cluster
+  operations, REST endpoints), is there functional coverage
+  in `shakenfist/deploy/cluster_ci`? Shakenfist prefers
+  functional tests to unit tests when we can only have
+  one.
+- Do the tests include adversarial cases (malformed input,
+  empty namespaces, duplicate UUIDs, state transitions from
+  terminal states, concurrent deletion)?
+- Are there any assertions that test implementation details
+  rather than behaviour (fragile tests that will break on
+  refactors)?
+- Are there any new modules or functions with zero test
+  coverage that should have at least basic tests?
+
+Also verify:
+- All existing tests still pass (wave 1 already confirmed
+  this, so just check the wave 1 result).
+- If the change touches instance lifecycle, networking, or
+  the database daemon, note which `cluster_ci` tests in
+  particular would exercise the new behaviour and whether
+  they should be run before push.
+
+Report findings as a bullet list grouped by file.
+
+### 2c. Documentation review
+
+| Setting | Value |
+|---------|-------|
+| Model | sonnet |
+| Effort | medium |
+
+**Brief for sub-agent:**
+
+Check that documentation matches the current code state.
+Read the diff (`git diff develop...HEAD`) and verify:
+
+- `README.md` reflects any new features, changed usage, or
+  updated project structure.
+- `ARCHITECTURE.md` reflects any new or modified modules,
+  daemons, object types, or gRPC services.
+- `AGENTS.md` reflects any new dependencies, build
+  commands, or conventions.
+- `docs/` content is in sync — in particular,
+  `docs/operator_guide/database.md` for schema changes,
+  `docs/operator_guide/` for new operator-visible
+  behaviour, and `docs/developer_guide/` for new internal
+  patterns.
+- Plan files in `docs/plans/` are up to date — completed
+  phases marked complete, deferred items listed, and the
+  *Plan Status* table in `docs/plans/index.md` reflects
+  reality.
+- If database schema changed, verify there is migration
+  guidance (either in-tree migration code or a documented
+  upgrade path).
+
+Report findings as a bullet list. "No documentation gaps
+found" is a valid answer.
+
+### 2d. Security review
+
+| Setting | Value |
+|---------|-------|
+| Model | opus |
+| Effort | high |
+
+**Brief for sub-agent:**
+
+Security review of the diff (`git diff develop...HEAD`).
+This requires careful judgment — read the actual code, not
+just the diff summary.
+
+Check for:
+
+- **Authentication and authorisation:** Does every new
+  REST endpoint and gRPC method enforce JWT validation
+  and namespace authorisation? Is the
+  `@external_api.base.requires_namespace*` decorator (or
+  equivalent) applied? Can a caller in namespace A read or
+  mutate objects owned by namespace B?
+- **Input validation:** Are API inputs (namespace names,
+  instance metadata, source URLs, artifact names) validated
+  before use? Could malformed input cause unhandled
+  exceptions or bypass checks? Watch for `.get()` with
+  implicit default where a required field is expected.
+- **SQL injection:** All MariaDB access should go through
+  SQLAlchemy parameterised queries. Any f-string or
+  string-concatenated SQL is a finding. Any use of
+  `text()` with interpolated user input is a finding.
+- **Shell and subprocess safety:** Are user-controlled
+  values passed to subprocess calls, `os.system`, or shell
+  templates without sanitisation? Any new `shell=True` is
+  a finding unless the command string is a constant.
+- **Credential and secret handling:** Are passwords, JWT
+  secrets, or database credentials logged, persisted to
+  events, or returned in API responses? The event log is
+  particularly dangerous because it is broadly readable.
+- **Resource exhaustion:** Could a malicious caller cause
+  unbounded memory growth (e.g. via a very large artifact
+  list), file descriptor leaks, or daemon CPU spin? Look
+  for unpaginated `get_all_*` calls in hot paths and
+  missing timeouts on external operations.
+- **Concurrency:** Are there new shared-state patterns or
+  lock acquisitions? Could they deadlock with existing
+  locks? Is lock ordering documented or obvious?
+
+Report findings with severity (critical / high / medium /
+low / informational). For each finding, state the file,
+line, the vulnerability class, and a recommended fix.
+
+## Management session checklist
+
+After all agents complete, the management session should:
+
+- [ ] Wave 1 passed (pre-commit, tox, proto stubs fresh,
+      style greps clean).
+- [ ] Wave 2 findings reviewed.
+- [ ] Any blocking findings from 2a/2b/2c have been fixed
+      and re-verified.
+- [ ] Any security findings from 2d have been assessed —
+      critical and high must be fixed before push.
+- [ ] The commit history is clean (no fixup commits that
+      should be squashed, no accidental files, no WIP
+      messages).
+- [ ] The branch is up to date with the target branch
+      (rebase if needed).
+- [ ] Ready to push.
