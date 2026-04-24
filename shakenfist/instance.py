@@ -56,6 +56,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
@@ -344,6 +345,38 @@ class Instance(dbowo):
             obj = cls(cls._static_values_to_dict(data))
             if all(f(obj) for f in filters):
                 yield obj
+
+    @classmethod
+    def from_db_by_ref(cls, object_ref, namespace=None):
+        """Look up an instance by UUID or by name within a namespace.
+
+        UUID lookups short-circuit to from_db. Name lookups push
+        state + namespace + name down to a single indexed SQL
+        query via mariadb.find_instances.
+        """
+        if object_ref and util_general.valid_uuid4(object_ref):
+            return cls.from_db(object_ref)
+
+        # namespace='system' or namespace=None means 'look across
+        # all namespaces' - preserve that by omitting the namespace
+        # filter. Matches baseobject.namespace_filter semantics.
+        criteria_namespace = (
+            namespace if namespace and namespace != 'system' else None)
+
+        criteria = ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            namespace=criteria_namespace,
+            name=object_ref,
+        )
+        matches = mariadb.find_instances(criteria)
+
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise exceptions.MultipleObjects(
+                f'multiple instances have the name "{object_ref}"'
+                f' in namespace "{namespace}"')
+        return cls(cls._static_values_to_dict(matches[0]))
 
     def _db_get_attribute(self, attribute, default=None):
         """Get an attribute, routing MariaDB-stored attributes appropriately."""

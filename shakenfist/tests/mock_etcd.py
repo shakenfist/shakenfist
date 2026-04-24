@@ -22,6 +22,7 @@ from shakenfist.schema.agentoperation_data import AgentOperationData
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.instance_attributes import InstanceAttributesData
 from shakenfist.schema.instance_data import InstanceData
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.dnsmasq import DnsMasqData
@@ -414,6 +415,12 @@ class MockEtcd():
         self.mariadb_get_all_artifacts.start()
         self.test_obj.addCleanup(self.mariadb_get_all_artifacts.stop)
 
+        self.mariadb_find_artifacts = mock.patch(
+            'shakenfist.mariadb.find_artifacts',
+            side_effect=self._mariadb_find_artifacts)
+        self.mariadb_find_artifacts.start()
+        self.test_obj.addCleanup(self.mariadb_find_artifacts.stop)
+
         self.mariadb_update_artifact = mock.patch(
             'shakenfist.mariadb.update_artifact',
             side_effect=self._mariadb_update_artifact)
@@ -551,6 +558,12 @@ class MockEtcd():
         self.mariadb_get_all_networks.start()
         self.test_obj.addCleanup(self.mariadb_get_all_networks.stop)
 
+        self.mariadb_find_networks = mock.patch(
+            'shakenfist.mariadb.find_networks',
+            side_effect=self._mariadb_find_networks)
+        self.mariadb_find_networks.start()
+        self.test_obj.addCleanup(self.mariadb_find_networks.stop)
+
         self.mariadb_delete_network = mock.patch(
             'shakenfist.mariadb.delete_network',
             side_effect=self._mariadb_delete_network)
@@ -673,6 +686,12 @@ class MockEtcd():
             side_effect=self._mariadb_get_all_instances)
         self.mariadb_get_all_instances.start()
         self.test_obj.addCleanup(self.mariadb_get_all_instances.stop)
+
+        self.mariadb_find_instances = mock.patch(
+            'shakenfist.mariadb.find_instances',
+            side_effect=self._mariadb_find_instances)
+        self.mariadb_find_instances.start()
+        self.test_obj.addCleanup(self.mariadb_find_instances.stop)
 
         self.mariadb_get_all_instance_uuids = mock.patch(
             'shakenfist.mariadb.get_all_instance_uuids',
@@ -1551,6 +1570,24 @@ class MockEtcd():
             f'{len(self.artifact_objects)} results')
         return list(self.artifact_objects.values())
 
+    def _mariadb_find_artifacts(
+            self, criteria: ObjectFilterCriteria) -> list[ArtifactData]:
+        """Mock implementation of mariadb.find_artifacts().
+
+        The mock does not track state, so criteria.states is ignored
+        (all mocked artifacts are treated as active). Namespace and
+        name filters are applied in Python.
+        """
+        results = list(self.artifact_objects.values())
+        if criteria.namespace is not None:
+            results = [d for d in results if d.namespace == criteria.namespace]
+        if criteria.name is not None:
+            results = [d for d in results if d.name == criteria.name]
+        self._trace(
+            f'MockMariaDB.find_artifacts(criteria={criteria!r}): '
+            f'{len(results)} results')
+        return results
+
     def _mariadb_update_artifact(self, data: ArtifactData) -> bool:
         """Mock implementation of mariadb.update_artifact()"""
         key = str(data.uuid)
@@ -1788,6 +1825,27 @@ class MockEtcd():
         self._trace('MockMariaDB.get_all_networks()')
         return list(self.network_objects.values())
 
+    def _mariadb_find_networks(
+            self, criteria: ObjectFilterCriteria) -> list[NetworkData]:
+        """Mock implementation of mariadb.find_networks().
+
+        The mock does not track state, so criteria.states is ignored
+        (all mocked networks are treated as active). Namespace and
+        name filters are applied in Python. NetworkData.namespace is
+        Optional[str], so a non-None criteria.namespace excludes
+        networks whose stored namespace is None (matches SQL NULL
+        semantics).
+        """
+        results = list(self.network_objects.values())
+        if criteria.namespace is not None:
+            results = [d for d in results if d.namespace == criteria.namespace]
+        if criteria.name is not None:
+            results = [d for d in results if d.name == criteria.name]
+        self._trace(
+            f'MockMariaDB.find_networks(criteria={criteria!r}): '
+            f'{len(results)} results')
+        return results
+
     def _mariadb_delete_network(self, net_uuid) -> bool:
         """Mock implementation of mariadb.delete_network()"""
         key = str(net_uuid)
@@ -2005,6 +2063,24 @@ class MockEtcd():
         """Mock implementation of mariadb.get_all_instances()"""
         self._trace('MockMariaDB.get_all_instances()')
         return list(self.instance_objects.values())
+
+    def _mariadb_find_instances(
+            self, criteria: ObjectFilterCriteria) -> list[InstanceData]:
+        """Mock implementation of mariadb.find_instances().
+
+        The mock does not track state, so criteria.states is ignored
+        (all mocked instances are treated as active). Namespace and
+        name filters are applied in Python.
+        """
+        results = list(self.instance_objects.values())
+        if criteria.namespace is not None:
+            results = [d for d in results if d.namespace == criteria.namespace]
+        if criteria.name is not None:
+            results = [d for d in results if d.name == criteria.name]
+        self._trace(
+            f'MockMariaDB.find_instances(criteria={criteria!r}): '
+            f'{len(results)} results')
+        return results
 
     def _mariadb_get_all_instance_uuids(self) -> list[str]:
         """Mock implementation of mariadb.get_all_instance_uuids()"""
