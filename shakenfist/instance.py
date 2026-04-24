@@ -2065,56 +2065,20 @@ class Instance(dbowo):
 class Instances(dbo_iter):
     base_object = Instance
 
-    def get_iterator(self):
-        if self.prefilter:
-            if self.prefilter == 'active':
-                target_states = Instance.ACTIVE_STATES
-            elif self.prefilter == 'deleted':
-                target_states = [dbo.STATE_DELETED]
-            elif self.prefilter == 'healthy':
-                target_states = Instance.HEALTHY_STATES
-            elif self.prefilter == 'inactive':
-                target_states = Instance.INACTIVE_STATES
-            else:
-                raise exceptions.InvalidObjectPrefilter(
-                    self.prefilter)
+    def _find(self, criteria):
+        return mariadb.find_instances(criteria)
 
-            matching_uuids_list = mariadb.get_objects_by_state(
-                Instance.object_type, list(target_states))
-
-            if matching_uuids_list is None:
-                # State query failed; yield all and let caller
-                # filters handle correctness.
-                LOG.warning('get_objects_by_state returned None for '
-                            'instances, falling back to full scan')
-                for data in mariadb.get_all_instances():
-                    yield (str(data.uuid),
-                           Instance._static_values_to_dict(data))
-                return
-
-            matching_uuids = set(matching_uuids_list)
-
-            results = []
-            for data in mariadb.get_all_instances():
-                if str(data.uuid) in matching_uuids:
-                    results.append(
-                        (str(data.uuid),
-                         Instance._static_values_to_dict(data)))
-            yield from results
-        else:
-            for data in mariadb.get_all_instances():
-                yield (str(data.uuid),
-                       Instance._static_values_to_dict(data))
+    def _to_static_values(self, data):
+        return Instance._static_values_to_dict(data)
 
     def __iter__(self):
         for _, static_values in self.get_iterator():
-            i = Instance(static_values)
-            if not i:
+            inst = Instance(static_values)
+            if not inst:
                 continue
-
-            out = self.apply_filters(i)
-            if out:
-                yield out
+            filtered = self.apply_filters(inst)
+            if filtered:
+                yield filtered
 
 
 def placement_filter(node, inst):
