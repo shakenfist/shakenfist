@@ -3564,6 +3564,39 @@ class GetAllNetworkInterfacesRequest(google.protobuf.message.Message):
 global___GetAllNetworkInterfacesRequest = GetAllNetworkInterfacesRequest
 
 @typing.final
+class FindNetworkInterfacesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CRITERIA_FIELD_NUMBER: builtins.int
+    @property
+    def criteria(self) -> global___ObjectFilterCriteria: ...
+    def __init__(
+        self,
+        *,
+        criteria: global___ObjectFilterCriteria | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["criteria", b"criteria"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["criteria", b"criteria"]) -> None: ...
+
+global___FindNetworkInterfacesRequest = FindNetworkInterfacesRequest
+
+@typing.final
+class FindNetworkInterfacesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORK_INTERFACES_FIELD_NUMBER: builtins.int
+    @property
+    def network_interfaces(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NetworkInterfaceStaticData]: ...
+    def __init__(
+        self,
+        *,
+        network_interfaces: collections.abc.Iterable[global___NetworkInterfaceStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["network_interfaces", b"network_interfaces"]) -> None: ...
+
+global___FindNetworkInterfacesReply = FindNetworkInterfacesReply
+
+@typing.final
 class DeleteNetworkInterfaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

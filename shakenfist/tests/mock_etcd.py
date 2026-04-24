@@ -514,6 +514,12 @@ class MockEtcd():
         self.mariadb_update_network_interface.start()
         self.test_obj.addCleanup(self.mariadb_update_network_interface.stop)
 
+        self.mariadb_find_network_interfaces = mock.patch(
+            'shakenfist.mariadb.find_network_interfaces',
+            side_effect=self._mariadb_find_network_interfaces)
+        self.mariadb_find_network_interfaces.start()
+        self.test_obj.addCleanup(self.mariadb_find_network_interfaces.stop)
+
         # MariaDB network interface attributes operations
         self.mariadb_create_network_interface_attributes = mock.patch(
             'shakenfist.mariadb.create_network_interface_attributes',
@@ -1763,6 +1769,32 @@ class MockEtcd():
             return True
         self._trace(f'MockMariaDB.update_network_interface({key}): not found')
         return False
+
+    def _mariadb_find_network_interfaces(
+            self, criteria: ObjectFilterCriteria) -> list[NetworkInterfaceData]:
+        """Mock implementation of mariadb.find_network_interfaces().
+
+        Honours criteria.states by cross-referencing mariadb_states,
+        matching the real SQL JOIN against object_states. Name filter
+        is applied in Python. Namespace is silently ignored because
+        network_interfaces has no namespace column.
+        """
+        results = list(self.network_interface_objects.values())
+        if criteria.states:
+            matching = {
+                d['object_uuid']
+                for d in self.mariadb_states.values()
+                if (d['object_type'] == ObjectType.INTERFACE
+                    and d['state_value'] in criteria.states)
+            }
+            results = [d for d in results if str(d.uuid) in matching]
+        # criteria.name is silently ignored: network_interfaces has no
+        # name column (name filter is a no-op for this type, consistent
+        # with how namespace is handled).
+        self._trace(
+            f'MockMariaDB.find_network_interfaces(criteria={criteria!r}): '
+            f'{len(results)} results')
+        return results
 
     def _mariadb_create_network_interface_attributes(
             self, data: NetworkInterfaceAttributesData) -> bool:

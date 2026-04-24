@@ -133,7 +133,7 @@ turns up a handful of call sites outside the iterator and
 |--------|--------|
 | `shakenfist/locks.py:118` `get_all_cluster_locks` | Admin-only; skip. |
 | `shakenfist/namespace.py:264` `get_all_namespace_names` | Covered by Namespaces port. |
-| `shakenfist/baseobject.py:77` `get_all_node_uuids` | Covered by Nodes port (or same code path). |
+| `shakenfist/baseobject.py:77` `get_all_node_uuids` | Admin skip — inside `_maintain_version_cache()`, a bounded metrics-cache refresh, not the Nodes iterator. Separate code path from `Nodes.__iter__`. |
 | `shakenfist/daemons/resources/main.py:408` `get_all_node_metrics` | Admin-only bulk metrics export; skip. |
 | `shakenfist/network/interface.py:332,340,347` `get_all_network_interfaces` | Covered by NetworkInterfaces port. |
 | `shakenfist/artifact.py:338,414` `get_all_artifact_indexes(self.uuid)` | Already scoped to one artifact; skip. |

@@ -621,6 +621,11 @@ class DatabaseServiceStub:
         database_pb2.GetNetworkInterfacesReply,
     ]
 
+    FindNetworkInterfaces: grpc.UnaryUnaryMultiCallable[
+        database_pb2.FindNetworkInterfacesRequest,
+        database_pb2.FindNetworkInterfacesReply,
+    ]
+
     DeleteNetworkInterface: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteNetworkInterfaceRequest,
         database_pb2.StatusReply,
@@ -1557,6 +1562,11 @@ class DatabaseServiceAsyncStub:
     GetAllNetworkInterfaces: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetAllNetworkInterfacesRequest,
         database_pb2.GetNetworkInterfacesReply,
+    ]
+
+    FindNetworkInterfaces: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.FindNetworkInterfacesRequest,
+        database_pb2.FindNetworkInterfacesReply,
     ]
 
     DeleteNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
@@ -2720,6 +2730,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetAllNetworkInterfacesRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfacesReply]]: ...
+
+    @abc.abstractmethod
+    def FindNetworkInterfaces(
+        self,
+        request: database_pb2.FindNetworkInterfacesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.FindNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.FindNetworkInterfacesReply]]: ...
 
     @abc.abstractmethod
     def DeleteNetworkInterface(

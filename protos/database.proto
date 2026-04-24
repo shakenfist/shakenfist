@@ -170,6 +170,7 @@ service DatabaseService {
   rpc GetNetworkInterfacesByInstance (GetNetworkInterfacesByInstanceRequest) returns (GetNetworkInterfacesReply) {}
   rpc GetNetworkInterfacesByNetwork (GetNetworkInterfacesByNetworkRequest) returns (GetNetworkInterfacesReply) {}
   rpc GetAllNetworkInterfaces (GetAllNetworkInterfacesRequest) returns (GetNetworkInterfacesReply) {}
+  rpc FindNetworkInterfaces (FindNetworkInterfacesRequest) returns (FindNetworkInterfacesReply) {}
   rpc DeleteNetworkInterface (DeleteNetworkInterfaceRequest) returns (StatusReply) {}
   rpc UpdateNetworkInterface (UpdateNetworkInterfaceRequest) returns (StatusReply) {}
 
@@ -1263,6 +1264,14 @@ message GetNetworkInterfacesReply {
 
 message GetAllNetworkInterfacesRequest {
   // No filters - returns all network interfaces
+}
+
+message FindNetworkInterfacesRequest {
+  ObjectFilterCriteria criteria = 1;
+}
+
+message FindNetworkInterfacesReply {
+  repeated NetworkInterfaceStaticData network_interfaces = 1;
 }
 
 message DeleteNetworkInterfaceRequest {

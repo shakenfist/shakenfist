@@ -594,6 +594,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetAllNetworkInterfacesRequest.SerializeToString,
                 response_deserializer=database__pb2.GetNetworkInterfacesReply.FromString,
                 _registered_method=True)
+        self.FindNetworkInterfaces = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindNetworkInterfaces',
+                request_serializer=database__pb2.FindNetworkInterfacesRequest.SerializeToString,
+                response_deserializer=database__pb2.FindNetworkInterfacesReply.FromString,
+                _registered_method=True)
         self.DeleteNetworkInterface = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteNetworkInterface',
                 request_serializer=database__pb2.DeleteNetworkInterfaceRequest.SerializeToString,
@@ -1589,6 +1594,12 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def FindNetworkInterfaces(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteNetworkInterface(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -2530,6 +2541,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetAllNetworkInterfaces,
                     request_deserializer=database__pb2.GetAllNetworkInterfacesRequest.FromString,
                     response_serializer=database__pb2.GetNetworkInterfacesReply.SerializeToString,
+            ),
+            'FindNetworkInterfaces': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindNetworkInterfaces,
+                    request_deserializer=database__pb2.FindNetworkInterfacesRequest.FromString,
+                    response_serializer=database__pb2.FindNetworkInterfacesReply.SerializeToString,
             ),
             'DeleteNetworkInterface': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteNetworkInterface,
@@ -5841,6 +5857,33 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetAllNetworkInterfaces',
             database__pb2.GetAllNetworkInterfacesRequest.SerializeToString,
             database__pb2.GetNetworkInterfacesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindNetworkInterfaces(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindNetworkInterfaces',
+            database__pb2.FindNetworkInterfacesRequest.SerializeToString,
+            database__pb2.FindNetworkInterfacesReply.FromString,
             options,
             channel_credentials,
             insecure,

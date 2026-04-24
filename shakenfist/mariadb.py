@@ -12445,6 +12445,54 @@ def _direct_get_all_network_interfaces() -> list[NetworkInterfaceData]:
         return []
 
 
+def _direct_find_network_interfaces(
+        criteria: ObjectFilterCriteria) -> list[NetworkInterfaceData]:
+    """Find NetworkInterface records matching the given filter criteria.
+
+    Joins ``network_interfaces`` to ``object_states`` and applies the
+    optional state filter from ``criteria``. Both the ``namespace`` and
+    ``name`` filters are silently ignored because the
+    ``network_interfaces`` table has neither column. On
+    ``OperationalError`` logs the full criteria at WARNING level and
+    returns an empty list.
+    """
+    engine = _get_engine()
+    table = _get_network_interfaces_table()
+    # network_interfaces has no namespace or name column; strip both
+    # before building the query to avoid WHERE clauses that would error.
+    safe_criteria = ObjectFilterCriteria(
+        states=criteria.states,
+        namespace=None,
+        name=None,
+    )
+    stmt = _build_object_filter_query(
+        table, ObjectType.INTERFACE, safe_criteria)
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(stmt).fetchall()
+            return [
+                NetworkInterfaceData(
+                    uuid=row.uuid,
+                    network_uuid=row.network_uuid,
+                    instance_uuid=row.instance_uuid,
+                    macaddr=row.macaddr,
+                    ipv4=row.ipv4,
+                    order=row.order,
+                    model=row.model,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find failed for network_interfaces '
+            f'(states={criteria.states!r}, '
+            f'namespace={criteria.namespace!r}, '
+            f'name={criteria.name!r}): {e}')
+        return []
+
+
 def _direct_delete_network_interface(ni_uuid: UUID) -> bool:
     """Delete a NetworkInterface record from MariaDB.
 
@@ -12744,6 +12792,40 @@ def _grpc_get_all_network_interfaces() -> list[NetworkInterfaceData]:
         return []
 
 
+def _grpc_find_network_interfaces(
+        criteria: ObjectFilterCriteria) -> list[NetworkInterfaceData]:
+    """Find NetworkInterface records matching criteria via the database
+    microservice."""
+    try:
+        stub = _get_database_stub()
+        proto_criteria = database_pb2.ObjectFilterCriteria(
+            states=criteria.states if criteria.states is not None else []
+        )
+        if criteria.namespace is not None:
+            proto_criteria.namespace = criteria.namespace
+        if criteria.name is not None:
+            proto_criteria.name = criteria.name
+        request = database_pb2.FindNetworkInterfacesRequest(
+            criteria=proto_criteria)
+        reply = _grpc_call(stub.FindNetworkInterfaces, request)
+        return [
+            NetworkInterfaceData(
+                uuid=d.uuid,
+                network_uuid=d.network_uuid,
+                instance_uuid=d.instance_uuid,
+                macaddr=d.macaddr,
+                ipv4=d.ipv4,
+                order=d.order,
+                model=d.model or None,
+                version=d.version
+            )
+            for d in reply.network_interfaces
+        ]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC FindNetworkInterfaces failed: {e}')
+        return []
+
+
 def _grpc_delete_network_interface(ni_uuid: UUID) -> bool:
     """Delete a NetworkInterface record via the database
     microservice."""
@@ -12943,6 +13025,24 @@ def get_all_network_interfaces() -> list[NetworkInterfaceData]:
     if _use_database_service():
         return _grpc_get_all_network_interfaces()
     return _direct_get_all_network_interfaces()
+
+
+def find_network_interfaces(
+        criteria: ObjectFilterCriteria) -> list[NetworkInterfaceData]:
+    """Find NetworkInterface records matching the given filter criteria.
+
+    Args:
+        criteria: Filter criteria (states). The namespace and name
+            fields are accepted for proto-shape consistency but are
+            silently ignored because network_interfaces has neither
+            column.
+
+    Returns:
+        List of matching NetworkInterfaceData objects.
+    """
+    if _use_database_service():
+        return _grpc_find_network_interfaces(criteria)
+    return _direct_find_network_interfaces(criteria)
 
 
 def delete_network_interface(ni_uuid: UUID) -> bool:

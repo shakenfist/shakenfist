@@ -2424,6 +2424,37 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetNetworkInterfacesReply(
                 network_interfaces=[])
 
+    def FindNetworkInterfaces(
+        self,
+        request: database_pb2.FindNetworkInterfacesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindNetworkInterfacesReply:
+        """Find NetworkInterface records matching filter criteria from MariaDB."""
+        try:
+            self.monitor.counters['find_network_interfaces'].inc()
+            criteria = ObjectFilterCriteria(
+                states=list(request.criteria.states) or None,
+                namespace=(
+                    request.criteria.namespace
+                    if request.criteria.HasField('namespace') else None),
+                name=(
+                    request.criteria.name
+                    if request.criteria.HasField('name') else None),
+            )
+            nis = mariadb._direct_find_network_interfaces(criteria)
+            return database_pb2.FindNetworkInterfacesReply(
+                network_interfaces=[
+                    self._ni_to_proto(d)
+                    for d in nis
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindNetworkInterfaces failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.FindNetworkInterfacesReply(
+                network_interfaces=[])
+
     def DeleteNetworkInterface(
         self,
         request: database_pb2.DeleteNetworkInterfaceRequest,
@@ -4592,6 +4623,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_and_enqueue_cluster_operation',
             # MariaDB find (filter-pushdown) operations
             'find_artifacts', 'find_instances', 'find_networks',
+            'find_network_interfaces',
             # MariaDB node metrics operations
             'upsert_node_metrics', 'get_node_metrics',
             'get_all_node_metrics', 'delete_node_metrics',

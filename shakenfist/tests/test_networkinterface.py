@@ -54,7 +54,7 @@ JUST_INTERFACES = [
 
 class NetworkInterfaceTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INTERFACES)
-    @mock.patch('shakenfist.mariadb.get_all_network_interfaces',
+    @mock.patch('shakenfist.mariadb.find_network_interfaces',
                 return_value=MARIADB_ALL_INTERFACES)
-    def test_ni_iterator_mocking(self, mock_get_all_nis, mock_get):
+    def test_ni_iterator_mocking(self, mock_find_nis, mock_get):
         self.assertEqual(2, len(list(NetworkInterfaces([]))))
