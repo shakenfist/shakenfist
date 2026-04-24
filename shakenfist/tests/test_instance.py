@@ -210,7 +210,8 @@ class InstanceTestCase(base.ShakenFistTestCase):
             user_data=str(base64.b64encode(b'thisisuserdata'), 'utf-8'))
 
         i = instance.Instance.from_db(instance_uuid)
-        i.interfaces = [iface_uuid_one, iface_uuid_two]
+        # The NetworkInterface rows above carry instance_uuid; the
+        # query-backed ``interfaces`` property finds them automatically.
 
         (fd, cd_file) = tempfile.mkstemp()
         os.close(fd)
@@ -357,7 +358,8 @@ class InstanceTestCase(base.ShakenFistTestCase):
             user_data=str(base64.b64encode(b'thisisuserdata'), 'utf-8'))
 
         i = instance.Instance.from_db(instance_uuid)
-        i.interfaces = [iface_uuid_one, iface_uuid_two]
+        # The NetworkInterface rows above carry instance_uuid; the
+        # query-backed ``interfaces`` property finds them automatically.
 
         (fd, cd_file) = tempfile.mkstemp()
         os.close(fd)

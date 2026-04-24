@@ -159,10 +159,13 @@ class Instance(dbowo):
     initial_version = 19
     current_version = 19
 
-    # Attributes stored in MariaDB (everything else stays in etcd)
+    # Attributes stored in MariaDB (everything else stays in etcd).
+    # ``interfaces`` was here pre-phase-7; the column on
+    # ``instance_attributes`` is dropped in phase 7e and the property
+    # now queries ``network_interfaces`` directly.
     MARIADB_ATTRIBUTES = {
         'placement', 'power_state', 'ports', 'enforced_deletes',
-        'block_devices', 'interfaces', 'agent_state',
+        'block_devices', 'agent_state',
         'agent_attributes', 'agent_operations', 'kvm_pid', 'error',
         'vsock_cids',
     }
@@ -428,8 +431,6 @@ class Instance(dbowo):
                 attrs.kvm_pid = value.get('pid') if isinstance(value, dict) else value
             elif attribute == 'error':
                 attrs.error_message = value.get('message', '') if isinstance(value, dict) else str(value)
-            elif attribute == 'interfaces':
-                attrs.interfaces = value if isinstance(value, list) else value
             elif attribute == 'agent_state':
                 if hasattr(value, 'model_dump'):
                     attrs.agent_state = value.model_dump()
@@ -539,14 +540,7 @@ class Instance(dbowo):
 
         # Mix in details of the instance's interfaces to reduce API round trips
         # for clients.
-        i['interfaces'] = []
-        for iface_uuid in self.interfaces:
-            ni = interface.NetworkInterface.from_db(iface_uuid)
-            if not ni:
-                self.log.with_fields({'interface': ni}).error(
-                    'Network interface missing')
-            else:
-                i['interfaces'].append(ni.external_view())
+        i['interfaces'] = [ni.external_view() for ni in self.interfaces]
 
         # Mix in details of the configured disks. We don't have all the details
         # in the block devices structure until _initialize_block_devices() is
@@ -678,26 +672,24 @@ class Instance(dbowo):
     def block_devices(self):
         return self._db_get_attribute('block_devices')
 
-    # NOTE(mikal): this really should use the newer _add_item / _remove_item
-    # stuff, but I can't immediately think of an online upgrade path for this
-    # so skipping for now.
     @property
     def interfaces(self):
-        return self._db_get_attribute('interfaces', [])
+        """Currently-attached NetworkInterface objects.
 
-    # NOTE(mikal): this really should use the newer _add_item / _remove_item
-    # stuff, but I can't immediately think of an online upgrade path for this
-    # so skipping for now.
-    @interfaces.setter
-    def interfaces(self, interfaces):
-        with self.get_lock_attr('interfaces', 'Set interface'):
-            self._db_set_attribute('interfaces', interfaces)
-
-    def interfaces_append(self, interface):
-        with self.get_lock_attr('interfaces', 'Append interface'):
-            ifaces = self._db_get_attribute('interfaces', [])
-            ifaces.append(interface)
-            self._db_set_attribute('interfaces', ifaces)
+        Queried live from the network_interfaces table
+        (instance_uuid is an indexed column). Previously
+        cached as a list of UUID strings on
+        instance_attributes; that column is dropped in phase 7e.
+        """
+        criteria = ObjectFilterCriteria(
+            states=list(interface.NetworkInterface.ACTIVE_STATES),
+            instance_uuid=str(self.uuid),
+        )
+        return [
+            interface.NetworkInterface(
+                interface.NetworkInterface._static_values_to_dict(d))
+            for d in mariadb.find_network_interfaces(criteria)
+        ]
 
     @property
     def tags(self):
@@ -936,9 +928,8 @@ class Instance(dbowo):
     # creation. It is assumed that the image sits in local cache already, and
     # has been transcoded to the right format. This has been done to facilitate
     # moving to a queue and task based creation mechanism.
-    def create(self, iface_uuids):
+    def create(self):
         self.state = self.STATE_CREATING
-        self.interfaces = iface_uuids
 
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
@@ -1282,8 +1273,7 @@ class Instance(dbowo):
 
         detected_dns_servers = []
         have_default_route = False
-        for iface_uuid in self.interfaces:
-            iface = interface.NetworkInterface.from_db(iface_uuid)
+        for iface in self.interfaces:
             if iface.ipv4:
                 devname = f'eth{iface.order}'
                 nd['links'].append(
@@ -1402,8 +1392,7 @@ class Instance(dbowo):
             t = jinja2.Template(f.read())
 
         networks = []
-        for iface_uuid in self.interfaces:
-            ni = interface.NetworkInterface.from_db(iface_uuid)
+        for ni in self.interfaces:
             n = network.Network.from_db(ni.network_uuid)
             networks.append(
                 {
