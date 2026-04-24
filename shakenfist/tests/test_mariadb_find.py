@@ -733,3 +733,241 @@ class GrpcFindInstancesTestCase(base.ShakenFistTestCase):
         self.assertIn('active', list(request.criteria.states))
         self.assertIn('initial', list(request.criteria.states))
         self.assertEqual(request.criteria.namespace, 'system')
+
+
+# ---------------------------------------------------------------------------
+# _direct_find_network_interfaces
+# ---------------------------------------------------------------------------
+
+NI_UUID = uuid.uuid4()
+NI_NETWORK_UUID = uuid.uuid4()
+NI_INSTANCE_UUID = uuid.uuid4()
+
+
+def _ni_row(
+        ni_uuid=None, network_uuid=None, instance_uuid=None,
+        macaddr='52:54:00:ab:cd:ef', ipv4='10.0.0.2',
+        order=0, model='virtio', version=1):
+    """Return a mock DB row for the network_interfaces table."""
+    row = mock.MagicMock()
+    row.uuid = ni_uuid or NI_UUID
+    row.network_uuid = network_uuid or NI_NETWORK_UUID
+    row.instance_uuid = instance_uuid or NI_INSTANCE_UUID
+    row.macaddr = macaddr
+    row.ipv4 = ipv4
+    row.order = order
+    row.model = model
+    row.version = version
+    return row
+
+
+class DirectFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_find_network_interfaces()."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_all_filters_returns_match(self, mock_get_engine):
+        """State filter present — matching row returned (namespace/name no-ops)."""
+        row = _ni_row()
+        mock_get_engine.return_value = _make_engine_mock([row])
+
+        criteria = ObjectFilterCriteria(
+            states=['created'], namespace='tenant-a', name='eth0')
+        result = mariadb._direct_find_network_interfaces(criteria)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(str(result[0].uuid), str(NI_UUID))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_state_filter_only(self, mock_get_engine):
+        """states only — no namespace/name filter."""
+        mock_get_engine.return_value = _make_engine_mock([_ni_row()])
+
+        result = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(states=['created']))
+
+        self.assertEqual(len(result), 1)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_no_filters_returns_all(self, mock_get_engine):
+        """No filters — all rows returned."""
+        rows = [_ni_row(ni_uuid=uuid.uuid4(), order=i) for i in range(3)]
+        mock_get_engine.return_value = _make_engine_mock(rows)
+
+        result = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria())
+
+        self.assertEqual(len(result), 3)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_empty_states_list_returns_all(self, mock_get_engine):
+        """states=[] — no state filter, all rows returned."""
+        rows = [_ni_row(ni_uuid=uuid.uuid4(), order=i) for i in range(2)]
+        mock_get_engine.return_value = _make_engine_mock(rows)
+
+        result = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(states=[]))
+
+        self.assertEqual(len(result), 2)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_no_match_returns_empty(self, mock_get_engine):
+        """Query returns no rows — result is []."""
+        mock_get_engine.return_value = _make_engine_mock([])
+
+        result = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(states=['deleted']))
+
+        self.assertEqual(result, [])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_empty_table_returns_empty(self, mock_get_engine):
+        """Empty table — []."""
+        mock_get_engine.return_value = _make_engine_mock([])
+
+        result = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria())
+
+        self.assertEqual(result, [])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_logs_and_returns_empty(self, mock_get_engine):
+        """OperationalError — logs warning with all criteria and returns []."""
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.side_effect = OperationalError(
+            'statement', {}, Exception('DB gone'))
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        criteria = ObjectFilterCriteria(
+            states=['created'], namespace='tenant-a', name='eth0')
+
+        with self.assertLogs('shakenfist.mariadb', level='WARNING') as cm:
+            result = mariadb._direct_find_network_interfaces(criteria)
+
+        self.assertEqual(result, [])
+        combined = ' '.join(cm.output)
+        self.assertIn('network_interfaces', combined)
+        self.assertIn("['created']", combined)
+        self.assertIn('tenant-a', combined)
+        self.assertIn('eth0', combined)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_namespace_in_criteria_is_silently_ignored(self, mock_get_engine):
+        """namespace in criteria is stripped — result equals namespace=None call."""
+        rows = [_ni_row(ni_uuid=uuid.uuid4(), order=i) for i in range(2)]
+        mock_get_engine.return_value = _make_engine_mock(rows)
+
+        # Calling with namespace set and without should hit the same SQL path
+        # because the helper strips namespace to None before building the query.
+        # Both calls see the same mock rows, so both results must be equal.
+        result_with_ns = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(states=['created'], namespace='tenant-a'))
+
+        mock_get_engine.return_value = _make_engine_mock(rows)
+        result_without_ns = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(states=['created']))
+
+        self.assertEqual(len(result_with_ns), len(result_without_ns))
+        self.assertEqual(
+            [str(r.uuid) for r in result_with_ns],
+            [str(r.uuid) for r in result_without_ns],
+        )
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_name_in_criteria_is_silently_ignored(self, mock_get_engine):
+        """name in criteria is stripped — result equals name=None call."""
+        rows = [_ni_row(ni_uuid=uuid.uuid4(), order=i) for i in range(2)]
+        mock_get_engine.return_value = _make_engine_mock(rows)
+
+        result_with_name = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(states=['created'], name='eth0'))
+
+        mock_get_engine.return_value = _make_engine_mock(rows)
+        result_without_name = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(states=['created']))
+
+        self.assertEqual(len(result_with_name), len(result_without_name))
+        self.assertEqual(
+            [str(r.uuid) for r in result_with_name],
+            [str(r.uuid) for r in result_without_name],
+        )
+
+
+# ---------------------------------------------------------------------------
+# Public wrapper — routing (direct vs gRPC)
+# ---------------------------------------------------------------------------
+
+class FindNetworkInterfacesPublicTestCase(base.ShakenFistTestCase):
+    """Tests for find_network_interfaces() public wrapper routing."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._direct_find_network_interfaces')
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    def test_routes_to_direct(self, _mock_uds, mock_direct):
+        """_use_database_service=False → _direct_find_network_interfaces called."""
+        mock_direct.return_value = []
+        criteria = ObjectFilterCriteria(states=['created'])
+        result = mariadb.find_network_interfaces(criteria)
+        mock_direct.assert_called_once_with(criteria)
+        self.assertEqual(result, [])
+
+    @mock.patch('shakenfist.mariadb._grpc_find_network_interfaces')
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_routes_to_grpc(self, _mock_uds, mock_grpc):
+        """_use_database_service=True → _grpc_find_network_interfaces called."""
+        mock_grpc.return_value = []
+        criteria = ObjectFilterCriteria(namespace='tenant-a')
+        result = mariadb.find_network_interfaces(criteria)
+        mock_grpc.assert_called_once_with(criteria)
+        self.assertEqual(result, [])
+
+
+# ---------------------------------------------------------------------------
+# gRPC wrapper — proto conversion smoke test
+# ---------------------------------------------------------------------------
+
+class GrpcFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
+    """Smoke tests for _grpc_find_network_interfaces() proto conversion."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_criteria_converted_to_proto(self, mock_stub, mock_grpc_call):
+        """Criteria fields (states, namespace, name) forwarded to proto request."""
+        from shakenfist.protos import database_pb2
+        mock_reply = mock.MagicMock()
+        mock_reply.network_interfaces = []
+        mock_grpc_call.return_value = mock_reply
+
+        criteria = ObjectFilterCriteria(
+            states=['created'], namespace='tenant-a', name='eth0')
+        result = mariadb._grpc_find_network_interfaces(criteria)
+
+        self.assertEqual(result, [])
+        mock_grpc_call.assert_called_once()
+        request = mock_grpc_call.call_args[0][1]
+        self.assertIsInstance(
+            request, database_pb2.FindNetworkInterfacesRequest)
+        self.assertIn('created', list(request.criteria.states))
+        self.assertEqual(request.criteria.namespace, 'tenant-a')
+        self.assertEqual(request.criteria.name, 'eth0')
