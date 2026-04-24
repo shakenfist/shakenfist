@@ -71,6 +71,29 @@ The database microservice (`sf-database`) centralizes all database access:
 - All other daemons use the gRPC interface
 - Provides Prometheus metrics for database operations
 
+#### SQL Filter-Pushdown Discipline
+
+Object iteration uses one indexed SQL query per call rather than the older pattern of materialising all rows
+and filtering them in Python. Every `find_artifacts`, `find_instances`, `find_networks`, and
+`find_network_interfaces` call in `shakenfist/mariadb.py` JOINs the per-type static-values table to
+`object_states` and applies the caller's state, namespace, and name predicates directly in the WHERE clause.
+
+The composite index `idx_object_states_type_state` on `(object_type, state_value)` covers the JOIN condition
+that is present in every query. Per-type `name` and `namespace` single-column indexes on the artifact,
+instance, and network tables cover the optional equality predicates. This keeps the common REST-layer calls
+— list-by-namespace, list-active, lookup-by-name — to an index scan with no full-table read.
+
+Filter criteria are expressed as `ObjectFilterCriteria` in
+[`shakenfist/schema/object_filter.py`](shakenfist/schema/object_filter.py). The iterator base class
+(`DatabaseBackedObjectIterator` in `baseobject.py`) builds criteria from its constructor arguments and
+delegates to the appropriate `find_*` primitive, so callers such as `Artifacts(namespace=ns,
+prefilter='active')` get SQL pushdown without any extra work at the call site. Filters that have no SQL
+equivalent (e.g. predicates over lazily-loaded attribute columns) remain as Python callables passed through
+the `filters=` argument and execute after the indexed scan.
+
+See [`docs/operator_guide/database.md`](docs/operator_guide/database.md) — "SQL Filter Pushdown" — for
+per-API guidance and a code example.
+
 #### gRPC Reliability
 
 All gRPC calls use `timeout=30` seconds and `wait_for_ready=True` to handle

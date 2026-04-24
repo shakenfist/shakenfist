@@ -106,6 +106,69 @@ The `shakenfist.mariadb` module automatically routes requests:
 - If `DATABASE_USE_DIRECT_ETCD=True` (database daemon): Direct MariaDB access
 - If `DATABASE_USE_DIRECT_ETCD=False` (all other daemons): gRPC to database service
 
+#### SQL Filter Pushdown
+
+Object iteration uses a single indexed SQL query per call rather than materialising all rows and filtering in Python.
+
+The filter criteria shape is `ObjectFilterCriteria` in
+[`shakenfist/schema/object_filter.py`](../../shakenfist/schema/object_filter.py):
+
+```python
+from shakenfist.schema.object_filter import ObjectFilterCriteria
+
+criteria = ObjectFilterCriteria(
+    states=['created'],   # None means no state filter; [] is a no-op at the SQL layer
+    namespace='tenant-a', # None means no namespace filter
+    name=None,            # None means no name filter
+)
+```
+
+`None` on any field is "do not filter on this field". An empty list on `states` behaves the same as `None` at
+the MariaDB layer, but callers may pass `[]` to express "no matching states" explicitly for future use.
+
+**The `find_*` primitives.**
+Four public functions in `shakenfist.mariadb` follow the naming convention `find_<type>`:
+`find_artifacts`, `find_instances`, `find_networks`, and `find_network_interfaces`. Each one JOINs the
+per-type static-values table to `object_states` on `uuid` and `object_type`, then applies whichever of the
+three optional WHERE clauses the criteria specifies. The JOIN is always covered by the composite index
+`idx_object_states_type_state` on `(object_type, state_value)`. The per-type `name` and `namespace` columns
+each have their own single-column index on the type table.
+
+**When to use which entry point.**
+
+Name lookups from REST handlers should call the per-type `from_db_by_ref(name, namespace=ns)` class method
+(e.g. `Artifact.from_db_by_ref(ref, namespace=ns)`). This override was added in phases 2 and 3 and pushes
+the name equality predicate to SQL.
+
+Bulk iteration scoped by state and/or namespace should use the iterator constructor directly:
+`Artifacts(namespace=ns, prefilter='active')`, `Instances(namespace=ns)`, `Networks(namespace=ns)`.
+The iterator's `_find` override builds an `ObjectFilterCriteria` from the constructor arguments and delegates
+to the appropriate `find_*` primitive, so both state and namespace reach SQL without a second round-trip.
+
+Arbitrary-predicate filtering — logic that has no simple SQL equivalent, such as
+`namespace_or_shared_filter` which must JOIN the `artifact_attributes` table to check the `shared` flag —
+should pass a callable to the `filters=` argument of the iterator, or call `.filter([predicate])` on the
+class. These predicates execute in Python after the indexed SQL scan returns its rows.
+
+**NetworkInterface special case.**
+The `network_interfaces` table has no `namespace` or `name` column. `find_network_interfaces` therefore
+strips both fields from the criteria before building the query; they are silently ignored. State pushdown
+still works. See the Future-work entry in
+[`docs/plans/PLAN-sql-pushdown-filtering.md`](../plans/PLAN-sql-pushdown-filtering.md) ("NetworkInterface
+namespace column") for the deferred discussion of whether to add the column or use a JOIN-based approach
+once a concrete caller exists.
+
+**Example.**
+
+```python
+from shakenfist import mariadb
+from shakenfist.schema.object_filter import ObjectFilterCriteria
+
+criteria = ObjectFilterCriteria(states=['created'], namespace='tenant-a')
+for a in mariadb.find_artifacts(criteria):
+    ...
+```
+
 ### Connection
 
 The database service connects to MariaDB using SQLAlchemy. Connection details
