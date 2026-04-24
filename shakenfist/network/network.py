@@ -39,12 +39,14 @@ from shakenfist.schema.operations.node_net_op \
 from shakenfist.schema.operations.node_net_op \
     import model_tasks as nn_tasks
 from shakenfist.eventlog import add_event_multi
+from shakenfist import exceptions
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
@@ -182,6 +184,42 @@ class Network(dbowo):
             obj = cls(cls._static_values_to_dict(data))
             if all(f(obj) for f in filters):
                 yield obj
+
+    @classmethod
+    def from_db_by_ref(cls, object_ref, namespace=None):
+        """Look up a network by UUID or by name within a namespace.
+
+        UUID lookups short-circuit to from_db. Name lookups push
+        state + namespace + name down to a single indexed SQL
+        query via mariadb.find_networks.
+
+        The floating network (FLOATING_NETWORK_UUID) has namespace=None
+        in the database. A tenant-scoped query (namespace != None) won't
+        match it via SQL NULL semantics, so no explicit skip is required.
+        """
+        if object_ref and util_general.valid_uuid4(object_ref):
+            return cls.from_db(object_ref)
+
+        # namespace='system' or namespace=None means 'look across
+        # all namespaces' - preserve that by omitting the namespace
+        # filter. Matches baseobject.namespace_filter semantics.
+        criteria_namespace = (
+            namespace if namespace and namespace != 'system' else None)
+
+        criteria = ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            namespace=criteria_namespace,
+            name=object_ref,
+        )
+        matches = mariadb.find_networks(criteria)
+
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise exceptions.MultipleObjects(
+                f'multiple networks have the name "{object_ref}"'
+                f' in namespace "{namespace}"')
+        return cls(cls._static_values_to_dict(matches[0]))
 
     def _load_attributes(self) -> Optional[NetworkAttributesData]:
         """Load attributes from MariaDB."""
