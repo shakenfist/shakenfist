@@ -3052,10 +3052,16 @@ class ObjectFilterCriteria(google.protobuf.message.Message):
     STATES_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
     NAME_FIELD_NUMBER: builtins.int
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    INSTANCE_UUID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """absent = don't filter"""
     name: builtins.str
     """absent = don't filter"""
+    network_uuid: builtins.str
+    """absent = don't filter (network_interfaces only)"""
+    instance_uuid: builtins.str
+    """absent = don't filter (network_interfaces only)"""
     @property
     def states(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """empty = don't filter"""
@@ -3066,13 +3072,19 @@ class ObjectFilterCriteria(google.protobuf.message.Message):
         states: collections.abc.Iterable[builtins.str] | None = ...,
         namespace: builtins.str | None = ...,
         name: builtins.str | None = ...,
+        network_uuid: builtins.str | None = ...,
+        instance_uuid: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_name", b"_name", "_namespace", b"_namespace", "name", b"name", "namespace", b"namespace"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_name", b"_name", "_namespace", b"_namespace", "name", b"name", "namespace", b"namespace", "states", b"states"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_instance_uuid", b"_instance_uuid", "_name", b"_name", "_namespace", b"_namespace", "_network_uuid", b"_network_uuid", "instance_uuid", b"instance_uuid", "name", b"name", "namespace", b"namespace", "network_uuid", b"network_uuid"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_instance_uuid", b"_instance_uuid", "_name", b"_name", "_namespace", b"_namespace", "_network_uuid", b"_network_uuid", "instance_uuid", b"instance_uuid", "name", b"name", "namespace", b"namespace", "network_uuid", b"network_uuid", "states", b"states"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_instance_uuid", b"_instance_uuid"]) -> typing.Literal["instance_uuid"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_name", b"_name"]) -> typing.Literal["name"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_namespace", b"_namespace"]) -> typing.Literal["namespace"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_network_uuid", b"_network_uuid"]) -> typing.Literal["network_uuid"] | None: ...
 
 global___ObjectFilterCriteria = ObjectFilterCriteria
 

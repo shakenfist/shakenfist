@@ -23,8 +23,16 @@ class ObjectFilterCriteria(BaseModel):
             ``[]`` = no matching states (explicit empty list).
         namespace: Namespace to filter by. ``None`` = no namespace filter.
         name: Object name to filter by. ``None`` = no name filter.
+        network_uuid: Foreign-key filter for the ``network_interfaces``
+            table. Honoured only by ``find_network_interfaces`` and
+            silently ignored by other ``find_*`` helpers.
+        instance_uuid: Foreign-key filter for the ``network_interfaces``
+            table. Honoured only by ``find_network_interfaces`` and
+            silently ignored by other ``find_*`` helpers.
     """
 
     states: Optional[list[str]] = None
     namespace: Optional[str] = None
     name: Optional[str] = None
+    network_uuid: Optional[str] = None
+    instance_uuid: Optional[str] = None

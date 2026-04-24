@@ -1133,6 +1133,8 @@ message ObjectFilterCriteria {
   repeated string states = 1;        // empty = don't filter
   optional string namespace = 2;     // absent = don't filter
   optional string name = 3;          // absent = don't filter
+  optional string network_uuid = 4;  // absent = don't filter (network_interfaces only)
+  optional string instance_uuid = 5; // absent = don't filter (network_interfaces only)
 }
 
 message FindArtifactsRequest {

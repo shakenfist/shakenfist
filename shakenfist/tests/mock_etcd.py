@@ -1775,9 +1775,11 @@ class MockEtcd():
         """Mock implementation of mariadb.find_network_interfaces().
 
         Honours criteria.states by cross-referencing mariadb_states,
-        matching the real SQL JOIN against object_states. Name filter
-        is applied in Python. Namespace is silently ignored because
-        network_interfaces has no namespace column.
+        matching the real SQL JOIN against object_states. Honours
+        criteria.network_uuid and criteria.instance_uuid against the
+        corresponding indexed columns on network_interfaces. Namespace
+        and name are silently ignored because network_interfaces has
+        neither column.
         """
         results = list(self.network_interface_objects.values())
         if criteria.states:
@@ -1788,9 +1790,17 @@ class MockEtcd():
                     and d['state_value'] in criteria.states)
             }
             results = [d for d in results if str(d.uuid) in matching]
-        # criteria.name is silently ignored: network_interfaces has no
-        # name column (name filter is a no-op for this type, consistent
-        # with how namespace is handled).
+        if criteria.network_uuid is not None:
+            results = [
+                d for d in results
+                if str(d.network_uuid) == criteria.network_uuid]
+        if criteria.instance_uuid is not None:
+            results = [
+                d for d in results
+                if str(d.instance_uuid) == criteria.instance_uuid]
+        # criteria.namespace and criteria.name are silently ignored:
+        # network_interfaces has neither column (consistent with the
+        # real _direct_find_network_interfaces behaviour).
         self._trace(
             f'MockMariaDB.find_network_interfaces(criteria={criteria!r}): '
             f'{len(results)} results')

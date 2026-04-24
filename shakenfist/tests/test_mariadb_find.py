@@ -902,6 +902,51 @@ class DirectFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
             [str(r.uuid) for r in result_without_name],
         )
 
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_network_uuid_filter(self, mock_get_engine):
+        """network_uuid in criteria adds a WHERE clause on network_uuid."""
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = [_ni_row()]
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        target_uuid = str(uuid.uuid4())
+        result = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(network_uuid=target_uuid))
+
+        self.assertEqual(len(result), 1)
+        # Inspect the compiled SQL to confirm the WHERE clause is present.
+        stmt = mock_conn.execute.call_args[0][0]
+        rendered = str(
+            stmt.compile(compile_kwargs={'literal_binds': False}))
+        self.assertIn('network_uuid', rendered)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_instance_uuid_filter(self, mock_get_engine):
+        """instance_uuid in criteria adds a WHERE clause on instance_uuid."""
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = [_ni_row()]
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        target_uuid = str(uuid.uuid4())
+        result = mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(instance_uuid=target_uuid))
+
+        self.assertEqual(len(result), 1)
+        stmt = mock_conn.execute.call_args[0][0]
+        rendered = str(
+            stmt.compile(compile_kwargs={'literal_binds': False}))
+        self.assertIn('instance_uuid', rendered)
+
 
 # ---------------------------------------------------------------------------
 # Public wrapper — routing (direct vs gRPC)

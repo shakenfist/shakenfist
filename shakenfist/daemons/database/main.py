@@ -2440,6 +2440,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 name=(
                     request.criteria.name
                     if request.criteria.HasField('name') else None),
+                network_uuid=(
+                    request.criteria.network_uuid
+                    if request.criteria.HasField('network_uuid') else None),
+                instance_uuid=(
+                    request.criteria.instance_uuid
+                    if request.criteria.HasField('instance_uuid') else None),
             )
             nis = mariadb._direct_find_network_interfaces(criteria)
             return database_pb2.FindNetworkInterfacesReply(

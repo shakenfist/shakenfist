@@ -431,12 +431,15 @@ def _build_object_filter_query(
           ON s.object_uuid = <table>.uuid
          AND s.object_type = <object_type>
         WHERE (optional) s.state_value IN criteria.states
-          AND (optional) <table>.namespace = criteria.namespace
-          AND (optional) <table>.name     = criteria.name
+          AND (optional) <table>.namespace    = criteria.namespace
+          AND (optional) <table>.name         = criteria.name
+          AND (optional) <table>.network_uuid = criteria.network_uuid
+          AND (optional) <table>.instance_uuid = criteria.instance_uuid
 
     ``criteria.states`` of ``None`` or ``[]`` skips the state filter.
-    ``criteria.namespace`` or ``criteria.name`` of ``None`` skips that
-    filter.
+    Any scalar filter of ``None`` skips that filter. Callers are
+    responsible for stripping fields that do not exist on the target
+    table (e.g. ``name``/``namespace`` on ``network_interfaces``).
     """
     states_table = _get_object_states_table()
     stmt = sa.select(table).join(
@@ -451,6 +454,10 @@ def _build_object_filter_query(
         stmt = stmt.where(table.c.namespace == criteria.namespace)
     if criteria.name is not None:
         stmt = stmt.where(table.c.name == criteria.name)
+    if criteria.network_uuid is not None:
+        stmt = stmt.where(table.c.network_uuid == criteria.network_uuid)
+    if criteria.instance_uuid is not None:
+        stmt = stmt.where(table.c.instance_uuid == criteria.instance_uuid)
     return stmt
 
 
@@ -12450,9 +12457,11 @@ def _direct_find_network_interfaces(
     """Find NetworkInterface records matching the given filter criteria.
 
     Joins ``network_interfaces`` to ``object_states`` and applies the
-    optional state filter from ``criteria``. Both the ``namespace`` and
+    optional state filter from ``criteria``. The ``namespace`` and
     ``name`` filters are silently ignored because the
-    ``network_interfaces`` table has neither column. On
+    ``network_interfaces`` table has neither column. The
+    ``network_uuid`` and ``instance_uuid`` filters ARE honoured —
+    they correspond to indexed columns on the same table. On
     ``OperationalError`` logs the full criteria at WARNING level and
     returns an empty list.
     """
@@ -12464,6 +12473,8 @@ def _direct_find_network_interfaces(
         states=criteria.states,
         namespace=None,
         name=None,
+        network_uuid=criteria.network_uuid,
+        instance_uuid=criteria.instance_uuid,
     )
     stmt = _build_object_filter_query(
         table, ObjectType.INTERFACE, safe_criteria)
@@ -12489,7 +12500,9 @@ def _direct_find_network_interfaces(
             f'MariaDB find failed for network_interfaces '
             f'(states={criteria.states!r}, '
             f'namespace={criteria.namespace!r}, '
-            f'name={criteria.name!r}): {e}')
+            f'name={criteria.name!r}, '
+            f'network_uuid={criteria.network_uuid!r}, '
+            f'instance_uuid={criteria.instance_uuid!r}): {e}')
         return []
 
 
@@ -12805,6 +12818,10 @@ def _grpc_find_network_interfaces(
             proto_criteria.namespace = criteria.namespace
         if criteria.name is not None:
             proto_criteria.name = criteria.name
+        if criteria.network_uuid is not None:
+            proto_criteria.network_uuid = criteria.network_uuid
+        if criteria.instance_uuid is not None:
+            proto_criteria.instance_uuid = criteria.instance_uuid
         request = database_pb2.FindNetworkInterfacesRequest(
             criteria=proto_criteria)
         reply = _grpc_call(stub.FindNetworkInterfaces, request)
