@@ -2107,7 +2107,7 @@ def healthy_instances_on_node(n):
 
 
 def instances_in_namespace(namespace):
-    return Instances([partial(baseobject.namespace_filter, namespace)])
+    return Instances(namespace=namespace)
 
 
 def all_instances():

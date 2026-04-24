@@ -890,7 +890,7 @@ class InstancesEndpoint(api_base.Resource):
             namespace = request_namespace()
 
         waiting_for = []
-        for inst in instance.Instances([partial(baseobject.namespace_filter, namespace)]):
+        for inst in instance.Instances(namespace=namespace):
             inst.add_event(
                 EVENT_TYPE_AUDIT, 'delete request via delete all from REST API')
             inst.enqueue_delete()

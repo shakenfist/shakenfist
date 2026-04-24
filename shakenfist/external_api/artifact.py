@@ -30,7 +30,6 @@ from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import Artifacts
-from shakenfist.artifact import namespace_exact_filter
 from shakenfist.artifact import namespace_or_shared_filter
 from shakenfist.artifact import UPLOAD_URL
 from shakenfist.blob import Blob
@@ -384,7 +383,7 @@ class ArtifactsEndpoint(api_base.Resource):
             namespace = request_namespace()
 
         deleted = []
-        for a in Artifacts([partial(namespace_exact_filter, namespace)]):
+        for a in Artifacts(namespace=namespace):
             a.add_event(EVENT_TYPE_AUDIT, 'deletion request from REST API')
             a.delete()
             deleted.append(a.uuid)

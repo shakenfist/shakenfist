@@ -608,5 +608,4 @@ def namespace_or_shared_filter(namespace, o):
 
 
 def artifacts_in_namespace(namespace):
-    return Artifacts([partial(baseobject.namespace_filter, namespace)],
-                     prefilter='active')
+    return Artifacts(namespace=namespace, prefilter='active')

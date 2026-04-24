@@ -1,14 +1,12 @@
 # Copyright 2020 Michael Still
 import os
 import random
-from functools import partial
 from typing import Optional
 from uuid import UUID
 from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import baseobject
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.constants import get_object_class
 from shakenfist import instance
@@ -987,7 +985,7 @@ class Networks(dbo_iter):
 
 # Convenience helpers
 def networks_in_namespace(namespace):
-    return Networks([partial(baseobject.namespace_filter, namespace)])
+    return Networks(namespace=namespace)
 
 
 def floating_network():
