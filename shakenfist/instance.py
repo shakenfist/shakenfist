@@ -2065,6 +2065,15 @@ class Instance(dbowo):
 class Instances(dbo_iter):
     base_object = Instance
 
+    def _resolve_prefilter_to_states(self):
+        # Preserve the pre-phase-4 Instances override behaviour: when
+        # no prefilter is set, do not filter on state (return every
+        # instance and let predicate filters scope). The base class
+        # default of ACTIVE_STATES is kept for other inheritors.
+        if self.prefilter is None:
+            return set()
+        return super()._resolve_prefilter_to_states()
+
     def _find(self, criteria):
         return mariadb.find_instances(criteria)
 

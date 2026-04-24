@@ -549,6 +549,15 @@ class Artifact(dbowo):
 class Artifacts(dbo_iter):
     base_object = Artifact
 
+    def _resolve_prefilter_to_states(self):
+        # Preserve the pre-phase-4 Artifacts override behaviour: when
+        # no prefilter is set, do not filter on state (return every
+        # artifact and let predicate filters scope). The base class
+        # default of ACTIVE_STATES is kept for other inheritors.
+        if self.prefilter is None:
+            return set()
+        return super()._resolve_prefilter_to_states()
+
     def _find(self, criteria):
         return mariadb.find_artifacts(criteria)
 

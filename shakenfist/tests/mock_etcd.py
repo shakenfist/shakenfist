@@ -1574,11 +1574,19 @@ class MockEtcd():
             self, criteria: ObjectFilterCriteria) -> list[ArtifactData]:
         """Mock implementation of mariadb.find_artifacts().
 
-        The mock does not track state, so criteria.states is ignored
-        (all mocked artifacts are treated as active). Namespace and
-        name filters are applied in Python.
+        Honours criteria.states by cross-referencing mariadb_states,
+        matching the real SQL JOIN against object_states. Namespace
+        and name filters are applied in Python.
         """
         results = list(self.artifact_objects.values())
+        if criteria.states:
+            matching = {
+                d['object_uuid']
+                for d in self.mariadb_states.values()
+                if (d['object_type'] == ObjectType.ARTIFACT
+                    and d['state_value'] in criteria.states)
+            }
+            results = [d for d in results if str(d.uuid) in matching]
         if criteria.namespace is not None:
             results = [d for d in results if d.namespace == criteria.namespace]
         if criteria.name is not None:
@@ -1829,14 +1837,22 @@ class MockEtcd():
             self, criteria: ObjectFilterCriteria) -> list[NetworkData]:
         """Mock implementation of mariadb.find_networks().
 
-        The mock does not track state, so criteria.states is ignored
-        (all mocked networks are treated as active). Namespace and
-        name filters are applied in Python. NetworkData.namespace is
-        Optional[str], so a non-None criteria.namespace excludes
+        Honours criteria.states by cross-referencing mariadb_states,
+        matching the real SQL JOIN against object_states. Namespace
+        and name filters are applied in Python. NetworkData.namespace
+        is Optional[str], so a non-None criteria.namespace excludes
         networks whose stored namespace is None (matches SQL NULL
         semantics).
         """
         results = list(self.network_objects.values())
+        if criteria.states:
+            matching = {
+                d['object_uuid']
+                for d in self.mariadb_states.values()
+                if (d['object_type'] == ObjectType.NETWORK
+                    and d['state_value'] in criteria.states)
+            }
+            results = [d for d in results if str(d.uuid) in matching]
         if criteria.namespace is not None:
             results = [d for d in results if d.namespace == criteria.namespace]
         if criteria.name is not None:
@@ -2068,11 +2084,19 @@ class MockEtcd():
             self, criteria: ObjectFilterCriteria) -> list[InstanceData]:
         """Mock implementation of mariadb.find_instances().
 
-        The mock does not track state, so criteria.states is ignored
-        (all mocked instances are treated as active). Namespace and
-        name filters are applied in Python.
+        Honours criteria.states by cross-referencing mariadb_states,
+        matching the real SQL JOIN against object_states. Namespace
+        and name filters are applied in Python.
         """
         results = list(self.instance_objects.values())
+        if criteria.states:
+            matching = {
+                d['object_uuid']
+                for d in self.mariadb_states.values()
+                if (d['object_type'] == ObjectType.INSTANCE
+                    and d['state_value'] in criteria.states)
+            }
+            results = [d for d in results if str(d.uuid) in matching]
         if criteria.namespace is not None:
             results = [d for d in results if d.namespace == criteria.namespace]
         if criteria.name is not None:

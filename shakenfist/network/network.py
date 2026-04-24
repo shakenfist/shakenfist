@@ -956,46 +956,20 @@ class Network(dbowo):
 class Networks(dbo_iter):
     base_object = Network
 
-    def get_iterator(self):
-        from shakenfist import exceptions
+    def _resolve_prefilter_to_states(self):
+        # Preserve the pre-phase-4 Networks override behaviour: when
+        # no prefilter is set, do not filter on state (return every
+        # network and let predicate filters scope). The base class
+        # default of ACTIVE_STATES is kept for other inheritors.
+        if self.prefilter is None:
+            return set()
+        return super()._resolve_prefilter_to_states()
 
-        if self.prefilter:
-            if self.prefilter == 'active':
-                target_states = Network.ACTIVE_STATES
-            elif self.prefilter == 'deleted':
-                target_states = [dbo.STATE_DELETED]
-            elif self.prefilter == 'healthy':
-                target_states = Network.HEALTHY_STATES
-            elif self.prefilter == 'inactive':
-                target_states = Network.INACTIVE_STATES
-            else:
-                raise exceptions.InvalidObjectPrefilter(
-                    self.prefilter)
+    def _find(self, criteria):
+        return mariadb.find_networks(criteria)
 
-            matching_uuids_list = mariadb.get_objects_by_state(
-                Network.object_type, list(target_states))
-
-            if matching_uuids_list is None:
-                LOG.warning('get_objects_by_state returned None for '
-                            'networks, falling back to full scan')
-                for data in mariadb.get_all_networks():
-                    yield (str(data.uuid),
-                           Network._static_values_to_dict(data))
-                return
-
-            matching_uuids = set(matching_uuids_list)
-
-            results = []
-            for data in mariadb.get_all_networks():
-                if str(data.uuid) in matching_uuids:
-                    results.append(
-                        (str(data.uuid),
-                         Network._static_values_to_dict(data)))
-            yield from results
-        else:
-            for data in mariadb.get_all_networks():
-                yield (str(data.uuid),
-                       Network._static_values_to_dict(data))
+    def _to_static_values(self, data):
+        return Network._static_values_to_dict(data)
 
     def __iter__(self):
         for _, static_values in self.get_iterator():
@@ -1006,9 +980,9 @@ class Networks(dbo_iter):
             if not n:
                 continue
 
-            out = self.apply_filters(n)
-            if out:
-                yield out
+            filtered = self.apply_filters(n)
+            if filtered:
+                yield filtered
 
 
 # Convenience helpers
