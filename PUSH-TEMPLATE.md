@@ -46,6 +46,7 @@ Then a few grep-level style checks on the diff against
 git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].{120,}'  # lines > 120 chars
 git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\bprint\('  # stray print()s in new code
 git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\betcd\b'  # new etcd references
+git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'  # new bulk-scan pushdown violations
 ```
 
 Exit condition: wave 1 passes when pre-commit, tox, proto
@@ -80,10 +81,14 @@ conventions in `CLAUDE.md` and `AGENTS.md`:
   `_grpc_*`, and a public wrapper that chooses between
   them via `_use_database_service()`. Direct access from
   non-database-daemon code paths is a bug.
-- SQL-pushdown discipline: does any new code materialise a
-  full object list with `get_all_*()` and then filter in
-  Python where a `WHERE` clause on an indexed column could
-  have done the work at the database?
+- SQL-pushdown discipline (blocking): does any new code
+  materialise a full object list with `get_all_*()` and then
+  filter in Python where a `WHERE` clause on an indexed
+  column could have done the work at the database? New
+  `mariadb.get_all_*(` call sites must either route through
+  a `find_*` primitive or carry a `# nopushdown: <reason>`
+  trailing comment. See
+  [docs/operator_guide/database.md](docs/operator_guide/database.md).
 - gRPC conventions: proto edits in
   `shakenfist/protos/database.proto`; counter registered
   in the Monitor operations list in
@@ -149,11 +154,18 @@ Add the judgment-level review on the diff
 - **Missed abstractions:** Should any new code be extracted
   into a shared module? Look for logic a second object type
   or daemon would likely need.
-- **SQL pushdown:** Does any new code load objects in bulk
-  and filter in Python where a parameterised query on an
-  indexed column could have done the work? Flag these as
-  blocking unless the caller's expected cardinality is
-  clearly tiny.
+- **SQL pushdown (blocking):** Any new `mariadb.get_all_*(`
+  call that is not on an existing line and not tagged with
+  a `# nopushdown: <reason>` trailing comment must be
+  rewritten as a `find_*` call (or as a scoped helper with
+  explicit justification). The SQL-pushdown rule is
+  blocking, not advisory — the wave-1 mechanical grep
+  flags the diff-level occurrences; this brief covers the
+  judgment-level cases the grep misses (for example,
+  callers that reach through a helper function that itself
+  scans). See
+  [docs/operator_guide/database.md](docs/operator_guide/database.md)
+  for when each entry point applies.
 - **Three-layer pattern:** Does every new MariaDB function
   have the direct/gRPC/public trio, with the corresponding
   counter registered and proto definition (if needed)?
