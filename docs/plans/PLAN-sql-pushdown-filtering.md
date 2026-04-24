@@ -398,6 +398,19 @@ creep:
 * **Admin/sync loops.** `get_all_*` accessors used by
   periodic cluster maintenance remain. Whether they also
   benefit from pushdown is a separate question.
+* **Rename / rethink `shakenfist/tests/mock_etcd.py`.**
+  Stale name from the pre-MariaDB era. It no longer mocks
+  etcd — it now provides an in-memory fake of the
+  `shakenfist.mariadb` public API. Minimum: rename the file
+  and class (mechanical, ~40+ import sites). Bigger
+  rethink: decide whether a stateful hand-rolled fake is
+  still the right shape now that phase 1 gave us real
+  SQLAlchemy primitives — a sqlite-backed test DB using
+  the actual engine would exercise the real SQL
+  (including the pushed-down state/namespace JOINs added
+  in phases 1-4) instead of a second implementation that
+  can drift. Track separately; do not bundle with any
+  SQL-pushdown phase.
 
 ### Bugs fixed during this work
 
