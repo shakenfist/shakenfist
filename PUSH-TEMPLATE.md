@@ -166,6 +166,21 @@ Add the judgment-level review on the diff
   scans). See
   [docs/operator_guide/database.md](docs/operator_guide/database.md)
   for when each entry point applies.
+- **Cached FK list pattern (blocking):** Any new
+  `list[str]` / `list[UUID4]` field on a
+  `shakenfist/schema/*_attributes.py` model — and any new
+  `add_*` / `remove_*` mutator pair on the owning object
+  that appends to or removes from it — should prompt the
+  reviewer to ask: *is this a list of child-object UUIDs
+  that a `WHERE <fk> = ?` query against the child table
+  could provide live?* If yes, the property must be
+  query-backed and the cache column must not exist. Phase
+  7 of the SQL-pushdown plan removed two such
+  caches (`network_attributes.networkinterfaces`,
+  `instance_attributes.interfaces`); legitimate non-FK
+  list fields (e.g. `node_attributes.daemons`,
+  `namespace_attributes.trust`) are not flagged. See
+  [docs/plans/PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md](docs/plans/PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md).
 - **Three-layer pattern:** Does every new MariaDB function
   have the direct/gRPC/public trio, with the corresponding
   counter registered and proto definition (if needed)?
