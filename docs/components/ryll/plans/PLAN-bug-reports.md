@@ -275,6 +275,16 @@ writes a zip file.
   pcap from ring buffer, session statistics JSON.
 - For display reports: full-surface PNG screenshot, region
   coordinates in metadata.
+
+> **Note (2026-04-23):** the zip schema below was the phase
+> 1–7 shape. The trigger-snapshot master plan
+> ([PLAN-bugreport-trigger-snapshot.md](/components/ryll/plans/PLAN-bugreport-trigger-snapshot/))
+> later added a second image (`screenshot-region.png`) and
+> two new `metadata.json` fields (`triggered_at`,
+> `triggered_uptime_secs`). See `docs/troubleshooting.md`
+> for the current user-facing layout and `ARCHITECTURE.md`
+> for the contributor view.
+
 - Writes a zip file with structure:
   ```
   ryll-bugreport-2026-04-03T12-34-56Z.zip

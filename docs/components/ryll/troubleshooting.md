@@ -378,13 +378,37 @@ capture without highlighting a specific region.
 
 ```
 ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
-├── metadata.json       — report type, description, ryll version,
-│                         platform, target host/port, timestamp
-├── session.json        — FPS, bandwidth, surfaces, uptime
-├── channel-state.json  — snapshot of the affected channel
-├── traffic.pcap        — recent protocol traffic (pcap format)
-└── screenshot.png      — full display surface (Display reports only)
+├── metadata.json         — report type, description, ryll
+│                           version, platform, target,
+│                           timestamp (submit), triggered_at
+│                           (dialog-open), submitted uptime
+│                           and triggered uptime
+├── session.json          — FPS, bandwidth, surfaces, uptime
+├── channel-state.json    — snapshot of the affected channel
+├── traffic.pcap          — recent protocol traffic (pcap format)
+├── screenshot.png        — full display surface captured at the
+│                           moment the dialog opened (Display
+│                           reports only)
+├── screenshot-region.png — crop of the submit-time surface at
+│                           the selected region (Display reports
+│                           only, when a region was drawn)
+└── runtime-metrics.json  — process and per-thread CPU / RSS
 ```
+
+**Timestamps.** `metadata.json` carries two timestamps:
+`timestamp` / `session_uptime_secs` are when the zip was
+written; `triggered_at` / `triggered_uptime_secs` are when the
+user opened the dialog. For short-lived artefacts the gap
+between the two is where you should be looking in
+`traffic.pcap` — subtract a few seconds from
+`triggered_uptime_secs`.
+
+**Two images for Display reports.** `screenshot.png` is
+captured the moment you open the dialog (before the artefact
+can fade); `screenshot-region.png` is produced after you drag
+the region and shows what was on screen at submit time,
+cropped to your selection. Compare the two to see what
+changed while you were typing the description.
 
 ### Where reports are saved
 

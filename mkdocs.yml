@@ -155,6 +155,7 @@ nav:
             - Plans:
                 - "Android APK Port of Ryll": components/ryll/plans/PLAN-android-apk.md
                 - "Bug reporting mode for ryll": components/ryll/plans/PLAN-bug-reports.md
+                - "Bug-report trigger-time snapshot (2026-04-23)": components/ryll/plans/PLAN-bugreport-trigger-snapshot.md
                 - "Capture mode for protocol and display debugging": components/ryll/plans/PLAN-capture.md
                 - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
                 - "Deferred debt: collating and paying down outstanding work": components/ryll/plans/PLAN-deferred-debt.md
@@ -163,7 +164,9 @@ nav:
                 - "Extract reusable crates from ryll": components/ryll/plans/PLAN-crate-extraction.md
                 - "Idle CPU reduction and real latency measurement": components/ryll/plans/PLAN-idle-cpu-and-latency.md
                 - "Interactive USB device management UI": components/ryll/plans/PLAN-usb-ui.md
+                - "Macbook bug-report fixes (2026-04-23)": components/ryll/plans/PLAN-macbook-bugreport-fixes.md
                 - "Phase 01: Idle CPU profile": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile.md
+                - "Phase 1 — trigger-snapshot metadata plumbing": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-01-metadata.md
                 - "Phase 10: Testing and QEMU setup": components/ryll/plans/PLAN-usb-redir-phase-10-testing.md
                 - "Phase 1: Capture infrastructure": components/ryll/plans/PLAN-capture-phase-01-infra.md
                 - "Phase 1: Convert ryll to a Cargo workspace": components/ryll/plans/PLAN-crate-extraction-phase-01-workspace.md
@@ -176,6 +179,7 @@ nav:
                 - "Phase 1: Screenshot hotkey and save dialog": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-01-screenshot.md
                 - "Phase 1: SpiceVMC channel transport": components/ryll/plans/PLAN-usb-redir-phase-01-vmc-channel.md
                 - "Phase 1: SpiceVMC port channel transport for WebDAV": components/ryll/plans/PLAN-webdav-phase-01-port-channel.md
+                - "Phase 2 — trigger-time surface snapshot": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-02-snapshot.md
                 - "Phase 2: Audio correctness": components/ryll/plans/PLAN-deferred-debt-phase-02-audio.md
                 - "Phase 2: Channel state snapshots": components/ryll/plans/PLAN-bug-reports-phase-02-channel-state.md
                 - "Phase 2: DRAW_FILL (solid brush)": components/ryll/plans/PLAN-display-draw-ops-phase-02-fill.md
@@ -188,6 +192,7 @@ nav:
                 - "Phase 2: Reserve crate names on crates.io": components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names.md
                 - "Phase 2: usbredir protocol parser": components/ryll/plans/PLAN-usb-redir-phase-02-usbredir-parser.md
                 - "Phase 2: Wire usb_tx and channel events": components/ryll/plans/PLAN-usb-ui-phase-02-wire-tx.md
+                - "Phase 3 — submit-time region crop": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-03-region.md
                 - "Phase 3: Bug report assembly and zip output": components/ryll/plans/PLAN-bug-reports-phase-03-zip-output.md
                 - "Phase 3: Debian Packaging": components/ryll/plans/PLAN-packaging-phase-03-debian.md
                 - "Phase 3: Demote protocol logging": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging.md
@@ -199,6 +204,7 @@ nav:
                 - "Phase 3: Input and session correctness": components/ryll/plans/PLAN-deferred-debt-phase-03-session.md
                 - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
+                - "Phase 4 — documentation": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs.md
                 - "Phase 4: COPY_BITS": components/ryll/plans/PLAN-display-draw-ops-phase-04-copy-bits.md
                 - "Phase 4: Device enumeration display": components/ryll/plans/PLAN-usb-ui-phase-04-enumerate.md
                 - "Phase 4: Extract shakenfist-spice-protocol": components/ryll/plans/PLAN-crate-extraction-phase-04-protocol.md
