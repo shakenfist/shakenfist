@@ -451,8 +451,46 @@ creep:
 
 ### Bugs fixed during this work
 
-This section should list any bugs we encounter during
-development that we fixed. (To be filled in as we go.)
+Real bugs the rollout caught, outside the plan's design
+decisions:
+
+* **Stability-branch merge-CI regressions.** The work
+  started from three independent bugs on the stability
+  branch that were making Debian 12 merge-CI time out:
+  `NotImplementedError: Artifact must override filter()`
+  (fixed in commit 915de7e7 by overriding the classmethod
+  — phase 2 later pushed this further to SQL),
+  `RuntimeError: MARIADB_HOST not configured` from
+  `get_active_blob_uuids()` calling `_direct_*` on
+  non-primary nodes (5d620d90), and `KeyError` on three
+  unregistered cluster-operation counters in the database
+  daemon (a812a44c).
+* **mock_etcd state-filter fixup (phase 4).** The existing
+  `_mariadb_find_*` mocks ignored `criteria.states`. They
+  passed while the iterators still routed through the old
+  `get_all_* + cls.filter` path (which had its own state
+  check). With the phase-4 port the iterators hit
+  `find_*` directly, so the mocks were exposed as a
+  silent-match hazard. Now they cross-reference
+  `self.mariadb_states` the same way the real SQL JOIN on
+  `object_states` does.
+* **Phase-4 `_resolve_prefilter_to_states` regression.**
+  The unified base-class default coerced `prefilter=None`
+  to `ACTIVE_STATES`, but the pre-phase-4
+  Artifacts/Instances/Networks overrides had returned
+  every row when no prefilter was set. Two
+  `InstancesTestCase` tests caught this. Fix: per-type
+  override returning `set()` on `prefilter=None`; base
+  class default unchanged so IPAMs/AgentOperations keep
+  working.
+* **Namespaces alphabetical-ordering regression
+  (phase 5).** The pre-phase-5 `Namespaces.__iter__`
+  relied on `mariadb.get_all_namespace_names()` returning
+  names in alphabetical order. The new `_find` path goes
+  through `get_objects_by_state` which returns
+  insertion-order UUIDs. `test_auth.test_get_namespaces`
+  caught this. Fix: sort by name inside
+  `Namespaces.__iter__` before yielding.
 
 ### Documentation index maintenance
 
