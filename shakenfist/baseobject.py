@@ -22,6 +22,7 @@ from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import locks
 from shakenfist import mariadb
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import concurrency as util_concurrency
@@ -746,12 +747,14 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
 
 
 class DatabaseBackedObjectIterator:
-    def __init__(self, filters, prefilter=None, suppress_failure_audit=False):
-        self.filters = filters
+    def __init__(self, filters=None, prefilter=None, namespace=None,
+                 suppress_failure_audit=False):
+        self.filters = filters or []
         self.prefilter = prefilter
+        self.namespace = namespace
         self.suppress_failure_audit = suppress_failure_audit
 
-    def get_iterator(self):
+    def _resolve_prefilter_to_states(self) -> set[str]:
         if self.prefilter == 'active':
             target_states = self.base_object.ACTIVE_STATES
         elif self.prefilter == 'deleted':
@@ -765,21 +768,58 @@ class DatabaseBackedObjectIterator:
             target_states = self.base_object.ACTIVE_STATES
         else:
             raise exceptions.InvalidObjectPrefilter(self.prefilter)
+        return set(target_states)
 
-        # Use MariaDB for state-based filtering
-        matching_uuids_list = mariadb.get_objects_by_state(
-            self.base_object.object_type, list(target_states))
+    def _find(self, criteria):
+        """Default: two-step get_objects_by_state + _db_get hydration.
 
-        if matching_uuids_list is None:
-            LOG.warning('get_objects_by_state returned None for '
-                        f'{self.base_object.object_type}')
+        Subclasses SHOULD override with a single mariadb.find_* call
+        when the object has a Find* RPC available. The default exists
+        to keep subclasses that inherit the iterator (IPAMs,
+        AgentOperations) working until they get their own overrides.
+        """
+        uuids = mariadb.get_objects_by_state(
+            self.base_object.object_type, criteria.states or [])
+        if uuids is None:
+            LOG.warning(
+                'get_objects_by_state returned None for '
+                f'{self.base_object.object_type}')
             return
+        for objuuid in uuids:
+            data = self.base_object._db_get(objuuid)
+            if data is None:
+                continue
+            # Default doesn't know how to push namespace to SQL,
+            # so filter in Python. Subclasses that override _find
+            # for fast SQL paths handle namespace there.
+            if criteria.namespace is not None:
+                if isinstance(data, dict):
+                    ns = data.get('namespace')
+                else:
+                    ns = getattr(data, 'namespace', None)
+                if ns != criteria.namespace:
+                    continue
+            yield data
 
-        # Fetch static values from MariaDB for each matching UUID
-        for objuuid in matching_uuids_list:
-            static_values = self.base_object._db_get(objuuid)
-            if static_values is not None:
-                yield objuuid, static_values
+    def _to_static_values(self, data):
+        return data
+
+    def get_iterator(self):
+        target_states = self._resolve_prefilter_to_states()
+        criteria_namespace = (
+            self.namespace
+            if self.namespace and self.namespace != 'system'
+            else None)
+        criteria = ObjectFilterCriteria(
+            states=list(target_states),
+            namespace=criteria_namespace,
+        )
+        for data in self._find(criteria):
+            if isinstance(data, dict):
+                objuuid = data.get('uuid')
+            else:
+                objuuid = data.uuid
+            yield str(objuuid), self._to_static_values(data)
 
     def apply_filters(self, o):
         for f in self.filters:
