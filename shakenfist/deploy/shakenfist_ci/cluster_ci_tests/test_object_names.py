@@ -3,6 +3,7 @@ import json
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 class TestObjectNames(base.BaseNamespacedTestCase):
@@ -70,3 +71,183 @@ class TestObjectNames(base.BaseNamespacedTestCase):
                 'inst_%s' % name,
                 content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
             self.assertEqual(uuid, inst['uuid'])
+
+
+class TestSameNameLookup(base.BaseNamespacedTestCase):
+    """Functional tests for same-name cross-namespace lookup (phase 3 SQL pushdown).
+
+    Verifies that after the Instance and Network from_db_by_ref overrides land,
+    each namespace client resolves its own object when two namespaces share an
+    object name, and that the system client receives either a 400
+    (MultipleObjects surfaced as RequestMalformedException) or a 200 returning
+    one of the two known UUIDs — never a 404.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'samenametest'
+        super().__init__(*args, **kwargs)
+
+    def test_instance_same_name_different_namespace(self):
+        """Two namespaces each own an instance called 'shared-name'.
+
+        get_instance('shared-name') from each namespace's client must return
+        the instance belonging to *that* namespace (verified by UUID). The
+        system client query must not return 404 — a 400 (ambiguous) or 200
+        (one UUID returned silently) are both acceptable outcomes.
+
+        Instances are created with no disk and no network interface so that
+        they never attempt to boot. This keeps wall time minimal and avoids
+        any dependency on image availability or hypervisor capacity.
+        """
+        inst_name = 'shared-name'
+
+        ns_b_name = self.namespace + '-b'
+        ns_b_key = self._uniquifier()
+        client_b = self._make_namespace(ns_b_name, ns_b_key)
+
+        try:
+            # Namespace A instance (self.namespace / self.test_client)
+            inst_a = self.test_client.create_instance(
+                inst_name, 1, 128, None, None, None, None,
+                namespace=self.namespace)
+            self.addDetail(
+                'inst_a',
+                content.text_content(json.dumps(inst_a, indent=4, sort_keys=True)))
+
+            # Namespace B instance
+            inst_b = client_b.create_instance(
+                inst_name, 1, 128, None, None, None, None,
+                namespace=ns_b_name)
+            self.addDetail(
+                'inst_b',
+                content.text_content(json.dumps(inst_b, indent=4, sort_keys=True)))
+
+            self.assertNotEqual(
+                inst_a['uuid'], inst_b['uuid'],
+                'Expected different UUIDs for same name in different namespaces')
+
+            # Each namespace client must resolve its own instance by name
+            resolved_a = self.test_client.get_instance(inst_name)
+            self.addDetail(
+                'resolved_a',
+                content.text_content(json.dumps(resolved_a, indent=4, sort_keys=True)))
+            self.assertEqual(
+                inst_a['uuid'], resolved_a['uuid'],
+                'Namespace A client should resolve to its own instance')
+
+            resolved_b = client_b.get_instance(inst_name)
+            self.addDetail(
+                'resolved_b',
+                content.text_content(json.dumps(resolved_b, indent=4, sort_keys=True)))
+            self.assertEqual(
+                inst_b['uuid'], resolved_b['uuid'],
+                'Namespace B client should resolve to its own instance')
+
+            # System client: ambiguous lookup — accept 400 or 200, never 404
+            try:
+                resolved_sys = self.system_client.get_instance(inst_name)
+                self.addDetail(
+                    'resolved_sys',
+                    content.text_content(json.dumps(resolved_sys, indent=4, sort_keys=True)))
+                self.assertIn(
+                    resolved_sys['uuid'],
+                    {inst_a['uuid'], inst_b['uuid']},
+                    'System client resolved an unexpected instance UUID')
+            except apiclient.RequestMalformedException:
+                # Expected after phase 3: MultipleObjects surfaces as 400
+                pass
+
+        finally:
+            # Delete instances immediately (they never booted, deletion is fast)
+            for client, inst in [(self.test_client, inst_a), (client_b, inst_b)]:
+                try:
+                    client.delete_instance(inst['uuid'])
+                except apiclient.ResourceNotFoundException:
+                    pass
+            try:
+                self.system_client.delete_namespace(ns_b_name)
+            except apiclient.ResourceNotFoundException:
+                pass
+
+    def test_network_same_name_different_namespace(self):
+        """Two namespaces each own a network called 'shared-net'.
+
+        get_network('shared-net') from each namespace's client must return
+        the network belonging to *that* namespace (verified by UUID). The
+        system client query must not return 404.
+        """
+        net_name = 'shared-net'
+
+        ns_b_name = self.namespace + '-b'
+        ns_b_key = self._uniquifier()
+        client_b = self._make_namespace(ns_b_name, ns_b_key)
+
+        net_a = None
+        net_b = None
+        try:
+            # Namespace A network (self.namespace / self.test_client)
+            net_a = self.test_client.allocate_network(
+                '10.100.0.0/24', True, True, net_name)
+            self.addDetail(
+                'net_a',
+                content.text_content(json.dumps(net_a, indent=4, sort_keys=True)))
+
+            # Namespace B network — use a non-overlapping prefix so the
+            # allocator does not reject it for address-space reasons.
+            net_b = client_b.allocate_network(
+                '10.101.0.0/24', True, True, net_name)
+            self.addDetail(
+                'net_b',
+                content.text_content(json.dumps(net_b, indent=4, sort_keys=True)))
+
+            self.assertNotEqual(
+                net_a['uuid'], net_b['uuid'],
+                'Expected different UUIDs for same name in different namespaces')
+
+            # Each namespace client must resolve its own network by name
+            resolved_a = self.test_client.get_network(net_name)
+            self.addDetail(
+                'resolved_a',
+                content.text_content(json.dumps(resolved_a, indent=4, sort_keys=True)))
+            self.assertEqual(
+                net_a['uuid'], resolved_a['uuid'],
+                'Namespace A client should resolve to its own network')
+
+            resolved_b = client_b.get_network(net_name)
+            self.addDetail(
+                'resolved_b',
+                content.text_content(json.dumps(resolved_b, indent=4, sort_keys=True)))
+            self.assertEqual(
+                net_b['uuid'], resolved_b['uuid'],
+                'Namespace B client should resolve to its own network')
+
+            # System client: ambiguous lookup — accept 400 or 200, never 404
+            try:
+                resolved_sys = self.system_client.get_network(net_name)
+                self.addDetail(
+                    'resolved_sys',
+                    content.text_content(json.dumps(resolved_sys, indent=4, sort_keys=True)))
+                self.assertIn(
+                    resolved_sys['uuid'],
+                    {net_a['uuid'], net_b['uuid']},
+                    'System client resolved an unexpected network UUID')
+            except apiclient.RequestMalformedException:
+                # Expected after phase 3: MultipleObjects surfaces as 400
+                pass
+
+        finally:
+            # Delete networks then namespace B
+            for client, net in [
+                    (self.test_client, net_a),
+                    (client_b, net_b)]:
+                if net is None:
+                    continue
+                try:
+                    client.delete_network(net['uuid'])
+                except (apiclient.ResourceNotFoundException,
+                        apiclient.ResourceStateConflictException):
+                    pass
+            try:
+                self.system_client.delete_namespace(ns_b_name)
+            except apiclient.ResourceNotFoundException:
+                pass
