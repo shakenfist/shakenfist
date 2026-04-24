@@ -147,12 +147,7 @@ class Job(util_concurrency.Job):
                             # If the network node was missing a network, then that implies
                             # that we also need to re-create all of the floating IPs for
                             # that network.
-                            for ni_uuid in n.networkinterfaces:
-                                ni = interface.NetworkInterface.from_db(
-                                    ni_uuid, suppress_failure_audit=True)
-                                if not ni:
-                                    continue
-
+                            for ni in n.networkinterfaces:
                                 floating_addr = ni.floating.get(
                                     'floating_address')
                                 if floating_addr:

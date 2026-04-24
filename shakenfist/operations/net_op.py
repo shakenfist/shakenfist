@@ -5,7 +5,6 @@ from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.network.network import Network
-from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import exceptions as util_exceptions
@@ -106,13 +105,9 @@ class NetOp(BaseClusterOperation):
         n.ensure_mesh()
 
     def _network_destroy(self, n):
-        if n.networkinterfaces:
-            wo = []
-            for ni_uuid in n.networkinterfaces:
-                ni = NetworkInterface.from_db(ni_uuid)
-                if ni:
-                    wo.append(ni)
-            self.defer(waiting_on=wo)
+        nis = n.networkinterfaces
+        if nis:
+            self.defer(waiting_on=nis)
             return
 
         try:

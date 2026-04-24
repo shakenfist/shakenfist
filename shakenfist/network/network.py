@@ -392,29 +392,33 @@ class Network(dbowo):
 
     @property
     def networkinterfaces(self):
-        attrs = self._ensure_attributes()
-        return attrs.networkinterfaces
+        """Currently-attached NetworkInterface objects.
 
-    def add_networkinterface(self, ni):
-        attrs = self._ensure_attributes()
-        ni_uuid = str(ni.uuid)
-        if ni_uuid not in attrs.networkinterfaces:
-            attrs.networkinterfaces.append(ni_uuid)
-            attrs.networkinterfaces_initialized = True
-            self._save_attributes()
-            self.add_event(EVENT_TYPE_MUTATE, 'add networkinterface',
-                           extra={'networkinterface': ni_uuid})
+        Queried live from the network_interfaces table
+        (network_uuid is an indexed column). Previously cached
+        as a list of UUID strings on network_attributes; that
+        column is dropped in phase 7e.
+        """
+        criteria = ObjectFilterCriteria(
+            states=list(interface.NetworkInterface.ACTIVE_STATES),
+            network_uuid=str(self.uuid),
+        )
+        return [
+            interface.NetworkInterface(
+                interface.NetworkInterface._static_values_to_dict(d))
+            for d in mariadb.find_network_interfaces(criteria)
+        ]
 
-    def remove_networkinterface(self, ni):
+    def remove_networkinterface_lease(self, ni):
+        """Release a DHCP lease held by a departing NetworkInterface.
+
+        The row-level association is managed by the
+        NetworkInterface lifecycle; all that remains for the
+        owning Network is the DHCP-lease housekeeping that used
+        to live alongside the list mutation.
+        """
         if ni.ipv4:
             self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
-        attrs = self._ensure_attributes()
-        ni_uuid = str(ni.uuid)
-        if ni_uuid in attrs.networkinterfaces:
-            attrs.networkinterfaces.remove(ni_uuid)
-            self._save_attributes()
-            self.add_event(EVENT_TYPE_MUTATE, 'remove networkinterface',
-                           extra={'networkinterface': ni_uuid})
 
     def _update_floating_gateway(self, gateway):
         attrs = self._ensure_attributes()
@@ -858,8 +862,7 @@ class Network(dbowo):
     def ensure_mesh(self):
         # Determine which IPs should be on this mesh and where
         instances = []
-        for ni_uuid in self.networkinterfaces:
-            ni = interface.NetworkInterface.from_db(ni_uuid)
+        for ni in self.networkinterfaces:
             if ni.instance_uuid not in instances:
                 instances.append(ni.instance_uuid)
 

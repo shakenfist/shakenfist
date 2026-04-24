@@ -192,7 +192,10 @@ class NetworkInterface(dbo):
         if not n:
             raise exceptions.NetworkMissing(
                 'No such network: %s' % netdesc['network_uuid'])
-        n.add_networkinterface(ni)
+        # The NetworkInterface row itself is the source of truth for
+        # the association; the network-side list is queried live.
+        n.add_event(EVENT_TYPE_MUTATE, 'add networkinterface',
+                    extra={'networkinterface': str(ni.uuid)})
 
         return ni
 
@@ -296,7 +299,9 @@ class NetworkInterface(dbo):
         if n:
             if self.ipv4:
                 n.ipam.release(self.ipv4)
-            n.remove_networkinterface(self)
+            n.remove_networkinterface_lease(self)
+            n.add_event(EVENT_TYPE_MUTATE, 'remove networkinterface',
+                        extra={'networkinterface': str(self.uuid)})
 
         self.state = dbo.STATE_DELETED
 
