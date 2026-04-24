@@ -16,7 +16,7 @@
         <link rel="prev" href="../PLAN-android-apk/">
       
       
-        <link rel="next" href="../PLAN-capture/">
+        <link rel="next" href="../PLAN-bugreport-trigger-snapshot/">
       
       
         
@@ -3281,6 +3281,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug-report trigger-time snapshot (2026-04-23)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-capture/" class="md-nav__link">
         
   
@@ -3505,6 +3533,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Macbook bug-report fixes (2026-04-23)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-idle-cpu-and-latency-phase-01-profile/" class="md-nav__link">
         
   
@@ -3513,6 +3569,34 @@
     
   
     Phase 01: Idle CPU profile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bugreport-trigger-snapshot-phase-01-metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1 — trigger-snapshot metadata plumbing
   
 
     
@@ -3869,6 +3953,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-bugreport-trigger-snapshot-phase-02-snapshot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2 — trigger-time surface snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-deferred-debt-phase-02-audio/" class="md-nav__link">
         
   
@@ -4205,6 +4317,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-bugreport-trigger-snapshot-phase-03-region/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3 — submit-time region crop
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-bug-reports-phase-03-zip-output/" class="md-nav__link">
         
   
@@ -4493,6 +4633,34 @@
     
   
     Phase 3: Video frame capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bugreport-trigger-snapshot-phase-04-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4 — documentation
   
 
     
@@ -8141,6 +8309,18 @@ writes a zip file.</p>
   pcap from ring buffer, session statistics JSON.</li>
 <li>For display reports: full-surface PNG screenshot, region
   coordinates in metadata.</li>
+</ul>
+<blockquote>
+<p><strong>Note (2026-04-23):</strong> the zip schema below was the phase
+1–7 shape. The trigger-snapshot master plan
+(<a href="/components/ryll/plans/PLAN-bugreport-trigger-snapshot/">PLAN-bugreport-trigger-snapshot.md</a>)
+later added a second image (<code>screenshot-region.png</code>) and
+two new <code>metadata.json</code> fields (<code>triggered_at</code>,
+<code>triggered_uptime_secs</code>). See <code>docs/troubleshooting.md</code>
+for the current user-facing layout and <code>ARCHITECTURE.md</code>
+for the contributor view.</p>
+</blockquote>
+<ul>
 <li>Writes a zip file with structure:
   <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ryll-bugreport-2026-04-03T12-34-56Z.zip
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── metadata.json      # report type, description,
