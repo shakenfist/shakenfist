@@ -169,6 +169,7 @@ begins.
 | 4. Iterator rework | PLAN-sql-pushdown-filtering-phase-04-iterators.md | Not started |
 | 5. Ad-hoc bulk scan cleanup | PLAN-sql-pushdown-filtering-phase-05-adhoc.md | Not started |
 | 6. Tests and documentation | PLAN-sql-pushdown-filtering-phase-06-tests-docs.md | Not started |
+| 7. Denormalised child-UUID list removal | PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md | Not started |
 
 Phase outlines (detailed plans to be written when each phase
 starts):
@@ -227,6 +228,25 @@ new bulk-scan call site must either be on the allowlist or
 accompanied by a comment explaining why pushdown is not
 possible.
 
+**Phase 7 — Denormalised child-UUID list removal.** Several
+attributes-table fields are hand-maintained lists of child
+object UUIDs that became pure denormalisation once MariaDB
+gained indexed FK-like columns. Targets:
+`network_attributes.networkinterfaces` (replaceable by
+`WHERE network_uuid = ?`),
+`instance_attributes.interfaces` (replaceable by
+`WHERE instance_uuid = ?`), and the adjacent dead
+`networkinterfaces_initialized` flag. Each field becomes a
+query-backed property that returns live data from the
+`network_interfaces` table; the `add_*` / `remove_*`
+mutator methods go away. Drop the columns via an
+`_ensure_*_schema` migration after callers migrate. Sweep
+the ~10 call sites. Not included:
+`node_attributes.instances` (would need placement-JSON
+pushdown — defer to the attribute-column work),
+`node_attributes.daemons` (not object UUIDs),
+`namespace_attributes.trust` (graph, not parent-child).
+
 ## Agent guidance
 
 ### Execution model
@@ -254,8 +274,8 @@ The workflow is:
 
 Phase 1 and phase 4 touch broadly-used primitives; spawn
 those sub-agents with `isolation: "worktree"`. Phases 2, 3,
-5, 6 are contained enough to work in the main tree once the
-phase plan is tight.
+5, 6, 7 are contained enough to work in the main tree once
+the phase plan is tight.
 
 ### Planning effort
 
@@ -274,6 +294,7 @@ semantics across the codebase.
 | 4 | high | opus |
 | 5 | medium | sonnet |
 | 6 | medium | sonnet |
+| 7 | medium | sonnet |
 
 ### Step-level guidance
 
@@ -411,6 +432,22 @@ creep:
   in phases 1-4) instead of a second implementation that
   can drift. Track separately; do not bundle with any
   SQL-pushdown phase.
+* **NetworkInterface namespace column.** `NetworkInterfaceData`
+  has no namespace column today; interface-namespace ownership
+  is derived from the owning `Network` (or `Instance`). Phase 5
+  investigation found zero current production call sites that
+  filter interfaces by namespace — the dnsmasq DHCP path uses
+  the per-Network `networkinterfaces` attribute rather than a
+  namespace-scoped query. Defer until there is a concrete
+  caller. When that caller appears, decide between: (a)
+  JOIN-based pushdown through `networks.namespace` or
+  `instances.namespace` (no schema change, no denormalisation
+  risk), or (b) adding the column with a data-migration v-bump
+  (consistent shape with Artifact/Instance/Network but risks
+  drift if a Network is ever reassigned). `find_network_interfaces`
+  in phase 5 accepts a namespace criteria field that is
+  currently a no-op so either path can land as a one-line
+  enable.
 
 ### Bugs fixed during this work
 
