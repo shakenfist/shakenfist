@@ -217,21 +217,31 @@ as the kwarg still means "no filter". A caller passing
 `namespace='tenant-a'` means `WHERE namespace = 'tenant-a'`,
 which excludes NULL rows by SQL semantics — correct.
 
-### Base-class default: raise
+### Base-class default: preserve N+1 path (revised)
 
-Phase 4 only ports the Artifact / Instance / Network
-iterators (per master plan scope). Other object types
-(Upload, IPAM, NetworkInterface, etc.) have no concrete
-iterator today; they either inherit the default or don't
-use the iterator machinery at all. The base-class default
-`_find` raises `NotImplementedError` — matches phase 1's
-`_db_get` stance, makes the fault loud and immediate, and
-forces any future iterator author to provide an explicit
-SQL path. Step 4a's back brief confirms no live caller
-depends on the old default before landing the change; if
-one is found, downgrade to a `LOG.error` that the CI
-log-check catches at end of run (still fails CI, just
-defers the raise).
+Initial plan was to raise `NotImplementedError` from the
+default `_find`. Step 4a's back brief found five other
+subclasses of `DatabaseBackedObjectIterator` beyond the
+three in scope: `NetworkInterfaces` (has its own
+`get_iterator` override — safe), `IPAMs` and
+`AgentOperations` (use the default `get_iterator` —
+would break if we raise), and `Namespaces` / `Nodes`
+(override `__iter__` end-to-end and never call
+`get_iterator` — safe but latent footgun).
+
+Decision: **preserve the existing N+1 path as the default
+`_find`.** `get_objects_by_state` + per-UUID `_db_get`
+continues to work for subclasses that haven't opted in.
+Subclasses that want the fast single-SQL path override
+`_find` (Artifacts, Instances, Networks do this in
+4b/4c/4d). No breakage for IPAMs or AgentOperations.
+
+This is strictly weaker than "raise" for catching new-
+iterator-author mistakes, but it's the correct call given
+existing callers depend on the default. Future work: audit
+the remaining subclasses in a separate plan and migrate
+them to explicit `_find` overrides so the default can
+eventually become strict.
 
 ## Steps
 
@@ -318,16 +328,16 @@ After each step:
 
 ## Open questions for this phase
 
-1. **Base-class default `_find` behaviour.** Resolved:
-   raise `NotImplementedError` from the base class when a
-   concrete subclass forgets to override `_find`. This
-   matches the phase-1 stance on `_db_get` and makes the
-   fault loud and immediate. Fallback option considered
-   (log an `ERROR sf ...` / `Traceback ...` line that the
-   CI log-check script would catch at end of run) is
-   strictly weaker than raising — record this here for
-   posterity in case the hard raise surprises a caller at
-   runtime, in which case we can downgrade.
+1. **Base-class default `_find` behaviour.** Revised
+   during step 4a's back brief: **preserve the N+1 path**
+   as the default (get_objects_by_state + per-UUID
+   _db_get). Raising turned out to break IPAMs and
+   AgentOperations, which use the default `get_iterator`
+   today. Future work (separate plan) should audit and
+   migrate the remaining subclasses so the default can
+   eventually raise; for now the slow path continues to
+   function for opted-out types while Artifacts, Instances,
+   and Networks get the fast path via explicit overrides.
 
 2. **State-filter semantics on `mock_etcd`.** The existing
    mocks were implemented trusting that state filtering

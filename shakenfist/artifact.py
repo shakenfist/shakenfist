@@ -549,24 +549,17 @@ class Artifact(dbowo):
 class Artifacts(dbo_iter):
     base_object = Artifact
 
+    def _find(self, criteria):
+        return mariadb.find_artifacts(criteria)
+
     def __iter__(self):
-        for data in mariadb.get_all_artifacts():
-            a = Artifact(data)
-            if not a:
+        for _, data in self.get_iterator():
+            obj = Artifact(data)
+            if not obj:
                 continue
-
-            out = self.apply_filters(a)
-            if out:
-                yield out
-
-    def get_iterator(self):
-        """Override to use MariaDB instead of etcd.
-
-        This is used by the prefilter logic in the parent class.
-        We yield (key, data) tuples where data is an ArtifactData model.
-        """
-        for data in mariadb.get_all_artifacts():
-            yield str(data.uuid), data
+            filtered = self.apply_filters(obj)
+            if filtered:
+                yield filtered
 
 
 def url_filter(url, a):
