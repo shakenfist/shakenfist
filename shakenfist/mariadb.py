@@ -152,12 +152,12 @@ ARTIFACT_INDEXES_VERSION = 2
 NETWORK_INTERFACES_VERSION = 2
 NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
 NETWORKS_VERSION = 3
-NETWORK_ATTRIBUTES_VERSION = 2
+NETWORK_ATTRIBUTES_VERSION = 3
 IPAMS_VERSION = 2
 AGENT_OPERATIONS_VERSION = 2
 AGENT_OPERATION_ATTRIBUTES_VERSION = 2
 INSTANCES_VERSION = 3
-INSTANCE_ATTRIBUTES_VERSION = 2
+INSTANCE_ATTRIBUTES_VERSION = 3
 OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
@@ -3499,9 +3499,6 @@ def _migrate_etcd_network_attributes(
             # Read attributes from etcd
             routing_data = etcd.get(
                 'attribute/network', net_uuid, 'routing')
-            ni_data = etcd.get(
-                'attribute/network', net_uuid,
-                'networkinterfaces')
             dns_data = etcd.get(
                 'attribute/network', net_uuid, 'hosteddns')
 
@@ -3511,14 +3508,6 @@ def _migrate_etcd_network_attributes(
                 floating_gateway = routing_data.get(
                     'floating_gateway')
 
-            networkinterfaces: list[str] = []
-            networkinterfaces_initialized = False
-            if ni_data:
-                networkinterfaces = ni_data.get(
-                    'networkinterfaces', [])
-                networkinterfaces_initialized = ni_data.get(
-                    'initialized', False)
-
             hosteddns: dict[str, Any] = {}
             if dns_data:
                 hosteddns = dns_data
@@ -3526,15 +3515,16 @@ def _migrate_etcd_network_attributes(
             attrs = NetworkAttributesData(
                 uuid=UUIDType(net_uuid),
                 floating_gateway=floating_gateway,
-                networkinterfaces=networkinterfaces,
-                networkinterfaces_initialized=(
-                    networkinterfaces_initialized),
                 hosteddns=hosteddns,
             )
             success = _direct_create_network_attributes(attrs)
 
             if success:
-                # Delete etcd attributes after successful migration
+                # Delete etcd attributes after successful migration. The
+                # ``networkinterfaces`` etcd key is also dropped here even
+                # though we no longer read it -- phase 7 made the cached
+                # list redundant, but stale etcd data should still be
+                # cleaned up so re-migrations are idempotent.
                 etcd.delete(
                     'attribute/network', net_uuid, 'routing')
                 etcd.delete(
@@ -3804,8 +3794,6 @@ def _migrate_etcd_instance_attributes(
                 'enforced_deletes')
             block_devices = etcd.get(
                 'attribute/instance', inst_uuid, 'block_devices')
-            interfaces_data = etcd.get(
-                'attribute/instance', inst_uuid, 'interfaces')
             agent_state = etcd.get(
                 'attribute/instance', inst_uuid, 'agent_state')
             agent_attributes = etcd.get(
@@ -3820,15 +3808,6 @@ def _migrate_etcd_instance_attributes(
                 'attribute/instance', inst_uuid, 'error')
 
             # Extract values from etcd format
-            interfaces = []
-            if interfaces_data and isinstance(
-                    interfaces_data, list):
-                interfaces = interfaces_data
-            elif interfaces_data and isinstance(
-                    interfaces_data, dict):
-                interfaces = interfaces_data.get(
-                    'interfaces', [])
-
             kvm_pid = None
             if kvm_pid_data and isinstance(
                     kvm_pid_data, dict):
@@ -3863,7 +3842,6 @@ def _migrate_etcd_instance_attributes(
                     enforced_deletes, dict) else None,
                 block_devices=block_devices if isinstance(
                     block_devices, dict) else None,
-                interfaces=interfaces,
                 agent_state=agent_state if isinstance(
                     agent_state, dict) else None,
                 agent_attributes=agent_attributes if isinstance(
@@ -13587,6 +13565,32 @@ def _ensure_network_attributes_schema(
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver < NETWORK_ATTRIBUTES_VERSION:
+        # Phase 7: drop the cached child-NI list. The
+        # ``Network.networkinterfaces`` property now queries
+        # network_interfaces live via an indexed
+        # ``WHERE network_uuid = ?``. ``DROP COLUMN IF EXISTS`` is
+        # idempotent so a re-run on a fresh deployment (where
+        # ``create_all`` never created the columns) is a no-op.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{NETWORK_ATTRIBUTES_VERSION} '
+            '(drop cached networkinterfaces columns)')
+        with engine.connect() as conn:
+            for col in (
+                    'networkinterfaces',
+                    'networkinterfaces_initialized'):
+                try:
+                    conn.execute(sa.text(
+                        f'ALTER TABLE {table_name} '
+                        f'DROP COLUMN IF EXISTS {col}'))
+                    conn.commit()
+                except (IntegrityError, OperationalError) as e:
+                    LOG.debug(
+                        f'Column {col} drop skipped: {e}')
+        current_ver = NETWORK_ATTRIBUTES_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -13793,10 +13797,6 @@ def _direct_create_network_attributes(
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
                 floating_gateway=data.floating_gateway,
-                networkinterfaces=json.dumps(
-                    data.networkinterfaces),
-                networkinterfaces_initialized=(
-                    data.networkinterfaces_initialized),
                 hosteddns=json.dumps(data.hosteddns))
             conn.execute(stmt)
             conn.commit()
@@ -13825,10 +13825,6 @@ def _direct_get_network_attributes(
             if result is None:
                 return None
 
-            # Parse JSON fields
-            nis = result.networkinterfaces
-            if isinstance(nis, str):
-                nis = json.loads(nis)
             dns = result.hosteddns
             if isinstance(dns, str):
                 dns = json.loads(dns)
@@ -13836,9 +13832,6 @@ def _direct_get_network_attributes(
             return NetworkAttributesData(
                 uuid=result.uuid,
                 floating_gateway=result.floating_gateway,
-                networkinterfaces=nis if nis else [],
-                networkinterfaces_initialized=(
-                    result.networkinterfaces_initialized),
                 hosteddns=dns if dns else {},
             )
     except OperationalError as e:
@@ -13860,10 +13853,6 @@ def _direct_update_network_attributes(
                 table.c.uuid == data.uuid
             ).values(
                 floating_gateway=data.floating_gateway,
-                networkinterfaces=json.dumps(
-                    data.networkinterfaces),
-                networkinterfaces_initialized=(
-                    data.networkinterfaces_initialized),
                 hosteddns=json.dumps(data.hosteddns))
             result = conn.execute(stmt)
             conn.commit()
@@ -14044,9 +14033,6 @@ def _grpc_create_network_attributes(
                 uuid=str(data.uuid),
                 floating_gateway=(
                     data.floating_gateway or ''),
-                networkinterfaces=data.networkinterfaces,
-                networkinterfaces_initialized=(
-                    data.networkinterfaces_initialized),
                 hosteddns_json=json.dumps(data.hosteddns)))
         reply = _grpc_call(stub.CreateNetworkAttributes, request)
         return bool(reply.success)
@@ -14074,9 +14060,6 @@ def _grpc_get_network_attributes(
             floating_gateway=(
                 d.floating_gateway
                 if d.floating_gateway else None),
-            networkinterfaces=list(d.networkinterfaces),
-            networkinterfaces_initialized=(
-                d.networkinterfaces_initialized),
             hosteddns=dns,
         )
     except grpc.RpcError as e:
@@ -14096,9 +14079,6 @@ def _grpc_update_network_attributes(
                 uuid=str(data.uuid),
                 floating_gateway=(
                     data.floating_gateway or ''),
-                networkinterfaces=data.networkinterfaces,
-                networkinterfaces_initialized=(
-                    data.networkinterfaces_initialized),
                 hosteddns_json=json.dumps(data.hosteddns)))
         reply = _grpc_call(stub.UpdateNetworkAttributes, request)
         return bool(reply.success)
@@ -14935,7 +14915,7 @@ def _ensure_instance_attributes_schema(
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
-    if current_ver < INSTANCE_ATTRIBUTES_VERSION:
+    if current_ver < 2:
         # Add vsock_cids column (not in original v1 schema). Safe
         # to run repeatedly -- IF NOT EXISTS is a no-op when the
         # column already exists (e.g. new deployments where
@@ -14949,6 +14929,28 @@ def _ensure_instance_attributes_schema(
                 'ALTER TABLE instance_attributes '
                 'ADD COLUMN IF NOT EXISTS vsock_cids JSON NULL'))
             conn.commit()
+
+    if current_ver < INSTANCE_ATTRIBUTES_VERSION:
+        # Phase 7: drop the cached per-instance NI UUID list. The
+        # ``Instance.interfaces`` property now queries
+        # network_interfaces live via an indexed
+        # ``WHERE instance_uuid = ?``. ``DROP COLUMN IF EXISTS`` is
+        # idempotent so a re-run on a fresh deployment (where
+        # ``create_all`` never created the column) is a no-op.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{INSTANCE_ATTRIBUTES_VERSION} '
+            '(drop cached interfaces column)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'ALTER TABLE instance_attributes '
+                    'DROP COLUMN IF EXISTS interfaces'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(f'Column interfaces drop skipped: {e}')
+        current_ver = INSTANCE_ATTRIBUTES_VERSION
+        _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,
@@ -15279,7 +15281,6 @@ def _direct_create_instance_attributes(
                     data.enforced_deletes),
                 block_devices=_json_dumps(
                     data.block_devices),
-                interfaces=_json_dumps(data.interfaces),
                 agent_state=_json_dumps(data.agent_state),
                 agent_attributes=_json_dumps(
                     data.agent_attributes),
@@ -15328,7 +15329,6 @@ def _direct_get_instance_attributes(
                 result.enforced_deletes)
             block_devices = _parse_json(
                 result.block_devices)
-            interfaces = _parse_json(result.interfaces)
             agent_state = _parse_json(result.agent_state)
             agent_attributes = _parse_json(
                 result.agent_attributes)
@@ -15343,8 +15343,6 @@ def _direct_get_instance_attributes(
                 ports=ports,
                 enforced_deletes=enforced_deletes,
                 block_devices=block_devices,
-                interfaces=(
-                    interfaces if interfaces else []),
                 agent_state=agent_state,
                 agent_attributes=agent_attributes,
                 agent_operations=agent_operations,
@@ -15378,7 +15376,6 @@ def _direct_update_instance_attributes(
                     data.enforced_deletes),
                 block_devices=_json_dumps(
                     data.block_devices),
-                interfaces=_json_dumps(data.interfaces),
                 agent_state=_json_dumps(data.agent_state),
                 agent_attributes=_json_dumps(
                     data.agent_attributes),
@@ -15737,8 +15734,6 @@ def _grpc_create_instance_attributes(
                     data.enforced_deletes),
                 block_devices_json=_json_dumps(
                     data.block_devices),
-                interfaces_json=_json_dumps(
-                    data.interfaces),
                 agent_state_json=_json_dumps(
                     data.agent_state),
                 agent_attributes_json=_json_dumps(
@@ -15775,7 +15770,6 @@ def _grpc_get_instance_attributes(
         def _parse(val: str) -> Any:
             return json.loads(val) if val else None
 
-        interfaces = _parse(d.interfaces_json)
         return InstanceAttributesData(
             uuid=d.uuid,
             placement=_parse(d.placement_json),
@@ -15785,8 +15779,6 @@ def _grpc_get_instance_attributes(
                 d.enforced_deletes_json),
             block_devices=_parse(
                 d.block_devices_json),
-            interfaces=(
-                interfaces if interfaces else []),
             agent_state=_parse(d.agent_state_json),
             agent_attributes=_parse(
                 d.agent_attributes_json),
@@ -15820,8 +15812,6 @@ def _grpc_update_instance_attributes(
                     data.enforced_deletes),
                 block_devices_json=_json_dumps(
                     data.block_devices),
-                interfaces_json=_json_dumps(
-                    data.interfaces),
                 agent_state_json=_json_dumps(
                     data.agent_state),
                 agent_attributes_json=_json_dumps(

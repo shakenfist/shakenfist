@@ -2941,9 +2941,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             floating_gateway=(
                 d.floating_gateway
                 if d.floating_gateway else None),
-            networkinterfaces=list(d.networkinterfaces),
-            networkinterfaces_initialized=(
-                d.networkinterfaces_initialized),
             hosteddns=dns,
         )
 
@@ -2955,9 +2952,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         return database_pb2.NetworkAttributesProto(
             uuid=str(data.uuid),
             floating_gateway=data.floating_gateway or '',
-            networkinterfaces=data.networkinterfaces,
-            networkinterfaces_initialized=(
-                data.networkinterfaces_initialized),
             hosteddns_json=json.dumps(data.hosteddns))
 
     # AgentOperation Operations (MariaDB)
@@ -4441,7 +4435,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         def _parse(val: str) -> Any:
             return json.loads(val) if val else None
 
-        interfaces = _parse(d.interfaces_json)
         return InstanceAttributesData(
             uuid=UUID(d.uuid),
             placement=_parse(d.placement_json),
@@ -4451,8 +4444,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 d.enforced_deletes_json),
             block_devices=_parse(
                 d.block_devices_json),
-            interfaces=(
-                interfaces if interfaces else []),
             agent_state=_parse(d.agent_state_json),
             agent_attributes=_parse(
                 d.agent_attributes_json),
@@ -4478,7 +4469,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 data.enforced_deletes),
             block_devices_json=json.dumps(
                 data.block_devices),
-            interfaces_json=json.dumps(data.interfaces),
             agent_state_json=json.dumps(
                 data.agent_state),
             agent_attributes_json=json.dumps(

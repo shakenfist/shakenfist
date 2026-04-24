@@ -16,9 +16,12 @@
 #
 # Consolidates separate etcd attributes into a single row:
 # - attribute/network/{uuid}/routing -> floating_gateway
-# - attribute/network/{uuid}/networkinterfaces ->
-#       networkinterfaces, networkinterfaces_initialized
 # - attribute/network/{uuid}/hosteddns -> hosteddns
+#
+# The cached ``networkinterfaces`` list (and its
+# ``networkinterfaces_initialized`` flag) was removed in phase 7;
+# ``Network.networkinterfaces`` now queries the network_interfaces
+# table live via an indexed ``WHERE network_uuid = ?``.
 
 from typing import Annotated
 from typing import Any
@@ -47,10 +50,6 @@ class NetworkAttributesData(BaseModel):
         floating_gateway: The floating IP gateway address assigned
             to this network, or None if no floating gateway.
             Flattened from the etcd 'routing' attribute dict.
-        networkinterfaces: List of NetworkInterface UUIDs attached
-            to this network.
-        networkinterfaces_initialized: Whether the NI list has been
-            populated (legacy migration flag).
         hosteddns: Dictionary mapping DNS names to addresses for
             networks with provide_dns=True.
     """
@@ -63,12 +62,6 @@ class NetworkAttributesData(BaseModel):
 
     # Floating IP gateway address (or None)
     floating_gateway: Optional[str] = None
-
-    # List of NetworkInterface UUIDs attached to this network
-    networkinterfaces: list[str] = Field(default_factory=list)
-
-    # Whether the NI list has been populated
-    networkinterfaces_initialized: bool = False
 
     # DNS entries: {name: address} for hosted DNS
     hosteddns: dict[str, Any] = Field(default_factory=dict)

@@ -4063,31 +4063,21 @@ class NetworkAttributesProto(google.protobuf.message.Message):
 
     UUID_FIELD_NUMBER: builtins.int
     FLOATING_GATEWAY_FIELD_NUMBER: builtins.int
-    NETWORKINTERFACES_FIELD_NUMBER: builtins.int
-    NETWORKINTERFACES_INITIALIZED_FIELD_NUMBER: builtins.int
     HOSTEDDNS_JSON_FIELD_NUMBER: builtins.int
     uuid: builtins.str
     """References networks.uuid"""
     floating_gateway: builtins.str
     """Floating IP gateway (empty = None)"""
-    networkinterfaces_initialized: builtins.bool
-    """Whether NI list has been populated"""
     hosteddns_json: builtins.str
     """JSON-encoded {name: address} dict"""
-    @property
-    def networkinterfaces(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """List of NI UUIDs"""
-
     def __init__(
         self,
         *,
         uuid: builtins.str = ...,
         floating_gateway: builtins.str = ...,
-        networkinterfaces: collections.abc.Iterable[builtins.str] | None = ...,
-        networkinterfaces_initialized: builtins.bool = ...,
         hosteddns_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["floating_gateway", b"floating_gateway", "hosteddns_json", b"hosteddns_json", "networkinterfaces", b"networkinterfaces", "networkinterfaces_initialized", b"networkinterfaces_initialized", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["floating_gateway", b"floating_gateway", "hosteddns_json", b"hosteddns_json", "uuid", b"uuid"]) -> None: ...
 
 global___NetworkAttributesProto = NetworkAttributesProto
 
@@ -4643,7 +4633,6 @@ class InstanceAttributesProto(google.protobuf.message.Message):
     PORTS_JSON_FIELD_NUMBER: builtins.int
     ENFORCED_DELETES_JSON_FIELD_NUMBER: builtins.int
     BLOCK_DEVICES_JSON_FIELD_NUMBER: builtins.int
-    INTERFACES_JSON_FIELD_NUMBER: builtins.int
     AGENT_STATE_JSON_FIELD_NUMBER: builtins.int
     AGENT_ATTRIBUTES_JSON_FIELD_NUMBER: builtins.int
     AGENT_OPERATIONS_JSON_FIELD_NUMBER: builtins.int
@@ -4662,8 +4651,6 @@ class InstanceAttributesProto(google.protobuf.message.Message):
     """JSON: {count}"""
     block_devices_json: builtins.str
     """JSON: {devices, extracommands, finalized}"""
-    interfaces_json: builtins.str
-    """JSON: list of NI UUIDs"""
     agent_state_json: builtins.str
     """JSON: {value, update_time}"""
     agent_attributes_json: builtins.str
@@ -4685,7 +4672,6 @@ class InstanceAttributesProto(google.protobuf.message.Message):
         ports_json: builtins.str = ...,
         enforced_deletes_json: builtins.str = ...,
         block_devices_json: builtins.str = ...,
-        interfaces_json: builtins.str = ...,
         agent_state_json: builtins.str = ...,
         agent_attributes_json: builtins.str = ...,
         agent_operations_json: builtins.str = ...,
@@ -4693,7 +4679,7 @@ class InstanceAttributesProto(google.protobuf.message.Message):
         error_message: builtins.str = ...,
         vsock_cids_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["agent_attributes_json", b"agent_attributes_json", "agent_operations_json", b"agent_operations_json", "agent_state_json", b"agent_state_json", "block_devices_json", b"block_devices_json", "enforced_deletes_json", b"enforced_deletes_json", "error_message", b"error_message", "interfaces_json", b"interfaces_json", "kvm_pid", b"kvm_pid", "placement_json", b"placement_json", "ports_json", b"ports_json", "power_state_json", b"power_state_json", "uuid", b"uuid", "vsock_cids_json", b"vsock_cids_json"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_attributes_json", b"agent_attributes_json", "agent_operations_json", b"agent_operations_json", "agent_state_json", b"agent_state_json", "block_devices_json", b"block_devices_json", "enforced_deletes_json", b"enforced_deletes_json", "error_message", b"error_message", "kvm_pid", b"kvm_pid", "placement_json", b"placement_json", "ports_json", b"ports_json", "power_state_json", b"power_state_json", "uuid", b"uuid", "vsock_cids_json", b"vsock_cids_json"]) -> None: ...
 
 global___InstanceAttributesProto = InstanceAttributesProto
 

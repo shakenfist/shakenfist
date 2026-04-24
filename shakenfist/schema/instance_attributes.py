@@ -20,7 +20,6 @@
 # - attribute/instance/{uuid}/ports -> ports
 # - attribute/instance/{uuid}/enforced_deletes -> enforced_deletes
 # - attribute/instance/{uuid}/block_devices -> block_devices
-# - attribute/instance/{uuid}/interfaces -> interfaces
 # - attribute/instance/{uuid}/agent_state -> agent_state
 # - attribute/instance/{uuid}/agent_attributes -> agent_attributes
 # - attribute/instance/{uuid}/agent_operations -> agent_operations
@@ -36,7 +35,6 @@ from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
-from pydantic import Field
 from pydantic import UUID4
 
 from shakenfist.schema.sqlalchemy import SQLNativeUUID
@@ -63,7 +61,6 @@ class InstanceAttributesData(BaseModel):
             attempts.
         block_devices: Dict with devices list, extracommands,
             and finalized flag.
-        interfaces: List of NetworkInterface UUIDs.
         agent_state: Dict with state value and update_time.
         agent_attributes: Dict with start_time, system_boot_time,
             and facts.
@@ -93,9 +90,6 @@ class InstanceAttributesData(BaseModel):
 
     # Block devices: {devices: [...], extracommands: [...], finalized: bool}
     block_devices: Optional[dict[str, Any]] = None
-
-    # List of NetworkInterface UUIDs
-    interfaces: list[str] = Field(default_factory=list)
 
     # Agent state: {value: <str>, update_time: <float>}
     agent_state: Optional[dict[str, Any]] = None

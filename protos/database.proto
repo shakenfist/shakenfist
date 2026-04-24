@@ -1400,8 +1400,11 @@ message DeleteNetworkRequest {
 message NetworkAttributesProto {
   string uuid = 1;                        // References networks.uuid
   string floating_gateway = 2;            // Floating IP gateway (empty = None)
-  repeated string networkinterfaces = 3;  // List of NI UUIDs
-  bool networkinterfaces_initialized = 4; // Whether NI list has been populated
+  // Field tags 3 and 4 (networkinterfaces / networkinterfaces_initialized)
+  // were dropped in phase 7; the per-network NI list is queried live from
+  // network_interfaces. Tags reserved to prevent accidental reuse.
+  reserved 3, 4;
+  reserved "networkinterfaces", "networkinterfaces_initialized";
   string hosteddns_json = 5;              // JSON-encoded {name: address} dict
 }
 
@@ -1561,7 +1564,10 @@ message InstanceAttributesProto {
   string ports_json = 4;               // JSON: {console_port, vdi_port, ...}
   string enforced_deletes_json = 5;    // JSON: {count}
   string block_devices_json = 6;       // JSON: {devices, extracommands, finalized}
-  string interfaces_json = 7;          // JSON: list of NI UUIDs
+  // Tag 7 (interfaces_json) dropped in phase 7; the per-instance NI list
+  // is queried live from network_interfaces. Tag reserved.
+  reserved 7;
+  reserved "interfaces_json";
   string agent_state_json = 8;         // JSON: {value, update_time}
   string agent_attributes_json = 9;    // JSON: {start_time, boot_time, facts}
   string agent_operations_json = 10;   // JSON: {queue, queued, running, completed}
