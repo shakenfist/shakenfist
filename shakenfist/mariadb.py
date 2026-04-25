@@ -4543,6 +4543,11 @@ def _direct_get_objects_by_state(object_type: ObjectType,
                                  ) -> Optional[list[str]]:
     """Get all object UUIDs of a given type in specified states.
 
+    An empty ``state_values`` list means "no state filter" — return every
+    object of ``object_type`` regardless of state. This matches the
+    pre-phase-5 ``Nodes([])`` semantics where no prefilter returned every
+    node, including DELETED.
+
     This is the direct access version used by the database daemon.
     Returns None on error (distinct from [] for no matches).
     """
@@ -4551,12 +4556,10 @@ def _direct_get_objects_by_state(object_type: ObjectType,
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(table.c.object_uuid).where(
-                sa.and_(
-                    table.c.object_type == object_type,
-                    table.c.state_value.in_(state_values)
-                )
-            )
+            where = [table.c.object_type == object_type]
+            if state_values:
+                where.append(table.c.state_value.in_(state_values))
+            stmt = sa.select(table.c.object_uuid).where(sa.and_(*where))
             result = conn.execute(stmt).fetchall()
             return [row.object_uuid for row in result]
     except OperationalError as e:

@@ -1118,3 +1118,85 @@ class BuildObjectFilterQueryJoinTestCase(base.ShakenFistTestCase):
             rows = conn.execute(stmt).fetchall()
 
         self.assertEqual(0, len(rows))
+
+
+class DirectGetObjectsByStateTestCase(base.ShakenFistTestCase):
+    """``_direct_get_objects_by_state`` empty-states semantics.
+
+    ``Nodes([])`` (no prefilter) resolves to an empty state list and
+    relies on the default iterator's ``get_objects_by_state`` path. An
+    empty list must mean "no state filter — return every object of this
+    type" (preserving the pre-phase-5 ``Nodes([])`` semantics that
+    returned every node, including DELETED). This was missed in the
+    initial port and surfaced as ``test_metadata.TestNodeMetadata``
+    failing with ``IndexError`` because ``get_nodes()`` came back empty.
+    """
+
+    def _build_engine(self):
+        import sqlalchemy as sa
+
+        for attr in (
+                '_object_states_table',
+                '_artifacts_table',
+                '_instances_table',
+                '_networks_table',
+                '_network_interfaces_table'):
+            setattr(mariadb, attr, None)
+        mariadb._metadata = None
+
+        engine = sa.create_engine('sqlite:///:memory:')
+        states = mariadb._get_object_states_table()
+        states.metadata.create_all(engine, tables=[states])
+        return engine, states
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_empty_states_returns_all_for_object_type(
+            self, mock_get_engine):
+        from shakenfist.schema.object_types import ObjectType
+        import sqlalchemy as sa
+
+        engine, states = self._build_engine()
+        mock_get_engine.return_value = engine
+
+        with engine.connect() as conn:
+            for state_value in ('created', 'deleted', 'error'):
+                conn.execute(sa.insert(states).values(
+                    object_uuid=str(uuid.uuid4()),
+                    object_type='node',
+                    state_value=state_value,
+                    update_time=0.0,
+                    message=None))
+            # Different object_type — must not be returned.
+            conn.execute(sa.insert(states).values(
+                object_uuid=str(uuid.uuid4()),
+                object_type='instance',
+                state_value='created',
+                update_time=0.0,
+                message=None))
+            conn.commit()
+
+        result = mariadb._direct_get_objects_by_state(ObjectType.NODE, [])
+        self.assertEqual(3, len(result))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_state_filter_still_applies_when_provided(
+            self, mock_get_engine):
+        from shakenfist.schema.object_types import ObjectType
+        import sqlalchemy as sa
+
+        engine, states = self._build_engine()
+        mock_get_engine.return_value = engine
+
+        with engine.connect() as conn:
+            for state_value in ('created', 'deleted', 'error'):
+                conn.execute(sa.insert(states).values(
+                    object_uuid=str(uuid.uuid4()),
+                    object_type='node',
+                    state_value=state_value,
+                    update_time=0.0,
+                    message=None))
+            conn.commit()
+
+        result = mariadb._direct_get_objects_by_state(
+            ObjectType.NODE, ['created'])
+        self.assertEqual(1, len(result))
