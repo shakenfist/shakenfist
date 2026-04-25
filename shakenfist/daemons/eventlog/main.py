@@ -350,7 +350,15 @@ def main():
         time.sleep(1)
     LOG.info('nodelock daemon reports healthy')
 
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    # Allow clients to send keepalive pings as often as every 5 seconds.
+    # Without this the default minimum (5 minutes) triggers GOAWAY with
+    # ENHANCE_YOUR_CALM when the client pings more frequently.
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=10),
+        options=[
+            ('grpc.http2.min_recv_ping_interval_without_data_ms', 5000),
+        ]
+    )
     event_pb2_grpc.add_EventServiceServicer_to_server(
         EventService(m), server)
     server.add_insecure_port(

@@ -104,7 +104,7 @@ def get_etcd_native_client():
         local.sf_etcd_native_client = grpc.insecure_channel(
             '%s:2379' % config.ETCD_HOST,
             options=[
-                ('keepalive_timeout_ms', 200),
+                ('grpc.keepalive_timeout_ms', 200),
                 ('grpc.http2.max_pings_without_data', 0),
                 ('grpc.keepalive_permit_without_calls', 1),
                 ('grpc.max_send_message_length', 100000000),

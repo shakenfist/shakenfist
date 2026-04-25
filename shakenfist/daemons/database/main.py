@@ -4702,8 +4702,16 @@ def main() -> None:
     # Run any pending data migrations (e.g., etcd -> MariaDB)
     mariadb.ensure_data_migrations()
 
-    # Create the gRPC server
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
+    # Create the gRPC server.  Allow clients to send keepalive pings as
+    # often as every 5 seconds — mariadb.py uses a 10-second interval.
+    # Without this the default minimum (5 minutes) triggers GOAWAY with
+    # ENHANCE_YOUR_CALM when the client pings more frequently.
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=20),
+        options=[
+            ('grpc.http2.min_recv_ping_interval_without_data_ms', 5000),
+        ]
+    )
     server.add_insecure_port(
         f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
 
