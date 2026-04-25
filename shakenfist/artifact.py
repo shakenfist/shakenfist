@@ -22,9 +22,11 @@ from shakenfist.eventlog import add_event
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.artifact_data import ArtifactData
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import general as util_general
 
 
 LOG, _ = logs.setup(__name__)
@@ -162,6 +164,22 @@ class Artifact(dbowo):
         return data
 
     @classmethod
+    def filter(cls, filters):
+        """Override base class to use MariaDB instead of etcd.
+
+        Documented fallback: ``Artifact.from_db_by_ref`` is the
+        live name-lookup path and pushes its predicates to SQL via
+        ``find_artifacts``. ``filter()`` exists so the predicate
+        API on ``DatabaseBackedObject.from_db_by_ref`` keeps a
+        usable implementation, even though no in-tree caller
+        currently reaches it. See commit 2d8d393b.
+        """
+        for data in mariadb.get_all_artifacts():  # nopushdown: fallback (see docstring)
+            obj = cls(data)
+            if all(f(obj) for f in filters):
+                yield obj
+
+    @classmethod
     def from_db(cls, object_uuid: Union[str, uuid_mod.UUID],
                 suppress_failure_audit: bool = False) -> 'Artifact | None':
         """Load an Artifact from the database.
@@ -183,6 +201,40 @@ class Artifact(dbowo):
             return None
 
         return cls(data)
+
+    @classmethod
+    def from_db_by_ref(
+            cls, object_ref: Union[str, uuid_mod.UUID],
+            namespace: Optional[str] = None) -> 'Artifact | None':
+        """Look up an artifact by UUID or by name within a namespace.
+
+        UUID lookups short-circuit to from_db. Name lookups push
+        state + namespace + name down to a single indexed SQL
+        query via mariadb.find_artifacts.
+        """
+        if object_ref and util_general.valid_uuid4(object_ref):
+            return cls.from_db(object_ref)
+
+        # namespace='system' or namespace=None means "look across
+        # all namespaces" — preserve that by omitting the namespace
+        # filter. Matches baseobject.namespace_filter semantics.
+        criteria_namespace = (
+            namespace if namespace and namespace != 'system' else None)
+
+        criteria = ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            namespace=criteria_namespace,
+            name=object_ref,
+        )
+        matches = mariadb.find_artifacts(criteria)
+
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise exceptions.MultipleObjects(
+                f'multiple artifacts have the name "{object_ref}"'
+                f' in namespace "{namespace}"')
+        return cls(matches[0])
 
     @classmethod
     def new(cls, artifact_type, source_url, name=None, max_versions=0,
@@ -505,24 +557,26 @@ class Artifact(dbowo):
 class Artifacts(dbo_iter):
     base_object = Artifact
 
+    def _resolve_prefilter_to_states(self):
+        # Preserve the pre-phase-4 Artifacts override behaviour: when
+        # no prefilter is set, do not filter on state (return every
+        # artifact and let predicate filters scope). The base class
+        # default of ACTIVE_STATES is kept for other inheritors.
+        if self.prefilter is None:
+            return set()
+        return super()._resolve_prefilter_to_states()
+
+    def _find(self, criteria):
+        return mariadb.find_artifacts(criteria)
+
     def __iter__(self):
-        for data in mariadb.get_all_artifacts():
-            a = Artifact(data)
-            if not a:
+        for _, data in self.get_iterator():
+            obj = Artifact(data)
+            if not obj:
                 continue
-
-            out = self.apply_filters(a)
-            if out:
-                yield out
-
-    def get_iterator(self):
-        """Override to use MariaDB instead of etcd.
-
-        This is used by the prefilter logic in the parent class.
-        We yield (key, data) tuples where data is an ArtifactData model.
-        """
-        for data in mariadb.get_all_artifacts():
-            yield str(data.uuid), data
+            filtered = self.apply_filters(obj)
+            if filtered:
+                yield filtered
 
 
 def url_filter(url, a):
@@ -562,5 +616,4 @@ def namespace_or_shared_filter(namespace, o):
 
 
 def artifacts_in_namespace(namespace):
-    return Artifacts([partial(baseobject.namespace_filter, namespace)],
-                     prefilter='active')
+    return Artifacts(namespace=namespace, prefilter='active')

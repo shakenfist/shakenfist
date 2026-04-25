@@ -1,14 +1,12 @@
 # Copyright 2020 Michael Still
 import os
 import random
-from functools import partial
 from typing import Optional
 from uuid import UUID
 from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import baseobject
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.constants import get_object_class
 from shakenfist import instance
@@ -39,12 +37,14 @@ from shakenfist.schema.operations.node_net_op \
 from shakenfist.schema.operations.node_net_op \
     import model_tasks as nn_tasks
 from shakenfist.eventlog import add_event_multi
+from shakenfist import exceptions
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
@@ -177,11 +177,55 @@ class Network(dbowo):
 
     @classmethod
     def filter(cls, filters):
-        """Override base class to use MariaDB instead of etcd."""
-        for data in mariadb.get_all_networks():
+        """Override base class to use MariaDB instead of etcd.
+
+        Documented fallback: ``Network.from_db_by_ref`` is the
+        live name-lookup path and pushes its predicates to SQL
+        via ``find_networks``. ``filter()`` exists so the
+        predicate API on ``DatabaseBackedObject.from_db_by_ref``
+        keeps a usable implementation, even though no in-tree
+        caller currently reaches it.
+        """
+        for data in mariadb.get_all_networks():  # nopushdown: fallback (see docstring)
             obj = cls(cls._static_values_to_dict(data))
             if all(f(obj) for f in filters):
                 yield obj
+
+    @classmethod
+    def from_db_by_ref(cls, object_ref, namespace=None):
+        """Look up a network by UUID or by name within a namespace.
+
+        UUID lookups short-circuit to from_db. Name lookups push
+        state + namespace + name down to a single indexed SQL
+        query via mariadb.find_networks.
+
+        The floating network (FLOATING_NETWORK_UUID) has namespace=None
+        in the database. A tenant-scoped query (namespace != None) won't
+        match it via SQL NULL semantics, so no explicit skip is required.
+        """
+        if object_ref and util_general.valid_uuid4(object_ref):
+            return cls.from_db(object_ref)
+
+        # namespace='system' or namespace=None means 'look across
+        # all namespaces' - preserve that by omitting the namespace
+        # filter. Matches baseobject.namespace_filter semantics.
+        criteria_namespace = (
+            namespace if namespace and namespace != 'system' else None)
+
+        criteria = ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            namespace=criteria_namespace,
+            name=object_ref,
+        )
+        matches = mariadb.find_networks(criteria)
+
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise exceptions.MultipleObjects(
+                f'multiple networks have the name "{object_ref}"'
+                f' in namespace "{namespace}"')
+        return cls(cls._static_values_to_dict(matches[0]))
 
     def _load_attributes(self) -> Optional[NetworkAttributesData]:
         """Load attributes from MariaDB."""
@@ -356,29 +400,33 @@ class Network(dbowo):
 
     @property
     def networkinterfaces(self):
-        attrs = self._ensure_attributes()
-        return attrs.networkinterfaces
+        """Currently-attached NetworkInterface objects.
 
-    def add_networkinterface(self, ni):
-        attrs = self._ensure_attributes()
-        ni_uuid = str(ni.uuid)
-        if ni_uuid not in attrs.networkinterfaces:
-            attrs.networkinterfaces.append(ni_uuid)
-            attrs.networkinterfaces_initialized = True
-            self._save_attributes()
-            self.add_event(EVENT_TYPE_MUTATE, 'add networkinterface',
-                           extra={'networkinterface': ni_uuid})
+        Queried live from the network_interfaces table
+        (network_uuid is an indexed column). Previously cached
+        as a list of UUID strings on network_attributes; that
+        column is dropped in phase 7e.
+        """
+        criteria = ObjectFilterCriteria(
+            states=list(interface.NetworkInterface.ACTIVE_STATES),
+            network_uuid=str(self.uuid),
+        )
+        return [
+            interface.NetworkInterface(
+                interface.NetworkInterface._static_values_to_dict(d))
+            for d in mariadb.find_network_interfaces(criteria)
+        ]
 
-    def remove_networkinterface(self, ni):
+    def remove_networkinterface_lease(self, ni):
+        """Release a DHCP lease held by a departing NetworkInterface.
+
+        The row-level association is managed by the
+        NetworkInterface lifecycle; all that remains for the
+        owning Network is the DHCP-lease housekeeping that used
+        to live alongside the list mutation.
+        """
         if ni.ipv4:
             self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
-        attrs = self._ensure_attributes()
-        ni_uuid = str(ni.uuid)
-        if ni_uuid in attrs.networkinterfaces:
-            attrs.networkinterfaces.remove(ni_uuid)
-            self._save_attributes()
-            self.add_event(EVENT_TYPE_MUTATE, 'remove networkinterface',
-                           extra={'networkinterface': ni_uuid})
 
     def _update_floating_gateway(self, gateway):
         attrs = self._ensure_attributes()
@@ -822,8 +870,7 @@ class Network(dbowo):
     def ensure_mesh(self):
         # Determine which IPs should be on this mesh and where
         instances = []
-        for ni_uuid in self.networkinterfaces:
-            ni = interface.NetworkInterface.from_db(ni_uuid)
+        for ni in self.networkinterfaces:
             if ni.instance_uuid not in instances:
                 instances.append(ni.instance_uuid)
 
@@ -918,46 +965,20 @@ class Network(dbowo):
 class Networks(dbo_iter):
     base_object = Network
 
-    def get_iterator(self):
-        from shakenfist import exceptions
+    def _resolve_prefilter_to_states(self):
+        # Preserve the pre-phase-4 Networks override behaviour: when
+        # no prefilter is set, do not filter on state (return every
+        # network and let predicate filters scope). The base class
+        # default of ACTIVE_STATES is kept for other inheritors.
+        if self.prefilter is None:
+            return set()
+        return super()._resolve_prefilter_to_states()
 
-        if self.prefilter:
-            if self.prefilter == 'active':
-                target_states = Network.ACTIVE_STATES
-            elif self.prefilter == 'deleted':
-                target_states = [dbo.STATE_DELETED]
-            elif self.prefilter == 'healthy':
-                target_states = Network.HEALTHY_STATES
-            elif self.prefilter == 'inactive':
-                target_states = Network.INACTIVE_STATES
-            else:
-                raise exceptions.InvalidObjectPrefilter(
-                    self.prefilter)
+    def _find(self, criteria):
+        return mariadb.find_networks(criteria)
 
-            matching_uuids_list = mariadb.get_objects_by_state(
-                Network.object_type, list(target_states))
-
-            if matching_uuids_list is None:
-                LOG.warning('get_objects_by_state returned None for '
-                            'networks, falling back to full scan')
-                for data in mariadb.get_all_networks():
-                    yield (str(data.uuid),
-                           Network._static_values_to_dict(data))
-                return
-
-            matching_uuids = set(matching_uuids_list)
-
-            results = []
-            for data in mariadb.get_all_networks():
-                if str(data.uuid) in matching_uuids:
-                    results.append(
-                        (str(data.uuid),
-                         Network._static_values_to_dict(data)))
-            yield from results
-        else:
-            for data in mariadb.get_all_networks():
-                yield (str(data.uuid),
-                       Network._static_values_to_dict(data))
+    def _to_static_values(self, data):
+        return Network._static_values_to_dict(data)
 
     def __iter__(self):
         for _, static_values in self.get_iterator():
@@ -968,14 +989,14 @@ class Networks(dbo_iter):
             if not n:
                 continue
 
-            out = self.apply_filters(n)
-            if out:
-                yield out
+            filtered = self.apply_filters(n)
+            if filtered:
+                yield filtered
 
 
 # Convenience helpers
 def networks_in_namespace(namespace):
-    return Networks([partial(baseobject.namespace_filter, namespace)])
+    return Networks(namespace=namespace)
 
 
 def floating_network():

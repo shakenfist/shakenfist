@@ -509,6 +509,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetAllArtifactsRequest.SerializeToString,
                 response_deserializer=database__pb2.GetAllArtifactsReply.FromString,
                 _registered_method=True)
+        self.FindArtifacts = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindArtifacts',
+                request_serializer=database__pb2.FindArtifactsRequest.SerializeToString,
+                response_deserializer=database__pb2.FindArtifactsReply.FromString,
+                _registered_method=True)
         self.UpdateArtifact = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/UpdateArtifact',
                 request_serializer=database__pb2.UpdateArtifactRequest.SerializeToString,
@@ -589,6 +594,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetAllNetworkInterfacesRequest.SerializeToString,
                 response_deserializer=database__pb2.GetNetworkInterfacesReply.FromString,
                 _registered_method=True)
+        self.FindNetworkInterfaces = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindNetworkInterfaces',
+                request_serializer=database__pb2.FindNetworkInterfacesRequest.SerializeToString,
+                response_deserializer=database__pb2.FindNetworkInterfacesReply.FromString,
+                _registered_method=True)
         self.DeleteNetworkInterface = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteNetworkInterface',
                 request_serializer=database__pb2.DeleteNetworkInterfaceRequest.SerializeToString,
@@ -653,6 +663,11 @@ class DatabaseServiceStub(object):
                 '/shakenfist.protos.DatabaseService/GetAllNetworks',
                 request_serializer=database__pb2.GetAllNetworksRequest.SerializeToString,
                 response_deserializer=database__pb2.GetAllNetworksReply.FromString,
+                _registered_method=True)
+        self.FindNetworks = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindNetworks',
+                request_serializer=database__pb2.FindNetworksRequest.SerializeToString,
+                response_deserializer=database__pb2.FindNetworksReply.FromString,
                 _registered_method=True)
         self.DeleteNetwork = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteNetwork',
@@ -728,6 +743,11 @@ class DatabaseServiceStub(object):
                 '/shakenfist.protos.DatabaseService/GetAllInstances',
                 request_serializer=database__pb2.GetAllInstancesRequest.SerializeToString,
                 response_deserializer=database__pb2.GetAllInstancesReply.FromString,
+                _registered_method=True)
+        self.FindInstances = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindInstances',
+                request_serializer=database__pb2.FindInstancesRequest.SerializeToString,
+                response_deserializer=database__pb2.FindInstancesReply.FromString,
                 _registered_method=True)
         self.GetAllInstanceUuids = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/GetAllInstanceUuids',
@@ -1466,6 +1486,12 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def FindArtifacts(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def UpdateArtifact(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1568,6 +1594,12 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def FindNetworkInterfaces(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteNetworkInterface(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1649,6 +1681,12 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetAllNetworks(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FindNetworks(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1749,6 +1787,12 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetAllInstances(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FindInstances(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2413,6 +2457,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.GetAllArtifactsRequest.FromString,
                     response_serializer=database__pb2.GetAllArtifactsReply.SerializeToString,
             ),
+            'FindArtifacts': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindArtifacts,
+                    request_deserializer=database__pb2.FindArtifactsRequest.FromString,
+                    response_serializer=database__pb2.FindArtifactsReply.SerializeToString,
+            ),
             'UpdateArtifact': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateArtifact,
                     request_deserializer=database__pb2.UpdateArtifactRequest.FromString,
@@ -2493,6 +2542,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.GetAllNetworkInterfacesRequest.FromString,
                     response_serializer=database__pb2.GetNetworkInterfacesReply.SerializeToString,
             ),
+            'FindNetworkInterfaces': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindNetworkInterfaces,
+                    request_deserializer=database__pb2.FindNetworkInterfacesRequest.FromString,
+                    response_serializer=database__pb2.FindNetworkInterfacesReply.SerializeToString,
+            ),
             'DeleteNetworkInterface': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteNetworkInterface,
                     request_deserializer=database__pb2.DeleteNetworkInterfaceRequest.FromString,
@@ -2557,6 +2611,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetAllNetworks,
                     request_deserializer=database__pb2.GetAllNetworksRequest.FromString,
                     response_serializer=database__pb2.GetAllNetworksReply.SerializeToString,
+            ),
+            'FindNetworks': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindNetworks,
+                    request_deserializer=database__pb2.FindNetworksRequest.FromString,
+                    response_serializer=database__pb2.FindNetworksReply.SerializeToString,
             ),
             'DeleteNetwork': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteNetwork,
@@ -2632,6 +2691,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetAllInstances,
                     request_deserializer=database__pb2.GetAllInstancesRequest.FromString,
                     response_serializer=database__pb2.GetAllInstancesReply.SerializeToString,
+            ),
+            'FindInstances': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindInstances,
+                    request_deserializer=database__pb2.FindInstancesRequest.FromString,
+                    response_serializer=database__pb2.FindInstancesReply.SerializeToString,
             ),
             'GetAllInstanceUuids': grpc.unary_unary_rpc_method_handler(
                     servicer.GetAllInstanceUuids,
@@ -5345,6 +5409,33 @@ class DatabaseService(object):
             _registered_method=True)
 
     @staticmethod
+    def FindArtifacts(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindArtifacts',
+            database__pb2.FindArtifactsRequest.SerializeToString,
+            database__pb2.FindArtifactsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def UpdateArtifact(request,
             target,
             options=(),
@@ -5777,6 +5868,33 @@ class DatabaseService(object):
             _registered_method=True)
 
     @staticmethod
+    def FindNetworkInterfaces(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindNetworkInterfaces',
+            database__pb2.FindNetworkInterfacesRequest.SerializeToString,
+            database__pb2.FindNetworkInterfacesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def DeleteNetworkInterface(request,
             target,
             options=(),
@@ -6117,6 +6235,33 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetAllNetworks',
             database__pb2.GetAllNetworksRequest.SerializeToString,
             database__pb2.GetAllNetworksReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindNetworks(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindNetworks',
+            database__pb2.FindNetworksRequest.SerializeToString,
+            database__pb2.FindNetworksReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -6522,6 +6667,33 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetAllInstances',
             database__pb2.GetAllInstancesRequest.SerializeToString,
             database__pb2.GetAllInstancesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindInstances(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindInstances',
+            database__pb2.FindInstancesRequest.SerializeToString,
+            database__pb2.FindInstancesReply.FromString,
             options,
             channel_credentials,
             insecure,

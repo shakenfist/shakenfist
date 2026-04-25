@@ -20,7 +20,6 @@ from shakenfist import baseobject
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist.network import network
-from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FLOATING_NETWORK_UUID
@@ -289,8 +288,7 @@ class NetworksEndpoint(api_base.Resource):
 
         networks_del = []
         networks_unable = []
-        for n in network.Networks([partial(baseobject.namespace_filter, namespace)],
-                                  prefilter='active'):
+        for n in network.Networks(namespace=namespace, prefilter='active'):
             if not n.networkinterfaces:
                 _delete_network(n)
             else:
@@ -406,8 +404,7 @@ class NetworkInterfacesEndpoint(api_base.Resource):
     @api_base.log_token_use
     def get(self, network_ref=None, network_from_db=None):
         out = []
-        for ni_uuid in network_from_db.networkinterfaces:
-            ni = interface.NetworkInterface.from_db(ni_uuid)
+        for ni in network_from_db.networkinterfaces:
             if not ni:
                 continue
             out.append(ni.external_view())

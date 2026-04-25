@@ -203,10 +203,8 @@ class NodeInstNetdescOp(BaseClusterOperation):
         with inst.get_lock(op='Instance start', global_scope=False):
             try:
                 # Ensure networks are connected to this node
-                iface_uuids = []
                 float_tasks = []
                 for netdesc in self.net_desc:
-                    iface_uuids.append(netdesc['iface_uuid'])
                     n = Network.from_db(netdesc['network_uuid'])
                     if not n:
                         add_event_multi(
@@ -259,7 +257,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
 
                 # Now we can start the instance
                 with util_general.RecordedOperation('instance creation', inst):
-                    inst.create(iface_uuids)
+                    inst.create()
 
                 # And now float any required interfaces
                 for ft in float_tasks:

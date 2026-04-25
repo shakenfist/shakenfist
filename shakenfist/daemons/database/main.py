@@ -55,6 +55,7 @@ from shakenfist.schema.network_data import NetworkData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
@@ -2423,6 +2424,43 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetNetworkInterfacesReply(
                 network_interfaces=[])
 
+    def FindNetworkInterfaces(
+        self,
+        request: database_pb2.FindNetworkInterfacesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindNetworkInterfacesReply:
+        """Find NetworkInterface records matching filter criteria from MariaDB."""
+        try:
+            self.monitor.counters['find_network_interfaces'].inc()
+            criteria = ObjectFilterCriteria(
+                states=list(request.criteria.states) or None,
+                namespace=(
+                    request.criteria.namespace
+                    if request.criteria.HasField('namespace') else None),
+                name=(
+                    request.criteria.name
+                    if request.criteria.HasField('name') else None),
+                network_uuid=(
+                    request.criteria.network_uuid
+                    if request.criteria.HasField('network_uuid') else None),
+                instance_uuid=(
+                    request.criteria.instance_uuid
+                    if request.criteria.HasField('instance_uuid') else None),
+            )
+            nis = mariadb._direct_find_network_interfaces(criteria)
+            return database_pb2.FindNetworkInterfacesReply(
+                network_interfaces=[
+                    self._ni_to_proto(d)
+                    for d in nis
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindNetworkInterfaces failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.FindNetworkInterfacesReply(
+                network_interfaces=[])
+
     def DeleteNetworkInterface(
         self,
         request: database_pb2.DeleteNetworkInterfaceRequest,
@@ -2721,6 +2759,36 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetAllNetworksReply(networks=[])
 
+    def FindNetworks(
+        self,
+        request: database_pb2.FindNetworksRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindNetworksReply:
+        """Find Network records matching filter criteria from MariaDB."""
+        try:
+            self.monitor.counters['find_networks'].inc()
+            criteria = ObjectFilterCriteria(
+                states=list(request.criteria.states) or None,
+                namespace=(
+                    request.criteria.namespace
+                    if request.criteria.HasField('namespace') else None),
+                name=(
+                    request.criteria.name
+                    if request.criteria.HasField('name') else None),
+            )
+            networks = mariadb._direct_find_networks(criteria)
+            return database_pb2.FindNetworksReply(
+                networks=[
+                    self._network_to_proto(d)
+                    for d in networks
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindNetworks failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.FindNetworksReply(networks=[])
+
     def DeleteNetwork(
         self,
         request: database_pb2.DeleteNetworkRequest,
@@ -2873,9 +2941,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             floating_gateway=(
                 d.floating_gateway
                 if d.floating_gateway else None),
-            networkinterfaces=list(d.networkinterfaces),
-            networkinterfaces_initialized=(
-                d.networkinterfaces_initialized),
             hosteddns=dns,
         )
 
@@ -2887,9 +2952,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         return database_pb2.NetworkAttributesProto(
             uuid=str(data.uuid),
             floating_gateway=data.floating_gateway or '',
-            networkinterfaces=data.networkinterfaces,
-            networkinterfaces_initialized=(
-                data.networkinterfaces_initialized),
             hosteddns_json=json.dumps(data.hosteddns))
 
     # AgentOperation Operations (MariaDB)
@@ -3185,6 +3247,42 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetAllArtifacts failed', e)
             return database_pb2.GetAllArtifactsReply(artifacts=[])
+
+    def FindArtifacts(
+        self,
+        request: database_pb2.FindArtifactsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindArtifactsReply:
+        """Find artifact records matching filter criteria from MariaDB."""
+        try:
+            self.monitor.counters['find_artifacts'].inc()
+            criteria = ObjectFilterCriteria(
+                states=list(request.criteria.states) or None,
+                namespace=(
+                    request.criteria.namespace
+                    if request.criteria.HasField('namespace') else None),
+                name=(
+                    request.criteria.name
+                    if request.criteria.HasField('name') else None),
+            )
+            all_artifacts = mariadb._direct_find_artifacts(criteria)
+            return database_pb2.FindArtifactsReply(
+                artifacts=[
+                    database_pb2.ArtifactStaticData(
+                        uuid=str(a.uuid),
+                        artifact_type=a.artifact_type,
+                        source_url=a.source_url,
+                        name=a.name,
+                        namespace=a.namespace,
+                        version=a.version
+                    )
+                    for a in all_artifacts
+                ]
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindArtifacts failed', e)
+            return database_pb2.FindArtifactsReply(artifacts=[])
 
     def UpdateArtifact(
         self,
@@ -3487,6 +3585,36 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetAllInstancesReply(
                 instances=[])
+
+    def FindInstances(
+        self,
+        request: database_pb2.FindInstancesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindInstancesReply:
+        """Find Instance records matching filter criteria from MariaDB."""
+        try:
+            self.monitor.counters['find_instances'].inc()
+            criteria = ObjectFilterCriteria(
+                states=list(request.criteria.states) or None,
+                namespace=(
+                    request.criteria.namespace
+                    if request.criteria.HasField('namespace') else None),
+                name=(
+                    request.criteria.name
+                    if request.criteria.HasField('name') else None),
+            )
+            all_data = mariadb._direct_find_instances(criteria)
+            return database_pb2.FindInstancesReply(
+                instances=[
+                    self._instance_to_proto(d)
+                    for d in all_data
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindInstances failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.FindInstancesReply(instances=[])
 
     def GetAllInstanceUuids(
         self,
@@ -4307,7 +4435,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         def _parse(val: str) -> Any:
             return json.loads(val) if val else None
 
-        interfaces = _parse(d.interfaces_json)
         return InstanceAttributesData(
             uuid=UUID(d.uuid),
             placement=_parse(d.placement_json),
@@ -4317,8 +4444,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 d.enforced_deletes_json),
             block_devices=_parse(
                 d.block_devices_json),
-            interfaces=(
-                interfaces if interfaces else []),
             agent_state=_parse(d.agent_state_json),
             agent_attributes=_parse(
                 d.agent_attributes_json),
@@ -4344,7 +4469,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 data.enforced_deletes),
             block_devices_json=json.dumps(
                 data.block_devices),
-            interfaces_json=json.dumps(data.interfaces),
             agent_state_json=json.dumps(
                 data.agent_state),
             agent_attributes_json=json.dumps(
@@ -4489,6 +4613,13 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_cluster_operation_target',
             'delete_cluster_operation_targets_for_object',
             'delete_stale_cluster_operation_targets',
+            # MariaDB cluster operation operations
+            'create_cluster_operation', 'get_cluster_operation',
+            'get_cluster_operations_by_node', 'delete_cluster_operation',
+            'create_and_enqueue_cluster_operation',
+            # MariaDB find (filter-pushdown) operations
+            'find_artifacts', 'find_instances', 'find_networks',
+            'find_network_interfaces',
             # MariaDB node metrics operations
             'upsert_node_metrics', 'get_node_metrics',
             'get_all_node_metrics', 'delete_node_metrics',

@@ -56,6 +56,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
@@ -158,10 +159,13 @@ class Instance(dbowo):
     initial_version = 19
     current_version = 19
 
-    # Attributes stored in MariaDB (everything else stays in etcd)
+    # Attributes stored in MariaDB (everything else stays in etcd).
+    # ``interfaces`` was here pre-phase-7; the column on
+    # ``instance_attributes`` is dropped in phase 7e and the property
+    # now queries ``network_interfaces`` directly.
     MARIADB_ATTRIBUTES = {
         'placement', 'power_state', 'ports', 'enforced_deletes',
-        'block_devices', 'interfaces', 'agent_state',
+        'block_devices', 'agent_state',
         'agent_attributes', 'agent_operations', 'kvm_pid', 'error',
         'vsock_cids',
     }
@@ -339,11 +343,51 @@ class Instance(dbowo):
 
     @classmethod
     def filter(cls, filters):
-        """Override base class to use MariaDB instead of etcd."""
-        for data in mariadb.get_all_instances():
+        """Override base class to use MariaDB instead of etcd.
+
+        Documented fallback: ``Instance.from_db_by_ref`` is the
+        live name-lookup path and pushes its predicates to SQL
+        via ``find_instances``. ``filter()`` exists so the
+        predicate API on ``DatabaseBackedObject.from_db_by_ref``
+        keeps a usable implementation, even though no in-tree
+        caller currently reaches it.
+        """
+        for data in mariadb.get_all_instances():  # nopushdown: fallback (see docstring)
             obj = cls(cls._static_values_to_dict(data))
             if all(f(obj) for f in filters):
                 yield obj
+
+    @classmethod
+    def from_db_by_ref(cls, object_ref, namespace=None):
+        """Look up an instance by UUID or by name within a namespace.
+
+        UUID lookups short-circuit to from_db. Name lookups push
+        state + namespace + name down to a single indexed SQL
+        query via mariadb.find_instances.
+        """
+        if object_ref and util_general.valid_uuid4(object_ref):
+            return cls.from_db(object_ref)
+
+        # namespace='system' or namespace=None means 'look across
+        # all namespaces' - preserve that by omitting the namespace
+        # filter. Matches baseobject.namespace_filter semantics.
+        criteria_namespace = (
+            namespace if namespace and namespace != 'system' else None)
+
+        criteria = ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            namespace=criteria_namespace,
+            name=object_ref,
+        )
+        matches = mariadb.find_instances(criteria)
+
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise exceptions.MultipleObjects(
+                f'multiple instances have the name "{object_ref}"'
+                f' in namespace "{namespace}"')
+        return cls(cls._static_values_to_dict(matches[0]))
 
     def _db_get_attribute(self, attribute, default=None):
         """Get an attribute, routing MariaDB-stored attributes appropriately."""
@@ -395,8 +439,6 @@ class Instance(dbowo):
                 attrs.kvm_pid = value.get('pid') if isinstance(value, dict) else value
             elif attribute == 'error':
                 attrs.error_message = value.get('message', '') if isinstance(value, dict) else str(value)
-            elif attribute == 'interfaces':
-                attrs.interfaces = value if isinstance(value, list) else value
             elif attribute == 'agent_state':
                 if hasattr(value, 'model_dump'):
                     attrs.agent_state = value.model_dump()
@@ -506,14 +548,7 @@ class Instance(dbowo):
 
         # Mix in details of the instance's interfaces to reduce API round trips
         # for clients.
-        i['interfaces'] = []
-        for iface_uuid in self.interfaces:
-            ni = interface.NetworkInterface.from_db(iface_uuid)
-            if not ni:
-                self.log.with_fields({'interface': ni}).error(
-                    'Network interface missing')
-            else:
-                i['interfaces'].append(ni.external_view())
+        i['interfaces'] = [ni.external_view() for ni in self.interfaces]
 
         # Mix in details of the configured disks. We don't have all the details
         # in the block devices structure until _initialize_block_devices() is
@@ -645,26 +680,24 @@ class Instance(dbowo):
     def block_devices(self):
         return self._db_get_attribute('block_devices')
 
-    # NOTE(mikal): this really should use the newer _add_item / _remove_item
-    # stuff, but I can't immediately think of an online upgrade path for this
-    # so skipping for now.
     @property
     def interfaces(self):
-        return self._db_get_attribute('interfaces', [])
+        """Currently-attached NetworkInterface objects.
 
-    # NOTE(mikal): this really should use the newer _add_item / _remove_item
-    # stuff, but I can't immediately think of an online upgrade path for this
-    # so skipping for now.
-    @interfaces.setter
-    def interfaces(self, interfaces):
-        with self.get_lock_attr('interfaces', 'Set interface'):
-            self._db_set_attribute('interfaces', interfaces)
-
-    def interfaces_append(self, interface):
-        with self.get_lock_attr('interfaces', 'Append interface'):
-            ifaces = self._db_get_attribute('interfaces', [])
-            ifaces.append(interface)
-            self._db_set_attribute('interfaces', ifaces)
+        Queried live from the network_interfaces table
+        (instance_uuid is an indexed column). Previously
+        cached as a list of UUID strings on
+        instance_attributes; that column is dropped in phase 7e.
+        """
+        criteria = ObjectFilterCriteria(
+            states=list(interface.NetworkInterface.ACTIVE_STATES),
+            instance_uuid=str(self.uuid),
+        )
+        return [
+            interface.NetworkInterface(
+                interface.NetworkInterface._static_values_to_dict(d))
+            for d in mariadb.find_network_interfaces(criteria)
+        ]
 
     @property
     def tags(self):
@@ -903,9 +936,8 @@ class Instance(dbowo):
     # creation. It is assumed that the image sits in local cache already, and
     # has been transcoded to the right format. This has been done to facilitate
     # moving to a queue and task based creation mechanism.
-    def create(self, iface_uuids):
+    def create(self):
         self.state = self.STATE_CREATING
-        self.interfaces = iface_uuids
 
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
@@ -1249,8 +1281,7 @@ class Instance(dbowo):
 
         detected_dns_servers = []
         have_default_route = False
-        for iface_uuid in self.interfaces:
-            iface = interface.NetworkInterface.from_db(iface_uuid)
+        for iface in self.interfaces:
             if iface.ipv4:
                 devname = f'eth{iface.order}'
                 nd['links'].append(
@@ -1369,8 +1400,7 @@ class Instance(dbowo):
             t = jinja2.Template(f.read())
 
         networks = []
-        for iface_uuid in self.interfaces:
-            ni = interface.NetworkInterface.from_db(iface_uuid)
+        for ni in self.interfaces:
             n = network.Network.from_db(ni.network_uuid)
             networks.append(
                 {
@@ -2032,56 +2062,29 @@ class Instance(dbowo):
 class Instances(dbo_iter):
     base_object = Instance
 
-    def get_iterator(self):
-        if self.prefilter:
-            if self.prefilter == 'active':
-                target_states = Instance.ACTIVE_STATES
-            elif self.prefilter == 'deleted':
-                target_states = [dbo.STATE_DELETED]
-            elif self.prefilter == 'healthy':
-                target_states = Instance.HEALTHY_STATES
-            elif self.prefilter == 'inactive':
-                target_states = Instance.INACTIVE_STATES
-            else:
-                raise exceptions.InvalidObjectPrefilter(
-                    self.prefilter)
+    def _resolve_prefilter_to_states(self):
+        # Preserve the pre-phase-4 Instances override behaviour: when
+        # no prefilter is set, do not filter on state (return every
+        # instance and let predicate filters scope). The base class
+        # default of ACTIVE_STATES is kept for other inheritors.
+        if self.prefilter is None:
+            return set()
+        return super()._resolve_prefilter_to_states()
 
-            matching_uuids_list = mariadb.get_objects_by_state(
-                Instance.object_type, list(target_states))
+    def _find(self, criteria):
+        return mariadb.find_instances(criteria)
 
-            if matching_uuids_list is None:
-                # State query failed; yield all and let caller
-                # filters handle correctness.
-                LOG.warning('get_objects_by_state returned None for '
-                            'instances, falling back to full scan')
-                for data in mariadb.get_all_instances():
-                    yield (str(data.uuid),
-                           Instance._static_values_to_dict(data))
-                return
-
-            matching_uuids = set(matching_uuids_list)
-
-            results = []
-            for data in mariadb.get_all_instances():
-                if str(data.uuid) in matching_uuids:
-                    results.append(
-                        (str(data.uuid),
-                         Instance._static_values_to_dict(data)))
-            yield from results
-        else:
-            for data in mariadb.get_all_instances():
-                yield (str(data.uuid),
-                       Instance._static_values_to_dict(data))
+    def _to_static_values(self, data):
+        return Instance._static_values_to_dict(data)
 
     def __iter__(self):
         for _, static_values in self.get_iterator():
-            i = Instance(static_values)
-            if not i:
+            inst = Instance(static_values)
+            if not inst:
                 continue
-
-            out = self.apply_filters(i)
-            if out:
-                yield out
+            filtered = self.apply_filters(inst)
+            if filtered:
+                yield filtered
 
 
 def placement_filter(node, inst):
@@ -2101,7 +2104,7 @@ def healthy_instances_on_node(n):
 
 
 def instances_in_namespace(namespace):
-    return Instances([partial(baseobject.namespace_filter, namespace)])
+    return Instances(namespace=namespace)
 
 
 def all_instances():

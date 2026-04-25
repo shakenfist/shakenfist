@@ -12,7 +12,6 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import managedexecutable
-from shakenfist.network import interface
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
@@ -221,11 +220,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         instances: list[dict[str, Any]] = []
         allowed_leases: dict[str, str] = {}
 
-        for ni_uuid in self.network.networkinterfaces:
-            ni = interface.NetworkInterface.from_db(ni_uuid)
-            if not ni:
-                continue
-
+        for ni in self.network.networkinterfaces:
             inst = instance.Instance.from_db(ni.instance_uuid)
             if not inst:
                 continue
