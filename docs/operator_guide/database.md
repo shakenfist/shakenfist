@@ -117,9 +117,11 @@ The filter criteria shape is `ObjectFilterCriteria` in
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 
 criteria = ObjectFilterCriteria(
-    states=['created'],   # None means no state filter; [] is a no-op at the SQL layer
-    namespace='tenant-a', # None means no namespace filter
-    name=None,            # None means no name filter
+    states=['created'],          # None means no state filter; [] is a no-op at the SQL layer
+    namespace='tenant-a',        # None means no namespace filter
+    name=None,                   # None means no name filter
+    network_uuid=None,           # FK filter — see NetworkInterface special case below
+    instance_uuid=None,          # FK filter — see NetworkInterface special case below
 )
 ```
 
@@ -153,7 +155,14 @@ class. These predicates execute in Python after the indexed SQL scan returns its
 **NetworkInterface special case.**
 The `network_interfaces` table has no `namespace` or `name` column. `find_network_interfaces` therefore
 strips both fields from the criteria before building the query; they are silently ignored. State pushdown
-still works. See the Future-work entry in
+still works. The two FK filter fields `network_uuid` and `instance_uuid` *are* honoured — they map to
+indexed columns on the `network_interfaces` table, and they are how `Network.networkinterfaces` and
+`Instance.interfaces` resolve their per-parent NI list (phase 7 of the SQL-pushdown plan: those properties
+return hydrated `NetworkInterface` objects rather than the cached UUID list that used to live on the
+attribute table). The other `find_*` helpers leave the FK fields at their default of `None` because the
+underlying tables have no matching column.
+
+See the Future-work entry in
 [`docs/plans/PLAN-sql-pushdown-filtering.md`](../plans/PLAN-sql-pushdown-filtering.md) ("NetworkInterface
 namespace column") for the deferred discussion of whether to add the column or use a JOIN-based approach
 once a concrete caller exists.
@@ -726,9 +735,9 @@ dedicated attribute tables:
 | `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
-| `network_attributes` | Network | uuid, floating_gateway, networkinterfaces (JSON list), networkinterfaces_initialized, hosteddns (JSON dict) |
+| `network_attributes` | Network | uuid, floating_gateway, hosteddns (JSON dict) |
 | `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict) |
-| `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), interfaces (JSON list), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message, vsock_cids (JSON dict) |
+| `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message, vsock_cids (JSON dict) |
 
 Node attributes consolidate many separate etcd keys (observed, roles,
 daemons, daemon:{name}, instances, versions, etc.) into a single row.
@@ -764,23 +773,27 @@ If the persisted UUID does not match the current node's FQDN, it is
 ignored and the FQDN-based fallback is used. This guards against stale
 UUID files left over from a previous node installation.
 
-Future attribute tables will follow the same pattern:
+Each attribute table follows the same pattern — typed scalar columns
+for hot-path fields, JSON columns for complex structures, and one
+indexed FK column per parent — for example:
 
 ```sql
--- Example: instance_attributes (future)
-CREATE TABLE instance_attributes (
-    instance_uuid UUID PRIMARY KEY,
-    kvm_pid INT,
-    power_state VARCHAR(32),
-    power_state_previous VARCHAR(32),
-    console_port INT,
-    vdi_port INT,
+CREATE TABLE node_attributes (
+    uuid UUID PRIMARY KEY,
+    last_seen DOUBLE,
+    installed_version VARCHAR(64),
     -- Complex structures as JSON
-    placement JSON,
-    block_devices JSON,
-    interfaces JSON
+    roles JSON,
+    daemons JSON,
+    metrics JSON
 );
 ```
+
+Cached lists of *child* object UUIDs are deliberately not stored on
+the parent attribute table — querying the child table by an indexed
+FK column is the source of truth. Phase 7 of the SQL-pushdown plan
+removed the last two such caches (`network_attributes.networkinterfaces`
+and `instance_attributes.interfaces`); see `PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md`.
 
 This approach:
 

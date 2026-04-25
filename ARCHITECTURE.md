@@ -76,7 +76,11 @@ The database microservice (`sf-database`) centralizes all database access:
 Object iteration uses one indexed SQL query per call rather than the older pattern of materialising all rows
 and filtering them in Python. Every `find_artifacts`, `find_instances`, `find_networks`, and
 `find_network_interfaces` call in `shakenfist/mariadb.py` JOINs the per-type static-values table to
-`object_states` and applies the caller's state, namespace, and name predicates directly in the WHERE clause.
+`object_states` and applies the caller's state, namespace, name and FK predicates directly in the WHERE
+clause. The two FK fields (`network_uuid`, `instance_uuid`) on `ObjectFilterCriteria` are honoured only
+by `find_network_interfaces`, which is what makes `Network.networkinterfaces` and `Instance.interfaces`
+query-backed properties returning hydrated `NetworkInterface` objects rather than the cached UUID lists
+they used to be (phase 7 of the SQL-pushdown plan).
 
 The composite index `idx_object_states_type_state` on `(object_type, state_value)` covers the JOIN condition
 that is present in every query. Per-type `name` and `namespace` single-column indexes on the artifact,
