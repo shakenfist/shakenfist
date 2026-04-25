@@ -442,10 +442,18 @@ def _build_object_filter_query(
     table (e.g. ``name``/``namespace`` on ``network_interfaces``).
     """
     states_table = _get_object_states_table()
+    # ``object_states.object_uuid`` is VARCHAR(36) (with dashes) while the
+    # per-type ``uuid`` columns use SQLAlchemy ``Uuid()`` which renders as
+    # CHAR(32) (no dashes) on MariaDB, so the JOIN cannot compare the two
+    # columns directly. Strip the dashes off the state row's UUID before
+    # comparing — the composite ``(object_type, state_value)`` index still
+    # narrows the join, and the per-type primary key matches a 32-char hex
+    # value.
     stmt = sa.select(table).join(
         states_table,
         sa.and_(
-            states_table.c.object_uuid == table.c.uuid,
+            sa.func.replace(states_table.c.object_uuid, '-', '')
+            == table.c.uuid,
             states_table.c.object_type == object_type))
     if criteria.states:
         stmt = stmt.where(
@@ -9371,8 +9379,9 @@ def _direct_get_expired_blob_uuids(
                 attrs_table.join(
                     states_table,
                     sa.and_(
-                        states_table.c.object_uuid
-                        == sa.cast(attrs_table.c.uuid, sa.String),
+                        sa.func.replace(
+                            states_table.c.object_uuid, '-', '')
+                        == attrs_table.c.uuid,
                         states_table.c.object_type == ObjectType.BLOB
                     )
                 )
@@ -9436,9 +9445,9 @@ def _direct_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
                 attrs_table.join(
                     states_table,
                     sa.and_(
-                        states_table.c.object_uuid
-                        == sa.cast(
-                            attrs_table.c.uuid, sa.String),
+                        sa.func.replace(
+                            states_table.c.object_uuid, '-', '')
+                        == attrs_table.c.uuid,
                         states_table.c.object_type
                         == ObjectType.BLOB
                     )

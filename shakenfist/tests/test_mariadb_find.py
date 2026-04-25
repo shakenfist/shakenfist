@@ -1016,3 +1016,105 @@ class GrpcFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
         self.assertIn('created', list(request.criteria.states))
         self.assertEqual(request.criteria.namespace, 'tenant-a')
         self.assertEqual(request.criteria.name, 'eth0')
+
+
+# ---------------------------------------------------------------------------
+# End-to-end JOIN regression — runs the actual SQL against in-memory SQLite.
+# ---------------------------------------------------------------------------
+
+class BuildObjectFilterQueryJoinTestCase(base.ShakenFistTestCase):
+    """Run ``_build_object_filter_query`` against a real engine.
+
+    The mocking-heavy tests above never execute the rendered SQL, so they
+    cannot catch a JOIN whose WHERE clause silently matches zero rows.
+    Phase 1 of the SQL-pushdown work introduced exactly that bug:
+    ``object_states.object_uuid`` is ``VARCHAR(36)`` (with dashes) but
+    every per-type ``uuid`` column is ``sa.Uuid()`` which renders as
+    ``CHAR(32)`` (no dashes) on MariaDB. The CI smoke tests broke because
+    the resulting JOIN never matched anything, making
+    ``Artifact.from_url`` return ``None`` and every instance creation
+    flow fail with 404 ``artifact not found``.
+
+    These tests build the same schema in-memory, insert a row through
+    each path the way the real code does, and assert the JOIN returns
+    the row.
+    """
+
+    def _build_engine(self):
+        import sqlalchemy as sa  # noqa: F401  (import locally so the rest
+        # of the module's mocked tests stay independent of SQLAlchemy
+        # state).
+
+        # Reset module-level table caches so the new in-memory engine
+        # gets a fresh metadata.
+        for attr in (
+                '_object_states_table',
+                '_artifacts_table',
+                '_instances_table',
+                '_networks_table',
+                '_network_interfaces_table'):
+            setattr(mariadb, attr, None)
+        mariadb._metadata = None
+
+        engine = sa.create_engine('sqlite:///:memory:')
+        # Build the tables we need.
+        states = mariadb._get_object_states_table()
+        artifacts = mariadb._get_artifacts_table()
+        nis = mariadb._get_network_interfaces_table()
+        states.metadata.create_all(engine, tables=[states, artifacts, nis])
+        return engine, states, artifacts, nis
+
+    def test_join_matches_artifact_row(self):
+        from shakenfist.schema.object_types import ObjectType
+        import sqlalchemy as sa
+
+        engine, states, artifacts, _ = self._build_engine()
+        a_uuid = uuid.uuid4()
+        with engine.connect() as conn:
+            conn.execute(sa.insert(artifacts).values(
+                uuid=a_uuid,
+                artifact_type='image',
+                source_url='sf://upload/system/debian-12',
+                name='debian-12',
+                namespace='system',
+                version=9))
+            # ``mariadb.set_state`` writes the dashed string form.
+            conn.execute(sa.insert(states).values(
+                object_uuid=str(a_uuid),
+                object_type='artifact',
+                state_value='created',
+                update_time=0.0,
+                message=None))
+            conn.commit()
+
+            criteria = ObjectFilterCriteria(states=['created'])
+            stmt = mariadb._build_object_filter_query(
+                artifacts, ObjectType.ARTIFACT, criteria)
+            rows = conn.execute(stmt).fetchall()
+
+        self.assertEqual(1, len(rows))
+        self.assertEqual('debian-12', rows[0].name)
+
+    def test_join_excludes_other_object_types(self):
+        from shakenfist.schema.object_types import ObjectType
+        import sqlalchemy as sa
+
+        engine, states, artifacts, _ = self._build_engine()
+        a_uuid = uuid.uuid4()
+        with engine.connect() as conn:
+            conn.execute(sa.insert(artifacts).values(
+                uuid=a_uuid, artifact_type='image',
+                source_url='x', name='x', namespace='ns', version=9))
+            # Same UUID but stored under a different object_type — the
+            # JOIN must not pick this up.
+            conn.execute(sa.insert(states).values(
+                object_uuid=str(a_uuid), object_type='instance',
+                state_value='created', update_time=0.0, message=None))
+            conn.commit()
+
+            criteria = ObjectFilterCriteria(states=['created'])
+            stmt = mariadb._build_object_filter_query(
+                artifacts, ObjectType.ARTIFACT, criteria)
+            rows = conn.execute(stmt).fetchall()
+
+        self.assertEqual(0, len(rows))
