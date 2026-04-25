@@ -95,11 +95,14 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
         system client query must not return 404 — a 400 (ambiguous) or 200
         (one UUID returned silently) are both acceptable outcomes.
 
-        Instances are created with no disk and no network interface so that
-        they never attempt to boot. This keeps wall time minimal and avoids
-        any dependency on image availability or hypervisor capacity.
+        A minimal empty disk is provided so the server accepts the request,
+        but no base image is specified so nothing is downloaded and the
+        instance never boots. This keeps wall time minimal and avoids any
+        dependency on image availability or hypervisor capacity.
         """
         inst_name = 'shared-name'
+        # Minimal disk spec: empty 1 GB disk, no base image to download
+        minimal_disk = [{'size': 1, 'type': 'disk'}]
 
         ns_b_name = self.namespace + '-b'
         ns_b_key = self._uniquifier()
@@ -108,7 +111,7 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
         try:
             # Namespace A instance (self.namespace / self.test_client)
             inst_a = self.test_client.create_instance(
-                inst_name, 1, 128, None, None, None, None,
+                inst_name, 1, 128, None, minimal_disk, None, None,
                 namespace=self.namespace)
             self.addDetail(
                 'inst_a',
@@ -116,7 +119,7 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
 
             # Namespace B instance
             inst_b = client_b.create_instance(
-                inst_name, 1, 128, None, None, None, None,
+                inst_name, 1, 128, None, minimal_disk, None, None,
                 namespace=ns_b_name)
             self.addDetail(
                 'inst_b',
@@ -166,7 +169,10 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
                     pass
             try:
                 self.system_client.delete_namespace(ns_b_name)
-            except apiclient.ResourceNotFoundException:
+            except (apiclient.ResourceNotFoundException,
+                    apiclient.RequestMalformedException):
+                # RequestMalformedException if instances are still being
+                # asynchronously deleted.
                 pass
 
     def test_network_same_name_different_namespace(self):
@@ -249,5 +255,8 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
                     pass
             try:
                 self.system_client.delete_namespace(ns_b_name)
-            except apiclient.ResourceNotFoundException:
+            except (apiclient.ResourceNotFoundException,
+                    apiclient.RequestMalformedException):
+                # RequestMalformedException if networks are still being
+                # asynchronously deleted.
                 pass

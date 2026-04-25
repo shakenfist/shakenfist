@@ -563,6 +563,9 @@ class InstancesEndpoint(api_base.Resource):
             if not n:
                 return sf_api.error(
                     404, f'Specified node {placed_on} does not exist')
+            # Normalize to UUID so the scheduler can match against its
+            # UUID-keyed metrics dict.
+            placed_on = str(n.uuid)
             node_state = n.state.value
             if node_state != Node.STATE_CREATED:
                 n.add_event(
