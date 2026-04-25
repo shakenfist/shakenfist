@@ -449,6 +449,99 @@ creep:
   currently a no-op so either path can land as a one-line
   enable.
 
+#### Items raised by the phase 7 pre-push audit
+
+The `PUSH-TEMPLATE.md` audit on the post-phase-7 branch
+flagged a handful of items that are real but not phase-7
+specific. Capturing them here so the next contributor in
+this area has a punch list rather than re-discovering
+them:
+
+* **Refactor the duplicated `from_db_by_ref` overrides.**
+  The pattern (UUID short-circuit → namespace='system'/None
+  collapsed to `criteria_namespace=None` → build
+  `ObjectFilterCriteria` → call the type's `find_*` →
+  raise `MultipleObjects` on duplicates) is now ~25 lines
+  copy-pasted in `shakenfist/artifact.py`,
+  `shakenfist/instance.py`, and `shakenfist/network/network.py`.
+  A shared base-class helper that takes a criteria-builder
+  callback would eliminate the drift risk before a fourth
+  type lands.
+* **`FindArtifacts` gRPC handler error reporting.** The
+  except branch in `shakenfist/daemons/database/main.py`
+  for `FindArtifacts` omits the `context.set_code(grpc.StatusCode.INTERNAL)`
+  and `context.set_details(str(e))` calls that the other
+  three new `Find*` handlers use. Inconsistency, not a
+  regression — gRPC callers get a less descriptive error
+  on database failure.
+* **`Namespaces(prefilter=None)` silently yields nothing.**
+  `_resolve_prefilter_to_states` returns an empty set when
+  `prefilter is None`, which the base `_find` translates to
+  a `state_value IN ()` clause that matches zero rows. The
+  docstring still promises "every namespace". Currently
+  dormant because the only production caller passes
+  `prefilter='active'`. Either fix the resolver to return
+  no state filter for the `None` case, or update the
+  docstring; do not leave the contract mismatched.
+* **`interfaces_for_instance` is now weaker than its
+  caller.** `shakenfist/network/interface.py:interfaces_for_instance`
+  iterates the full active-NI set and filters in Python.
+  `Instance.interfaces` (phase 7d) does the same job via a
+  `WHERE instance_uuid = ?` index lookup. Two remaining
+  callers in `shakenfist/daemons/queues/startup_tasks.py`
+  and `shakenfist/operations/node_inst_op.py` should
+  migrate to `inst.interfaces` (or call
+  `find_network_interfaces` with `instance_uuid` set
+  directly) to benefit from the index.
+* **Compile-time guard against unsupported criteria
+  fields.** `_build_object_filter_query` silently ignores
+  fields that don't map to a column on the target table —
+  it relies on each `_direct_find_*` helper remembering to
+  strip them. Adding an explicit per-type whitelist (or
+  raising at construction time) would prevent a future
+  helper from forgetting and tripping a runtime
+  `AttributeError`.
+* **Trailing test gaps from phase 7.** Phase 7d's
+  ``Instance.interfaces`` shape change is exercised
+  through cluster_ci and indirectly via
+  ``test_make_config_drive``, but lacks a focused unit
+  test (analogous to phase 7's
+  ``NetworkInterfacesPropertyTestCase`` covering
+  ``Network.networkinterfaces``). Likewise
+  ``DnsMasq._enumerate_leases`` with an attached NI, and a
+  combined ``network_uuid``+``instance_uuid`` filter case
+  in ``DirectFindNetworkInterfacesTestCase``, are missing.
+  Low-risk: fill in opportunistically when next touching
+  these files.
+* **`Artifact.hard_delete` does not clean MariaDB rows.**
+  `NetworkInterface.hard_delete` correctly clears both
+  `network_interface_attributes` and `network_interfaces`;
+  the equivalent override on `Artifact` is missing, so
+  hard-deleting an artifact leaves orphan
+  `artifacts` / `artifact_attributes` rows. Pre-existing
+  hygiene gap, not introduced by SQL pushdown work.
+* **Database gRPC service is unauthenticated
+  (pre-existing).** `shakenfist/daemons/database/main.py`
+  binds via `add_insecure_port` with no interceptor. Phase
+  1-7's new `Find*` RPCs inherit the gap. Anyone with TCP
+  reach to `DATABASE_API_PORT` can enumerate any tenant's
+  objects via the criteria fields. Not regressed by this
+  plan but worth tracking — fix is service-mesh ACL,
+  shared-cluster JWT interceptor, or mTLS on the channel.
+* **`NetworkInterface.order` race on concurrent hot-plug
+  (pre-existing).** Two concurrent
+  `InstanceInterfacesEndpoint.post` requests on the same
+  instance can both compute the same `max(order)+1` and
+  create two NICs with the same `order`. There is no
+  UNIQUE constraint on `(instance_uuid, order)`. Phase 7d
+  did remove the `interfaces` lock from
+  `interfaces_append`, but that lock only protected the
+  cached UUID list, not the order computation — so this
+  is *not* a regression. Fix is either a lock around the
+  read+create or a UNIQUE constraint with retry-on-collide
+  (mirroring the MAC-collision handling already in
+  `network/interface.py:NetworkInterface.new`).
+
 ### Bugs fixed during this work
 
 Real bugs the rollout caught, outside the plan's design
