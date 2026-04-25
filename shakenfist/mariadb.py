@@ -455,9 +455,18 @@ def _build_object_filter_query(
     if criteria.name is not None:
         stmt = stmt.where(table.c.name == criteria.name)
     if criteria.network_uuid is not None:
-        stmt = stmt.where(table.c.network_uuid == criteria.network_uuid)
+        # Convert string UUIDs to uuid.UUID objects when the column uses
+        # native MariaDB UUID type (sa.Uuid), which expects objects with
+        # a .hex attribute rather than plain strings.
+        net_uuid = criteria.network_uuid
+        if isinstance(net_uuid, str):
+            net_uuid = UUID(net_uuid)
+        stmt = stmt.where(table.c.network_uuid == net_uuid)
     if criteria.instance_uuid is not None:
-        stmt = stmt.where(table.c.instance_uuid == criteria.instance_uuid)
+        inst_uuid = criteria.instance_uuid
+        if isinstance(inst_uuid, str):
+            inst_uuid = UUID(inst_uuid)
+        stmt = stmt.where(table.c.instance_uuid == inst_uuid)
     return stmt
 
 
