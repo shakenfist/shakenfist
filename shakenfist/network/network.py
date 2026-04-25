@@ -177,8 +177,16 @@ class Network(dbowo):
 
     @classmethod
     def filter(cls, filters):
-        """Override base class to use MariaDB instead of etcd."""
-        for data in mariadb.get_all_networks():
+        """Override base class to use MariaDB instead of etcd.
+
+        Documented fallback: ``Network.from_db_by_ref`` is the
+        live name-lookup path and pushes its predicates to SQL
+        via ``find_networks``. ``filter()`` exists so the
+        predicate API on ``DatabaseBackedObject.from_db_by_ref``
+        keeps a usable implementation, even though no in-tree
+        caller currently reaches it.
+        """
+        for data in mariadb.get_all_networks():  # nopushdown: fallback (see docstring)
             obj = cls(cls._static_values_to_dict(data))
             if all(f(obj) for f in filters):
                 yield obj
