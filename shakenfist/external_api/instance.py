@@ -697,7 +697,6 @@ class InstancesEndpoint(api_base.Resource):
                     'original_template': original_template,
                     'blob': nvram_template
                 }).info('NVRAM template URL converted')
-                nvram_template = blob_uuid
 
         # We no longer support IDE.
         for d in disk:
@@ -828,6 +827,9 @@ class InstancesEndpoint(api_base.Resource):
                     url = f'{BLOB_URL}{disk["blob_uuid"]}'
                 elif not util_general.noneish(disk_base):
                     url = disk['base']
+                else:
+                    # Empty disk with no base image, no artifact fetch needed
+                    continue
 
                 # TODO(mikal): I would really like the target_node not to be set
                 # here so that any node in the cluster could start downloading
