@@ -441,7 +441,7 @@ class Artifact(dbowo):
         self.add_event(EVENT_TYPE_USAGE, 'usage', extra={'bytes': total_used_storage},
                        suppress_event_logging=True)
 
-    def add_index(self, blob_uuid):
+    def add_index(self, blob_uuid, force=False):
         with self.get_lock_attr('index', 'Artifact index creation'):
             mri = self.most_recent_index
             old_sha512 = None
@@ -455,7 +455,7 @@ class Artifact(dbowo):
                 old_blob_uuid = old_blob.uuid
                 old_sha512 = mariadb.get_valid_hash(str(old_blob.uuid), 'sha512')
 
-            if old_blob_uuid and old_blob_uuid == blob_uuid:
+            if not force and old_blob_uuid and old_blob_uuid == blob_uuid:
                 # Skip using the same blob UUID as two consecutive indexes
                 return mri
 
@@ -465,7 +465,7 @@ class Artifact(dbowo):
                     f'Failed to retrieve new artifact version: {blob_uuid}')
             new_sha512 = mariadb.get_valid_hash(str(new_blob.uuid), 'sha512')
 
-            if old_sha512 and new_sha512:
+            if not force and old_sha512 and new_sha512:
                 if old_sha512 == new_sha512:
                     # Skipping the update, the blobs have the same content...
                     return mri

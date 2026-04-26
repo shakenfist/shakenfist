@@ -1872,7 +1872,7 @@ class Instance(dbowo):
                 b.observe()
                 b.verify_checksum()
 
-                a.add_index(blob_uuid)
+                a.add_index(blob_uuid, force=True)
                 a.state = artifact.Artifact.STATE_CREATED
 
             else:
