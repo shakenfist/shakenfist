@@ -3182,6 +3182,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-hamburger-menu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hamburger menu for status-bar actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-idle-cpu-and-latency/" class="md-nav__link">
         
   
@@ -3246,6 +3274,62 @@
     
   
     Macbook bug-report fixes (2026-04-23)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-notifications/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications system
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-paste-as-keystrokes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paste-as-keystrokes fallback
   
 
     
@@ -3462,6 +3546,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-hamburger-menu-phase-01-migrate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Migrate action buttons to hamburger menu
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-cursor-rendering-phase-01-parse/" class="md-nav__link">
         
   
@@ -3470,6 +3582,34 @@
     
   
     Phase 1: Parse SpiceCursor image data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-paste-as-keystrokes-phase-01-translator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Paste-as-keystrokes translator
   
 
     
@@ -3694,6 +3834,34 @@
     
   
     Phase 2: Audio correctness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-paste-as-keystrokes-phase-02-channel-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Channel integration and CLI flags
   
 
     
@@ -4274,6 +4442,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-paste-as-keystrokes-phase-03-gui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: GUI gesture for paste-as-keystrokes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-deferred-debt-phase-03-session/" class="md-nav__link">
         
   
@@ -4422,6 +4618,34 @@
     
   
     Phase 4: Device enumeration display
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-paste-as-keystrokes-phase-04-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Documentation and cross-repo updates
   
 
     
@@ -7610,6 +7834,27 @@ reviewing and merging external contributor PRs see <code>MERGE-TEMPLATE.md</code
 <td>Capture the display surface when the bug dialog opens, not at submit, so transient artefacts survive the form-filling delay</td>
 <td>Complete</td>
 <td><a href="/components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-01-metadata/">1. Metadata</a>, <a href="/components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-02-snapshot/">2. Snapshot</a>, <a href="/components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-03-region/">3. Region image</a>, <a href="/components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs/">4. Docs</a></td>
+</tr>
+<tr>
+<td>2026-04-25</td>
+<td><a href="/components/ryll/plans/PLAN-paste-as-keystrokes/">Paste-as-keystrokes fallback</a></td>
+<td>Synthesise SPICE keystrokes for the contents of a string when no vdagent is available, so guests like uncalibrated-sextant can be driven without an in-guest agent</td>
+<td>Complete</td>
+<td><a href="/components/ryll/plans/PLAN-paste-as-keystrokes-phase-01-translator/">1. Translator</a>, <a href="/components/ryll/plans/PLAN-paste-as-keystrokes-phase-02-channel-cli/">2. Channel + CLI</a>, <a href="/components/ryll/plans/PLAN-paste-as-keystrokes-phase-03-gui/">3. GUI gesture</a>, <a href="/components/ryll/plans/PLAN-paste-as-keystrokes-phase-04-docs/">4. Docs</a></td>
+</tr>
+<tr>
+<td>2026-04-25</td>
+<td><a href="/components/ryll/plans/PLAN-hamburger-menu/">Hamburger menu</a></td>
+<td>Replace the status-bar action-button row with a single hamburger menu so the row returns to glanceable state</td>
+<td>Complete</td>
+<td><a href="/components/ryll/plans/PLAN-hamburger-menu-phase-01-migrate/">1. Migrate</a></td>
+</tr>
+<tr>
+<td>2026-04-25</td>
+<td><a href="/components/ryll/plans/PLAN-notifications/">Notifications system</a></td>
+<td>In-app notifications surface for protocol gaps, bug-report status, and SPICE_MSG_NOTIFY messages that ryll currently drops on the floor</td>
+<td>Not started</td>
+<td>(phases not yet written)</td>
 </tr>
 </tbody>
 </table>
