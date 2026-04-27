@@ -25,11 +25,16 @@ class FakeBlob:
     STATE_CREATED = dbo.STATE_CREATED
     STATE_DELETED = dbo.STATE_DELETED
 
-    def __init__(self, uuid, state='created', ref_count=1, locations=None):
+    def __init__(self, uuid, state='created', ref_count=1, locations=None,
+                 last_used=None, fetched_at=None):
         self.uuid = uuid
         self._state_value = state
         self._ref_count = ref_count
         self._locations = locations or []
+        # Default to "old enough" so existing tests bypass the grace
+        # period; new tests pass explicit timestamps.
+        self.last_used = last_used if last_used is not None else 0.0
+        self.fetched_at = fetched_at if fetched_at is not None else 0.0
 
     @property
     def state(self):
@@ -282,5 +287,27 @@ class ProcessPerBlobQueueTestCase(base.ShakenFistTestCase):
         st._process_per_blob_queue(execution_limit=5)
 
         # Should delete, not schedule checksums
+        mock_get_targets.assert_not_called()
+        mock_create_and_enqueue.assert_not_called()
+        self.assertEqual(dbo.STATE_DELETED, blob._state_value)
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.nbo_schema.create_and_enqueue')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_cluster_operation_targets_for_object')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_blob_hashes')
+    def test_zero_ref_count_within_grace_period_is_skipped(
+            self, mock_get_hashes, mock_get_targets,
+            mock_create_and_enqueue):
+        # Freshly registered blob: ref_count is briefly zero between
+        # snapshot_disk()'s b.register() and the snapshot operation's
+        # a.add_index() call. The per-blob queue must leave it alone
+        # during the 300s grace period.
+        blob = FakeBlob(
+            BLOB_UUID_1, ref_count=0,
+            last_used=time.time(), fetched_at=time.time())
+        st.BLOB_CHECKS_QUEUE.put(blob)
+
+        st._process_per_blob_queue(execution_limit=5)
+
+        self.assertEqual(dbo.STATE_CREATED, blob._state_value)
         mock_get_targets.assert_not_called()
         mock_create_and_enqueue.assert_not_called()
