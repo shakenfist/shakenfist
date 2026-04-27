@@ -219,11 +219,11 @@ Five phases plus inline docs.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Store and ring buffer | PLAN-notifications-phase-01-store.md | Not started |
-| 2. SPICE_MSG_NOTIFY parser and channel plumbing | PLAN-notifications-phase-02-spice-notify.md | Not started |
-| 3. Migrate Gaps and bug-report status as sources | PLAN-notifications-phase-03-existing-sources.md | Not started |
-| 4. GUI: bell, side panel, mark-read | PLAN-notifications-phase-04-gui.md | Not started |
-| 5. Docs and bug-report serialisation | PLAN-notifications-phase-05-docs.md | Not started |
+| 1. Store and ring buffer | PLAN-notifications-phase-01-store.md | Complete (a16f6781) |
+| 2. SPICE_MSG_NOTIFY parser and channel plumbing | PLAN-notifications-phase-02-spice-notify.md | Complete (b3e520b1) |
+| 3. Migrate Gaps and bug-report status as sources | PLAN-notifications-phase-03-existing-sources.md | Complete (3780be03) |
+| 4. GUI: bell, side panel, mark-read | PLAN-notifications-phase-04-gui.md | Complete (ed3f91db) |
+| 5. Docs and bug-report serialisation | PLAN-notifications-phase-05-docs.md | Complete (a2d35d8b) |
 
 **Phase 1 — Store and ring buffer (high effort, opus)**.
 Define `NotificationEntry { id: u64, when: SystemTime,
@@ -477,6 +477,50 @@ should verify:
 ### Bugs fixed during this work
 
 (To be filled in as the work proceeds.)
+
+### Discoveries during this work
+
+* **Phase 2 smoke test, 2026-04-26**: against `make
+  test-qemu` (a default `-spice
+  port=5900,disable-ticketing=on,plaintext-channel=all`
+  config) only the **main** channel receives NOTIFY
+  messages. Master plan Q5's premise that "each channel
+  emits its own [insecure] warning" is wrong for QEMU;
+  the SPICE server emits a single notification per
+  affected channel **on the main channel**, with the
+  affected channel name in the message text (e.g.
+  `keyboard channel is insecure`). Phase 2's per-channel
+  NOTIFY arms still earn their keep against non-QEMU
+  SPICE servers (Kerbside proxy, future servers) and
+  against any future QEMU notifications that aren't
+  insecure-channel reports, but typical QEMU sessions
+  will produce a small number of `Spice { channel: Main,
+  what: N }` entries with distinct messages — never
+  exercising cross-channel dedup. Phase 4's GUI should
+  render these as separate entries in the side panel
+  with the message text doing the per-affected-channel
+  disambiguation.
+
+* **Phase 1 planning, 2026-04-26**: the master plan's
+  premise that "Ryll does not parse SPICE_MSG_NOTIFY at
+  all today" is wrong. `shakenfist-spice-protocol` already
+  defines a `Notify` wire-format parser
+  (`messages.rs:182`) and a `NotifySeverity` enum
+  (`constants.rs:389`), and `ryll/src/channels/main_channel.rs`
+  (around line 520) already matches `main_server::NOTIFY`,
+  parses the message, and routes it by severity into
+  `tracing::warn!` / `info!`. The other six channels still
+  drop the message. Phase 2's brief should be revised
+  before that phase is planned: the wire-format parser
+  exists, the main-channel handler exists, and Phase 2's
+  real scope is (a) push the existing main-channel
+  handler's parsed `Notify` into the notification store,
+  (b) add the same NOTIFY arm to display / inputs /
+  cursor / playback / usbredir / webdav, (c) tighten
+  `Notify::visibility` from raw `u32` to
+  `Option<SpiceVisibility>`. Phase 1 reuses the existing
+  `NotifySeverity` rather than defining a parallel
+  `NotificationSeverity`.
 
 ### Documentation index maintenance
 

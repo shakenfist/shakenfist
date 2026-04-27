@@ -176,6 +176,7 @@ nav:
                 - "Phase 1: Display correctness": components/ryll/plans/PLAN-deferred-debt-phase-01-display.md
                 - "Phase 1: Fix enumerate_physical bus field": components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix.md
                 - "Phase 1: Migrate action buttons to hamburger menu": components/ryll/plans/PLAN-hamburger-menu-phase-01-migrate.md
+                - "Phase 1: Notification store and ring buffer": components/ryll/plans/PLAN-notifications-phase-01-store.md
                 - "Phase 1: Parse SpiceCursor image data": components/ryll/plans/PLAN-cursor-rendering-phase-01-parse.md
                 - "Phase 1: Paste-as-keystrokes translator": components/ryll/plans/PLAN-paste-as-keystrokes-phase-01-translator.md
                 - "Phase 1: Platform Portability": components/ryll/plans/PLAN-packaging-phase-01-portability.md
@@ -196,6 +197,7 @@ nav:
                 - "Phase 2: Render cursor as egui overlay": components/ryll/plans/PLAN-cursor-rendering-phase-02-render.md
                 - "Phase 2: Repaint cadence fix": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint.md
                 - "Phase 2: Reserve crate names on crates.io": components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names.md
+                - "Phase 2: SPICE_MSG_NOTIFY end-to-end": components/ryll/plans/PLAN-notifications-phase-02-spice-notify.md
                 - "Phase 2: usbredir protocol parser": components/ryll/plans/PLAN-usb-redir-phase-02-usbredir-parser.md
                 - "Phase 2: Wire usb_tx and channel events": components/ryll/plans/PLAN-usb-ui-phase-02-wire-tx.md
                 - "Phase 3 — submit-time region crop": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-03-region.md
@@ -209,6 +211,7 @@ nav:
                 - "Phase 3: Extract shakenfist-spice-compression": components/ryll/plans/PLAN-crate-extraction-phase-03-compression.md
                 - "Phase 3: GUI gesture for paste-as-keystrokes": components/ryll/plans/PLAN-paste-as-keystrokes-phase-03-gui.md
                 - "Phase 3: Input and session correctness": components/ryll/plans/PLAN-deferred-debt-phase-03-session.md
+                - "Phase 3: migrate Gaps and bug-report status as sources": components/ryll/plans/PLAN-notifications-phase-03-existing-sources.md
                 - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
                 - "Phase 4 — documentation": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs.md
@@ -217,6 +220,7 @@ nav:
                 - "Phase 4: Documentation and cross-repo updates": components/ryll/plans/PLAN-paste-as-keystrokes-phase-04-docs.md
                 - "Phase 4: Extract shakenfist-spice-protocol": components/ryll/plans/PLAN-crate-extraction-phase-04-protocol.md
                 - "Phase 4: GUI report button and description dialog": components/ryll/plans/PLAN-bug-reports-phase-04-gui-button.md
+                - "Phase 4: GUI — bell, side panel, mark-read": components/ryll/plans/PLAN-notifications-phase-04-gui.md
                 - "Phase 4: Integration (mux ↔ WebDAV server)": components/ryll/plans/PLAN-webdav-phase-04-integration.md
                 - "Phase 4: Real device enumeration and passthrough": components/ryll/plans/PLAN-usb-redir-phase-04-real-devices.md
                 - "Phase 4: Real latency from PING/PONG": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency.md
@@ -226,6 +230,7 @@ nav:
                 - "Phase 5: Code quality and cleanup": components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup.md
                 - "Phase 5: Connect and disconnect controls": components/ryll/plans/PLAN-usb-ui-phase-05-connect.md
                 - "Phase 5: Device connection lifecycle": components/ryll/plans/PLAN-usb-redir-phase-05-device-connect.md
+                - "Phase 5: docs and bug-report serialisation": components/ryll/plans/PLAN-notifications-phase-05-docs.md
                 - "Phase 5: DRAW_OPAQUE and DRAW_BLEND": components/ryll/plans/PLAN-display-draw-ops-phase-05-image-rop.md
                 - "Phase 5: Extract shakenfist-spice-usbredir": components/ryll/plans/PLAN-crate-extraction-phase-05-usbredir.md
                 - "Phase 5: GUI display region selection": components/ryll/plans/PLAN-bug-reports-phase-05-region-select.md
