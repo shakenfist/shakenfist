@@ -3525,6 +3525,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#discoveries-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discoveries during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#documentation-index-maintenance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3799,6 +3810,34 @@
     
   
     Phase 1: Migrate action buttons to hamburger menu
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-notifications-phase-01-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Notification store and ring buffer
   
 
     
@@ -4379,6 +4418,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-notifications-phase-02-spice-notify/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: SPICE_MSG_NOTIFY end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-usb-redir-phase-02-usbredir-parser/" class="md-nav__link">
         
   
@@ -4743,6 +4810,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-notifications-phase-03-existing-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: migrate Gaps and bug-report status as sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-usb-ui-phase-03-panel/" class="md-nav__link">
         
   
@@ -4947,6 +5042,34 @@
     
   
     Phase 4: GUI report button and description dialog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-notifications-phase-04-gui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: GUI — bell, side panel, mark-read
   
 
     
@@ -5199,6 +5322,34 @@
     
   
     Phase 5: Device connection lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-notifications-phase-05-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: docs and bug-report serialisation
   
 
     
@@ -8070,6 +8221,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#discoveries-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discoveries during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#documentation-index-maintenance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8344,27 +8506,27 @@ badge is redundant); the bug-report transient at
 <tr>
 <td>1. Store and ring buffer</td>
 <td>PLAN-notifications-phase-01-store.md</td>
-<td>Not started</td>
+<td>Complete (a16f6781)</td>
 </tr>
 <tr>
 <td>2. SPICE_MSG_NOTIFY parser and channel plumbing</td>
 <td>PLAN-notifications-phase-02-spice-notify.md</td>
-<td>Not started</td>
+<td>Complete (b3e520b1)</td>
 </tr>
 <tr>
 <td>3. Migrate Gaps and bug-report status as sources</td>
 <td>PLAN-notifications-phase-03-existing-sources.md</td>
-<td>Not started</td>
+<td>Complete (3780be03)</td>
 </tr>
 <tr>
 <td>4. GUI: bell, side panel, mark-read</td>
 <td>PLAN-notifications-phase-04-gui.md</td>
-<td>Not started</td>
+<td>Complete (ed3f91db)</td>
 </tr>
 <tr>
 <td>5. Docs and bug-report serialisation</td>
 <td>PLAN-notifications-phase-05-docs.md</td>
-<td>Not started</td>
+<td>Complete (a2d35d8b)</td>
 </tr>
 </tbody>
 </table>
@@ -8593,6 +8755,53 @@ should verify:</p>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>(To be filled in as the work proceeds.)</p>
+<h3 id="discoveries-during-this-work">Discoveries during this work<a class="headerlink" href="#discoveries-during-this-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p><strong>Phase 2 smoke test, 2026-04-26</strong>: against <code>make
+  test-qemu</code> (a default <code>-spice
+  port=5900,disable-ticketing=on,plaintext-channel=all</code>
+  config) only the <strong>main</strong> channel receives NOTIFY
+  messages. Master plan Q5's premise that "each channel
+  emits its own [insecure] warning" is wrong for QEMU;
+  the SPICE server emits a single notification per
+  affected channel <strong>on the main channel</strong>, with the
+  affected channel name in the message text (e.g.
+  <code>keyboard channel is insecure</code>). Phase 2's per-channel
+  NOTIFY arms still earn their keep against non-QEMU
+  SPICE servers (Kerbside proxy, future servers) and
+  against any future QEMU notifications that aren't
+  insecure-channel reports, but typical QEMU sessions
+  will produce a small number of <code>Spice { channel: Main,
+  what: N }</code> entries with distinct messages — never
+  exercising cross-channel dedup. Phase 4's GUI should
+  render these as separate entries in the side panel
+  with the message text doing the per-affected-channel
+  disambiguation.</p>
+</li>
+<li>
+<p><strong>Phase 1 planning, 2026-04-26</strong>: the master plan's
+  premise that "Ryll does not parse SPICE_MSG_NOTIFY at
+  all today" is wrong. <code>shakenfist-spice-protocol</code> already
+  defines a <code>Notify</code> wire-format parser
+  (<code>messages.rs:182</code>) and a <code>NotifySeverity</code> enum
+  (<code>constants.rs:389</code>), and <code>ryll/src/channels/main_channel.rs</code>
+  (around line 520) already matches <code>main_server::NOTIFY</code>,
+  parses the message, and routes it by severity into
+  <code>tracing::warn!</code> / <code>info!</code>. The other six channels still
+  drop the message. Phase 2's brief should be revised
+  before that phase is planned: the wire-format parser
+  exists, the main-channel handler exists, and Phase 2's
+  real scope is (a) push the existing main-channel
+  handler's parsed <code>Notify</code> into the notification store,
+  (b) add the same NOTIFY arm to display / inputs /
+  cursor / playback / usbredir / webdav, (c) tighten
+  <code>Notify::visibility</code> from raw <code>u32</code> to
+  <code>Option&lt;SpiceVisibility&gt;</code>. Phase 1 reuses the existing
+  <code>NotifySeverity</code> rather than defining a parallel
+  <code>NotificationSeverity</code>.</p>
+</li>
+</ul>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When this master plan is created, add a row to
 <code>docs/plans/index.md</code> <em>Master plans</em> table with today's
