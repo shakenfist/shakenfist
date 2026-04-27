@@ -4711,11 +4711,18 @@ def main() -> None:
     # active RPCs the server otherwise treats the transport as idle and
     # forces a 2-hour minimum ping interval regardless of
     # min_recv_ping_interval_without_data_ms.
+    #
+    # max_ping_strikes=0 disables the strike counter entirely. Even with the
+    # two options above, multi-node CI clusters still occasionally tripped
+    # the default 2-strike limit (e.g., during reconnect bursts), producing
+    # GOAWAY too_many_pings. Our clients are trusted internal daemons, so
+    # disabling the kill switch is the recommended pattern.
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=20),
         options=[
             ('grpc.http2.min_recv_ping_interval_without_data_ms', 5000),
             ('grpc.keepalive_permit_without_calls', 1),
+            ('grpc.http2.max_ping_strikes', 0),
         ]
     )
     server.add_insecure_port(
