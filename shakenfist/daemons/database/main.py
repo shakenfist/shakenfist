@@ -4706,10 +4706,16 @@ def main() -> None:
     # often as every 5 seconds — mariadb.py uses a 10-second interval.
     # Without this the default minimum (5 minutes) triggers GOAWAY with
     # ENHANCE_YOUR_CALM when the client pings more frequently.
+    #
+    # keepalive_permit_without_calls=1 is also required: when there are no
+    # active RPCs the server otherwise treats the transport as idle and
+    # forces a 2-hour minimum ping interval regardless of
+    # min_recv_ping_interval_without_data_ms.
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=20),
         options=[
             ('grpc.http2.min_recv_ping_interval_without_data_ms', 5000),
+            ('grpc.keepalive_permit_without_calls', 1),
         ]
     )
     server.add_insecure_port(
