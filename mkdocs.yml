@@ -258,6 +258,7 @@ nav:
                 - "Plan: Publish workspace crates on release": components/ryll/plans/PLAN-crate-release.md
                 - "PR #20 follow-up fixes": components/ryll/plans/PLAN-pr20-followup.md
                 - "PR 23 follow-up: audio playback channel": components/ryll/plans/PLAN-pr23-followup.md
+                - "PR 31 follow-up: UI improvements, reconnect, and protocol fixes": components/ryll/plans/PLAN-pr31-followup.md
                 - "Remaining issues after initial bring-up": components/ryll/plans/PLAN-remaining-issues.md
                 - "Render SPICE cursor on screen": components/ryll/plans/PLAN-cursor-rendering.md
                 - "Replace audiopus with pure-Rust opus-decoder": components/ryll/plans/PLAN-opus-decoder.md

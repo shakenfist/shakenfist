@@ -45,6 +45,7 @@ execution.
 | 2026-04-18 | [Supply-chain scanning](/components/ryll/plans/PLAN-supply-chain-scanning/) | Deterministic scanners for dependencies, secrets, and Unicode-based attacks |
 | 2026-04-18 | [Supply-chain follow-ups](/components/ryll/plans/PLAN-supply-chain-followups/) | Tracked advisory ignores and unmaintained-crate debt surfaced when landing scanners |
 | 2026-04-23 | [Macbook bug-report fixes](/components/ryll/plans/PLAN-macbook-bugreport-fixes/) | MOUSE_MODE wire format, client-mode re-request after guest reboot, and MULTI_MEDIA_TIME handler |
+| 2026-04-27 | [PR #31 follow-up](/components/ryll/plans/PLAN-pr31-followup/) | Tests, docs, and polish items deferred when landing PR 31 (UI improvements, reconnect, protocol fixes) |
 
 ## Consolidation plans
 
