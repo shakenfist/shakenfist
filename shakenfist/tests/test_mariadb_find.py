@@ -947,6 +947,31 @@ class DirectFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
             stmt.compile(compile_kwargs={'literal_binds': False}))
         self.assertIn('instance_uuid', rendered)
 
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_results_are_ordered_by_order_column(self, mock_get_engine):
+        """SELECT carries ORDER BY ``order`` so callers iterate
+        interfaces in user-specified order."""
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = [_ni_row()]
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(states=['created']))
+
+        stmt = mock_conn.execute.call_args[0][0]
+        rendered = str(
+            stmt.compile(compile_kwargs={'literal_binds': False}))
+        self.assertIn('ORDER BY', rendered)
+        # ``order`` is a SQL reserved word — the rendered statement
+        # should reference the column, however the dialect chooses to
+        # quote it.
+        self.assertIn('order', rendered)
+
 
 # ---------------------------------------------------------------------------
 # Public wrapper — routing (direct vs gRPC)

@@ -12582,6 +12582,14 @@ def _direct_find_network_interfaces(
     )
     stmt = _build_object_filter_query(
         table, ObjectType.INTERFACE, safe_criteria)
+    # Order by the per-instance interface index so callers iterate
+    # interfaces in user-specified order. Without this MariaDB returns
+    # rows in an unspecified order, which makes ``Instance.interfaces``
+    # iteration nondeterministic and breaks code that relies on the
+    # first interface being the one the user listed first (e.g. the
+    # default-route choice in
+    # ``_make_config_drive_openstack_disk``).
+    stmt = stmt.order_by(table.c.order)
 
     try:
         with engine.connect() as conn:
