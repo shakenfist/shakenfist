@@ -14,7 +14,6 @@ from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
 from shakenfist.network import network
 from shakenfist.schema.ipam_reservation import ReservationType
-from shakenfist.network import interface
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.net_op \
@@ -59,10 +58,10 @@ class Job(util_concurrency.Job):
             seen_vxids = []
 
             if not config.NODE_IS_NETWORK_NODE:
-                # For normal nodes, just the ones we have instances for. We need
-                # to use the more expensive interfaces_for_instance() method of
-                # looking up instance interfaces here if the instance cache hasn't
-                # been populated yet (i.e. the instance is still being created)
+                # For normal nodes, just the ones we have instances for.
+                # ``inst.interfaces`` queries the network_interfaces table
+                # live, so the instance-cache fallback that used to live
+                # here is no longer needed.
                 for inst in instance.Instances([instance.this_node_filter],
                                                prefilter='healthy'):
                     # Is the instance built yet?
@@ -71,20 +70,8 @@ class Job(util_concurrency.Job):
                                             dbo.STATE_CREATING]:
                         continue
 
-                    ifaces = inst.interfaces
-                    if not ifaces:
-                        ifaces = list(
-                            interface.interfaces_for_instance(inst))
-
-                    for iface_uuid in ifaces:
-                        ni = interface.NetworkInterface.from_db(
-                            iface_uuid, suppress_failure_audit=True)
-                        if not ni:
-                            LOG.with_fields({
-                                'instance': inst,
-                                'interface': iface_uuid
-                            }).error('Network interface does not exist')
-                        elif ni.network_uuid not in host_networks:
+                    for ni in inst.interfaces:
+                        if ni.network_uuid not in host_networks:
                             host_networks.append(ni.network_uuid)
             else:
                 # For network nodes, its all networks
@@ -147,12 +134,7 @@ class Job(util_concurrency.Job):
                             # If the network node was missing a network, then that implies
                             # that we also need to re-create all of the floating IPs for
                             # that network.
-                            for ni_uuid in n.networkinterfaces:
-                                ni = interface.NetworkInterface.from_db(
-                                    ni_uuid, suppress_failure_audit=True)
-                                if not ni:
-                                    continue
-
+                            for ni in n.networkinterfaces:
                                 floating_addr = ni.floating.get(
                                     'floating_address')
                                 if floating_addr:

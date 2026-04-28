@@ -61,6 +61,7 @@ from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_metadata import ObjectMetadataData
 from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import State
@@ -145,18 +146,18 @@ NODES_VERSION = 2
 NODE_ATTRIBUTES_VERSION = 2
 NAMESPACES_VERSION = 2
 NAMESPACE_ATTRIBUTES_VERSION = 2
-ARTIFACTS_VERSION = 2
+ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
 ARTIFACT_INDEXES_VERSION = 2
 NETWORK_INTERFACES_VERSION = 2
 NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
-NETWORKS_VERSION = 2
-NETWORK_ATTRIBUTES_VERSION = 2
+NETWORKS_VERSION = 3
+NETWORK_ATTRIBUTES_VERSION = 3
 IPAMS_VERSION = 2
 AGENT_OPERATIONS_VERSION = 2
 AGENT_OPERATION_ATTRIBUTES_VERSION = 2
-INSTANCES_VERSION = 2
-INSTANCE_ATTRIBUTES_VERSION = 2
+INSTANCES_VERSION = 3
+INSTANCE_ATTRIBUTES_VERSION = 3
 OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
@@ -415,6 +416,66 @@ def _build_object_type_enum_values() -> str:
     ALTER TABLE statements.
     """
     return ', '.join(f"'{ot.value}'" for ot in ObjectType)
+
+
+def _build_object_filter_query(
+        table: sa.Table,
+        object_type: ObjectType,
+        criteria: ObjectFilterCriteria) -> sa.Select[Any]:
+    """Build a Select that joins a per-type table to object_states.
+
+    Produces:
+
+        SELECT <table>.* FROM <table>
+        JOIN object_states s
+          ON s.object_uuid = <table>.uuid
+         AND s.object_type = <object_type>
+        WHERE (optional) s.state_value IN criteria.states
+          AND (optional) <table>.namespace    = criteria.namespace
+          AND (optional) <table>.name         = criteria.name
+          AND (optional) <table>.network_uuid = criteria.network_uuid
+          AND (optional) <table>.instance_uuid = criteria.instance_uuid
+
+    ``criteria.states`` of ``None`` or ``[]`` skips the state filter.
+    Any scalar filter of ``None`` skips that filter. Callers are
+    responsible for stripping fields that do not exist on the target
+    table (e.g. ``name``/``namespace`` on ``network_interfaces``).
+    """
+    states_table = _get_object_states_table()
+    # ``object_states.object_uuid`` is VARCHAR(36) (with dashes) while the
+    # per-type ``uuid`` columns use SQLAlchemy ``Uuid()`` which renders as
+    # CHAR(32) (no dashes) on MariaDB, so the JOIN cannot compare the two
+    # columns directly. Strip the dashes off the state row's UUID before
+    # comparing — the composite ``(object_type, state_value)`` index still
+    # narrows the join, and the per-type primary key matches a 32-char hex
+    # value.
+    stmt = sa.select(table).join(
+        states_table,
+        sa.and_(
+            sa.func.replace(states_table.c.object_uuid, '-', '')
+            == table.c.uuid,
+            states_table.c.object_type == object_type))
+    if criteria.states:
+        stmt = stmt.where(
+            states_table.c.state_value.in_(criteria.states))
+    if criteria.namespace is not None:
+        stmt = stmt.where(table.c.namespace == criteria.namespace)
+    if criteria.name is not None:
+        stmt = stmt.where(table.c.name == criteria.name)
+    if criteria.network_uuid is not None:
+        # Convert string UUIDs to uuid.UUID objects when the column uses
+        # native MariaDB UUID type (sa.Uuid), which expects objects with
+        # a .hex attribute rather than plain strings.
+        net_uuid: UUID | str = criteria.network_uuid
+        if isinstance(net_uuid, str):
+            net_uuid = UUID(net_uuid)
+        stmt = stmt.where(table.c.network_uuid == net_uuid)
+    if criteria.instance_uuid is not None:
+        inst_uuid: UUID | str = criteria.instance_uuid
+        if isinstance(inst_uuid, str):
+            inst_uuid = UUID(inst_uuid)
+        stmt = stmt.where(table.c.instance_uuid == inst_uuid)
+    return stmt
 
 
 def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
@@ -1523,6 +1584,22 @@ def _ensure_artifacts_schema(engine: sa.Engine) -> dict[str, Any]:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver <= 2:
+        LOG.info(f'Upgrading {table_name} table to version 3 '
+                 '(add index on name column)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'CREATE INDEX idx_artifacts_name ON artifacts(name)'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'Index idx_artifacts_name already exists '
+                    f'or could not be added: {e}')
+
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -3439,9 +3516,6 @@ def _migrate_etcd_network_attributes(
             # Read attributes from etcd
             routing_data = etcd.get(
                 'attribute/network', net_uuid, 'routing')
-            ni_data = etcd.get(
-                'attribute/network', net_uuid,
-                'networkinterfaces')
             dns_data = etcd.get(
                 'attribute/network', net_uuid, 'hosteddns')
 
@@ -3451,14 +3525,6 @@ def _migrate_etcd_network_attributes(
                 floating_gateway = routing_data.get(
                     'floating_gateway')
 
-            networkinterfaces: list[str] = []
-            networkinterfaces_initialized = False
-            if ni_data:
-                networkinterfaces = ni_data.get(
-                    'networkinterfaces', [])
-                networkinterfaces_initialized = ni_data.get(
-                    'initialized', False)
-
             hosteddns: dict[str, Any] = {}
             if dns_data:
                 hosteddns = dns_data
@@ -3466,15 +3532,16 @@ def _migrate_etcd_network_attributes(
             attrs = NetworkAttributesData(
                 uuid=UUIDType(net_uuid),
                 floating_gateway=floating_gateway,
-                networkinterfaces=networkinterfaces,
-                networkinterfaces_initialized=(
-                    networkinterfaces_initialized),
                 hosteddns=hosteddns,
             )
             success = _direct_create_network_attributes(attrs)
 
             if success:
-                # Delete etcd attributes after successful migration
+                # Delete etcd attributes after successful migration. The
+                # ``networkinterfaces`` etcd key is also dropped here even
+                # though we no longer read it -- phase 7 made the cached
+                # list redundant, but stale etcd data should still be
+                # cleaned up so re-migrations are idempotent.
                 etcd.delete(
                     'attribute/network', net_uuid, 'routing')
                 etcd.delete(
@@ -3744,8 +3811,6 @@ def _migrate_etcd_instance_attributes(
                 'enforced_deletes')
             block_devices = etcd.get(
                 'attribute/instance', inst_uuid, 'block_devices')
-            interfaces_data = etcd.get(
-                'attribute/instance', inst_uuid, 'interfaces')
             agent_state = etcd.get(
                 'attribute/instance', inst_uuid, 'agent_state')
             agent_attributes = etcd.get(
@@ -3760,15 +3825,6 @@ def _migrate_etcd_instance_attributes(
                 'attribute/instance', inst_uuid, 'error')
 
             # Extract values from etcd format
-            interfaces = []
-            if interfaces_data and isinstance(
-                    interfaces_data, list):
-                interfaces = interfaces_data
-            elif interfaces_data and isinstance(
-                    interfaces_data, dict):
-                interfaces = interfaces_data.get(
-                    'interfaces', [])
-
             kvm_pid = None
             if kvm_pid_data and isinstance(
                     kvm_pid_data, dict):
@@ -3803,7 +3859,6 @@ def _migrate_etcd_instance_attributes(
                     enforced_deletes, dict) else None,
                 block_devices=block_devices if isinstance(
                     block_devices, dict) else None,
-                interfaces=interfaces,
                 agent_state=agent_state if isinstance(
                     agent_state, dict) else None,
                 agent_attributes=agent_attributes if isinstance(
@@ -4488,6 +4543,11 @@ def _direct_get_objects_by_state(object_type: ObjectType,
                                  ) -> Optional[list[str]]:
     """Get all object UUIDs of a given type in specified states.
 
+    An empty ``state_values`` list means "no state filter" — return every
+    object of ``object_type`` regardless of state. This matches the
+    pre-phase-5 ``Nodes([])`` semantics where no prefilter returned every
+    node, including DELETED.
+
     This is the direct access version used by the database daemon.
     Returns None on error (distinct from [] for no matches).
     """
@@ -4496,12 +4556,10 @@ def _direct_get_objects_by_state(object_type: ObjectType,
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(table.c.object_uuid).where(
-                sa.and_(
-                    table.c.object_type == object_type,
-                    table.c.state_value.in_(state_values)
-                )
-            )
+            where = [table.c.object_type == object_type]
+            if state_values:
+                where.append(table.c.state_value.in_(state_values))
+            stmt = sa.select(table.c.object_uuid).where(sa.and_(*where))
             result = conn.execute(stmt).fetchall()
             return [row.object_uuid for row in result]
     except OperationalError as e:
@@ -6745,7 +6803,7 @@ def get_active_blob_uuids() -> list[str]:
         List of blob UUID strings in active states (empty on error).
     """
     active_states = ['initial', 'created']
-    return _direct_get_objects_by_state(ObjectType.BLOB, active_states) or []
+    return get_objects_by_state(ObjectType.BLOB, active_states) or []
 
 
 # =============================================================================
@@ -9324,8 +9382,9 @@ def _direct_get_expired_blob_uuids(
                 attrs_table.join(
                     states_table,
                     sa.and_(
-                        states_table.c.object_uuid
-                        == sa.cast(attrs_table.c.uuid, sa.String),
+                        sa.func.replace(
+                            states_table.c.object_uuid, '-', '')
+                        == attrs_table.c.uuid,
                         states_table.c.object_type == ObjectType.BLOB
                     )
                 )
@@ -9389,9 +9448,9 @@ def _direct_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
                 attrs_table.join(
                     states_table,
                     sa.and_(
-                        states_table.c.object_uuid
-                        == sa.cast(
-                            attrs_table.c.uuid, sa.String),
+                        sa.func.replace(
+                            states_table.c.object_uuid, '-', '')
+                        == attrs_table.c.uuid,
                         states_table.c.object_type
                         == ObjectType.BLOB
                     )
@@ -11178,6 +11237,43 @@ def _direct_get_all_artifacts() -> list[ArtifactData]:
         return []
 
 
+def _direct_find_artifacts(
+        criteria: ObjectFilterCriteria) -> list[ArtifactData]:
+    """Find artifacts matching the given filter criteria.
+
+    Joins ``artifacts`` to ``object_states`` and applies the optional
+    state/namespace/name filters from ``criteria``. On
+    ``OperationalError`` logs the full criteria at WARNING level and
+    returns an empty list.
+    """
+    engine = _get_engine()
+    table = _get_artifacts_table()
+    stmt = _build_object_filter_query(
+        table, ObjectType.ARTIFACT, criteria)
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(stmt).fetchall()
+            return [
+                ArtifactData(
+                    uuid=row.uuid,
+                    artifact_type=row.artifact_type,
+                    source_url=row.source_url,
+                    name=row.name,
+                    namespace=row.namespace,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find failed for artifacts '
+            f'(states={criteria.states!r}, '
+            f'namespace={criteria.namespace!r}, '
+            f'name={criteria.name!r}): {e}')
+        return []
+
+
 def _direct_update_artifact(data: ArtifactData) -> bool:
     """Update an artifact record in MariaDB.
 
@@ -11534,6 +11630,37 @@ def _grpc_get_all_artifacts() -> list[ArtifactData]:
         return []
 
 
+def _grpc_find_artifacts(
+        criteria: ObjectFilterCriteria) -> list[ArtifactData]:
+    """Find artifacts matching criteria via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        proto_criteria = database_pb2.ObjectFilterCriteria(
+            states=criteria.states if criteria.states is not None else []
+        )
+        if criteria.namespace is not None:
+            proto_criteria.namespace = criteria.namespace
+        if criteria.name is not None:
+            proto_criteria.name = criteria.name
+        request = database_pb2.FindArtifactsRequest(
+            criteria=proto_criteria)
+        reply = _grpc_call(stub.FindArtifacts, request)
+        return [
+            ArtifactData(
+                uuid=a.uuid,
+                artifact_type=a.artifact_type,
+                source_url=a.source_url,
+                name=a.name,
+                namespace=a.namespace,
+                version=a.version
+            )
+            for a in reply.artifacts
+        ]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC FindArtifacts failed: {e}')
+        return []
+
+
 def _grpc_update_artifact(data: ArtifactData) -> bool:
     """Update an artifact record via the database microservice."""
     try:
@@ -11817,6 +11944,21 @@ def get_all_artifacts() -> list[ArtifactData]:
     if _use_database_service():
         return _grpc_get_all_artifacts()
     return _direct_get_all_artifacts()
+
+
+def find_artifacts(
+        criteria: ObjectFilterCriteria) -> list[ArtifactData]:
+    """Find artifacts matching the given filter criteria.
+
+    Args:
+        criteria: Filter criteria (states, namespace, name).
+
+    Returns:
+        List of matching ArtifactData objects.
+    """
+    if _use_database_service():
+        return _grpc_find_artifacts(criteria)
+    return _direct_find_artifacts(criteria)
 
 
 def update_artifact(data: ArtifactData) -> bool:
@@ -12309,6 +12451,60 @@ def _direct_get_all_network_interfaces() -> list[NetworkInterfaceData]:
         return []
 
 
+def _direct_find_network_interfaces(
+        criteria: ObjectFilterCriteria) -> list[NetworkInterfaceData]:
+    """Find NetworkInterface records matching the given filter criteria.
+
+    Joins ``network_interfaces`` to ``object_states`` and applies the
+    optional state filter from ``criteria``. The ``namespace`` and
+    ``name`` filters are silently ignored because the
+    ``network_interfaces`` table has neither column. The
+    ``network_uuid`` and ``instance_uuid`` filters ARE honoured —
+    they correspond to indexed columns on the same table. On
+    ``OperationalError`` logs the full criteria at WARNING level and
+    returns an empty list.
+    """
+    engine = _get_engine()
+    table = _get_network_interfaces_table()
+    # network_interfaces has no namespace or name column; strip both
+    # before building the query to avoid WHERE clauses that would error.
+    safe_criteria = ObjectFilterCriteria(
+        states=criteria.states,
+        namespace=None,
+        name=None,
+        network_uuid=criteria.network_uuid,
+        instance_uuid=criteria.instance_uuid,
+    )
+    stmt = _build_object_filter_query(
+        table, ObjectType.INTERFACE, safe_criteria)
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(stmt).fetchall()
+            return [
+                NetworkInterfaceData(
+                    uuid=row.uuid,
+                    network_uuid=row.network_uuid,
+                    instance_uuid=row.instance_uuid,
+                    macaddr=row.macaddr,
+                    ipv4=row.ipv4,
+                    order=row.order,
+                    model=row.model,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find failed for network_interfaces '
+            f'(states={criteria.states!r}, '
+            f'namespace={criteria.namespace!r}, '
+            f'name={criteria.name!r}, '
+            f'network_uuid={criteria.network_uuid!r}, '
+            f'instance_uuid={criteria.instance_uuid!r}): {e}')
+        return []
+
+
 def _direct_delete_network_interface(ni_uuid: UUID) -> bool:
     """Delete a NetworkInterface record from MariaDB.
 
@@ -12608,6 +12804,44 @@ def _grpc_get_all_network_interfaces() -> list[NetworkInterfaceData]:
         return []
 
 
+def _grpc_find_network_interfaces(
+        criteria: ObjectFilterCriteria) -> list[NetworkInterfaceData]:
+    """Find NetworkInterface records matching criteria via the database
+    microservice."""
+    try:
+        stub = _get_database_stub()
+        proto_criteria = database_pb2.ObjectFilterCriteria(
+            states=criteria.states if criteria.states is not None else []
+        )
+        if criteria.namespace is not None:
+            proto_criteria.namespace = criteria.namespace
+        if criteria.name is not None:
+            proto_criteria.name = criteria.name
+        if criteria.network_uuid is not None:
+            proto_criteria.network_uuid = criteria.network_uuid
+        if criteria.instance_uuid is not None:
+            proto_criteria.instance_uuid = criteria.instance_uuid
+        request = database_pb2.FindNetworkInterfacesRequest(
+            criteria=proto_criteria)
+        reply = _grpc_call(stub.FindNetworkInterfaces, request)
+        return [
+            NetworkInterfaceData(
+                uuid=d.uuid,
+                network_uuid=d.network_uuid,
+                instance_uuid=d.instance_uuid,
+                macaddr=d.macaddr,
+                ipv4=d.ipv4,
+                order=d.order,
+                model=d.model or None,
+                version=d.version
+            )
+            for d in reply.network_interfaces
+        ]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC FindNetworkInterfaces failed: {e}')
+        return []
+
+
 def _grpc_delete_network_interface(ni_uuid: UUID) -> bool:
     """Delete a NetworkInterface record via the database
     microservice."""
@@ -12807,6 +13041,24 @@ def get_all_network_interfaces() -> list[NetworkInterfaceData]:
     if _use_database_service():
         return _grpc_get_all_network_interfaces()
     return _direct_get_all_network_interfaces()
+
+
+def find_network_interfaces(
+        criteria: ObjectFilterCriteria) -> list[NetworkInterfaceData]:
+    """Find NetworkInterface records matching the given filter criteria.
+
+    Args:
+        criteria: Filter criteria (states). The namespace and name
+            fields are accepted for proto-shape consistency but are
+            silently ignored because network_interfaces has neither
+            column.
+
+    Returns:
+        List of matching NetworkInterfaceData objects.
+    """
+    if _use_database_service():
+        return _grpc_find_network_interfaces(criteria)
+    return _direct_find_network_interfaces(criteria)
 
 
 def delete_network_interface(ni_uuid: UUID) -> bool:
@@ -13285,6 +13537,22 @@ def _ensure_networks_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver <= 2:
+        LOG.info(f'Upgrading {table_name} table to version 3 '
+                 '(add index on name column)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'CREATE INDEX idx_networks_name ON networks(name)'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'Index idx_networks_name already exists '
+                    f'or could not be added: {e}')
+
+        current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -13316,6 +13584,32 @@ def _ensure_network_attributes_schema(
                         f'Index {idx.name} creation skipped: {e}')
 
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < NETWORK_ATTRIBUTES_VERSION:
+        # Phase 7: drop the cached child-NI list. The
+        # ``Network.networkinterfaces`` property now queries
+        # network_interfaces live via an indexed
+        # ``WHERE network_uuid = ?``. ``DROP COLUMN IF EXISTS`` is
+        # idempotent so a re-run on a fresh deployment (where
+        # ``create_all`` never created the columns) is a no-op.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{NETWORK_ATTRIBUTES_VERSION} '
+            '(drop cached networkinterfaces columns)')
+        with engine.connect() as conn:
+            for col in (
+                    'networkinterfaces',
+                    'networkinterfaces_initialized'):
+                try:
+                    conn.execute(sa.text(
+                        f'ALTER TABLE {table_name} '
+                        f'DROP COLUMN IF EXISTS {col}'))
+                    conn.commit()
+                except (IntegrityError, OperationalError) as e:
+                    LOG.debug(
+                        f'Column {col} drop skipped: {e}')
+        current_ver = NETWORK_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -13446,6 +13740,48 @@ def _direct_get_all_networks() -> list[NetworkData]:
         return []
 
 
+def _direct_find_networks(
+        criteria: ObjectFilterCriteria) -> list[NetworkData]:
+    """Find networks matching the given filter criteria.
+
+    Joins ``networks`` to ``object_states`` and applies the optional
+    state/namespace/name filters from ``criteria``. On
+    ``OperationalError`` logs the full criteria at WARNING level and
+    returns an empty list.
+    """
+    engine = _get_engine()
+    table = _get_networks_table()
+    stmt = _build_object_filter_query(
+        table, ObjectType.NETWORK, criteria)
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(stmt).fetchall()
+            return [
+                NetworkData(
+                    uuid=row.uuid,
+                    name=row.name,
+                    namespace=row.namespace,
+                    netblock=row.netblock,
+                    provide_dhcp=row.provide_dhcp,
+                    provide_nat=row.provide_nat,
+                    provide_dns=row.provide_dns,
+                    vxid=row.vxid,
+                    egress_nic=row.egress_nic,
+                    mesh_nic=row.mesh_nic,
+                    version=row.version
+                )
+                for row in result
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find failed for networks '
+            f'(states={criteria.states!r}, '
+            f'namespace={criteria.namespace!r}, '
+            f'name={criteria.name!r}): {e}')
+        return []
+
+
 def _direct_delete_network(net_uuid: UUID) -> bool:
     """Delete a Network record from MariaDB.
 
@@ -13482,10 +13818,6 @@ def _direct_create_network_attributes(
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
                 floating_gateway=data.floating_gateway,
-                networkinterfaces=json.dumps(
-                    data.networkinterfaces),
-                networkinterfaces_initialized=(
-                    data.networkinterfaces_initialized),
                 hosteddns=json.dumps(data.hosteddns))
             conn.execute(stmt)
             conn.commit()
@@ -13514,10 +13846,6 @@ def _direct_get_network_attributes(
             if result is None:
                 return None
 
-            # Parse JSON fields
-            nis = result.networkinterfaces
-            if isinstance(nis, str):
-                nis = json.loads(nis)
             dns = result.hosteddns
             if isinstance(dns, str):
                 dns = json.loads(dns)
@@ -13525,9 +13853,6 @@ def _direct_get_network_attributes(
             return NetworkAttributesData(
                 uuid=result.uuid,
                 floating_gateway=result.floating_gateway,
-                networkinterfaces=nis if nis else [],
-                networkinterfaces_initialized=(
-                    result.networkinterfaces_initialized),
                 hosteddns=dns if dns else {},
             )
     except OperationalError as e:
@@ -13549,10 +13874,6 @@ def _direct_update_network_attributes(
                 table.c.uuid == data.uuid
             ).values(
                 floating_gateway=data.floating_gateway,
-                networkinterfaces=json.dumps(
-                    data.networkinterfaces),
-                networkinterfaces_initialized=(
-                    data.networkinterfaces_initialized),
                 hosteddns=json.dumps(data.hosteddns))
             result = conn.execute(stmt)
             conn.commit()
@@ -13673,6 +13994,42 @@ def _grpc_get_all_networks() -> list[NetworkData]:
         return []
 
 
+def _grpc_find_networks(
+        criteria: ObjectFilterCriteria) -> list[NetworkData]:
+    """Find networks matching criteria via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        proto_criteria = database_pb2.ObjectFilterCriteria(
+            states=criteria.states if criteria.states is not None else []
+        )
+        if criteria.namespace is not None:
+            proto_criteria.namespace = criteria.namespace
+        if criteria.name is not None:
+            proto_criteria.name = criteria.name
+        request = database_pb2.FindNetworksRequest(
+            criteria=proto_criteria)
+        reply = _grpc_call(stub.FindNetworks, request)
+        return [
+            NetworkData(
+                uuid=d.uuid,
+                name=d.name,
+                namespace=d.namespace or None,
+                netblock=d.netblock,
+                provide_dhcp=d.provide_dhcp,
+                provide_nat=d.provide_nat,
+                provide_dns=d.provide_dns,
+                vxid=d.vxid,
+                egress_nic=d.egress_nic or None,
+                mesh_nic=d.mesh_nic or None,
+                version=d.version
+            )
+            for d in reply.networks
+        ]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC FindNetworks failed: {e}')
+        return []
+
+
 def _grpc_delete_network(net_uuid: UUID) -> bool:
     """Delete a Network record via the database microservice."""
     try:
@@ -13697,9 +14054,6 @@ def _grpc_create_network_attributes(
                 uuid=str(data.uuid),
                 floating_gateway=(
                     data.floating_gateway or ''),
-                networkinterfaces=data.networkinterfaces,
-                networkinterfaces_initialized=(
-                    data.networkinterfaces_initialized),
                 hosteddns_json=json.dumps(data.hosteddns)))
         reply = _grpc_call(stub.CreateNetworkAttributes, request)
         return bool(reply.success)
@@ -13727,9 +14081,6 @@ def _grpc_get_network_attributes(
             floating_gateway=(
                 d.floating_gateway
                 if d.floating_gateway else None),
-            networkinterfaces=list(d.networkinterfaces),
-            networkinterfaces_initialized=(
-                d.networkinterfaces_initialized),
             hosteddns=dns,
         )
     except grpc.RpcError as e:
@@ -13749,9 +14100,6 @@ def _grpc_update_network_attributes(
                 uuid=str(data.uuid),
                 floating_gateway=(
                     data.floating_gateway or ''),
-                networkinterfaces=data.networkinterfaces,
-                networkinterfaces_initialized=(
-                    data.networkinterfaces_initialized),
                 hosteddns_json=json.dumps(data.hosteddns)))
         reply = _grpc_call(stub.UpdateNetworkAttributes, request)
         return bool(reply.success)
@@ -13820,6 +14168,21 @@ def get_all_networks() -> list[NetworkData]:
     if _use_database_service():
         return _grpc_get_all_networks()
     return _direct_get_all_networks()
+
+
+def find_networks(
+        criteria: ObjectFilterCriteria) -> list[NetworkData]:
+    """Find networks matching the given filter criteria.
+
+    Args:
+        criteria: Filter criteria (states, namespace, name).
+
+    Returns:
+        List of matching NetworkData objects.
+    """
+    if _use_database_service():
+        return _grpc_find_networks(criteria)
+    return _direct_find_networks(criteria)
 
 
 def delete_network(net_uuid: UUID) -> bool:
@@ -14524,6 +14887,22 @@ def _ensure_instances_schema(
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver <= 2:
+        LOG.info(f'Upgrading {table_name} table to version 3 '
+                 '(add index on name column)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'CREATE INDEX idx_instances_name ON instances(name)'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'Index idx_instances_name already exists '
+                    f'or could not be added: {e}')
+
+        current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -14557,7 +14936,7 @@ def _ensure_instance_attributes_schema(
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
-    if current_ver < INSTANCE_ATTRIBUTES_VERSION:
+    if current_ver < 2:
         # Add vsock_cids column (not in original v1 schema). Safe
         # to run repeatedly -- IF NOT EXISTS is a no-op when the
         # column already exists (e.g. new deployments where
@@ -14571,6 +14950,28 @@ def _ensure_instance_attributes_schema(
                 'ALTER TABLE instance_attributes '
                 'ADD COLUMN IF NOT EXISTS vsock_cids JSON NULL'))
             conn.commit()
+
+    if current_ver < INSTANCE_ATTRIBUTES_VERSION:
+        # Phase 7: drop the cached per-instance NI UUID list. The
+        # ``Instance.interfaces`` property now queries
+        # network_interfaces live via an indexed
+        # ``WHERE instance_uuid = ?``. ``DROP COLUMN IF EXISTS`` is
+        # idempotent so a re-run on a fresh deployment (where
+        # ``create_all`` never created the column) is a no-op.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{INSTANCE_ATTRIBUTES_VERSION} '
+            '(drop cached interfaces column)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'ALTER TABLE instance_attributes '
+                    'DROP COLUMN IF EXISTS interfaces'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(f'Column interfaces drop skipped: {e}')
+        current_ver = INSTANCE_ATTRIBUTES_VERSION
+        _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,
@@ -14767,6 +15168,78 @@ def _direct_get_all_instances() -> list[InstanceData]:
         return []
 
 
+def _direct_find_instances(
+        criteria: ObjectFilterCriteria) -> list[InstanceData]:
+    """Find instances matching the given filter criteria.
+
+    Joins ``instances`` to ``object_states`` and applies the optional
+    state/namespace/name filters from ``criteria``. On
+    ``OperationalError`` logs the full criteria at WARNING level and
+    returns an empty list.
+    """
+    engine = _get_engine()
+    table = _get_instances_table()
+    stmt = _build_object_filter_query(
+        table, ObjectType.INSTANCE, criteria)
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(stmt).fetchall()
+
+            results = []
+            for result in rows:
+                disk_spec = result.disk_spec
+                if isinstance(disk_spec, str):
+                    disk_spec = json.loads(disk_spec)
+
+                requested_placement = (
+                    result.requested_placement)
+                if isinstance(requested_placement, str):
+                    requested_placement = json.loads(
+                        requested_placement)
+                if not requested_placement:
+                    requested_placement = None
+
+                video = result.video
+                if isinstance(video, str):
+                    video = json.loads(video)
+
+                side_channels = result.side_channels
+                if isinstance(side_channels, str):
+                    side_channels = json.loads(side_channels)
+
+                results.append(InstanceData(
+                    uuid=result.uuid,
+                    cpus=result.cpus,
+                    disk_spec=disk_spec if disk_spec else [],
+                    memory=result.memory,
+                    name=result.name,
+                    namespace=result.namespace,
+                    requested_placement=requested_placement,
+                    ssh_key=result.ssh_key or None,
+                    user_data=result.user_data or None,
+                    video=video if video else {},
+                    uefi=result.uefi,
+                    configdrive=result.configdrive,
+                    nvram_template=(
+                        result.nvram_template or None),
+                    secure_boot=result.secure_boot,
+                    machine_type=result.machine_type,
+                    side_channels=(
+                        side_channels
+                        if side_channels else []),
+                    version=result.version
+                ))
+            return results
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find failed for instances '
+            f'(states={criteria.states!r}, '
+            f'namespace={criteria.namespace!r}, '
+            f'name={criteria.name!r}): {e}')
+        return []
+
+
 def _direct_get_all_instance_uuids() -> list[str]:
     """Get all instance UUIDs from MariaDB.
 
@@ -14829,7 +15302,6 @@ def _direct_create_instance_attributes(
                     data.enforced_deletes),
                 block_devices=_json_dumps(
                     data.block_devices),
-                interfaces=_json_dumps(data.interfaces),
                 agent_state=_json_dumps(data.agent_state),
                 agent_attributes=_json_dumps(
                     data.agent_attributes),
@@ -14878,7 +15350,6 @@ def _direct_get_instance_attributes(
                 result.enforced_deletes)
             block_devices = _parse_json(
                 result.block_devices)
-            interfaces = _parse_json(result.interfaces)
             agent_state = _parse_json(result.agent_state)
             agent_attributes = _parse_json(
                 result.agent_attributes)
@@ -14893,8 +15364,6 @@ def _direct_get_instance_attributes(
                 ports=ports,
                 enforced_deletes=enforced_deletes,
                 block_devices=block_devices,
-                interfaces=(
-                    interfaces if interfaces else []),
                 agent_state=agent_state,
                 agent_attributes=agent_attributes,
                 agent_operations=agent_operations,
@@ -14928,7 +15397,6 @@ def _direct_update_instance_attributes(
                     data.enforced_deletes),
                 block_devices=_json_dumps(
                     data.block_devices),
-                interfaces=_json_dumps(data.interfaces),
                 agent_state=_json_dumps(data.agent_state),
                 agent_attributes=_json_dumps(
                     data.agent_attributes),
@@ -15188,6 +15656,60 @@ def _grpc_get_all_instances() -> list[InstanceData]:
         return []
 
 
+def _grpc_find_instances(
+        criteria: ObjectFilterCriteria) -> list[InstanceData]:
+    """Find instances matching criteria via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        proto_criteria = database_pb2.ObjectFilterCriteria(
+            states=criteria.states if criteria.states is not None else []
+        )
+        if criteria.namespace is not None:
+            proto_criteria.namespace = criteria.namespace
+        if criteria.name is not None:
+            proto_criteria.name = criteria.name
+        request = database_pb2.FindInstancesRequest(
+            criteria=proto_criteria)
+        reply = _grpc_call(stub.FindInstances, request)
+        results = []
+        for d in reply.instances:
+            disk_spec = (json.loads(d.disk_spec_json)
+                         if d.disk_spec_json else [])
+            requested_placement = (
+                json.loads(d.requested_placement_json)
+                if d.requested_placement_json else None)
+            if not requested_placement:
+                requested_placement = None
+            video = (json.loads(d.video_json)
+                     if d.video_json else {})
+            side_channels = (
+                json.loads(d.side_channels_json)
+                if d.side_channels_json else [])
+            results.append(InstanceData(
+                uuid=d.uuid,
+                cpus=d.cpus,
+                disk_spec=disk_spec,
+                memory=d.memory,
+                name=d.name,
+                namespace=d.namespace,
+                requested_placement=requested_placement,
+                ssh_key=d.ssh_key or None,
+                user_data=d.user_data or None,
+                video=video,
+                uefi=d.uefi,
+                configdrive=d.configdrive,
+                nvram_template=d.nvram_template or None,
+                secure_boot=d.secure_boot,
+                machine_type=d.machine_type,
+                side_channels=side_channels,
+                version=d.version
+            ))
+        return results
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC FindInstances failed: {e}')
+        return []
+
+
 def _grpc_get_all_instance_uuids() -> list[str]:
     """Get all instance UUIDs via the database service."""
     try:
@@ -15233,8 +15755,6 @@ def _grpc_create_instance_attributes(
                     data.enforced_deletes),
                 block_devices_json=_json_dumps(
                     data.block_devices),
-                interfaces_json=_json_dumps(
-                    data.interfaces),
                 agent_state_json=_json_dumps(
                     data.agent_state),
                 agent_attributes_json=_json_dumps(
@@ -15271,7 +15791,6 @@ def _grpc_get_instance_attributes(
         def _parse(val: str) -> Any:
             return json.loads(val) if val else None
 
-        interfaces = _parse(d.interfaces_json)
         return InstanceAttributesData(
             uuid=d.uuid,
             placement=_parse(d.placement_json),
@@ -15281,8 +15800,6 @@ def _grpc_get_instance_attributes(
                 d.enforced_deletes_json),
             block_devices=_parse(
                 d.block_devices_json),
-            interfaces=(
-                interfaces if interfaces else []),
             agent_state=_parse(d.agent_state_json),
             agent_attributes=_parse(
                 d.agent_attributes_json),
@@ -15316,8 +15833,6 @@ def _grpc_update_instance_attributes(
                     data.enforced_deletes),
                 block_devices_json=_json_dumps(
                     data.block_devices),
-                interfaces_json=_json_dumps(
-                    data.interfaces),
                 agent_state_json=_json_dumps(
                     data.agent_state),
                 agent_attributes_json=_json_dumps(
@@ -15432,6 +15947,21 @@ def get_all_instances() -> list[InstanceData]:
     if _use_database_service():
         return _grpc_get_all_instances()
     return _direct_get_all_instances()
+
+
+def find_instances(
+        criteria: ObjectFilterCriteria) -> list[InstanceData]:
+    """Find instances matching the given filter criteria.
+
+    Args:
+        criteria: Filter criteria (states, namespace, name).
+
+    Returns:
+        List of matching InstanceData objects.
+    """
+    if _use_database_service():
+        return _grpc_find_instances(criteria)
+    return _direct_find_instances(criteria)
 
 
 def get_all_instance_uuids() -> list[str]:

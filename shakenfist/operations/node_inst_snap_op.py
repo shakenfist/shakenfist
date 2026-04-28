@@ -176,7 +176,12 @@ class NodeInstSnapOp(BaseClusterOperation):
                 return
 
             try:
-                a.add_index(b.uuid)
+                # User-initiated snapshots must always create a new index,
+                # even if the disk content is identical to the previous
+                # snapshot. Otherwise the blob_uuid returned by POST
+                # /snapshot would never appear in GET /snapshot, and the
+                # client would block waiting for it.
+                a.add_index(b.uuid, force=True)
                 a.state = Artifact.STATE_CREATED
             except BlobDeleted:
                 if a.state.value != Artifact.STATE_DELETED:

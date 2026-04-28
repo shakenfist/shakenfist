@@ -80,8 +80,20 @@ def _process_per_blob_queue(execution_limit=10):
         processed += 1
 
         if b.ref_count == 0:
+            # Grace period prevents racing freshly-registered blobs whose
+            # owning reference (e.g. an artifact_index) has not yet been
+            # written. snapshot_disk() registers the blob before the
+            # snapshot operation calls Artifact.add_index, so the per-blob
+            # queue can pick the blob up in that window. Mirror the
+            # cluster_wide_cleanup grace period in main.py.
+            last_used = b.last_used or b.fetched_at
+            age = time.time() - last_used
+            if age <= 300:
+                continue
             b.add_event(
-                EVENT_TYPE_AUDIT, 'deleting blob with reference count of 0')
+                EVENT_TYPE_AUDIT,
+                'deleting blob with reference count of 0',
+                extra={'last_used': last_used, 'age': age})
             b.state = Blob.STATE_DELETED
             continue
 

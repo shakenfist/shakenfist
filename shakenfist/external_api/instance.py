@@ -563,6 +563,9 @@ class InstancesEndpoint(api_base.Resource):
             if not n:
                 return sf_api.error(
                     404, f'Specified node {placed_on} does not exist')
+            # Normalize to UUID so the scheduler can match against its
+            # UUID-keyed metrics dict.
+            placed_on = str(n.uuid)
             node_state = n.state.value
             if node_state != Node.STATE_CREATED:
                 n.add_event(
@@ -694,7 +697,6 @@ class InstancesEndpoint(api_base.Resource):
                     'original_template': original_template,
                     'blob': nvram_template
                 }).info('NVRAM template URL converted')
-                nvram_template = blob_uuid
 
         # We no longer support IDE.
         for d in disk:
@@ -783,8 +785,8 @@ class InstancesEndpoint(api_base.Resource):
                 'networks': updated_networks
             })
 
-        # Store interfaces soon as they are allocated to the instance
-        inst.interfaces = [i['iface_uuid'] for i in updated_networks]
+        # The NetworkInterface rows allocated above carry instance_uuid
+        # already; the query-backed ``interfaces`` property finds them.
 
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
@@ -825,6 +827,9 @@ class InstancesEndpoint(api_base.Resource):
                     url = f'{BLOB_URL}{disk["blob_uuid"]}'
                 elif not util_general.noneish(disk_base):
                     url = disk['base']
+                else:
+                    # Empty disk with no base image, no artifact fetch needed
+                    continue
 
                 # TODO(mikal): I would really like the target_node not to be set
                 # here so that any node in the cluster could start downloading
@@ -890,7 +895,7 @@ class InstancesEndpoint(api_base.Resource):
             namespace = request_namespace()
 
         waiting_for = []
-        for inst in instance.Instances([partial(baseobject.namespace_filter, namespace)]):
+        for inst in instance.Instances(namespace=namespace):
             inst.add_event(
                 EVENT_TYPE_AUDIT, 'delete request via delete all from REST API')
             inst.enqueue_delete()
@@ -944,13 +949,7 @@ class InstanceInterfacesEndpoint(api_base.Resource):
     @api_base.requires_instance_ownership
     @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
-        out = []
-        for iface_uuid in instance_from_db.interfaces:
-            ni, _, err = api_util.safe_get_network_interface(iface_uuid)
-            if err:
-                return err
-            out.append(ni.external_view())
-        return out
+        return [ni.external_view() for ni in instance_from_db.interfaces]
 
     @swag_from(api_base.swagger_helper(
         'instances', 'Create a new network interface on an instance',
@@ -982,14 +981,10 @@ class InstanceInterfacesEndpoint(api_base.Resource):
             return err
 
         ifaces = instance_from_db.interfaces
-        if not ifaces or len(ifaces) == 0:
+        if not ifaces:
             order = 0
         else:
-            last_iface_uuid = ifaces[-1]
-            last_iface = NetworkInterface.from_db(last_iface_uuid)
-            if not last_iface:
-                return sf_api.error(406, 'instance interfae list invalid')
-            order = last_iface.order + 1
+            order = max(ni.order for ni in ifaces) + 1
 
         netdesc, err = _netdesc_allocate_address(
             instance_from_db, network, order)
@@ -1017,7 +1012,8 @@ class InstanceInterfacesEndpoint(api_base.Resource):
             ],
             runs_after=[instance_from_db.last_cluster_operation])
         instance_from_db.set_last_cluster_operation(op_type, op_uuid)
-        instance_from_db.interfaces_append(netdesc['iface_uuid'])
+        # The NetworkInterface row created above is the source of truth
+        # for the instance->NI association; no further bookkeeping needed.
 
         return NetworkInterface.from_db(netdesc['iface_uuid']).external_view()
 

@@ -7,7 +7,6 @@ from shakenfist.daemons import daemon
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.network import network
-from shakenfist.network.interface import NetworkInterface
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -36,11 +35,7 @@ class Job(util_concurrency.Job):
             for n in network.Networks([], prefilter='active'):
                 try:
                     t = time.time()
-                    for ni_uuid in n.networkinterfaces:
-                        ni = NetworkInterface.from_db(ni_uuid)
-                        if not ni:
-                            continue
-
+                    for ni in n.networkinterfaces:
                         inst = instance.Instance.from_db(ni.instance_uuid)
                         if not inst:
                             ni.delete()

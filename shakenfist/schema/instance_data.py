@@ -68,8 +68,8 @@ class InstanceData(BaseModel):
     # Memory in MB
     memory: int
 
-    # Human-readable instance name
-    name: str
+    # Human-readable instance name (indexed for name-lookup queries)
+    name: Annotated[str, SQLIndex()]
 
     # Tenant namespace (indexed for filtered listings)
     namespace: Annotated[str, SQLIndex()]

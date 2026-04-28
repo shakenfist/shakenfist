@@ -16,6 +16,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.eventlog import add_event
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import access_tokens
 from shakenfist.util import callstack as util_callstack
@@ -260,35 +261,28 @@ class Namespace(dbo):
 class Namespaces(dbo_iter):
     base_object = Namespace
 
+    def _resolve_prefilter_to_states(self) -> set[str]:
+        """Preserve the pre-phase-5 behaviour: when no prefilter is set,
+        do not filter on state (return every namespace). The base-class
+        default of ACTIVE_STATES is used when a prefilter is explicitly given.
+        """
+        if self.prefilter is None:
+            return set()
+        return super()._resolve_prefilter_to_states()
+
     def __iter__(self):
-        all_names = mariadb.get_all_namespace_names()
-
-        # Apply state prefilter if specified
-        if self.prefilter:
-            if self.prefilter == 'active':
-                target_states = self.base_object.ACTIVE_STATES
-            elif self.prefilter == 'deleted':
-                target_states = [dbo.STATE_DELETED]
-            elif self.prefilter == 'healthy':
-                target_states = self.base_object.HEALTHY_STATES
-            elif self.prefilter == 'inactive':
-                target_states = self.base_object.INACTIVE_STATES
-            else:
-                # Late import to avoid circular imports
-                from shakenfist import exceptions
-                raise exceptions.InvalidObjectPrefilter(self.prefilter)
-
-            matching = mariadb.get_objects_by_state(
-                ObjectType.NAMESPACE, list(target_states))
-            if matching is not None:
-                matching = set(matching)
-                all_names = [n for n in all_names if n in matching]
-
-        for name in all_names:
-            n = Namespace.from_db(name)
+        # NamespaceData has no .uuid attribute (namespace uses name as
+        # primary key), so we iterate _find directly rather than going
+        # through get_iterator() which assumes a .uuid field on the data.
+        # Sort by name for stable output — the pre-phase-5 path used
+        # mariadb.get_all_namespace_names() which returned names in
+        # alphabetical order, and at least one REST test asserts that.
+        target_states = self._resolve_prefilter_to_states()
+        criteria = ObjectFilterCriteria(states=list(target_states), namespace=None)
+        for data in sorted(self._find(criteria), key=lambda d: d.name):
+            n = Namespace(data)
             if not n:
                 continue
-
             out = self.apply_filters(n)
             if out:
                 yield out

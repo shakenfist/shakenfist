@@ -623,34 +623,20 @@ class Node(dbo):
 class Nodes(dbo_iter):
     base_object = Node
 
+    def _resolve_prefilter_to_states(self) -> set[str]:
+        """Preserve the pre-phase-5 behaviour: when no prefilter is set,
+        do not filter on state (return every node). The base-class default
+        of ACTIVE_STATES is used when a prefilter is explicitly given.
+        """
+        if self.prefilter is None:
+            return set()
+        return super()._resolve_prefilter_to_states()
+
     def __iter__(self):
-        all_uuids = mariadb.get_all_node_uuids()
-
-        # Apply state prefilter if specified
-        if self.prefilter:
-            if self.prefilter == 'active':
-                target_states = self.base_object.ACTIVE_STATES
-            elif self.prefilter == 'deleted':
-                target_states = [dbo.STATE_DELETED]
-            elif self.prefilter == 'healthy':
-                target_states = self.base_object.HEALTHY_STATES
-            elif self.prefilter == 'inactive':
-                target_states = self.base_object.INACTIVE_STATES
-            else:
-                from shakenfist import exceptions
-                raise exceptions.InvalidObjectPrefilter(self.prefilter)
-
-            matching = mariadb.get_objects_by_state(
-                ObjectType.NODE, list(target_states))
-            if matching is not None:
-                matching = set(matching)
-                all_uuids = [u for u in all_uuids if u in matching]
-
-        for node_uuid in all_uuids:
-            n = Node.from_db(node_uuid)
+        for _, data in self.get_iterator():
+            n = Node(data)
             if not n:
                 continue
-
             out = self.apply_filters(n)
             if out:
                 yield out

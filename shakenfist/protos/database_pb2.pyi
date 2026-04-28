@@ -3042,6 +3042,86 @@ class GetAllArtifactsReply(google.protobuf.message.Message):
 global___GetAllArtifactsReply = GetAllArtifactsReply
 
 @typing.final
+class ObjectFilterCriteria(google.protobuf.message.Message):
+    """ObjectFilterCriteria is a shared filter used by Find* RPCs.
+    Empty repeated / absent optional means "don't filter on this field".
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STATES_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    INSTANCE_UUID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """absent = don't filter"""
+    name: builtins.str
+    """absent = don't filter"""
+    network_uuid: builtins.str
+    """absent = don't filter (network_interfaces only)"""
+    instance_uuid: builtins.str
+    """absent = don't filter (network_interfaces only)"""
+    @property
+    def states(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """empty = don't filter"""
+
+    def __init__(
+        self,
+        *,
+        states: collections.abc.Iterable[builtins.str] | None = ...,
+        namespace: builtins.str | None = ...,
+        name: builtins.str | None = ...,
+        network_uuid: builtins.str | None = ...,
+        instance_uuid: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_instance_uuid", b"_instance_uuid", "_name", b"_name", "_namespace", b"_namespace", "_network_uuid", b"_network_uuid", "instance_uuid", b"instance_uuid", "name", b"name", "namespace", b"namespace", "network_uuid", b"network_uuid"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_instance_uuid", b"_instance_uuid", "_name", b"_name", "_namespace", b"_namespace", "_network_uuid", b"_network_uuid", "instance_uuid", b"instance_uuid", "name", b"name", "namespace", b"namespace", "network_uuid", b"network_uuid", "states", b"states"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_instance_uuid", b"_instance_uuid"]) -> typing.Literal["instance_uuid"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_name", b"_name"]) -> typing.Literal["name"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_namespace", b"_namespace"]) -> typing.Literal["namespace"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_network_uuid", b"_network_uuid"]) -> typing.Literal["network_uuid"] | None: ...
+
+global___ObjectFilterCriteria = ObjectFilterCriteria
+
+@typing.final
+class FindArtifactsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CRITERIA_FIELD_NUMBER: builtins.int
+    @property
+    def criteria(self) -> global___ObjectFilterCriteria: ...
+    def __init__(
+        self,
+        *,
+        criteria: global___ObjectFilterCriteria | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["criteria", b"criteria"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["criteria", b"criteria"]) -> None: ...
+
+global___FindArtifactsRequest = FindArtifactsRequest
+
+@typing.final
+class FindArtifactsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ARTIFACTS_FIELD_NUMBER: builtins.int
+    @property
+    def artifacts(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ArtifactStaticData]: ...
+    def __init__(
+        self,
+        *,
+        artifacts: collections.abc.Iterable[global___ArtifactStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["artifacts", b"artifacts"]) -> None: ...
+
+global___FindArtifactsReply = FindArtifactsReply
+
+@typing.final
 class UpdateArtifactRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3496,6 +3576,39 @@ class GetAllNetworkInterfacesRequest(google.protobuf.message.Message):
 global___GetAllNetworkInterfacesRequest = GetAllNetworkInterfacesRequest
 
 @typing.final
+class FindNetworkInterfacesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CRITERIA_FIELD_NUMBER: builtins.int
+    @property
+    def criteria(self) -> global___ObjectFilterCriteria: ...
+    def __init__(
+        self,
+        *,
+        criteria: global___ObjectFilterCriteria | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["criteria", b"criteria"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["criteria", b"criteria"]) -> None: ...
+
+global___FindNetworkInterfacesRequest = FindNetworkInterfacesRequest
+
+@typing.final
+class FindNetworkInterfacesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORK_INTERFACES_FIELD_NUMBER: builtins.int
+    @property
+    def network_interfaces(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NetworkInterfaceStaticData]: ...
+    def __init__(
+        self,
+        *,
+        network_interfaces: collections.abc.Iterable[global___NetworkInterfaceStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["network_interfaces", b"network_interfaces"]) -> None: ...
+
+global___FindNetworkInterfacesReply = FindNetworkInterfacesReply
+
+@typing.final
 class DeleteNetworkInterfaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3893,6 +4006,39 @@ class GetAllNetworksReply(google.protobuf.message.Message):
 global___GetAllNetworksReply = GetAllNetworksReply
 
 @typing.final
+class FindNetworksRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CRITERIA_FIELD_NUMBER: builtins.int
+    @property
+    def criteria(self) -> global___ObjectFilterCriteria: ...
+    def __init__(
+        self,
+        *,
+        criteria: global___ObjectFilterCriteria | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["criteria", b"criteria"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["criteria", b"criteria"]) -> None: ...
+
+global___FindNetworksRequest = FindNetworksRequest
+
+@typing.final
+class FindNetworksReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NETWORKS_FIELD_NUMBER: builtins.int
+    @property
+    def networks(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NetworkStaticData]: ...
+    def __init__(
+        self,
+        *,
+        networks: collections.abc.Iterable[global___NetworkStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["networks", b"networks"]) -> None: ...
+
+global___FindNetworksReply = FindNetworksReply
+
+@typing.final
 class DeleteNetworkRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3917,31 +4063,21 @@ class NetworkAttributesProto(google.protobuf.message.Message):
 
     UUID_FIELD_NUMBER: builtins.int
     FLOATING_GATEWAY_FIELD_NUMBER: builtins.int
-    NETWORKINTERFACES_FIELD_NUMBER: builtins.int
-    NETWORKINTERFACES_INITIALIZED_FIELD_NUMBER: builtins.int
     HOSTEDDNS_JSON_FIELD_NUMBER: builtins.int
     uuid: builtins.str
     """References networks.uuid"""
     floating_gateway: builtins.str
     """Floating IP gateway (empty = None)"""
-    networkinterfaces_initialized: builtins.bool
-    """Whether NI list has been populated"""
     hosteddns_json: builtins.str
     """JSON-encoded {name: address} dict"""
-    @property
-    def networkinterfaces(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """List of NI UUIDs"""
-
     def __init__(
         self,
         *,
         uuid: builtins.str = ...,
         floating_gateway: builtins.str = ...,
-        networkinterfaces: collections.abc.Iterable[builtins.str] | None = ...,
-        networkinterfaces_initialized: builtins.bool = ...,
         hosteddns_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["floating_gateway", b"floating_gateway", "hosteddns_json", b"hosteddns_json", "networkinterfaces", b"networkinterfaces", "networkinterfaces_initialized", b"networkinterfaces_initialized", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["floating_gateway", b"floating_gateway", "hosteddns_json", b"hosteddns_json", "uuid", b"uuid"]) -> None: ...
 
 global___NetworkAttributesProto = NetworkAttributesProto
 
@@ -4409,6 +4545,39 @@ class GetAllInstancesReply(google.protobuf.message.Message):
 global___GetAllInstancesReply = GetAllInstancesReply
 
 @typing.final
+class FindInstancesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CRITERIA_FIELD_NUMBER: builtins.int
+    @property
+    def criteria(self) -> global___ObjectFilterCriteria: ...
+    def __init__(
+        self,
+        *,
+        criteria: global___ObjectFilterCriteria | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["criteria", b"criteria"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["criteria", b"criteria"]) -> None: ...
+
+global___FindInstancesRequest = FindInstancesRequest
+
+@typing.final
+class FindInstancesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INSTANCES_FIELD_NUMBER: builtins.int
+    @property
+    def instances(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___InstanceStaticData]: ...
+    def __init__(
+        self,
+        *,
+        instances: collections.abc.Iterable[global___InstanceStaticData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["instances", b"instances"]) -> None: ...
+
+global___FindInstancesReply = FindInstancesReply
+
+@typing.final
 class GetAllInstanceUuidsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4464,7 +4633,6 @@ class InstanceAttributesProto(google.protobuf.message.Message):
     PORTS_JSON_FIELD_NUMBER: builtins.int
     ENFORCED_DELETES_JSON_FIELD_NUMBER: builtins.int
     BLOCK_DEVICES_JSON_FIELD_NUMBER: builtins.int
-    INTERFACES_JSON_FIELD_NUMBER: builtins.int
     AGENT_STATE_JSON_FIELD_NUMBER: builtins.int
     AGENT_ATTRIBUTES_JSON_FIELD_NUMBER: builtins.int
     AGENT_OPERATIONS_JSON_FIELD_NUMBER: builtins.int
@@ -4483,8 +4651,6 @@ class InstanceAttributesProto(google.protobuf.message.Message):
     """JSON: {count}"""
     block_devices_json: builtins.str
     """JSON: {devices, extracommands, finalized}"""
-    interfaces_json: builtins.str
-    """JSON: list of NI UUIDs"""
     agent_state_json: builtins.str
     """JSON: {value, update_time}"""
     agent_attributes_json: builtins.str
@@ -4506,7 +4672,6 @@ class InstanceAttributesProto(google.protobuf.message.Message):
         ports_json: builtins.str = ...,
         enforced_deletes_json: builtins.str = ...,
         block_devices_json: builtins.str = ...,
-        interfaces_json: builtins.str = ...,
         agent_state_json: builtins.str = ...,
         agent_attributes_json: builtins.str = ...,
         agent_operations_json: builtins.str = ...,
@@ -4514,7 +4679,7 @@ class InstanceAttributesProto(google.protobuf.message.Message):
         error_message: builtins.str = ...,
         vsock_cids_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["agent_attributes_json", b"agent_attributes_json", "agent_operations_json", b"agent_operations_json", "agent_state_json", b"agent_state_json", "block_devices_json", b"block_devices_json", "enforced_deletes_json", b"enforced_deletes_json", "error_message", b"error_message", "interfaces_json", b"interfaces_json", "kvm_pid", b"kvm_pid", "placement_json", b"placement_json", "ports_json", b"ports_json", "power_state_json", b"power_state_json", "uuid", b"uuid", "vsock_cids_json", b"vsock_cids_json"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_attributes_json", b"agent_attributes_json", "agent_operations_json", b"agent_operations_json", "agent_state_json", b"agent_state_json", "block_devices_json", b"block_devices_json", "enforced_deletes_json", b"enforced_deletes_json", "error_message", b"error_message", "kvm_pid", b"kvm_pid", "placement_json", b"placement_json", "ports_json", b"ports_json", "power_state_json", b"power_state_json", "uuid", b"uuid", "vsock_cids_json", b"vsock_cids_json"]) -> None: ...
 
 global___InstanceAttributesProto = InstanceAttributesProto
 

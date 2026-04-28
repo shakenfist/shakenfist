@@ -60,7 +60,7 @@ class NetworkData(BaseModel):
     uuid: Annotated[UUID4, SQLNativeUUID()]
 
     # Human-readable network name
-    name: str
+    name: Annotated[str, SQLIndex()]
 
     # The namespace this network belongs to (nullable, indexed for
     # filtered listings)

@@ -388,3 +388,123 @@ class TestTypoedLabel(base.BaseNamespacedTestCase):
                               }
                           ],
                           None, None)
+
+
+class TestArtifactLookupByName(base.BaseNamespacedTestCase):
+    """Functional tests for Artifact.from_db_by_ref name-based lookup.
+
+    These tests verify the behaviour added in phase 2 of the SQL pushdown
+    filtering plan (PLAN-sql-pushdown-filtering-phase-02-artifact.md):
+
+    A) Same-name-different-namespace: each namespace resolves its own artifact.
+    B) System-namespace cross-visibility: the system client sees at least one
+       of the two artifacts when querying by the shared name.
+    C) Same-name-same-namespace: skipped because the REST creation path
+       de-duplicates on source_url (which embeds the namespace and name), so
+       two live artifacts with the identical (namespace, name) pair cannot be
+       created via the REST API. See open question #1 in the plan.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'artlookup'
+        super().__init__(*args, **kwargs)
+
+    def _upload_tiny_artifact(self, client, artifact_name):
+        """Upload a 16-byte placeholder blob and convert it to a named artifact.
+
+        Returns the artifact dict returned by the server.
+        """
+        # Create the upload slot
+        up = client.create_upload()
+        upload_uuid = up['uuid']
+        self.addDetail(
+            'upload_uuid_%s' % artifact_name,
+            content.text_content(upload_uuid))
+
+        # Send a tiny placeholder payload (16 null bytes)
+        client.send_upload(upload_uuid, b'\x00' * 16)
+
+        # Convert the upload to a named artifact
+        art = client.upload_artifact(artifact_name, upload_uuid)
+        self.addDetail(
+            'artifact_%s' % artifact_name,
+            content.text_content(json.dumps(art, indent=4, sort_keys=True)))
+        return art
+
+    def test_same_name_different_namespace(self):
+        """Part A: two namespaces each own an artifact called 'shared-name'.
+
+        get_artifact('shared-name') from each namespace's client must return
+        the artifact that belongs to *that* namespace (verified by UUID).
+        """
+        artifact_name = 'shared-name'
+
+        # Create a second namespace alongside the one provided by the base class
+        ns_b_name = self.namespace + '-b'
+        ns_b_key = self._uniquifier()
+        client_b = self._make_namespace(ns_b_name, ns_b_key)
+
+        try:
+            # Upload the same-named artifact in namespace A (self.namespace)
+            art_a = self._upload_tiny_artifact(self.test_client, artifact_name)
+            self.addDetail(
+                'art_a_uuid', content.text_content(art_a['uuid']))
+
+            # Upload the same-named artifact in namespace B
+            art_b = self._upload_tiny_artifact(client_b, artifact_name)
+            self.addDetail(
+                'art_b_uuid', content.text_content(art_b['uuid']))
+
+            # The two artifacts must be distinct objects
+            self.assertNotEqual(
+                art_a['uuid'], art_b['uuid'],
+                'Expected different UUIDs for same name in different namespaces')
+
+            # Part A: each namespace client resolves its own artifact by name
+            resolved_a = self.test_client.get_artifact(artifact_name)
+            self.addDetail(
+                'resolved_a', content.text_content(
+                    json.dumps(resolved_a, indent=4, sort_keys=True)))
+            self.assertEqual(
+                art_a['uuid'], resolved_a['uuid'],
+                'Namespace A client should resolve to its own artifact')
+
+            resolved_b = client_b.get_artifact(artifact_name)
+            self.addDetail(
+                'resolved_b', content.text_content(
+                    json.dumps(resolved_b, indent=4, sort_keys=True)))
+            self.assertEqual(
+                art_b['uuid'], resolved_b['uuid'],
+                'Namespace B client should resolve to its own artifact')
+
+            # Part B: system-namespace cross-visibility.
+            #
+            # When the system client queries by name both artifacts match
+            # (namespace='system' means no namespace filter). The current
+            # from_db_by_ref raises MultipleObjects in that situation;
+            # external_api/artifact.py:arg_is_artifact_ref wraps that as a
+            # 400 RequestMalformedException. We assert the no-404 outcome:
+            # either a 400 (ambiguous) or a 200 (first match silently
+            # returned) are acceptable here. A 404 would be a regression.
+            try:
+                resolved_sys = self.system_client.get_artifact(artifact_name)
+                # If we reach here the API returned one result silently.
+                # Assert it is one of the two known UUIDs.
+                self.addDetail(
+                    'resolved_sys', content.text_content(
+                        json.dumps(resolved_sys, indent=4, sort_keys=True)))
+                self.assertIn(
+                    resolved_sys['uuid'],
+                    {art_a['uuid'], art_b['uuid']},
+                    'System client resolved an unexpected artifact UUID')
+            except apiclient.RequestMalformedException:
+                # This is the expected path after phase 2: the API surfaces
+                # MultipleObjects as a 400 when the system client sees both.
+                pass
+
+        finally:
+            # Clean up namespace B (namespace A is cleaned up by tearDown)
+            try:
+                self.system_client.delete_namespace(ns_b_name)
+            except apiclient.ResourceNotFoundException:
+                pass

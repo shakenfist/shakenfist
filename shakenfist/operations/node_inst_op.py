@@ -12,7 +12,6 @@ from shakenfist.instance import Instances
 from shakenfist.instance import this_node_filter
 from shakenfist.network.network import Network
 from shakenfist.network.interface import interfaces_for_instance
-from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import exceptions as util_exceptions
@@ -216,9 +215,8 @@ class NodeInstOp(BaseClusterOperation):
             host_networks = []
             for i in Instances([this_node_filter], prefilter='active'):
                 if not i.uuid == inst.uuid:
-                    for iface_uuid in inst.interfaces:
-                        ni = NetworkInterface.from_db(iface_uuid)
-                        if ni and ni.network_uuid not in host_networks:
+                    for ni in i.interfaces:
+                        if ni.network_uuid not in host_networks:
                             host_networks.append(ni.network_uuid)
 
             inst.delete()

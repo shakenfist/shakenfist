@@ -98,7 +98,7 @@ def get_eventlog_client() -> grpc.Channel:
         local.sf_eventlog_client = grpc.insecure_channel(
             f'{config.EVENTLOG_NODE_IP}:{config.EVENTLOG_API_PORT}',
             options=[
-                ('keepalive_timeout_ms', 200),
+                ('grpc.keepalive_timeout_ms', 200),
                 ('grpc.http2.max_pings_without_data', 0),
                 ('grpc.keepalive_permit_without_calls', 1),
             ]

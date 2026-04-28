@@ -100,23 +100,13 @@ def restore_instances():
     instances = []
     for inst in instance.Instances([instance.this_node_filter], prefilter='healthy'):
         instance_problems = []
-        inst_interfaces = inst.interfaces
-        if not inst_interfaces:
-            inst_interfaces = []
-        updated_interfaces = False
 
+        # ``inst.interfaces`` queries network_interfaces live, so the
+        # cache-sync block that used to maintain a denormalised list
+        # here is no longer needed.
         for ni in interfaces_for_instance(inst):
             if ni.network_uuid not in networks:
                 networks.append(ni.network_uuid)
-            if ni.uuid not in inst_interfaces:
-                inst_interfaces.append(ni.uuid)
-                updated_interfaces = True
-
-        # We do not need a lock here because this loop only runs on the node
-        # with the instance, and interfaces don't change post instance
-        # creation.
-        if updated_interfaces:
-            inst.interfaces = inst_interfaces
 
         # TODO(mikal): do better here.
         # for disk in inst.disk_spec:

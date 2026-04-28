@@ -192,7 +192,10 @@ class NetworkInterface(dbo):
         if not n:
             raise exceptions.NetworkMissing(
                 'No such network: %s' % netdesc['network_uuid'])
-        n.add_networkinterface(ni)
+        # The NetworkInterface row itself is the source of truth for
+        # the association; the network-side list is queried live.
+        n.add_event(EVENT_TYPE_MUTATE, 'add networkinterface',
+                    extra={'networkinterface': str(ni.uuid)})
 
         return ni
 
@@ -296,7 +299,9 @@ class NetworkInterface(dbo):
         if n:
             if self.ipv4:
                 n.ipam.release(self.ipv4)
-            n.remove_networkinterface(self)
+            n.remove_networkinterface_lease(self)
+            n.add_event(EVENT_TYPE_MUTATE, 'remove networkinterface',
+                        extra={'networkinterface': str(self.uuid)})
 
         self.state = dbo.STATE_DELETED
 
@@ -309,54 +314,29 @@ class NetworkInterface(dbo):
 class NetworkInterfaces(dbo_iter):
     base_object = NetworkInterface
 
-    def get_iterator(self):
-        if self.prefilter:
-            if self.prefilter == 'active':
-                target_states = NetworkInterface.ACTIVE_STATES
-            elif self.prefilter == 'deleted':
-                target_states = [dbo.STATE_DELETED]
-            elif self.prefilter == 'healthy':
-                target_states = NetworkInterface.HEALTHY_STATES
-            elif self.prefilter == 'inactive':
-                target_states = NetworkInterface.INACTIVE_STATES
-            else:
-                raise exceptions.InvalidObjectPrefilter(
-                    self.prefilter)
+    def _resolve_prefilter_to_states(self):
+        # Preserve the pre-phase-5 NetworkInterfaces override behaviour:
+        # when no prefilter is set, do not filter on state (return every
+        # network interface and let predicate filters scope). The base
+        # class default of ACTIVE_STATES is kept for other inheritors.
+        if self.prefilter is None:
+            return set()
+        return super()._resolve_prefilter_to_states()
 
-            matching_uuids_list = mariadb.get_objects_by_state(
-                NetworkInterface.object_type, list(target_states))
+    def _find(self, criteria):
+        return mariadb.find_network_interfaces(criteria)
 
-            if matching_uuids_list is None:
-                LOG.warning('get_objects_by_state returned None for '
-                            'network_interfaces, falling back to full scan')
-                for data in mariadb.get_all_network_interfaces():
-                    yield (str(data.uuid),
-                           NetworkInterface._static_values_to_dict(data))
-                return
-
-            matching_uuids = set(matching_uuids_list)
-
-            results = []
-            for data in mariadb.get_all_network_interfaces():
-                if str(data.uuid) in matching_uuids:
-                    results.append(
-                        (str(data.uuid),
-                         NetworkInterface._static_values_to_dict(data)))
-            yield from results
-        else:
-            for data in mariadb.get_all_network_interfaces():
-                yield (str(data.uuid),
-                       NetworkInterface._static_values_to_dict(data))
+    def _to_static_values(self, data):
+        return NetworkInterface._static_values_to_dict(data)
 
     def __iter__(self):
         for _, static_values in self.get_iterator():
             ni = NetworkInterface(static_values)
             if not ni:
                 continue
-
-            out = self.apply_filters(ni)
-            if out:
-                yield out
+            filtered = self.apply_filters(ni)
+            if filtered:
+                yield filtered
 
 
 def instance_filter(inst, ni):
