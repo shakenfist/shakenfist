@@ -53,106 +53,82 @@ All blocking items from the original review have been resolved:
 
 ## Should fix
 
-1. **ANNOUNCE_CAPABILITIES = 6 regression test.** Develop
-   carried `VD_AGENT_ANNOUNCE_CAPABILITIES = 1` for some
-   time, which collided with `VD_AGENT_MOUSE_STATE = 1`
-   and broke capability negotiation. PR 31 corrected the
-   constant to 6 but added no regression guard. Add a unit
-   test in `shakenfist-spice-protocol/src/constants.rs`
-   that asserts `VD_AGENT_ANNOUNCE_CAPABILITIES != VD_AGENT_MOUSE_STATE`
-   and that the constant value matches the spec
-   (`spice-protocol/spice/vd_agent.h`).
+1. ~~**ANNOUNCE_CAPABILITIES = 6 regression test.**~~
+   Landed in Phase 1 — see
+   [PLAN-pr31-followup-phase-01-tests.md](/components/ryll/plans/PLAN-pr31-followup-phase-01-tests/).
+   Test lives next to the constants in
+   `ryll/src/channels/main_channel.rs` rather than the
+   shared protocol crate (constants are still file-private
+   in main_channel.rs; rationale in the phase plan).
 
-2. **`MOUSE_MODE_REQUEST` wire-format regression test.**
-   The blocking #3 fix is a one-liner that's easy to
-   silently revert during a future refactor. Add a test in
-   `ryll/src/channels/main_channel.rs` that builds a
-   `MOUSE_MODE_REQUEST` payload via the same path
-   `maybe_request_client_mouse_mode` uses and asserts the
-   body is exactly 2 bytes. The existing
-   `parse_mouse_mode_payload` tests cover the read side;
-   this covers the write side.
+2. ~~**`MOUSE_MODE_REQUEST` wire-format regression test.**~~
+   Landed in Phase 1 — see
+   [PLAN-pr31-followup-phase-01-tests.md](/components/ryll/plans/PLAN-pr31-followup-phase-01-tests/).
+   Encoding extracted into
+   `build_mouse_mode_request_payload` so the byte shape
+   can be asserted without constructing a `MainChannel`.
 
-3. **README: reconnect button + window persistence.** PR 31
-   added user-visible features that aren't documented.
-   Update `README.md` to describe the Reconnect button in
-   the disconnect dialog and the eframe window persistence
-   (window position/size restored on next launch). Mention
-   that persistence pulls in ~4 transitive crates (audited
-   when the PR landed).
+3. ~~**README: reconnect button + window persistence.**~~
+   Landed in Phase 2 — see
+   [PLAN-pr31-followup-phase-02-docs.md](/components/ryll/plans/PLAN-pr31-followup-phase-02-docs/).
+   Two new Features bullets (Reconnect on disconnect,
+   Window persistence) cover the user-visible behaviour;
+   the persistence bullet names the per-platform config
+   directory rather than counting transitive crates,
+   which turned out to be the more useful detail.
 
-4. **ARCHITECTURE: reconnect flow.** `ARCHITECTURE.md` does
-   not yet describe how `reconnect()` tears down channels,
-   spawns a fresh tokio runtime, and rebuilds the
-   `SpiceClient`. The block belongs alongside the existing
-   "Connection lifecycle" section. Note the relationship
-   to `RyllApp::reconnect_virtual_disks` /
-   `reconnect_share_dir` for state preservation across
-   reconnects.
+4. ~~**ARCHITECTURE: reconnect flow.**~~ Landed in Phase 2 —
+   see
+   [PLAN-pr31-followup-phase-02-docs.md](/components/ryll/plans/PLAN-pr31-followup-phase-02-docs/).
+   New top-level `## Reconnection` section after Graceful
+   Shutdown, structured as Trigger / What is recreated /
+   What survives / Threading and runtime. Cross-links to
+   item 6 below for the cancellation-token follow-up.
 
-5. **ARCHITECTURE: mouse-mode model.** The mouse-mode model
-   was significantly expanded by `10f19477` and PR 31's
-   reconnect flow interacts with it. Document:
-   - The two modes (SERVER / relative, CLIENT / absolute).
-   - The negotiation: server sends supported + current at
-     INIT, client requests CLIENT mode if supported but
-     not current.
-   - The `mouse_mode_request_pending` guard preventing
-     request-loop storms.
-   - The post-reboot recovery via the MOUSE_MODE handler
-     calling `maybe_request_client_mouse_mode` again.
+5. ~~**ARCHITECTURE: mouse-mode model.**~~ Landed in Phase 2
+   — see
+   [PLAN-pr31-followup-phase-02-docs.md](/components/ryll/plans/PLAN-pr31-followup-phase-02-docs/).
+   New `### Mouse-Mode Negotiation` subsection under
+   `## SPICE Protocol` covers the two modes, both wire-
+   format directions, the negotiation flow at INIT and
+   on subsequent server-driven mode changes, and the
+   `mouse_mode_request_pending` guard. The previous
+   inline mention in the input-channel bullet is now a
+   pointer to the canonical text.
 
 ## Should consider
 
-6. **`reconnect()` resource leak under spam.** Spamming the
-   Reconnect button against an unresponsive server spawns a
-   new connection thread + tokio runtime + SPICE socket
-   without explicitly tearing down the previous attempt.
-   The previous attempt's socket eventually times out, but
-   threads and runtimes accumulate in the meantime. Fix:
-   give `reconnect()` a `CancellationToken` (or a tracked
-   `JoinHandle`) and signal cancel on the previous attempt
-   before spawning the next.
-   Location: `ryll/src/app.rs::reconnect`.
+6. ~~**`reconnect()` resource leak under spam.**~~ Landed
+   in Phase 3 — see
+   [PLAN-pr31-followup-phase-03-polish.md](/components/ryll/plans/PLAN-pr31-followup-phase-03-polish/).
+   Implementation uses an `Arc<AtomicBool>` mirroring the
+   existing `SHUTDOWN_REQUESTED` cooperative-cancel
+   pattern; `RyllApp::reconnect` raises the previous flag
+   before spawning the next attempt and a small watcher
+   task aborts the channel JoinHandles when the flag is
+   set.
 
-7. **Cursor-hide regression for popups over the surface.**
-   PR 31 changed the cursor-hide predicate from
-   `response.hovered()` to
-   `surface_rect.contains(hover_pos)`. The new predicate
-   keeps the cursor hidden even when a popup, tooltip, or
-   the bug-report dialog is positioned over the surface.
-   For overlays the host cursor should reappear so the
-   user can interact with the overlay. Fix: combine the
-   two predicates — hide only when hovering the surface
-   *and* no overlay is consuming pointer events. egui's
-   `ctx.wants_pointer_input()` is the conventional probe.
-   Location: `ryll/src/app.rs` (search for
-   `surface_rect.contains`).
+7. ~~**Cursor-hide regression for popups over the surface.**~~
+   Landed in Phase 3 — see
+   [PLAN-pr31-followup-phase-03-polish.md](/components/ryll/plans/PLAN-pr31-followup-phase-03-polish/).
+   Resolved by adding `!ctx.wants_pointer_input()` to the
+   AND chain in the cursor-hide predicate.
 
-8. **Clipboard echo CRLF/LF normalization.** The clipboard
-   echo-prevention dedup compares raw text. On Windows and
-   some Wayland compositors the round-tripped text differs
-   in line endings (CRLF vs LF) and trailing whitespace,
-   which causes the echo guard to miss and the clipboard
-   to ping-pong. Fix: normalize line endings and trim
-   trailing whitespace before comparing, or store a hash
-   of the normalized text. Storing the hash is preferable
-   for memory.
-   Location: `ryll/src/channels/main_channel.rs`
-   (`last_clipboard_text` and the comparison sites).
+8. ~~**Clipboard echo CRLF/LF normalization.**~~ Landed in
+   Phase 3 — see
+   [PLAN-pr31-followup-phase-03-polish.md](/components/ryll/plans/PLAN-pr31-followup-phase-03-polish/).
+   `last_clipboard_text: Option<String>` became
+   `last_clipboard_hash: Option<u64>` storing a hash of
+   the normalised text; three new unit tests guard the
+   invariants.
 
-9. **Three-arm match in MOUSE_MODE log line.** A leftover
-   `if current == 1 { "server" } else { "client" }` in
-   PR 31's MOUSE_MODE log line reports `"client"` for
-   `current == 0` (which a server can legitimately send
-   during transitions). Convert to a three-arm match
-   matching the INIT handler's pattern (`1 => "server"`,
-   `2 => "client"`, `_ => "unknown"`). Note: this may
-   already be moot if the second-rebase merge replaced
-   that log line wholesale; verify before opening the
-   item.
-   Location: `ryll/src/channels/main_channel.rs` MOUSE_MODE
-   handler. **Verify still relevant** before scheduling.
+9. ~~**Three-arm match in MOUSE_MODE log line.**~~ Closed
+   without code changes — verified against current
+   `main_channel.rs`. Develop's `10f19477` and our
+   second-rebase merge (`9aa12b9e`) replaced both INIT
+   and MOUSE_MODE handlers wholesale; both now use
+   three-arm matches. The buggy `if current == 1 ... else
+   "client"` line PR 31 had no longer exists.
 
 ## Informational
 
@@ -188,13 +164,18 @@ at `ryll/src/channels/main_channel.rs:998-1046`.
 Items in this plan are independent and can be picked up in
 any order. Suggested batching for follow-up PRs:
 
-- **One PR for items 1-2** (regression tests). Small,
-  self-contained, no behaviour change.
-- **One PR for items 3-5** (docs sweep). README +
-  ARCHITECTURE updates only.
-- **One PR per item in Should consider** (6, 7, 8, 9).
-  Each has independent failure modes and should be
-  reviewable on its own.
+- ~~**One PR for items 1-2** (regression tests).~~ Phase 1
+  landed; see
+  [PLAN-pr31-followup-phase-01-tests.md](/components/ryll/plans/PLAN-pr31-followup-phase-01-tests/).
+- ~~**One PR for items 3-5** (docs sweep).~~ Phase 2
+  landed; see
+  [PLAN-pr31-followup-phase-02-docs.md](/components/ryll/plans/PLAN-pr31-followup-phase-02-docs/).
+- ~~**One PR per item in Should consider** (6, 7, 8, 9).~~
+  Phase 3 landed three commits (one per live item:
+  reconnect cancellation, cursor-hide overlay, clipboard
+  hash); item 9 closed without code as it was made moot
+  by develop's `10f19477`. See
+  [PLAN-pr31-followup-phase-03-polish.md](/components/ryll/plans/PLAN-pr31-followup-phase-03-polish/).
 
 ### Context
 

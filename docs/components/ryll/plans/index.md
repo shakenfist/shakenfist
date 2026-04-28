@@ -30,6 +30,7 @@ reviewing and merging external contributor PRs see `MERGE-TEMPLATE.md`.
 | 2026-04-25 | [Paste-as-keystrokes fallback](/components/ryll/plans/PLAN-paste-as-keystrokes/) | Synthesise SPICE keystrokes for the contents of a string when no vdagent is available, so guests like uncalibrated-sextant can be driven without an in-guest agent | Complete | [1. Translator](/components/ryll/plans/PLAN-paste-as-keystrokes-phase-01-translator/), [2. Channel + CLI](/components/ryll/plans/PLAN-paste-as-keystrokes-phase-02-channel-cli/), [3. GUI gesture](/components/ryll/plans/PLAN-paste-as-keystrokes-phase-03-gui/), [4. Docs](/components/ryll/plans/PLAN-paste-as-keystrokes-phase-04-docs/) |
 | 2026-04-25 | [Hamburger menu](/components/ryll/plans/PLAN-hamburger-menu/) | Replace the status-bar action-button row with a single hamburger menu so the row returns to glanceable state | Complete | [1. Migrate](/components/ryll/plans/PLAN-hamburger-menu-phase-01-migrate/) |
 | 2026-04-25 | [Notifications system](/components/ryll/plans/PLAN-notifications/) | In-app notifications surface for protocol gaps, bug-report status, and SPICE_MSG_NOTIFY messages that ryll currently drops on the floor | Complete | [1. Store](/components/ryll/plans/PLAN-notifications-phase-01-store/), [2. SPICE_MSG_NOTIFY](/components/ryll/plans/PLAN-notifications-phase-02-spice-notify/), [3. Existing sources](/components/ryll/plans/PLAN-notifications-phase-03-existing-sources/), [4. GUI](/components/ryll/plans/PLAN-notifications-phase-04-gui/), [5. Docs](/components/ryll/plans/PLAN-notifications-phase-05-docs/) |
+| 2026-04-27 | [PR #31 follow-up](/components/ryll/plans/PLAN-pr31-followup/) | Tests, docs, and polish items deferred when landing PR 31 (UI improvements, reconnect, protocol fixes) | Complete | [1. Tests](/components/ryll/plans/PLAN-pr31-followup-phase-01-tests/), [2. Docs](/components/ryll/plans/PLAN-pr31-followup-phase-02-docs/), [3. Polish](/components/ryll/plans/PLAN-pr31-followup-phase-03-polish/) |
 
 ## Standalone plans
 
@@ -45,7 +46,6 @@ execution.
 | 2026-04-18 | [Supply-chain scanning](/components/ryll/plans/PLAN-supply-chain-scanning/) | Deterministic scanners for dependencies, secrets, and Unicode-based attacks |
 | 2026-04-18 | [Supply-chain follow-ups](/components/ryll/plans/PLAN-supply-chain-followups/) | Tracked advisory ignores and unmaintained-crate debt surfaced when landing scanners |
 | 2026-04-23 | [Macbook bug-report fixes](/components/ryll/plans/PLAN-macbook-bugreport-fixes/) | MOUSE_MODE wire format, client-mode re-request after guest reboot, and MULTI_MEDIA_TIME handler |
-| 2026-04-27 | [PR #31 follow-up](/components/ryll/plans/PLAN-pr31-followup/) | Tests, docs, and polish items deferred when landing PR 31 (UI improvements, reconnect, protocol fixes) |
 
 ## Consolidation plans
 
