@@ -153,3 +153,37 @@ class NetworkInterfacesPropertyTestCase(base.ShakenFistTestCase):
             'lonely', net_uuid, netblock='127.0.0.0/8')
         n = network.Network.from_db(net_uuid)
         self.assertEqual([], n.networkinterfaces)
+
+
+class NetworkInterfaceDataSchemaTestCase(base.ShakenFistTestCase):
+    """``ipv4`` is Optional[str] because OpenStack Kolla compatibility
+    lets callers create interfaces with ``address=none`` — see
+    ``external_api/instance.py:_netdesc_allocate_address``. A regression
+    here surfaces as a 500 from POST /instances complaining that ipv4
+    must be a string.
+    """
+
+    def test_ipv4_can_be_none(self):
+        data = NetworkInterfaceData(
+            uuid='11111111-1111-4111-8111-111111111111',
+            instance_uuid='22222222-2222-4222-8222-222222222222',
+            network_uuid='33333333-3333-4333-8333-333333333333',
+            macaddr='1a:91:64:d2:15:39',
+            ipv4=None,
+            order=0,
+            model='virtio',
+            version=5,
+        )
+        self.assertIsNone(data.ipv4)
+
+    def test_ipv4_defaults_to_none(self):
+        data = NetworkInterfaceData(
+            uuid='11111111-1111-4111-8111-111111111111',
+            instance_uuid='22222222-2222-4222-8222-222222222222',
+            network_uuid='33333333-3333-4333-8333-333333333333',
+            macaddr='1a:91:64:d2:15:39',
+            order=0,
+            model='virtio',
+            version=5,
+        )
+        self.assertIsNone(data.ipv4)

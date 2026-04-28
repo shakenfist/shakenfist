@@ -2569,7 +2569,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             network_uuid=UUID(d.network_uuid),
             instance_uuid=UUID(d.instance_uuid),
             macaddr=d.macaddr,
-            ipv4=d.ipv4,
+            ipv4=d.ipv4 or None,
             order=d.order,
             model=d.model or None,
             version=d.version
@@ -2583,7 +2583,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             network_uuid=str(data.network_uuid),
             instance_uuid=str(data.instance_uuid),
             macaddr=data.macaddr,
-            ipv4=data.ipv4,
+            ipv4=data.ipv4 or '',
             order=data.order,
             model=data.model or '',
             version=data.version

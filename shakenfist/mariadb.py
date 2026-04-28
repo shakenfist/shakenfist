@@ -3254,7 +3254,7 @@ def _migrate_etcd_network_interfaces(engine: sa.Engine) -> dict[str, Any]:
                 network_uuid=UUIDType(data['network_uuid']),
                 instance_uuid=UUIDType(data['instance_uuid']),
                 macaddr=data.get('macaddr', ''),
-                ipv4=data.get('ipv4', ''),
+                ipv4=data.get('ipv4') or None,
                 order=data.get('order', 0),
                 model=data.get('model', 'virtio'),
                 version=NetworkInterface.current_version,
@@ -12677,7 +12677,7 @@ def _grpc_create_network_interface(
                 network_uuid=str(data.network_uuid),
                 instance_uuid=str(data.instance_uuid),
                 macaddr=data.macaddr,
-                ipv4=data.ipv4,
+                ipv4=data.ipv4 or '',
                 order=data.order,
                 model=data.model or '',
                 version=data.version
@@ -12709,7 +12709,7 @@ def _grpc_get_network_interface(
             network_uuid=d.network_uuid,
             instance_uuid=d.instance_uuid,
             macaddr=d.macaddr,
-            ipv4=d.ipv4,
+            ipv4=d.ipv4 or None,
             order=d.order,
             model=d.model or None,
             version=d.version
@@ -12736,7 +12736,7 @@ def _grpc_get_network_interfaces_by_instance(
                 network_uuid=d.network_uuid,
                 instance_uuid=d.instance_uuid,
                 macaddr=d.macaddr,
-                ipv4=d.ipv4,
+                ipv4=d.ipv4 or None,
                 order=d.order,
                 model=d.model or None,
                 version=d.version
@@ -12766,7 +12766,7 @@ def _grpc_get_network_interfaces_by_network(
                 network_uuid=d.network_uuid,
                 instance_uuid=d.instance_uuid,
                 macaddr=d.macaddr,
-                ipv4=d.ipv4,
+                ipv4=d.ipv4 or None,
                 order=d.order,
                 model=d.model or None,
                 version=d.version
@@ -12792,7 +12792,7 @@ def _grpc_get_all_network_interfaces() -> list[NetworkInterfaceData]:
                 network_uuid=d.network_uuid,
                 instance_uuid=d.instance_uuid,
                 macaddr=d.macaddr,
-                ipv4=d.ipv4,
+                ipv4=d.ipv4 or None,
                 order=d.order,
                 model=d.model or None,
                 version=d.version
@@ -12830,7 +12830,7 @@ def _grpc_find_network_interfaces(
                 network_uuid=d.network_uuid,
                 instance_uuid=d.instance_uuid,
                 macaddr=d.macaddr,
-                ipv4=d.ipv4,
+                ipv4=d.ipv4 or None,
                 order=d.order,
                 model=d.model or None,
                 version=d.version
@@ -12870,7 +12870,7 @@ def _grpc_update_network_interface(
                 network_uuid=str(data.network_uuid),
                 instance_uuid=str(data.instance_uuid),
                 macaddr=data.macaddr,
-                ipv4=data.ipv4,
+                ipv4=data.ipv4 or '',
                 order=data.order,
                 model=data.model or '',
                 version=data.version
