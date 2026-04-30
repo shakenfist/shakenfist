@@ -947,6 +947,31 @@ class DirectFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
             stmt.compile(compile_kwargs={'literal_binds': False}))
         self.assertIn('instance_uuid', rendered)
 
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_results_are_ordered_by_order_column(self, mock_get_engine):
+        """SELECT carries ORDER BY ``order`` so callers iterate
+        interfaces in user-specified order."""
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = [_ni_row()]
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        mariadb._direct_find_network_interfaces(
+            ObjectFilterCriteria(states=['created']))
+
+        stmt = mock_conn.execute.call_args[0][0]
+        rendered = str(
+            stmt.compile(compile_kwargs={'literal_binds': False}))
+        self.assertIn('ORDER BY', rendered)
+        # ``order`` is a SQL reserved word — the rendered statement
+        # should reference the column, however the dialect chooses to
+        # quote it.
+        self.assertIn('order', rendered)
+
 
 # ---------------------------------------------------------------------------
 # Public wrapper — routing (direct vs gRPC)
@@ -1200,3 +1225,245 @@ class DirectGetObjectsByStateTestCase(base.ShakenFistTestCase):
         result = mariadb._direct_get_objects_by_state(
             ObjectType.NODE, ['created'])
         self.assertEqual(1, len(result))
+
+
+class NetworkInterfaceMacaddrUniquenessTestCase(base.ShakenFistTestCase):
+    """The macaddr UNIQUE constraint is scoped to active interfaces.
+
+    Background: ``test_interface_plug_and_exec_dhcp`` and
+    ``test_interface_plug_and_exec_reboot`` both hard-code MAC
+    ``02:00:00:ea:3a:28``. The dhcp test soft-deletes its interface
+    on tearDown, but the cluster cleaner only runs on a
+    ``CLEANER_DELAY`` schedule (default 1h) so the row stayed in
+    ``network_interfaces`` for the entire CI run. With a global
+    UNIQUE on ``macaddr`` the reboot test then failed to insert
+    its hot-plug interface. The same wall hits operators
+    redeploying VMs with stable MACs.
+
+    The fix: the ``active`` column is NULLed when an interface
+    transitions to ``deleted``, and the UNIQUE is on
+    ``(macaddr, active, network_uuid)``. NULLs do not collide in
+    MariaDB UNIQUE indexes, so soft-deleted rows do not block
+    MAC reuse, while two simultaneously-active rows with the same
+    MAC on the same network still error out as before.
+    """
+
+    def _build_engine(self):
+        from shakenfist.schema.network_interface_data import (
+            NetworkInterfaceData)
+        import sqlalchemy as sa
+
+        for attr in (
+                '_object_states_table',
+                '_object_metadata_table',
+                '_network_interfaces_table',
+                '_network_interface_attributes_table'):
+            setattr(mariadb, attr, None)
+        mariadb._metadata = None
+
+        engine = sa.create_engine('sqlite:///:memory:')
+        states = mariadb._get_object_states_table()
+        nis = mariadb._get_network_interfaces_table()
+        ni_attrs = mariadb._get_network_interface_attributes_table()
+        states.metadata.create_all(
+            engine, tables=[states, nis, ni_attrs])
+
+        for idx in nis.indexes:
+            idx.create(engine, checkfirst=True)
+        # Recreate the UNIQUE constraint as an Index for SQLite — the
+        # sa.UniqueConstraint attached to the Table is enforced by
+        # CREATE TABLE on MariaDB but does not auto-create on SQLite
+        # via metadata.create_all when added post-hoc.
+        sa.Index(
+            'uq_network_interfaces_macaddr_active_network',
+            nis.c.macaddr,
+            nis.c.active,
+            nis.c.network_uuid,
+            unique=True,
+        ).create(engine, checkfirst=True)
+
+        return engine, states, nis, ni_attrs, NetworkInterfaceData
+
+    def _make_data(self, macaddr, network_uuid, NIData, ni_uuid=None):
+        return NIData(
+            uuid=ni_uuid or uuid.uuid4(),
+            network_uuid=network_uuid,
+            instance_uuid=uuid.uuid4(),
+            macaddr=macaddr,
+            ipv4='10.0.0.5',
+            order=0,
+            model='virtio',
+            version=5,
+        )
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_macaddr_reusable_when_active_is_null(self, mock_get_engine):
+        """active=NULL on an existing row lets the MAC be inserted again."""
+        import sqlalchemy as sa
+
+        engine, _, nis, _, NIData = self._build_engine()
+        mock_get_engine.return_value = engine
+
+        net_uuid = uuid.uuid4()
+        macaddr = '02:00:00:ea:3a:28'
+
+        first = self._make_data(macaddr, net_uuid, NIData)
+        self.assertTrue(mariadb._direct_create_network_interface(first))
+
+        # Simulate ``_direct_set_state(INTERFACE, _, deleted)`` having
+        # already nulled the flag. The state transition itself is
+        # tested in DirectSetStateInterfaceDeletedHookTestCase below
+        # because it relies on a MariaDB-specific INSERT ... ON
+        # DUPLICATE KEY UPDATE that SQLite cannot compile.
+        with engine.connect() as conn:
+            conn.execute(sa.update(nis).where(
+                nis.c.uuid == first.uuid).values(active=None))
+            conn.commit()
+
+        # Reuse the same MAC on the same network — must succeed.
+        second = self._make_data(macaddr, net_uuid, NIData)
+        self.assertTrue(mariadb._direct_create_network_interface(second))
+
+        # The audit trail of the deleted row is preserved.
+        with engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(nis.c.uuid, nis.c.active).where(
+                    nis.c.macaddr == macaddr)
+            ).fetchall()
+        by_uuid = {str(r.uuid): r.active for r in rows}
+        self.assertEqual(2, len(by_uuid))
+        self.assertIsNone(by_uuid[str(first.uuid)])
+        self.assertTrue(by_uuid[str(second.uuid)])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_macaddr_collision_among_active_interfaces_fails(
+            self, mock_get_engine):
+        """Two active interfaces with the same (mac, network) cannot coexist."""
+        engine, _, _, _, NIData = self._build_engine()
+        mock_get_engine.return_value = engine
+
+        net_uuid = uuid.uuid4()
+        macaddr = '02:00:00:ea:3a:29'
+
+        first = self._make_data(macaddr, net_uuid, NIData)
+        self.assertTrue(mariadb._direct_create_network_interface(first))
+
+        # Without soft-deleting the first interface, a second insert
+        # with the same (mac, network) must fail. Mirrors the
+        # operator-error case "two VMs configured with the same MAC".
+        second = self._make_data(macaddr, net_uuid, NIData)
+        self.assertFalse(
+            mariadb._direct_create_network_interface(second))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_macaddr_reuse_across_networks(self, mock_get_engine):
+        """Same MAC on a different network is allowed.
+
+        Different VXLAN networks are isolated broadcast domains, so
+        a MAC clash across them does not break dnsmasq or ARP. The
+        constraint reflects that.
+        """
+        engine, _, _, _, NIData = self._build_engine()
+        mock_get_engine.return_value = engine
+
+        macaddr = '02:00:00:ea:3a:2a'
+
+        first = self._make_data(macaddr, uuid.uuid4(), NIData)
+        self.assertTrue(mariadb._direct_create_network_interface(first))
+
+        second = self._make_data(macaddr, uuid.uuid4(), NIData)
+        self.assertTrue(mariadb._direct_create_network_interface(second))
+
+
+class DirectSetStateInterfaceDeletedHookTestCase(base.ShakenFistTestCase):
+    """``_direct_set_state`` clears active on INTERFACE -> deleted only.
+
+    The hook is what makes MAC reuse possible: when an interface
+    transitions to deleted, the row's ``active`` column is NULLed so
+    the composite UNIQUE constraint stops counting it. This test
+    runs against a mock engine because the production upsert uses
+    MariaDB's INSERT ... ON DUPLICATE KEY UPDATE which SQLite cannot
+    compile.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    def _make_engine(self):
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        return mock_engine, mock_conn
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_interface_deleted_runs_active_null_update(
+            self, mock_get_engine):
+        from shakenfist.schema.object_state import State
+        from shakenfist.schema.object_types import ObjectType
+
+        engine, conn = self._make_engine()
+        mock_get_engine.return_value = engine
+
+        ni_uuid = uuid.uuid4()
+        self.assertTrue(mariadb._direct_set_state(
+            ObjectType.INTERFACE, str(ni_uuid),
+            State(value='deleted', update_time=0.0)))
+
+        # Two execute calls: the upsert into object_states and the
+        # UPDATE on network_interfaces clearing active.
+        executed_sql = [
+            str(call.args[0]) for call in conn.execute.call_args_list
+        ]
+        self.assertEqual(2, len(executed_sql))
+        update_sql = executed_sql[1]
+        self.assertIn('UPDATE network_interfaces', update_sql)
+        self.assertIn('active', update_sql)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_interface_other_state_does_not_touch_active(
+            self, mock_get_engine):
+        from shakenfist.schema.object_state import State
+        from shakenfist.schema.object_types import ObjectType
+
+        engine, conn = self._make_engine()
+        mock_get_engine.return_value = engine
+
+        ni_uuid = uuid.uuid4()
+        self.assertTrue(mariadb._direct_set_state(
+            ObjectType.INTERFACE, str(ni_uuid),
+            State(value='created', update_time=0.0)))
+
+        # Only the object_states upsert runs; no UPDATE on
+        # network_interfaces.
+        executed_sql = [
+            str(call.args[0]) for call in conn.execute.call_args_list
+        ]
+        self.assertEqual(1, len(executed_sql))
+        self.assertNotIn('network_interfaces', executed_sql[0])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_other_object_type_deleted_does_not_touch_active(
+            self, mock_get_engine):
+        """Network -> deleted must not touch network_interfaces."""
+        from shakenfist.schema.object_state import State
+        from shakenfist.schema.object_types import ObjectType
+
+        engine, conn = self._make_engine()
+        mock_get_engine.return_value = engine
+
+        net_uuid = uuid.uuid4()
+        self.assertTrue(mariadb._direct_set_state(
+            ObjectType.NETWORK, str(net_uuid),
+            State(value='deleted', update_time=0.0)))
+
+        executed_sql = [
+            str(call.args[0]) for call in conn.execute.call_args_list
+        ]
+        self.assertEqual(1, len(executed_sql))
+        self.assertNotIn('network_interfaces', executed_sql[0])

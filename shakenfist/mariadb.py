@@ -149,7 +149,7 @@ NAMESPACE_ATTRIBUTES_VERSION = 2
 ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
 ARTIFACT_INDEXES_VERSION = 2
-NETWORK_INTERFACES_VERSION = 2
+NETWORK_INTERFACES_VERSION = 3
 NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
 NETWORKS_VERSION = 3
 NETWORK_ATTRIBUTES_VERSION = 3
@@ -3254,7 +3254,7 @@ def _migrate_etcd_network_interfaces(engine: sa.Engine) -> dict[str, Any]:
                 network_uuid=UUIDType(data['network_uuid']),
                 instance_uuid=UUIDType(data['instance_uuid']),
                 macaddr=data.get('macaddr', ''),
-                ipv4=data.get('ipv4', ''),
+                ipv4=data.get('ipv4') or None,
                 order=data.get('order', 0),
                 model=data.get('model', 'virtio'),
                 version=NetworkInterface.current_version,
@@ -4485,6 +4485,12 @@ def _direct_set_state(object_type: ObjectType, object_uuid: str, state: State) -
 
     This is the direct access version used by the database daemon.
     Uses INSERT ... ON DUPLICATE KEY UPDATE for atomic upsert.
+
+    For NetworkInterface objects, also nulls out the
+    ``network_interfaces.active`` flag when the new state is
+    ``deleted``. The flag is part of the composite UNIQUE constraint
+    on macaddr — clearing it lets the MAC be reused immediately
+    while the soft-deleted row remains in place for audit.
     """
     engine = _get_engine()
     table = _get_object_states_table()
@@ -4505,6 +4511,14 @@ def _direct_set_state(object_type: ObjectType, object_uuid: str, state: State) -
                 message=state.message
             )
             conn.execute(stmt)
+
+            if (object_type == ObjectType.INTERFACE
+                    and state.value == 'deleted'):
+                ni_table = _get_network_interfaces_table()
+                conn.execute(sa.update(ni_table).where(
+                    ni_table.c.uuid == UUID(object_uuid)
+                ).values(active=None))
+
             conn.commit()
             return True
     except OperationalError as e:
@@ -12160,10 +12174,27 @@ def _get_network_interfaces_table() -> sa.Table:
             primary_key_fields=['uuid'],
             include_id_column=False
         )
-        # Add UNIQUE constraint on macaddr for atomic MAC allocation
+        # ``active`` is a server-managed flag, not part of the
+        # NetworkInterfaceData DTO. It is TRUE while an interface is
+        # live and NULLed when the interface enters the ``deleted``
+        # state — see ``_direct_set_state``. The flag exists so that
+        # the macaddr UNIQUE constraint below can ignore soft-deleted
+        # rows: NULL values do not collide with each other in MariaDB
+        # UNIQUE indexes, so a deleted interface keeps its row (for
+        # audit) without blocking MAC reuse during the
+        # ``CLEANER_DELAY`` window.
+        _network_interfaces_table.append_column(
+            sa.Column('active', sa.Boolean(), nullable=True))
+        # MAC must be unique among ACTIVE interfaces on the same
+        # network. Two soft-deleted rows (both with active=NULL) do
+        # not collide, and an active row coexists with deleted rows
+        # holding the same MAC. Cross-network MAC reuse is allowed —
+        # different VXLAN networks are isolated broadcast domains.
         sa.UniqueConstraint(
             _network_interfaces_table.c.macaddr,
-            name='uq_network_interfaces_macaddr')
+            _network_interfaces_table.c.active,
+            _network_interfaces_table.c.network_uuid,
+            name='uq_network_interfaces_macaddr_active_network')
     return _network_interfaces_table
 
 
@@ -12219,6 +12250,75 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
                     f'or could not be added: {e}')
 
         current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver <= 2:
+        # Replace the global UNIQUE on (macaddr) with a partial-style
+        # UNIQUE on (macaddr, active, network_uuid). The ``active``
+        # column is NULL when the interface is soft-deleted, so
+        # multiple deleted rows sharing a MAC do not collide and a
+        # caller can reuse the MAC for a new interface immediately
+        # rather than waiting for ``CLEANER_DELAY`` to elapse.
+        LOG.info(f'Upgrading {table_name} table to version 3 '
+                 '(scope macaddr UNIQUE to active interfaces)')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    'ALTER TABLE network_interfaces '
+                    'ADD COLUMN active BOOLEAN NULL'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'active column already exists on '
+                    f'{table_name} or could not be added: {e}')
+
+            # Backfill: rows whose state is ``deleted`` get
+            # active=NULL; everything else gets active=TRUE so the new
+            # UNIQUE constraint is correct from the moment it lands.
+            # ``object_states.object_uuid`` is VARCHAR-with-dashes,
+            # ``network_interfaces.uuid`` is native UUID rendered as
+            # 32-char hex, so the JOIN strips dashes — same trick as
+            # ``_build_object_filter_query``.
+            try:
+                conn.execute(sa.text("""
+                    UPDATE network_interfaces ni
+                    LEFT JOIN object_states s
+                      ON REPLACE(s.object_uuid, '-', '') = LOWER(HEX(ni.uuid))
+                     AND s.object_type = 'interface'
+                    SET ni.active = CASE
+                        WHEN s.state_value = 'deleted' THEN NULL
+                        ELSE 1
+                    END
+                """))
+                conn.commit()
+            except OperationalError as e:
+                LOG.warning(
+                    f'Backfill of active column on {table_name} '
+                    f'failed: {e}')
+
+            try:
+                conn.execute(sa.text(
+                    'ALTER TABLE network_interfaces '
+                    'DROP CONSTRAINT uq_network_interfaces_macaddr'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'Old UNIQUE constraint on macaddr could not be '
+                    f'dropped (probably already gone): {e}')
+
+            try:
+                conn.execute(sa.text(
+                    'ALTER TABLE network_interfaces '
+                    'ADD CONSTRAINT '
+                    'uq_network_interfaces_macaddr_active_network '
+                    'UNIQUE (macaddr, active, network_uuid)'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'Composite UNIQUE constraint already exists '
+                    f'or could not be added: {e}')
+
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -12290,7 +12390,12 @@ def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
                 ipv4=data.ipv4,
                 order=data.order,
                 model=data.model,
-                version=data.version
+                version=data.version,
+                # Marks the row as participating in the macaddr UNIQUE
+                # constraint. ``_direct_set_state`` will null this out
+                # when the interface transitions to ``deleted`` so the
+                # MAC can be reused.
+                active=True,
             )
             conn.execute(stmt)
             conn.commit()
@@ -12477,6 +12582,14 @@ def _direct_find_network_interfaces(
     )
     stmt = _build_object_filter_query(
         table, ObjectType.INTERFACE, safe_criteria)
+    # Order by the per-instance interface index so callers iterate
+    # interfaces in user-specified order. Without this MariaDB returns
+    # rows in an unspecified order, which makes ``Instance.interfaces``
+    # iteration nondeterministic and breaks code that relies on the
+    # first interface being the one the user listed first (e.g. the
+    # default-route choice in
+    # ``_make_config_drive_openstack_disk``).
+    stmt = stmt.order_by(table.c.order)
 
     try:
         with engine.connect() as conn:
@@ -12677,7 +12790,7 @@ def _grpc_create_network_interface(
                 network_uuid=str(data.network_uuid),
                 instance_uuid=str(data.instance_uuid),
                 macaddr=data.macaddr,
-                ipv4=data.ipv4,
+                ipv4=data.ipv4 or '',
                 order=data.order,
                 model=data.model or '',
                 version=data.version
@@ -12709,7 +12822,7 @@ def _grpc_get_network_interface(
             network_uuid=d.network_uuid,
             instance_uuid=d.instance_uuid,
             macaddr=d.macaddr,
-            ipv4=d.ipv4,
+            ipv4=d.ipv4 or None,
             order=d.order,
             model=d.model or None,
             version=d.version
@@ -12736,7 +12849,7 @@ def _grpc_get_network_interfaces_by_instance(
                 network_uuid=d.network_uuid,
                 instance_uuid=d.instance_uuid,
                 macaddr=d.macaddr,
-                ipv4=d.ipv4,
+                ipv4=d.ipv4 or None,
                 order=d.order,
                 model=d.model or None,
                 version=d.version
@@ -12766,7 +12879,7 @@ def _grpc_get_network_interfaces_by_network(
                 network_uuid=d.network_uuid,
                 instance_uuid=d.instance_uuid,
                 macaddr=d.macaddr,
-                ipv4=d.ipv4,
+                ipv4=d.ipv4 or None,
                 order=d.order,
                 model=d.model or None,
                 version=d.version
@@ -12792,7 +12905,7 @@ def _grpc_get_all_network_interfaces() -> list[NetworkInterfaceData]:
                 network_uuid=d.network_uuid,
                 instance_uuid=d.instance_uuid,
                 macaddr=d.macaddr,
-                ipv4=d.ipv4,
+                ipv4=d.ipv4 or None,
                 order=d.order,
                 model=d.model or None,
                 version=d.version
@@ -12830,7 +12943,7 @@ def _grpc_find_network_interfaces(
                 network_uuid=d.network_uuid,
                 instance_uuid=d.instance_uuid,
                 macaddr=d.macaddr,
-                ipv4=d.ipv4,
+                ipv4=d.ipv4 or None,
                 order=d.order,
                 model=d.model or None,
                 version=d.version
@@ -12870,7 +12983,7 @@ def _grpc_update_network_interface(
                 network_uuid=str(data.network_uuid),
                 instance_uuid=str(data.instance_uuid),
                 macaddr=data.macaddr,
-                ipv4=data.ipv4,
+                ipv4=data.ipv4 or '',
                 order=data.order,
                 model=data.model or '',
                 version=data.version

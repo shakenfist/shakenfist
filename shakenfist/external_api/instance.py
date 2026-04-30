@@ -1384,7 +1384,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
             EVENT_TYPE_AUDIT, 'get console data request from REST API')
         resp = flask.Response(
             instance_from_db.get_console_data(parsed_length),
-            mimetype='applicaton/octet-stream')
+            mimetype='application/octet-stream')
         resp.status_code = 200
         return resp
 

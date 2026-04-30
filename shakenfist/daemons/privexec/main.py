@@ -267,9 +267,18 @@ class PrivExecJob:
         )
 
     def _discover_mesh(self, vx_interface):
+        # The vxlan device may have been torn down since the caller
+        # built its EnsureVXLANMesh request — networks are deleted
+        # asynchronously and the next mesh refresh can race the
+        # teardown. ``bridge fdb show`` writes ``Cannot find device``
+        # to stderr and exits non-zero in that case, which the caller
+        # already turns into a benign FAILURE reply. Pass
+        # ``failure_is_error=False`` so command_helper logs the miss
+        # at debug level instead of producing an ``ERROR sf-privexec``
+        # line that fails the post-test stable-log check.
         stdout, _, returncode = privexec_util.command_helper(
             privexec_util.locate_command('bridge'), 'fdb', 'show', 'brport',
-            vx_interface
+            vx_interface, failure_is_error=False
         )
         if returncode != 0:
             raise VXLANMeshDiscoveryFailure()

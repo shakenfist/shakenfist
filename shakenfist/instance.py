@@ -1282,36 +1282,43 @@ class Instance(dbowo):
         detected_dns_servers = []
         have_default_route = False
         for iface in self.interfaces:
-            if iface.ipv4:
-                devname = f'eth{iface.order}'
-                nd['links'].append(
-                    {
-                        'ethernet_mac_address': iface.macaddr,
-                        'id': devname,
-                        'name': devname,
-                        'mtu': config.MAX_HYPERVISOR_MTU - 50,
-                        'type': 'vif',
-                        'vif_id': str(iface.uuid)
-                    }
-                )
+            # Interfaces without an IPv4 address contribute nothing to
+            # network_data.json: they have no link metadata to publish, no
+            # route to install, and no DNS resolver to advertise. Skip them
+            # so the default-route and DNS branches below can safely assume
+            # ``n`` is bound and ``nd['networks']`` is non-empty.
+            if not iface.ipv4:
+                continue
 
-                n = network.Network.from_db(iface.network_uuid)
-                nd['networks'].append(
-                    {
-                        'id': f'{iface.network_uuid}-{iface.order}',
-                        'link': devname,
-                        'type': 'ipv4',
-                        'network_id': str(iface.network_uuid)
-                    }
-                )
+            devname = f'eth{iface.order}'
+            nd['links'].append(
+                {
+                    'ethernet_mac_address': iface.macaddr,
+                    'id': devname,
+                    'name': devname,
+                    'mtu': config.MAX_HYPERVISOR_MTU - 50,
+                    'type': 'vif',
+                    'vif_id': str(iface.uuid)
+                }
+            )
 
-                nd['networks'][-1].update({
-                    'ip_address': iface.ipv4,
-                    'netmask': str(n.netmask),
-                })
+            n = network.Network.from_db(iface.network_uuid)
+            nd['networks'].append(
+                {
+                    'id': f'{iface.network_uuid}-{iface.order}',
+                    'link': devname,
+                    'type': 'ipv4',
+                    'network_id': str(iface.network_uuid)
+                }
+            )
+
+            nd['networks'][-1].update({
+                'ip_address': iface.ipv4,
+                'netmask': str(n.netmask),
+            })
 
             # NOTE(mikal): it is assumed that the default route should be on
-            # the first interface specified.
+            # the first interface specified that has an IPv4 address.
             if not have_default_route:
                 nd['networks'][-1].update({
                     'routes': [

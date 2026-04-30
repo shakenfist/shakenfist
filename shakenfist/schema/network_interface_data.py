@@ -61,8 +61,10 @@ class NetworkInterfaceData(BaseModel):
     # The MAC address assigned to this interface
     macaddr: Annotated[str, SQLIndex()]
 
-    # The IPv4 address assigned to this interface
-    ipv4: str
+    # The IPv4 address assigned to this interface. None when the interface
+    # was created with address=none (an OpenStack Kolla compatibility mode
+    # documented in external_api/instance.py:_netdesc_allocate_address).
+    ipv4: Optional[str] = None
 
     # The interface ordering index within the instance
     order: int
