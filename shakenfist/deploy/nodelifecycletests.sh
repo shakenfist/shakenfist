@@ -85,8 +85,8 @@ for hypervisor in ${hypervisors}; do
 	    log "Created network ${hypervisor}-${i}"
 
         sf-client instance create ${hypervisor}-${i} 1 1024 \
-            -d 20@sf://upload/system/debian-11 -f ${hypervisor}-${i} \
-            -p ${hypervisor} > /dev/null
+            -d 20@sf://upload/system/debian-12 -f ${hypervisor}-${i} \
+            -p ${hypervisor}
 	    log "Created instance ${hypervisor}-${i}"
     done
 done
@@ -94,6 +94,17 @@ done
 # Sleep a tiny bit
 echo
 sleep 30
+
+# Fail fast if the create commands didn't actually produce any instances
+# (e.g. a missing artifact reference). Without this, a silent create
+# failure only surfaces later as "No instances in created state".
+created_count=$(sf-client --json instance list | jq '.instances | length')
+if [ "${created_count}" -lt 1 ]; then
+    log "No instances were created -- aborting"
+    sf-client instance list
+    exit 1
+fi
+log "Created ${created_count} instances"
 
 # List artifacts
 echo
