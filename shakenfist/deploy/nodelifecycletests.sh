@@ -95,12 +95,16 @@ done
 echo
 sleep 30
 
-# Fail fast if the create commands didn't actually produce any instances
-# (e.g. a missing artifact reference). Without this, a silent create
-# failure only surfaces later as "No instances in created state".
+# Fail fast if the create commands didn't actually produce the expected
+# number of instances (e.g. a missing artifact reference, or a partial
+# failure where only some of the creates succeeded). Without this, a
+# silent create failure only surfaces later as "No instances in created
+# state". We expect two instances per hypervisor.
+hypervisor_count=$(echo ${hypervisors} | wc -w)
+expected_count=$((hypervisor_count * 2))
 created_count=$(sf-client --json instance list | jq '.instances | length')
-if [ "${created_count}" -lt 1 ]; then
-    log "No instances were created -- aborting"
+if [ "${created_count}" -lt "${expected_count}" ]; then
+    log "Expected ${expected_count} instances but only ${created_count} were created -- aborting"
     sf-client instance list
     exit 1
 fi
@@ -272,7 +276,7 @@ log "=== Cluster maintenance failover check ==="
 log "Pausing for maintenance node failover..."
 sleep 60
 new_maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
-if [ "${maintainer}" == "{new_maintainer}" ]; then
+if [ "${maintainer}" == "${new_maintainer}" ]; then
     log "SF failed to select a new maintenance node"
     exit 1
 fi
