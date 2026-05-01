@@ -592,13 +592,15 @@ jobs:
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
-          # Zip it all up
+      - name: Bundle artifacts
+        if: always()
+        run: |
           cd /srv/github
           sudo chown -R debian:debian /srv/github
           sudo find . -ls
-
           echo
-          zip -rq artifacts/bundle.zip bundle/*
+          mkdir -p /srv/github/artifacts /srv/github/bundle
+          zip -rq artifacts/bundle.zip bundle/* || true
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -1102,13 +1104,15 @@ jobs:
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
-          # Zip it all up
+      - name: Bundle artifacts
+        if: always()
+        run: |
           cd /srv/github
           sudo chown -R debian:debian /srv/github
           sudo find . -ls
-
           echo
-          zip -rq artifacts/bundle.zip bundle/*
+          mkdir -p /srv/github/artifacts /srv/github/bundle
+          zip -rq artifacts/bundle.zip bundle/* || true
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -1473,13 +1477,15 @@ jobs:
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
-          # Zip it all up
+      - name: Bundle artifacts
+        if: always()
+        run: |
           cd /srv/github
           sudo chown -R debian:debian /srv/github
           sudo find . -ls
-
           echo
-          zip -rq artifacts/bundle.zip bundle/*
+          mkdir -p /srv/github/artifacts /srv/github/bundle
+          zip -rq artifacts/bundle.zip bundle/* || true
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -1687,13 +1693,15 @@ jobs:
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
-          # Zip it all up
+      - name: Bundle artifacts
+        if: always()
+        run: |
           cd /srv/github
           sudo chown -R debian:debian /srv/github
           sudo find . -ls
-
           echo
-          zip -rq artifacts/bundle.zip bundle/*
+          mkdir -p /srv/github/artifacts /srv/github/bundle
+          zip -rq artifacts/bundle.zip bundle/* || true
 
       - uses: actions/upload-artifact@v7
         if: always()
