@@ -557,6 +557,15 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
+      - name: Snapshot primary syslog
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle
+          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ssh ${SSH_OPTS} ${{ matrix.pr.base_image_user }}@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
+          scp ${SSH_OPTS} ${{ matrix.pr.base_image_user }}@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+
       - name: Gather logs
         if: always()
         run: |
@@ -1062,6 +1071,15 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
+      - name: Snapshot primary syslog
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle
+          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ssh ${SSH_OPTS} ${{ matrix.merge.base_image_user }}@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
+          scp ${SSH_OPTS} ${{ matrix.merge.base_image_user }}@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+
       - name: Gather logs
         if: always()
         run: |
@@ -1433,6 +1451,15 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
+      - name: Snapshot primary syslog
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle
+          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ssh ${SSH_OPTS} debian@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
+          scp ${SSH_OPTS} debian@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+
       - name: Gather logs
         if: always()
         run: |
@@ -1637,6 +1664,15 @@ jobs:
 
           echo "====="
           cat /srv/github/inventory.yaml
+
+      - name: Snapshot primary syslog
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle
+          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ssh ${SSH_OPTS} debian@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
+          scp ${SSH_OPTS} debian@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
 
       - name: Gather logs
         if: always()
