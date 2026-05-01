@@ -272,6 +272,13 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
 
+      - name: Dump systemd state and journals
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
+
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
       # cost. That's not really something we can control, so just ignore the CPU
       # usage of that process instead.
