@@ -8,6 +8,8 @@
 import time
 from unittest import mock
 
+from sqlalchemy.exc import OperationalError
+
 from shakenfist import mariadb
 from shakenfist.tests import base
 
@@ -66,15 +68,22 @@ class _MockConnection:
     """Minimal mock for a SQLAlchemy Connection.
 
     Records executed statements and returns a configurable result.
+    Pass a single ``result`` for all calls, or ``results`` (a list)
+    to return a different result per execute() in order -- useful
+    when a single function issues several statements in sequence
+    (e.g. INSERT-then-steal-UPDATE in _direct_acquire_cluster_lock).
     """
 
-    def __init__(self, result=None):
+    def __init__(self, result=None, results=None):
+        self.results = list(results) if results is not None else None
         self.result = result or _MockResult()
         self.executed = []
         self.committed = False
 
     def execute(self, stmt):
         self.executed.append(stmt)
+        if self.results is not None:
+            return self.results.pop(0)
         return self.result
 
     def commit(self):
@@ -108,7 +117,69 @@ HOLDER = {
 
 
 class DirectAcquireClusterLockTestCase(base.ShakenFistTestCase):
-    """Tests for _direct_acquire_cluster_lock."""
+    """Tests for _direct_acquire_cluster_lock.
+
+    The function does up to two writes per call -- a fresh
+    INSERT IGNORE, and on duplicate-PK a steal-the-expired-row
+    UPDATE -- so the mock connection returns a list of rowcounts.
+    """
+
+    def _patch_engine(self, *rowcounts):
+        results = [_MockResult(rowcount=rc) for rc in rowcounts]
+        conn = _MockConnection(results=results)
+        engine = _MockEngine(conn)
+        patcher = mock.patch(
+            'shakenfist.mariadb._get_engine', return_value=engine)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return conn
+
+    def test_acquire_succeeds_on_fresh_insert(self):
+        # INSERT IGNORE matched (no prior holder).
+        conn = self._patch_engine(1)
+        result = mariadb._direct_acquire_cluster_lock(
+            'instance/parent/uuid1', HOLDER, 'node1', 42,
+            'lock-abc', time.time())
+        self.assertTrue(result)
+        self.assertTrue(conn.committed)
+        # Single statement -- the steal UPDATE never runs.
+        self.assertEqual(len(conn.executed), 1)
+
+    def test_acquire_steals_expired_lock(self):
+        # INSERT lost the duplicate-PK race, but the existing row had
+        # an expired lease so the steal UPDATE matched.
+        conn = self._patch_engine(0, 1)
+        result = mariadb._direct_acquire_cluster_lock(
+            'instance/parent/uuid1', HOLDER, 'node1', 42,
+            'lock-abc', time.time())
+        self.assertTrue(result)
+        self.assertTrue(conn.committed)
+        self.assertEqual(len(conn.executed), 2)
+
+    def test_acquire_fails_when_held_and_alive(self):
+        # INSERT lost, steal UPDATE found no expired row.
+        conn = self._patch_engine(0, 0)
+        result = mariadb._direct_acquire_cluster_lock(
+            'instance/parent/uuid1', HOLDER, 'node1', 42,
+            'lock-abc', time.time())
+        self.assertFalse(result)
+        self.assertTrue(conn.committed)
+        self.assertEqual(len(conn.executed), 2)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_acquire_returns_false_on_operational_error(self, mock_engine):
+        conn = _MockConnection()
+        conn.execute = mock.Mock(
+            side_effect=OperationalError('stmt', {}, Exception()))
+        mock_engine.return_value = _MockEngine(conn)
+
+        result = mariadb._direct_acquire_cluster_lock(
+            'key', HOLDER, 'node1', 42, 'lock-abc', time.time())
+        self.assertFalse(result)
+
+
+class DirectRefreshClusterLockTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_refresh_cluster_lock."""
 
     def _patch_engine(self, rowcount):
         conn = _MockConnection(result=_MockResult(rowcount=rowcount))
@@ -119,34 +190,85 @@ class DirectAcquireClusterLockTestCase(base.ShakenFistTestCase):
         self.addCleanup(patcher.stop)
         return conn
 
-    def test_acquire_succeeds(self):
+    def test_refresh_succeeds(self):
         conn = self._patch_engine(rowcount=1)
-        result = mariadb._direct_acquire_cluster_lock(
-            'instance/parent/uuid1', HOLDER, 'node1', 42,
-            'lock-abc', time.time())
-        self.assertTrue(result)
+        ok = mariadb._direct_refresh_cluster_lock(
+            'instance/parent/uuid1', 'lock-abc')
+        self.assertTrue(ok)
         self.assertTrue(conn.committed)
-        self.assertEqual(len(conn.executed), 1)
 
-    def test_acquire_fails_when_held(self):
+    def test_refresh_returns_false_on_lost(self):
+        # No row matched -- our lock_id is no longer the holder.
         conn = self._patch_engine(rowcount=0)
-        result = mariadb._direct_acquire_cluster_lock(
-            'instance/parent/uuid1', HOLDER, 'node1', 42,
-            'lock-abc', time.time())
-        self.assertFalse(result)
+        ok = mariadb._direct_refresh_cluster_lock(
+            'instance/parent/uuid1', 'lock-abc')
+        self.assertFalse(ok)
         self.assertTrue(conn.committed)
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_acquire_returns_false_on_operational_error(self, mock_engine):
-        from sqlalchemy.exc import OperationalError
+    def test_refresh_raises_on_operational_error(self, mock_engine):
+        # Transient errors must propagate so the caller can retry
+        # rather than mistake them for confirmed loss.
         conn = _MockConnection()
         conn.execute = mock.Mock(
             side_effect=OperationalError('stmt', {}, Exception()))
         mock_engine.return_value = _MockEngine(conn)
 
-        result = mariadb._direct_acquire_cluster_lock(
-            'key', HOLDER, 'node1', 42, 'lock-abc', time.time())
-        self.assertFalse(result)
+        self.assertRaises(
+            OperationalError,
+            mariadb._direct_refresh_cluster_lock, 'key', 'lock-abc')
+
+
+class GrpcRefreshClusterLockTestCase(base.ShakenFistTestCase):
+    """Tests for _grpc_refresh_cluster_lock.
+
+    The dispatch from refresh_cluster_lock() based on
+    _use_database_service() is exercised here too -- it is the only
+    distinguishing feature between the gRPC and direct paths.
+    """
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_refresh_returns_true_on_server_success(
+            self, mock_stub, mock_call):
+        mock_stub.return_value = mock.MagicMock()
+        mock_call.return_value = mock.MagicMock(success=True)
+
+        ok = mariadb._grpc_refresh_cluster_lock(
+            'cluster', '', '', 'lock-abc')
+
+        self.assertTrue(ok)
+        # The proto field name is part of the contract -- if a future
+        # rename misses this site the test catches it.
+        request = mock_call.call_args[0][1]
+        self.assertEqual(request.lock_id, 'lock-abc')
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_refresh_returns_false_on_server_loss(
+            self, mock_stub, mock_call):
+        mock_stub.return_value = mock.MagicMock()
+        mock_call.return_value = mock.MagicMock(success=False)
+
+        ok = mariadb._grpc_refresh_cluster_lock(
+            'cluster', '', '', 'lock-abc')
+
+        self.assertFalse(ok)
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_refresh_propagates_rpc_error(
+            self, mock_stub, mock_call):
+        # Transient gRPC errors must propagate so the refresh loop
+        # treats them as retryable rather than confirmed loss.
+        import grpc
+        mock_stub.return_value = mock.MagicMock()
+        mock_call.side_effect = grpc.RpcError('boom')
+
+        self.assertRaises(
+            grpc.RpcError,
+            mariadb._grpc_refresh_cluster_lock,
+            'cluster', '', '', 'lock-abc')
 
 
 class DirectReleaseClusterLockTestCase(base.ShakenFistTestCase):
@@ -176,7 +298,6 @@ class DirectReleaseClusterLockTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_release_returns_false_on_operational_error(self, mock_engine):
-        from sqlalchemy.exc import OperationalError
         conn = _MockConnection()
         conn.execute = mock.Mock(
             side_effect=OperationalError('stmt', {}, Exception()))
@@ -211,7 +332,6 @@ class DirectGetClusterLockTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_get_returns_none_on_operational_error(self, mock_engine):
-        from sqlalchemy.exc import OperationalError
         conn = _MockConnection()
         conn.execute = mock.Mock(
             side_effect=OperationalError('stmt', {}, Exception()))
@@ -256,7 +376,6 @@ class DirectClearStaleClusterLocksTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_returns_zero_on_operational_error(self, mock_engine):
-        from sqlalchemy.exc import OperationalError
         conn = _MockConnection()
         conn.execute = mock.Mock(
             side_effect=OperationalError('stmt', {}, Exception()))
@@ -297,7 +416,6 @@ class DirectGetAllClusterLocksTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_returns_empty_on_operational_error(self, mock_engine):
-        from sqlalchemy.exc import OperationalError
         conn = _MockConnection()
         conn.execute = mock.Mock(
             side_effect=OperationalError('stmt', {}, Exception()))

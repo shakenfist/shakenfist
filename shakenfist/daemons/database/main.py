@@ -20,6 +20,7 @@ import grpc
 from prometheus_client import Counter
 from prometheus_client import start_http_server
 from shakenfist_utilities import logs  # noreorder
+from sqlalchemy.exc import OperationalError
 
 from shakenfist import eventlog
 from shakenfist import mariadb
@@ -274,6 +275,38 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=released, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database ReleaseLock failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def RefreshLock(
+        self,
+        request: database_pb2.ClusterRefreshLockRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Extend the lease on a distributed lock for the current holder.
+
+        A transient MariaDB error must not look like "lock stolen" to
+        the client (success=False), or the holder will spuriously
+        re-elect. Signal UNAVAILABLE on transient failure so the
+        client's retry / refresher loop can treat it as such.
+        """
+        try:
+            self.monitor.counters['refresh_lock'].inc()
+            lock_key = mariadb._cluster_lock_key(
+                request.object_type, request.subtype,
+                request.name)
+            refreshed = mariadb._direct_refresh_cluster_lock(
+                lock_key=lock_key,
+                lock_id=request.lock_id,
+            )
+            return database_pb2.StatusReply(success=refreshed, error='')
+        except OperationalError as e:
+            util_exceptions.ignore_exception(
+                'database RefreshLock transient', e)
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False, error=str(e))
+        except Exception as e:
+            util_exceptions.ignore_exception('database RefreshLock failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def GetLockHolder(
@@ -4599,7 +4632,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'enqueue', 'dequeue', 'resolve', 'get_queue_length',
             'restart_queue', 'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
-            'acquire_lock', 'release_lock', 'get_lock_holder',
+            'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',
             'enqueue_event_dlq', 'drain_event_dlq',

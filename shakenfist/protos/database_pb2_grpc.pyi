@@ -71,6 +71,11 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    RefreshLock: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ClusterRefreshLockRequest,
+        database_pb2.StatusReply,
+    ]
+
     GetLockHolder: grpc.UnaryUnaryMultiCallable[
         database_pb2.ClusterGetLockHolderRequest,
         database_pb2.ClusterLockHolderReply,
@@ -1037,6 +1042,11 @@ class DatabaseServiceAsyncStub:
 
     ReleaseLock: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.ClusterReleaseLockRequest,
+        database_pb2.StatusReply,
+    ]
+
+    RefreshLock: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ClusterRefreshLockRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2026,6 +2036,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def ReleaseLock(
         self,
         request: database_pb2.ClusterReleaseLockRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def RefreshLock(
+        self,
+        request: database_pb2.ClusterRefreshLockRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

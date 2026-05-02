@@ -83,6 +83,13 @@ class LockException(DatabaseException):
     ...
 
 
+class LockNotHeld(LockException):
+    """Raised when a caller tries to release or refresh a cluster lock
+    that the database does not record them as holding -- typically
+    because the lease expired and another node stole it."""
+    ...
+
+
 class WriteException(DatabaseException):
     ...
 

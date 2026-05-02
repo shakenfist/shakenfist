@@ -18,6 +18,7 @@ service DatabaseService {
   // Lock Operations
   rpc AcquireLock (ClusterLockRequest) returns (ClusterLockReply) {}
   rpc ReleaseLock (ClusterReleaseLockRequest) returns (StatusReply) {}
+  rpc RefreshLock (ClusterRefreshLockRequest) returns (StatusReply) {}
   rpc GetLockHolder (ClusterGetLockHolderRequest) returns (ClusterLockHolderReply) {}
   rpc ClearStaleLocks (ClusterClearStaleLocksRequest) returns (StatusReply) {}
   rpc GetExistingLocks (ClusterGetExistingLocksRequest) returns (ClusterGetExistingLocksReply) {}
@@ -376,6 +377,13 @@ message ClusterReleaseLockRequest {
   string subtype = 2;
   string name = 3;
   string lock_data = 4;  // JSON-encoded, for CAS verification
+}
+
+message ClusterRefreshLockRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string name = 3;
+  string lock_id = 4;  // CAS check; refresh succeeds only if our id still holds
 }
 
 message ClusterGetLockHolderRequest {

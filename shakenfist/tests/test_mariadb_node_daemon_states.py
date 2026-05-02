@@ -2,8 +2,10 @@
 #
 # Tests for the mariadb node daemon state functions.
 
-from unittest import mock
 import uuid
+from unittest import mock
+
+from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
 from shakenfist.config import BaseSettings
@@ -51,7 +53,6 @@ class SetNodeDaemonStateTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_returns_false_on_operational_error(self, mock_get_engine):
-        from sqlalchemy.exc import OperationalError
         mock_engine = mock.MagicMock()
         mock_conn = mock.MagicMock()
         mock_conn.execute.side_effect = OperationalError(

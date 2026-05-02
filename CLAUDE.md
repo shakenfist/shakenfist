@@ -281,6 +281,25 @@ with ClusterLock('lock_name', timeout=30):
     # Critical section
 ```
 
+Locks are leased: every `cluster_locks` row has a server-side
+`expires_at` and the holder's `acquire()` starts a daemon thread
+that refreshes the lease every 20s. If the holder dies, the row
+expires after 60s and another candidate may steal it. There is no
+manual cleanup or stale-lock reaper required.
+
+For long-held locks (anything held for more than a few seconds), the
+holder must poll `lock.lost_event` between iterations of its critical
+section and abort cleanly when it fires -- the refresher sets it on
+confirmed loss. The cluster maintainer's inner loop is the canonical
+example: it sleeps via `lock.lost_event.wait(60)` so it wakes
+immediately on confirmed loss.
+
+`ClusterLock.release()` raises `shakenfist.exceptions.LockNotHeld` if
+the database has no record of the caller holding the lock. The
+context-manager `__exit__` swallows that exception (a body exception
+is more important) but the noisy log emitted from inside `release()`
+is preserved so CI checks still catch it.
+
 ### API Pattern
 
 Flask-based REST API with decorators:
@@ -421,6 +440,25 @@ performance. This is required for all deployments - MariaDB must be configured.
   seconds by the resources daemon. Uses a JSON column (`metrics_json`)
   for the schemaless metrics payload (~50+ fields). One row per node,
   upserted each update cycle. Primary key is `node_uuid`.
+- **Per-daemon state** (`node_daemon_states` table): One row per
+  `(node_uuid, daemon)` carrying the daemon's `value`, `update_time`
+  and optional `message`. Replaces the JSON `daemon_states` dict that
+  used to live on `node_attributes`; the dict required a coarse
+  per-node lock for every transition which serialised every daemon's
+  startup/shutdown through one hot path. The new table uses
+  `INSERT ... ON DUPLICATE KEY UPDATE` so writes for different daemons
+  on the same node run fully in parallel. The legacy JSON column on
+  `node_attributes` is no longer read or written but remains for one
+  release cycle as a rollback fallback.
+- **Cluster Locks** (`cluster_locks` table): Distributed locks with
+  a server-side `expires_at TIMESTAMP`. Holders refresh the lease
+  every ~20s while alive; if a holder dies (or is partitioned for
+  >60s), a candidate steals the row by issuing
+  `UPDATE ... WHERE expires_at < NOW()`. There is no garbage-
+  collection step or external reaper -- a dead holder's lock recovers
+  on the next acquire attempt. See
+  `docs/operator_guide/locks.md` for the operator view and
+  `shakenfist/locks.py` for the refresher and `lost_event` protocol.
 
 ### Migrating Existing Deployments
 

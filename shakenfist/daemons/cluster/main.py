@@ -27,6 +27,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist.daemons.cluster import scheduled_tasks
+from shakenfist import exceptions
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
 from shakenfist.node import Nodes
@@ -50,8 +51,10 @@ class Monitor(daemon.Daemon):
         start_http_server(config.CLUSTER_METRICS_PORT)
 
     def _await_election(self):
-        # Attempt to acquire the cluster maintenance lock forever. We never
-        # release the lock, it gets cleared on a crash. This is so that only
+        # Attempt to acquire the cluster maintenance lock forever. The
+        # lock is leased -- if we hold it, the refresher thread keeps
+        # extending the lease; if we crash or get partitioned, the
+        # lease expires and a candidate steals the row here. So only
         # one node at a time is performing cluster maintenance.
         while daemon.check_abort_path(self.abort_path):
             self.lock = locks.ClusterLock(
@@ -65,6 +68,14 @@ class Monitor(daemon.Daemon):
             self.check_daemon_state()
 
     def _cluster_wide_cleanup(self, last_loop_run):
+        # Bail out before doing anything destructive if our lease has
+        # already lapsed -- another node may be running this same loop
+        # in parallel and we should not double up on the cleanup work.
+        # The outer wait() will see lost_event and re-elect.
+        if self.lock and self.lock.lost_event.is_set():
+            LOG.warning(
+                'Skipping cluster maintenance pass; lease lost')
+            return
         LOG.info('Running cluster maintenance')
 
         # NOTE: The per-node blob cache is now maintained by each node's
@@ -436,11 +447,23 @@ class Monitor(daemon.Daemon):
 
                 last_loop_run = time.time()
 
-                self.idle(60)
+                # Sleep up to 60s, but wake immediately if the
+                # background refresher reports our lease was stolen.
+                # If lost, drop maintainer status and re-enter the
+                # outer loop to fight for the lock again.
+                if self.lock.lost_event.wait(60):
+                    LOG.warning(
+                        'Cluster maintenance lock lost; re-entering election')
+                    self.is_elected = False
 
-        # Stop being the cluster maintenance node if we were
-        if self.lock.is_acquired():
-            self.lock.release()
+        # Stop being the cluster maintenance node if we were. Release
+        # may raise LockNotHeld if our lease has lapsed -- swallow it,
+        # the row is gone either way.
+        if self.lock and self.lock.is_acquired():
+            try:
+                self.lock.release()
+            except exceptions.LockNotHeld:
+                ...
 
 
 def main():

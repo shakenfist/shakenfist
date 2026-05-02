@@ -322,6 +322,31 @@ class ClusterReleaseLockRequest(google.protobuf.message.Message):
 global___ClusterReleaseLockRequest = ClusterReleaseLockRequest
 
 @typing.final
+class ClusterRefreshLockRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    SUBTYPE_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    LOCK_ID_FIELD_NUMBER: builtins.int
+    object_type: builtins.str
+    subtype: builtins.str
+    name: builtins.str
+    lock_id: builtins.str
+    """CAS check; refresh succeeds only if our id still holds"""
+    def __init__(
+        self,
+        *,
+        object_type: builtins.str = ...,
+        subtype: builtins.str = ...,
+        name: builtins.str = ...,
+        lock_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["lock_id", b"lock_id", "name", b"name", "object_type", b"object_type", "subtype", b"subtype"]) -> None: ...
+
+global___ClusterRefreshLockRequest = ClusterRefreshLockRequest
+
+@typing.final
 class ClusterGetLockHolderRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

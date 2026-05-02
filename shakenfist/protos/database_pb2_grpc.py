@@ -84,6 +84,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.ClusterReleaseLockRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.RefreshLock = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/RefreshLock',
+                request_serializer=database__pb2.ClusterRefreshLockRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.GetLockHolder = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/GetLockHolder',
                 request_serializer=database__pb2.ClusterGetLockHolderRequest.SerializeToString,
@@ -966,6 +971,12 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def ReleaseLock(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RefreshLock(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2081,6 +2092,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.ClusterReleaseLockRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
+            'RefreshLock': grpc.unary_unary_rpc_method_handler(
+                    servicer.RefreshLock,
+                    request_deserializer=database__pb2.ClusterRefreshLockRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
             'GetLockHolder': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLockHolder,
                     request_deserializer=database__pb2.ClusterGetLockHolderRequest.FromString,
@@ -3171,6 +3187,33 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/ReleaseLock',
             database__pb2.ClusterReleaseLockRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RefreshLock(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/RefreshLock',
+            database__pb2.ClusterRefreshLockRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

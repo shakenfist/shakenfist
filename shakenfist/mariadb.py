@@ -68,6 +68,7 @@ from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.schema.sqlalchemy import get_table_columns
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import callstack as util_callstack
@@ -168,7 +169,9 @@ NODE_METRICS_VERSION = 2
 NODE_DAEMON_STATES_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 2
 WORK_QUEUE_VERSION = 2
-CLUSTER_LOCKS_VERSION = 2
+# v3: leased locks. Adds expires_at, makes acquire steal-if-expired,
+# and introduces a refresh path so live holders can extend their lease.
+CLUSTER_LOCKS_VERSION = 3
 CLUSTER_CONFIG_VERSION = 2
 EVENT_DLQ_VERSION = 2
 
@@ -802,14 +805,24 @@ def _ensure_work_queue_schema(engine: sa.Engine) -> dict[str, Any]:
 _cluster_locks_table: Optional[sa.Table] = None
 
 
+# Must stay aligned with ``locks.LEASE_SECONDS`` -- duplicated rather
+# than shared because importing across the two modules would be
+# circular. If you change one, change the other.
+CLUSTER_LOCK_LEASE_SECONDS = 60
+
+
 def _get_cluster_locks_table() -> sa.Table:
     """Get or create the cluster_locks table definition.
 
     This table stores distributed locks previously held in etcd at
     /sflocks/{type}/{subtype}/{name}. The lock_key column stores the
-    path without the /sflocks/ prefix. Acquire uses INSERT IGNORE
-    (duplicate PK = lock already held). Release uses DELETE with a
-    lock_id CAS check.
+    path without the /sflocks/ prefix. Acquire is either a fresh
+    INSERT IGNORE or a steal-the-expired-row UPDATE; release is a
+    DELETE with a lock_id CAS check; refresh extends ``expires_at``
+    for the current holder. ``expires_at`` is a server-side
+    ``TIMESTAMP`` so the database is the single source of truth for
+    "is this lease still alive" -- per-node clock skew can never let
+    a candidate steal a lock the holder still believes it owns.
     """
     global _cluster_locks_table
     if _cluster_locks_table is None:
@@ -828,10 +841,14 @@ def _get_cluster_locks_table() -> sa.Table:
                       nullable=False),
             sa.Column('acquired_at', sa.Double(),
                       nullable=False),
+            sa.Column('expires_at', sa.DateTime(),
+                      nullable=False),
             sa.Index('idx_cluster_locks_node',
                      'node_uuid'),
             sa.Index('idx_cluster_locks_acquired',
                      'acquired_at'),
+            sa.Index('idx_cluster_locks_expires',
+                     'expires_at'),
         )
     return _cluster_locks_table
 
@@ -864,6 +881,27 @@ def _ensure_cluster_locks_schema(engine: sa.Engine) -> dict[str, Any]:
         LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        # v3 adds expires_at for leased locks. Pre-existing rows get a
+        # fresh full lease so an in-flight holder is not immediately
+        # stealable just because the cluster restarted into the new
+        # schema.
+        LOG.info(f'Adding expires_at to {table_name} table (version 3)')
+        with engine.begin() as conn:
+            cols = get_table_columns(engine, table_name)
+            if 'expires_at' not in cols:
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} ADD COLUMN expires_at '
+                    f'TIMESTAMP NOT NULL DEFAULT '
+                    f'(NOW() + INTERVAL {CLUSTER_LOCK_LEASE_SECONDS} SECOND)'
+                ))
+                conn.execute(sa.text(
+                    f'CREATE INDEX IF NOT EXISTS idx_cluster_locks_expires '
+                    f'ON {table_name} (expires_at)'
+                ))
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -10347,6 +10385,14 @@ def _direct_set_node_daemon_state(
     No Python-side locking: the composite primary key
     ``(node_uuid, daemon)`` and ``INSERT ... ON DUPLICATE KEY UPDATE``
     give us per-daemon isolation directly at the SQL layer.
+
+    A delayed call (e.g. a state transition queued behind a slow
+    refresh) must not overwrite a fresher state with an older
+    timestamp -- callers stamp ``update_time`` from
+    ``time.time()`` so per-node clock skew can let two writes arrive
+    out-of-order. Use ``GREATEST`` on the timestamp and gate the
+    value/message rewrites with the same comparison so the latest
+    write always wins.
     """
     engine = _get_engine()
     table = _get_node_daemon_states_table()
@@ -10361,9 +10407,15 @@ def _direct_set_node_daemon_state(
                 message=message,
             )
             stmt = stmt.on_duplicate_key_update(
-                value=value,
-                update_time=update_time,
-                message=message,
+                value=sa.case(
+                    (table.c.update_time <= update_time, stmt.inserted.value),
+                    else_=table.c.value),
+                message=sa.case(
+                    (table.c.update_time <= update_time,
+                     stmt.inserted.message),
+                    else_=table.c.message),
+                update_time=sa.func.greatest(
+                    table.c.update_time, stmt.inserted.update_time),
             )
             conn.execute(stmt)
             conn.commit()
@@ -17784,14 +17836,27 @@ def _direct_acquire_cluster_lock(
         lock_key: str, holder_json: dict[str, Any],
         node_uuid: str, pid: int,
         lock_id: str, now: float) -> bool:
-    """Attempt to acquire a lock by inserting a row.
+    """Atomically take or steal a leased cluster lock.
 
-    Returns True if the row was inserted (lock acquired),
-    False if the key already exists (lock held by another).
-    Uses INSERT IGNORE so a duplicate PK is a silent failure.
+    Two queries, each individually atomic:
+
+    1. ``INSERT IGNORE`` -- claims an unheld lock_key. rowcount == 1
+       means we got it.
+    2. ``UPDATE ... WHERE expires_at < NOW()`` -- only fires when (1)
+       lost the duplicate-PK race; rewrites the row in place if the
+       previous holder's lease has expired. rowcount == 1 means we
+       stole it.
+
+    ``expires_at`` is set server-side to ``NOW() + CLUSTER_LOCK_LEASE_SECONDS`` so
+    we never trust per-node clocks. Holders extend their lease via
+    ``_direct_refresh_cluster_lock``; if they cannot, the row will
+    expire and a candidate will eventually steal here.
     """
     engine = _get_engine()
     table = _get_cluster_locks_table()
+    expires = sa.func.date_add(
+        sa.func.now(),
+        sa.text(f'INTERVAL {CLUSTER_LOCK_LEASE_SECONDS} SECOND'))
 
     try:
         with engine.connect() as conn:
@@ -17802,8 +17867,29 @@ def _direct_acquire_cluster_lock(
                 pid=pid,
                 lock_id=lock_id,
                 acquired_at=now,
+                expires_at=expires,
             )
             result = conn.execute(stmt)
+            if result.rowcount == 1:
+                conn.commit()
+                return True
+
+            # Cold acquire lost the duplicate-PK race. Try to steal a
+            # lock whose lease has lapsed.
+            steal = sa.update(table).where(
+                sa.and_(
+                    table.c.lock_key == lock_key,
+                    table.c.expires_at < sa.func.now(),
+                )
+            ).values(
+                holder_json=holder_json,
+                node_uuid=node_uuid,
+                pid=pid,
+                lock_id=lock_id,
+                acquired_at=now,
+                expires_at=expires,
+            )
+            result = conn.execute(steal)
             conn.commit()
             return result.rowcount == 1
     except OperationalError as e:
@@ -17811,6 +17897,40 @@ def _direct_acquire_cluster_lock(
             f'MariaDB acquire_cluster_lock failed for '
             f'{lock_key}: {e}')
         return False
+
+
+def _direct_refresh_cluster_lock(
+        lock_key: str, lock_id: str) -> bool:
+    """Extend the lease for a lock we still hold.
+
+    Returns True if the row was matched and refreshed, False if no
+    row matched -- which means our lock has been stolen (or never
+    existed). Callers must treat False as "lock lost" and abort
+    whatever critical section they were in.
+    """
+    engine = _get_engine()
+    table = _get_cluster_locks_table()
+    expires = sa.func.date_add(
+        sa.func.now(),
+        sa.text(f'INTERVAL {CLUSTER_LOCK_LEASE_SECONDS} SECOND'))
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                sa.and_(
+                    table.c.lock_key == lock_key,
+                    table.c.lock_id == lock_id,
+                )
+            ).values(expires_at=expires)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount == 1
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB refresh_cluster_lock failed for '
+            f'{lock_key}: {e}')
+        # Transient: caller should retry the refresh, not give up.
+        raise
 
 
 def _direct_release_cluster_lock(
@@ -18227,6 +18347,27 @@ def _grpc_release_cluster_lock(
     return bool(response.success)
 
 
+def _grpc_refresh_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_id: str) -> bool:
+    """Extend the lease for a lock via the database microservice.
+
+    Transient gRPC errors propagate as ``grpc.RpcError`` after
+    ``_grpc_call`` exhausts its retries; the refresh loop in
+    ``ClusterLock`` catches those and tries again rather than
+    treating them as confirmed lock loss.
+    """
+    stub = _get_database_stub()
+    request = database_pb2.ClusterRefreshLockRequest(
+        object_type=object_type,
+        subtype=subtype or '',
+        name=name,
+        lock_id=lock_id,
+    )
+    response = _grpc_call(stub.RefreshLock, request)
+    return bool(response.success)
+
+
 def _grpc_get_cluster_lock_holder(
         object_type: str, subtype: str,
         name: str) -> Optional[dict[str, Any]]:
@@ -18325,6 +18466,30 @@ def release_cluster_lock(
     return _direct_release_cluster_lock(
         lock_key=lock_key,
         lock_id=lock_data.get('id', ''),
+    )
+
+
+def refresh_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_id: str) -> bool:
+    """Extend the lease on a distributed lock we still hold.
+
+    Returns True on a successful refresh, False if the lock has been
+    stolen (no row matched lock_id) -- callers must treat False as
+    "lock lost" and abort whatever critical section they were in.
+    Transient backend failures propagate (``OperationalError`` on the
+    direct path, ``grpc.RpcError`` on the gRPC path); the refresh
+    loop in ``ClusterLock`` catches them and retries rather than
+    treating them as confirmed loss.
+    """
+    if _use_database_service():
+        return _grpc_refresh_cluster_lock(
+            object_type, subtype, name, lock_id)
+
+    lock_key = _cluster_lock_key(object_type, subtype, name)
+    return _direct_refresh_cluster_lock(
+        lock_key=lock_key,
+        lock_id=lock_id,
     )
 
 

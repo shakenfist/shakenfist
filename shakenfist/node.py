@@ -339,7 +339,7 @@ class Node(dbo):
             retval['is_eventlog_node'] = attrs.is_eventlog_node
 
         # Add daemon states (single round trip rather than one per daemon)
-        rows = mariadb.get_all_node_daemon_states(self.uuid) or []
+        rows = mariadb.get_all_node_daemon_states(self.uuid) or []  # nopushdown: per-node scope, ~12 rows
         states_by_daemon = {r.daemon: r.value for r in rows}
         for daemon in self.VALID_DAEMONS:
             retval[f'daemon-{daemon}-state'] = states_by_daemon.get(daemon)
@@ -430,7 +430,7 @@ class Node(dbo):
         return row.to_state()
 
     def get_degraded_daemons(self):
-        rows = mariadb.get_all_node_daemon_states(self.uuid) or []
+        rows = mariadb.get_all_node_daemon_states(self.uuid) or []  # nopushdown: per-node scope, ~12 rows
         states_by_daemon = {r.daemon: r.value for r in rows}
         degraded = []
         for daemon in self.get_registered_daemons():

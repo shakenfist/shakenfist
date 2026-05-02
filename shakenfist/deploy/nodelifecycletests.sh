@@ -270,11 +270,14 @@ if [ ${running_count} -gt 0 ]; then
     exit 1
 fi
 
-# Ensure another node is now the maintenance node
+# Ensure another node is now the maintenance node. The cluster
+# maintenance lock has a 60s lease, so we wait 90s here -- comfortably
+# past the lease expiry plus a couple of refresh cycles -- before
+# expecting a candidate to have stolen the dead maintainer's lock.
 echo
 log "=== Cluster maintenance failover check ==="
 log "Pausing for maintenance node failover..."
-sleep 60
+sleep 90
 new_maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
 if [ "${maintainer}" == "${new_maintainer}" ]; then
     log "SF failed to select a new maintenance node"
