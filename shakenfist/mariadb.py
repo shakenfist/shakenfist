@@ -49,6 +49,7 @@ from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
+from shakenfist.schema.node_daemon_state import NodeDaemonStateData
 from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
@@ -125,6 +126,7 @@ _instance_attributes_table: Optional[sa.Table] = None
 _object_metadata_table: Optional[sa.Table] = None
 _cluster_operation_targets_table: Optional[sa.Table] = None
 _node_metrics_table: Optional[sa.Table] = None
+_node_daemon_states_table: Optional[sa.Table] = None
 _cluster_operations_table: Optional[sa.Table] = None
 _work_queue_table: Optional[sa.Table] = None
 
@@ -161,6 +163,9 @@ INSTANCE_ATTRIBUTES_VERSION = 3
 OBJECT_METADATA_VERSION = 2
 CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
+# v1: schema creation. v2: data migration from node_attributes.daemon_states
+# JSON column.
+NODE_DAEMON_STATES_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 2
 WORK_QUEUE_VERSION = 2
 CLUSTER_LOCKS_VERSION = 2
@@ -1725,6 +1730,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_object_metadata_schema(engine))
     results.append(_ensure_cluster_operation_targets_schema(engine))
     results.append(_ensure_node_metrics_schema(engine))
+    results.append(_ensure_node_daemon_states_schema(engine))
     results.append(_ensure_cluster_operations_schema(engine))
     results.append(_ensure_work_queue_schema(engine))
     results.append(_ensure_cluster_locks_schema(engine))
@@ -9878,6 +9884,131 @@ def _ensure_node_attributes_schema(
     }
 
 
+def _get_node_daemon_states_table() -> sa.Table:
+    """Get or create the node_daemon_states table definition.
+
+    One row per (node_uuid, daemon). Replaces the daemon_states JSON
+    dict that used to live inside node_attributes; that dict required a
+    coarse per-node lock for every transition, which serialised every
+    daemon's startup and shutdown through a single 10s-timeout lock and
+    caused tail acquisitions to fail under load.
+    """
+    global _node_daemon_states_table
+    if _node_daemon_states_table is None:
+        metadata = _get_metadata()
+        _node_daemon_states_table = sa.Table(
+            'node_daemon_states',
+            metadata,
+            sa.Column('node_uuid', sa.Uuid(), nullable=False),
+            sa.Column('daemon', sa.String(32), nullable=False),
+            sa.Column('value', sa.String(32), nullable=True),
+            sa.Column('update_time', sa.Double(), nullable=False, default=0.0),
+            sa.Column('message', sa.String(255), nullable=True),
+            sa.PrimaryKeyConstraint('node_uuid', 'daemon'),
+            sa.Index('idx_node_daemon_states_daemon_value', 'daemon', 'value'),
+        )
+    return _node_daemon_states_table
+
+
+def _migrate_daemon_states_from_node_attributes(
+    engine: sa.Engine,
+) -> tuple[int, int]:
+    """Copy daemon_states JSON entries from node_attributes into node_daemon_states.
+
+    Idempotent: uses INSERT ... ON DUPLICATE KEY UPDATE so re-running on
+    an already-migrated cluster is a no-op. The JSON column is left in
+    place; it is dropped in a later schema bump once nothing reads it.
+
+    Returns ``(migrated, errors)``.
+    """
+    src = _get_node_attributes_table()
+    dst = _get_node_daemon_states_table()
+    migrated = 0
+    errors = 0
+
+    with engine.connect() as conn:
+        rows = conn.execute(
+            sa.select(src.c.uuid, src.c.daemon_states)
+        ).fetchall()
+
+        for row in rows:
+            ds = row.daemon_states or {}
+            if not isinstance(ds, dict):
+                continue
+            for daemon_name, payload in ds.items():
+                if not isinstance(payload, dict):
+                    errors += 1
+                    continue
+                try:
+                    stmt = sa.dialects.mysql.insert(dst).values(
+                        node_uuid=row.uuid,
+                        daemon=daemon_name,
+                        value=payload.get('value'),
+                        update_time=payload.get('update_time') or 0.0,
+                        message=payload.get('message'),
+                    )
+                    stmt = stmt.on_duplicate_key_update(
+                        value=payload.get('value'),
+                        update_time=payload.get('update_time') or 0.0,
+                        message=payload.get('message'),
+                    )
+                    conn.execute(stmt)
+                    migrated += 1
+                except Exception as e:
+                    LOG.warning(
+                        f'Failed to migrate daemon_state '
+                        f'{row.uuid}/{daemon_name}: {e}')
+                    errors += 1
+        conn.commit()
+
+    return migrated, errors
+
+
+def _ensure_node_daemon_states_schema(
+    engine: sa.Engine,
+) -> dict[str, Any]:
+    """Ensure the node_daemon_states table schema is up to date."""
+    table_name = 'node_daemon_states'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_node_daemon_states_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 2:
+        # Migrate any pre-existing daemon_states JSON content from
+        # node_attributes. Skipped automatically on a fresh cluster
+        # because there is nothing to read.
+        LOG.info(
+            f'Migrating daemon_states JSON into {table_name} (version 2)')
+        migrated, errors = _migrate_daemon_states_from_node_attributes(engine)
+        LOG.info(
+            f'{table_name} migration: {migrated} row(s) copied, '
+            f'{errors} error(s)')
+        current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NODE_DAEMON_STATES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 # --- Direct node access functions ---
 
 def _direct_create_node(
@@ -10202,6 +10333,132 @@ def _direct_delete_node_attributes(
             'MariaDB delete failed for '
             f'node_attributes {node_uuid}: {e}'
         )
+        return False
+
+
+# --- Direct node daemon state access functions ---
+
+def _direct_set_node_daemon_state(
+    node_uuid: UUID, daemon: str, value: Optional[str],
+    update_time: float, message: Optional[str],
+) -> bool:
+    """Atomically upsert one (node, daemon) state row.
+
+    No Python-side locking: the composite primary key
+    ``(node_uuid, daemon)`` and ``INSERT ... ON DUPLICATE KEY UPDATE``
+    give us per-daemon isolation directly at the SQL layer.
+    """
+    engine = _get_engine()
+    table = _get_node_daemon_states_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                node_uuid=node_uuid,
+                daemon=daemon,
+                value=value,
+                update_time=update_time,
+                message=message,
+            )
+            stmt = stmt.on_duplicate_key_update(
+                value=value,
+                update_time=update_time,
+                message=message,
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB write failed for node_daemon_states '
+            f'{node_uuid}/{daemon}: {e}')
+        return False
+
+
+def _direct_get_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> Optional[NodeDaemonStateData]:
+    """Read one (node, daemon) state row, or None if absent."""
+    engine = _get_engine()
+    table = _get_node_daemon_states_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(
+                    table.c.node_uuid == node_uuid,
+                    table.c.daemon == daemon,
+                )
+            )
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return None
+            return NodeDaemonStateData(
+                node_uuid=result.node_uuid,
+                daemon=result.daemon,
+                value=result.value,
+                update_time=result.update_time,
+                message=result.message,
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for node_daemon_states '
+            f'{node_uuid}/{daemon}: {e}')
+        return None
+
+
+def _direct_get_all_node_daemon_states(
+    node_uuid: UUID,
+) -> Optional[list[NodeDaemonStateData]]:
+    """Read every daemon state row for one node.
+
+    Returns ``None`` on a database error, ``[]`` for no rows.
+    """
+    engine = _get_engine()
+    table = _get_node_daemon_states_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.node_uuid == node_uuid)
+            results = conn.execute(stmt).fetchall()
+            return [
+                NodeDaemonStateData(
+                    node_uuid=row.node_uuid,
+                    daemon=row.daemon,
+                    value=row.value,
+                    update_time=row.update_time,
+                    message=row.message,
+                )
+                for row in results
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for node_daemon_states {node_uuid}: {e}')
+        return None
+
+
+def _direct_delete_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> bool:
+    """Delete one (node, daemon) state row. Returns True if absent or removed."""
+    engine = _get_engine()
+    table = _get_node_daemon_states_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.node_uuid == node_uuid,
+                    table.c.daemon == daemon,
+                )
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for node_daemon_states '
+            f'{node_uuid}/{daemon}: {e}')
         return False
 
 
@@ -10679,6 +10936,143 @@ def delete_node_attributes(
     if _use_database_service():
         return _grpc_delete_node_attributes(node_uuid)
     return _direct_delete_node_attributes(node_uuid)
+
+
+# --- gRPC node daemon state client functions ---
+
+def _grpc_set_node_daemon_state(
+    node_uuid: UUID, daemon: str, value: Optional[str],
+    update_time: float, message: Optional[str],
+) -> bool:
+    """Atomically upsert one (node, daemon) state row via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.SetNodeDaemonStateRequest(
+            data=database_pb2.NodeDaemonStateData(
+                node_uuid=str(node_uuid),
+                daemon=daemon,
+                value=value or '',
+                update_time=update_time,
+                message=message or '',
+            ),
+        )
+        reply = _grpc_call(stub.SetNodeDaemonState, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC SetNodeDaemonState failed for {node_uuid}/{daemon}: {e}')
+        return False
+
+
+def _grpc_get_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> Optional[NodeDaemonStateData]:
+    """Read one (node, daemon) state row via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNodeDaemonStateRequest(
+            node_uuid=str(node_uuid), daemon=daemon)
+        reply = _grpc_call(stub.GetNodeDaemonState, request)
+        if not reply.found:
+            return None
+        d = reply.data
+        return NodeDaemonStateData(
+            node_uuid=UUID(d.node_uuid),
+            daemon=d.daemon,
+            value=d.value if d.value else None,
+            update_time=d.update_time,
+            message=d.message if d.message else None,
+        )
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetNodeDaemonState failed for {node_uuid}/{daemon}: {e}')
+        return None
+
+
+def _grpc_get_all_node_daemon_states(
+    node_uuid: UUID,
+) -> Optional[list[NodeDaemonStateData]]:
+    """Read every daemon state row for one node via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllNodeDaemonStatesRequest(
+            node_uuid=str(node_uuid))
+        reply = _grpc_call(stub.GetAllNodeDaemonStates, request)
+        return [
+            NodeDaemonStateData(
+                node_uuid=UUID(d.node_uuid),
+                daemon=d.daemon,
+                value=d.value if d.value else None,
+                update_time=d.update_time,
+                message=d.message if d.message else None,
+            )
+            for d in reply.data
+        ]
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetAllNodeDaemonStates failed for {node_uuid}: {e}')
+        return None
+
+
+def _grpc_delete_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> bool:
+    """Delete one (node, daemon) state row via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNodeDaemonStateRequest(
+            node_uuid=str(node_uuid), daemon=daemon)
+        reply = _grpc_call(stub.DeleteNodeDaemonState, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC DeleteNodeDaemonState failed for {node_uuid}/{daemon}: {e}')
+        return False
+
+
+# --- Public node daemon state API functions ---
+
+def set_node_daemon_state(
+    node_uuid: UUID, daemon: str, value: Optional[str],
+    update_time: float, message: Optional[str] = None,
+) -> bool:
+    """Atomically upsert one (node, daemon) state row.
+
+    No Python-level locking is required: the composite primary key
+    ``(node_uuid, daemon)`` plus ``INSERT ... ON DUPLICATE KEY UPDATE``
+    serialise concurrent writes for the same daemon at the SQL layer
+    while leaving writes for different daemons fully parallel.
+    """
+    if _use_database_service():
+        return _grpc_set_node_daemon_state(
+            node_uuid, daemon, value, update_time, message)
+    return _direct_set_node_daemon_state(
+        node_uuid, daemon, value, update_time, message)
+
+
+def get_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> Optional[NodeDaemonStateData]:
+    """Read one (node, daemon) state row, or None if absent."""
+    if _use_database_service():
+        return _grpc_get_node_daemon_state(node_uuid, daemon)
+    return _direct_get_node_daemon_state(node_uuid, daemon)
+
+
+def get_all_node_daemon_states(
+    node_uuid: UUID,
+) -> Optional[list[NodeDaemonStateData]]:
+    """Read every daemon state row for one node."""
+    if _use_database_service():
+        return _grpc_get_all_node_daemon_states(node_uuid)
+    return _direct_get_all_node_daemon_states(node_uuid)
+
+
+def delete_node_daemon_state(node_uuid: UUID, daemon: str) -> bool:
+    """Delete one (node, daemon) state row."""
+    if _use_database_service():
+        return _grpc_delete_node_daemon_state(node_uuid, daemon)
+    return _direct_delete_node_daemon_state(node_uuid, daemon)
 
 
 # =============================================================================

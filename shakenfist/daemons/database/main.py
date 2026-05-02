@@ -2206,6 +2206,108 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             )
 
     # =========================================================
+    # Node Daemon State Operations (MariaDB)
+    # =========================================================
+
+    def SetNodeDaemonState(
+        self,
+        request: database_pb2.SetNodeDaemonStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Atomically upsert one (node, daemon) state row."""
+        try:
+            self.monitor.counters['set_node_daemon_state'].inc()
+            d = request.data
+            success = mariadb._direct_set_node_daemon_state(
+                UUID(d.node_uuid),
+                d.daemon,
+                d.value if d.value else None,
+                d.update_time,
+                d.message if d.message else None,
+            )
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database SetNodeDaemonState failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetNodeDaemonState(
+        self,
+        request: database_pb2.GetNodeDaemonStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNodeDaemonStateReply:
+        """Get one (node, daemon) state row."""
+        try:
+            self.monitor.counters['get_node_daemon_state'].inc()
+            row = mariadb._direct_get_node_daemon_state(
+                UUID(request.node_uuid), request.daemon)
+            if row is None:
+                return database_pb2.GetNodeDaemonStateReply(found=False)
+            return database_pb2.GetNodeDaemonStateReply(
+                found=True,
+                data=database_pb2.NodeDaemonStateData(
+                    node_uuid=str(row.node_uuid),
+                    daemon=row.daemon,
+                    value=row.value or '',
+                    update_time=row.update_time,
+                    message=row.message or '',
+                ),
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNodeDaemonState failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNodeDaemonStateReply(found=False)
+
+    def GetAllNodeDaemonStates(
+        self,
+        request: database_pb2.GetAllNodeDaemonStatesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllNodeDaemonStatesReply:
+        """Get every daemon state row for one node."""
+        try:
+            self.monitor.counters['get_all_node_daemon_states'].inc()
+            rows = mariadb._direct_get_all_node_daemon_states(
+                UUID(request.node_uuid))
+            if rows is None:
+                rows = []
+            return database_pb2.GetAllNodeDaemonStatesReply(
+                data=[
+                    database_pb2.NodeDaemonStateData(
+                        node_uuid=str(r.node_uuid),
+                        daemon=r.daemon,
+                        value=r.value or '',
+                        update_time=r.update_time,
+                        message=r.message or '',
+                    )
+                    for r in rows
+                ],
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllNodeDaemonStates failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetAllNodeDaemonStatesReply()
+
+    def DeleteNodeDaemonState(
+        self,
+        request: database_pb2.DeleteNodeDaemonStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete one (node, daemon) state row."""
+        try:
+            self.monitor.counters['delete_node_daemon_state'].inc()
+            success = mariadb._direct_delete_node_daemon_state(
+                UUID(request.node_uuid), request.daemon)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNodeDaemonState failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    # =========================================================
     # Namespace Operations (MariaDB)
     # =========================================================
 
@@ -4623,6 +4725,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB node metrics operations
             'upsert_node_metrics', 'get_node_metrics',
             'get_all_node_metrics', 'delete_node_metrics',
+            # MariaDB node daemon state operations
+            'set_node_daemon_state', 'get_node_daemon_state',
+            'get_all_node_daemon_states', 'delete_node_daemon_state',
         ]
         for op in operations:
             self.counters[op] = Counter(

@@ -2692,6 +2692,146 @@ class DeleteNodeAttributesRequest(google.protobuf.message.Message):
 global___DeleteNodeAttributesRequest = DeleteNodeAttributesRequest
 
 @typing.final
+class NodeDaemonStateData(google.protobuf.message.Message):
+    """Node Daemon State Operations (MariaDB)
+    One row per (node_uuid, daemon). Replaces the daemon_states JSON dict.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    DAEMON_FIELD_NUMBER: builtins.int
+    VALUE_FIELD_NUMBER: builtins.int
+    UPDATE_TIME_FIELD_NUMBER: builtins.int
+    MESSAGE_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    """Node UUID (string form)"""
+    daemon: builtins.str
+    """Daemon short name (e.g. 'net', 'queues')"""
+    value: builtins.str
+    """State string, '' if unset"""
+    update_time: builtins.float
+    """Unix timestamp of last update"""
+    message: builtins.str
+    """Optional message"""
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+        daemon: builtins.str = ...,
+        value: builtins.str = ...,
+        update_time: builtins.float = ...,
+        message: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["daemon", b"daemon", "message", b"message", "node_uuid", b"node_uuid", "update_time", b"update_time", "value", b"value"]) -> None: ...
+
+global___NodeDaemonStateData = NodeDaemonStateData
+
+@typing.final
+class SetNodeDaemonStateRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> global___NodeDaemonStateData: ...
+    def __init__(
+        self,
+        *,
+        data: global___NodeDaemonStateData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___SetNodeDaemonStateRequest = SetNodeDaemonStateRequest
+
+@typing.final
+class GetNodeDaemonStateRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    DAEMON_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    daemon: builtins.str
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+        daemon: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["daemon", b"daemon", "node_uuid", b"node_uuid"]) -> None: ...
+
+global___GetNodeDaemonStateRequest = GetNodeDaemonStateRequest
+
+@typing.final
+class GetNodeDaemonStateReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    @property
+    def data(self) -> global___NodeDaemonStateData: ...
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        data: global___NodeDaemonStateData | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "found", b"found"]) -> None: ...
+
+global___GetNodeDaemonStateReply = GetNodeDaemonStateReply
+
+@typing.final
+class GetAllNodeDaemonStatesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["node_uuid", b"node_uuid"]) -> None: ...
+
+global___GetAllNodeDaemonStatesRequest = GetAllNodeDaemonStatesRequest
+
+@typing.final
+class GetAllNodeDaemonStatesReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NodeDaemonStateData]: ...
+    def __init__(
+        self,
+        *,
+        data: collections.abc.Iterable[global___NodeDaemonStateData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___GetAllNodeDaemonStatesReply = GetAllNodeDaemonStatesReply
+
+@typing.final
+class DeleteNodeDaemonStateRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODE_UUID_FIELD_NUMBER: builtins.int
+    DAEMON_FIELD_NUMBER: builtins.int
+    node_uuid: builtins.str
+    daemon: builtins.str
+    def __init__(
+        self,
+        *,
+        node_uuid: builtins.str = ...,
+        daemon: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["daemon", b"daemon", "node_uuid", b"node_uuid"]) -> None: ...
+
+global___DeleteNodeDaemonStateRequest = DeleteNodeDaemonStateRequest
+
+@typing.final
 class NamespaceStaticData(google.protobuf.message.Message):
     """Namespace Operations (MariaDB)
     Namespaces use their name (string) as primary key, not a UUID.

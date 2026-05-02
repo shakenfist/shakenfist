@@ -461,6 +461,32 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    SetNodeDaemonState: grpc.UnaryUnaryMultiCallable[
+        database_pb2.SetNodeDaemonStateRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Daemon State Operations (MariaDB)
+    Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
+    that previously lived inside node_attributes; that dict required a
+    coarse per-node lock for every transition and serialised every
+    daemon's startup/shutdown through a single 10s lock.
+    """
+
+    GetNodeDaemonState: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeDaemonStateRequest,
+        database_pb2.GetNodeDaemonStateReply,
+    ]
+
+    GetAllNodeDaemonStates: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNodeDaemonStatesRequest,
+        database_pb2.GetAllNodeDaemonStatesReply,
+    ]
+
+    DeleteNodeDaemonState: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeDaemonStateRequest,
+        database_pb2.StatusReply,
+    ]
+
     CreateNamespace: grpc.UnaryUnaryMultiCallable[
         database_pb2.CreateNamespaceRequest,
         database_pb2.StatusReply,
@@ -1401,6 +1427,32 @@ class DatabaseServiceAsyncStub:
 
     DeleteNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteNodeAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    SetNodeDaemonState: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.SetNodeDaemonStateRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Daemon State Operations (MariaDB)
+    Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
+    that previously lived inside node_attributes; that dict required a
+    coarse per-node lock for every transition and serialised every
+    daemon's startup/shutdown through a single 10s lock.
+    """
+
+    GetNodeDaemonState: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeDaemonStateRequest,
+        database_pb2.GetNodeDaemonStateReply,
+    ]
+
+    GetAllNodeDaemonStates: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNodeDaemonStatesRequest,
+        database_pb2.GetAllNodeDaemonStatesReply,
+    ]
+
+    DeleteNodeDaemonState: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeDaemonStateRequest,
         database_pb2.StatusReply,
     ]
 
@@ -2512,6 +2564,40 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def DeleteNodeAttributes(
         self,
         request: database_pb2.DeleteNodeAttributesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def SetNodeDaemonState(
+        self,
+        request: database_pb2.SetNodeDaemonStateRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Node Daemon State Operations (MariaDB)
+        Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
+        that previously lived inside node_attributes; that dict required a
+        coarse per-node lock for every transition and serialised every
+        daemon's startup/shutdown through a single 10s lock.
+        """
+
+    @abc.abstractmethod
+    def GetNodeDaemonState(
+        self,
+        request: database_pb2.GetNodeDaemonStateRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNodeDaemonStateReply, collections.abc.Awaitable[database_pb2.GetNodeDaemonStateReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllNodeDaemonStates(
+        self,
+        request: database_pb2.GetAllNodeDaemonStatesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllNodeDaemonStatesReply, collections.abc.Awaitable[database_pb2.GetAllNodeDaemonStatesReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNodeDaemonState(
+        self,
+        request: database_pb2.DeleteNodeDaemonStateRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 

@@ -338,9 +338,11 @@ class Node(dbo):
             retval['is_network_node'] = attrs.is_network_node
             retval['is_eventlog_node'] = attrs.is_eventlog_node
 
-        # Add daemon states
+        # Add daemon states (single round trip rather than one per daemon)
+        rows = mariadb.get_all_node_daemon_states(self.uuid) or []
+        states_by_daemon = {r.daemon: r.value for r in rows}
         for daemon in self.VALID_DAEMONS:
-            retval[f'daemon-{daemon}-state'] = self.get_daemon_state(daemon).value
+            retval[f'daemon-{daemon}-state'] = states_by_daemon.get(daemon)
 
         # Object references use FQDN as the node identifier in the
         # object_references table.
@@ -381,9 +383,8 @@ class Node(dbo):
             attrs = self._ensure_attributes()
             if daemon in attrs.daemons:
                 attrs.daemons.remove(daemon)
-            if daemon in attrs.daemon_states:
-                del attrs.daemon_states[daemon]
-            self._save_attributes()
+                self._save_attributes()
+        mariadb.delete_node_daemon_state(self.uuid, daemon)
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon deregistered')
 
     def set_daemon_state(self, daemon, state, message=None):
@@ -394,24 +395,14 @@ class Node(dbo):
         if state not in self.VALID_DAEMON_STATES:
             raise NoSuchDaemonState(f'The daemon state {state} does not exist')
 
-        changed = False
-        with self.get_lock_attr('daemon_states', f'Set {daemon} state'):
-            self._invalidate_attributes()
-            attrs = self._ensure_attributes()
-            current = attrs.daemon_states.get(daemon, {})
-            if current.get('value') != state:
-                attrs.daemon_states[daemon] = {
-                    'value': state,
-                    'update_time': time.time(),
-                    'message': message
-                }
-                self._save_attributes()
-                changed = True
+        # Per-daemon row, atomic upsert at the SQL layer -- no Python lock,
+        # no read-modify-write, no inter-daemon contention.
+        mariadb.set_node_daemon_state(
+            self.uuid, daemon, state, time.time(), message)
 
-        if not changed:
-            return
-
-        # Determine if the node should transition state based on this update
+        # Reconcile node degraded state. The transition guards below mean a
+        # spurious call (state didn't actually change) is a cheap no-op, so
+        # we no longer need a "changed" check before running this.
         degraded = self.get_degraded_daemons()
         degraded_or_stopping = [
             self.STATE_DEGRADED, self.STATE_STOPPING, self.STATE_STOPPED]
@@ -433,21 +424,19 @@ class Node(dbo):
             raise NoSuchDaemon(
                 f'Cannot get daemon state for "{daemon}" on node {self.fqdn}, '
                 f'as that daemon is unknown.')
-        attrs = self._load_attributes()
-        if attrs is None:
+        row = mariadb.get_node_daemon_state(self.uuid, daemon)
+        if row is None:
             return State(value=None, update_time=0)
-        ds = attrs.daemon_states.get(daemon)
-        if not ds:
-            return State(value=None, update_time=0)
-        return State(**ds)
+        return row.to_state()
 
     def get_degraded_daemons(self):
+        rows = mariadb.get_all_node_daemon_states(self.uuid) or []
+        states_by_daemon = {r.daemon: r.value for r in rows}
         degraded = []
         for daemon in self.get_registered_daemons():
-            daemon_state = self.get_daemon_state(daemon).value
-            if not daemon_state:
-                degraded.append(daemon)
-            if daemon_state in [self.DAEMON_STATE_STOPPING, self.DAEMON_STATE_STOPPED]:
+            value = states_by_daemon.get(daemon)
+            if not value or value in (
+                    self.DAEMON_STATE_STOPPING, self.DAEMON_STATE_STOPPED):
                 degraded.append(daemon)
         return degraded
 

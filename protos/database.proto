@@ -123,6 +123,16 @@ service DatabaseService {
   rpc UpdateNodeAttributes (UpdateNodeAttributesRequest) returns (StatusReply) {}
   rpc DeleteNodeAttributes (DeleteNodeAttributesRequest) returns (StatusReply) {}
 
+  // Node Daemon State Operations (MariaDB)
+  // Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
+  // that previously lived inside node_attributes; that dict required a
+  // coarse per-node lock for every transition and serialised every
+  // daemon's startup/shutdown through a single 10s lock.
+  rpc SetNodeDaemonState (SetNodeDaemonStateRequest) returns (StatusReply) {}
+  rpc GetNodeDaemonState (GetNodeDaemonStateRequest) returns (GetNodeDaemonStateReply) {}
+  rpc GetAllNodeDaemonStates (GetAllNodeDaemonStatesRequest) returns (GetAllNodeDaemonStatesReply) {}
+  rpc DeleteNodeDaemonState (DeleteNodeDaemonStateRequest) returns (StatusReply) {}
+
   // Namespace Operations (MariaDB)
   // These manage namespace static values (name, version) in MariaDB.
   // Namespaces use their name as primary key (not a UUID).
@@ -1029,6 +1039,44 @@ message UpdateNodeAttributesRequest {
 
 message DeleteNodeAttributesRequest {
   string uuid = 1;
+}
+
+// Node Daemon State Operations (MariaDB)
+// One row per (node_uuid, daemon). Replaces the daemon_states JSON dict.
+
+message NodeDaemonStateData {
+  string node_uuid = 1;       // Node UUID (string form)
+  string daemon = 2;          // Daemon short name (e.g. 'net', 'queues')
+  string value = 3;           // State string, '' if unset
+  double update_time = 4;     // Unix timestamp of last update
+  string message = 5;         // Optional message
+}
+
+message SetNodeDaemonStateRequest {
+  NodeDaemonStateData data = 1;
+}
+
+message GetNodeDaemonStateRequest {
+  string node_uuid = 1;
+  string daemon = 2;
+}
+
+message GetNodeDaemonStateReply {
+  bool found = 1;
+  NodeDaemonStateData data = 2;
+}
+
+message GetAllNodeDaemonStatesRequest {
+  string node_uuid = 1;
+}
+
+message GetAllNodeDaemonStatesReply {
+  repeated NodeDaemonStateData data = 1;
+}
+
+message DeleteNodeDaemonStateRequest {
+  string node_uuid = 1;
+  string daemon = 2;
 }
 
 // Namespace Operations (MariaDB)
