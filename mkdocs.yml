@@ -157,6 +157,7 @@ nav:
                 - "Bug reporting mode for ryll": components/ryll/plans/PLAN-bug-reports.md
                 - "Bug-report trigger-time snapshot (2026-04-23)": components/ryll/plans/PLAN-bugreport-trigger-snapshot.md
                 - "Capture mode for protocol and display debugging": components/ryll/plans/PLAN-capture.md
+                - "Connection properties dialog": components/ryll/plans/PLAN-connection-properties.md
                 - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
                 - "Deferred debt: collating and paying down outstanding work": components/ryll/plans/PLAN-deferred-debt.md
                 - "Display draw-op coverage": components/ryll/plans/PLAN-display-draw-ops.md
@@ -169,6 +170,7 @@ nav:
                 - "Notifications system": components/ryll/plans/PLAN-notifications.md
                 - "Paste-as-keystrokes fallback": components/ryll/plans/PLAN-paste-as-keystrokes.md
                 - "Phase 01: Idle CPU profile": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile.md
+                - "Phase 1 — always fit window to guest surface": components/ryll/plans/PLAN-display-window-sizing-phase-01-always-fit.md
                 - "Phase 1 — PR 31 follow-up: regression tests": components/ryll/plans/PLAN-pr31-followup-phase-01-tests.md
                 - "Phase 1 — trigger-snapshot metadata plumbing": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-01-metadata.md
                 - "Phase 10: Testing and QEMU setup": components/ryll/plans/PLAN-usb-redir-phase-10-testing.md
@@ -186,6 +188,7 @@ nav:
                 - "Phase 1: Screenshot hotkey and save dialog": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-01-screenshot.md
                 - "Phase 1: SpiceVMC channel transport": components/ryll/plans/PLAN-usb-redir-phase-01-vmc-channel.md
                 - "Phase 1: SpiceVMC port channel transport for WebDAV": components/ryll/plans/PLAN-webdav-phase-01-port-channel.md
+                - "Phase 2 — hamburger toggle and CLI flag": components/ryll/plans/PLAN-display-window-sizing-phase-02-toggle.md
                 - "Phase 2 — PR 31 follow-up: docs sweep": components/ryll/plans/PLAN-pr31-followup-phase-02-docs.md
                 - "Phase 2 — trigger-time surface snapshot": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-02-snapshot.md
                 - "Phase 2: Audio correctness": components/ryll/plans/PLAN-deferred-debt-phase-02-audio.md
@@ -204,6 +207,7 @@ nav:
                 - "Phase 2: Wire usb_tx and channel events": components/ryll/plans/PLAN-usb-ui-phase-02-wire-tx.md
                 - "Phase 3 — PR 31 follow-up: polish items": components/ryll/plans/PLAN-pr31-followup-phase-03-polish.md
                 - "Phase 3 — submit-time region crop": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-03-region.md
+                - "Phase 3 — tests for the resize state machine": components/ryll/plans/PLAN-display-window-sizing-phase-03-tests.md
                 - "Phase 3: Bug report assembly and zip output": components/ryll/plans/PLAN-bug-reports-phase-03-zip-output.md
                 - "Phase 3: Debian Packaging": components/ryll/plans/PLAN-packaging-phase-03-debian.md
                 - "Phase 3: Demote protocol logging": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging.md
@@ -217,6 +221,7 @@ nav:
                 - "Phase 3: migrate Gaps and bug-report status as sources": components/ryll/plans/PLAN-notifications-phase-03-existing-sources.md
                 - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
+                - "Phase 4 — documentation": components/ryll/plans/PLAN-display-window-sizing-phase-04-docs.md
                 - "Phase 4 — documentation": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs.md
                 - "Phase 4: COPY_BITS": components/ryll/plans/PLAN-display-draw-ops-phase-04-copy-bits.md
                 - "Phase 4: Device enumeration display": components/ryll/plans/PLAN-usb-ui-phase-04-enumerate.md
@@ -229,6 +234,7 @@ nav:
                 - "Phase 4: Real latency from PING/PONG": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency.md
                 - "Phase 4: Robustness and safety": components/ryll/plans/PLAN-deferred-debt-phase-04-robustness.md
                 - "Phase 4: RPM Packaging": components/ryll/plans/PLAN-packaging-phase-04-rpm.md
+                - "Phase 5 — resolution-change notifications": components/ryll/plans/PLAN-display-window-sizing-phase-05-notify.md
                 - "Phase 5: Capture runtime metrics in bug reports": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics.md
                 - "Phase 5: Code quality and cleanup": components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup.md
                 - "Phase 5: Connect and disconnect controls": components/ryll/plans/PLAN-usb-ui-phase-05-connect.md
@@ -270,6 +276,7 @@ nav:
                 - "Supply-chain follow-ups": components/ryll/plans/PLAN-supply-chain-followups.md
                 - "USB device redirection via the SPICE usbredir channel": components/ryll/plans/PLAN-usb-redir.md
                 - "WebDAV folder sharing via the SPICE port channel": components/ryll/plans/PLAN-webdav.md
+                - "Window-follows-guest display sizing": components/ryll/plans/PLAN-display-window-sizing.md
     - Features: features.md
     - Release notes:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
