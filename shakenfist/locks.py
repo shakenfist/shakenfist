@@ -38,6 +38,14 @@ REFRESH_INTERVAL = LEASE_SECONDS // 3
 # transient failure. Tighter than REFRESH_INTERVAL so we recover
 # quickly from short outages without blowing the lease.
 REFRESH_RETRY = 2
+# How long ``release()`` waits for the refresher thread to join
+# before giving up. A sleeping refresher wakes from
+# ``_stop_event.set()`` in microseconds, so this only matters when
+# the refresher is mid-gRPC-call -- and gRPC retries on UNAVAILABLE
+# can stretch that to a minute or more, which is well past systemd's
+# 30s ``TimeoutStopSec``. Keep this short and accept that pathological
+# cases will leave a daemon thread to die when the process exits.
+REFRESH_JOIN_TIMEOUT = 2
 
 
 class ClusterLock:
@@ -174,7 +182,10 @@ class ClusterLock:
         # Best-effort join. The refresher is a daemon thread so a
         # hung join during interpreter shutdown will not prevent
         # exit; but during normal release we want it stopped cleanly.
-        self._refresher.join(timeout=REFRESH_INTERVAL + 1)
+        # Keep this short -- a refresher mid-gRPC-call will not return
+        # for tens of seconds, and that is fine: orphan it and let it
+        # die when the process exits.
+        self._refresher.join(timeout=REFRESH_JOIN_TIMEOUT)
         if self._refresher.is_alive():
             # The refresher is still inside a slow gRPC call. Leaving
             # the handle attached would let `_start_refresher` spawn a
