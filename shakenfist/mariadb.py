@@ -70,6 +70,7 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.sqlalchemy import get_table_columns
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
+from shakenfist.schema.sqlalchemy import TABLE_CREATION_LOCK
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import callstack as util_callstack
 
@@ -399,21 +400,30 @@ def _get_object_states_table() -> sa.Table:
     """
     global _object_states_table
     if _object_states_table is None:
-        metadata = _get_metadata()
-        # Build the table manually to support composite primary key
-        _object_states_table = sa.Table(
-            'object_states',
-            metadata,
-            sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
-            sa.Column('state_value', sa.String(32), nullable=True),
-            sa.Column('update_time', sa.Double(), nullable=False),
-            sa.Column('message', sa.String(255), nullable=True),
-            # Composite primary key
-            sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
-            # Index for efficient queries by type and state
-            sa.Index('idx_object_states_type_state', 'object_type', 'state_value'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _object_states_table is not None:
+                return _object_states_table
+            metadata = _get_metadata()
+            if 'object_states' in metadata.tables:
+                _object_states_table = metadata.tables['object_states']
+                return _object_states_table
+            # Build the table manually to support composite primary key
+            _object_states_table = sa.Table(
+                'object_states',
+                metadata,
+                sa.Column('object_uuid', sa.String(36), nullable=False),
+                sa.Column(
+                    'object_type', sa.Enum(ObjectType), nullable=False),
+                sa.Column('state_value', sa.String(32), nullable=True),
+                sa.Column('update_time', sa.Double(), nullable=False),
+                sa.Column('message', sa.String(255), nullable=True),
+                # Composite primary key
+                sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
+                # Index for efficient queries by type and state
+                sa.Index(
+                    'idx_object_states_type_state',
+                    'object_type', 'state_value'),
+            )
     return _object_states_table
 
 
@@ -826,31 +836,36 @@ def _get_cluster_locks_table() -> sa.Table:
     """
     global _cluster_locks_table
     if _cluster_locks_table is None:
-        metadata = _get_metadata()
-        _cluster_locks_table = sa.Table(
-            'cluster_locks',
-            metadata,
-            sa.Column('lock_key', sa.String(255),
-                      primary_key=True),
-            sa.Column('holder_json', sa.JSON(),
-                      nullable=False),
-            sa.Column('node_uuid', sa.String(255),
-                      nullable=False),
-            sa.Column('pid', sa.Integer(), nullable=False),
-            sa.Column('lock_id', sa.String(64),
-                      nullable=False),
-            sa.Column('acquired_at', sa.Double(),
-                      nullable=False),
-            sa.Column('expires_at', sa.DateTime(),
-                      nullable=False),
-            sa.Index('idx_cluster_locks_node',
-                     'node_uuid'),
-            sa.Index('idx_cluster_locks_acquired',
-                     'acquired_at'),
-            sa.Index('idx_cluster_locks_expires',
-                     'expires_at'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_locks_table is not None:
+                return _cluster_locks_table
+            metadata = _get_metadata()
+            # If another thread registered this table while we were
+            # waiting on the lock, hand back the existing object
+            # instead of re-registering and tripping
+            # ``InvalidRequestError: Table already defined``.
+            if 'cluster_locks' in metadata.tables:
+                _cluster_locks_table = metadata.tables['cluster_locks']
+                return _cluster_locks_table
+            _cluster_locks_table = _build_cluster_locks_table(metadata)
     return _cluster_locks_table
+
+
+def _build_cluster_locks_table(metadata: sa.MetaData) -> sa.Table:
+    return sa.Table(
+        'cluster_locks',
+        metadata,
+        sa.Column('lock_key', sa.String(255), primary_key=True),
+        sa.Column('holder_json', sa.JSON(), nullable=False),
+        sa.Column('node_uuid', sa.String(255), nullable=False),
+        sa.Column('pid', sa.Integer(), nullable=False),
+        sa.Column('lock_id', sa.String(64), nullable=False),
+        sa.Column('acquired_at', sa.Double(), nullable=False),
+        sa.Column('expires_at', sa.DateTime(), nullable=False),
+        sa.Index('idx_cluster_locks_node', 'node_uuid'),
+        sa.Index('idx_cluster_locks_acquired', 'acquired_at'),
+        sa.Index('idx_cluster_locks_expires', 'expires_at'),
+    )
 
 
 def _cluster_lock_key(
@@ -9933,18 +9948,27 @@ def _get_node_daemon_states_table() -> sa.Table:
     """
     global _node_daemon_states_table
     if _node_daemon_states_table is None:
-        metadata = _get_metadata()
-        _node_daemon_states_table = sa.Table(
-            'node_daemon_states',
-            metadata,
-            sa.Column('node_uuid', sa.Uuid(), nullable=False),
-            sa.Column('daemon', sa.String(32), nullable=False),
-            sa.Column('value', sa.String(32), nullable=True),
-            sa.Column('update_time', sa.Double(), nullable=False, default=0.0),
-            sa.Column('message', sa.String(255), nullable=True),
-            sa.PrimaryKeyConstraint('node_uuid', 'daemon'),
-            sa.Index('idx_node_daemon_states_daemon_value', 'daemon', 'value'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _node_daemon_states_table is not None:
+                return _node_daemon_states_table
+            metadata = _get_metadata()
+            if 'node_daemon_states' in metadata.tables:
+                _node_daemon_states_table = (
+                    metadata.tables['node_daemon_states'])
+                return _node_daemon_states_table
+            _node_daemon_states_table = sa.Table(
+                'node_daemon_states',
+                metadata,
+                sa.Column('node_uuid', sa.Uuid(), nullable=False),
+                sa.Column('daemon', sa.String(32), nullable=False),
+                sa.Column('value', sa.String(32), nullable=True),
+                sa.Column(
+                    'update_time', sa.Double(), nullable=False, default=0.0),
+                sa.Column('message', sa.String(255), nullable=True),
+                sa.PrimaryKeyConstraint('node_uuid', 'daemon'),
+                sa.Index(
+                    'idx_node_daemon_states_daemon_value', 'daemon', 'value'),
+            )
     return _node_daemon_states_table
 
 

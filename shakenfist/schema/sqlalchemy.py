@@ -31,6 +31,7 @@
 #       )
 
 from enum import Enum
+import threading
 from typing import Annotated
 from typing import Any
 from typing import get_args
@@ -47,6 +48,21 @@ from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)
+
+# Lazy-init of SQLAlchemy Table objects from many ``_get_*_table()``
+# helpers in ``mariadb.py`` is not thread-safe: two threads can both
+# observe the module-level cache as ``None`` and both call this
+# function, with the second one raising ``InvalidRequestError`` when
+# its ``sa.Table(...)`` registration finds the name already in the
+# metadata. Serialise table creation here, and short-circuit if the
+# table is already registered, so the second thread gets the existing
+# Table object instead of failing.
+#
+# Shared across this module and ``mariadb.py`` so manual ``sa.Table``
+# registrations in mariadb (object_states, cluster_locks,
+# node_daemon_states) get the same protection as the
+# pydantic_to_sqlalchemy_table path.
+TABLE_CREATION_LOCK = threading.Lock()
 
 
 # Marker classes for use with Annotated types
@@ -374,15 +390,22 @@ def pydantic_to_sqlalchemy_table(
             idx_name = f'idx_{table_name}_{"_".join(idx_columns)}'
             all_indexes.append((idx_name, idx_columns, False))
 
-    # Create the table with indexes
-    table = sa.Table(table_name, metadata, *columns)
+    # Serialise table creation; if the table was registered while we
+    # were waiting on the lock, hand back the existing Table object
+    # rather than re-registering and tripping SQLAlchemy's
+    # already-defined check.
+    with TABLE_CREATION_LOCK:
+        if table_name in metadata.tables:
+            return metadata.tables[table_name]
 
-    # Attach indexes to the table
-    for idx_name, idx_columns, is_unique in all_indexes:
-        sa.Index(idx_name, *[table.c[col] for col in idx_columns],
-                 unique=is_unique)
+        table = sa.Table(table_name, metadata, *columns)
 
-    return table
+        # Attach indexes to the table
+        for idx_name, idx_columns, is_unique in all_indexes:
+            sa.Index(idx_name, *[table.c[col] for col in idx_columns],
+                     unique=is_unique)
+
+        return table
 
 
 def get_table_creation_sql(
