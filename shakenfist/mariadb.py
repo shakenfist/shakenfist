@@ -240,6 +240,13 @@ def _grpc_call(method: Any, request: Any) -> Any:
     stub.GetNode). On retry we must re-resolve the method from a
     fresh stub, because _reset_database_stub() closes the old
     channel and any methods bound to it become invalid.
+
+    Concurrent gRPC calls can race: thread A's retry path closes the
+    channel while thread B is mid-invoke, and thread B then sees
+    ``ValueError("Cannot invoke RPC on closed channel!")`` rather
+    than an ``RpcError``. Treat that ValueError as retryable in the
+    same way -- the channel was just closed under us, so the next
+    attempt picks up a fresh stub from ``_get_database_stub()``.
     """
     retryable_codes = {
         grpc.StatusCode.UNAVAILABLE,
@@ -247,7 +254,7 @@ def _grpc_call(method: Any, request: Any) -> Any:
     }
     method_name = getattr(method, '__name__', None)
 
-    last_error: grpc.RpcError = grpc.RpcError()
+    last_error: BaseException = grpc.RpcError()
     for attempt in range(GRPC_RETRIES):
         try:
             if attempt > 0 and method_name:
@@ -258,6 +265,13 @@ def _grpc_call(method: Any, request: Any) -> Any:
             last_error = e
             if e.code() not in retryable_codes:
                 raise
+            if attempt < GRPC_RETRIES - 1:
+                time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
+                _reset_database_stub()
+        except ValueError as e:
+            if 'closed channel' not in str(e):
+                raise
+            last_error = e
             if attempt < GRPC_RETRIES - 1:
                 time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
                 _reset_database_stub()
