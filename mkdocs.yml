@@ -100,6 +100,63 @@ nav:
             - "Release Automation": components/development/release-automation.md
             - Plans:
                 - "Title for the plan": components/development/plans/PLAN-consistency-audits-v2.md
+        - Instar:
+            - "Introduction": components/instar/index.md
+            - "Announcement": components/instar/openstack-announcement-email.md
+            - "Backing Chain Discovery": components/instar/chain-discovery.md
+            - "Chain Config Protocol": components/instar/chain-config.md
+            - "Configuration Guide": components/instar/configuration.md
+            - "Format Auto-Detection Safety in Instar": components/instar/format-detection-safety.md
+            - "Format Detection and Safety Check Coverage": components/instar/format-coverage.md
+            - "Image Handling and qemu-img Security Vulnerabilities": components/instar/security.md
+            - "Integration Test Suite": components/instar/testing.md
+            - "qemu-img Output Formats": components/instar/output-formats.md
+            - "qemu-img Quirks": components/instar/quirks.md
+            - "qemu-img Usage Analysis": components/instar/usage.md
+            - "Security Audits": components/instar/security-audits.md
+            - "Technology Primer": components/instar/technology-primer.md
+            - "Why Rust for Instar": components/instar/rust-rationale.md
+            - Commentary:
+                - "Architectural Decisions": components/instar/commentary/architectural-decisions.md
+                - "Reading Order": components/instar/commentary/reading-order.md
+            - Crates:
+                - "Guest Protocol Crate": components/instar/crates/guest-protocol.md
+            - Image Notes:
+                - "cirros-qcow2 Test Image": components/instar/image_notes/cirros-qcow2.md
+                - "Image Notes": components/instar/image_notes/README.md
+                - "qcow2-v2 Test Image": components/instar/image_notes/qcow2-v2.md
+                - "virtualpc-vhd Test Image": components/instar/image_notes/virtualpc-vhd.md
+            - Prototypes:
+                - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
+                - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
+                - "Direct Memory I/O for KVM Guests": components/instar/prototypes/data-transfer-direct-memory.md
+                - "KVM API and Bare-Metal Guest Setup": components/instar/prototypes/kvm.md
+                - "KVM Hello World 2 - Using rust-vmm Crates": components/instar/prototypes/kvm-hello-world2.md
+                - "KVM Hello World Prototype": components/instar/prototypes/kvm-hello-world.md
+                - "KVM Performance Counters and Resource Monitoring": components/instar/prototypes/performance-counters.md
+                - "Other Data Transfer Mechanisms for KVM Guests": components/instar/prototypes/data-transfer-other.md
+                - "Virtio-block for KVM Guests": components/instar/prototypes/data-transfer-virtio-block.md
+                - "Virtio-Block Prototype": components/instar/prototypes/virtio-block.md
+                - "Virtio-Block2 Prototype (with Protobuf)": components/instar/prototypes/virtio-block2.md
+                - "Virtio-Block3 Prototype": components/instar/prototypes/virtio-block3.md
+                - "Virtio-Block4 Prototype": components/instar/prototypes/virtio-block4.md
+                - "Virtio-Block5 Prototype": components/instar/prototypes/virtio-block5.md
+                - "Virtio-vsock for KVM Guests": components/instar/prototypes/data-transfer-virtio-vsock.md
+            - Qcow2:
+                - "QCOW2 Compression System": components/instar/qcow2/qcow2-compression.md
+                - "QCOW2 Encryption System": components/instar/qcow2/qcow2-encryption.md
+                - "QCOW2 Format Specification": components/instar/qcow2/qcow2-format.md
+                - "QCOW2 Implementation Notes": components/instar/qcow2/qcow2-implementation-notes.md
+                - "QCOW2 L1/L2 Tables - Address Translation": components/instar/qcow2/qcow2-l1l2-tables.md
+                - "QCOW2 Reference Counting System": components/instar/qcow2/qcow2-refcount.md
+                - "QCOW2 Snapshot System": components/instar/qcow2/qcow2-snapshots.md
+            - Raw:
+                - "Raw Disk Image Format": components/instar/raw/raw-format.md
+            - Vmdk:
+                - "VMDK Compression and StreamOptimized Format": components/instar/vmdk/vmdk-compression.md
+                - "VMDK Extent Types and Descriptor Format": components/instar/vmdk/vmdk-extents.md
+                - "VMDK Format Specification": components/instar/vmdk/vmdk-format.md
+                - "VMDK Grain Directory and Grain Tables": components/instar/vmdk/vmdk-grain-tables.md
         - Kerbside:
             - "Introduction": components/kerbside/index.md
             - "Configuring Kerbside": components/kerbside/configuration.md
