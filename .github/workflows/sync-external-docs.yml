@@ -63,6 +63,13 @@ jobs:
           path: development
           fetch-depth: 0
 
+      - name: Checkout the instar repository
+        uses: actions/checkout@v6
+        with:
+          repository: shakenfist/instar
+          path: instar
+          fetch-depth: 0
+
       - name: Checkout the kerbside repository
         uses: actions/checkout@v6
         with:
