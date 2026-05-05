@@ -297,15 +297,19 @@ class DirectReleaseClusterLockTestCase(base.ShakenFistTestCase):
         self.assertFalse(result)
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_release_returns_false_on_operational_error(self, mock_engine):
+    def test_release_raises_on_operational_error(self, mock_engine):
+        # Transient deadlocks must propagate so the daemon handler can
+        # signal UNAVAILABLE and let the gRPC client retry. Returning
+        # False would look identical to "lease was stolen" and trigger
+        # a spurious LockNotHeld error in the caller.
         conn = _MockConnection()
         conn.execute = mock.Mock(
             side_effect=OperationalError('stmt', {}, Exception()))
         mock_engine.return_value = _MockEngine(conn)
 
-        result = mariadb._direct_release_cluster_lock(
-            'key', 'lock-abc')
-        self.assertFalse(result)
+        self.assertRaises(
+            OperationalError,
+            mariadb._direct_release_cluster_lock, 'key', 'lock-abc')
 
 
 class DirectGetClusterLockTestCase(base.ShakenFistTestCase):

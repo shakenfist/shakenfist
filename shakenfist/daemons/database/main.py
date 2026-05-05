@@ -261,7 +261,17 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.ClusterReleaseLockRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.StatusReply:
-        """Release a distributed lock."""
+        """Release a distributed lock.
+
+        InnoDB deadlocks (errno 1213) on the cluster_locks row are
+        routine when acquire / steal / release races overlap. Signal
+        UNAVAILABLE so the gRPC client retries the delete rather than
+        treating the transient as success=False -- which would
+        otherwise trip the caller's ``LockNotHeld`` path and produce a
+        noisy ``ERROR gunicorn`` log plus a real lease loss for any
+        other waiter, since the abandoning holder has already stopped
+        refreshing.
+        """
         try:
             self.monitor.counters['release_lock'].inc()
             lock_data = json.loads(request.lock_data)
@@ -273,6 +283,14 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 lock_id=lock_data.get('id', ''),
             )
             return database_pb2.StatusReply(success=released, error='')
+        except OperationalError as e:
+            LOG.warning(
+                f'ReleaseLock transient MariaDB error '
+                f'({request.object_type}/{request.subtype}/{request.name}): '
+                f'{e}')
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False, error=str(e))
         except Exception as e:
             util_exceptions.ignore_exception('database ReleaseLock failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))

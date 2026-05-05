@@ -17976,7 +17976,14 @@ def _direct_release_cluster_lock(
     """Release a lock by deleting the row, but only if the
     lock_id matches (CAS-equivalent).
 
-    Returns True if a row was deleted, False otherwise.
+    Returns True if a row was deleted, False if no row matched
+    (the lease was stolen, or we never held it).
+
+    Raises ``OperationalError`` for transient MariaDB issues
+    (e.g. InnoDB deadlock, errno 1213). Callers must treat that
+    as retryable, not as ``return False`` -- collapsing the two
+    looks identical to "another holder stole the lease" and
+    triggers a noisy ``LockNotHeld`` log on the next contender.
     """
     engine = _get_engine()
     table = _get_cluster_locks_table()
@@ -17996,7 +18003,7 @@ def _direct_release_cluster_lock(
         LOG.warning(
             f'MariaDB release_cluster_lock failed for '
             f'{lock_key}: {e}')
-        return False
+        raise
 
 
 def _direct_get_cluster_lock(
