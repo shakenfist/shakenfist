@@ -112,70 +112,60 @@ object already does the synthesis. The work is in switching
 gating callers to a new "any-in-flight" query and automating
 the writes.
 
-## Open questions
+## Decisions
 
-These need decisions before phase planning starts. The
-"recommended answer" reflects what I'd default to; the
-operator should confirm or override.
+These open questions were resolved by the operator before
+phase planning began. Each is recorded here so phase plans
+can reference the chosen path without re-litigating.
 
-1. **Synthetic `external_view` semantics.** Should
-   `last_cluster_operation` in `external_view()` continue to
-   be the *latest* target row regardless of state, or the
-   *latest non-terminal* one (matching the new gating
-   query)?
-   *Recommended: latest of any state.* Matches existing
-   external behaviour; consumers that rely on it (e.g.
+1. **Synthetic `external_view` semantics — keep latest of
+   any state.** `last_cluster_operation` in `external_view()`
+   continues to return the latest `cluster_operation_targets`
+   row regardless of state. The new gating query is a
+   separate, internal-only API. Consumers like
    `runs_after=[instance_from_db.last_cluster_operation]`
-   in `external_api/instance.py:1013`) keep their meaning.
-   The new gating query is a separate, internal-only API.
+   (`external_api/instance.py:1027`) keep their existing
+   meaning.
 
-2. **Auto-targeting target discovery.** Each
-   `*_create_and_enqueue` helper has known target UUID
-   fields in its Pydantic model (`network_uuid`,
-   `instance_uuid`, `interface_uuid`, `agentoperation_uuid`,
-   `artifact_uuid`, `node_uuid`, `blob_uuid`). Should the
-   automation enumerate fields by convention (`*_uuid` →
-   matching object type), or should each schema declare its
-   targets explicitly?
-   *Recommended: explicit declaration in the schema model.*
-   `interface_uuid` belongs to a `NetworkInterface` not an
-   `Interface`; `node_uuid` does not have LCO tracking;
-   convention is brittle. A `target_object_types: ClassVar`
-   on each model is unambiguous.
+2. **Auto-targeting via explicit declaration.** Each
+   operation schema model declares its targets via a
+   `target_object_types: ClassVar` (or equivalent). Convention
+   is brittle: `node_uuid` is execution context (Node does
+   not inherit `DatabaseBackedObjectWithOperations`, see
+   decision 5), and `interface_uuid` is sometimes context.
+   Explicit declaration is unambiguous.
 
-3. **Should `set_last_cluster_operation` remain a public
-   API?** Once auto-targeting lands, every existing caller
-   becomes redundant.
-   *Recommended: keep as a private helper on the base
-   object, used only by `*_create_and_enqueue`. Audit and
-   remove the explicit external callers in phase 4.*
+3. **`set_last_cluster_operation` becomes private.** Once
+   auto-targeting lands, the method is renamed to
+   `_set_last_cluster_operation` so callers cannot use it
+   wrong. The `daemons/network/maintain.py:113` caller
+   (missed in the original audit) is also rewired to
+   auto-targeting in phase 3.
 
-4. **Per-target locking.** The existing pattern wraps each
-   API enqueue in `obj.get_lock_attr('last_cluster_operation',
-   'add new operation')`. This was meaningful when the
-   single-pointer write was racy. With auto-targeting, every
-   write is a fresh `INSERT` into `cluster_operation_targets`
-   with an `AUTO_INCREMENT` `sequence_number` — concurrent
-   writers don't conflict.
-   *Recommended: drop the attr lock once auto-targeting is
-   the only writer.* Confirm by reading
-   `_direct_create_cluster_operation_target` for any hidden
-   read-modify-write that requires serialisation.
+4. **Drop the per-target attr lock.**
+   `_direct_create_cluster_operation_target`
+   (`mariadb.py:5294`) is a pure INSERT with no
+   read-modify-write; `sequence_number` is `AUTO_INCREMENT`,
+   `operation_uuid` is `UNIQUE`. Concurrent writers do not
+   conflict, so `obj.get_lock_attr('last_cluster_operation',
+   ...)` is removed alongside the explicit
+   `set_last_cluster_operation` calls in phase 3.
 
-5. **Node objects.** `node_net_op` and other `node_*` ops
-   target a node UUID. Does the `Node` class inherit
-   `DatabaseBackedObjectWithOperations`?
-   *Recommended: confirm in phase 1; if not, exclude
-   node-targeted ops from auto-targeting.*
+5. **Node objects are not auto-targets.** Confirmed:
+   `Node` (`shakenfist/node.py:32`) inherits
+   `DatabaseBackedObject`, not
+   `DatabaseBackedObjectWithOperations`. All `node_*_op`
+   schemas target other objects (instance, network, blob,
+   artifact); `node_uuid` on those schemas identifies the
+   execution location and is not registered as a target.
 
-6. **Migration of stale `object_metadata` rows.** The
-   `last_cluster_operation` JSON field on `object_metadata`
-   is no longer read or written (the property and setter
-   route through `cluster_operation_targets`). Do we drop
-   the column, leave it dead, or keep-and-clear?
-   *Recommended: leave dead for one release, schedule
-   removal in a follow-up.* Matches the precedent set by
-   the per-daemon-state migration described in `CLAUDE.md`.
+6. **Drop the `object_metadata.last_cluster_operation_json`
+   column now.** This branch has not been deployed, so
+   there is no rollback path that needs the dead column.
+   Phase 4 fully severs the read/write paths in
+   `mariadb.py` and `daemons/database/main.py`, drops the
+   column from the SQLAlchemy schema, and removes the
+   field from the gRPC `ObjectMetadataReply` message.
 
 ## Execution
 
@@ -183,8 +173,8 @@ operator should confirm or override.
 |-------|------|--------|
 | 1. Add `has_pending_cluster_operation` query and tests | PLAN-replace-last-cluster-operation-phase-01-query.md | Not started |
 | 2. Switch `Network.is_okay()` and other gating callers | PLAN-replace-last-cluster-operation-phase-02-gating.md | Not started |
-| 3. Auto-target tracking in `*_create_and_enqueue` helpers | PLAN-replace-last-cluster-operation-phase-03-auto-target.md | Not started |
-| 4. Remove explicit `set_last_cluster_operation` callers | PLAN-replace-last-cluster-operation-phase-04-cleanup.md | Not started |
+| 3. Auto-target tracking, remove explicit callers, privatise setter | PLAN-replace-last-cluster-operation-phase-03-auto-target.md | Not started |
+| 4. Drop `object_metadata.last_cluster_operation_json` column | PLAN-replace-last-cluster-operation-phase-04-drop-column.md | Not started |
 | 5. Documentation and final audit | PLAN-replace-last-cluster-operation-phase-05-docs.md | Not started |
 
 ### Phase outlines
@@ -192,16 +182,20 @@ operator should confirm or override.
 **Phase 1.** Add a new `has_pending_cluster_operation()`
 method on `DatabaseBackedObjectWithOperations` that returns
 True if any row in `cluster_operation_targets` for this
-`(object_type, uuid)` references an operation whose state is
-not in `{COMPLETE, ABORT, ERROR, DELETED}`. Implement the
-query as `_direct_*` / `_grpc_*` / public trio in
-`mariadb.py`, mirroring the existing
-`get_latest_cluster_operation_target` shape. Add unit tests
+`(object_type, uuid)` references an operation whose
+`object_states.state_value` is in the active set
+(`queued`, `preflight`, `executing`). The terminal set is
+defined by exclusion, matching
+`_direct_delete_stale_cluster_operation_targets`
+(`mariadb.py:5508`). Implement as `_direct_*` / `_grpc_*` /
+public trio in `mariadb.py`, mirroring the existing
+`get_latest_cluster_operation_target` shape, including a new
+proto RPC `HasPendingClusterOperationTarget`. Add unit tests
 covering: no targets, single in-flight target, single
 terminal target, multiple targets with mixed states, and
 multiple terminal targets followed by an in-flight one (the
-race we are fixing). Plan effort: high; phase plan effort:
-medium.
+latest-only race we are fixing). Plan effort: high; phase
+plan effort: medium.
 
 **Phase 2.** Switch `Network.is_okay()`, the network
 maintainer in `shakenfist/daemons/network/maintain.py`, and
@@ -219,30 +213,45 @@ effort: medium; phase plan effort: medium.
 `*_create_and_enqueue` helpers in
 `shakenfist/schema/operations/*.py`. Each schema's `model`
 class declares its target object types via a class variable
-(see open question 2), and `enqueue_cluster_operation` (or
-the helper directly) writes a `cluster_operation_targets`
-row per target before returning. This is the
-behaviour-preserving change: every existing
-`set_last_cluster_operation` call becomes redundant after
-this lands. Plan effort: high; phase plan effort: high.
+(see decision 2), and `enqueue_cluster_operation` (or the
+helper directly) writes a `cluster_operation_targets` row
+per target before returning. In the same phase, sweep the
+audit list (`shakenfist/network/network.py:731, 782, 798,
+816, 839, 863`, `shakenfist/external_api/instance.py:1554`,
+`shakenfist/daemons/cluster/scheduled_tasks.py:210`,
+`shakenfist/daemons/network/maintain.py:113`, plus the
+operation-execution sites listed in the explore findings
+attached to this plan), removing the explicit
+`set_last_cluster_operation` call and the surrounding
+`obj.get_lock_attr('last_cluster_operation', ...)` wrapper
+at each site. Finally rename `set_last_cluster_operation` to
+`_set_last_cluster_operation` so the only remaining callers
+are the enqueue helpers and tests. Plan effort: high; phase
+plan effort: high.
 
-**Phase 4.** Audit and remove the now-redundant explicit
-`set_last_cluster_operation` calls. The audit list is in the
-*Situation* section above. For each call site, verify the
-auto-targeting in phase 3 produces the same row, then delete
-the explicit call and its surrounding `get_lock_attr`
-wrapping. Phase plan should include verification by
-inspection of the produced `cluster_operation_targets` rows
-in a CI run. Plan effort: medium; phase plan effort: medium.
+**Phase 4.** Drop the dead
+`object_metadata.last_cluster_operation_json` column.
+Remove the SQLAlchemy column definition (`mariadb.py:566`),
+the read paths (`mariadb.py:5071-5072` direct,
+`mariadb.py:5168-5169` gRPC), the NULL write
+(`mariadb.py:5105`), the `last_cluster_operation` field from
+the `ObjectMetadata` Pydantic model and the proto
+`ObjectMetadataReply`, and the corresponding
+`daemons/database/main.py` plumbing. Add a schema migration
+that drops the column. Regenerate protos with
+`tox -e genprotos`. Plan effort: medium; phase plan effort:
+medium.
 
 **Phase 5.** Update `docs/operator_guide/database.md` to
-describe the new gating model and the deprecation of the
+describe the new gating model and the removal of the
 single-pointer field. Update `CLAUDE.md` *Cluster Operation
-Targets* entry. Update `ARCHITECTURE.md` if the locking
-section references `last_cluster_operation` semantics. Run
-`pre-commit run --all-files` and the merge-queue
-functional CI suite to confirm no regression. Plan effort:
-low; phase plan effort: low.
+Targets* entry to reflect that there is no longer a
+companion JSON column on `object_metadata`. Update
+`ARCHITECTURE.md` if the locking section references
+`last_cluster_operation` semantics. Run
+`pre-commit run --all-files` and the merge-queue functional
+CI suite to confirm no regression. Plan effort: low; phase
+plan effort: low.
 
 ## Agent guidance
 
@@ -254,12 +263,14 @@ correctness work, sonnet for well-briefed mechanical
 sweeps.)
 
 The phase that most warrants opus is phase 3 (auto-target
-tracking). It touches every operation schema, the queue
-helpers, and changes a contract that ~20 callers rely on.
-Phase 1 and 2 are well-scoped and could be sonnet with a
-detailed brief. Phase 4 is a sweep — sonnet is fine, with
-the management session verifying the diff against the audit
-list. Phase 5 is mechanical (haiku acceptable).
+tracking, audit sweep, and privatisation). It touches every
+operation schema, the queue helpers, and changes a contract
+that ~20 callers rely on. Phase 1 and 2 are well-scoped and
+could be sonnet with a detailed brief. Phase 4 is a
+schema-and-proto change — sonnet is fine, with the
+management session verifying the migration runs on a fresh
+DB and that `tox -e genprotos` was rerun. Phase 5 is
+mechanical (haiku acceptable).
 
 ### Management session review checklist
 
@@ -309,10 +320,6 @@ implemented because the following statements will be true:
 
 ### Future work
 
-* **Drop the dead `last_cluster_operation` JSON column on
-  `object_metadata`** in a follow-up release once we are
-  confident no rollback path needs it. Track in the same
-  cadence as the per-daemon-state migration.
 * **Consider exposing a full history endpoint** — once the
   data is reliably populated, an external API to list all
   cluster ops against a given object would aid debugging.
