@@ -263,6 +263,7 @@ service DatabaseService {
   rpc GetClusterOperationTarget (GetClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
   rpc GetClusterOperationTargetsForObject (GetClusterOperationTargetsForObjectRequest) returns (GetClusterOperationTargetsForObjectReply) {}
   rpc GetLatestClusterOperationTarget (GetLatestClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
+  rpc HasPendingClusterOperationTarget (HasPendingClusterOperationTargetRequest) returns (HasPendingClusterOperationTargetReply) {}
   rpc DeleteClusterOperationTarget (DeleteClusterOperationTargetRequest) returns (StatusReply) {}
   rpc DeleteClusterOperationTargetsForObject (DeleteClusterOperationTargetsForObjectRequest) returns (StatusReply) {}
   rpc DeleteStaleClusterOperationTargets (DeleteStaleClusterOperationTargetsRequest) returns (DeleteCountReply) {}
@@ -1733,6 +1734,15 @@ message GetClusterOperationTargetsForObjectReply {
 message GetLatestClusterOperationTargetRequest {
   ObjectType target_object_type = 1;
   string target_uuid = 2;
+}
+
+message HasPendingClusterOperationTargetRequest {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
+}
+
+message HasPendingClusterOperationTargetReply {
+  bool pending = 1;
 }
 
 message DeleteClusterOperationTargetRequest {

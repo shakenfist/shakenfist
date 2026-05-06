@@ -5223,6 +5223,39 @@ class GetLatestClusterOperationTargetRequest(google.protobuf.message.Message):
 global___GetLatestClusterOperationTargetRequest = GetLatestClusterOperationTargetRequest
 
 @typing.final
+class HasPendingClusterOperationTargetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___HasPendingClusterOperationTargetRequest = HasPendingClusterOperationTargetRequest
+
+@typing.final
+class HasPendingClusterOperationTargetReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PENDING_FIELD_NUMBER: builtins.int
+    pending: builtins.bool
+    def __init__(
+        self,
+        *,
+        pending: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["pending", b"pending"]) -> None: ...
+
+global___HasPendingClusterOperationTargetReply = HasPendingClusterOperationTargetReply
+
+@typing.final
 class DeleteClusterOperationTargetRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

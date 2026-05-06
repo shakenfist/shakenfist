@@ -4269,6 +4269,38 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetClusterOperationTargetReply(
                 found=False)
 
+    def HasPendingClusterOperationTarget(
+        self,
+        request: database_pb2.HasPendingClusterOperationTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.HasPendingClusterOperationTargetReply:
+        """True if any in-flight cluster operation targets this object."""
+        try:
+            self.monitor.counters[
+                'has_pending_cluster_operation_target'].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                # Unknown object type — fail closed.
+                return database_pb2.HasPendingClusterOperationTargetReply(
+                    pending=True)
+            pending = (
+                mariadb
+                ._direct_has_pending_cluster_operation_target(
+                    target_object_type,
+                    request.target_uuid))
+            return database_pb2.HasPendingClusterOperationTargetReply(
+                pending=pending)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database HasPendingClusterOperationTarget'
+                ' failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            # Fail closed: treat unknown as in-flight.
+            return database_pb2.HasPendingClusterOperationTargetReply(
+                pending=True)
+
     def DeleteClusterOperationTarget(
         self,
         request: database_pb2.DeleteClusterOperationTargetRequest,
@@ -4771,6 +4803,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_cluster_operation_target',
             'get_cluster_operation_targets_for_object',
             'get_latest_cluster_operation_target',
+            'has_pending_cluster_operation_target',
             'delete_cluster_operation_target',
             'delete_cluster_operation_targets_for_object',
             'delete_stale_cluster_operation_targets',

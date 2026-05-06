@@ -5431,6 +5431,48 @@ def _direct_get_latest_cluster_operation_target(
         return None
 
 
+# An operation is "in flight" if and only if its row in object_states has
+# one of these state values. Anything else (complete, abort, error,
+# deleted, ...) is terminal. Matches
+# _direct_delete_stale_cluster_operation_targets.
+_ACTIVE_OPERATION_STATES = ('queued', 'preflight', 'executing')
+
+
+def _direct_has_pending_cluster_operation_target(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> bool:
+    """True if any in-flight cluster operation targets this object."""
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+    states_table = _get_object_states_table()
+
+    try:
+        with engine.connect() as conn:
+            inner = sa.select(sa.literal(1)).select_from(
+                table.join(
+                    states_table,
+                    table.c.operation_uuid == states_table.c.object_uuid
+                )
+            ).where(
+                sa.and_(
+                    table.c.target_object_type == target_object_type,
+                    table.c.target_uuid == target_uuid,
+                    states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES)
+                )
+            )
+            stmt = sa.select(inner.exists())
+            result = conn.execute(stmt).scalar()
+            return bool(result)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for has_pending_cluster_operation '
+            f'{target_object_type}/{target_uuid}: {e}')
+        # Fail closed: if we cannot prove no op is in flight, treat that
+        # as "in flight" so callers defer rather than racing.
+        return True
+
+
 def _direct_delete_cluster_operation_target(
     operation_uuid: str
 ) -> bool:
@@ -5639,6 +5681,29 @@ def _grpc_get_latest_cluster_operation_target(
         return None
 
 
+def _grpc_has_pending_cluster_operation_target(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> bool:
+    """True if any in-flight cluster operation targets this object (gRPC)."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.HasPendingClusterOperationTargetRequest(
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid
+        )
+        reply = _grpc_call(
+            stub.HasPendingClusterOperationTarget, request)
+        return bool(reply.pending)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC HasPendingClusterOperationTarget failed for '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return True
+
+
 def _grpc_delete_cluster_operation_target(
     operation_uuid: str
 ) -> bool:
@@ -5768,6 +5833,25 @@ def get_latest_cluster_operation_target(
         return _grpc_get_latest_cluster_operation_target(
             target_object_type, target_uuid)
     return _direct_get_latest_cluster_operation_target(
+        target_object_type, target_uuid)
+
+
+def has_pending_cluster_operation_target(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> bool:
+    """True if any in-flight cluster operation targets this object.
+
+    "In flight" means the operation's row in object_states is in
+    {queued, preflight, executing}. Any later operation against the same
+    object that has reached a terminal state does NOT mask an earlier
+    in-flight operation, fixing the latest-only race in the legacy
+    single-pointer last_cluster_operation gating.
+    """
+    if _use_database_service():
+        return _grpc_has_pending_cluster_operation_target(
+            target_object_type, target_uuid)
+    return _direct_has_pending_cluster_operation_target(
         target_object_type, target_uuid)
 
 
