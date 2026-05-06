@@ -991,26 +991,41 @@ class InstanceInterfacesEndpoint(api_base.Resource):
         if err:
             return err
 
+        network_from_db = sfnet.Network.from_db(netdesc['network_uuid'])
+
         # We ensure the new interface is in the DHCP service for the network
         # before we plug the interface into the instance.
-        dnsmasq_op_type, dnsmasq_op_uuid = net_create_and_enqueue(
-            netdesc['network_uuid'],
-            [net_tasks.network_update_dnsmasq],
-            priority=PRIORITY.user_waiting
-        )
+        #
+        # The hot-plug op runs ``n.create_on_hypervisor()`` on the target
+        # node as a side effect, so for the duration of the chain the
+        # network is being modified on that node. Set the network's
+        # last_cluster_operation accordingly so the network maintainer
+        # treats it as "operation in flight" via ``Network.is_okay()``
+        # rather than firing its own recreate path -- otherwise the
+        # maintainer can race the queue worker and log the audit-tripping
+        # "recreating not okay network on hypervisor" event for what is a
+        # first-time creation, not a recreation.
+        with network_from_db.get_lock_attr(
+                'last_cluster_operation', 'add new operation'):
+            dnsmasq_op_type, dnsmasq_op_uuid = net_create_and_enqueue(
+                netdesc['network_uuid'],
+                [net_tasks.network_update_dnsmasq],
+                priority=PRIORITY.user_waiting
+            )
 
-        op_type, op_uuid = niio_create_and_enqueue(
-            instance_from_db.placement['node'],
-            instance_from_db.uuid,
-            netdesc['network_uuid'],
-            netdesc['iface_uuid'],
-            [niio_tasks.hot_plug_instance_interface],
-            PRIORITY.user_waiting,
-            request_id=util_general.get_request_id(),
-            depends_on=[
-                dependency(op_type=dnsmasq_op_type, op_uuid=dnsmasq_op_uuid)
-            ],
-            runs_after=[instance_from_db.last_cluster_operation])
+            op_type, op_uuid = niio_create_and_enqueue(
+                instance_from_db.placement['node'],
+                instance_from_db.uuid,
+                netdesc['network_uuid'],
+                netdesc['iface_uuid'],
+                [niio_tasks.hot_plug_instance_interface],
+                PRIORITY.user_waiting,
+                request_id=util_general.get_request_id(),
+                depends_on=[
+                    dependency(op_type=dnsmasq_op_type, op_uuid=dnsmasq_op_uuid)
+                ],
+                runs_after=[instance_from_db.last_cluster_operation])
+            network_from_db.set_last_cluster_operation(op_type, op_uuid)
         instance_from_db.set_last_cluster_operation(op_type, op_uuid)
         # The NetworkInterface row created above is the source of truth
         # for the instance->NI association; no further bookkeeping needed.
