@@ -9,3 +9,4 @@
 - blob-storage-roadmap.md: Blob storage roadmap
 - api-query-batching-roadmap.md: API query batching roadmap
 - PLAN-sql-pushdown-filtering.md: SQL-pushdown filtering
+- PLAN-replace-last-cluster-operation.md: Replace last_cluster_operation with cluster_operation_targets gating
