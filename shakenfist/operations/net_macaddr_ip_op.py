@@ -30,11 +30,6 @@ class NoSuchNetwork(NetMacaddrIPOpException):
         super().__init__(op, 'network missing')
 
 
-class InvalidStateForTask(NetMacaddrIPOpException):
-    def __init__(self, op):
-        super().__init__(op, 'network not in a state which allows this task')
-
-
 class NetMacaddrIPOp(BaseClusterOperation):
     object_type = schema.object_type
     initial_version = schema.initial_version
@@ -99,6 +94,15 @@ class NetMacaddrIPOp(BaseClusterOperation):
 
     def _remove_dhcp_lease(self, n):
         if n.is_dead():
-            raise InvalidStateForTask(self)
+            # The network has been deleted (or is on its way out)
+            # between this op being enqueued and now. Its dnsmasq is
+            # going with it, so the lease no longer needs explicit
+            # removal -- this is a benign teardown race, not an error.
+            # Returning here lets dispatch_task mark the op complete
+            # rather than routing through ignore_exception, which
+            # would write a traceback to syslog and trip the CI
+            # forbidden-string checks.
+            self.log.info('Network is dead; skipping DHCP lease removal')
+            return
 
         n.remove_dhcp_lease(self.ip, self.mac_address)
