@@ -5,14 +5,30 @@ and across platforms.
 
 ## Supported Platforms
 
-| Platform | GUI | Headless | Capture (`--capture`) |
-|----------|-----|----------|----------------------|
-| Linux x86_64 | Yes | Yes | Yes |
-| macOS aarch64 (Apple Silicon) | Yes | Yes | Yes |
-| Windows x86_64 | Yes | Yes | No (feature-gated off) |
+| Platform | GUI | Headless | Capture (`--capture`) | Web (`--web`) |
+|----------|-----|----------|-----------------------|---------------|
+| Linux x86_64 | Yes | Yes | Yes | Yes (verified) |
+| macOS aarch64 (Apple Silicon) | Yes | Yes | Yes | Compile-only |
+| Windows x86_64 | Yes | Yes | No (feature-gated off) | Compile-only |
 
 Capture mode is disabled on Windows builds via a Cargo feature gate.
 On Linux and macOS, it is enabled by default.
+
+### `--web` mode platform status
+
+**Linux** is the verified runtime target for `--web` mode.
+`tools/web-smoke.sh` runs on every Linux PR in CI: it launches
+`ryll --web`, checks the process stays alive, then SIGTERMs and
+asserts a clean exit. libopus is dynamically linked on Linux
+(`libopus0` is a declared runtime dependency in the deb/rpm
+packages).
+
+**macOS and Windows** are compile-only for `--web` mode. The
+CI build matrix confirms the `--web` dependencies link cleanly
+on both platforms, but no runtime smoke test runs there. On
+macOS and Windows, `audiopus_sys` builds libopus from source
+(pkg-config finds no system libopus), so no runtime libopus
+dependency exists on those platforms.
 
 ## Build Environment vs Runtime Environment
 
