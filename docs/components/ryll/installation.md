@@ -6,10 +6,11 @@ and as CI artifacts on pull requests.
 
 ## Debian / Ubuntu
 
-Download the `.deb` package for your architecture and install:
+Download the `.deb` package for your architecture and install. Both
+`amd64` and `arm64` builds are published:
 
 ```bash
-sudo dpkg -i ryll_0.1.0-1_amd64.deb
+sudo dpkg -i ryll_0.1.0-1_amd64.deb   # or ryll_0.1.0-1_arm64.deb
 sudo apt-get install -f   # install any missing dependencies
 ```
 
@@ -19,10 +20,11 @@ The package installs `ryll` to `/usr/bin/ryll`. Runtime dependencies
 
 ## Red Hat / Fedora (RPM)
 
-Download the `.rpm` package for your architecture and install:
+Download the `.rpm` package for your architecture and install. Both
+`x86_64` and `aarch64` builds are published:
 
 ```bash
-sudo dnf install ./ryll-0.1.0-1.x86_64.rpm
+sudo dnf install ./ryll-0.1.0-1.x86_64.rpm   # or ryll-0.1.0-1.aarch64.rpm
 ```
 
 Or with older `yum`-based systems:
@@ -64,9 +66,10 @@ cp ryll /usr/local/bin/
 
 ## Windows
 
-Download the `.zip` archive from
-[GitHub Releases](https://github.com/shakenfist/ryll/releases),
-extract it, and run `ryll.exe`:
+Download the `.zip` archive for your architecture from
+[GitHub Releases](https://github.com/shakenfist/ryll/releases)
+(both `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc` are
+published), extract it, and run `ryll.exe`:
 
 ```powershell
 Expand-Archive ryll-x86_64-pc-windows-msvc.zip -DestinationPath .

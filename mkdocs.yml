@@ -207,7 +207,9 @@ nav:
             - "Building and Testing on macOS": components/ryll/development-macos.md
             - "Configuration": components/ryll/configuration.md
             - "Installation": components/ryll/installation.md
+            - "Multi-mode parity matrix": components/ryll/multi-mode-parity.md
             - "Releasing": components/ryll/releasing.md
+            - "ryll --web operator guide": components/ryll/web-frontend.md
             - "Troubleshooting": components/ryll/troubleshooting.md
             - Plans:
                 - "Android APK Port of Ryll": components/ryll/plans/PLAN-android-apk.md
@@ -241,6 +243,7 @@ nav:
                 - "Phase 1: Paste-as-keystrokes translator": components/ryll/plans/PLAN-paste-as-keystrokes-phase-01-translator.md
                 - "Phase 1: Platform Portability": components/ryll/plans/PLAN-packaging-phase-01-portability.md
                 - "Phase 1: Plumbing": components/ryll/plans/PLAN-display-draw-ops-phase-01-plumbing.md
+                - "Phase 1: Renderer extraction (`shakenfist-spice-renderer`)": components/ryll/plans/PLAN-web-frontend-phase-01-extract.md
                 - "Phase 1: Ring buffer infrastructure": components/ryll/plans/PLAN-bug-reports-phase-01-ring-buffer.md
                 - "Phase 1: Screenshot hotkey and save dialog": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-01-screenshot.md
                 - "Phase 1: SpiceVMC channel transport": components/ryll/plans/PLAN-usb-redir-phase-01-vmc-channel.md
@@ -252,6 +255,7 @@ nav:
                 - "Phase 2: Channel integration and CLI flags": components/ryll/plans/PLAN-paste-as-keystrokes-phase-02-channel-cli.md
                 - "Phase 2: Channel state snapshots": components/ryll/plans/PLAN-bug-reports-phase-02-channel-state.md
                 - "Phase 2: DRAW_FILL (solid brush)": components/ryll/plans/PLAN-display-draw-ops-phase-02-fill.md
+                - "Phase 2: Encoder pipeline (framebuffer → H.264 NAL units)": components/ryll/plans/PLAN-web-frontend-phase-02-encoder.md
                 - "Phase 2: GitHub Actions CI": components/ryll/plans/PLAN-packaging-phase-02-ci.md
                 - "Phase 2: Latency sparkline": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-02-latency-sparkline.md
                 - "Phase 2: Mux protocol (demux and remux)": components/ryll/plans/PLAN-webdav-phase-02-mux-protocol.md
@@ -278,6 +282,7 @@ nav:
                 - "Phase 3: migrate Gaps and bug-report status as sources": components/ryll/plans/PLAN-notifications-phase-03-existing-sources.md
                 - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
+                - "Phase 3: WebRTC plumbing (`webrtc-rs`)": components/ryll/plans/PLAN-web-frontend-phase-03-webrtc.md
                 - "Phase 4 — documentation": components/ryll/plans/PLAN-display-window-sizing-phase-04-docs.md
                 - "Phase 4 — documentation": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs.md
                 - "Phase 4: COPY_BITS": components/ryll/plans/PLAN-display-draw-ops-phase-04-copy-bits.md
@@ -286,6 +291,7 @@ nav:
                 - "Phase 4: Extract shakenfist-spice-protocol": components/ryll/plans/PLAN-crate-extraction-phase-04-protocol.md
                 - "Phase 4: GUI report button and description dialog": components/ryll/plans/PLAN-bug-reports-phase-04-gui-button.md
                 - "Phase 4: GUI — bell, side panel, mark-read": components/ryll/plans/PLAN-notifications-phase-04-gui.md
+                - "Phase 4: HTTP server, token auth, signalling, browser shell": components/ryll/plans/PLAN-web-frontend-phase-04-server.md
                 - "Phase 4: Integration (mux ↔ WebDAV server)": components/ryll/plans/PLAN-webdav-phase-04-integration.md
                 - "Phase 4: Real device enumeration and passthrough": components/ryll/plans/PLAN-usb-redir-phase-04-real-devices.md
                 - "Phase 4: Real latency from PING/PONG": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency.md
@@ -301,15 +307,18 @@ nav:
                 - "Phase 5: Extract shakenfist-spice-usbredir": components/ryll/plans/PLAN-crate-extraction-phase-05-usbredir.md
                 - "Phase 5: GUI display region selection": components/ryll/plans/PLAN-bug-reports-phase-05-region-select.md
                 - "Phase 5: macOS Packaging": components/ryll/plans/PLAN-packaging-phase-05-macos.md
+                - "Phase 5: Real frames, inputs, cursor, audio": components/ryll/plans/PLAN-web-frontend-phase-05-iac.md
                 - "Phase 5: UI panel": components/ryll/plans/PLAN-webdav-phase-05-ui.md
                 - "Phase 6: Add virtual disk at runtime": components/ryll/plans/PLAN-usb-ui-phase-06-add-disk.md
                 - "Phase 6: Control and bulk transfers": components/ryll/plans/PLAN-usb-redir-phase-06-transfers.md
                 - "Phase 6: DRAW_TRANSPARENT and DRAW_ALPHA_BLEND": components/ryll/plans/PLAN-display-draw-ops-phase-06-alpha.md
                 - "Phase 6: GUI live traffic viewer": components/ryll/plans/PLAN-bug-reports-phase-06-traffic-viewer.md
                 - "Phase 6: Introduce ConnectionConfig and move SpiceClient": components/ryll/plans/PLAN-crate-extraction-phase-06-client.md
+                - "Phase 6: Reconnect and lifecycle": components/ryll/plans/PLAN-web-frontend-phase-06-lifecycle.md
                 - "Phase 6: Test coverage": components/ryll/plans/PLAN-deferred-debt-phase-06-tests.md
                 - "Phase 6: Testing and documentation": components/ryll/plans/PLAN-webdav-phase-06-testing.md
                 - "Phase 6: Windows Packaging": components/ryll/plans/PLAN-packaging-phase-06-windows.md
+                - "Phase 7: CI build + packaging": components/ryll/plans/PLAN-web-frontend-phase-07-ci.md
                 - "Phase 7: Documentation and testing": components/ryll/plans/PLAN-bug-reports-phase-07-docs.md
                 - "Phase 7: DRAW_INVERS and warn-once for deferred ops": components/ryll/plans/PLAN-display-draw-ops-phase-07-invers-and-warnings.md
                 - "Phase 7: Release Automation": components/ryll/plans/PLAN-packaging-phase-07-release.md
@@ -317,6 +326,7 @@ nav:
                 - "Phase 7: Virtual mass storage device (RAW images)": components/ryll/plans/PLAN-usb-redir-phase-07-virtual-msc.md
                 - "Phase 8: --pedantic mode and status-bar gap counter": components/ryll/plans/PLAN-display-draw-ops-phase-08-pedantic.md
                 - "Phase 8: Documentation": components/ryll/plans/PLAN-usb-ui-phase-08-docs.md
+                - "Phase 8: Native TLS + operator docs + systemd": components/ryll/plans/PLAN-web-frontend-phase-08-docs.md
                 - "Phase 8: UI integration and CLI flags": components/ryll/plans/PLAN-usb-redir-phase-08-ui.md
                 - "Phase 9: Interrupt transfers": components/ryll/plans/PLAN-usb-redir-phase-09-interrupt.md
                 - "Phase 9: Thread live bug-report handles to the pedantic observer": components/ryll/plans/PLAN-display-draw-ops-phase-09-pedantic-handles.md
@@ -332,6 +342,7 @@ nav:
                 - "Supply-chain and prompt-injection scanning": components/ryll/plans/PLAN-supply-chain-scanning.md
                 - "Supply-chain follow-ups": components/ryll/plans/PLAN-supply-chain-followups.md
                 - "USB device redirection via the SPICE usbredir channel": components/ryll/plans/PLAN-usb-redir.md
+                - "Web frontend for ryll (SPICE → browser transcoder)": components/ryll/plans/PLAN-web-frontend.md
                 - "WebDAV folder sharing via the SPICE port channel": components/ryll/plans/PLAN-webdav.md
                 - "Window-follows-guest display sizing": components/ryll/plans/PLAN-display-window-sizing.md
     - Features: features.md
