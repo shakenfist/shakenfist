@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import ClassVar, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -29,6 +29,15 @@ class model_tasks(Enum):
 
 
 class model(BaseModel):
+    # NOTE: this schema does not carry an artifact_uuid -- the
+    # artifact this op is fetching for is identified by URL and
+    # namespace, with a transient artifact lookup happening
+    # inside the operation. Only the optional instance_uuid is
+    # available here as a target.
+    target_fields: ClassVar[dict[str, ObjectType]] = {
+        'instance_uuid': ObjectType.INSTANCE,
+    }
+
     uuid: UUID4
     namespace: str
     url: str
@@ -87,5 +96,6 @@ def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
         raise exc
 
     enqueue_cluster_operation(
-        object_type, m.model_dump(mode='json'), target=target_node)
+        object_type, m.model_dump(mode='json'), target=target_node,
+        model_class=model)
     return object_type, operation_uuid

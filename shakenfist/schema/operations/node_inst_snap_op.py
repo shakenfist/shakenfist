@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import ClassVar, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -36,6 +36,10 @@ class snapshot(BaseModel):
 
 
 class model(BaseModel):
+    target_fields: ClassVar[dict[str, ObjectType]] = {
+        'instance_uuid': ObjectType.INSTANCE,
+    }
+
     uuid: UUID4
     node_uuid: UUID4
     instance_uuid: UUID4
@@ -89,5 +93,6 @@ def create_and_enqueue(node_uuid, instance_uuid, snapshots, tasks, priority,
         }).error(f'schema validation error: {exc}')
         raise exc
 
-    enqueue_cluster_operation(object_type, m.model_dump(mode='json'))
+    enqueue_cluster_operation(
+        object_type, m.model_dump(mode='json'), model_class=model)
     return object_type, operation_uuid

@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import ClassVar
 from typing import List
 from typing import Optional
 from uuid import uuid4
@@ -32,6 +33,10 @@ class model_tasks(Enum):
 
 
 class model(BaseModel):
+    target_fields: ClassVar[dict[str, ObjectType]] = {
+        'network_uuid': ObjectType.NETWORK,
+    }
+
     uuid: UUID4
     network_uuid: UUID4
     mac_address: MacAddress
@@ -87,5 +92,6 @@ def create_and_enqueue(network_uuid, mac_address, ip, tasks, priority,
         raise exc
 
     enqueue_cluster_operation(
-        object_type, m.model_dump(mode='json'), target='networknode')
+        object_type, m.model_dump(mode='json'), target='networknode',
+        model_class=model)
     return object_type, operation_uuid

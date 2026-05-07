@@ -1,7 +1,8 @@
 import copy
 import time
-from typing import Any, Optional
+from typing import Any, Optional, Type
 
+from pydantic import BaseModel
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -16,7 +17,8 @@ LOG, _ = logs.setup(__name__)
 def enqueue_cluster_operation(
         object_type: ClusterOperation,
         metadata: dict[str, Any],
-        target: Optional[str] = None
+        target: Optional[str] = None,
+        model_class: Optional[Type[BaseModel]] = None,
 ) -> None:
     """Create a cluster operation and enqueue its work item.
 
@@ -58,6 +60,33 @@ def enqueue_cluster_operation(
         'operation_uuid': metadata['uuid'],
         'queue_name': queue_name,
     }).info('Enqueued cluster operation')
+
+    # Auto-write cluster_operation_targets rows for every target
+    # declared by the model class. The declaration is a class-level
+    # ClassVar mapping metadata field names to ObjectType enum
+    # members. Fields whose value on the metadata is None are
+    # skipped (the schema permits Optional UUIDs in some ops).
+    #
+    # Duplicate writes are harmless: the underlying INSERT is
+    # protected by a UNIQUE constraint on operation_uuid and the
+    # _direct_create_cluster_operation_target() implementation in
+    # mariadb.py absorbs the resulting IntegrityError. So this
+    # write is safe even though existing manual
+    # set_last_cluster_operation() callers still also write the
+    # same row -- the explicit callers are removed in sub-phase 3b.
+    if model_class is not None:
+        target_fields = getattr(model_class, 'target_fields', {})
+        for field_name, target_object_type in target_fields.items():
+            target_uuid = metadata.get(field_name)
+            if target_uuid is None:
+                continue
+            mariadb.create_cluster_operation_target(
+                operation_uuid=metadata['uuid'],
+                operation_type=object_type_str,
+                target_object_type=target_object_type,
+                target_uuid=target_uuid,
+                created_at=creation_time,
+            )
 
     # Build the audit event targets: the operation itself plus
     # every object referenced in the metadata via an _uuid key.
