@@ -5319,9 +5319,7 @@ def _direct_create_cluster_operation_target(
             return True
     except IntegrityError:
         # Duplicate operation_uuid — already recorded, which is fine.
-        # This happens when set_last_cluster_operation is called more
-        # than once for the same operation (e.g. at enqueue time and
-        # again when the operation starts executing).
+        # The UNIQUE constraint on operation_uuid ensures idempotency.
         return True
     except OperationalError as e:
         LOG.warning(

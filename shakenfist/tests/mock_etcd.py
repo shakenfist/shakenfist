@@ -2279,10 +2279,8 @@ class MockEtcd():
         if operation_uuid in self.cluster_operation_targets:
             # Real code (_direct_create_cluster_operation_target in
             # mariadb.py) swallows IntegrityError on the UNIQUE
-            # constraint and returns True. The mock must match that
-            # behaviour or auto-targeting + an explicit
-            # set_last_cluster_operation() call will spuriously
-            # fail in tests when the duplicate write hits.
+            # constraint and returns True. The mock matches that
+            # behaviour to preserve idempotency semantics.
             self._trace(
                 f'MockMariaDB.create_cluster_operation_target'
                 f'({operation_uuid}): duplicate')

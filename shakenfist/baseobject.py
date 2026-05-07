@@ -695,7 +695,7 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
         return mariadb.has_pending_cluster_operation_target(
             self.object_type, str(self.uuid))
 
-    def set_last_cluster_operation(self, op_type, op_uuid):
+    def _set_last_cluster_operation(self, op_type, op_uuid):
         if not self.in_memory_only:
             success = mariadb.create_cluster_operation_target(
                 operation_uuid=str(op_uuid),

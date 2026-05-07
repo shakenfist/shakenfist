@@ -278,18 +278,12 @@ class NetworkInterface(dbo):
     def delete(self):
         floating_address = self.floating['floating_address']
         if floating_address:
-            op_type, op_uuid = nii_create_and_enqueue(
+            nii_create_and_enqueue(
                 self.network_uuid,
                 self.uuid,
                 floating_address,
                 [nii_tasks.interface_defloat],
                 priority=PRIORITY.user_facing)
-            n = network.Network.from_db(self.network_uuid)
-            if n:
-                try:
-                    n.set_last_cluster_operation(op_type, op_uuid)
-                except RuntimeError:
-                    pass  # Delete must proceed even if LCO tracking fails
 
             fn = network.floating_network()
             fn.ipam.release(floating_address)

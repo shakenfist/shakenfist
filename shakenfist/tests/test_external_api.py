@@ -76,7 +76,7 @@ class FakeInstance(BaseFakeObject):
                   suppress_event_logging=False, log_as_error=False):
         ...
 
-    def set_last_cluster_operation(self, op_type, op_uuid):
+    def _set_last_cluster_operation(self, op_type, op_uuid):
         self.last_cluster_operation = (op_type, op_uuid)
 
     def get_lock_attr(self, name, op, global_scope=True, timeout=10):

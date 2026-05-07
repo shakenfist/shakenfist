@@ -337,16 +337,15 @@ class ArtifactsEndpoint(api_base.Resource):
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
 
-        with a.get_lock_attr('last_cluster_operation', 'add new operation'):
-            op_type, op_uuid = afo_create_and_enqueue(
-                namespace,
-                url,
-                None,
-                [afo_tasks.image_fetch],
-                PRIORITY.user_facing,
-                request_id=util_general.get_request_id(),
-                runs_after=[a.last_cluster_operation])
-            a.set_last_cluster_operation(op_type, op_uuid)
+        afo_create_and_enqueue(
+            namespace,
+            url,
+            None,
+            [afo_tasks.image_fetch],
+            PRIORITY.user_facing,
+            artifact_uuid=a.uuid,
+            request_id=util_general.get_request_id(),
+            runs_after=[a.last_cluster_operation])
 
         return a.external_view()
 

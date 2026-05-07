@@ -105,14 +105,10 @@ class Job(util_concurrency.Job):
                         if not n.networkinterfaces:
                             LOG.with_fields({'network': n}).info(
                                 'Removing stray delete_wait network')
-                            op_type, op_uuid = net_create_and_enqueue(
+                            net_create_and_enqueue(
                                 n.uuid,
                                 [net_tasks.network_destroy],
                                 PRIORITY.user_facing)
-                            try:
-                                n.set_last_cluster_operation(op_type, op_uuid)
-                            except RuntimeError:
-                                pass  # Cleanup must proceed
 
                         # We skip maintenance on all delete_wait networks
                         continue

@@ -6,6 +6,7 @@ from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -49,7 +50,7 @@ class LastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
 
 
 class SetLastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
-    """Test set_last_cluster_operation writes to cluster_operation_targets."""
+    """Test _set_last_cluster_operation writes to cluster_operation_targets."""
 
     @mock.patch('shakenfist.mariadb.create_cluster_operation_target',
                 return_value=True)
@@ -59,7 +60,7 @@ class SetLastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
         mock_time.time.return_value = 1234.5
 
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
-        d.set_last_cluster_operation('instance_preflight', OP_UUID)
+        d._set_last_cluster_operation('instance_preflight', OP_UUID)
 
         # Verify cluster_operation_targets write
         mock_create_target.assert_called_once_with(
@@ -75,7 +76,7 @@ class SetLastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
             self, mock_create_target):
         d = DatabaseBackedObjectWithOperations(
             TEST_UUID, in_memory_only=True)
-        d.set_last_cluster_operation('net_op', OP_UUID)
+        d._set_last_cluster_operation('net_op', OP_UUID)
 
         mock_create_target.assert_not_called()
 
@@ -533,3 +534,76 @@ class DirectHasPendingClusterOperationTargetTestCase(
             'instance', TEST_UUID)
 
         self.assertFalse(result)
+
+
+HOTPLUG_INSTANCE_UUID = 'eeee1111-1111-4111-8111-111111111111'
+HOTPLUG_NETWORK_UUID = 'ffff1111-1111-4111-8111-111111111111'
+HOTPLUG_INTERFACE_UUID = 'aaaa2222-2222-4222-8222-222222222222'
+HOTPLUG_NODE_UUID = 'bbbb3333-3333-4333-8333-333333333333'
+
+
+class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
+    """Regression test for the hot-plug triple-target bug (commit 8923391c).
+
+    Enqueueing a node_inst_net_iface_op must write three
+    cluster_operation_targets rows (instance, network, interface) via
+    the auto-targeting path in enqueue_cluster_operation(). Before
+    3a/3b, the network target was written by an explicit
+    set_last_cluster_operation() call that was sometimes omitted,
+    causing the network maintainer to race the queue worker.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_create_and_enqueue = mock.patch(
+            'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+            return_value=True,
+        ).start()
+        self.mock_create_target = mock.patch(
+            'shakenfist.mariadb.create_cluster_operation_target',
+        ).start()
+        self.mock_add_event_multi = mock.patch(
+            'shakenfist.schema.operations.util.eventlog.add_event_multi',
+        ).start()
+        self.mock_time = mock.patch(
+            'shakenfist.schema.operations.util.time.time',
+            return_value=5000.0,
+        ).start()
+        self.addCleanup(mock.patch.stopall)
+
+    def test_hot_plug_enqueue_writes_three_target_rows(self):
+        """Three cluster_operation_targets rows must be written: instance,
+        network, and interface. This locks in that the original CI failure
+        from commit 8923391c cannot regress.
+        """
+        from shakenfist.schema.operations.node_inst_net_iface_op import (
+            create_and_enqueue, model_tasks)
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+
+        create_and_enqueue(
+            HOTPLUG_NODE_UUID,
+            HOTPLUG_INSTANCE_UUID,
+            HOTPLUG_NETWORK_UUID,
+            HOTPLUG_INTERFACE_UUID,
+            [model_tasks.hot_plug_instance_interface],
+            PRIORITY.user_waiting,
+        )
+
+        self.assertEqual(3, self.mock_create_target.call_count)
+        target_types = {
+            call.kwargs['target_object_type']
+            for call in self.mock_create_target.call_args_list
+        }
+        self.assertEqual(
+            {ObjectType.INSTANCE, ObjectType.NETWORK, ObjectType.INTERFACE},
+            target_types,
+        )
+        target_uuids = {
+            call.kwargs['target_uuid']
+            for call in self.mock_create_target.call_args_list
+        }
+        self.assertEqual(
+            {HOTPLUG_INSTANCE_UUID, HOTPLUG_NETWORK_UUID,
+             HOTPLUG_INTERFACE_UUID},
+            target_uuids,
+        )

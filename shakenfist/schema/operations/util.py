@@ -66,14 +66,6 @@ def enqueue_cluster_operation(
     # ClassVar mapping metadata field names to ObjectType enum
     # members. Fields whose value on the metadata is None are
     # skipped (the schema permits Optional UUIDs in some ops).
-    #
-    # Duplicate writes are harmless: the underlying INSERT is
-    # protected by a UNIQUE constraint on operation_uuid and the
-    # _direct_create_cluster_operation_target() implementation in
-    # mariadb.py absorbs the resulting IntegrityError. So this
-    # write is safe even though existing manual
-    # set_last_cluster_operation() callers still also write the
-    # same row -- the explicit callers are removed in sub-phase 3b.
     if model_class is not None:
         target_fields = getattr(model_class, 'target_fields', {})
         for field_name, target_object_type in target_fields.items():

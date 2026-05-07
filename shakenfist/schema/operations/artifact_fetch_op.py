@@ -29,18 +29,15 @@ class model_tasks(Enum):
 
 
 class model(BaseModel):
-    # NOTE: this schema does not carry an artifact_uuid -- the
-    # artifact this op is fetching for is identified by URL and
-    # namespace, with a transient artifact lookup happening
-    # inside the operation. Only the optional instance_uuid is
-    # available here as a target.
     target_fields: ClassVar[dict[str, ObjectType]] = {
+        'artifact_uuid': ObjectType.ARTIFACT,
         'instance_uuid': ObjectType.INSTANCE,
     }
 
     uuid: UUID4
     namespace: str
     url: str
+    artifact_uuid: Optional[UUID4] = None
     instance_uuid: Optional[UUID4]
     priority: PRIORITY
     request_id: Optional[str]
@@ -59,8 +56,8 @@ class model(BaseModel):
 
 
 def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
-                       request_id=None, depends_on=None, runs_after=None,
-                       target_node=None):
+                       artifact_uuid=None, request_id=None, depends_on=None,
+                       runs_after=None, target_node=None):
     operation_uuid = str(uuid4())
 
     if not target_node:
@@ -72,6 +69,7 @@ def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
             uuid=operation_uuid,
             namespace=namespace,
             url=url,
+            artifact_uuid=artifact_uuid,
             instance_uuid=instance_uuid,
             priority=priority,
             request_id=request_id,
@@ -85,6 +83,7 @@ def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
             'uuid': operation_uuid,
             'namespace': namespace,
             'url': url,
+            'artifact_uuid': artifact_uuid,
             'instance_uuid': instance_uuid,
             'priority': priority,
             'request_id': request_id,
