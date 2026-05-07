@@ -75,6 +75,46 @@ re-litigating.
    these execution-path calls are redundant. The 3b sweep
    removes them too.
 
+6. **Resolve the artifact UUID earlier so auto-targeting
+   covers it.** Sub-phase 3a left `artifact_fetch_op`
+   declaring only `instance_uuid` as a target, because
+   the schema carries no `artifact_uuid` field — the
+   artifact has historically been resolved by URL +
+   namespace at op-execution time. Sub-phase 3b adds
+   `artifact_uuid: Optional[UUID4]` to the schema,
+   updates the two enqueue sites to resolve eagerly, and
+   adds `'artifact_uuid': ObjectType.ARTIFACT` to the
+   `target_fields` declaration. Concretely:
+   - `external_api/artifact.py:329-349` already calls
+     `Artifact.from_url(... create_if_new=True)` before
+     enqueueing — pass the resolved `a.uuid` into
+     `afo_create_and_enqueue`.
+   - `external_api/instance.py:820-849` is the only
+     enqueue site that does not pre-resolve. Move the
+     `Artifact.from_url(... create_if_new=True)` call
+     into the disk loop *before* the enqueue, then pass
+     `a.uuid`. This mirrors what the artifact API
+     already does.
+   - The execution-path `Artifact.from_url(... create_if_new=True)`
+     inside `_image_fetch` (`operations/artifact_fetch_op.py:99-101`)
+     stays in place: it is idempotent for the same
+     URL+namespace key, and is still the correct fallback
+     for any future caller that does not pre-resolve.
+
+   **Side effect.** The instance create path now creates
+   artifacts at API time instead of at op-execution time.
+   If the instance create is aborted before the op runs,
+   an orphan INITIAL-state artifact is left. This is not
+   a regression: the same artifact gets created at op-
+   execution time today, and the same abandonment
+   scenario already exists if the op fails mid-execution.
+   Eager creation just shifts *when* the artifact
+   appears.
+
+   With this decision, no documented exceptions remain
+   and the rename of `set_last_cluster_operation` to
+   `_set_last_cluster_operation` covers every call site.
+
 ## Goal
 
 After phase 3 lands:
@@ -373,17 +413,26 @@ tox
 - `shakenfist/tests/test_enqueue_cluster_operation.py`
   (existing or new) — coverage for the four cases above.
 
-### 3b (sweep + privatise)
+### 3b (sweep + privatise + artifact_uuid)
 
+- `shakenfist/schema/operations/artifact_fetch_op.py` —
+  add `artifact_uuid: Optional[UUID4]` field to the
+  model; add `'artifact_uuid': ObjectType.ARTIFACT` to
+  the `target_fields` declaration.
 - `shakenfist/baseobject.py` — rename method.
 - `shakenfist/external_api/network.py` — drop 3 lock
   wrappers and 3 set calls.
 - `shakenfist/external_api/instance.py` — drop 2 lock
-  wrappers and 3 set calls.
+  wrappers and 3 set calls; add the
+  `Artifact.from_url(... create_if_new=True)` resolve-
+  early step inside the disk loop, pass `a.uuid` as
+  `artifact_uuid` to `afo_create_and_enqueue`.
 - `shakenfist/external_api/interface.py` — drop 2 lock
   wrappers and 2 set calls.
 - `shakenfist/external_api/artifact.py` — drop 1 lock
-  wrapper and 1 set call.
+  wrapper and 1 set call; pass the already-resolved
+  `a.uuid` as `artifact_uuid` to
+  `afo_create_and_enqueue`.
 - `shakenfist/network/network.py` — drop 1 set call.
 - `shakenfist/network/interface.py` — drop 1 set call.
 - `shakenfist/instance.py` — drop 2 set calls and the
