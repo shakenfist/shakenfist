@@ -320,6 +320,25 @@ implemented because the following statements will be true:
 
 ### Future work
 
+* **Rewire list-style consumers of `last_cluster_operation`
+  to use a pending-operations list query.** Phase 2's
+  audit identified two consumers that share the same
+  latest-only race as `Network.is_okay()` but cannot use
+  the boolean `has_pending_cluster_operation`:
+  `shakenfist/baseobject.py:722` `get_cluster_operations()`
+  (consumed by three external API endpoints —
+  `external_api/network.py:764`,
+  `external_api/artifact.py:856`,
+  `external_api/instance.py:1725`) and
+  `shakenfist/instance.py:1772-1777`
+  `Instance.enqueue_delete()` aborting outstanding ops
+  before delete. The right fix is a separate
+  `get_pending_cluster_operation_targets()` query plus
+  rewiring those two consumers — deferred because it
+  needs a list-based query rather than a boolean and the
+  failure mode (an unaborted op during instance delete)
+  is different enough from the network maintainer race
+  that bundling them would obscure both fixes.
 * **Consider exposing a full history endpoint** — once the
   data is reliably populated, an external API to list all
   cluster ops against a given object would aid debugging.
