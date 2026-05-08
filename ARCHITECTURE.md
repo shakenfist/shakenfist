@@ -121,16 +121,30 @@ object static values now live in MariaDB.
 
 #### Cluster Operation Tracking
 
-`set_last_cluster_operation()` records which cluster operation was most recently
-enqueued for an object. API clients poll this to wait for operations to complete.
-The write now raises `RuntimeError` on failure so API endpoints return 500
-instead of silently losing the tracking data. Callers in deletion paths and
-daemons catch this exception to ensure cleanup always proceeds.
+Every operation schema's `model` class declares its target objects via a
+`target_fields: ClassVar[dict[str, ObjectType]]` class variable. When
+`enqueue_cluster_operation` (in `schema/operations/util.py`) writes the
+`cluster_operations` row, it reads that declaration and writes one
+`cluster_operation_targets` row per non-None target field. Callers have
+no per-target bookkeeping obligation — targets are recorded automatically.
 
-The history is stored in the dedicated `cluster_operation_targets` MariaDB
-table -- one append-only row per (operation, target object) pair, with an
-AUTO_INCREMENT `sequence_number` providing total ordering per target.
-`last_cluster_operation` reads the highest-sequence row for the target.
+The setter `_set_last_cluster_operation` is private and used only by the
+internal enqueue plumbing. It is not a public API and should not be called
+directly.
+
+`DatabaseBackedObjectWithOperations` exposes two read shapes over the
+history:
+
+- **`last_cluster_operation` (property)**: returns the most recent target
+  row regardless of its state. Consumed by `external_view()` projections
+  and `runs_after=[...]` chains, which want the latest pointer
+  independent of whether it has reached a terminal state.
+- **`has_pending_cluster_operation()` (method)**: returns `True` if any
+  target row's operation is in `{queued, preflight, executing}`. Consumed
+  by `Network.is_okay()` and any future history-aware gate. The query
+  joins `cluster_operation_targets` against `object_states`, so a later
+  terminal operation cannot mask an earlier in-flight one.
+
 Because the table is append-only it is bounded by a periodic prune in the
 cluster daemon, alongside the existing `delete_stale_transfers` cleanup.
 The prune removes rows older than `CLUSTER_OPERATION_TARGET_RETENTION`

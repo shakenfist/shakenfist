@@ -424,17 +424,20 @@ performance. This is required for all deployments - MariaDB must be configured.
   agent_operations, kvm_pid, error_message, vsock_cids). Complex fields stored as
   JSON. Dual-write with etcd fallback for unmigrated objects.
 - **Object Metadata** (`object_metadata` table): User-defined metadata
-  key-value pairs and last_cluster_operation for all object types.
+  key-value pairs for all object types.
   Uses composite primary key (object_type, object_uuid) following the
-  same pattern as object_states. Dual-write with etcd fallback.
+  same pattern as object_states.
 - **Cluster Operation Targets** (`cluster_operation_targets` table):
   Records every cluster operation targeting an object (Instance,
   Artifact, Network, Blob) with AUTO_INCREMENT sequence numbering
-  for ordering. Replaces the single-pointer `last_cluster_operation`
+  for ordering. Replaced the single-pointer `last_cluster_operation`
   in `object_metadata` with a full append-only history. Primary key
   is `sequence_number` (AUTO_INCREMENT), with a UNIQUE constraint on
   `operation_uuid`. Indexed on `(target_object_type, target_uuid)`
-  and `created_at`. Dual-write with object_metadata fallback.
+  and `created_at`. Target rows are written automatically by
+  `enqueue_cluster_operation`; callers have no per-target bookkeeping
+  obligation. `has_pending_cluster_operation()` exposes the
+  history-aware "any in-flight op?" query used by gating logic.
 - **Node Metrics** (`node_metrics` table): Ephemeral per-node resource
   metrics (CPU, memory, disk, network, queue depths) updated every 60
   seconds by the resources daemon. Uses a JSON column (`metrics_json`)

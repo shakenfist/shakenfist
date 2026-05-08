@@ -350,7 +350,32 @@ implemented because the following statements will be true:
 
 ### Bugs fixed during this work
 
-(To be filled in as phases land.)
+- **Latest-only race in `Network.is_okay()`** — the legacy
+  single-pointer read concluded "no op in flight" whenever a
+  later terminal op had been written, even if an earlier op was
+  still queued or executing. The network maintainer raced the
+  queue worker and produced the recurring `recreating not okay
+  network on hypervisor` audit event for first-time creations.
+  Fixed in phase 2 by switching to `has_pending_cluster_operation()`,
+  which joins against `object_states` and checks all target rows
+  rather than only the latest one.
+
+- **Forgotten-call race in the hot-plug interface flow
+  (commit `8923391c`)** — the API path
+  `external_api/instance.py:1028-1029` called
+  `set_last_cluster_operation` twice, once on the instance and
+  once on the network, but the execution-path call in
+  `operations/node_inst_net_iface_op.py:168` was also missing.
+  Fixed in phase 3 by moving target writes inside
+  `enqueue_cluster_operation` so callers cannot forget.
+
+- **Additional forgotten `set_last_cluster_operation` calls found
+  during phase 3 sweep** — the original audit identified six at-risk
+  sites; two more were found during implementation:
+  `network/network.py:763` in `remove_dhcp_lease` and
+  `operations/node_inst_net_iface_op.py:168` in the hot-plug
+  execution path. All sites removed in phase 3 when target writes
+  were centralised inside `enqueue_cluster_operation`.
 
 ### Documentation index maintenance
 

@@ -611,7 +611,7 @@ The migration is happening in phases:
 | 11 | Network objects | Complete - `networks`, `network_attributes` tables |
 | 12 | AgentOperation objects | Complete - `agent_operations`, `agent_operation_attributes` tables |
 | 13 | Instance objects | Complete - `instances`, `instance_attributes` tables |
-| 14 | Object metadata | Complete - `object_metadata` table (metadata + last_cluster_operation) |
+| 14 | Object metadata | Complete - `object_metadata` table (user metadata) |
 | 15 | Cluster operation targets | Complete - `cluster_operation_targets` table (operation ordering per object) |
 | 16 | Node metrics | Complete - `node_metrics` table (ephemeral per-node resource metrics, JSON payload) |
 | 17 | Cluster operations | Complete - `cluster_operations` table (full operation metadata with indexed node/instance/network/priority columns) |
@@ -632,7 +632,7 @@ tables with `(object_type, object_uuid)` keys:
 | Table | Purpose |
 |-------|---------|
 | `object_states` | State value, update time, message for all objects |
-| `object_metadata` | User-defined metadata and last_cluster_operation for all objects |
+| `object_metadata` | User-defined metadata for all objects |
 
 These tables are efficient for cross-type queries (e.g., "find all objects
 in error state").
@@ -703,6 +703,33 @@ currently in an active state (`queued`, `preflight`, or `executing`) in
 `object_states`. Operations still in flight are never pruned regardless of
 age. Set `CLUSTER_OPERATION_TARGET_RETENTION` to 0 to disable pruning
 entirely (the default is 7 days).
+
+#### Cluster Operation Target Tracking
+
+The `cluster_operation_targets` table holds one row per (operation, target
+object) pair. Each row carries the target's object type and UUID, plus the
+`operation_uuid` and an `AUTO_INCREMENT` `sequence_number` that gives
+total ordering per target.
+
+Two query shapes are exposed to the rest of the system:
+
+- **`get_latest_cluster_operation_target`**: returns the highest-sequence
+  row for a given `(object_type, uuid)` pair, regardless of state. Used
+  by the `last_cluster_operation` property and `external_view()`
+  projections to provide the familiar "which op ran last?" answer.
+- **`has_pending_cluster_operation_target`**: returns `True` if any row
+  for the object references an operation whose state is `queued`,
+  `preflight`, or `executing`. Used by `Network.is_okay()` and any other
+  gate that must defer while work is in flight. Because it checks all
+  rows rather than only the latest one, a later terminal operation cannot
+  mask an earlier in-flight one.
+
+Rows are written automatically by `enqueue_cluster_operation`; operators
+do not need to manage them. Pruning is performed by the cluster daemon
+under `ClusterLock` election via
+`_direct_delete_stale_cluster_operation_targets`: rows older than
+`CLUSTER_OPERATION_TARGET_RETENTION` whose operation has reached a
+terminal state are removed; in-flight operations are never pruned.
 
 #### Per-Type Static Value Tables
 
