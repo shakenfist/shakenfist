@@ -30,8 +30,8 @@
 #           }
 #       )
 
-from enum import Enum
 import threading
+from enum import Enum
 from typing import Annotated
 from typing import Any
 from typing import get_args
