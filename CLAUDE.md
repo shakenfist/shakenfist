@@ -401,19 +401,17 @@ performance. This is required for all deployments - MariaDB must be configured.
 - **Network Interfaces** (`network_interfaces`, `network_interface_attributes`
   tables): Network interface static values (uuid, network_uuid, instance_uuid,
   macaddr, ipv4, order, model) and mutable attributes (floating_address).
-  Dual-write with etcd fallback for unmigrated objects.
 - **IPAMs** (`ipams` table): IPAM static values (uuid, namespace,
-  network_uuid, ipblock). No mutable attributes. Dual-write with etcd
-  fallback for unmigrated objects.
+  network_uuid, ipblock). No mutable attributes.
 - **Networks** (`networks`, `network_attributes` tables): Network static
   values (uuid, name, namespace, netblock, provide_dhcp/nat/dns, vxid,
   egress_nic, mesh_nic) and mutable attributes (floating_gateway,
   hosteddns). VXLAN ID uniqueness enforced by UNIQUE constraint on
-  vxid column. Dual-write with etcd fallback for unmigrated objects.
+  vxid column.
 - **AgentOperations** (`agent_operations`, `agent_operation_attributes`
   tables): AgentOperation static values (uuid, namespace, instance_uuid,
   commands) and mutable attributes (results). Commands and results stored
-  as JSON. Dual-write with etcd fallback for unmigrated objects.
+  as JSON.
 - **Instances** (`instances`, `instance_attributes` tables): Instance
   static values (uuid, cpus, disk_spec, memory, name, namespace,
   requested_placement, ssh_key, user_data, video, uefi, configdrive,
@@ -421,7 +419,7 @@ performance. This is required for all deployments - MariaDB must be configured.
   attributes (placement, power_state, ports, enforced_deletes,
   block_devices, interfaces, agent_state, agent_attributes,
   agent_operations, kvm_pid, error_message, vsock_cids). Complex fields stored as
-  JSON. Dual-write with etcd fallback for unmigrated objects.
+  JSON.
 - **Object Metadata** (`object_metadata` table): User-defined metadata
   key-value pairs for all object types.
   Uses composite primary key (object_type, object_uuid) following the
