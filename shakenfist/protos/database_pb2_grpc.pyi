@@ -881,8 +881,8 @@ class DatabaseServiceStub:
         database_pb2.GetObjectMetadataReply,
     ]
     """Object Metadata Operations (MariaDB)
-    These store user-defined metadata and last_cluster_operation for all
-    object types in a single shared table (like object_states).
+    These store user-defined metadata for all object types in a single shared
+    table (like object_states).
     """
 
     SetMetadata: grpc.UnaryUnaryMultiCallable[
@@ -1860,8 +1860,8 @@ class DatabaseServiceAsyncStub:
         database_pb2.GetObjectMetadataReply,
     ]
     """Object Metadata Operations (MariaDB)
-    These store user-defined metadata and last_cluster_operation for all
-    object types in a single shared table (like object_states).
+    These store user-defined metadata for all object types in a single shared
+    table (like object_states).
     """
 
     SetMetadata: grpc.aio.UnaryUnaryMultiCallable[
@@ -3153,8 +3153,8 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetObjectMetadataReply, collections.abc.Awaitable[database_pb2.GetObjectMetadataReply]]:
         """Object Metadata Operations (MariaDB)
-        These store user-defined metadata and last_cluster_operation for all
-        object types in a single shared table (like object_states).
+        These store user-defined metadata for all object types in a single shared
+        table (like object_states).
         """
 
     @abc.abstractmethod

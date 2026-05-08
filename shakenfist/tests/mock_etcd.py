@@ -2235,8 +2235,6 @@ class MockEtcd():
                 object_type=str(object_type),
                 object_uuid=object_uuid,
                 metadata=data.get('metadata'),
-                last_cluster_operation=data.get(
-                    'last_cluster_operation')
             )
         self._trace(
             f'MockMariaDB.get_object_metadata({key}): '

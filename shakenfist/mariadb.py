@@ -162,7 +162,7 @@ AGENT_OPERATIONS_VERSION = 2
 AGENT_OPERATION_ATTRIBUTES_VERSION = 2
 INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 3
-OBJECT_METADATA_VERSION = 2
+OBJECT_METADATA_VERSION = 3
 CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
 # v1: schema creation. v2: data migration from node_attributes.daemon_states
@@ -550,9 +550,9 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
 def _get_object_metadata_table() -> sa.Table:
     """Get or create the object_metadata table definition.
 
-    This table stores user-defined metadata and last_cluster_operation for all
-    object types. It uses a composite primary key of (object_type, object_uuid)
-    following the same pattern as the object_states table.
+    This table stores user-defined metadata for all object types. It uses a
+    composite primary key of (object_type, object_uuid) following the same
+    pattern as the object_states table.
     """
     global _object_metadata_table
     if _object_metadata_table is None:
@@ -563,7 +563,6 @@ def _get_object_metadata_table() -> sa.Table:
             sa.Column('object_uuid', sa.String(36), nullable=False),
             sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
             sa.Column('metadata_json', sa.Text(), nullable=True),
-            sa.Column('last_cluster_operation_json', sa.Text(), nullable=True),
             # Composite primary key
             sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
         )
@@ -585,6 +584,19 @@ def _ensure_object_metadata_schema(engine: sa.Engine) -> dict[str, Any]:
         LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v3: '
+            'dropping dead last_cluster_operation_json column.')
+        with engine.connect() as conn:
+            conn.execute(sa.text(
+                'ALTER TABLE object_metadata '
+                'DROP COLUMN IF EXISTS last_cluster_operation_json'
+            ))
+            conn.commit()
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -5044,7 +5056,7 @@ def get_all_states_for_type(object_type: ObjectType) -> list[tuple[str, State]]:
 
 # =============================================================================
 # Object Metadata Direct Access Functions
-# These store user-defined metadata and last_cluster_operation for all objects.
+# These store user-defined metadata for all objects.
 # =============================================================================
 
 def _direct_get_object_metadata(
@@ -5068,14 +5080,11 @@ def _direct_get_object_metadata(
                 return None
 
             metadata = json.loads(result.metadata_json) if result.metadata_json else None
-            lco = (json.loads(result.last_cluster_operation_json)
-                   if result.last_cluster_operation_json else None)
 
             return ObjectMetadataData(
                 object_type=object_type.value,
                 object_uuid=object_uuid,
                 metadata=metadata,
-                last_cluster_operation=lco
             )
     except OperationalError as e:
         LOG.warning(f'MariaDB read failed for object_metadata {object_type}/{object_uuid}: {e}')
@@ -5102,7 +5111,6 @@ def _direct_set_metadata(
                 object_uuid=object_uuid,
                 object_type=object_type,
                 metadata_json=metadata_json,
-                last_cluster_operation_json=None
             )
             stmt = stmt.on_duplicate_key_update(
                 metadata_json=metadata_json
@@ -5165,14 +5173,11 @@ def _grpc_get_object_metadata(
             return None
 
         metadata = json.loads(reply.metadata_json) if reply.metadata_json else None
-        lco = (json.loads(reply.last_cluster_operation_json)
-               if reply.last_cluster_operation_json else None)
 
         return ObjectMetadataData(
             object_type=object_type.value,
             object_uuid=object_uuid,
             metadata=metadata,
-            last_cluster_operation=lco
         )
     except grpc.RpcError as e:
         LOG.error(
@@ -5234,7 +5239,7 @@ def get_object_metadata(
     object_type: ObjectType,
     object_uuid: str
 ) -> Optional[ObjectMetadataData]:
-    """Read metadata and last_cluster_operation for an object.
+    """Read metadata for an object.
 
     Args:
         object_type: The type of object.
@@ -5272,7 +5277,7 @@ def delete_object_metadata(
     object_type: ObjectType,
     object_uuid: str
 ) -> bool:
-    """Delete metadata and last_cluster_operation for an object.
+    """Delete metadata for an object.
 
     Args:
         object_type: The type of object.

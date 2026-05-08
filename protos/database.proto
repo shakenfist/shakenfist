@@ -251,8 +251,8 @@ service DatabaseService {
   rpc IsVsockCidInUse (IsVsockCidInUseRequest) returns (IsVsockCidInUseReply) {}
 
   // Object Metadata Operations (MariaDB)
-  // These store user-defined metadata and last_cluster_operation for all
-  // object types in a single shared table (like object_states).
+  // These store user-defined metadata for all object types in a single shared
+  // table (like object_states).
   rpc GetObjectMetadata (GetObjectMetadataRequest) returns (GetObjectMetadataReply) {}
   rpc SetMetadata (SetMetadataRequest) returns (StatusReply) {}
   rpc DeleteObjectMetadata (DeleteObjectMetadataRequest) returns (StatusReply) {}
@@ -1680,7 +1680,8 @@ message GetObjectMetadataRequest {
 message GetObjectMetadataReply {
   bool found = 1;
   string metadata_json = 2;                  // JSON dict or empty
-  string last_cluster_operation_json = 3;    // JSON dict or empty
+  reserved 3;
+  reserved "last_cluster_operation_json";
 }
 
 message SetMetadataRequest {

@@ -5019,20 +5019,16 @@ class GetObjectMetadataReply(google.protobuf.message.Message):
 
     FOUND_FIELD_NUMBER: builtins.int
     METADATA_JSON_FIELD_NUMBER: builtins.int
-    LAST_CLUSTER_OPERATION_JSON_FIELD_NUMBER: builtins.int
     found: builtins.bool
     metadata_json: builtins.str
-    """JSON dict or empty"""
-    last_cluster_operation_json: builtins.str
     """JSON dict or empty"""
     def __init__(
         self,
         *,
         found: builtins.bool = ...,
         metadata_json: builtins.str = ...,
-        last_cluster_operation_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["found", b"found", "last_cluster_operation_json", b"last_cluster_operation_json", "metadata_json", b"metadata_json"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["found", b"found", "metadata_json", b"metadata_json"]) -> None: ...
 
 global___GetObjectMetadataReply = GetObjectMetadataReply
 

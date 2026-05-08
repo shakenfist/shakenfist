@@ -4052,10 +4052,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 metadata_json=(
                     json.dumps(data.metadata)
                     if data.metadata is not None else ''),
-                last_cluster_operation_json=(
-                    json.dumps(data.last_cluster_operation)
-                    if data.last_cluster_operation is not None
-                    else '')
             )
         except Exception as e:
             util_exceptions.ignore_exception(
