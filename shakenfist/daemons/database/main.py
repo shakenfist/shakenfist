@@ -19,8 +19,8 @@ from uuid import UUID
 import grpc
 from prometheus_client import Counter
 from prometheus_client import start_http_server
-from shakenfist_utilities import logs  # noreorder
 from sqlalchemy.exc import OperationalError
+from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
 from shakenfist import mariadb
