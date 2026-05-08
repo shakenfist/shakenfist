@@ -17622,6 +17622,15 @@ def create_and_enqueue_cluster_operation(
     emit them via shakenfist.eventlog.add_event_multi() after this
     call returns True.
 
+    Note: this is the low-level transactional primitive. The
+    schema-layer helper shakenfist/schema/operations/util.py:
+    enqueue_cluster_operation() should normally be preferred --
+    it adds automatic cluster_operation_targets registration
+    based on each schema's ``target_fields`` ClassVar. Calling
+    this function directly bypasses that registration and
+    should only be done when the caller has its own reason to
+    skip it (e.g. internal bookkeeping migrations).
+
     Args:
         op_uuid: The operation's UUID (str or UUID).
         operation_type: Operation type name, e.g. 'node_net_op'.
