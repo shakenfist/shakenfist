@@ -611,7 +611,7 @@ The migration is happening in phases:
 | 11 | Network objects | Complete - `networks`, `network_attributes` tables |
 | 12 | AgentOperation objects | Complete - `agent_operations`, `agent_operation_attributes` tables |
 | 13 | Instance objects | Complete - `instances`, `instance_attributes` tables |
-| 14 | Object metadata | Complete - `object_metadata` table (user metadata) |
+| 14 | Object metadata | Complete - `object_metadata` table (user metadata). Schema v3 drops the legacy `last_cluster_operation_json` column via `ALTER TABLE ... DROP COLUMN IF EXISTS`; the column was unused since `last_cluster_operation` moved to `cluster_operation_targets`. |
 | 15 | Cluster operation targets | Complete - `cluster_operation_targets` table (operation ordering per object) |
 | 16 | Node metrics | Complete - `node_metrics` table (ephemeral per-node resource metrics, JSON payload) |
 | 17 | Cluster operations | Complete - `cluster_operations` table (full operation metadata with indexed node/instance/network/priority columns) |
