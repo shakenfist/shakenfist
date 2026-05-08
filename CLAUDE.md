@@ -408,9 +408,8 @@ performance. This is required for all deployments - MariaDB must be configured.
 - **Networks** (`networks`, `network_attributes` tables): Network static
   values (uuid, name, namespace, netblock, provide_dhcp/nat/dns, vxid,
   egress_nic, mesh_nic) and mutable attributes (floating_gateway,
-  networkinterfaces, networkinterfaces_initialized, hosteddns).
-  VXLAN ID uniqueness enforced by UNIQUE constraint on vxid column.
-  Dual-write with etcd fallback for unmigrated objects.
+  hosteddns). VXLAN ID uniqueness enforced by UNIQUE constraint on
+  vxid column. Dual-write with etcd fallback for unmigrated objects.
 - **AgentOperations** (`agent_operations`, `agent_operation_attributes`
   tables): AgentOperation static values (uuid, namespace, instance_uuid,
   commands) and mutable attributes (results). Commands and results stored
