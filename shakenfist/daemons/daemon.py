@@ -1,12 +1,12 @@
 import faulthandler
 import logging
-from logging.handlers import SysLogHandler
-from math import inf
 import os
 import signal
 import socket
 import threading
 import time
+from logging.handlers import SysLogHandler
+from math import inf
 
 import requests
 import setproctitle
