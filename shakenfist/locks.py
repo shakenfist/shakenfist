@@ -19,6 +19,7 @@ from shakenfist_utilities import random as util_random  # noreorder
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import config
+from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
 from shakenfist.util import callstack as util_callstack
 
 
@@ -27,12 +28,10 @@ LOG, _ = logs.setup(__name__)
 
 # Lease length on the database side. Refreshes target one third of
 # this so a holder can lose two consecutive refreshes (e.g. through a
-# transient sf-database outage) and still keep the lock.
-#
-# Must stay aligned with ``mariadb.CLUSTER_LOCK_LEASE_SECONDS`` -- they
-# are duplicated rather than shared because importing across the two
-# modules would be circular. If you change one, change the other.
-LEASE_SECONDS = 60
+# transient sf-database outage) and still keep the lock. The constant
+# itself lives in ``shakenfist.constants`` so ``shakenfist.mariadb``
+# can read the same value.
+LEASE_SECONDS = CLUSTER_LOCK_LEASE_SECONDS
 REFRESH_INTERVAL = LEASE_SECONDS // 3
 # How long the refresher waits between attempts when it hits a
 # transient failure. Tighter than REFRESH_INTERVAL so we recover

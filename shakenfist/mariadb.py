@@ -34,6 +34,7 @@ from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs
 
 from shakenfist.config import config
+from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
@@ -841,10 +842,8 @@ def _ensure_work_queue_schema(engine: sa.Engine) -> dict[str, Any]:
 _cluster_locks_table: Optional[sa.Table] = None
 
 
-# Must stay aligned with ``locks.LEASE_SECONDS`` -- duplicated rather
-# than shared because importing across the two modules would be
-# circular. If you change one, change the other.
-CLUSTER_LOCK_LEASE_SECONDS = 60
+# Lease length is shared with ``shakenfist.locks.LEASE_SECONDS`` via the
+# common constant in ``shakenfist.constants``.
 
 
 def _get_cluster_locks_table() -> sa.Table:
