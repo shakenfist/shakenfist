@@ -126,6 +126,8 @@ nav:
                 - "Image Notes": components/instar/image_notes/README.md
                 - "qcow2-v2 Test Image": components/instar/image_notes/qcow2-v2.md
                 - "virtualpc-vhd Test Image": components/instar/image_notes/virtualpc-vhd.md
+            - Plans:
+                - "Plan: Multi-distro install + qemu-img differential CI": components/instar/plans/PLAN-distro-matrix-ci.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
