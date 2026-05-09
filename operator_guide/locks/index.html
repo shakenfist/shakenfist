@@ -10135,6 +10135,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locks
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -10151,6 +10169,80 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#inspecting-locks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting locks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acquire-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acquire semantics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lease-loss-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lease loss handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transient-database-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transient database failures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stale-lock-cleanup-on-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stale-lock cleanup on restart
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -10324,6 +10416,69 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#inspecting-locks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting locks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acquire-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acquire semantics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lease-loss-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lease loss handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transient-database-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transient database failures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stale-lock-cleanup-on-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stale-lock cleanup on restart
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -10344,21 +10499,68 @@
 
 
 <h1 id="locks">Locks<a class="headerlink" href="#locks" title="Permanent link">&para;</a></h1>
-<p>Shaken Fist uses etcd for distributed locking. All locks are written into etcd
-with the <code>/sflocks</code> key prefix. Locks are effectively leases on a key within
-etcd, where the key contains metadata about the lock being held. This means its
-easy to determine who else is holding a lock if you see contention issues within
-your cluster.</p>
-<p>The easiest way to do this is with the <code>sf-client admin lock list</code> command,
-which will list all locks currently held in the cluster. For example, here's a
-relatively idle cluster:</p>
+<p>Shaken Fist uses leased distributed locks backed by MariaDB. Each
+held lock is a row in the <code>cluster_locks</code> table with an <code>expires_at</code>
+timestamp. The holder's daemon refreshes the timestamp every ~20s
+while it still wants the lock; if a holder dies (or is partitioned
+from the database for too long), the row's lease lapses and another
+candidate may steal it. There is no garbage-collection step or
+external reaper -- a dead holder's lock recovers automatically the
+next time anyone tries to acquire it.</p>
+<p>The lease length is 60s and the refresh interval is one third of that
+(20s), so a holder can lose two consecutive refreshes (e.g. through a
+brief <code>sf-database</code> outage) and still keep the lock. These constants
+are kept aligned in <code>shakenfist.locks.LEASE_SECONDS</code> and
+<code>shakenfist.mariadb.CLUSTER_LOCK_LEASE_SECONDS</code>.</p>
+<h2 id="inspecting-locks">Inspecting locks<a class="headerlink" href="#inspecting-locks" title="Permanent link">&para;</a></h2>
+<p>The easiest way to see who is holding what is <code>sf-client admin lock
+list</code>. For example, here's a relatively idle cluster:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ sf-client admin lock list
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>+----------------------+-------+------+---------------------+
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>|         lock         |  pid  | node |      operation      |
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>+----------------------+-------+------+---------------------+
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>| /sflocks/sf/cluster/ | 26407 | sf-7 | Cluster maintenance |
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>+----------------------+-------+------+---------------------+
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>+----------------+-------+------+---------------------+
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>|      lock      |  pid  | node |      operation      |
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>+----------------+-------+------+---------------------+
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>| cluster/       | 26407 | sf-7 | Cluster maintenance |
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>+----------------+-------+------+---------------------+
 </code></pre></div>
+<p>(Old lock keys carried a <code>/sflocks/</code> prefix when locks lived in etcd.
+The MariaDB-backed table stores lock keys without that prefix.)</p>
+<h2 id="acquire-semantics">Acquire semantics<a class="headerlink" href="#acquire-semantics" title="Permanent link">&para;</a></h2>
+<p><code>ClusterLock.acquire()</code> does up to two atomic writes:</p>
+<ol>
+<li><code>INSERT IGNORE</code> a fresh row -- claims an unheld key.</li>
+<li>If (1) loses the duplicate-PK race, an <code>UPDATE ... WHERE
+   expires_at &lt; NOW()</code> to steal a row whose lease has lapsed.</li>
+</ol>
+<p><code>expires_at</code> is set server-side via <code>NOW() + INTERVAL 60 SECOND</code>, so
+candidate clock skew across nodes does not affect lease ordering.</p>
+<p>On successful <code>acquire()</code> the lock starts a daemon thread that
+refreshes the row every 20s. The thread exits cleanly on <code>release()</code>
+or when a refresh attempt finds the row no longer carries our
+<code>lock_id</code> (i.e. another node stole the lease while we were absent).</p>
+<h2 id="lease-loss-handling">Lease loss handling<a class="headerlink" href="#lease-loss-handling" title="Permanent link">&para;</a></h2>
+<p>When the refresher confirms a lock has been stolen it sets
+<code>ClusterLock.lost_event</code> (a <code>threading.Event</code>) and exits. Long-held
+holders should poll this event between iterations of their critical
+section and abort cleanly when it fires. The cluster maintainer's
+inner loop already does this -- it sleeps on <code>lock.lost_event.wait(60)</code>
+and re-enters election when the wait returns truthy.</p>
+<p><code>ClusterLock.release()</code> raises <code>shakenfist.exceptions.LockNotHeld</code> if
+the database has no record of us holding the lock at release time;
+the context-manager <code>__exit__</code> swallows it (the body's exception is
+more interesting) but the noisy log is preserved.</p>
+<h2 id="transient-database-failures">Transient database failures<a class="headerlink" href="#transient-database-failures" title="Permanent link">&para;</a></h2>
+<p>A transient <code>sf-database</code> outage during a refresh round causes the
+refresher to retry every ~2s rather than treat the failure as a
+confirmed loss. As long as the database recovers within ~40s the
+holder keeps the lock without a re-election. The <code>RefreshLock</code> gRPC
+handler signals <code>UNAVAILABLE</code> on transient MariaDB errors so the
+client side's standard retry path applies.</p>
+<h2 id="stale-lock-cleanup-on-restart">Stale-lock cleanup on restart<a class="headerlink" href="#stale-lock-cleanup-on-restart" title="Permanent link">&para;</a></h2>
+<p>When a daemon starts up, its <code>queues</code> startup task calls
+<code>locks.clear_stale_locks()</code> which deletes any rows still attributed
+to that node by a process ID that no longer exists. This is no longer
+required for correctness (the lease will time them out anyway) but it
+keeps the table tidy after fast restarts.</p>
 
 
 

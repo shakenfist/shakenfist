@@ -10539,6 +10539,36 @@
 <td>Complete</td>
 <td>Replace cached UUID lists on attributes tables with SQL queries</td>
 </tr>
+<tr>
+<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
+<td>Phase 1: <code>has_pending_cluster_operation</code> query</td>
+<td>Complete</td>
+<td>New query API and tests</td>
+</tr>
+<tr>
+<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
+<td>Phase 2: Switch gating callers</td>
+<td>Complete</td>
+<td>Move <code>is_okay()</code> and siblings off the single-pointer read</td>
+</tr>
+<tr>
+<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
+<td>Phase 3: Auto-target tracking</td>
+<td>Complete</td>
+<td><code>*_create_and_enqueue</code> writes target rows automatically</td>
+</tr>
+<tr>
+<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
+<td>Phase 4: Remove explicit setters</td>
+<td>Complete</td>
+<td>Drop redundant <code>set_last_cluster_operation</code> callers</td>
+</tr>
+<tr>
+<td><a href="PLAN-replace-last-cluster-operation/">Replace last_cluster_operation</a></td>
+<td>Phase 5: Documentation and final audit</td>
+<td>Complete</td>
+<td>Update docs, verify CI</td>
+</tr>
 </tbody>
 </table>
 <h3 id="status-definitions">Status Definitions<a class="headerlink" href="#status-definitions" title="Permanent link">&para;</a></h3>

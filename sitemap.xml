@@ -1197,6 +1197,30 @@
          <lastmod>2026-05-09</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-01-query/</loc>
+         <lastmod>2026-05-09</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-02-gating/</loc>
+         <lastmod>2026-05-09</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-03-auto-target/</loc>
+         <lastmod>2026-05-09</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-04-drop-column/</loc>
+         <lastmod>2026-05-09</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-05-docs/</loc>
+         <lastmod>2026-05-09</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation/</loc>
+         <lastmod>2026-05-09</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-01-infrastructure/</loc>
          <lastmod>2026-05-09</lastmod>
     </url>
