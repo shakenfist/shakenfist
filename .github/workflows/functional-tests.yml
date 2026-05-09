@@ -1673,10 +1673,14 @@ jobs:
         run: |
           set -x
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
+          # The sf{N}_uuid values are under-cloud instance UUIDs, so the
+          # reboot has to be issued against the under-cloud's API. The
+          # GitHub runner already has under-cloud sf-client credentials
+          # (the topology playbooks use sf_instance from here). Don't
+          # let one failed reboot abort the rest of the loop -- we want
+          # all five attempted before log collection.
           for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
-              tools/run_remote ${primary} \
-                  ". /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client instance reboot --hard ${node}"
+              sf-client instance reboot --hard ${node} || true
           done
           sleep 90
 
