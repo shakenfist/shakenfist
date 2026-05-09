@@ -128,6 +128,7 @@ nav:
                 - "virtualpc-vhd Test Image": components/instar/image_notes/virtualpc-vhd.md
             - Plans:
                 - "Plan: Multi-distro install + qemu-img differential CI": components/instar/plans/PLAN-distro-matrix-ci.md
+                - "Release v0.2.0": components/instar/plans/PLAN-release-v0.2.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
