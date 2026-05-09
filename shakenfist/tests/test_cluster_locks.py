@@ -119,13 +119,20 @@ HOLDER = {
 class DirectAcquireClusterLockTestCase(base.ShakenFistTestCase):
     """Tests for _direct_acquire_cluster_lock.
 
-    The function does up to two writes per call -- a fresh
-    INSERT IGNORE, and on duplicate-PK a steal-the-expired-row
-    UPDATE -- so the mock connection returns a list of rowcounts.
+    The function issues a single ``INSERT ... ON DUPLICATE KEY
+    UPDATE`` followed by a primary-key SELECT to confirm whether
+    our lock_id ended up in the row, so the mock connection
+    returns one rowcount-only result and one row-bearing result.
     """
 
-    def _patch_engine(self, *rowcounts):
-        results = [_MockResult(rowcount=rc) for rc in rowcounts]
+    def _patch_engine(self, lock_id_in_row):
+        # Two execute() calls per acquire: the upsert (rowcount
+        # ignored by the new logic) and a confirming SELECT. Pass
+        # ``lock_id_in_row=None`` to simulate "row was deleted out
+        # from under us between upsert and SELECT" -- otherwise the
+        # SELECT returns one row containing the given lock_id.
+        rows = [(lock_id_in_row,)] if lock_id_in_row is not None else []
+        results = [_MockResult(rowcount=1), _MockResult(rows=rows)]
         conn = _MockConnection(results=results)
         engine = _MockEngine(conn)
         patcher = mock.patch(
@@ -135,20 +142,22 @@ class DirectAcquireClusterLockTestCase(base.ShakenFistTestCase):
         return conn
 
     def test_acquire_succeeds_on_fresh_insert(self):
-        # INSERT IGNORE matched (no prior holder).
-        conn = self._patch_engine(1)
+        # Cold acquire: upsert inserts, SELECT confirms our lock_id.
+        conn = self._patch_engine(lock_id_in_row='lock-abc')
         result = mariadb._direct_acquire_cluster_lock(
             'instance/parent/uuid1', HOLDER, 'node1', 42,
             'lock-abc', time.time())
         self.assertTrue(result)
         self.assertTrue(conn.committed)
-        # Single statement -- the steal UPDATE never runs.
-        self.assertEqual(len(conn.executed), 1)
+        # Upsert + confirming SELECT.
+        self.assertEqual(len(conn.executed), 2)
 
     def test_acquire_steals_expired_lock(self):
-        # INSERT lost the duplicate-PK race, but the existing row had
-        # an expired lease so the steal UPDATE matched.
-        conn = self._patch_engine(0, 1)
+        # Steal: upsert overwrote the expired row in place, SELECT
+        # confirms our lock_id is now in the row. Indistinguishable
+        # from cold acquire at this layer -- and that's by design,
+        # the IF()-gated SET clause does both.
+        conn = self._patch_engine(lock_id_in_row='lock-abc')
         result = mariadb._direct_acquire_cluster_lock(
             'instance/parent/uuid1', HOLDER, 'node1', 42,
             'lock-abc', time.time())
@@ -157,8 +166,9 @@ class DirectAcquireClusterLockTestCase(base.ShakenFistTestCase):
         self.assertEqual(len(conn.executed), 2)
 
     def test_acquire_fails_when_held_and_alive(self):
-        # INSERT lost, steal UPDATE found no expired row.
-        conn = self._patch_engine(0, 0)
+        # Held with valid lease: upsert was a no-op, SELECT shows the
+        # incumbent's lock_id rather than ours.
+        conn = self._patch_engine(lock_id_in_row='other-holder')
         result = mariadb._direct_acquire_cluster_lock(
             'instance/parent/uuid1', HOLDER, 'node1', 42,
             'lock-abc', time.time())
@@ -166,8 +176,20 @@ class DirectAcquireClusterLockTestCase(base.ShakenFistTestCase):
         self.assertTrue(conn.committed)
         self.assertEqual(len(conn.executed), 2)
 
+    def test_acquire_fails_when_select_returns_no_row(self):
+        # Belt-and-braces: a missing row after upsert should not
+        # crash and should be treated as "didn't get it".
+        conn = self._patch_engine(lock_id_in_row=None)
+        result = mariadb._direct_acquire_cluster_lock(
+            'instance/parent/uuid1', HOLDER, 'node1', 42,
+            'lock-abc', time.time())
+        self.assertFalse(result)
+        self.assertTrue(conn.committed)
+
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_acquire_returns_false_on_operational_error(self, mock_engine):
+    def test_acquire_returns_false_on_non_deadlock_error(self, mock_engine):
+        # Non-deadlock OperationalErrors short-circuit out of the
+        # retry helper and are reported as "couldn't acquire".
         conn = _MockConnection()
         conn.execute = mock.Mock(
             side_effect=OperationalError('stmt', {}, Exception()))
@@ -176,6 +198,106 @@ class DirectAcquireClusterLockTestCase(base.ShakenFistTestCase):
         result = mariadb._direct_acquire_cluster_lock(
             'key', HOLDER, 'node1', 42, 'lock-abc', time.time())
         self.assertFalse(result)
+        # No retry attempts on non-deadlock errors.
+        self.assertEqual(conn.execute.call_count, 1)
+
+
+def _make_deadlock_error():
+    """Build a SQLAlchemy OperationalError whose orig is shaped
+    like the mysqldb driver's deadlock exception (errno 1213)."""
+    orig = mock.Mock()
+    orig.args = (1213, 'Deadlock found when trying to get lock; '
+                       'try restarting transaction')
+    return OperationalError('stmt', {}, orig)
+
+
+class IsInnodbDeadlockTestCase(base.ShakenFistTestCase):
+    """Tests for the _is_innodb_deadlock errno classifier."""
+
+    def test_true_on_1213(self):
+        self.assertTrue(
+            mariadb._is_innodb_deadlock(_make_deadlock_error()))
+
+    def test_false_on_other_errno(self):
+        orig = mock.Mock()
+        orig.args = (1062, 'Duplicate entry')
+        exc = OperationalError('stmt', {}, orig)
+        self.assertFalse(mariadb._is_innodb_deadlock(exc))
+
+    def test_false_when_orig_missing(self):
+        # SQLAlchemy can synthesize OperationalErrors without an
+        # underlying DB-API exception in some test paths.
+        exc = OperationalError('stmt', {}, None)
+        self.assertFalse(mariadb._is_innodb_deadlock(exc))
+
+    def test_false_when_args_empty(self):
+        orig = mock.Mock()
+        orig.args = ()
+        exc = OperationalError('stmt', {}, orig)
+        self.assertFalse(mariadb._is_innodb_deadlock(exc))
+
+
+class RetryOnDeadlockTestCase(base.ShakenFistTestCase):
+    """Tests for the _retry_on_deadlock helper.
+
+    ``time.sleep`` is patched out so the jittered backoff doesn't
+    actually slow the suite down, but we keep the call-count
+    assertions so a regression that drops the backoff would show
+    up here.
+    """
+
+    def setUp(self):
+        super().setUp()
+        sleep_patcher = mock.patch('shakenfist.mariadb.time.sleep')
+        self.mock_sleep = sleep_patcher.start()
+        self.addCleanup(sleep_patcher.stop)
+
+    def test_returns_value_on_first_success(self):
+        fn = mock.Mock(return_value='ok')
+        result = mariadb._retry_on_deadlock(fn, 'op')
+        self.assertEqual(result, 'ok')
+        self.assertEqual(fn.call_count, 1)
+        self.assertEqual(self.mock_sleep.call_count, 0)
+
+    def test_retries_then_succeeds(self):
+        # Two deadlocks then a success: caller never sees the
+        # transient errors.
+        fn = mock.Mock(side_effect=[
+            _make_deadlock_error(),
+            _make_deadlock_error(),
+            'ok',
+        ])
+        result = mariadb._retry_on_deadlock(fn, 'op')
+        self.assertEqual(result, 'ok')
+        self.assertEqual(fn.call_count, 3)
+        # One sleep before each retry, two retries here.
+        self.assertEqual(self.mock_sleep.call_count, 2)
+
+    def test_raises_after_all_attempts_deadlock(self):
+        # Sustained storm: every attempt deadlocks. Helper raises
+        # the last 1213 so callers can run their existing handling.
+        fn = mock.Mock(side_effect=[
+            _make_deadlock_error() for _ in range(
+                mariadb._DEADLOCK_MAX_ATTEMPTS)
+        ])
+        self.assertRaises(
+            OperationalError, mariadb._retry_on_deadlock, fn, 'op')
+        self.assertEqual(fn.call_count, mariadb._DEADLOCK_MAX_ATTEMPTS)
+        # No sleep after the final attempt.
+        self.assertEqual(
+            self.mock_sleep.call_count,
+            mariadb._DEADLOCK_MAX_ATTEMPTS - 1)
+
+    def test_propagates_non_deadlock_error_immediately(self):
+        # A non-1213 OperationalError is not retryable -- the helper
+        # must surface it on the first attempt rather than burning
+        # the retry budget on something a retry can't fix.
+        non_deadlock = OperationalError('stmt', {}, Exception())
+        fn = mock.Mock(side_effect=non_deadlock)
+        self.assertRaises(
+            OperationalError, mariadb._retry_on_deadlock, fn, 'op')
+        self.assertEqual(fn.call_count, 1)
+        self.assertEqual(self.mock_sleep.call_count, 0)
 
 
 class DirectRefreshClusterLockTestCase(base.ShakenFistTestCase):

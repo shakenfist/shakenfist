@@ -20,9 +20,10 @@
 
 from ipaddress import IPv4Address
 import json
+import random
 import time
 import threading
-from typing import Any, Callable, cast, Optional
+from typing import Any, Callable, cast, Optional, TypeVar
 from uuid import UUID
 from uuid import uuid4
 
@@ -173,7 +174,10 @@ CLUSTER_OPERATIONS_VERSION = 2
 WORK_QUEUE_VERSION = 2
 # v3: leased locks. Adds expires_at, makes acquire steal-if-expired,
 # and introduces a refresh path so live holders can extend their lease.
-CLUSTER_LOCKS_VERSION = 3
+# v4: drops idx_cluster_locks_expires and idx_cluster_locks_acquired.
+# The expires index was a deadlock vector via REPEATABLE READ gap
+# locks; the acquired index never had a reader.
+CLUSTER_LOCKS_VERSION = 4
 CLUSTER_CONFIG_VERSION = 2
 EVENT_DLQ_VERSION = 2
 
@@ -887,9 +891,13 @@ def _build_cluster_locks_table(metadata: sa.MetaData) -> sa.Table:
         sa.Column('lock_id', sa.String(64), nullable=False),
         sa.Column('acquired_at', sa.Double(), nullable=False),
         sa.Column('expires_at', sa.DateTime(), nullable=False),
+        # idx_cluster_locks_node serves _direct_clear_stale_cluster_locks
+        # (WHERE node_uuid = ?). expires_at and acquired_at have no
+        # readers worth indexing for: the steal path uses a primary-key
+        # lookup on lock_key inside an ON DUPLICATE KEY UPDATE, and
+        # acquired_at is written but never read. A secondary index here
+        # only adds a gap-lock surface under REPEATABLE READ.
         sa.Index('idx_cluster_locks_node', 'node_uuid'),
-        sa.Index('idx_cluster_locks_acquired', 'acquired_at'),
-        sa.Index('idx_cluster_locks_expires', 'expires_at'),
     )
 
 
@@ -942,6 +950,27 @@ def _ensure_cluster_locks_schema(engine: sa.Engine) -> dict[str, Any]:
                     f'ON {table_name} (expires_at)'
                 ))
         current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 4:
+        # v4 drops idx_cluster_locks_expires and idx_cluster_locks_acquired.
+        # Both were dead weight: the steal path resolves rows by
+        # primary-key lock_key inside a single INSERT ... ON DUPLICATE
+        # KEY UPDATE, and acquired_at has never had a query reader.
+        # Their only side-effect was widening InnoDB's gap-lock
+        # footprint under REPEATABLE READ, which produced 1213
+        # deadlocks on cluster_locks under acquire/release contention.
+        LOG.info(
+            f'Dropping idx_cluster_locks_expires and '
+            f'idx_cluster_locks_acquired from {table_name} (version 4)')
+        with engine.begin() as conn:
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} '
+                f'DROP INDEX IF EXISTS idx_cluster_locks_expires'))
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} '
+                f'DROP INDEX IF EXISTS idx_cluster_locks_acquired'))
+        current_ver = 4
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -17965,25 +17994,106 @@ def _direct_work_queue_delete_row(row_id: int) -> bool:
 # Cluster Locks Direct Access Functions
 # =============================================================================
 
+# InnoDB returns errno 1213 (ER_LOCK_DEADLOCK) when it picks a
+# transaction as the deadlock victim. Retrying the same statement
+# almost always wins on the next attempt because the conflicting
+# transaction has either committed or moved on. Bound the retry
+# count and use jittered exponential backoff so a deadlock storm
+# from many simultaneous contenders doesn't synchronise on the
+# next round.
+_DEADLOCK_ERRNO = 1213
+_DEADLOCK_MAX_ATTEMPTS = 4
+_DEADLOCK_BASE_DELAY = 0.005
+
+_T = TypeVar('_T')
+
+
+def _is_innodb_deadlock(exc: OperationalError) -> bool:
+    """Identify an InnoDB 1213 deadlock from a SQLAlchemy
+    ``OperationalError``.
+
+    SQLAlchemy wraps the underlying DB-API exception in
+    ``exc.orig``; the mysqldb driver puts the MariaDB errno in
+    ``orig.args[0]``.
+    """
+    orig = getattr(exc, 'orig', None)
+    if orig is None:
+        return False
+    args: tuple[Any, ...] = getattr(orig, 'args', ())
+    if len(args) == 0:
+        return False
+    return bool(args[0] == _DEADLOCK_ERRNO)
+
+
+def _retry_on_deadlock(fn: Callable[[], _T], op_name: str) -> _T:
+    """Run ``fn`` and retry on InnoDB 1213 deadlocks.
+
+    Recovery from a deadlock is local to the database daemon:
+    rerunning the rolled-back statement immediately is far cheaper
+    than letting the error bubble out to the gRPC layer and consume
+    the client's UNAVAILABLE retry budget. Without this, a deadlock
+    storm on ``cluster_locks`` could push a release past the
+    contender's 10s acquire timeout even though each individual
+    deadlock resolves in milliseconds.
+
+    Re-raises the last 1213 if every attempt deadlocks, so the
+    caller's existing ``OperationalError`` handling still runs
+    (warning + return-False for acquire, raise for release/refresh).
+    Any non-deadlock ``OperationalError`` propagates immediately.
+    """
+    last_error: Optional[OperationalError] = None
+    for attempt in range(_DEADLOCK_MAX_ATTEMPTS):
+        try:
+            return fn()
+        except OperationalError as e:
+            if not _is_innodb_deadlock(e):
+                raise
+            last_error = e
+            if attempt < _DEADLOCK_MAX_ATTEMPTS - 1:
+                # 5ms, 10ms, 20ms (* 0.5..1.5 jitter).
+                delay = (_DEADLOCK_BASE_DELAY * (2 ** attempt)
+                         * random.uniform(0.5, 1.5))
+                time.sleep(delay)
+    LOG.warning(
+        f'{op_name}: {_DEADLOCK_MAX_ATTEMPTS} consecutive InnoDB '
+        f'deadlocks, giving up: {last_error}')
+    assert last_error is not None
+    raise last_error
+
+
 def _direct_acquire_cluster_lock(
         lock_key: str, holder_json: dict[str, Any],
         node_uuid: str, pid: int,
         lock_id: str, now: float) -> bool:
     """Atomically take or steal a leased cluster lock.
 
-    Two queries, each individually atomic:
+    A single ``INSERT ... ON DUPLICATE KEY UPDATE`` either inserts
+    a new row (cold acquire) or rewrites the existing row in place
+    when the previous holder's lease has expired (steal). When the
+    existing lease is still valid the row is left untouched.
 
-    1. ``INSERT IGNORE`` -- claims an unheld lock_key. rowcount == 1
-       means we got it.
-    2. ``UPDATE ... WHERE expires_at < NOW()`` -- only fires when (1)
-       lost the duplicate-PK race; rewrites the row in place if the
-       previous holder's lease has expired. rowcount == 1 means we
-       stole it.
+    The earlier two-statement (INSERT IGNORE, then UPDATE on PK
+    collision) implementation was a classic InnoDB shared-shared
+    upgrade deadlock vector: two concurrent acquires on the same
+    ``lock_key`` each took an S-lock on the existing row during
+    INSERT IGNORE's duplicate-key check, then both tried to
+    upgrade to X via the steal UPDATE -- guaranteed deadlock,
+    detected and rolled back as 1213. Collapsing the two
+    statements removes the upgrade window entirely.
 
-    ``expires_at`` is set server-side to ``NOW() + CLUSTER_LOCK_LEASE_SECONDS`` so
-    we never trust per-node clocks. Holders extend their lease via
-    ``_direct_refresh_cluster_lock``; if they cannot, the row will
-    expire and a candidate will eventually steal here.
+    Per-column ``IF(expires_at < NOW(), VALUES(col), col)`` lets a
+    single SET clause express both "rewrite to me" and "leave
+    alone" depending on lease state, but ``ON DUPLICATE KEY
+    UPDATE`` rowcounts can't cleanly distinguish "stole it" from
+    "left alone" across drivers. A primary-key SELECT for our
+    ``lock_id`` after the upsert is the unambiguous test, and is
+    cheap because it hits the PK we just touched.
+
+    ``expires_at`` is set server-side to
+    ``NOW() + CLUSTER_LOCK_LEASE_SECONDS`` so we never trust
+    per-node clocks. Holders extend their lease via
+    ``_direct_refresh_cluster_lock``; if they cannot, the row
+    expires and a later candidate steals here.
     """
     engine = _get_engine()
     table = _get_cluster_locks_table()
@@ -17991,40 +18101,50 @@ def _direct_acquire_cluster_lock(
         sa.func.now(),
         sa.text(f'INTERVAL {CLUSTER_LOCK_LEASE_SECONDS} SECOND'))
 
-    try:
-        with engine.connect() as conn:
-            stmt = sa.insert(table).prefix_with('IGNORE').values(
-                lock_key=lock_key,
-                holder_json=holder_json,
-                node_uuid=node_uuid,
-                pid=pid,
-                lock_id=lock_id,
-                acquired_at=now,
-                expires_at=expires,
-            )
-            result = conn.execute(stmt)
-            if result.rowcount == 1:
-                conn.commit()
-                return True
+    insert_stmt = sa.dialects.mysql.insert(table).values(
+        lock_key=lock_key,
+        holder_json=holder_json,
+        node_uuid=node_uuid,
+        pid=pid,
+        lock_id=lock_id,
+        acquired_at=now,
+        expires_at=expires,
+    )
+    inserted = insert_stmt.inserted
+    expired = table.c.expires_at < sa.func.now()
+    upsert_stmt = insert_stmt.on_duplicate_key_update(
+        holder_json=sa.case(
+            (expired, inserted.holder_json),
+            else_=table.c.holder_json),
+        node_uuid=sa.case(
+            (expired, inserted.node_uuid),
+            else_=table.c.node_uuid),
+        pid=sa.case(
+            (expired, inserted.pid),
+            else_=table.c.pid),
+        lock_id=sa.case(
+            (expired, inserted.lock_id),
+            else_=table.c.lock_id),
+        acquired_at=sa.case(
+            (expired, inserted.acquired_at),
+            else_=table.c.acquired_at),
+        expires_at=sa.case(
+            (expired, inserted.expires_at),
+            else_=table.c.expires_at),
+    )
+    confirm_stmt = sa.select(table.c.lock_id).where(
+        table.c.lock_key == lock_key)
 
-            # Cold acquire lost the duplicate-PK race. Try to steal a
-            # lock whose lease has lapsed.
-            steal = sa.update(table).where(
-                sa.and_(
-                    table.c.lock_key == lock_key,
-                    table.c.expires_at < sa.func.now(),
-                )
-            ).values(
-                holder_json=holder_json,
-                node_uuid=node_uuid,
-                pid=pid,
-                lock_id=lock_id,
-                acquired_at=now,
-                expires_at=expires,
-            )
-            result = conn.execute(steal)
+    def _do_acquire() -> bool:
+        with engine.connect() as conn:
+            conn.execute(upsert_stmt)
+            row = conn.execute(confirm_stmt).first()
             conn.commit()
-            return result.rowcount == 1
+            return row is not None and row[0] == lock_id
+
+    try:
+        return _retry_on_deadlock(
+            _do_acquire, f'acquire_cluster_lock({lock_key})')
     except OperationalError as e:
         LOG.warning(
             f'MariaDB acquire_cluster_lock failed for '
@@ -18040,24 +18160,32 @@ def _direct_refresh_cluster_lock(
     row matched -- which means our lock has been stolen (or never
     existed). Callers must treat False as "lock lost" and abort
     whatever critical section they were in.
+
+    InnoDB 1213 deadlocks are retried inline before propagating
+    so a transient deadlock storm doesn't masquerade as a lost
+    lease.
     """
     engine = _get_engine()
     table = _get_cluster_locks_table()
     expires = sa.func.date_add(
         sa.func.now(),
         sa.text(f'INTERVAL {CLUSTER_LOCK_LEASE_SECONDS} SECOND'))
+    stmt = sa.update(table).where(
+        sa.and_(
+            table.c.lock_key == lock_key,
+            table.c.lock_id == lock_id,
+        )
+    ).values(expires_at=expires)
 
-    try:
+    def _do_refresh() -> bool:
         with engine.connect() as conn:
-            stmt = sa.update(table).where(
-                sa.and_(
-                    table.c.lock_key == lock_key,
-                    table.c.lock_id == lock_id,
-                )
-            ).values(expires_at=expires)
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount == 1
+
+    try:
+        return _retry_on_deadlock(
+            _do_refresh, f'refresh_cluster_lock({lock_key})')
     except OperationalError as e:
         LOG.warning(
             f'MariaDB refresh_cluster_lock failed for '
@@ -18079,21 +18207,29 @@ def _direct_release_cluster_lock(
     as retryable, not as ``return False`` -- collapsing the two
     looks identical to "another holder stole the lease" and
     triggers a noisy ``LockNotHeld`` log on the next contender.
+
+    1213 deadlocks are retried inline first; only a sustained
+    storm propagates to the caller, where gRPC's UNAVAILABLE
+    retry path takes over.
     """
     engine = _get_engine()
     table = _get_cluster_locks_table()
+    stmt = sa.delete(table).where(
+        sa.and_(
+            table.c.lock_key == lock_key,
+            table.c.lock_id == lock_id,
+        )
+    )
 
-    try:
+    def _do_release() -> bool:
         with engine.connect() as conn:
-            stmt = sa.delete(table).where(
-                sa.and_(
-                    table.c.lock_key == lock_key,
-                    table.c.lock_id == lock_id,
-                )
-            )
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount == 1
+
+    try:
+        return _retry_on_deadlock(
+            _do_release, f'release_cluster_lock({lock_key})')
     except OperationalError as e:
         LOG.warning(
             f'MariaDB release_cluster_lock failed for '
