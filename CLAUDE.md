@@ -281,6 +281,25 @@ with ClusterLock('lock_name', timeout=30):
     # Critical section
 ```
 
+Locks are leased: every `cluster_locks` row has a server-side
+`expires_at` and the holder's `acquire()` starts a daemon thread
+that refreshes the lease every 20s. If the holder dies, the row
+expires after 60s and another candidate may steal it. There is no
+manual cleanup or stale-lock reaper required.
+
+For long-held locks (anything held for more than a few seconds), the
+holder must poll `lock.lost_event` between iterations of its critical
+section and abort cleanly when it fires -- the refresher sets it on
+confirmed loss. The cluster maintainer's inner loop is the canonical
+example: it sleeps via `lock.lost_event.wait(60)` so it wakes
+immediately on confirmed loss.
+
+`ClusterLock.release()` raises `shakenfist.exceptions.LockNotHeld` if
+the database has no record of the caller holding the lock. The
+context-manager `__exit__` swallows that exception (a body exception
+is more important) but the noisy log emitted from inside `release()`
+is preserved so CI checks still catch it.
+
 ### API Pattern
 
 Flask-based REST API with decorators:
@@ -382,20 +401,17 @@ performance. This is required for all deployments - MariaDB must be configured.
 - **Network Interfaces** (`network_interfaces`, `network_interface_attributes`
   tables): Network interface static values (uuid, network_uuid, instance_uuid,
   macaddr, ipv4, order, model) and mutable attributes (floating_address).
-  Dual-write with etcd fallback for unmigrated objects.
 - **IPAMs** (`ipams` table): IPAM static values (uuid, namespace,
-  network_uuid, ipblock). No mutable attributes. Dual-write with etcd
-  fallback for unmigrated objects.
+  network_uuid, ipblock). No mutable attributes.
 - **Networks** (`networks`, `network_attributes` tables): Network static
   values (uuid, name, namespace, netblock, provide_dhcp/nat/dns, vxid,
   egress_nic, mesh_nic) and mutable attributes (floating_gateway,
-  networkinterfaces, networkinterfaces_initialized, hosteddns).
-  VXLAN ID uniqueness enforced by UNIQUE constraint on vxid column.
-  Dual-write with etcd fallback for unmigrated objects.
+  hosteddns). VXLAN ID uniqueness enforced by UNIQUE constraint on
+  vxid column.
 - **AgentOperations** (`agent_operations`, `agent_operation_attributes`
   tables): AgentOperation static values (uuid, namespace, instance_uuid,
   commands) and mutable attributes (results). Commands and results stored
-  as JSON. Dual-write with etcd fallback for unmigrated objects.
+  as JSON.
 - **Instances** (`instances`, `instance_attributes` tables): Instance
   static values (uuid, cpus, disk_spec, memory, name, namespace,
   requested_placement, ssh_key, user_data, video, uefi, configdrive,
@@ -403,24 +419,46 @@ performance. This is required for all deployments - MariaDB must be configured.
   attributes (placement, power_state, ports, enforced_deletes,
   block_devices, interfaces, agent_state, agent_attributes,
   agent_operations, kvm_pid, error_message, vsock_cids). Complex fields stored as
-  JSON. Dual-write with etcd fallback for unmigrated objects.
+  JSON.
 - **Object Metadata** (`object_metadata` table): User-defined metadata
-  key-value pairs and last_cluster_operation for all object types.
+  key-value pairs for all object types.
   Uses composite primary key (object_type, object_uuid) following the
-  same pattern as object_states. Dual-write with etcd fallback.
+  same pattern as object_states.
 - **Cluster Operation Targets** (`cluster_operation_targets` table):
   Records every cluster operation targeting an object (Instance,
   Artifact, Network, Blob) with AUTO_INCREMENT sequence numbering
-  for ordering. Replaces the single-pointer `last_cluster_operation`
+  for ordering. Replaced the single-pointer `last_cluster_operation`
   in `object_metadata` with a full append-only history. Primary key
   is `sequence_number` (AUTO_INCREMENT), with a UNIQUE constraint on
   `operation_uuid`. Indexed on `(target_object_type, target_uuid)`
-  and `created_at`. Dual-write with object_metadata fallback.
+  and `created_at`. Target rows are written automatically by
+  `enqueue_cluster_operation`; callers have no per-target bookkeeping
+  obligation. `has_pending_cluster_operation()` exposes the
+  history-aware "any in-flight op?" query used by gating logic.
 - **Node Metrics** (`node_metrics` table): Ephemeral per-node resource
   metrics (CPU, memory, disk, network, queue depths) updated every 60
   seconds by the resources daemon. Uses a JSON column (`metrics_json`)
   for the schemaless metrics payload (~50+ fields). One row per node,
   upserted each update cycle. Primary key is `node_uuid`.
+- **Per-daemon state** (`node_daemon_states` table): One row per
+  `(node_uuid, daemon)` carrying the daemon's `value`, `update_time`
+  and optional `message`. Replaces the JSON `daemon_states` dict that
+  used to live on `node_attributes`; the dict required a coarse
+  per-node lock for every transition which serialised every daemon's
+  startup/shutdown through one hot path. The new table uses
+  `INSERT ... ON DUPLICATE KEY UPDATE` so writes for different daemons
+  on the same node run fully in parallel. The legacy JSON column on
+  `node_attributes` is no longer read or written but remains for one
+  release cycle as a rollback fallback.
+- **Cluster Locks** (`cluster_locks` table): Distributed locks with
+  a server-side `expires_at TIMESTAMP`. Holders refresh the lease
+  every ~20s while alive; if a holder dies (or is partitioned for
+  >60s), a candidate steals the row by issuing
+  `UPDATE ... WHERE expires_at < NOW()`. There is no garbage-
+  collection step or external reaper -- a dead holder's lock recovers
+  on the next acquire attempt. See
+  `docs/operator_guide/locks.md` for the operator view and
+  `shakenfist/locks.py` for the refresher and `lost_event` protocol.
 
 ### Migrating Existing Deployments
 

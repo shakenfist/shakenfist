@@ -20,9 +20,10 @@
 
 from ipaddress import IPv4Address
 import json
+import random
 import time
 import threading
-from typing import Any, Callable, cast, Optional
+from typing import Any, Callable, cast, Optional, TypeVar
 from uuid import UUID
 from uuid import uuid4
 
@@ -34,6 +35,7 @@ from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs
 
 from shakenfist.config import config
+from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
@@ -49,6 +51,7 @@ from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
+from shakenfist.schema.node_daemon_state import NodeDaemonStateData
 from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
@@ -67,7 +70,9 @@ from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
+from shakenfist.schema.sqlalchemy import get_table_columns
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
+from shakenfist.schema.sqlalchemy import TABLE_CREATION_LOCK
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import callstack as util_callstack
 
@@ -125,6 +130,7 @@ _instance_attributes_table: Optional[sa.Table] = None
 _object_metadata_table: Optional[sa.Table] = None
 _cluster_operation_targets_table: Optional[sa.Table] = None
 _node_metrics_table: Optional[sa.Table] = None
+_node_daemon_states_table: Optional[sa.Table] = None
 _cluster_operations_table: Optional[sa.Table] = None
 _work_queue_table: Optional[sa.Table] = None
 
@@ -158,12 +164,20 @@ AGENT_OPERATIONS_VERSION = 2
 AGENT_OPERATION_ATTRIBUTES_VERSION = 2
 INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 3
-OBJECT_METADATA_VERSION = 2
+OBJECT_METADATA_VERSION = 3
 CLUSTER_OPERATION_TARGETS_VERSION = 1
 NODE_METRICS_VERSION = 2
+# v1: schema creation. v2: data migration from node_attributes.daemon_states
+# JSON column.
+NODE_DAEMON_STATES_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 2
 WORK_QUEUE_VERSION = 2
-CLUSTER_LOCKS_VERSION = 2
+# v3: leased locks. Adds expires_at, makes acquire steal-if-expired,
+# and introduces a refresh path so live holders can extend their lease.
+# v4: drops idx_cluster_locks_expires and idx_cluster_locks_acquired.
+# The expires index was a deadlock vector via REPEATABLE READ gap
+# locks; the acquired index never had a reader.
+CLUSTER_LOCKS_VERSION = 4
 CLUSTER_CONFIG_VERSION = 2
 EVENT_DLQ_VERSION = 2
 
@@ -231,6 +245,13 @@ def _grpc_call(method: Any, request: Any) -> Any:
     stub.GetNode). On retry we must re-resolve the method from a
     fresh stub, because _reset_database_stub() closes the old
     channel and any methods bound to it become invalid.
+
+    Concurrent gRPC calls can race: thread A's retry path closes the
+    channel while thread B is mid-invoke, and thread B then sees
+    ``ValueError("Cannot invoke RPC on closed channel!")`` rather
+    than an ``RpcError``. Treat that ValueError as retryable in the
+    same way -- the channel was just closed under us, so the next
+    attempt picks up a fresh stub from ``_get_database_stub()``.
     """
     retryable_codes = {
         grpc.StatusCode.UNAVAILABLE,
@@ -238,7 +259,7 @@ def _grpc_call(method: Any, request: Any) -> Any:
     }
     method_name = getattr(method, '__name__', None)
 
-    last_error: grpc.RpcError = grpc.RpcError()
+    last_error: BaseException = grpc.RpcError()
     for attempt in range(GRPC_RETRIES):
         try:
             if attempt > 0 and method_name:
@@ -249,6 +270,13 @@ def _grpc_call(method: Any, request: Any) -> Any:
             last_error = e
             if e.code() not in retryable_codes:
                 raise
+            if attempt < GRPC_RETRIES - 1:
+                time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
+                _reset_database_stub()
+        except ValueError as e:
+            if 'closed channel' not in str(e):
+                raise
+            last_error = e
             if attempt < GRPC_RETRIES - 1:
                 time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
                 _reset_database_stub()
@@ -391,21 +419,30 @@ def _get_object_states_table() -> sa.Table:
     """
     global _object_states_table
     if _object_states_table is None:
-        metadata = _get_metadata()
-        # Build the table manually to support composite primary key
-        _object_states_table = sa.Table(
-            'object_states',
-            metadata,
-            sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
-            sa.Column('state_value', sa.String(32), nullable=True),
-            sa.Column('update_time', sa.Double(), nullable=False),
-            sa.Column('message', sa.String(255), nullable=True),
-            # Composite primary key
-            sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
-            # Index for efficient queries by type and state
-            sa.Index('idx_object_states_type_state', 'object_type', 'state_value'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _object_states_table is not None:
+                return _object_states_table
+            metadata = _get_metadata()
+            if 'object_states' in metadata.tables:
+                _object_states_table = metadata.tables['object_states']
+                return _object_states_table
+            # Build the table manually to support composite primary key
+            _object_states_table = sa.Table(
+                'object_states',
+                metadata,
+                sa.Column('object_uuid', sa.String(36), nullable=False),
+                sa.Column(
+                    'object_type', sa.Enum(ObjectType), nullable=False),
+                sa.Column('state_value', sa.String(32), nullable=True),
+                sa.Column('update_time', sa.Double(), nullable=False),
+                sa.Column('message', sa.String(255), nullable=True),
+                # Composite primary key
+                sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
+                # Index for efficient queries by type and state
+                sa.Index(
+                    'idx_object_states_type_state',
+                    'object_type', 'state_value'),
+            )
     return _object_states_table
 
 
@@ -518,9 +555,9 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
 def _get_object_metadata_table() -> sa.Table:
     """Get or create the object_metadata table definition.
 
-    This table stores user-defined metadata and last_cluster_operation for all
-    object types. It uses a composite primary key of (object_type, object_uuid)
-    following the same pattern as the object_states table.
+    This table stores user-defined metadata for all object types. It uses a
+    composite primary key of (object_type, object_uuid) following the same
+    pattern as the object_states table.
     """
     global _object_metadata_table
     if _object_metadata_table is None:
@@ -531,7 +568,6 @@ def _get_object_metadata_table() -> sa.Table:
             sa.Column('object_uuid', sa.String(36), nullable=False),
             sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
             sa.Column('metadata_json', sa.Text(), nullable=True),
-            sa.Column('last_cluster_operation_json', sa.Text(), nullable=True),
             # Composite primary key
             sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
         )
@@ -553,6 +589,19 @@ def _ensure_object_metadata_schema(engine: sa.Engine) -> dict[str, Any]:
         LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v3: '
+            'dropping dead last_cluster_operation_json column.')
+        with engine.connect() as conn:
+            conn.execute(sa.text(
+                'ALTER TABLE object_metadata '
+                'DROP COLUMN IF EXISTS last_cluster_operation_json'
+            ))
+            conn.commit()
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -797,38 +846,59 @@ def _ensure_work_queue_schema(engine: sa.Engine) -> dict[str, Any]:
 _cluster_locks_table: Optional[sa.Table] = None
 
 
+# Lease length is shared with ``shakenfist.locks.LEASE_SECONDS`` via the
+# common constant in ``shakenfist.constants``.
+
+
 def _get_cluster_locks_table() -> sa.Table:
     """Get or create the cluster_locks table definition.
 
     This table stores distributed locks previously held in etcd at
     /sflocks/{type}/{subtype}/{name}. The lock_key column stores the
-    path without the /sflocks/ prefix. Acquire uses INSERT IGNORE
-    (duplicate PK = lock already held). Release uses DELETE with a
-    lock_id CAS check.
+    path without the /sflocks/ prefix. Acquire is either a fresh
+    INSERT IGNORE or a steal-the-expired-row UPDATE; release is a
+    DELETE with a lock_id CAS check; refresh extends ``expires_at``
+    for the current holder. ``expires_at`` is a server-side
+    ``TIMESTAMP`` so the database is the single source of truth for
+    "is this lease still alive" -- per-node clock skew can never let
+    a candidate steal a lock the holder still believes it owns.
     """
     global _cluster_locks_table
     if _cluster_locks_table is None:
-        metadata = _get_metadata()
-        _cluster_locks_table = sa.Table(
-            'cluster_locks',
-            metadata,
-            sa.Column('lock_key', sa.String(255),
-                      primary_key=True),
-            sa.Column('holder_json', sa.JSON(),
-                      nullable=False),
-            sa.Column('node_uuid', sa.String(255),
-                      nullable=False),
-            sa.Column('pid', sa.Integer(), nullable=False),
-            sa.Column('lock_id', sa.String(64),
-                      nullable=False),
-            sa.Column('acquired_at', sa.Double(),
-                      nullable=False),
-            sa.Index('idx_cluster_locks_node',
-                     'node_uuid'),
-            sa.Index('idx_cluster_locks_acquired',
-                     'acquired_at'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_locks_table is not None:
+                return _cluster_locks_table
+            metadata = _get_metadata()
+            # If another thread registered this table while we were
+            # waiting on the lock, hand back the existing object
+            # instead of re-registering and tripping
+            # ``InvalidRequestError: Table already defined``.
+            if 'cluster_locks' in metadata.tables:
+                _cluster_locks_table = metadata.tables['cluster_locks']
+                return _cluster_locks_table
+            _cluster_locks_table = _build_cluster_locks_table(metadata)
     return _cluster_locks_table
+
+
+def _build_cluster_locks_table(metadata: sa.MetaData) -> sa.Table:
+    return sa.Table(
+        'cluster_locks',
+        metadata,
+        sa.Column('lock_key', sa.String(255), primary_key=True),
+        sa.Column('holder_json', sa.JSON(), nullable=False),
+        sa.Column('node_uuid', sa.String(255), nullable=False),
+        sa.Column('pid', sa.Integer(), nullable=False),
+        sa.Column('lock_id', sa.String(64), nullable=False),
+        sa.Column('acquired_at', sa.Double(), nullable=False),
+        sa.Column('expires_at', sa.DateTime(), nullable=False),
+        # idx_cluster_locks_node serves _direct_clear_stale_cluster_locks
+        # (WHERE node_uuid = ?). expires_at and acquired_at have no
+        # readers worth indexing for: the steal path uses a primary-key
+        # lookup on lock_key inside an ON DUPLICATE KEY UPDATE, and
+        # acquired_at is written but never read. A secondary index here
+        # only adds a gap-lock surface under REPEATABLE READ.
+        sa.Index('idx_cluster_locks_node', 'node_uuid'),
+    )
 
 
 def _cluster_lock_key(
@@ -859,6 +929,48 @@ def _ensure_cluster_locks_schema(engine: sa.Engine) -> dict[str, Any]:
         LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        # v3 adds expires_at for leased locks. Pre-existing rows get a
+        # fresh full lease so an in-flight holder is not immediately
+        # stealable just because the cluster restarted into the new
+        # schema.
+        LOG.info(f'Adding expires_at to {table_name} table (version 3)')
+        with engine.begin() as conn:
+            cols = get_table_columns(engine, table_name)
+            if 'expires_at' not in cols:
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} ADD COLUMN expires_at '
+                    f'TIMESTAMP NOT NULL DEFAULT '
+                    f'(NOW() + INTERVAL {CLUSTER_LOCK_LEASE_SECONDS} SECOND)'
+                ))
+                conn.execute(sa.text(
+                    f'CREATE INDEX IF NOT EXISTS idx_cluster_locks_expires '
+                    f'ON {table_name} (expires_at)'
+                ))
+        current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 4:
+        # v4 drops idx_cluster_locks_expires and idx_cluster_locks_acquired.
+        # Both were dead weight: the steal path resolves rows by
+        # primary-key lock_key inside a single INSERT ... ON DUPLICATE
+        # KEY UPDATE, and acquired_at has never had a query reader.
+        # Their only side-effect was widening InnoDB's gap-lock
+        # footprint under REPEATABLE READ, which produced 1213
+        # deadlocks on cluster_locks under acquire/release contention.
+        LOG.info(
+            f'Dropping idx_cluster_locks_expires and '
+            f'idx_cluster_locks_acquired from {table_name} (version 4)')
+        with engine.begin() as conn:
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} '
+                f'DROP INDEX IF EXISTS idx_cluster_locks_expires'))
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} '
+                f'DROP INDEX IF EXISTS idx_cluster_locks_acquired'))
+        current_ver = 4
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1725,6 +1837,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_object_metadata_schema(engine))
     results.append(_ensure_cluster_operation_targets_schema(engine))
     results.append(_ensure_node_metrics_schema(engine))
+    results.append(_ensure_node_daemon_states_schema(engine))
     results.append(_ensure_cluster_operations_schema(engine))
     results.append(_ensure_work_queue_schema(engine))
     results.append(_ensure_cluster_locks_schema(engine))
@@ -4971,7 +5084,7 @@ def get_all_states_for_type(object_type: ObjectType) -> list[tuple[str, State]]:
 
 # =============================================================================
 # Object Metadata Direct Access Functions
-# These store user-defined metadata and last_cluster_operation for all objects.
+# These store user-defined metadata for all objects.
 # =============================================================================
 
 def _direct_get_object_metadata(
@@ -4995,14 +5108,11 @@ def _direct_get_object_metadata(
                 return None
 
             metadata = json.loads(result.metadata_json) if result.metadata_json else None
-            lco = (json.loads(result.last_cluster_operation_json)
-                   if result.last_cluster_operation_json else None)
 
             return ObjectMetadataData(
                 object_type=object_type.value,
                 object_uuid=object_uuid,
                 metadata=metadata,
-                last_cluster_operation=lco
             )
     except OperationalError as e:
         LOG.warning(f'MariaDB read failed for object_metadata {object_type}/{object_uuid}: {e}')
@@ -5029,7 +5139,6 @@ def _direct_set_metadata(
                 object_uuid=object_uuid,
                 object_type=object_type,
                 metadata_json=metadata_json,
-                last_cluster_operation_json=None
             )
             stmt = stmt.on_duplicate_key_update(
                 metadata_json=metadata_json
@@ -5092,14 +5201,11 @@ def _grpc_get_object_metadata(
             return None
 
         metadata = json.loads(reply.metadata_json) if reply.metadata_json else None
-        lco = (json.loads(reply.last_cluster_operation_json)
-               if reply.last_cluster_operation_json else None)
 
         return ObjectMetadataData(
             object_type=object_type.value,
             object_uuid=object_uuid,
             metadata=metadata,
-            last_cluster_operation=lco
         )
     except grpc.RpcError as e:
         LOG.error(
@@ -5161,7 +5267,7 @@ def get_object_metadata(
     object_type: ObjectType,
     object_uuid: str
 ) -> Optional[ObjectMetadataData]:
-    """Read metadata and last_cluster_operation for an object.
+    """Read metadata for an object.
 
     Args:
         object_type: The type of object.
@@ -5199,7 +5305,7 @@ def delete_object_metadata(
     object_type: ObjectType,
     object_uuid: str
 ) -> bool:
-    """Delete metadata and last_cluster_operation for an object.
+    """Delete metadata for an object.
 
     Args:
         object_type: The type of object.
@@ -5246,9 +5352,7 @@ def _direct_create_cluster_operation_target(
             return True
     except IntegrityError:
         # Duplicate operation_uuid — already recorded, which is fine.
-        # This happens when set_last_cluster_operation is called more
-        # than once for the same operation (e.g. at enqueue time and
-        # again when the operation starts executing).
+        # The UNIQUE constraint on operation_uuid ensures idempotency.
         return True
     except OperationalError as e:
         LOG.warning(
@@ -5356,6 +5460,48 @@ def _direct_get_latest_cluster_operation_target(
             f'MariaDB read failed for cluster_operation_targets '
             f'{target_object_type}/{target_uuid}: {e}')
         return None
+
+
+# An operation is "in flight" if and only if its row in object_states has
+# one of these state values. Anything else (complete, abort, error,
+# deleted, ...) is terminal. Matches
+# _direct_delete_stale_cluster_operation_targets.
+_ACTIVE_OPERATION_STATES = ('queued', 'preflight', 'executing')
+
+
+def _direct_has_pending_cluster_operation_target(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> bool:
+    """True if any in-flight cluster operation targets this object."""
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+    states_table = _get_object_states_table()
+
+    try:
+        with engine.connect() as conn:
+            inner = sa.select(sa.literal(1)).select_from(
+                table.join(
+                    states_table,
+                    table.c.operation_uuid == states_table.c.object_uuid
+                )
+            ).where(
+                sa.and_(
+                    table.c.target_object_type == target_object_type,
+                    table.c.target_uuid == target_uuid,
+                    states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES)
+                )
+            )
+            stmt = sa.select(inner.exists())
+            result = conn.execute(stmt).scalar()
+            return bool(result)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for has_pending_cluster_operation '
+            f'{target_object_type}/{target_uuid}: {e}')
+        # Fail closed: if we cannot prove no op is in flight, treat that
+        # as "in flight" so callers defer rather than racing.
+        return True
 
 
 def _direct_delete_cluster_operation_target(
@@ -5566,6 +5712,29 @@ def _grpc_get_latest_cluster_operation_target(
         return None
 
 
+def _grpc_has_pending_cluster_operation_target(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> bool:
+    """True if any in-flight cluster operation targets this object (gRPC)."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.HasPendingClusterOperationTargetRequest(
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid
+        )
+        reply = _grpc_call(
+            stub.HasPendingClusterOperationTarget, request)
+        return bool(reply.pending)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC HasPendingClusterOperationTarget failed for '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return True
+
+
 def _grpc_delete_cluster_operation_target(
     operation_uuid: str
 ) -> bool:
@@ -5695,6 +5864,25 @@ def get_latest_cluster_operation_target(
         return _grpc_get_latest_cluster_operation_target(
             target_object_type, target_uuid)
     return _direct_get_latest_cluster_operation_target(
+        target_object_type, target_uuid)
+
+
+def has_pending_cluster_operation_target(
+    target_object_type: ObjectType,
+    target_uuid: str
+) -> bool:
+    """True if any in-flight cluster operation targets this object.
+
+    "In flight" means the operation's row in object_states is in
+    {queued, preflight, executing}. Any later operation against the same
+    object that has reached a terminal state does NOT mask an earlier
+    in-flight operation, fixing the latest-only race in the legacy
+    single-pointer last_cluster_operation gating.
+    """
+    if _use_database_service():
+        return _grpc_has_pending_cluster_operation_target(
+            target_object_type, target_uuid)
+    return _direct_has_pending_cluster_operation_target(
         target_object_type, target_uuid)
 
 
@@ -9878,6 +10066,140 @@ def _ensure_node_attributes_schema(
     }
 
 
+def _get_node_daemon_states_table() -> sa.Table:
+    """Get or create the node_daemon_states table definition.
+
+    One row per (node_uuid, daemon). Replaces the daemon_states JSON
+    dict that used to live inside node_attributes; that dict required a
+    coarse per-node lock for every transition, which serialised every
+    daemon's startup and shutdown through a single 10s-timeout lock and
+    caused tail acquisitions to fail under load.
+    """
+    global _node_daemon_states_table
+    if _node_daemon_states_table is None:
+        with TABLE_CREATION_LOCK:
+            if _node_daemon_states_table is not None:
+                return _node_daemon_states_table
+            metadata = _get_metadata()
+            if 'node_daemon_states' in metadata.tables:
+                _node_daemon_states_table = (
+                    metadata.tables['node_daemon_states'])
+                return _node_daemon_states_table
+            _node_daemon_states_table = sa.Table(
+                'node_daemon_states',
+                metadata,
+                sa.Column('node_uuid', sa.Uuid(), nullable=False),
+                sa.Column('daemon', sa.String(32), nullable=False),
+                sa.Column('value', sa.String(32), nullable=True),
+                sa.Column(
+                    'update_time', sa.Double(), nullable=False, default=0.0),
+                sa.Column('message', sa.String(255), nullable=True),
+                sa.PrimaryKeyConstraint('node_uuid', 'daemon'),
+                sa.Index(
+                    'idx_node_daemon_states_daemon_value', 'daemon', 'value'),
+            )
+    return _node_daemon_states_table
+
+
+def _migrate_daemon_states_from_node_attributes(
+    engine: sa.Engine,
+) -> tuple[int, int]:
+    """Copy daemon_states JSON entries from node_attributes into node_daemon_states.
+
+    Idempotent: uses INSERT ... ON DUPLICATE KEY UPDATE so re-running on
+    an already-migrated cluster is a no-op. The JSON column is left in
+    place; it is dropped in a later schema bump once nothing reads it.
+
+    Returns ``(migrated, errors)``.
+    """
+    src = _get_node_attributes_table()
+    dst = _get_node_daemon_states_table()
+    migrated = 0
+    errors = 0
+
+    with engine.connect() as conn:
+        rows = conn.execute(
+            sa.select(src.c.uuid, src.c.daemon_states)
+        ).fetchall()
+
+        for row in rows:
+            ds = row.daemon_states or {}
+            if not isinstance(ds, dict):
+                continue
+            for daemon_name, payload in ds.items():
+                if not isinstance(payload, dict):
+                    errors += 1
+                    continue
+                try:
+                    stmt = sa.dialects.mysql.insert(dst).values(
+                        node_uuid=row.uuid,
+                        daemon=daemon_name,
+                        value=payload.get('value'),
+                        update_time=payload.get('update_time') or 0.0,
+                        message=payload.get('message'),
+                    )
+                    stmt = stmt.on_duplicate_key_update(
+                        value=payload.get('value'),
+                        update_time=payload.get('update_time') or 0.0,
+                        message=payload.get('message'),
+                    )
+                    conn.execute(stmt)
+                    migrated += 1
+                except Exception as e:
+                    LOG.warning(
+                        f'Failed to migrate daemon_state '
+                        f'{row.uuid}/{daemon_name}: {e}')
+                    errors += 1
+        conn.commit()
+
+    return migrated, errors
+
+
+def _ensure_node_daemon_states_schema(
+    engine: sa.Engine,
+) -> dict[str, Any]:
+    """Ensure the node_daemon_states table schema is up to date."""
+    table_name = 'node_daemon_states'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_node_daemon_states_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 2:
+        # Migrate any pre-existing daemon_states JSON content from
+        # node_attributes. Skipped automatically on a fresh cluster
+        # because there is nothing to read.
+        LOG.info(
+            f'Migrating daemon_states JSON into {table_name} (version 2)')
+        migrated, errors = _migrate_daemon_states_from_node_attributes(engine)
+        LOG.info(
+            f'{table_name} migration: {migrated} row(s) copied, '
+            f'{errors} error(s)')
+        current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NODE_DAEMON_STATES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 # --- Direct node access functions ---
 
 def _direct_create_node(
@@ -10202,6 +10524,146 @@ def _direct_delete_node_attributes(
             'MariaDB delete failed for '
             f'node_attributes {node_uuid}: {e}'
         )
+        return False
+
+
+# --- Direct node daemon state access functions ---
+
+def _direct_set_node_daemon_state(
+    node_uuid: UUID, daemon: str, value: Optional[str],
+    update_time: float, message: Optional[str],
+) -> bool:
+    """Atomically upsert one (node, daemon) state row.
+
+    No Python-side locking: the composite primary key
+    ``(node_uuid, daemon)`` and ``INSERT ... ON DUPLICATE KEY UPDATE``
+    give us per-daemon isolation directly at the SQL layer.
+
+    A delayed call (e.g. a state transition queued behind a slow
+    refresh) must not overwrite a fresher state with an older
+    timestamp -- callers stamp ``update_time`` from
+    ``time.time()`` so per-node clock skew can let two writes arrive
+    out-of-order. Use ``GREATEST`` on the timestamp and gate the
+    value/message rewrites with the same comparison so the latest
+    write always wins.
+    """
+    engine = _get_engine()
+    table = _get_node_daemon_states_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                node_uuid=node_uuid,
+                daemon=daemon,
+                value=value,
+                update_time=update_time,
+                message=message,
+            )
+            stmt = stmt.on_duplicate_key_update(
+                value=sa.case(
+                    (table.c.update_time <= update_time, stmt.inserted.value),
+                    else_=table.c.value),
+                message=sa.case(
+                    (table.c.update_time <= update_time,
+                     stmt.inserted.message),
+                    else_=table.c.message),
+                update_time=sa.func.greatest(
+                    table.c.update_time, stmt.inserted.update_time),
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB write failed for node_daemon_states '
+            f'{node_uuid}/{daemon}: {e}')
+        return False
+
+
+def _direct_get_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> Optional[NodeDaemonStateData]:
+    """Read one (node, daemon) state row, or None if absent."""
+    engine = _get_engine()
+    table = _get_node_daemon_states_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(
+                sa.and_(
+                    table.c.node_uuid == node_uuid,
+                    table.c.daemon == daemon,
+                )
+            )
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return None
+            return NodeDaemonStateData(
+                node_uuid=result.node_uuid,
+                daemon=result.daemon,
+                value=result.value,
+                update_time=result.update_time,
+                message=result.message,
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for node_daemon_states '
+            f'{node_uuid}/{daemon}: {e}')
+        return None
+
+
+def _direct_get_all_node_daemon_states(
+    node_uuid: UUID,
+) -> Optional[list[NodeDaemonStateData]]:
+    """Read every daemon state row for one node.
+
+    Returns ``None`` on a database error, ``[]`` for no rows.
+    """
+    engine = _get_engine()
+    table = _get_node_daemon_states_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.node_uuid == node_uuid)
+            results = conn.execute(stmt).fetchall()
+            return [
+                NodeDaemonStateData(
+                    node_uuid=row.node_uuid,
+                    daemon=row.daemon,
+                    value=row.value,
+                    update_time=row.update_time,
+                    message=row.message,
+                )
+                for row in results
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for node_daemon_states {node_uuid}: {e}')
+        return None
+
+
+def _direct_delete_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> bool:
+    """Delete one (node, daemon) state row. Returns True if absent or removed."""
+    engine = _get_engine()
+    table = _get_node_daemon_states_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(
+                sa.and_(
+                    table.c.node_uuid == node_uuid,
+                    table.c.daemon == daemon,
+                )
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for node_daemon_states '
+            f'{node_uuid}/{daemon}: {e}')
         return False
 
 
@@ -10679,6 +11141,143 @@ def delete_node_attributes(
     if _use_database_service():
         return _grpc_delete_node_attributes(node_uuid)
     return _direct_delete_node_attributes(node_uuid)
+
+
+# --- gRPC node daemon state client functions ---
+
+def _grpc_set_node_daemon_state(
+    node_uuid: UUID, daemon: str, value: Optional[str],
+    update_time: float, message: Optional[str],
+) -> bool:
+    """Atomically upsert one (node, daemon) state row via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.SetNodeDaemonStateRequest(
+            data=database_pb2.NodeDaemonStateData(
+                node_uuid=str(node_uuid),
+                daemon=daemon,
+                value=value or '',
+                update_time=update_time,
+                message=message or '',
+            ),
+        )
+        reply = _grpc_call(stub.SetNodeDaemonState, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC SetNodeDaemonState failed for {node_uuid}/{daemon}: {e}')
+        return False
+
+
+def _grpc_get_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> Optional[NodeDaemonStateData]:
+    """Read one (node, daemon) state row via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNodeDaemonStateRequest(
+            node_uuid=str(node_uuid), daemon=daemon)
+        reply = _grpc_call(stub.GetNodeDaemonState, request)
+        if not reply.found:
+            return None
+        d = reply.data
+        return NodeDaemonStateData(
+            node_uuid=UUID(d.node_uuid),
+            daemon=d.daemon,
+            value=d.value if d.value else None,
+            update_time=d.update_time,
+            message=d.message if d.message else None,
+        )
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetNodeDaemonState failed for {node_uuid}/{daemon}: {e}')
+        return None
+
+
+def _grpc_get_all_node_daemon_states(
+    node_uuid: UUID,
+) -> Optional[list[NodeDaemonStateData]]:
+    """Read every daemon state row for one node via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllNodeDaemonStatesRequest(
+            node_uuid=str(node_uuid))
+        reply = _grpc_call(stub.GetAllNodeDaemonStates, request)
+        return [
+            NodeDaemonStateData(
+                node_uuid=UUID(d.node_uuid),
+                daemon=d.daemon,
+                value=d.value if d.value else None,
+                update_time=d.update_time,
+                message=d.message if d.message else None,
+            )
+            for d in reply.data
+        ]
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetAllNodeDaemonStates failed for {node_uuid}: {e}')
+        return None
+
+
+def _grpc_delete_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> bool:
+    """Delete one (node, daemon) state row via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNodeDaemonStateRequest(
+            node_uuid=str(node_uuid), daemon=daemon)
+        reply = _grpc_call(stub.DeleteNodeDaemonState, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC DeleteNodeDaemonState failed for {node_uuid}/{daemon}: {e}')
+        return False
+
+
+# --- Public node daemon state API functions ---
+
+def set_node_daemon_state(
+    node_uuid: UUID, daemon: str, value: Optional[str],
+    update_time: float, message: Optional[str] = None,
+) -> bool:
+    """Atomically upsert one (node, daemon) state row.
+
+    No Python-level locking is required: the composite primary key
+    ``(node_uuid, daemon)`` plus ``INSERT ... ON DUPLICATE KEY UPDATE``
+    serialise concurrent writes for the same daemon at the SQL layer
+    while leaving writes for different daemons fully parallel.
+    """
+    if _use_database_service():
+        return _grpc_set_node_daemon_state(
+            node_uuid, daemon, value, update_time, message)
+    return _direct_set_node_daemon_state(
+        node_uuid, daemon, value, update_time, message)
+
+
+def get_node_daemon_state(
+    node_uuid: UUID, daemon: str,
+) -> Optional[NodeDaemonStateData]:
+    """Read one (node, daemon) state row, or None if absent."""
+    if _use_database_service():
+        return _grpc_get_node_daemon_state(node_uuid, daemon)
+    return _direct_get_node_daemon_state(node_uuid, daemon)
+
+
+def get_all_node_daemon_states(
+    node_uuid: UUID,
+) -> Optional[list[NodeDaemonStateData]]:
+    """Read every daemon state row for one node."""
+    if _use_database_service():
+        return _grpc_get_all_node_daemon_states(node_uuid)
+    return _direct_get_all_node_daemon_states(node_uuid)
+
+
+def delete_node_daemon_state(node_uuid: UUID, daemon: str) -> bool:
+    """Delete one (node, daemon) state row."""
+    if _use_database_service():
+        return _grpc_delete_node_daemon_state(node_uuid, daemon)
+    return _direct_delete_node_daemon_state(node_uuid, daemon)
 
 
 # =============================================================================
@@ -17051,6 +17650,15 @@ def create_and_enqueue_cluster_operation(
     emit them via shakenfist.eventlog.add_event_multi() after this
     call returns True.
 
+    Note: this is the low-level transactional primitive. The
+    schema-layer helper shakenfist/schema/operations/util.py:
+    enqueue_cluster_operation() should normally be preferred --
+    it adds automatic cluster_operation_targets registration
+    based on each schema's ``target_fields`` ClassVar. Calling
+    this function directly bypasses that registration and
+    should only be done when the caller has its own reason to
+    skip it (e.g. internal bookkeeping migrations).
+
     Args:
         op_uuid: The operation's UUID (str or UUID).
         operation_type: Operation type name, e.g. 'node_net_op'.
@@ -17386,32 +17994,157 @@ def _direct_work_queue_delete_row(row_id: int) -> bool:
 # Cluster Locks Direct Access Functions
 # =============================================================================
 
+# InnoDB returns errno 1213 (ER_LOCK_DEADLOCK) when it picks a
+# transaction as the deadlock victim. Retrying the same statement
+# almost always wins on the next attempt because the conflicting
+# transaction has either committed or moved on. Bound the retry
+# count and use jittered exponential backoff so a deadlock storm
+# from many simultaneous contenders doesn't synchronise on the
+# next round.
+_DEADLOCK_ERRNO = 1213
+_DEADLOCK_MAX_ATTEMPTS = 4
+_DEADLOCK_BASE_DELAY = 0.005
+
+_T = TypeVar('_T')
+
+
+def _is_innodb_deadlock(exc: OperationalError) -> bool:
+    """Identify an InnoDB 1213 deadlock from a SQLAlchemy
+    ``OperationalError``.
+
+    SQLAlchemy wraps the underlying DB-API exception in
+    ``exc.orig``; the mysqldb driver puts the MariaDB errno in
+    ``orig.args[0]``.
+    """
+    orig = getattr(exc, 'orig', None)
+    if orig is None:
+        return False
+    args: tuple[Any, ...] = getattr(orig, 'args', ())
+    if len(args) == 0:
+        return False
+    return bool(args[0] == _DEADLOCK_ERRNO)
+
+
+def _retry_on_deadlock(fn: Callable[[], _T], op_name: str) -> _T:
+    """Run ``fn`` and retry on InnoDB 1213 deadlocks.
+
+    Recovery from a deadlock is local to the database daemon:
+    rerunning the rolled-back statement immediately is far cheaper
+    than letting the error bubble out to the gRPC layer and consume
+    the client's UNAVAILABLE retry budget. Without this, a deadlock
+    storm on ``cluster_locks`` could push a release past the
+    contender's 10s acquire timeout even though each individual
+    deadlock resolves in milliseconds.
+
+    Re-raises the last 1213 if every attempt deadlocks, so the
+    caller's existing ``OperationalError`` handling still runs
+    (warning + return-False for acquire, raise for release/refresh).
+    Any non-deadlock ``OperationalError`` propagates immediately.
+    """
+    last_error: Optional[OperationalError] = None
+    for attempt in range(_DEADLOCK_MAX_ATTEMPTS):
+        try:
+            return fn()
+        except OperationalError as e:
+            if not _is_innodb_deadlock(e):
+                raise
+            last_error = e
+            if attempt < _DEADLOCK_MAX_ATTEMPTS - 1:
+                # 5ms, 10ms, 20ms (* 0.5..1.5 jitter).
+                delay = (_DEADLOCK_BASE_DELAY * (2 ** attempt)
+                         * random.uniform(0.5, 1.5))
+                time.sleep(delay)
+    LOG.warning(
+        f'{op_name}: {_DEADLOCK_MAX_ATTEMPTS} consecutive InnoDB '
+        f'deadlocks, giving up: {last_error}')
+    assert last_error is not None
+    raise last_error
+
+
 def _direct_acquire_cluster_lock(
         lock_key: str, holder_json: dict[str, Any],
         node_uuid: str, pid: int,
         lock_id: str, now: float) -> bool:
-    """Attempt to acquire a lock by inserting a row.
+    """Atomically take or steal a leased cluster lock.
 
-    Returns True if the row was inserted (lock acquired),
-    False if the key already exists (lock held by another).
-    Uses INSERT IGNORE so a duplicate PK is a silent failure.
+    A single ``INSERT ... ON DUPLICATE KEY UPDATE`` either inserts
+    a new row (cold acquire) or rewrites the existing row in place
+    when the previous holder's lease has expired (steal). When the
+    existing lease is still valid the row is left untouched.
+
+    The earlier two-statement (INSERT IGNORE, then UPDATE on PK
+    collision) implementation was a classic InnoDB shared-shared
+    upgrade deadlock vector: two concurrent acquires on the same
+    ``lock_key`` each took an S-lock on the existing row during
+    INSERT IGNORE's duplicate-key check, then both tried to
+    upgrade to X via the steal UPDATE -- guaranteed deadlock,
+    detected and rolled back as 1213. Collapsing the two
+    statements removes the upgrade window entirely.
+
+    Per-column ``IF(expires_at < NOW(), VALUES(col), col)`` lets a
+    single SET clause express both "rewrite to me" and "leave
+    alone" depending on lease state, but ``ON DUPLICATE KEY
+    UPDATE`` rowcounts can't cleanly distinguish "stole it" from
+    "left alone" across drivers. A primary-key SELECT for our
+    ``lock_id`` after the upsert is the unambiguous test, and is
+    cheap because it hits the PK we just touched.
+
+    ``expires_at`` is set server-side to
+    ``NOW() + CLUSTER_LOCK_LEASE_SECONDS`` so we never trust
+    per-node clocks. Holders extend their lease via
+    ``_direct_refresh_cluster_lock``; if they cannot, the row
+    expires and a later candidate steals here.
     """
     engine = _get_engine()
     table = _get_cluster_locks_table()
+    expires = sa.func.date_add(
+        sa.func.now(),
+        sa.text(f'INTERVAL {CLUSTER_LOCK_LEASE_SECONDS} SECOND'))
+
+    insert_stmt = sa.dialects.mysql.insert(table).values(
+        lock_key=lock_key,
+        holder_json=holder_json,
+        node_uuid=node_uuid,
+        pid=pid,
+        lock_id=lock_id,
+        acquired_at=now,
+        expires_at=expires,
+    )
+    inserted = insert_stmt.inserted
+    expired = table.c.expires_at < sa.func.now()
+    upsert_stmt = insert_stmt.on_duplicate_key_update(
+        holder_json=sa.case(
+            (expired, inserted.holder_json),
+            else_=table.c.holder_json),
+        node_uuid=sa.case(
+            (expired, inserted.node_uuid),
+            else_=table.c.node_uuid),
+        pid=sa.case(
+            (expired, inserted.pid),
+            else_=table.c.pid),
+        lock_id=sa.case(
+            (expired, inserted.lock_id),
+            else_=table.c.lock_id),
+        acquired_at=sa.case(
+            (expired, inserted.acquired_at),
+            else_=table.c.acquired_at),
+        expires_at=sa.case(
+            (expired, inserted.expires_at),
+            else_=table.c.expires_at),
+    )
+    confirm_stmt = sa.select(table.c.lock_id).where(
+        table.c.lock_key == lock_key)
+
+    def _do_acquire() -> bool:
+        with engine.connect() as conn:
+            conn.execute(upsert_stmt)
+            row = conn.execute(confirm_stmt).first()
+            conn.commit()
+            return row is not None and row[0] == lock_id
 
     try:
-        with engine.connect() as conn:
-            stmt = sa.insert(table).prefix_with('IGNORE').values(
-                lock_key=lock_key,
-                holder_json=holder_json,
-                node_uuid=node_uuid,
-                pid=pid,
-                lock_id=lock_id,
-                acquired_at=now,
-            )
-            result = conn.execute(stmt)
-            conn.commit()
-            return result.rowcount == 1
+        return _retry_on_deadlock(
+            _do_acquire, f'acquire_cluster_lock({lock_key})')
     except OperationalError as e:
         LOG.warning(
             f'MariaDB acquire_cluster_lock failed for '
@@ -17419,32 +18152,89 @@ def _direct_acquire_cluster_lock(
         return False
 
 
+def _direct_refresh_cluster_lock(
+        lock_key: str, lock_id: str) -> bool:
+    """Extend the lease for a lock we still hold.
+
+    Returns True if the row was matched and refreshed, False if no
+    row matched -- which means our lock has been stolen (or never
+    existed). Callers must treat False as "lock lost" and abort
+    whatever critical section they were in.
+
+    InnoDB 1213 deadlocks are retried inline before propagating
+    so a transient deadlock storm doesn't masquerade as a lost
+    lease.
+    """
+    engine = _get_engine()
+    table = _get_cluster_locks_table()
+    expires = sa.func.date_add(
+        sa.func.now(),
+        sa.text(f'INTERVAL {CLUSTER_LOCK_LEASE_SECONDS} SECOND'))
+    stmt = sa.update(table).where(
+        sa.and_(
+            table.c.lock_key == lock_key,
+            table.c.lock_id == lock_id,
+        )
+    ).values(expires_at=expires)
+
+    def _do_refresh() -> bool:
+        with engine.connect() as conn:
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount == 1
+
+    try:
+        return _retry_on_deadlock(
+            _do_refresh, f'refresh_cluster_lock({lock_key})')
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB refresh_cluster_lock failed for '
+            f'{lock_key}: {e}')
+        # Transient: caller should retry the refresh, not give up.
+        raise
+
+
 def _direct_release_cluster_lock(
         lock_key: str, lock_id: str) -> bool:
     """Release a lock by deleting the row, but only if the
     lock_id matches (CAS-equivalent).
 
-    Returns True if a row was deleted, False otherwise.
+    Returns True if a row was deleted, False if no row matched
+    (the lease was stolen, or we never held it).
+
+    Raises ``OperationalError`` for transient MariaDB issues
+    (e.g. InnoDB deadlock, errno 1213). Callers must treat that
+    as retryable, not as ``return False`` -- collapsing the two
+    looks identical to "another holder stole the lease" and
+    triggers a noisy ``LockNotHeld`` log on the next contender.
+
+    1213 deadlocks are retried inline first; only a sustained
+    storm propagates to the caller, where gRPC's UNAVAILABLE
+    retry path takes over.
     """
     engine = _get_engine()
     table = _get_cluster_locks_table()
+    stmt = sa.delete(table).where(
+        sa.and_(
+            table.c.lock_key == lock_key,
+            table.c.lock_id == lock_id,
+        )
+    )
 
-    try:
+    def _do_release() -> bool:
         with engine.connect() as conn:
-            stmt = sa.delete(table).where(
-                sa.and_(
-                    table.c.lock_key == lock_key,
-                    table.c.lock_id == lock_id,
-                )
-            )
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount == 1
+
+    try:
+        return _retry_on_deadlock(
+            _do_release, f'release_cluster_lock({lock_key})')
     except OperationalError as e:
         LOG.warning(
             f'MariaDB release_cluster_lock failed for '
             f'{lock_key}: {e}')
-        return False
+        raise
 
 
 def _direct_get_cluster_lock(
@@ -17833,6 +18623,27 @@ def _grpc_release_cluster_lock(
     return bool(response.success)
 
 
+def _grpc_refresh_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_id: str) -> bool:
+    """Extend the lease for a lock via the database microservice.
+
+    Transient gRPC errors propagate as ``grpc.RpcError`` after
+    ``_grpc_call`` exhausts its retries; the refresh loop in
+    ``ClusterLock`` catches those and tries again rather than
+    treating them as confirmed lock loss.
+    """
+    stub = _get_database_stub()
+    request = database_pb2.ClusterRefreshLockRequest(
+        object_type=object_type,
+        subtype=subtype or '',
+        name=name,
+        lock_id=lock_id,
+    )
+    response = _grpc_call(stub.RefreshLock, request)
+    return bool(response.success)
+
+
 def _grpc_get_cluster_lock_holder(
         object_type: str, subtype: str,
         name: str) -> Optional[dict[str, Any]]:
@@ -17931,6 +18742,30 @@ def release_cluster_lock(
     return _direct_release_cluster_lock(
         lock_key=lock_key,
         lock_id=lock_data.get('id', ''),
+    )
+
+
+def refresh_cluster_lock(
+        object_type: str, subtype: str, name: str,
+        lock_id: str) -> bool:
+    """Extend the lease on a distributed lock we still hold.
+
+    Returns True on a successful refresh, False if the lock has been
+    stolen (no row matched lock_id) -- callers must treat False as
+    "lock lost" and abort whatever critical section they were in.
+    Transient backend failures propagate (``OperationalError`` on the
+    direct path, ``grpc.RpcError`` on the gRPC path); the refresh
+    loop in ``ClusterLock`` catches them and retries rather than
+    treating them as confirmed loss.
+    """
+    if _use_database_service():
+        return _grpc_refresh_cluster_lock(
+            object_type, subtype, name, lock_id)
+
+    lock_key = _cluster_lock_key(object_type, subtype, name)
+    return _direct_refresh_cluster_lock(
+        lock_key=lock_key,
+        lock_id=lock_id,
     )
 
 

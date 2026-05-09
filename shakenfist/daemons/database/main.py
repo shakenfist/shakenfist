@@ -19,6 +19,7 @@ from uuid import UUID
 import grpc
 from prometheus_client import Counter
 from prometheus_client import start_http_server
+from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
@@ -260,7 +261,17 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.ClusterReleaseLockRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.StatusReply:
-        """Release a distributed lock."""
+        """Release a distributed lock.
+
+        InnoDB deadlocks (errno 1213) on the cluster_locks row are
+        routine when acquire / steal / release races overlap. Signal
+        UNAVAILABLE so the gRPC client retries the delete rather than
+        treating the transient as success=False -- which would
+        otherwise trip the caller's ``LockNotHeld`` path and produce a
+        noisy ``ERROR gunicorn`` log plus a real lease loss for any
+        other waiter, since the abandoning holder has already stopped
+        refreshing.
+        """
         try:
             self.monitor.counters['release_lock'].inc()
             lock_data = json.loads(request.lock_data)
@@ -272,8 +283,56 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 lock_id=lock_data.get('id', ''),
             )
             return database_pb2.StatusReply(success=released, error='')
+        except OperationalError as e:
+            LOG.warning(
+                f'ReleaseLock transient MariaDB error '
+                f'({request.object_type}/{request.subtype}/{request.name}): '
+                f'{e}')
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False, error=str(e))
         except Exception as e:
             util_exceptions.ignore_exception('database ReleaseLock failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def RefreshLock(
+        self,
+        request: database_pb2.ClusterRefreshLockRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Extend the lease on a distributed lock for the current holder.
+
+        A transient MariaDB error must not look like "lock stolen" to
+        the client (success=False), or the holder will spuriously
+        re-elect. Signal UNAVAILABLE on transient failure so the
+        client's retry / refresher loop can treat it as such.
+
+        InnoDB deadlocks (errno 1213) are routine on this row when
+        acquire/steal/refresh races overlap; gRPC retry handles them.
+        Log them at warning without a traceback or on-disk exception
+        record so the CI forbidden-string checks (Traceback / ERROR sf)
+        do not trip on benign transients.
+        """
+        try:
+            self.monitor.counters['refresh_lock'].inc()
+            lock_key = mariadb._cluster_lock_key(
+                request.object_type, request.subtype,
+                request.name)
+            refreshed = mariadb._direct_refresh_cluster_lock(
+                lock_key=lock_key,
+                lock_id=request.lock_id,
+            )
+            return database_pb2.StatusReply(success=refreshed, error='')
+        except OperationalError as e:
+            LOG.warning(
+                f'RefreshLock transient MariaDB error '
+                f'({request.object_type}/{request.subtype}/{request.name}): '
+                f'{e}')
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False, error=str(e))
+        except Exception as e:
+            util_exceptions.ignore_exception('database RefreshLock failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def GetLockHolder(
@@ -2206,6 +2265,108 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             )
 
     # =========================================================
+    # Node Daemon State Operations (MariaDB)
+    # =========================================================
+
+    def SetNodeDaemonState(
+        self,
+        request: database_pb2.SetNodeDaemonStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Atomically upsert one (node, daemon) state row."""
+        try:
+            self.monitor.counters['set_node_daemon_state'].inc()
+            d = request.data
+            success = mariadb._direct_set_node_daemon_state(
+                UUID(d.node_uuid),
+                d.daemon,
+                d.value if d.value else None,
+                d.update_time,
+                d.message if d.message else None,
+            )
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database SetNodeDaemonState failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def GetNodeDaemonState(
+        self,
+        request: database_pb2.GetNodeDaemonStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNodeDaemonStateReply:
+        """Get one (node, daemon) state row."""
+        try:
+            self.monitor.counters['get_node_daemon_state'].inc()
+            row = mariadb._direct_get_node_daemon_state(
+                UUID(request.node_uuid), request.daemon)
+            if row is None:
+                return database_pb2.GetNodeDaemonStateReply(found=False)
+            return database_pb2.GetNodeDaemonStateReply(
+                found=True,
+                data=database_pb2.NodeDaemonStateData(
+                    node_uuid=str(row.node_uuid),
+                    daemon=row.daemon,
+                    value=row.value or '',
+                    update_time=row.update_time,
+                    message=row.message or '',
+                ),
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNodeDaemonState failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNodeDaemonStateReply(found=False)
+
+    def GetAllNodeDaemonStates(
+        self,
+        request: database_pb2.GetAllNodeDaemonStatesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetAllNodeDaemonStatesReply:
+        """Get every daemon state row for one node."""
+        try:
+            self.monitor.counters['get_all_node_daemon_states'].inc()
+            rows = mariadb._direct_get_all_node_daemon_states(
+                UUID(request.node_uuid))
+            if rows is None:
+                rows = []
+            return database_pb2.GetAllNodeDaemonStatesReply(
+                data=[
+                    database_pb2.NodeDaemonStateData(
+                        node_uuid=str(r.node_uuid),
+                        daemon=r.daemon,
+                        value=r.value or '',
+                        update_time=r.update_time,
+                        message=r.message or '',
+                    )
+                    for r in rows
+                ],
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetAllNodeDaemonStates failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetAllNodeDaemonStatesReply()
+
+    def DeleteNodeDaemonState(
+        self,
+        request: database_pb2.DeleteNodeDaemonStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete one (node, daemon) state row."""
+        try:
+            self.monitor.counters['delete_node_daemon_state'].inc()
+            success = mariadb._direct_delete_node_daemon_state(
+                UUID(request.node_uuid), request.daemon)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNodeDaemonState failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    # =========================================================
     # Namespace Operations (MariaDB)
     # =========================================================
 
@@ -3891,10 +4052,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 metadata_json=(
                     json.dumps(data.metadata)
                     if data.metadata is not None else ''),
-                last_cluster_operation_json=(
-                    json.dumps(data.last_cluster_operation)
-                    if data.last_cluster_operation is not None
-                    else '')
             )
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -4107,6 +4264,38 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetClusterOperationTargetReply(
                 found=False)
+
+    def HasPendingClusterOperationTarget(
+        self,
+        request: database_pb2.HasPendingClusterOperationTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.HasPendingClusterOperationTargetReply:
+        """True if any in-flight cluster operation targets this object."""
+        try:
+            self.monitor.counters[
+                'has_pending_cluster_operation_target'].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                # Unknown object type — fail closed.
+                return database_pb2.HasPendingClusterOperationTargetReply(
+                    pending=True)
+            pending = (
+                mariadb
+                ._direct_has_pending_cluster_operation_target(
+                    target_object_type,
+                    request.target_uuid))
+            return database_pb2.HasPendingClusterOperationTargetReply(
+                pending=pending)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database HasPendingClusterOperationTarget'
+                ' failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            # Fail closed: treat unknown as in-flight.
+            return database_pb2.HasPendingClusterOperationTargetReply(
+                pending=True)
 
     def DeleteClusterOperationTarget(
         self,
@@ -4497,7 +4686,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'enqueue', 'dequeue', 'resolve', 'get_queue_length',
             'restart_queue', 'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
-            'acquire_lock', 'release_lock', 'get_lock_holder',
+            'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',
             'enqueue_event_dlq', 'drain_event_dlq',
@@ -4610,6 +4799,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_cluster_operation_target',
             'get_cluster_operation_targets_for_object',
             'get_latest_cluster_operation_target',
+            'has_pending_cluster_operation_target',
             'delete_cluster_operation_target',
             'delete_cluster_operation_targets_for_object',
             'delete_stale_cluster_operation_targets',
@@ -4623,6 +4813,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB node metrics operations
             'upsert_node_metrics', 'get_node_metrics',
             'get_all_node_metrics', 'delete_node_metrics',
+            # MariaDB node daemon state operations
+            'set_node_daemon_state', 'get_node_daemon_state',
+            'get_all_node_daemon_states', 'delete_node_daemon_state',
         ]
         for op in operations:
             self.counters[op] = Counter(

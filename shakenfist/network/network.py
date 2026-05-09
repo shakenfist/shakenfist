@@ -8,7 +8,6 @@ from uuid import uuid4
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import FLOATING_NETWORK_UUID
-from shakenfist.constants import get_object_class
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import mariadb
@@ -307,13 +306,12 @@ class Network(dbowo):
         n.state = Network.STATE_INITIAL
 
         # Networks should immediately appear on the network node
-        op_type, op_uuid = net_create_and_enqueue(
+        net_create_and_enqueue(
             n.uuid,
             [net_tasks.network_deploy],
             PRIORITY.user_waiting,
             runs_after=[n.last_cluster_operation],
             request_id=util_general.get_request_id())
-        n.set_last_cluster_operation(op_type, op_uuid)
 
         return n
 
@@ -502,17 +500,11 @@ class Network(dbowo):
 
     def is_okay(self):
         """Check if network is created and running."""
-        last_op = self.last_cluster_operation
-        if last_op and last_op.get('op_type'):
-            op = get_object_class(last_op.get('op_type')).from_db(
-                last_op.get('op_uuid'), suppress_failure_audit=True)
-            if op and op.state.value not in [op.STATE_COMPLETE,
-                                             op.STATE_ABORT,
-                                             op.STATE_ERROR,
-                                             op.STATE_DELETED]:
-                # There is an incomplete operation so we assume this network
-                # is ok for now.
-                return True
+        if self.has_pending_cluster_operation():
+            # An operation is in flight against this network. Defer
+            # the maintainer's recreate path so it does not race with
+            # the queue worker.
+            return True
 
         if not self.is_created():
             self.add_event(EVENT_TYPE_STATUS, 'network not ok, is not created')
@@ -765,10 +757,9 @@ class Network(dbowo):
                 d = self._get_dnsmasq_object()
                 d.remove_lease(ipv4, macaddr)
         else:
-            op_type, op_uuid = nmi_create_and_enqueue(
+            nmi_create_and_enqueue(
                 self.uuid, macaddr, ipv4, [nmi_tasks.remove_dhcp_lease],
                 PRIORITY.user_facing)
-            self.set_last_cluster_operation(op_type, op_uuid)
 
     def update_dnsmasq(self):
         if not self.provide_dhcp and not self.provide_dns:

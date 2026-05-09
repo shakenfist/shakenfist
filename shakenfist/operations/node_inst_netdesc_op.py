@@ -244,13 +244,12 @@ class NodeInstNetdescOp(BaseClusterOperation):
                     n.update_dnsmasq()
 
                     if ni.floating['floating_address']:
-                        op_type, op_uuid = ni_create_and_enqueue(
+                        ni_create_and_enqueue(
                             n.uuid,
                             ni.uuid,
                             [ni_tasks.interface_float],
                             priority=self.priority,
                             request_id=self.request_id)
-                        n.set_last_cluster_operation(op_type, op_uuid)
 
                 # Allocate console and VDI ports
                 inst.allocate_instance_ports()

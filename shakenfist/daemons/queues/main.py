@@ -75,9 +75,22 @@ def _health_checks():
     return healthy
 
 
-def _block_until_healthy():
+def _block_until_healthy(abort_path=None):
+    """Loop until every dependency reports healthy.
+
+    Pass ``abort_path`` and the loop returns immediately when the
+    abort file appears, so a SIGTERM during sf.target shutdown is
+    not held up here while the api/nodelock daemons we are
+    health-checking are themselves shutting down. Without this
+    check the queue daemon ignores its own stop signal until
+    systemd's TimeoutStopSec elapses and it gets SIGKILLed.
+    """
     start_time = time.time()
     while not _health_checks():
+        if abort_path and not daemon.check_abort_path(abort_path):
+            LOG.info(
+                'Aborting health check loop because of pending shutdown')
+            return
         if time.time() - start_time > 60:
             LOG.warning('Not processing queues as dependencies are unhealthy')
             start_time = time.time()
@@ -86,7 +99,7 @@ def _block_until_healthy():
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
-        _block_until_healthy()
+        _block_until_healthy(abort_path=self.abort_path)
 
         warned_locks = {}
         last_third_party_health_check = 0
@@ -98,7 +111,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if time.time() - last_third_party_health_check > 30:
                     # We also check in on the privexec and api daemon heres because
                     # they cannot do this for themselves...
-                    _block_until_healthy()
+                    _block_until_healthy(abort_path=self.abort_path)
                     last_third_party_health_check = time.time()
 
                 # Check if we hold any locks for processes which don't exist any

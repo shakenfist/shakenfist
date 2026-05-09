@@ -347,3 +347,83 @@ class EnsureDataMigrationsFailureTestCase(base.ShakenFistTestCase):
         self.assertEqual(migration_order, [2])
         self.assertEqual(len(result), 1)
         self.assertFalse(result[0]['migrated'])
+
+
+class EnsureObjectMetadataSchemaTestCase(base.ShakenFistTestCase):
+    """Tests for _ensure_object_metadata_schema() v2->v3 migration."""
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    def _make_mock_engine(self):
+        """Build a mock engine whose connect() is a usable context manager."""
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        return mock_engine, mock_conn
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version')
+    def test_v2_to_v3_runs_drop_column(
+            self, mock_get_version, mock_set_version):
+        """v2->v3 ALTER TABLE DROP COLUMN DDL must be issued and committed."""
+        mock_get_version.return_value = 2
+        mock_engine, mock_conn = self._make_mock_engine()
+
+        mariadb._ensure_object_metadata_schema(mock_engine)
+
+        # Verify the right DDL was executed.
+        self.assertEqual(mock_conn.execute.call_count, 1)
+        call_args = mock_conn.execute.call_args
+        # sa.text() objects compare by their string, accessible via .text
+        executed_sql = str(call_args[0][0])
+        self.assertIn('ALTER TABLE', executed_sql)
+        self.assertIn('DROP COLUMN IF EXISTS', executed_sql)
+        self.assertIn('last_cluster_operation_json', executed_sql)
+
+        # commit must be issued after the DDL
+        mock_conn.commit.assert_called_once()
+
+        # version must be bumped to 3
+        mock_set_version.assert_called_once_with(
+            mock_engine, 'object_metadata', 3)
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version')
+    def test_already_v3_is_noop(
+            self, mock_get_version, mock_set_version):
+        """Already at v3: no DDL and no version bump."""
+        mock_get_version.return_value = 3
+        mock_engine, mock_conn = self._make_mock_engine()
+
+        mariadb._ensure_object_metadata_schema(mock_engine)
+
+        mock_conn.execute.assert_not_called()
+        mock_set_version.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version')
+    def test_v0_creates_then_migrates(
+            self, mock_get_version, mock_set_version):
+        """Table at v0: create_all runs first, then v2->v3 migration."""
+        mock_get_version.return_value = 0
+        mock_engine, mock_conn = self._make_mock_engine()
+
+        # Suppress the create_all call on the SQLAlchemy metadata object so
+        # we don't need a real database dialect.
+        with mock.patch('sqlalchemy.MetaData.create_all'):
+            mariadb._ensure_object_metadata_schema(mock_engine)
+
+        # _set_table_version must be called twice: once for v1 and once for v3
+        self.assertEqual(mock_set_version.call_count, 2)
+        calls = mock_set_version.call_args_list
+        # First call: set to 1 after create_all
+        self.assertEqual(calls[0], mock.call(mock_engine, 'object_metadata', 1))
+        # Second call: set to 3 after DROP COLUMN
+        self.assertEqual(calls[1], mock.call(mock_engine, 'object_metadata', 3))

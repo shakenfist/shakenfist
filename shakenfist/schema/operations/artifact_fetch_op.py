@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import ClassVar, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -29,9 +29,15 @@ class model_tasks(Enum):
 
 
 class model(BaseModel):
+    target_fields: ClassVar[dict[str, ObjectType]] = {
+        'artifact_uuid': ObjectType.ARTIFACT,
+        'instance_uuid': ObjectType.INSTANCE,
+    }
+
     uuid: UUID4
     namespace: str
     url: str
+    artifact_uuid: Optional[UUID4] = None
     instance_uuid: Optional[UUID4]
     priority: PRIORITY
     request_id: Optional[str]
@@ -50,8 +56,8 @@ class model(BaseModel):
 
 
 def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
-                       request_id=None, depends_on=None, runs_after=None,
-                       target_node=None):
+                       artifact_uuid=None, request_id=None, depends_on=None,
+                       runs_after=None, target_node=None):
     operation_uuid = str(uuid4())
 
     if not target_node:
@@ -63,6 +69,7 @@ def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
             uuid=operation_uuid,
             namespace=namespace,
             url=url,
+            artifact_uuid=artifact_uuid,
             instance_uuid=instance_uuid,
             priority=priority,
             request_id=request_id,
@@ -76,6 +83,7 @@ def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
             'uuid': operation_uuid,
             'namespace': namespace,
             'url': url,
+            'artifact_uuid': artifact_uuid,
             'instance_uuid': instance_uuid,
             'priority': priority,
             'request_id': request_id,
@@ -87,5 +95,6 @@ def create_and_enqueue(namespace, url, instance_uuid, tasks, priority,
         raise exc
 
     enqueue_cluster_operation(
-        object_type, m.model_dump(mode='json'), target=target_node)
+        object_type, m.model_dump(mode='json'), target=target_node,
+        model_class=model)
     return object_type, operation_uuid

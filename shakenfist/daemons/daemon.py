@@ -1,11 +1,12 @@
 import faulthandler
 import logging
-from math import inf
 import os
 import signal
 import socket
 import threading
 import time
+from logging.handlers import SysLogHandler
+from math import inf
 
 import requests
 import setproctitle
@@ -50,6 +51,22 @@ def process_name(name):
     if name not in DAEMON_NAMES:
         raise Exception('Code Error: Bad process name: %s' % name)
     return DAEMON_NAMES[name]
+
+
+def set_syslog_ident(procname):
+    # Each module-level `logs.setup(__name__)` call attaches its own
+    # SysLogHandler at import time, before setproctitle runs. Without
+    # an explicit ident, the syslog program field falls back to whatever
+    # rsyslog parses from /proc/PID/comm, which is truncated to 15 chars
+    # and unreliable. Stamp every SysLogHandler we can see with the
+    # daemon's process name so the centralised syslog has a stable,
+    # greppable program= label that we can also reuse as a Loki label
+    # when the eventual structured-logging migration lands.
+    ident = f'{procname}: '
+    for name in list(logging.root.manager.loggerDict.keys()) + ['']:
+        for handler in logging.getLogger(name).handlers:
+            if isinstance(handler, SysLogHandler):
+                handler.ident = ident
 
 
 def set_log_level(log, name):
@@ -138,6 +155,7 @@ class Daemon:
         util_concurrency.set_thread_name(procname)
         self.log, _ = logs.setup(name)
         set_log_level(self.log, name)
+        set_syslog_ident(procname)
 
         self.abort_path = f'/run/sf/{name}.abort'
         clear_abort_path(self.abort_path)

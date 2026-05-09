@@ -6,6 +6,7 @@ from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -49,7 +50,7 @@ class LastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
 
 
 class SetLastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
-    """Test set_last_cluster_operation writes to cluster_operation_targets."""
+    """Test _set_last_cluster_operation writes to cluster_operation_targets."""
 
     @mock.patch('shakenfist.mariadb.create_cluster_operation_target',
                 return_value=True)
@@ -59,7 +60,7 @@ class SetLastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
         mock_time.time.return_value = 1234.5
 
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
-        d.set_last_cluster_operation('instance_preflight', OP_UUID)
+        d._set_last_cluster_operation('instance_preflight', OP_UUID)
 
         # Verify cluster_operation_targets write
         mock_create_target.assert_called_once_with(
@@ -75,7 +76,7 @@ class SetLastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
             self, mock_create_target):
         d = DatabaseBackedObjectWithOperations(
             TEST_UUID, in_memory_only=True)
-        d.set_last_cluster_operation('net_op', OP_UUID)
+        d._set_last_cluster_operation('net_op', OP_UUID)
 
         mock_create_target.assert_not_called()
 
@@ -333,3 +334,276 @@ class MockDeleteStaleClusterOperationTargetsTestCase(
             mariadb.get_cluster_operation_target(OP_UUID_ACTIVE))
         self.assertIsNotNone(
             mariadb.get_cluster_operation_target(OP_UUID_NEW))
+
+
+class HasPendingClusterOperationTestCase(base.ShakenFistTestCase):
+    """Test has_pending_cluster_operation() on DatabaseBackedObjectWithOperations."""
+
+    @mock.patch('shakenfist.mariadb.has_pending_cluster_operation_target',
+                return_value=False)
+    def test_no_targets_returns_false(self, mock_has_pending):
+        d = DatabaseBackedObjectWithOperations(TEST_UUID)
+        result = d.has_pending_cluster_operation()
+        self.assertFalse(result)
+        mock_has_pending.assert_called_once_with(d.object_type, TEST_UUID)
+
+    @mock.patch('shakenfist.mariadb.has_pending_cluster_operation_target',
+                return_value=True)
+    def test_in_flight_target_returns_true(self, mock_has_pending):
+        d = DatabaseBackedObjectWithOperations(TEST_UUID)
+        result = d.has_pending_cluster_operation()
+        self.assertTrue(result)
+        mock_has_pending.assert_called_once_with(d.object_type, TEST_UUID)
+
+    @mock.patch('shakenfist.mariadb.has_pending_cluster_operation_target')
+    def test_in_memory_object_short_circuits(self, mock_has_pending):
+        d = DatabaseBackedObjectWithOperations(TEST_UUID, in_memory_only=True)
+        result = d.has_pending_cluster_operation()
+        self.assertFalse(result)
+        mock_has_pending.assert_not_called()
+
+
+class HasPendingClusterOperationQueryTestCase(base.ShakenFistTestCase):
+    """Test has_pending_cluster_operation_target dispatcher routing."""
+
+    @mock.patch('shakenfist.mariadb._direct_has_pending_cluster_operation_target',
+                return_value=False)
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    def test_routes_to_direct_when_no_service(
+            self, mock_use_svc, mock_direct):
+        result = mariadb.has_pending_cluster_operation_target(
+            'instance', TEST_UUID)
+        self.assertFalse(result)
+        mock_direct.assert_called_once_with('instance', TEST_UUID)
+
+    @mock.patch('shakenfist.mariadb._grpc_has_pending_cluster_operation_target',
+                return_value=True)
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_routes_to_grpc_when_service_enabled(
+            self, mock_use_svc, mock_grpc):
+        result = mariadb.has_pending_cluster_operation_target(
+            'instance', TEST_UUID)
+        self.assertTrue(result)
+        mock_grpc.assert_called_once_with('instance', TEST_UUID)
+
+
+class DirectHasPendingClusterOperationTargetTestCase(
+        base.ShakenFistTestCase):
+    """Test the SQL-level _direct_has_pending_cluster_operation_target.
+
+    Tests 4-8 from phase 1 plan: no targets, one in-flight, one terminal,
+    terminal-then-in-flight (the latest-only race fix), multiple terminal.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from shakenfist.config import BaseSettings
+
+        class _FakeConfig(BaseSettings):
+            DATABASE_NODE_IP: str = '192.168.1.1'
+            DATABASE_API_PORT: int = 13005
+            MARIADB_HOST: str = 'localhost'
+            NODE_NAME: str = 'testnode'
+
+        self.config_patch = mock.patch(
+            'shakenfist.mariadb.config', _FakeConfig())
+        self.config_patch.start()
+        self.addCleanup(self.config_patch.stop)
+
+    def _make_tables(self):
+        import sqlalchemy as sa
+        metadata = sa.MetaData()
+        targets_table = sa.Table(
+            'cluster_operation_targets',
+            metadata,
+            sa.Column('operation_uuid', sa.String(36), primary_key=True),
+            sa.Column('target_object_type', sa.String(32)),
+            sa.Column('target_uuid', sa.String(36)),
+        )
+        states_table = sa.Table(
+            'object_states',
+            metadata,
+            sa.Column('object_uuid', sa.String(36)),
+            sa.Column('state_value', sa.String(32)),
+        )
+        return targets_table, states_table
+
+    def _make_engine(self, scalar_result):
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.return_value.scalar.return_value = scalar_result
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        return mock_engine, mock_conn
+
+    @mock.patch('shakenfist.mariadb._get_object_states_table')
+    @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_no_targets_returns_false(
+            self, mock_get_engine, mock_get_table, mock_get_states):
+        targets_table, states_table = self._make_tables()
+        mock_get_table.return_value = targets_table
+        mock_get_states.return_value = states_table
+        mock_engine, mock_conn = self._make_engine(scalar_result=False)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_has_pending_cluster_operation_target(
+            'instance', TEST_UUID)
+
+        self.assertFalse(result)
+        mock_conn.execute.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb._get_object_states_table')
+    @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_one_in_flight_target_returns_true(
+            self, mock_get_engine, mock_get_table, mock_get_states):
+        targets_table, states_table = self._make_tables()
+        mock_get_table.return_value = targets_table
+        mock_get_states.return_value = states_table
+        mock_engine, mock_conn = self._make_engine(scalar_result=True)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_has_pending_cluster_operation_target(
+            'instance', TEST_UUID)
+
+        self.assertTrue(result)
+
+    @mock.patch('shakenfist.mariadb._get_object_states_table')
+    @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_one_terminal_target_returns_false(
+            self, mock_get_engine, mock_get_table, mock_get_states):
+        targets_table, states_table = self._make_tables()
+        mock_get_table.return_value = targets_table
+        mock_get_states.return_value = states_table
+        # Terminal operation — JOIN to object_states finds no active rows.
+        mock_engine, mock_conn = self._make_engine(scalar_result=False)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_has_pending_cluster_operation_target(
+            'instance', TEST_UUID)
+
+        self.assertFalse(result)
+
+    @mock.patch('shakenfist.mariadb._get_object_states_table')
+    @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_terminal_then_in_flight_returns_true(
+            self, mock_get_engine, mock_get_table, mock_get_states):
+        """The latest-only race: a later terminal op must not hide an earlier
+        in-flight op. The query must check ALL rows, not just the latest."""
+        targets_table, states_table = self._make_tables()
+        mock_get_table.return_value = targets_table
+        mock_get_states.return_value = states_table
+        # Scalar would return True because the JOIN finds the in-flight row.
+        mock_engine, mock_conn = self._make_engine(scalar_result=True)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_has_pending_cluster_operation_target(
+            'instance', TEST_UUID)
+
+        self.assertTrue(result)
+
+        # Verify the SQL shape: must contain state_value IN (...) with all
+        # three active states. This ensures the query actually checks state
+        # rather than just counting rows.
+        executed_stmt = mock_conn.execute.call_args[0][0]
+        compiled = str(executed_stmt.compile(
+            compile_kwargs={'literal_binds': True}))
+        self.assertIn('state_value IN', compiled)
+        self.assertIn("'queued'", compiled)
+        self.assertIn("'preflight'", compiled)
+        self.assertIn("'executing'", compiled)
+
+    @mock.patch('shakenfist.mariadb._get_object_states_table')
+    @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_multiple_terminal_targets_returns_false(
+            self, mock_get_engine, mock_get_table, mock_get_states):
+        targets_table, states_table = self._make_tables()
+        mock_get_table.return_value = targets_table
+        mock_get_states.return_value = states_table
+        # All operations terminal — no JOIN match.
+        mock_engine, mock_conn = self._make_engine(scalar_result=False)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_has_pending_cluster_operation_target(
+            'instance', TEST_UUID)
+
+        self.assertFalse(result)
+
+
+HOTPLUG_INSTANCE_UUID = 'eeee1111-1111-4111-8111-111111111111'
+HOTPLUG_NETWORK_UUID = 'ffff1111-1111-4111-8111-111111111111'
+HOTPLUG_INTERFACE_UUID = 'aaaa2222-2222-4222-8222-222222222222'
+HOTPLUG_NODE_UUID = 'bbbb3333-3333-4333-8333-333333333333'
+
+
+class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
+    """Regression test for the hot-plug triple-target bug (commit 8923391c).
+
+    Enqueueing a node_inst_net_iface_op must write three
+    cluster_operation_targets rows (instance, network, interface) via
+    the auto-targeting path in enqueue_cluster_operation(). Before
+    3a/3b, the network target was written by an explicit
+    set_last_cluster_operation() call that was sometimes omitted,
+    causing the network maintainer to race the queue worker.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_create_and_enqueue = mock.patch(
+            'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+            return_value=True,
+        ).start()
+        self.mock_create_target = mock.patch(
+            'shakenfist.mariadb.create_cluster_operation_target',
+        ).start()
+        self.mock_add_event_multi = mock.patch(
+            'shakenfist.schema.operations.util.eventlog.add_event_multi',
+        ).start()
+        self.mock_time = mock.patch(
+            'shakenfist.schema.operations.util.time.time',
+            return_value=5000.0,
+        ).start()
+        self.addCleanup(mock.patch.stopall)
+
+    def test_hot_plug_enqueue_writes_three_target_rows(self):
+        """Three cluster_operation_targets rows must be written: instance,
+        network, and interface. This locks in that the original CI failure
+        from commit 8923391c cannot regress.
+        """
+        from shakenfist.schema.operations.node_inst_net_iface_op import (
+            create_and_enqueue, model_tasks)
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+
+        create_and_enqueue(
+            HOTPLUG_NODE_UUID,
+            HOTPLUG_INSTANCE_UUID,
+            HOTPLUG_NETWORK_UUID,
+            HOTPLUG_INTERFACE_UUID,
+            [model_tasks.hot_plug_instance_interface],
+            PRIORITY.user_waiting,
+        )
+
+        self.assertEqual(3, self.mock_create_target.call_count)
+        target_types = {
+            call.kwargs['target_object_type']
+            for call in self.mock_create_target.call_args_list
+        }
+        self.assertEqual(
+            {ObjectType.INSTANCE, ObjectType.NETWORK, ObjectType.INTERFACE},
+            target_types,
+        )
+        target_uuids = {
+            call.kwargs['target_uuid']
+            for call in self.mock_create_target.call_args_list
+        }
+        self.assertEqual(
+            {HOTPLUG_INSTANCE_UUID, HOTPLUG_NETWORK_UUID,
+             HOTPLUG_INTERFACE_UUID},
+            target_uuids,
+        )

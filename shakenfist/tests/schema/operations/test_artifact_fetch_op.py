@@ -128,6 +128,7 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(
             {
+                'artifact_uuid': None,
                 'depends_on': None,
                 'runs_after': None,
                 'instance_uuid': None,

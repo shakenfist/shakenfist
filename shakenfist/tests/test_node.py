@@ -24,6 +24,7 @@ from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
 from shakenfist.node import Node
 from shakenfist.schema.node_attributes import NodeAttributesData
+from shakenfist.schema.node_daemon_state import NodeDaemonStateData
 from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import State
@@ -382,26 +383,26 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
         n._DatabaseBackedObject__in_memory_only = False
         return n
 
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    def test_get_daemon_state_no_attributes(self, mock_get_attrs):
-        """Test get_daemon_state when no attributes exist."""
-        mock_get_attrs.return_value = None
+    @mock.patch('shakenfist.node.mariadb.get_node_daemon_state')
+    def test_get_daemon_state_no_attributes(self, mock_get_state):
+        """Test get_daemon_state when no row exists."""
+        mock_get_state.return_value = None
         n = self._make_node()
 
         state = n.get_daemon_state('api')
         self.assertIsNone(state.value)
         self.assertEqual(state.update_time, 0)
 
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    def test_get_daemon_state_with_value(self, mock_get_attrs):
+    @mock.patch('shakenfist.node.mariadb.get_node_daemon_state')
+    def test_get_daemon_state_with_value(self, mock_get_state):
         """Test get_daemon_state returns correct state."""
-        attrs = NodeAttributesData(uuid=TEST_UUID)
-        attrs.daemon_states['api'] = {
-            'value': 'daemon-running',
-            'update_time': 1234567890.0,
-            'message': None
-        }
-        mock_get_attrs.return_value = attrs
+        mock_get_state.return_value = NodeDaemonStateData(
+            node_uuid=TEST_UUID,
+            daemon='api',
+            value='daemon-running',
+            update_time=1234567890.0,
+            message=None,
+        )
         n = self._make_node()
 
         state = n.get_daemon_state('api')
@@ -414,6 +415,10 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             NoSuchDaemon, n.get_daemon_state, 'bogus')
 
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
+                return_value=[])
+    @mock.patch('shakenfist.node.mariadb.set_node_daemon_state',
+                return_value=True)
     @mock.patch('shakenfist.node.mariadb.update_node_attributes')
     @mock.patch('shakenfist.node.mariadb.create_node_attributes')
     @mock.patch('shakenfist.node.mariadb.get_node_attributes')
@@ -427,7 +432,8 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
     def test_register_daemon(
             self, mock_get_state, mock_set_state,
             mock_lock, mock_add_event, mock_get_attrs,
-            mock_create_attrs, mock_update_attrs):
+            mock_create_attrs, mock_update_attrs,
+            mock_set_daemon_state, mock_get_all_states):
         """Test registering a daemon adds it to the list."""
         attrs = NodeAttributesData(uuid=TEST_UUID)
         mock_get_attrs.return_value = attrs
@@ -438,6 +444,7 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
         n.register_daemon('api')
 
         self.assertIn('api', attrs.daemons)
+        mock_set_daemon_state.assert_called_once()
 
     def test_register_invalid_daemon(self):
         """Test registering invalid daemon raises."""
@@ -445,6 +452,8 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             NoSuchDaemon, n.register_daemon, 'bogus')
 
+    @mock.patch('shakenfist.node.mariadb.delete_node_daemon_state',
+                return_value=True)
     @mock.patch('shakenfist.node.mariadb.update_node_attributes')
     @mock.patch('shakenfist.node.mariadb.get_node_attributes')
     @mock.patch('shakenfist.node.add_event')
@@ -456,15 +465,10 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
     def test_deregister_daemon(
             self, mock_get_state, mock_lock,
             mock_add_event, mock_get_attrs,
-            mock_update_attrs):
+            mock_update_attrs, mock_delete_daemon_state):
         """Test deregistering a daemon removes it."""
         attrs = NodeAttributesData(uuid=TEST_UUID)
         attrs.daemons.append('api')
-        attrs.daemon_states['api'] = {
-            'value': 'daemon-running',
-            'update_time': 1234567890.0,
-            'message': None
-        }
         mock_get_attrs.return_value = attrs
         mock_lock.return_value = mock.MagicMock()
         mock_update_attrs.return_value = True
@@ -473,7 +477,7 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
         n.deregister_daemon('api')
 
         self.assertNotIn('api', attrs.daemons)
-        self.assertNotIn('api', attrs.daemon_states)
+        mock_delete_daemon_state.assert_called_once_with(TEST_UUID, 'api')
 
 
 class NodeSetDaemonStateTestCase(base.ShakenFistTestCase):
@@ -738,59 +742,57 @@ class NodesDegradedTestCase(base.ShakenFistTestCase):
         n._DatabaseBackedObject__in_memory_only = False
         return n
 
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states')
     @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    def test_no_degraded_when_all_running(self, mock_get_attrs):
+    def test_no_degraded_when_all_running(
+            self, mock_get_attrs, mock_get_all_states):
         """Test no degraded daemons when all are running."""
         attrs = NodeAttributesData(uuid=TEST_UUID)
         attrs.daemons = ['api', 'database']
-        attrs.daemon_states = {
-            'api': {
-                'value': 'daemon-running',
-                'update_time': 1234567890.0,
-                'message': None
-            },
-            'database': {
-                'value': 'daemon-running',
-                'update_time': 1234567890.0,
-                'message': None
-            }
-        }
         mock_get_attrs.return_value = attrs
+        mock_get_all_states.return_value = [
+            NodeDaemonStateData(
+                node_uuid=TEST_UUID, daemon='api',
+                value='daemon-running', update_time=1234567890.0),
+            NodeDaemonStateData(
+                node_uuid=TEST_UUID, daemon='database',
+                value='daemon-running', update_time=1234567890.0),
+        ]
 
         n = self._make_node()
         degraded = n.get_degraded_daemons()
         self.assertEqual(degraded, [])
 
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states')
     @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    def test_degraded_when_daemon_stopped(self, mock_get_attrs):
+    def test_degraded_when_daemon_stopped(
+            self, mock_get_attrs, mock_get_all_states):
         """Test daemon shows as degraded when stopped."""
         attrs = NodeAttributesData(uuid=TEST_UUID)
         attrs.daemons = ['api', 'database']
-        attrs.daemon_states = {
-            'api': {
-                'value': 'daemon-running',
-                'update_time': 1234567890.0,
-                'message': None
-            },
-            'database': {
-                'value': 'daemon-stopped',
-                'update_time': 1234567890.0,
-                'message': None
-            }
-        }
         mock_get_attrs.return_value = attrs
+        mock_get_all_states.return_value = [
+            NodeDaemonStateData(
+                node_uuid=TEST_UUID, daemon='api',
+                value='daemon-running', update_time=1234567890.0),
+            NodeDaemonStateData(
+                node_uuid=TEST_UUID, daemon='database',
+                value='daemon-stopped', update_time=1234567890.0),
+        ]
 
         n = self._make_node()
         degraded = n.get_degraded_daemons()
         self.assertIn('database', degraded)
         self.assertNotIn('api', degraded)
 
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
+                return_value=[])
     @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    def test_degraded_when_no_state(self, mock_get_attrs):
+    def test_degraded_when_no_state(
+            self, mock_get_attrs, mock_get_all_states):
         """Test daemon shows as degraded when it has no state."""
         attrs = NodeAttributesData(uuid=TEST_UUID)
         attrs.daemons = ['api']
-        attrs.daemon_states = {}
         mock_get_attrs.return_value = attrs
 
         n = self._make_node()

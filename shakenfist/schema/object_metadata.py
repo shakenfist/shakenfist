@@ -1,23 +1,19 @@
 # Copyright 2019 Michael Still and contributors
 # Pydantic schema for object metadata storage in MariaDB.
 #
-# This schema defines the structure for storing object metadata and
-# last_cluster_operation in a single shared table. All object types use
-# this same table structure, with (object_type, object_uuid) as the
-# composite primary key — following the same pattern as object_states.
+# This schema defines the structure for storing object metadata in a single
+# shared table. All object types use this same table structure, with
+# (object_type, object_uuid) as the composite primary key — following the same
+# pattern as object_states.
 #
 # This model serves as both:
 # 1. The source of truth for the object_metadata table schema
 # 2. A typed data transfer object for object metadata
 #
-# Consolidates these etcd attributes into a single row per object:
+# Consolidates this etcd attribute into a single row per object:
 # - attribute/{type}/{uuid}/metadata -> metadata
-# - attribute/{type}/{uuid}/last_cluster_operation -> last_cluster_operation
 #
 # metadata: User-defined key-value pairs, available on all object types.
-# last_cluster_operation: Tracks the last queued operation, only used by
-#     DatabaseBackedObjectWithOperations subclasses (Instance, Artifact,
-#     Network).
 
 from typing import Any
 from typing import Optional
@@ -42,9 +38,6 @@ class ObjectMetadataData(BaseModel):
         object_type: The type of object (ObjectType enum value as string).
         object_uuid: The UUID of the object this metadata belongs to.
         metadata: User-defined key-value pairs, or None if not set.
-        last_cluster_operation: Dict with op_type and op_uuid of the
-            last queued cluster operation, or None if not set. Only
-            meaningful for Instance, Artifact, and Network objects.
     """
 
     # NOTE: Not frozen - metadata is mutable
@@ -58,6 +51,3 @@ class ObjectMetadataData(BaseModel):
 
     # User-defined key-value metadata: {'key1': 'val1', 'key2': 'val2'}
     metadata: Optional[dict[str, Any]] = Field(default=None)
-
-    # Last cluster operation: {'op_type': '...', 'op_uuid': '...'}
-    last_cluster_operation: Optional[dict[str, Any]] = Field(default=None)

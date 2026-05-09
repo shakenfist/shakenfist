@@ -11,6 +11,9 @@ ReloadPropagatedFrom=sf.target
 Type=simple
 User=root
 Group=root
+TimeoutStopSec=30s
+SuccessExitStatus=SIGTERM 143
+RestartPreventExitStatus=SIGTERM
 
 EnvironmentFile=/etc/sf/config
 ExecStartPre=/bin/sh -c '/srv/shakenfist/venv/bin/sf-ctl verify-config'

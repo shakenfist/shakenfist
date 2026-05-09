@@ -84,6 +84,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.ClusterReleaseLockRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.RefreshLock = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/RefreshLock',
+                request_serializer=database__pb2.ClusterRefreshLockRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.GetLockHolder = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/GetLockHolder',
                 request_serializer=database__pb2.ClusterGetLockHolderRequest.SerializeToString,
@@ -452,6 +457,26 @@ class DatabaseServiceStub(object):
         self.DeleteNodeAttributes = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteNodeAttributes',
                 request_serializer=database__pb2.DeleteNodeAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.SetNodeDaemonState = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/SetNodeDaemonState',
+                request_serializer=database__pb2.SetNodeDaemonStateRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetNodeDaemonState = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNodeDaemonState',
+                request_serializer=database__pb2.GetNodeDaemonStateRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNodeDaemonStateReply.FromString,
+                _registered_method=True)
+        self.GetAllNodeDaemonStates = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetAllNodeDaemonStates',
+                request_serializer=database__pb2.GetAllNodeDaemonStatesRequest.SerializeToString,
+                response_deserializer=database__pb2.GetAllNodeDaemonStatesReply.FromString,
+                _registered_method=True)
+        self.DeleteNodeDaemonState = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteNodeDaemonState',
+                request_serializer=database__pb2.DeleteNodeDaemonStateRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
         self.CreateNamespace = channel.unary_unary(
@@ -824,6 +849,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetLatestClusterOperationTargetRequest.SerializeToString,
                 response_deserializer=database__pb2.GetClusterOperationTargetReply.FromString,
                 _registered_method=True)
+        self.HasPendingClusterOperationTarget = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/HasPendingClusterOperationTarget',
+                request_serializer=database__pb2.HasPendingClusterOperationTargetRequest.SerializeToString,
+                response_deserializer=database__pb2.HasPendingClusterOperationTargetReply.FromString,
+                _registered_method=True)
         self.DeleteClusterOperationTarget = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteClusterOperationTarget',
                 request_serializer=database__pb2.DeleteClusterOperationTargetRequest.SerializeToString,
@@ -946,6 +976,12 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def ReleaseLock(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RefreshLock(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1412,6 +1448,35 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetNodeDaemonState(self, request, context):
+        """Node Daemon State Operations (MariaDB)
+        Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
+        that previously lived inside node_attributes; that dict required a
+        coarse per-node lock for every transition and serialised every
+        daemon's startup/shutdown through a single 10s lock.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNodeDaemonState(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAllNodeDaemonStates(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteNodeDaemonState(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CreateNamespace(self, request, context):
         """Namespace Operations (MariaDB)
         These manage namespace static values (name, version) in MariaDB.
@@ -1851,8 +1916,8 @@ class DatabaseServiceServicer(object):
 
     def GetObjectMetadata(self, request, context):
         """Object Metadata Operations (MariaDB)
-        These store user-defined metadata and last_cluster_operation for all
-        object types in a single shared table (like object_states).
+        These store user-defined metadata for all object types in a single shared
+        table (like object_states).
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1891,6 +1956,12 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetLatestClusterOperationTarget(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def HasPendingClusterOperationTarget(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2030,6 +2101,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
             'ReleaseLock': grpc.unary_unary_rpc_method_handler(
                     servicer.ReleaseLock,
                     request_deserializer=database__pb2.ClusterReleaseLockRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'RefreshLock': grpc.unary_unary_rpc_method_handler(
+                    servicer.RefreshLock,
+                    request_deserializer=database__pb2.ClusterRefreshLockRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
             'GetLockHolder': grpc.unary_unary_rpc_method_handler(
@@ -2402,6 +2478,26 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.DeleteNodeAttributesRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
+            'SetNodeDaemonState': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetNodeDaemonState,
+                    request_deserializer=database__pb2.SetNodeDaemonStateRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetNodeDaemonState': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNodeDaemonState,
+                    request_deserializer=database__pb2.GetNodeDaemonStateRequest.FromString,
+                    response_serializer=database__pb2.GetNodeDaemonStateReply.SerializeToString,
+            ),
+            'GetAllNodeDaemonStates': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAllNodeDaemonStates,
+                    request_deserializer=database__pb2.GetAllNodeDaemonStatesRequest.FromString,
+                    response_serializer=database__pb2.GetAllNodeDaemonStatesReply.SerializeToString,
+            ),
+            'DeleteNodeDaemonState': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteNodeDaemonState,
+                    request_deserializer=database__pb2.DeleteNodeDaemonStateRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
             'CreateNamespace': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateNamespace,
                     request_deserializer=database__pb2.CreateNamespaceRequest.FromString,
@@ -2772,6 +2868,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.GetLatestClusterOperationTargetRequest.FromString,
                     response_serializer=database__pb2.GetClusterOperationTargetReply.SerializeToString,
             ),
+            'HasPendingClusterOperationTarget': grpc.unary_unary_rpc_method_handler(
+                    servicer.HasPendingClusterOperationTarget,
+                    request_deserializer=database__pb2.HasPendingClusterOperationTargetRequest.FromString,
+                    response_serializer=database__pb2.HasPendingClusterOperationTargetReply.SerializeToString,
+            ),
             'DeleteClusterOperationTarget': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteClusterOperationTarget,
                     request_deserializer=database__pb2.DeleteClusterOperationTargetRequest.FromString,
@@ -3102,6 +3203,33 @@ class DatabaseService(object):
             target,
             '/shakenfist.protos.DatabaseService/ReleaseLock',
             database__pb2.ClusterReleaseLockRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RefreshLock(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/RefreshLock',
+            database__pb2.ClusterRefreshLockRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
@@ -5112,6 +5240,114 @@ class DatabaseService(object):
             _registered_method=True)
 
     @staticmethod
+    def SetNodeDaemonState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/SetNodeDaemonState',
+            database__pb2.SetNodeDaemonStateRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNodeDaemonState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNodeDaemonState',
+            database__pb2.GetNodeDaemonStateRequest.SerializeToString,
+            database__pb2.GetNodeDaemonStateReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAllNodeDaemonStates(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetAllNodeDaemonStates',
+            database__pb2.GetAllNodeDaemonStatesRequest.SerializeToString,
+            database__pb2.GetAllNodeDaemonStatesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteNodeDaemonState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteNodeDaemonState',
+            database__pb2.DeleteNodeDaemonStateRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def CreateNamespace(request,
             target,
             options=(),
@@ -7099,6 +7335,33 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetLatestClusterOperationTarget',
             database__pb2.GetLatestClusterOperationTargetRequest.SerializeToString,
             database__pb2.GetClusterOperationTargetReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def HasPendingClusterOperationTarget(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/HasPendingClusterOperationTarget',
+            database__pb2.HasPendingClusterOperationTargetRequest.SerializeToString,
+            database__pb2.HasPendingClusterOperationTargetReply.FromString,
             options,
             channel_credentials,
             insecure,

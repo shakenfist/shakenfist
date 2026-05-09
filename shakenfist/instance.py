@@ -1791,17 +1791,13 @@ class Instance(dbowo):
                 except exceptions.InvalidStateException:
                     op.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
-        op_type, op_uuid = nio_create_and_enqueue(
+        nio_create_and_enqueue(
             node,
             self.uuid,
             [nio_tasks.instance_delete],
             PRIORITY.user_facing,
             runs_after=[self.last_cluster_operation],
             request_id=util_general.get_request_id())
-        try:
-            self.set_last_cluster_operation(op_type, op_uuid)
-        except RuntimeError:
-            pass  # Delete must proceed even if LCO tracking fails
 
     def enqueue_delete_due_error(self, error_msg):
         # Error needs to be set immediately so that API clients get
@@ -1890,7 +1886,7 @@ class Instance(dbowo):
                     thin=thin
                 ))
 
-        op_type, op_uuid = niso_create_and_enqueue(
+        niso_create_and_enqueue(
             config.NODE_UUID,
             self.uuid,
             snapshots,
@@ -1898,7 +1894,6 @@ class Instance(dbowo):
             PRIORITY.user_facing_high_io,
             runs_after=[self.last_cluster_operation],
             request_id=util_general.get_request_id())
-        self.set_last_cluster_operation(op_type, op_uuid)
 
         self.add_event(EVENT_TYPE_AUDIT, 'snapshot requested', extra=out)
         return out

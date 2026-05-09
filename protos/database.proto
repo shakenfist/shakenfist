@@ -18,6 +18,7 @@ service DatabaseService {
   // Lock Operations
   rpc AcquireLock (ClusterLockRequest) returns (ClusterLockReply) {}
   rpc ReleaseLock (ClusterReleaseLockRequest) returns (StatusReply) {}
+  rpc RefreshLock (ClusterRefreshLockRequest) returns (StatusReply) {}
   rpc GetLockHolder (ClusterGetLockHolderRequest) returns (ClusterLockHolderReply) {}
   rpc ClearStaleLocks (ClusterClearStaleLocksRequest) returns (StatusReply) {}
   rpc GetExistingLocks (ClusterGetExistingLocksRequest) returns (ClusterGetExistingLocksReply) {}
@@ -122,6 +123,16 @@ service DatabaseService {
   rpc GetNodeAttributes (GetNodeAttributesRequest) returns (GetNodeAttributesReply) {}
   rpc UpdateNodeAttributes (UpdateNodeAttributesRequest) returns (StatusReply) {}
   rpc DeleteNodeAttributes (DeleteNodeAttributesRequest) returns (StatusReply) {}
+
+  // Node Daemon State Operations (MariaDB)
+  // Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
+  // that previously lived inside node_attributes; that dict required a
+  // coarse per-node lock for every transition and serialised every
+  // daemon's startup/shutdown through a single 10s lock.
+  rpc SetNodeDaemonState (SetNodeDaemonStateRequest) returns (StatusReply) {}
+  rpc GetNodeDaemonState (GetNodeDaemonStateRequest) returns (GetNodeDaemonStateReply) {}
+  rpc GetAllNodeDaemonStates (GetAllNodeDaemonStatesRequest) returns (GetAllNodeDaemonStatesReply) {}
+  rpc DeleteNodeDaemonState (DeleteNodeDaemonStateRequest) returns (StatusReply) {}
 
   // Namespace Operations (MariaDB)
   // These manage namespace static values (name, version) in MariaDB.
@@ -240,8 +251,8 @@ service DatabaseService {
   rpc IsVsockCidInUse (IsVsockCidInUseRequest) returns (IsVsockCidInUseReply) {}
 
   // Object Metadata Operations (MariaDB)
-  // These store user-defined metadata and last_cluster_operation for all
-  // object types in a single shared table (like object_states).
+  // These store user-defined metadata for all object types in a single shared
+  // table (like object_states).
   rpc GetObjectMetadata (GetObjectMetadataRequest) returns (GetObjectMetadataReply) {}
   rpc SetMetadata (SetMetadataRequest) returns (StatusReply) {}
   rpc DeleteObjectMetadata (DeleteObjectMetadataRequest) returns (StatusReply) {}
@@ -252,6 +263,7 @@ service DatabaseService {
   rpc GetClusterOperationTarget (GetClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
   rpc GetClusterOperationTargetsForObject (GetClusterOperationTargetsForObjectRequest) returns (GetClusterOperationTargetsForObjectReply) {}
   rpc GetLatestClusterOperationTarget (GetLatestClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
+  rpc HasPendingClusterOperationTarget (HasPendingClusterOperationTargetRequest) returns (HasPendingClusterOperationTargetReply) {}
   rpc DeleteClusterOperationTarget (DeleteClusterOperationTargetRequest) returns (StatusReply) {}
   rpc DeleteClusterOperationTargetsForObject (DeleteClusterOperationTargetsForObjectRequest) returns (StatusReply) {}
   rpc DeleteStaleClusterOperationTargets (DeleteStaleClusterOperationTargetsRequest) returns (DeleteCountReply) {}
@@ -366,6 +378,13 @@ message ClusterReleaseLockRequest {
   string subtype = 2;
   string name = 3;
   string lock_data = 4;  // JSON-encoded, for CAS verification
+}
+
+message ClusterRefreshLockRequest {
+  string object_type = 1;
+  string subtype = 2;
+  string name = 3;
+  string lock_id = 4;  // CAS check; refresh succeeds only if our id still holds
 }
 
 message ClusterGetLockHolderRequest {
@@ -1031,6 +1050,44 @@ message DeleteNodeAttributesRequest {
   string uuid = 1;
 }
 
+// Node Daemon State Operations (MariaDB)
+// One row per (node_uuid, daemon). Replaces the daemon_states JSON dict.
+
+message NodeDaemonStateData {
+  string node_uuid = 1;       // Node UUID (string form)
+  string daemon = 2;          // Daemon short name (e.g. 'net', 'queues')
+  string value = 3;           // State string, '' if unset
+  double update_time = 4;     // Unix timestamp of last update
+  string message = 5;         // Optional message
+}
+
+message SetNodeDaemonStateRequest {
+  NodeDaemonStateData data = 1;
+}
+
+message GetNodeDaemonStateRequest {
+  string node_uuid = 1;
+  string daemon = 2;
+}
+
+message GetNodeDaemonStateReply {
+  bool found = 1;
+  NodeDaemonStateData data = 2;
+}
+
+message GetAllNodeDaemonStatesRequest {
+  string node_uuid = 1;
+}
+
+message GetAllNodeDaemonStatesReply {
+  repeated NodeDaemonStateData data = 1;
+}
+
+message DeleteNodeDaemonStateRequest {
+  string node_uuid = 1;
+  string daemon = 2;
+}
+
 // Namespace Operations (MariaDB)
 // Namespaces use their name (string) as primary key, not a UUID.
 
@@ -1623,7 +1680,8 @@ message GetObjectMetadataRequest {
 message GetObjectMetadataReply {
   bool found = 1;
   string metadata_json = 2;                  // JSON dict or empty
-  string last_cluster_operation_json = 3;    // JSON dict or empty
+  reserved 3;
+  reserved "last_cluster_operation_json";
 }
 
 message SetMetadataRequest {
@@ -1677,6 +1735,15 @@ message GetClusterOperationTargetsForObjectReply {
 message GetLatestClusterOperationTargetRequest {
   ObjectType target_object_type = 1;
   string target_uuid = 2;
+}
+
+message HasPendingClusterOperationTargetRequest {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
+}
+
+message HasPendingClusterOperationTargetReply {
+  bool pending = 1;
 }
 
 message DeleteClusterOperationTargetRequest {

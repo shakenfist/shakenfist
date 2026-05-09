@@ -508,6 +508,20 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.pr.job_name }}"
 
+      - name: Dump matching forbidden log lines from primary
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+
+      - name: Dump systemd state and journals
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
+
       - name: Set check_logs output for matrix aggregation
         id: set_output
         if: always()
@@ -550,6 +564,15 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
+      - name: Snapshot primary syslog
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle
+          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ssh ${SSH_OPTS} ${{ matrix.pr.base_image_user }}@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
+          scp ${SSH_OPTS} ${{ matrix.pr.base_image_user }}@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+
       - name: Gather logs
         if: always()
         run: |
@@ -576,13 +599,15 @@ jobs:
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
-          # Zip it all up
+      - name: Bundle artifacts
+        if: always()
+        run: |
           cd /srv/github
           sudo chown -R debian:debian /srv/github
           sudo find . -ls
-
           echo
-          zip -rq artifacts/bundle.zip bundle/*
+          mkdir -p /srv/github/artifacts /srv/github/bundle
+          zip -rq artifacts/bundle.zip bundle/* || true
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -1009,11 +1034,26 @@ jobs:
           fi
 
       - name: Check logs
+        id: check_logs
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.merge.job_name }}"
+
+      - name: Dump matching forbidden log lines from primary
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+
+      - name: Dump systemd state and journals
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
 
       - name: Set exceptions output for matrix aggregation
         id: set_exceptions_output
@@ -1047,6 +1087,15 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
+      - name: Snapshot primary syslog
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle
+          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ssh ${SSH_OPTS} ${{ matrix.merge.base_image_user }}@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
+          scp ${SSH_OPTS} ${{ matrix.merge.base_image_user }}@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+
       - name: Gather logs
         if: always()
         run: |
@@ -1069,13 +1118,15 @@ jobs:
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
-          # Zip it all up
+      - name: Bundle artifacts
+        if: always()
+        run: |
           cd /srv/github
           sudo chown -R debian:debian /srv/github
           sudo find . -ls
-
           echo
-          zip -rq artifacts/bundle.zip bundle/*
+          mkdir -p /srv/github/artifacts /srv/github/bundle
+          zip -rq artifacts/bundle.zip bundle/* || true
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -1378,11 +1429,26 @@ jobs:
               debian@$primary "cd shakenfist/shakenfist/deploy; . /etc/sf/sfrc; bash ansiblemoduletests.sh"
 
       - name: Check logs
+        id: check_logs
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ansible-modules"
+
+      - name: Dump matching forbidden log lines from primary
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+
+      - name: Dump systemd state and journals
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
 
       - name: Check process CPU usage
         if: always()
@@ -1410,6 +1476,15 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
+      - name: Snapshot primary syslog
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle
+          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ssh ${SSH_OPTS} debian@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
+          scp ${SSH_OPTS} debian@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+
       - name: Gather logs
         if: always()
         run: |
@@ -1423,13 +1498,15 @@ jobs:
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
-          # Zip it all up
+      - name: Bundle artifacts
+        if: always()
+        run: |
           cd /srv/github
           sudo chown -R debian:debian /srv/github
           sudo find . -ls
-
           echo
-          zip -rq artifacts/bundle.zip bundle/*
+          mkdir -p /srv/github/artifacts /srv/github/bundle
+          zip -rq artifacts/bundle.zip bundle/* || true
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -1570,21 +1647,40 @@ jobs:
               debian@$primary "cd shakenfist/shakenfist/deploy; . /etc/sf/sfrc; bash nodelifecycletests.sh"
 
       - name: Check logs
+        id: check_logs
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop node-lifecycle"
 
+      - name: Dump matching forbidden log lines from primary
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+
+      - name: Dump systemd state and journals
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
+
       - name: Restart Shaken Fist nodes so we can collect logs
         if: always()
         run: |
           set -x
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
+          # The sf{N}_uuid values are under-cloud instance UUIDs, so the
+          # reboot has to be issued against the under-cloud's API. The
+          # GitHub runner already has under-cloud sf-client credentials
+          # (the topology playbooks use sf_instance from here). Don't
+          # let one failed reboot abort the rest of the loop -- we want
+          # all five attempted before log collection.
           for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
-              tools/run_remote ${primary} \
-                  ". /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client instance reboot --hard ${node}"
+              sf-client instance reboot --hard ${node} || true
           done
           sleep 90
 
@@ -1607,6 +1703,15 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
+      - name: Snapshot primary syslog
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          mkdir -p /srv/github/bundle
+          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ssh ${SSH_OPTS} debian@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
+          scp ${SSH_OPTS} debian@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+
       - name: Gather logs
         if: always()
         run: |
@@ -1620,13 +1725,15 @@ jobs:
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
-          # Zip it all up
+      - name: Bundle artifacts
+        if: always()
+        run: |
           cd /srv/github
           sudo chown -R debian:debian /srv/github
           sudo find . -ls
-
           echo
-          zip -rq artifacts/bundle.zip bundle/*
+          mkdir -p /srv/github/artifacts /srv/github/bundle
+          zip -rq artifacts/bundle.zip bundle/* || true
 
       - uses: actions/upload-artifact@v7
         if: always()

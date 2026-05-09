@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import ClassVar, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -29,6 +29,11 @@ class model_tasks(Enum):
 
 
 class model(BaseModel):
+    target_fields: ClassVar[dict[str, ObjectType]] = {
+        'network_uuid': ObjectType.NETWORK,
+        'interface_uuid': ObjectType.INTERFACE,
+    }
+
     uuid: UUID4
     network_uuid: UUID4
     interface_uuid: UUID4
@@ -80,5 +85,6 @@ def create_and_enqueue(network_uuid, interface_uuid, tasks, priority,
         raise exc
 
     enqueue_cluster_operation(
-        object_type, m.model_dump(mode='json'), target='networknode')
+        object_type, m.model_dump(mode='json'), target='networknode',
+        model_class=model)
     return object_type, operation_uuid

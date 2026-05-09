@@ -71,6 +71,11 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    RefreshLock: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ClusterRefreshLockRequest,
+        database_pb2.StatusReply,
+    ]
+
     GetLockHolder: grpc.UnaryUnaryMultiCallable[
         database_pb2.ClusterGetLockHolderRequest,
         database_pb2.ClusterLockHolderReply,
@@ -458,6 +463,32 @@ class DatabaseServiceStub:
 
     DeleteNodeAttributes: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteNodeAttributesRequest,
+        database_pb2.StatusReply,
+    ]
+
+    SetNodeDaemonState: grpc.UnaryUnaryMultiCallable[
+        database_pb2.SetNodeDaemonStateRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Daemon State Operations (MariaDB)
+    Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
+    that previously lived inside node_attributes; that dict required a
+    coarse per-node lock for every transition and serialised every
+    daemon's startup/shutdown through a single 10s lock.
+    """
+
+    GetNodeDaemonState: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeDaemonStateRequest,
+        database_pb2.GetNodeDaemonStateReply,
+    ]
+
+    GetAllNodeDaemonStates: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNodeDaemonStatesRequest,
+        database_pb2.GetAllNodeDaemonStatesReply,
+    ]
+
+    DeleteNodeDaemonState: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeDaemonStateRequest,
         database_pb2.StatusReply,
     ]
 
@@ -850,8 +881,8 @@ class DatabaseServiceStub:
         database_pb2.GetObjectMetadataReply,
     ]
     """Object Metadata Operations (MariaDB)
-    These store user-defined metadata and last_cluster_operation for all
-    object types in a single shared table (like object_states).
+    These store user-defined metadata for all object types in a single shared
+    table (like object_states).
     """
 
     SetMetadata: grpc.UnaryUnaryMultiCallable[
@@ -885,6 +916,11 @@ class DatabaseServiceStub:
     GetLatestClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
         database_pb2.GetLatestClusterOperationTargetRequest,
         database_pb2.GetClusterOperationTargetReply,
+    ]
+
+    HasPendingClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
+        database_pb2.HasPendingClusterOperationTargetRequest,
+        database_pb2.HasPendingClusterOperationTargetReply,
     ]
 
     DeleteClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
@@ -1011,6 +1047,11 @@ class DatabaseServiceAsyncStub:
 
     ReleaseLock: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.ClusterReleaseLockRequest,
+        database_pb2.StatusReply,
+    ]
+
+    RefreshLock: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ClusterRefreshLockRequest,
         database_pb2.StatusReply,
     ]
 
@@ -1404,6 +1445,32 @@ class DatabaseServiceAsyncStub:
         database_pb2.StatusReply,
     ]
 
+    SetNodeDaemonState: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.SetNodeDaemonStateRequest,
+        database_pb2.StatusReply,
+    ]
+    """Node Daemon State Operations (MariaDB)
+    Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
+    that previously lived inside node_attributes; that dict required a
+    coarse per-node lock for every transition and serialised every
+    daemon's startup/shutdown through a single 10s lock.
+    """
+
+    GetNodeDaemonState: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetNodeDaemonStateRequest,
+        database_pb2.GetNodeDaemonStateReply,
+    ]
+
+    GetAllNodeDaemonStates: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetAllNodeDaemonStatesRequest,
+        database_pb2.GetAllNodeDaemonStatesReply,
+    ]
+
+    DeleteNodeDaemonState: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteNodeDaemonStateRequest,
+        database_pb2.StatusReply,
+    ]
+
     CreateNamespace: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.CreateNamespaceRequest,
         database_pb2.StatusReply,
@@ -1793,8 +1860,8 @@ class DatabaseServiceAsyncStub:
         database_pb2.GetObjectMetadataReply,
     ]
     """Object Metadata Operations (MariaDB)
-    These store user-defined metadata and last_cluster_operation for all
-    object types in a single shared table (like object_states).
+    These store user-defined metadata for all object types in a single shared
+    table (like object_states).
     """
 
     SetMetadata: grpc.aio.UnaryUnaryMultiCallable[
@@ -1828,6 +1895,11 @@ class DatabaseServiceAsyncStub:
     GetLatestClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetLatestClusterOperationTargetRequest,
         database_pb2.GetClusterOperationTargetReply,
+    ]
+
+    HasPendingClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.HasPendingClusterOperationTargetRequest,
+        database_pb2.HasPendingClusterOperationTargetReply,
     ]
 
     DeleteClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
@@ -1974,6 +2046,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     def ReleaseLock(
         self,
         request: database_pb2.ClusterReleaseLockRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def RefreshLock(
+        self,
+        request: database_pb2.ClusterRefreshLockRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
@@ -2516,6 +2595,40 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
     @abc.abstractmethod
+    def SetNodeDaemonState(
+        self,
+        request: database_pb2.SetNodeDaemonStateRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Node Daemon State Operations (MariaDB)
+        Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
+        that previously lived inside node_attributes; that dict required a
+        coarse per-node lock for every transition and serialised every
+        daemon's startup/shutdown through a single 10s lock.
+        """
+
+    @abc.abstractmethod
+    def GetNodeDaemonState(
+        self,
+        request: database_pb2.GetNodeDaemonStateRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetNodeDaemonStateReply, collections.abc.Awaitable[database_pb2.GetNodeDaemonStateReply]]: ...
+
+    @abc.abstractmethod
+    def GetAllNodeDaemonStates(
+        self,
+        request: database_pb2.GetAllNodeDaemonStatesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetAllNodeDaemonStatesReply, collections.abc.Awaitable[database_pb2.GetAllNodeDaemonStatesReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteNodeDaemonState(
+        self,
+        request: database_pb2.DeleteNodeDaemonStateRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
     def CreateNamespace(
         self,
         request: database_pb2.CreateNamespaceRequest,
@@ -3040,8 +3153,8 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetObjectMetadataReply, collections.abc.Awaitable[database_pb2.GetObjectMetadataReply]]:
         """Object Metadata Operations (MariaDB)
-        These store user-defined metadata and last_cluster_operation for all
-        object types in a single shared table (like object_states).
+        These store user-defined metadata for all object types in a single shared
+        table (like object_states).
         """
 
     @abc.abstractmethod
@@ -3088,6 +3201,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetLatestClusterOperationTargetRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetClusterOperationTargetReply, collections.abc.Awaitable[database_pb2.GetClusterOperationTargetReply]]: ...
+
+    @abc.abstractmethod
+    def HasPendingClusterOperationTarget(
+        self,
+        request: database_pb2.HasPendingClusterOperationTargetRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.HasPendingClusterOperationTargetReply, collections.abc.Awaitable[database_pb2.HasPendingClusterOperationTargetReply]]: ...
 
     @abc.abstractmethod
     def DeleteClusterOperationTarget(

@@ -172,13 +172,10 @@ class ObjectMetadataDataTestCase(base.ShakenFistTestCase):
             object_type='instance',
             object_uuid=TEST_UUID,
             metadata={'key': 'value'},
-            last_cluster_operation={'op_type': 'test', 'op_uuid': 'uuid'}
         )
         self.assertEqual(data.object_type, 'instance')
         self.assertEqual(data.object_uuid, TEST_UUID)
         self.assertEqual(data.metadata, {'key': 'value'})
-        self.assertEqual(data.last_cluster_operation,
-                         {'op_type': 'test', 'op_uuid': 'uuid'})
 
     def test_create_with_defaults(self):
         data = ObjectMetadataData(
@@ -186,7 +183,6 @@ class ObjectMetadataDataTestCase(base.ShakenFistTestCase):
             object_uuid=TEST_UUID
         )
         self.assertIsNone(data.metadata)
-        self.assertIsNone(data.last_cluster_operation)
 
     def test_is_mutable(self):
         data = ObjectMetadataData(

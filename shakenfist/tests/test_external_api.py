@@ -76,7 +76,7 @@ class FakeInstance(BaseFakeObject):
                   suppress_event_logging=False, log_as_error=False):
         ...
 
-    def set_last_cluster_operation(self, op_type, op_uuid):
+    def _set_last_cluster_operation(self, op_type, op_uuid):
         self.last_cluster_operation = (op_type, op_uuid)
 
     def get_lock_attr(self, name, op, global_scope=True, timeout=10):
@@ -724,3 +724,167 @@ class ExternalApiExceptionRecordingTestCase(ExternalApiTestCase):
         finally:
             # Restore testing mode
             external_api.app.testing = True
+
+
+class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
+    """Tests for the disk-loop artifact-fetch logic in InstancesEndpoint.post.
+
+    Phase 3b refactored the disk loop to call Artifact.from_url eagerly
+    (with create_if_new=True) and pass artifact_uuid into afo_create_and_enqueue,
+    and to build instance_start_dependencies passed as depends_on to
+    nino_create_and_enqueue.  These tests verify that contract.
+    """
+
+    # Valid UUID4 values (version nibble = 4).
+    ARTIFACT_UUID = '11111111-2222-4333-8444-555555555555'
+    BLOB_UUID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+    FETCH_OP_UUID_1 = 'f1111111-2222-4333-8444-000000000001'
+    FETCH_OP_UUID_2 = 'f2222222-3333-4444-8555-000000000002'
+
+    def _fake_artifact(self):
+        """Return a minimal mock artifact with a uuid and add_event."""
+        a = mock.MagicMock()
+        a.uuid = self.ARTIFACT_UUID
+        return a
+
+    @mock.patch(
+        'shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch(
+        'shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch(
+        'shakenfist.external_api.instance.Artifact.from_url')
+    def test_post_instance_disk_loop_enqueues_artifact_fetch(
+            self, mock_from_url, mock_afo, mock_nino):
+        """A disk with a plain URL triggers afo_create_and_enqueue with
+        the artifact UUID and nino_create_and_enqueue with a depends_on list."""
+        fake_artifact = self._fake_artifact()
+        mock_from_url.return_value = fake_artifact
+
+        fetch_op_uuid = self.FETCH_OP_UUID_1
+        from shakenfist.schema.object_types import ObjectType as _OT
+        mock_afo.return_value = (_OT.ARTIFACT_FETCH_OP, fetch_op_uuid)
+        mock_nino.return_value = (_OT.NODE_INST_NETDESC_OP, str(uuid4()))
+
+        resp = self.client.post(
+            '/instances',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({
+                'name': 'test-disk-loop',
+                'cpus': 1,
+                'memory': 1024,
+                'network': [],
+                'disk': [{'size': 8, 'base': 'https://example.com/img.qcow2'}],
+                'namespace': 'system',
+            }))
+        self.assertEqual(200, resp.status_code, resp.get_json())
+
+        # Artifact.from_url must have been called at least once with
+        # create_if_new=True for the given URL.
+        url_arg = 'https://example.com/img.qcow2'
+        from_url_calls = mock_from_url.call_args_list
+        create_if_new_calls = [
+            c for c in from_url_calls
+            if c.kwargs.get('create_if_new') is True
+            or (len(c.args) > 1 and url_arg in c.args)
+        ]
+        self.assertTrue(
+            len(create_if_new_calls) > 0,
+            'Artifact.from_url was not called with create_if_new=True')
+
+        # afo_create_and_enqueue must have been called with artifact_uuid
+        # matching the resolved artifact's UUID.
+        mock_afo.assert_called()
+        afo_kwargs = mock_afo.call_args.kwargs
+        self.assertEqual(str(afo_kwargs.get('artifact_uuid')),
+                         str(self.ARTIFACT_UUID))
+
+        # nino_create_and_enqueue must have been called with a non-None
+        # depends_on list that references the fetch operation.
+        mock_nino.assert_called()
+        nino_kwargs = mock_nino.call_args.kwargs
+        depends_on = nino_kwargs.get('depends_on')
+        self.assertIsNotNone(depends_on,
+                             'depends_on must not be None when there is a fetch op')
+        self.assertTrue(
+            len(depends_on) > 0,
+            'depends_on must contain at least one dependency')
+        dep = depends_on[0]
+        self.assertEqual(str(dep.op_uuid), fetch_op_uuid)
+
+    @mock.patch(
+        'shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch(
+        'shakenfist.external_api.instance.afo_create_and_enqueue')
+    @mock.patch(
+        'shakenfist.external_api.instance.Artifact.from_url')
+    def test_post_instance_disk_loop_blob_uuid_branch(
+            self, mock_from_url, mock_afo, mock_nino):
+        """A disk with blob_uuid triggers Artifact.from_url with the BLOB_URL
+        prefix in the artifact-fetch loop."""
+        fake_artifact = self._fake_artifact()
+        mock_from_url.return_value = fake_artifact
+
+        from shakenfist.schema.object_types import ObjectType as _OT
+        mock_afo.return_value = (
+            _OT.ARTIFACT_FETCH_OP, self.FETCH_OP_UUID_2)
+        mock_nino.return_value = (_OT.NODE_INST_NETDESC_OP, str(uuid4()))
+
+        resp = self.client.post(
+            '/instances',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({
+                'name': 'test-blob-uuid',
+                'cpus': 1,
+                'memory': 1024,
+                'network': [],
+                'disk': [{'size': 8, 'blob_uuid': self.BLOB_UUID}],
+                'namespace': 'system',
+            }))
+        self.assertEqual(200, resp.status_code, resp.get_json())
+
+        # Artifact.from_url must be called with a URL that includes BLOB_URL
+        # prefix followed by the blob UUID.
+        from shakenfist.artifact import BLOB_URL
+        expected_url = f'{BLOB_URL}{self.BLOB_UUID}'
+        from_url_urls = [
+            c.args[1] if len(c.args) > 1 else c.kwargs.get('url', '')
+            for c in mock_from_url.call_args_list
+        ]
+        self.assertIn(
+            expected_url, from_url_urls,
+            f'Expected {expected_url!r} in from_url calls, got {from_url_urls!r}')
+
+    @mock.patch(
+        'shakenfist.external_api.instance.nino_create_and_enqueue')
+    @mock.patch(
+        'shakenfist.external_api.instance.afo_create_and_enqueue')
+    def test_post_instance_no_disks_skips_artifact_fetch(
+            self, mock_afo, mock_nino):
+        """A disk with no base and no blob_uuid skips afo_create_and_enqueue
+        and passes depends_on=None to nino_create_and_enqueue."""
+        from shakenfist.schema.object_types import ObjectType as _OT
+        mock_nino.return_value = (_OT.NODE_INST_NETDESC_OP, str(uuid4()))
+
+        resp = self.client.post(
+            '/instances',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({
+                'name': 'test-no-fetch',
+                'cpus': 1,
+                'memory': 1024,
+                'network': [],
+                # Disk with a size but no base or blob_uuid — empty disk.
+                'disk': [{'size': 8}],
+                'namespace': 'system',
+            }))
+        self.assertEqual(200, resp.status_code, resp.get_json())
+
+        # No artifact fetch operation should have been enqueued.
+        mock_afo.assert_not_called()
+
+        # nino_create_and_enqueue must have been called with depends_on=None.
+        mock_nino.assert_called()
+        nino_kwargs = mock_nino.call_args.kwargs
+        self.assertIsNone(
+            nino_kwargs.get('depends_on'),
+            'depends_on must be None when there are no fetch dependencies')

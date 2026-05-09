@@ -682,7 +682,20 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
             }
         return None
 
-    def set_last_cluster_operation(self, op_type, op_uuid):
+    def has_pending_cluster_operation(self) -> bool:
+        """True if any in-flight cluster operation targets this object.
+
+        Replaces the legacy pattern of reading ``last_cluster_operation``
+        and inspecting the embedded operation's state. That pattern was
+        racy: a later terminal op against the same object would mask an
+        earlier in-flight op. This query inspects every target row.
+        """
+        if self.in_memory_only:
+            return False
+        return mariadb.has_pending_cluster_operation_target(
+            self.object_type, str(self.uuid))
+
+    def _set_last_cluster_operation(self, op_type, op_uuid):
         if not self.in_memory_only:
             success = mariadb.create_cluster_operation_target(
                 operation_uuid=str(op_uuid),

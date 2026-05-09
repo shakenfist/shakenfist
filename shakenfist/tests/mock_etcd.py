@@ -2235,8 +2235,6 @@ class MockEtcd():
                 object_type=str(object_type),
                 object_uuid=object_uuid,
                 metadata=data.get('metadata'),
-                last_cluster_operation=data.get(
-                    'last_cluster_operation')
             )
         self._trace(
             f'MockMariaDB.get_object_metadata({key}): '
@@ -2277,10 +2275,14 @@ class MockEtcd():
             ClusterOperationTargetData)
 
         if operation_uuid in self.cluster_operation_targets:
+            # Real code (_direct_create_cluster_operation_target in
+            # mariadb.py) swallows IntegrityError on the UNIQUE
+            # constraint and returns True. The mock matches that
+            # behaviour to preserve idempotency semantics.
             self._trace(
                 f'MockMariaDB.create_cluster_operation_target'
                 f'({operation_uuid}): duplicate')
-            return False
+            return True
 
         seq = next(self._cot_sequence)
         self.cluster_operation_targets[operation_uuid] = (

@@ -611,11 +611,13 @@ The migration is happening in phases:
 | 11 | Network objects | Complete - `networks`, `network_attributes` tables |
 | 12 | AgentOperation objects | Complete - `agent_operations`, `agent_operation_attributes` tables |
 | 13 | Instance objects | Complete - `instances`, `instance_attributes` tables |
-| 14 | Object metadata | Complete - `object_metadata` table (metadata + last_cluster_operation) |
+| 14 | Object metadata | Complete - `object_metadata` table (user metadata). Schema v3 drops the legacy `last_cluster_operation_json` column via `ALTER TABLE ... DROP COLUMN IF EXISTS`; the column was unused since `last_cluster_operation` moved to `cluster_operation_targets`. |
 | 15 | Cluster operation targets | Complete - `cluster_operation_targets` table (operation ordering per object) |
 | 16 | Node metrics | Complete - `node_metrics` table (ephemeral per-node resource metrics, JSON payload) |
 | 17 | Cluster operations | Complete - `cluster_operations` table (full operation metadata with indexed node/instance/network/priority columns) |
 | 18 | Work queues | Complete - `work_queue` table (per-job row with claim state, replacing etcd two-prefix design) |
+| 19 | Per-daemon state | Complete - `node_daemon_states` table; replaces the JSON `daemon_states` dict that used to live on `node_attributes` |
+| 20 | Leased cluster locks | Complete - `cluster_locks` schema bumped to v3 to add `expires_at`; lock rows now self-expire on dead-holder partition rather than requiring a reaper |
 
 ### Table Architecture
 
@@ -630,7 +632,7 @@ tables with `(object_type, object_uuid)` keys:
 | Table | Purpose |
 |-------|---------|
 | `object_states` | State value, update time, message for all objects |
-| `object_metadata` | User-defined metadata and last_cluster_operation for all objects |
+| `object_metadata` | User-defined metadata for all objects |
 
 These tables are efficient for cross-type queries (e.g., "find all objects
 in error state").
@@ -647,6 +649,8 @@ constraints. These get dedicated tables optimized for their access patterns:
 | `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
 | `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
 | `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload |
+| `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
+| `cluster_locks` | Leased distributed locks. `expires_at` lets candidates steal a dead holder's lock without external GC; holders refresh every ~20 s while alive |
 
 IPAM reservations are stored separately because:
 
@@ -700,6 +704,33 @@ currently in an active state (`queued`, `preflight`, or `executing`) in
 age. Set `CLUSTER_OPERATION_TARGET_RETENTION` to 0 to disable pruning
 entirely (the default is 7 days).
 
+#### Cluster Operation Target Tracking
+
+The `cluster_operation_targets` table holds one row per (operation, target
+object) pair. Each row carries the target's object type and UUID, plus the
+`operation_uuid` and an `AUTO_INCREMENT` `sequence_number` that gives
+total ordering per target.
+
+Two query shapes are exposed to the rest of the system:
+
+- **`get_latest_cluster_operation_target`**: returns the highest-sequence
+  row for a given `(object_type, uuid)` pair, regardless of state. Used
+  by the `last_cluster_operation` property and `external_view()`
+  projections to provide the familiar "which op ran last?" answer.
+- **`has_pending_cluster_operation_target`**: returns `True` if any row
+  for the object references an operation whose state is `queued`,
+  `preflight`, or `executing`. Used by `Network.is_okay()` and any other
+  gate that must defer while work is in flight. Because it checks all
+  rows rather than only the latest one, a later terminal operation cannot
+  mask an earlier in-flight one.
+
+Rows are written automatically by `enqueue_cluster_operation`; operators
+do not need to manage them. Pruning is performed by the cluster daemon
+under `ClusterLock` election via
+`_direct_delete_stale_cluster_operation_targets`: rows older than
+`CLUSTER_OPERATION_TARGET_RETENTION` whose operation has reached a
+terminal state are removed; in-flight operations are never pruned.
+
 #### Per-Type Static Value Tables
 
 Each concrete object type that is migrated gets its own table for static
@@ -730,7 +761,7 @@ dedicated attribute tables:
 | Table | Object Type | Key Fields |
 |-------|-------------|------------|
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
-| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, daemon_states, versions, metrics |
+| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written |
 | `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON) |
 | `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |

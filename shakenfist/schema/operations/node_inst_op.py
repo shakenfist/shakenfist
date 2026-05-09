@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import ClassVar
 from typing import List
 from typing import Optional
 from uuid import uuid4
@@ -32,6 +33,10 @@ class model_tasks(Enum):
 
 
 class model(BaseModel):
+    target_fields: ClassVar[dict[str, ObjectType]] = {
+        'instance_uuid': ObjectType.INSTANCE,
+    }
+
     uuid: UUID4
     node_uuid: UUID4
     instance_uuid: UUID4
@@ -82,5 +87,6 @@ def create_and_enqueue(node_uuid, instance_uuid, tasks, priority, request_id=Non
         }).error(f'schema validation error: {exc}')
         raise exc
 
-    enqueue_cluster_operation(object_type, m.model_dump(mode='json'))
+    enqueue_cluster_operation(
+        object_type, m.model_dump(mode='json'), model_class=model)
     return object_type, operation_uuid

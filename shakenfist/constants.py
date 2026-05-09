@@ -12,6 +12,15 @@ TiB = 1024 * 1024 * 1024 * 1024
 ETCD_ATTEMPT_TIMEOUT = 60
 
 
+# Lease length on cluster locks (seconds). Holders refresh every third
+# of this while alive; if a holder dies, the row's lease lapses and
+# another candidate may steal it. Lives here rather than alongside the
+# locks code or the database accessor so both ``shakenfist.locks`` and
+# ``shakenfist.mariadb`` can read it without the two modules having to
+# import each other.
+CLUSTER_LOCK_LEASE_SECONDS = 60
+
+
 # Disk caching mode. Refer to docs/development/io_performance_tuning.md for
 # more details than you really want.
 #

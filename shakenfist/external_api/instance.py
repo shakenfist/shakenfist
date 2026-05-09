@@ -820,48 +820,51 @@ class InstancesEndpoint(api_base.Resource):
         # Request the artifact fetches immediately
         instance_start_dependencies = []
 
-        with inst.get_lock_attr('last_cluster_operation', 'add new operation'):
-            for disk in inst.disk_spec:
-                disk_base = disk.get('base')
-                if disk.get('blob_uuid'):
-                    url = f'{BLOB_URL}{disk["blob_uuid"]}'
-                elif not util_general.noneish(disk_base):
-                    url = disk['base']
-                else:
-                    # Empty disk with no base image, no artifact fetch needed
-                    continue
+        for disk in inst.disk_spec:
+            disk_base = disk.get('base')
+            if disk.get('blob_uuid'):
+                url = f'{BLOB_URL}{disk["blob_uuid"]}'
+            elif not util_general.noneish(disk_base):
+                url = disk['base']
+            else:
+                # Empty disk with no base image, no artifact fetch needed
+                continue
 
-                # TODO(mikal): I would really like the target_node not to be set
-                # here so that any node in the cluster could start downloading
-                # this image ASAP. Unfortunately, image download is also comingled
-                # with populating the local image cache for instance start at the
-                # moment and I need to tease that apart first.
-                op_type, op_uuid = afo_create_and_enqueue(
-                    namespace,
-                    url,
-                    inst.uuid,
-                    [afo_tasks.image_fetch],
-                    PRIORITY.user_waiting,
-                    request_id=util_general.get_request_id(),
-                    target_node=placement)
-                instance_start_dependencies.append(
-                    dependency(op_type=op_type, op_uuid=op_uuid))
+            a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
+                                  create_if_new=True)
+            a.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
 
-            # Then request the instance start
-            if not instance_start_dependencies:
-                instance_start_dependencies = None
-
-            op_type, op_uuid = nino_create_and_enqueue(
-                placement,
+            # TODO(mikal): I would really like the target_node not to be set
+            # here so that any node in the cluster could start downloading
+            # this image ASAP. Unfortunately, image download is also comingled
+            # with populating the local image cache for instance start at the
+            # moment and I need to tease that apart first.
+            op_type, op_uuid = afo_create_and_enqueue(
+                namespace,
+                url,
                 inst.uuid,
-                updated_networks,
-                [nino_tasks.instance_preflight,
-                 nino_tasks.instance_start],
+                [afo_tasks.image_fetch],
                 PRIORITY.user_waiting,
+                artifact_uuid=a.uuid,
                 request_id=util_general.get_request_id(),
-                depends_on=instance_start_dependencies,
-                runs_after=[inst.last_cluster_operation])
-            inst.set_last_cluster_operation(op_type, op_uuid)
+                target_node=placement)
+            instance_start_dependencies.append(
+                dependency(op_type=op_type, op_uuid=op_uuid))
+
+        # Then request the instance start
+        if not instance_start_dependencies:
+            instance_start_dependencies = None
+
+        nino_create_and_enqueue(
+            placement,
+            inst.uuid,
+            updated_networks,
+            [nino_tasks.instance_preflight,
+             nino_tasks.instance_start],
+            PRIORITY.user_waiting,
+            request_id=util_general.get_request_id(),
+            depends_on=instance_start_dependencies,
+            runs_after=[inst.last_cluster_operation])
 
         return inst.external_view()
 
@@ -993,13 +996,20 @@ class InstanceInterfacesEndpoint(api_base.Resource):
 
         # We ensure the new interface is in the DHCP service for the network
         # before we plug the interface into the instance.
+        #
+        # The hot-plug op runs ``n.create_on_hypervisor()`` on the target
+        # node as a side effect, so for the duration of the chain the
+        # network is being modified on that node. The cluster_operation_targets
+        # rows written automatically by enqueue_cluster_operation() mark both
+        # the network and the instance as "operation in flight" so the network
+        # maintainer's Network.is_okay() check defers its own recreate path.
         dnsmasq_op_type, dnsmasq_op_uuid = net_create_and_enqueue(
             netdesc['network_uuid'],
             [net_tasks.network_update_dnsmasq],
             priority=PRIORITY.user_waiting
         )
 
-        op_type, op_uuid = niio_create_and_enqueue(
+        niio_create_and_enqueue(
             instance_from_db.placement['node'],
             instance_from_db.uuid,
             netdesc['network_uuid'],
@@ -1011,7 +1021,6 @@ class InstanceInterfacesEndpoint(api_base.Resource):
                 dependency(op_type=dnsmasq_op_type, op_uuid=dnsmasq_op_uuid)
             ],
             runs_after=[instance_from_db.last_cluster_operation])
-        instance_from_db.set_last_cluster_operation(op_type, op_uuid)
         # The NetworkInterface row created above is the source of truth
         # for the instance->NI association; no further bookkeeping needed.
 
