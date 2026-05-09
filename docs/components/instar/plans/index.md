@@ -14,3 +14,4 @@ at the repo root).
 | Date | Plan | Intent | Status | Phases |
 |------|------|--------|--------|--------|
 | 2026-05-08 | [Distro matrix CI](/components/instar/plans/PLAN-distro-matrix-ci/) | Run instar's full functional test suite against installed `.deb`/`.rpm` packages on a representative matrix of Linux distributions in the GitHub merge queue, with qemu-img differential coverage | Drafted, not started | (phases not yet written; design blocks pending) |
+| 2026-05-09 | [Release v0.2.0](/components/instar/plans/PLAN-release-v0.2/) | Cut the v0.2.0 tag and publish signed GitHub Release artifacts (tarball, .deb, .rpm) for x86_64 Linux | Drafted, not started | (no phase files; sequential gates) |
