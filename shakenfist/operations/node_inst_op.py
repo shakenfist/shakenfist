@@ -218,6 +218,10 @@ class NodeInstOp(BaseClusterOperation):
                     for ni in i.interfaces:
                         if ni.network_uuid not in host_networks:
                             host_networks.append(ni.network_uuid)
+            self.log.with_fields({
+                'instance_networks': instance_networks,
+                'host_networks': host_networks,
+            }).debug('Computed host networks before delete cleanup')
 
             inst.delete()
 
@@ -236,4 +240,9 @@ class NodeInstOp(BaseClusterOperation):
                         network_uuid not in host_networks):
                     # We are not the network node and the network not used by any
                     # other instance on this hypervisor, therefore clean it up
+                    self.log.with_fields({
+                        'network': network_uuid,
+                        'host_networks': host_networks,
+                    }).debug('Last instance on host using this network, '
+                             'deleting on hypervisor')
                     n.delete_on_hypervisor()

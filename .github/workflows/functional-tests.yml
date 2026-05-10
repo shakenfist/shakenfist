@@ -1938,13 +1938,13 @@ jobs:
           payload: |
             channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
             ts: "${{ needs.merge_pr_comment.outputs.ts }}"
-            text:
+            text: |
               The merge attempt job at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} succeeded.
 
               The PR commit message is:
 
               ${{ needs.merge_pr_comment.outputs.commit }}
-              attachments:
+            attachments:
               - color: "90ee90"
                 fields:
                   - title: "Status"

@@ -559,11 +559,20 @@ class Network(dbowo):
 
     @_not_on_floating_network
     def create_on_hypervisor(self):
-        self.add_event(EVENT_TYPE_AUDIT, 'creating network on hypervisor')
+        subst = self.subst_dict()
+        self.add_event(
+            EVENT_TYPE_AUDIT, 'creating network on hypervisor',
+            extra={'vx_bridge': subst['vx_bridge'],
+                   'vx_interface': subst['vx_interface'],
+                   'mesh_nic': self.mesh_nic})
         with self.get_lock(op='create_on_hypervisor', global_scope=False):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
             util_concurrency.create_vxlan_interface(self.vxid, self.mesh_nic)
+        self.add_event(
+            EVENT_TYPE_AUDIT, 'created network on hypervisor',
+            extra={'vx_bridge': subst['vx_bridge'],
+                   'vx_interface': subst['vx_interface']})
 
     @_not_on_floating_network
     def create_on_network_node(self):
@@ -686,14 +695,28 @@ class Network(dbowo):
     def delete_on_hypervisor(self):
         with self.get_lock(op='Network delete', global_scope=False):
             subst = self.subst_dict()
+            self.add_event(
+                EVENT_TYPE_AUDIT, 'deleting network on hypervisor',
+                extra={'vx_bridge': subst['vx_bridge'],
+                       'vx_interface': subst['vx_interface']})
 
-            if util_network.check_for_interface(subst['vx_bridge']):
+            bridge_present = util_network.check_for_interface(subst['vx_bridge'])
+            if bridge_present:
                 util_concurrency.execute(
                     'ip link delete %(vx_bridge)s' % subst)
 
-            if util_network.check_for_interface(subst['vx_interface']):
+            interface_present = util_network.check_for_interface(
+                subst['vx_interface'])
+            if interface_present:
                 util_concurrency.execute(
                     'ip link delete %(vx_interface)s' % subst)
+
+            self.add_event(
+                EVENT_TYPE_AUDIT, 'deleted network on hypervisor',
+                extra={'vx_bridge': subst['vx_bridge'],
+                       'vx_interface': subst['vx_interface'],
+                       'bridge_was_present': bridge_present,
+                       'interface_was_present': interface_present})
 
     # This method should only ever be called when you already know you're on
     # the network node. Specifically it is called by a queue task that the
