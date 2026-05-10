@@ -201,9 +201,17 @@ log "Will hard stop the cluster maintainer, ${maintainer}"
 maintainer_uuid=$(sf-client --json node show ${maintainer} | jq --raw-output ".uuid")
 other_victim_uuid=$(sf-client --json node show ${other_victim} | jq --raw-output ".uuid")
 
-# Terminate the node uncleanly for ${maintainer}, with extra flags so we don't hang
-sudo ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=1 \
+# Terminate the node uncleanly for ${maintainer}. Wrap in `timeout` so a
+# stuck SSH cannot consume the entire 60-minute step budget; observed in
+# CI when the keepalive failed to fire after the remote halted. A clean
+# disconnect (rc 255) or the timeout itself (rc 124) are both fine -- the
+# point is that the node is going away.
+timeout 300 sudo ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=1 \
     -o ServerAliveCountMax=1 debian@${maintainer} "sudo halt --force --force"
+rc=$?
+if [ ${rc} -ne 0 ]; then
+    log "Halt SSH exited ${rc} (124=timeout, 255=connection lost are expected)"
+fi
 echo
 
 # Stop SF on ${other_victim}
