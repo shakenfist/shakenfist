@@ -2202,6 +2202,146 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-fuzz-autofix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated fuzzer bug fix workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-convert-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convert follow-ups: deferred work after PLAN-convert.md
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-coverage-fuzzing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage-guided fuzzing of parser crates (Phase 6)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instar and qemu-img security audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: First Public Release of Instar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-distro-matrix-ci/" class="md-nav__link">
         
   
@@ -10405,8 +10545,43 @@ at the repo root).</p>
 <td>2026-05-09</td>
 <td><a href="/components/instar/plans/PLAN-release-v0.2/">Release v0.2.0</a></td>
 <td>Cut the v0.2.0 tag and publish signed GitHub Release artifacts (tarball, .deb, .rpm) for x86_64 Linux</td>
-<td>Drafted, not started</td>
+<td>Complete (tagged 2026-05-09)</td>
 <td>(no phase files; sequential gates)</td>
+</tr>
+<tr>
+<td>2026-05-10</td>
+<td><a href="/components/instar/plans/PLAN-release/">First public release of instar</a></td>
+<td>Cargo.toml metadata, release workflow, .deb/.rpm packaging, and signing for instar's public releases (umbrella plan; v0.2.0 execution lives in <code>PLAN-release-v0.2.md</code>)</td>
+<td>In progress (phases 1-4 complete through v0.2.0; phase 5 audit mostly done; phase 6 coverage fuzzing in progress)</td>
+<td>(phases inline)</td>
+</tr>
+<tr>
+<td>2026-05-10</td>
+<td><a href="/components/instar/plans/PLAN-audit/">Security audit</a></td>
+<td>Sweep instar for security weaknesses across the host VMM, KVM guest, call-table boundary, and format parsers, including coverage-guided fuzzing</td>
+<td>In progress (phases 1a-5 done; phase 6 coverage fuzzing in progress)</td>
+<td>(phases inline)</td>
+</tr>
+<tr>
+<td>2026-05-10</td>
+<td><a href="/components/instar/plans/PLAN-coverage-fuzzing/">Coverage-guided fuzzing</a></td>
+<td>Stand up coverage-guided fuzzing across the format parsers and run sustained campaigns</td>
+<td>In progress (steps 1-5 infrastructure merged; extended runs not yet complete)</td>
+<td>(phases inline)</td>
+</tr>
+<tr>
+<td>2026-05-10</td>
+<td><a href="/components/instar/plans/PLAN-fuzz-autofix/">Fuzz autofix workflow</a></td>
+<td>Workflow that triages fuzzer-discovered crashes and proposes minimal fixes</td>
+<td>In progress (workflow scaffolding merged; not yet exercised end-to-end)</td>
+<td>(phases inline)</td>
+</tr>
+<tr>
+<td>2026-05-10</td>
+<td><a href="/components/instar/plans/PLAN-convert-followups/">Convert follow-ups</a></td>
+<td>Track the deferred work from the (now-removed) convert master plan: extra <code>qemu-img</code> subcommands (create / map / measure / resize / snapshot / rebase / commit) and <code>check --repair</code> wiring</td>
+<td>Not started</td>
+<td>1: subcommand parity, 2: check --repair</td>
 </tr>
 </tbody>
 </table>
