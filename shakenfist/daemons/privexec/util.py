@@ -163,20 +163,36 @@ def create_interface(interface, interface_type, extra, mtu=None,
 
 
 def create_vx_interface(vx_interface, vx_id, vx_bridge, mesh_interface):
+    log = LOG.with_fields({
+        'vx_id': vx_id,
+        'vx_interface': vx_interface,
+        'vx_bridge': vx_bridge,
+        'mesh_interface': mesh_interface,
+    })
+    log.debug('Ensuring vxlan interface and bridge exist')
+
     if not check_for_interface(vx_interface):
-        create_interface(
+        log.debug('vxlan interface absent, creating')
+        rc = create_interface(
             vx_interface, 'vxlan',
             ['id', str(vx_id), 'dev', str(mesh_interface), 'dstport', '0']
         )
+        log.with_fields({'create_interface_rc': rc}).debug(
+            'create_interface returned for vxlan interface')
 
         command = ['sysctl', '-w',
                    f'net.ipv4.conf.{vx_interface}.arp_notify=1']
         _, _, returncode = command_helper(*command)
         if returncode != 0:
             return False
+    else:
+        log.debug('vxlan interface already present')
 
     if not check_for_interface(vx_bridge):
-        create_interface(vx_bridge, 'bridge', [])
+        log.debug('vxlan bridge absent, creating')
+        rc = create_interface(vx_bridge, 'bridge', [])
+        log.with_fields({'create_interface_rc': rc}).debug(
+            'create_interface returned for vxlan bridge')
 
         command = [
             'ip', 'link', 'set', str(vx_interface), 'master', str(vx_bridge)
@@ -214,7 +230,10 @@ def create_vx_interface(vx_interface, vx_id, vx_bridge, mesh_interface):
         _, _, returncode = command_helper(*command)
         if returncode != 0:
             return False
+    else:
+        log.debug('vxlan bridge already present')
 
+    log.debug('vxlan interface and bridge ready')
     return True
 
 
