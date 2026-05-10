@@ -1,5 +1,13 @@
 # Release v0.2.0
 
+## Status: Complete
+
+v0.2.0 was tagged and published on 2026-05-09 (commit `24dabc7
+Release v0.2.0`, tag `v0.2.0`, `CHANGELOG.md` dated 2026-05-09).
+The execution table below is preserved for historical reference;
+all gates were either passed or carried forward as follow-ups
+(`PLAN-distro-matrix-ci.md` for the cross-distro install matrix).
+
 ## Prompt
 
 Before responding to questions or discussion points in this
