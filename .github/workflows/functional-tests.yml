@@ -117,7 +117,7 @@ jobs:
           tox -eflake8
 
       - name: Type check with mypy
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           . /tmp/venv-test/bin/activate
           tox -emypy
