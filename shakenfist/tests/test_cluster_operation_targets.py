@@ -816,3 +816,48 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
             self._mariadb._direct_has_pending_cluster_operation_target(
                 'network', HOTPLUG_NETWORK_UUID))
         self.assertFalse(result)
+
+    def test_full_enqueue_persists_three_rows(self):
+        """End-to-end: calling node_inst_net_iface_op.create_and_enqueue
+        must result in three persisted cluster_operation_targets rows
+        (instance, network, interface) in the real database, not just
+        three call-sites to create_cluster_operation_target.
+
+        This is the test the v1 schema bug would have failed: the
+        UNIQUE(operation_uuid) constraint silently dropped the
+        network and interface rows after the instance row landed.
+        """
+        from shakenfist.schema.operations.node_inst_net_iface_op import (
+            create_and_enqueue, model_tasks)
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+
+        # The op + state + work-queue write is its own MariaDB
+        # transaction; here we only care about the target writes,
+        # so stub it out as success.
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                return_value=True):
+            _, op_uuid = create_and_enqueue(
+                HOTPLUG_NODE_UUID,
+                HOTPLUG_INSTANCE_UUID,
+                HOTPLUG_NETWORK_UUID,
+                HOTPLUG_INTERFACE_UUID,
+                [model_tasks.hot_plug_instance_interface],
+                PRIORITY.user_waiting,
+            )
+
+        self.assertEqual(3, self._count_target_rows())
+
+        rows = self._target_rows()
+        for r in rows:
+            self.assertEqual(op_uuid, r['operation_uuid'])
+            self.assertEqual('node_inst_net_iface_op', r['operation_type'])
+
+        target_uuids = {r['target_uuid'] for r in rows}
+        self.assertEqual(
+            {HOTPLUG_INSTANCE_UUID, HOTPLUG_NETWORK_UUID,
+             HOTPLUG_INTERFACE_UUID},
+            target_uuids)
+        target_types = {r['target_object_type'] for r in rows}
+        self.assertEqual({'instance', 'network', 'interface'},
+                         target_types)
