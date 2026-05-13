@@ -165,7 +165,17 @@ AGENT_OPERATION_ATTRIBUTES_VERSION = 2
 INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 3
 OBJECT_METADATA_VERSION = 3
-CLUSTER_OPERATION_TARGETS_VERSION = 1
+# v1: schema creation.
+# v2: replace column-level UNIQUE on operation_uuid with a composite
+# UNIQUE on (operation_uuid, target_object_type, target_uuid). The v1
+# constraint made it impossible to record more than one target per
+# operation; multi-target ops (e.g. node_inst_net_iface_op) silently
+# dropped all but the first declared target via IntegrityError, which
+# the writer treated as idempotency. The replacement preserves real
+# idempotency (same target written twice) without truncating multi-
+# target ops. A non-unique idx_cot_operation index keeps lookups by
+# operation_uuid fast.
+CLUSTER_OPERATION_TARGETS_VERSION = 2
 NODE_METRICS_VERSION = 2
 # v1: schema creation. v2: data migration from node_attributes.daemon_states
 # JSON column.
@@ -627,24 +637,35 @@ def _get_cluster_operation_targets_table() -> sa.Table:
     global _cluster_operation_targets_table
     if _cluster_operation_targets_table is None:
         metadata = _get_metadata()
-        # sequence_number must be the primary key for MySQL/MariaDB to
-        # apply AUTO_INCREMENT. SQLAlchemy only generates AUTO_INCREMENT
-        # DDL for the first column of the primary key on MySQL backends.
-        # operation_uuid is made UNIQUE instead to preserve fast lookups.
+        # sequence_number is the primary key so MariaDB applies
+        # AUTO_INCREMENT (SQLAlchemy only emits AUTO_INCREMENT DDL for
+        # the first column of the primary key on MySQL backends).
+        #
+        # The unique constraint is on the triple (operation_uuid,
+        # target_object_type, target_uuid): one op can target many
+        # objects (e.g. node_inst_net_iface_op targets instance,
+        # network, and interface), but the same op-target pair must
+        # not appear twice. A column-level UNIQUE on operation_uuid
+        # alone (the v1 schema) silently truncated multi-target ops.
+        # idx_cot_operation keeps single-column operation_uuid
+        # lookups fast.
         _cluster_operation_targets_table = sa.Table(
             'cluster_operation_targets',
             metadata,
             sa.Column('sequence_number', sa.BigInteger(),
                       primary_key=True, autoincrement=True),
-            sa.Column('operation_uuid', sa.String(36),
-                      nullable=False, unique=True),
+            sa.Column('operation_uuid', sa.String(36), nullable=False),
             sa.Column('operation_type', sa.String(64), nullable=False),
             sa.Column('target_object_type', sa.Enum(ObjectType),
                       nullable=False),
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
+            sa.UniqueConstraint(
+                'operation_uuid', 'target_object_type', 'target_uuid',
+                name='uq_cot_op_target'),
             # Indexes for common query patterns
             sa.Index('idx_cot_target', 'target_object_type', 'target_uuid'),
+            sa.Index('idx_cot_operation', 'operation_uuid'),
             sa.Index('idx_cot_created', 'created_at'),
         )
     return _cluster_operation_targets_table
@@ -663,6 +684,50 @@ def _ensure_cluster_operation_targets_schema(
         LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 2:
+        # The v1 schema declared operation_uuid UNIQUE, which made
+        # multi-target operations impossible to represent: every
+        # target row after the first hit the UNIQUE constraint and
+        # was silently dropped by the writer's IntegrityError
+        # handler. The hot-plug interface op
+        # (node_inst_net_iface_op) is the path this bit hardest --
+        # the network target row was lost, so
+        # has_pending_cluster_operation(network) returned False
+        # while the op was queued, the network maintainer raced
+        # the queue worker, and the CI forbidden-string guard for
+        # "Recreating not okay network on hypervisor" tripped.
+        #
+        # The replacement is a composite UNIQUE on the triple
+        # (operation_uuid, target_object_type, target_uuid), which
+        # still gives idempotency (same op-target written twice is
+        # a no-op) without truncating multi-target ops. We also
+        # add idx_cot_operation to preserve the fast operation_uuid
+        # lookup the column-level UNIQUE was implicitly providing.
+        #
+        # SQLAlchemy's column-level unique=True on MariaDB creates
+        # an index named after the column. The drop is wrapped in
+        # IF EXISTS because some older deployments might already
+        # have it under a different auto-generated name -- the
+        # add-uniqueconstraint below is unconditional and will
+        # surface any leftover constraint as an error there.
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v2: '
+            'replacing UNIQUE(operation_uuid) with composite UNIQUE '
+            '(operation_uuid, target_object_type, target_uuid).')
+        with engine.begin() as conn:
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} '
+                f'DROP INDEX IF EXISTS operation_uuid'))
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} '
+                f'ADD CONSTRAINT uq_cot_op_target UNIQUE '
+                f'(operation_uuid, target_object_type, target_uuid)'))
+            conn.execute(sa.text(
+                f'CREATE INDEX IF NOT EXISTS idx_cot_operation '
+                f'ON {table_name} (operation_uuid)'))
+        current_ver = 2
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -5350,10 +5415,20 @@ def _direct_create_cluster_operation_target(
             conn.execute(stmt)
             conn.commit()
             return True
-    except IntegrityError:
-        # Duplicate operation_uuid — already recorded, which is fine.
-        # The UNIQUE constraint on operation_uuid ensures idempotency.
-        return True
+    except IntegrityError as e:
+        # The only IntegrityError we want to treat as success is the
+        # composite UNIQUE on (operation_uuid, target_object_type,
+        # target_uuid) tripping -- the same op-target pair already
+        # exists, which is the idempotency case. Any other integrity
+        # violation (NOT NULL, type-check, foreign-key) is a real
+        # bug and must surface.
+        msg = str(e).lower()
+        if 'uq_cot_op_target' in msg or 'unique' in msg or 'duplicate' in msg:
+            return True
+        LOG.warning(
+            f'Non-uniqueness IntegrityError writing '
+            f'cluster_operation_targets row for op {operation_uuid}: {e}')
+        return False
     except OperationalError as e:
         LOG.warning(
             f'MariaDB write failed for cluster_operation_targets '
