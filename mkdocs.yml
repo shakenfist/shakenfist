@@ -215,6 +215,7 @@ nav:
             - "Building and Testing on macOS": components/ryll/development-macos.md
             - "Configuration": components/ryll/configuration.md
             - "Installation": components/ryll/installation.md
+            - "K1: tokio waker silently lost on main channel after T+465 s": components/ryll/TOKIO-WEDGING.md
             - "Multi-mode parity matrix": components/ryll/multi-mode-parity.md
             - "Releasing": components/ryll/releasing.md
             - "ryll --web operator guide": components/ryll/web-frontend.md
@@ -224,9 +225,11 @@ nav:
                 - "Bug reporting mode for ryll": components/ryll/plans/PLAN-bug-reports.md
                 - "Bug-report trigger-time snapshot (2026-04-23)": components/ryll/plans/PLAN-bugreport-trigger-snapshot.md
                 - "Capture mode for protocol and display debugging": components/ryll/plans/PLAN-capture.md
+                - "CI platform-matrix expansion": components/ryll/plans/PLAN-ci-platform-matrix.md
                 - "Connection properties dialog": components/ryll/plans/PLAN-connection-properties.md
                 - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
                 - "Deferred debt: collating and paying down outstanding work": components/ryll/plans/PLAN-deferred-debt.md
+                - "Diagnosing "video stream not keeping up" reports": components/ryll/plans/PLAN-video-keeping-up.md
                 - "Display draw-op coverage": components/ryll/plans/PLAN-display-draw-ops.md
                 - "Display Iteration Follow-ups": components/ryll/plans/PLAN-display-iteration-followups.md
                 - "Extract reusable crates from ryll": components/ryll/plans/PLAN-crate-extraction.md
@@ -234,12 +237,23 @@ nav:
                 - "Idle CPU reduction and real latency measurement": components/ryll/plans/PLAN-idle-cpu-and-latency.md
                 - "Interactive USB device management UI": components/ryll/plans/PLAN-usb-ui.md
                 - "Macbook bug-report fixes (2026-04-23)": components/ryll/plans/PLAN-macbook-bugreport-fixes.md
+                - "macOS runtime metrics for bug reports": components/ryll/plans/PLAN-macos-runtime-metrics.md
                 - "Notifications system": components/ryll/plans/PLAN-notifications.md
                 - "Paste-as-keystrokes fallback": components/ryll/plans/PLAN-paste-as-keystrokes.md
+                - "Phase 01: Auto-snapshot ring buffer at disconnect moment": components/ryll/plans/PLAN-session-001-feedback-phase-01-disconnect-snapshot.md
                 - "Phase 01: Idle CPU profile": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile.md
+                - "Phase 02: Main-channel reconnect / keepalive (originally framed as the K1 fix)": components/ryll/plans/PLAN-session-001-feedback-phase-02-reconnect.md
+                - "Phase 03: Preserve audio volume across reconnect": components/ryll/plans/PLAN-session-001-feedback-phase-03-audio-volume.md
+                - "Phase 04: Region-select zero-width guard": components/ryll/plans/PLAN-session-001-feedback-phase-04-region-select.md
+                - "Phase 05: Handle `SPICE_MSG_DISPLAY_STREAM_DESTROY_ALL`": components/ryll/plans/PLAN-session-001-feedback-phase-05-stream-destroy-all.md
+                - "Phase 06: Rebalance per-channel ring-buffer split by expected traffic": components/ryll/plans/PLAN-session-001-feedback-phase-06-channel-rebalance.md
+                - "Phase 07: `Arc<[u8]>` refactor for `TrafficEntry::pcap_frame`": components/ryll/plans/PLAN-session-001-feedback-phase-07-traffic-arc.md
+                - "Phase 08: Segment large messages in ring-buffer frame builder": components/ryll/plans/PLAN-session-001-feedback-phase-08-ring-segmentation.md
+                - "Phase 09: Connection events in the notifications pane (F1)": components/ryll/plans/PLAN-session-001-feedback-phase-09-connection-notifications.md
                 - "Phase 1 — always fit window to guest surface": components/ryll/plans/PLAN-display-window-sizing-phase-01-always-fit.md
                 - "Phase 1 — PR 31 follow-up: regression tests": components/ryll/plans/PLAN-pr31-followup-phase-01-tests.md
                 - "Phase 1 — trigger-snapshot metadata plumbing": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-01-metadata.md
+                - "Phase 10: Notification → bug-report button (F2)": components/ryll/plans/PLAN-session-001-feedback-phase-10-notification-bug-button.md
                 - "Phase 10: Testing and QEMU setup": components/ryll/plans/PLAN-usb-redir-phase-10-testing.md
                 - "Phase 1: Capture infrastructure": components/ryll/plans/PLAN-capture-phase-01-infra.md
                 - "Phase 1: Convert ryll to a Cargo workspace": components/ryll/plans/PLAN-crate-extraction-phase-01-workspace.md
@@ -347,6 +361,7 @@ nav:
                 - "Render SPICE cursor on screen": components/ryll/plans/PLAN-cursor-rendering.md
                 - "Replace audiopus with pure-Rust opus-decoder": components/ryll/plans/PLAN-opus-decoder.md
                 - "Screenshot capture and latency HUD": components/ryll/plans/PLAN-screenshot-and-latency-hud.md
+                - "Session-001 dogfooding feedback triage": components/ryll/plans/PLAN-session-001-feedback.md
                 - "Supply-chain and prompt-injection scanning": components/ryll/plans/PLAN-supply-chain-scanning.md
                 - "Supply-chain follow-ups": components/ryll/plans/PLAN-supply-chain-followups.md
                 - "USB device redirection via the SPICE usbredir channel": components/ryll/plans/PLAN-usb-redir.md
