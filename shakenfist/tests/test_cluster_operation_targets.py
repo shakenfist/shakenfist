@@ -631,6 +631,13 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
+        # Late imports: sqlalchemy is heavy at import time and only
+        # this test class needs it; pulling it in lazily keeps the
+        # rest of the test suite's import phase fast. The shakenfist
+        # mariadb module is rebound locally as ``mariadb_mod`` so
+        # test methods can call ``self._mariadb.<fn>()`` without
+        # shadowing the module-level ``mariadb`` import the file
+        # uses elsewhere.
         import sqlalchemy as sa
         from shakenfist import mariadb as mariadb_mod
 
@@ -672,6 +679,8 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
 
         # SQLite :memory: databases are per-connection by default;
         # pool with StaticPool so every checkout shares one DB.
+        # Late import for the same reason sa is late above -- only
+        # this fixture needs the pool class.
         from sqlalchemy.pool import StaticPool
         self._engine = sa.create_engine(
             'sqlite:///:memory:',
@@ -817,6 +826,25 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
                 'network', HOTPLUG_NETWORK_UUID))
         self.assertFalse(result)
 
+    def test_non_uniqueness_integrity_error_returns_false(self):
+        """A NOT NULL violation (or any non-uniqueness IntegrityError)
+        must surface as False, not be swallowed as idempotency.
+
+        Before the keyword-match was tightened, the writer's
+        IntegrityError handler returned True for any IntegrityError --
+        which hid bugs like passing None for a required column. The
+        narrowed match only forgives the composite UNIQUE we
+        actually want to be idempotent on.
+        """
+        ok = self._mariadb._direct_create_cluster_operation_target(
+            operation_uuid=None,
+            operation_type='node_inst_net_iface_op',
+            target_object_type='network',
+            target_uuid=HOTPLUG_NETWORK_UUID,
+            created_at=1000.0)
+        self.assertFalse(ok)
+        self.assertEqual(0, self._count_target_rows())
+
     def test_full_enqueue_persists_three_rows(self):
         """End-to-end: calling node_inst_net_iface_op.create_and_enqueue
         must result in three persisted cluster_operation_targets rows
@@ -827,6 +855,11 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
         UNIQUE(operation_uuid) constraint silently dropped the
         network and interface rows after the instance row landed.
         """
+        # Late import to keep the schema module (and its transitive
+        # cluster-operation-target machinery) out of this test file's
+        # import path -- only this one method needs it, and pulling
+        # it at module scope would couple every test in the file to
+        # the operation-schema import chain.
         from shakenfist.schema.operations.node_inst_net_iface_op import (
             create_and_enqueue, model_tasks)
         from shakenfist.schema.operations.baseclusteroperation import PRIORITY

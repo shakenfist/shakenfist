@@ -716,17 +716,28 @@ def _ensure_cluster_operation_targets_schema(
             f'Upgrading {table_name} from v{current_ver} to v2: '
             'replacing UNIQUE(operation_uuid) with composite UNIQUE '
             '(operation_uuid, target_object_type, target_uuid).')
-        with engine.begin() as conn:
+        with engine.connect() as conn:
             conn.execute(sa.text(
                 f'ALTER TABLE {table_name} '
                 f'DROP INDEX IF EXISTS operation_uuid'))
-            conn.execute(sa.text(
-                f'ALTER TABLE {table_name} '
-                f'ADD CONSTRAINT uq_cot_op_target UNIQUE '
-                f'(operation_uuid, target_object_type, target_uuid)'))
+            # MariaDB has no ADD CONSTRAINT ... IF NOT EXISTS, so we
+            # tolerate an existing constraint of the same name. This
+            # mirrors the network_interfaces.macaddr migration and
+            # keeps the step restartable if a previous attempt
+            # crashed after the ALTER but before _set_table_version.
+            try:
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} '
+                    f'ADD CONSTRAINT uq_cot_op_target UNIQUE '
+                    f'(operation_uuid, target_object_type, target_uuid)'))
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(
+                    f'UNIQUE constraint uq_cot_op_target already '
+                    f'exists or could not be added: {e}')
             conn.execute(sa.text(
                 f'CREATE INDEX IF NOT EXISTS idx_cot_operation '
                 f'ON {table_name} (operation_uuid)'))
+            conn.commit()
         current_ver = 2
         _set_table_version(engine, table_name, current_ver)
 
@@ -5422,8 +5433,13 @@ def _direct_create_cluster_operation_target(
         # exists, which is the idempotency case. Any other integrity
         # violation (NOT NULL, type-check, foreign-key) is a real
         # bug and must surface.
+        #
+        # MariaDB names the constraint in the error text. SQLite does
+        # not, so we also accept its fixed "UNIQUE constraint failed"
+        # phrase; the table only carries this one composite UNIQUE so
+        # the fallback cannot misclassify a different uniqueness rule.
         msg = str(e).lower()
-        if 'uq_cot_op_target' in msg or 'unique' in msg or 'duplicate' in msg:
+        if 'uq_cot_op_target' in msg or 'unique constraint failed' in msg:
             return True
         LOG.warning(
             f'Non-uniqueness IntegrityError writing '
