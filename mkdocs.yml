@@ -258,6 +258,7 @@ nav:
                 - "Phase 1: Capture infrastructure": components/ryll/plans/PLAN-capture-phase-01-infra.md
                 - "Phase 1: Convert ryll to a Cargo workspace": components/ryll/plans/PLAN-crate-extraction-phase-01-workspace.md
                 - "Phase 1: Display correctness": components/ryll/plans/PLAN-deferred-debt-phase-01-display.md
+                - "Phase 1: Display-channel instrumentation": components/ryll/plans/PLAN-video-keeping-up-phase-01-instrumentation.md
                 - "Phase 1: Fix enumerate_physical bus field": components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix.md
                 - "Phase 1: Migrate action buttons to hamburger menu": components/ryll/plans/PLAN-hamburger-menu-phase-01-migrate.md
                 - "Phase 1: Notification store and ring buffer": components/ryll/plans/PLAN-notifications-phase-01-store.md
@@ -280,6 +281,7 @@ nav:
                 - "Phase 2: Encoder pipeline (framebuffer → H.264 NAL units)": components/ryll/plans/PLAN-web-frontend-phase-02-encoder.md
                 - "Phase 2: GitHub Actions CI": components/ryll/plans/PLAN-packaging-phase-02-ci.md
                 - "Phase 2: Latency sparkline": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-02-latency-sparkline.md
+                - "Phase 2: Move pcap writes to a dedicated writer task": components/ryll/plans/PLAN-video-keeping-up-phase-02-pcap-thread.md
                 - "Phase 2: Mux protocol (demux and remux)": components/ryll/plans/PLAN-webdav-phase-02-mux-protocol.md
                 - "Phase 2: Pcap packet capture": components/ryll/plans/PLAN-capture-phase-02-pcap.md
                 - "Phase 2: Render cursor as egui overlay": components/ryll/plans/PLAN-cursor-rendering-phase-02-render.md
@@ -302,6 +304,7 @@ nav:
                 - "Phase 3: GUI gesture for paste-as-keystrokes": components/ryll/plans/PLAN-paste-as-keystrokes-phase-03-gui.md
                 - "Phase 3: Input and session correctness": components/ryll/plans/PLAN-deferred-debt-phase-03-session.md
                 - "Phase 3: migrate Gaps and bug-report status as sources": components/ryll/plans/PLAN-notifications-phase-03-existing-sources.md
+                - "Phase 3: Move MP4 video encoding off the GUI event loop": components/ryll/plans/PLAN-video-keeping-up-phase-03-video-encode-thread.md
                 - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
                 - "Phase 3: WebRTC plumbing (`webrtc-rs`)": components/ryll/plans/PLAN-web-frontend-phase-03-webrtc.md
@@ -317,6 +320,7 @@ nav:
                 - "Phase 4: Integration (mux ↔ WebDAV server)": components/ryll/plans/PLAN-webdav-phase-04-integration.md
                 - "Phase 4: Real device enumeration and passthrough": components/ryll/plans/PLAN-usb-redir-phase-04-real-devices.md
                 - "Phase 4: Real latency from PING/PONG": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency.md
+                - "Phase 4: Render-side arrival-to-display latency": components/ryll/plans/PLAN-video-keeping-up-phase-04-render-latency.md
                 - "Phase 4: Robustness and safety": components/ryll/plans/PLAN-deferred-debt-phase-04-robustness.md
                 - "Phase 4: RPM Packaging": components/ryll/plans/PLAN-packaging-phase-04-rpm.md
                 - "Phase 5 — resolution-change notifications": components/ryll/plans/PLAN-display-window-sizing-phase-05-notify.md
