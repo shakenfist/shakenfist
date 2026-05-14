@@ -34,16 +34,22 @@ plan's creation:
   Backlogs can accumulate at the socket buffer, the decode step
   (especially GLZ), or implicitly downstream of `ImageReady`.
 
-- **Bug-report I/O is inline on the channel read path:**
-  - `PcapChannelWriter` is `Mutex`-guarded and writes to an
-    unbuffered `File`; `packet_sent` / `packet_received` block
-    the channel task
-    (`ryll/src/capture.rs:27`, called from
-    `display.rs:607` etc.).
-  - `VideoWriter` (H.264 + MP4) encodes synchronously on the
-    display read task on every MARK boundary
-    (`ryll/src/capture.rs:567`).
-  - Slow disk therefore back-pressures the SPICE socket today.
+- **Bug-report / capture I/O is inline on hot paths:**
+  - `PcapChannelWriter` (`ryll/src/capture.rs:28`) is
+    `Mutex`-guarded and writes to an unbuffered `File`. It is
+    invoked on the display *read* task at `display.rs:631`
+    (every received chunk) and on the *send* path at
+    `display.rs:2170`. Slow disk on the read side back-pressures
+    the SPICE socket directly.
+  - `VideoWriter` (H.264 + MP4) at `ryll/src/capture.rs:230`
+    encodes synchronously, but the call site is
+    `CaptureSession::frame()` at `capture.rs:622`, invoked from
+    the egui event handler at `app.rs:1615` in response to
+    `ChannelEvent::ImageReady` — **not** on the display read
+    task. So video encoding cannot directly stall the SPICE
+    socket; it can, however, block the GUI event loop and starve
+    presentation. Phase 3 addresses this UI-side backpressure
+    rather than socket-side backpressure.
 
 - **Existing metrics partially diagnose the problem:**
   - `last_latency_ms`: PING-to-PING interval on the main channel
@@ -54,9 +60,10 @@ plan's creation:
   - `fps`: derived from `DisplayMark` timestamps — measures
     presentation rate.
   - `frames_received`: cumulative `ImageReady` count.
-  - `DisplaySnapshot.recent_decodes`: VecDeque (cap 145) with
-    per-decode success flag, image type, dimensions, and
-    session-relative timestamp — **no wall-clock duration**.
+  - `DisplaySnapshot.recent_decodes`: VecDeque (cap
+    `MAX_RECENT_DECODES = 20`) with per-decode success flag,
+    image type, dimensions, and session-relative timestamp —
+    **no wall-clock duration**.
 
 - **Gaps that block diagnosis today:**
   - No decode wall-time per image; can't tell GLZ is choking.
@@ -84,43 +91,90 @@ decode CPU or server-side, we may stop after phase 1 + a fix in
 the right place rather than refactoring I/O paths that aren't
 actually hot.
 
-## Open questions
+## Resolved decisions
 
-1. **Drop-on-overflow vs. block-on-overflow** for the future
-   pcap and screenshot writer tasks. Dropping preserves the
-   socket read rate but creates gaps in pcaps; blocking keeps
-   pcaps complete but reintroduces the backpressure we're trying
-   to eliminate. Resolve before phase 2. Lean drop with a
-   counter exposed in the snapshot.
+1. **Drop-on-overflow** for the future pcap and screenshot
+   writer tasks (phases 2 and 3). Dropping preserves the socket
+   read rate; the cost is gaps in pcaps when disk falls behind.
+   Each dropped item increments a counter exposed in the
+   snapshot (`writer_dropped_count` per channel) so a bug
+   report makes the drop visible. Blocking would reintroduce
+   the backpressure the threading split is meant to remove.
 
-2. **Histogram vs. last-N** for decode duration. A bounded ring
-   of last-N decode durations is cheaper and matches
-   `recent_decodes`; a histogram gives long-run distribution at
-   the cost of more state. Resolve before phase 1. Lean last-N
-   matching the existing 145-cap, plus simple min/max/mean.
+2. **Last-N plus min/max/mean** for decode duration, sharing
+   the existing `recent_decodes` ring (cap
+   `MAX_RECENT_DECODES = 20` in `display.rs`). Cheap, matches
+   the surrounding code, and the aggregate stats give a
+   long-run summary without the state cost of a full histogram.
+   Computed at snapshot-emit time over the ring contents.
 
-3. **Definition of "render-side latency"** for phase 4. Is it
-   `ImageReady` → next presented `DisplayMark`, or something
-   finer-grained inside the renderer? Resolve when phase 4
-   starts; depends on whether the renderer can expose a
-   timestamp at present-time.
+3. **Render-side latency = mpsc-queue lag** between event
+   emission in the display channel and event drain in the
+   egui frame loop. Captured as `produced_at_secs: f64` on
+   `ChannelEvent::ImageReady*` and `ChannelEvent::DisplayMark`
+   at emit; consumed in `process_events` to compute
+   `consumed_at - produced_at` and feed two bounded rings
+   surfaced as min/max/mean aggregates on `AppSnapshot`.
+   Finer-grained "inside the egui paint" timing was rejected
+   as disproportionate; end-to-end "pixels visible to user"
+   is unmeasurable without external instrumentation. See
+   `PLAN-video-keeping-up-phase-04-render-latency.md`.
+
+## Acceptance criteria
+
+A "video stream not keeping up" bug report is self-diagnosing
+when its `channel-state.json` for the `display` channel lets a
+maintainer answer all of the following without re-running the
+session:
+
+- **Decode load.** What was the per-decode wall time (min / max
+  / mean over the recent window)? Were failures or cache misses
+  spiking? (Phase 1.)
+- **Socket read pressure.** Was the read loop consistently
+  filling its 256 KB chunks (a signal that the OS recv buffer
+  had bytes waiting when we read)? (Phase 1.)
+- **SPICE-level backpressure.** How often did we fill the ACK
+  window before sending an ACK, and how long were the gaps
+  between ACKs? (Phase 1.)
+- **Inline writer cost.** When pcap capture is enabled, are
+  writer drops happening? (Phase 2.)
+- **GUI loop encode cost.** When MP4 capture is enabled, is
+  encoding stalling presentation? (Phase 3.)
+- **Render path.** Optional: once the prior signals show
+  decode + I/O are healthy, can we attribute remaining latency
+  to the renderer? (Phase 4.)
 
 ## Execution
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Decode duration + socket high-water + ACK-window exhaustion | PLAN-video-keeping-up-phase-01-instrumentation.md | Not started |
-| 2. Move pcap writes to a dedicated writer task | PLAN-video-keeping-up-phase-02-pcap-thread.md | Not started |
-| 3. Move screenshot encoding off the display task | PLAN-video-keeping-up-phase-03-screenshot-thread.md | Not started |
-| 4. Render-side arrival-to-display latency | PLAN-video-keeping-up-phase-04-render-latency.md | Not started |
+| 1. Decode duration + socket fill + ACK-window signals | PLAN-video-keeping-up-phase-01-instrumentation.md | Done |
+| 2. Move pcap writes to a dedicated writer task | PLAN-video-keeping-up-phase-02-pcap-thread.md | Done |
+| 3. Move MP4 video encoding off the GUI event loop | PLAN-video-keeping-up-phase-03-video-encode-thread.md | Done |
+| 4. Render-side arrival-to-display latency | PLAN-video-keeping-up-phase-04-render-latency.md | Done |
 
-Phase 1 is the gate: it both produces the data needed to triage
-U1, and tells us whether phases 2–4 are warranted. Phases 2 and
-3 can run in either order once phase 1 lands, but should not
-start until phase 1 data confirms inline I/O is actually
-causing measurable backpressure on the read path. Phase 4 is
-optional and only justified if phases 1–3 leave a residual gap
-where the renderer is suspected.
+**Phase 1** is the gate. It produces the data needed to triage
+U1 and tells us whether phases 2–4 are warranted. Done when the
+display `channel-state.json` in a bug report includes per-decode
+wall time, socket-read fill stats, and ACK-send stats, and a
+maintainer can read those fields without consulting code.
+
+**Phase 2** moves `PcapChannelWriter` writes off the channel
+read tasks onto a dedicated writer task with a bounded queue.
+Done when `packet_received` and `packet_sent` are non-blocking
+enqueues, and dropped items are counted in the snapshot.
+
+**Phase 3** moves `VideoWriter::write_frame()` off the egui
+event handler onto a dedicated encoder task. Done when
+`CaptureSession::frame()` is a non-blocking enqueue and the egui
+event loop is not stalled by H.264 encoding.
+
+**Phase 4** is optional and only justified if phases 1–3 leave
+a residual gap where the renderer is suspected. Adds
+arrival-to-display latency at the renderer.
+
+Phases 2 and 3 can run in either order once phase 1 data
+confirms inline I/O is actually a meaningful contributor.
 
 Out of scope: changes to the SPICE protocol layer, decode
 algorithm changes (GLZ, Lz4), or renderer architecture changes.

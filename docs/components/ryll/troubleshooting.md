@@ -415,6 +415,92 @@ changed while you were typing the description.
 - If `--capture <DIR>` is active: `<DIR>/bug-reports/`
 - Otherwise: the current working directory
 
+### Reading display `channel-state.json` for "video not keeping up"
+
+When a Display bug report is submitted because video appears to
+stutter or fall behind, these fields in `channel-state.json` tell
+you which part of the pipeline was slow without re-running the
+session. They were added by the master plan
+[`PLAN-video-keeping-up.md`](/components/ryll/../docs/plans/PLAN-video-keeping-up/)
+phase 1.
+
+- `decode_total_count`, `decode_failed_count`,
+  `decode_from_cache_count` — cumulative decode counters since
+  the channel started.
+- `decode_recent_min_us`, `decode_recent_max_us`,
+  `decode_recent_mean_us` — min / max / mean decompression
+  wall-time in microseconds over the most recent decodes that
+  actually invoked the decoder (cache hits and failures are
+  excluded). Read alongside `recent_decodes[].decode_duration_us`
+  and `.image_type` to see whether GLZ or JPEG is the slow
+  format. A mean above a few milliseconds on a busy session
+  points at decode CPU as the bottleneck.
+- `socket_read_count`, `socket_reads_at_chunk_cap`,
+  `socket_max_chunk_bytes` — how often the channel's 256 KB
+  socket read returned full (a proxy for "the OS recv buffer
+  had bytes waiting when we read"). A high ratio of
+  `socket_reads_at_chunk_cap` to `socket_read_count` indicates
+  the read loop is not keeping up with the arrival rate; a low
+  ratio means the wire / server is the bottleneck, not us.
+- `ack_send_count`, `last_ack_send_ts_secs`,
+  `recent_ack_intervals_secs` — ACK cadence. A long tail in
+  `recent_ack_intervals_secs` (or a gap between
+  `last_ack_send_ts_secs` and `triggered_uptime_secs`) means we
+  stopped consuming server messages for that long, which
+  applies SPICE-level backpressure on the server.
+- `writer_dropped_count` — number of pcap-capture packets the
+  dedicated writer task's bounded queue rejected because it
+  was full. Zero unless `--capture` is active. A non-zero
+  value implicates disk speed (or anything else slowing the
+  writer task) rather than decode CPU or socket-read pacing;
+  the rest of the SPICE pipeline keeps running because the
+  enqueue is non-blocking. Added in phase 2.
+
+In `session.json` (a sibling artefact in the same zip):
+
+- `video_drop_count` — number of display frames dropped
+  because the H.264 encoder task's queue was full when the
+  egui frame loop tried to enqueue. Zero unless `--capture`
+  is active. A non-zero value implicates encoder CPU (or MP4
+  write speed) rather than the SPICE pipeline; the egui frame
+  loop stays responsive because the enqueue is non-blocking.
+  Added in phase 3.
+- `image_ready_lag_recent_{min,max,mean}_us` and
+  `display_mark_lag_recent_{min,max,mean}_us` — microseconds
+  spent waiting in the renderer→app mpsc queue, computed
+  over a bounded recent window of samples. `image_ready_*`
+  covers per-image emissions (high cadence); `display_mark_*`
+  covers per-frame-boundary emissions. A high mean here when
+  `channel-state.json`'s `decode_recent_max_us` and
+  `socket_reads_at_chunk_cap` look healthy implicates the
+  egui loop / GUI thread as the bottleneck — typically a
+  long-running synchronous operation inside `App::update`
+  starving the event drain. `max` is the most informative
+  single number; within-batch samples are correlated so
+  `mean` is biased by batch size. Added in phase 4.
+
+**MP4 finalisation note (phase 3 trade-off).** With phase 3
+the MP4 moov atom is written by the encoder task after the
+sender drops, not synchronously by `CaptureSession::close()`.
+In practice the encoder task finalises within milliseconds of
+close, but a bug report assembled in a very short window
+after a disconnect — or in the SIGINT abrupt-shutdown path —
+may see an unfinalised (unplayable) `display.mp4`. The pcap
+files and the rest of the report are unaffected.
+
+To read the report:
+
+1. `unzip ryll-bugreport-*.zip` and open `channel-state.json`.
+2. Check `decode_recent_*` first — if decode dominates, the
+   server is sending fine; look at decoder CPU or compression
+   format.
+3. If decode is fast, check `socket_reads_at_chunk_cap` vs
+   `socket_read_count` — a high ratio means the read loop is
+   behind; a low ratio means arrival is the bottleneck.
+4. Cross-check `recent_ack_intervals_secs` — flat intervals at
+   the expected cadence mean SPICE flow control is healthy;
+   long gaps mean we paused.
+
 ### Live traffic viewer
 
 Press **F11** or click **Traffic** in the status bar to open a side
