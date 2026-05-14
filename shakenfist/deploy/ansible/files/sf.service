@@ -49,6 +49,8 @@ Group=root
 TimeoutStopSec=30s
 SuccessExitStatus=SIGTERM 143
 RestartPreventExitStatus=SIGTERM
+RuntimeDirectory=sf
+RuntimeDirectoryPreserve=yes
 
 EnvironmentFile=/etc/sf/config
 ExecStartPre=/srv/shakenfist/venv/bin/sf-ctl verify-config
