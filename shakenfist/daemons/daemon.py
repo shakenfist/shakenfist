@@ -304,6 +304,30 @@ class Daemon:
                 break
 
 
+def force_clean_exit():
+    # Skip the interpreter's normal teardown and exit immediately.
+    #
+    # Some gRPC client channels (notably the thread-local eventlog channel
+    # in shakenfist.eventlog) leave C-level background threads alive that
+    # block ordinary interpreter shutdown when the server-side has already
+    # gone away. record_exit() has already flushed the audit state, so
+    # anything still running here is not productive work -- waiting for it
+    # only buys a systemd SIGKILL after TimeoutStopSec.
+    #
+    # Before exiting, log any non-daemon Python threads still alive. Those
+    # are leakers we control (the C++ gRPC event_engine threads we cannot)
+    # and naming them in syslog makes future regressions visible.
+    main_thread = threading.main_thread()
+    leakers = [
+        (t.name, t.ident) for t in threading.enumerate()
+        if t is not main_thread and not t.daemon
+    ]
+    if leakers:
+        LOG.warning(
+            f'Non-daemon Python threads still alive at exit: {leakers}')
+    os._exit(0)
+
+
 def _send_systemd_notification(message):
     # If running systemd and we are Type=notify...
     addr = os.environ.get('NOTIFY_SOCKET')
