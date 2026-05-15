@@ -26,13 +26,18 @@ from pydantic import Field
 class ClusterOperationTargetData(BaseModel):
     """Schema for cluster operation targets in MariaDB.
 
-    Each row records one operation targeting one object. The combination
-    of (target_object_type, target_uuid) identifies the target, while
-    operation_uuid is the primary key. sequence_number is assigned by
-    the database via AUTO_INCREMENT for implicit ordering.
+    Each row records one operation targeting one object. The
+    combination of (target_object_type, target_uuid) identifies the
+    target. An operation with multiple declared targets writes one
+    row per target, so operation_uuid is NOT unique on its own; the
+    composite UNIQUE constraint uq_cot_op_target on (operation_uuid,
+    target_object_type, target_uuid) provides idempotency without
+    truncating multi-target ops. sequence_number is the actual
+    primary key, assigned by the database via AUTO_INCREMENT for
+    implicit ordering.
 
     Table: cluster_operation_targets
-    Primary key: operation_uuid
+    Primary key: sequence_number
 
     Attributes:
         operation_uuid: UUID of the cluster operation.

@@ -74,6 +74,34 @@ Migrated table 'object_states' from version 1 to 2
 MariaDB schema verified.
 ```
 
+### Known migration notes
+
+#### cluster_operation_targets v1 to v2
+
+The v1 schema declared `operation_uuid` as a column-level `UNIQUE`,
+which prevented multi-target operations (e.g. the hot-plug interface
+op, which targets an instance, a network, and an interface) from
+recording more than one target row. The v2 migration replaces that
+constraint with a composite `UNIQUE(operation_uuid, target_object_type,
+target_uuid)` and adds a non-unique index `idx_cot_operation` for
+single-column lookups.
+
+Operations already in flight at the moment the migration runs will
+have only their first declared target row in the table; their
+remaining target rows were silently dropped under v1 and cannot be
+reconstructed. The practical effect is that
+`Network.is_okay()`'s pending-operation gate may transiently miss
+one in-flight op per affected network during the upgrade window,
+and the network maintainer can race the queue worker once -- which
+manifests as the "Recreating not okay network on hypervisor" event
+firing in syslog for that network. The recreate is idempotent with
+the queued operation's own `create_on_hypervisor`, so there is no
+functional breakage; only the audit event.
+
+Operations enqueued after the migration completes record all of
+their targets correctly, so the gate behaves as designed once the
+in-flight v1 ops drain.
+
 ### Database service architecture
 
 Only etcd_master nodes have direct access to MariaDB credentials. All other

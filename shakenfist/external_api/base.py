@@ -266,9 +266,11 @@ def redirect_instance_request(func):
                 'method': flask.request.environ['REQUEST_METHOD'],
                 'url': url,
                 'status_code': r.status_code,
-                'text': r.text
+                'body_bytes': len(r.content)
             }).info('Returning proxied request')
-            resp = flask.Response(r.text, mimetype='application/json')
+            resp = flask.Response(
+                r.content,
+                mimetype=r.headers.get('Content-Type', 'application/json'))
             resp.status_code = r.status_code
             return resp
 
@@ -352,9 +354,11 @@ def redirect_to_network_node(func):
                 'method': flask.request.environ['REQUEST_METHOD'],
                 'url': path,
                 'status_code': r.status_code,
-                'text': r.text
+                'body_bytes': len(r.content)
             }).info('Returning proxied request')
-            resp = flask.Response(r.text, mimetype='application/json')
+            resp = flask.Response(
+                r.content,
+                mimetype=r.headers.get('Content-Type', 'application/json'))
             resp.status_code = r.status_code
             return resp
 
@@ -455,9 +459,11 @@ def redirect_upload_request(func):
                 'method': flask.request.environ['REQUEST_METHOD'],
                 'url': url,
                 'status_code': r.status_code,
-                'text': r.text
+                'body_bytes': len(r.content)
             }).info('Returning proxied request')
-            resp = flask.Response(r.text,  mimetype='application/json')
+            resp = flask.Response(
+                r.content,
+                mimetype=r.headers.get('Content-Type', 'application/json'))
             resp.status_code = r.status_code
             return resp
 
@@ -486,9 +492,11 @@ def redirect_to_eventlog_node(func):
                 'method': flask.request.environ['REQUEST_METHOD'],
                 'url': path,
                 'status_code': r.status_code,
-                'text': r.text
+                'body_bytes': len(r.content)
             }).info('Returning proxied request')
-            resp = flask.Response(r.text, mimetype='application/json')
+            resp = flask.Response(
+                r.content,
+                mimetype=r.headers.get('Content-Type', 'application/json'))
             resp.status_code = r.status_code
             return resp
 

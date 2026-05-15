@@ -100,13 +100,16 @@ class Scheduler:
     def _has_reasonable_queue_state(self, log_ctx, node):
         waiting = self.metrics[node].get('node_queue_waiting', 0)
         if waiting > UNREASONABLE_QUEUE_LENGTH:
-            log_ctx.with_fields({
-                'node': node,
-                'node_queue_waiting': waiting
-            }).debug('Excluding node with many queued jobs')
-            return False
+            reason = {
+                'reason': 'queue too long',
+                'node_queue_waiting': waiting,
+                'unreasonable_threshold': UNREASONABLE_QUEUE_LENGTH,
+            }
+            log_ctx.with_fields({'node': node, **reason}).debug(
+                'Excluding node with many queued jobs')
+            return False, reason
 
-        return True
+        return True, None
 
     def _has_sufficient_cpu(self, log_ctx, cpus, node):
         hard_max_cpus = (self.metrics[node].get(
@@ -114,15 +117,17 @@ class Scheduler:
         current_cpu = self.metrics[node].get('cpu_total_instance_vcpus', 0)
 
         if current_cpu + cpus > hard_max_cpus:
-            log_ctx.with_fields({
-                'node': node,
+            reason = {
+                'reason': 'would exceed hard max CPUs',
                 'current_cpus': current_cpu,
                 'requested_cpus': cpus,
-                'hard_max_cpus': hard_max_cpus
-            }).debug('Scheduling on node would exceed hard maximum CPUs')
-            return False
+                'hard_max_cpus': hard_max_cpus,
+            }
+            log_ctx.with_fields({'node': node, **reason}).debug(
+                'Scheduling on node would exceed hard maximum CPUs')
+            return False, reason
 
-        return True
+        return True, None
 
     def _has_sufficient_ram(self, log_ctx, memory, node):
         # There are two things to track here... We must always have
@@ -132,28 +137,32 @@ class Scheduler:
         available = (self.metrics[node].get('memory_available', 0) -
                      (config.RAM_SYSTEM_RESERVATION * 1024))
         if available - memory < 0.0:
-            log_ctx.with_fields({
-                'node': node,
-                'available': available,
-                'requested_memory': memory
-            }).debug('Insufficient memory')
-            return False
+            reason = {
+                'reason': 'insufficient memory',
+                'available_mb': available,
+                'requested_memory_mb': memory,
+            }
+            log_ctx.with_fields({'node': node, **reason}).debug(
+                'Insufficient memory')
+            return False, reason
 
         # ...Secondly, if we're using KSM and over committing memory, we
         # shouldn't overcommit more than by RAM_OVERCOMMIT_RATIO
         instance_memory = (
             self.metrics[node].get('memory_total_instance_actual', 0) + memory)
-        if (instance_memory / self.metrics[node].get('memory_max', 0) >
-                config.RAM_OVERCOMMIT_RATIO):
-            log_ctx.with_fields({
-                'node': node,
-                'instance_memory': instance_memory,
-                'memory_max': self.metrics[node].get('memory_max', 0),
-                'overcommit_ratio': config.RAM_OVERCOMMIT_RATIO
-            }).debug('KSM overcommit ratio exceeded')
-            return False
+        memory_max = self.metrics[node].get('memory_max', 0)
+        if (instance_memory / memory_max > config.RAM_OVERCOMMIT_RATIO):
+            reason = {
+                'reason': 'KSM overcommit ratio exceeded',
+                'instance_memory_mb': instance_memory,
+                'memory_max_mb': memory_max,
+                'overcommit_ratio': config.RAM_OVERCOMMIT_RATIO,
+            }
+            log_ctx.with_fields({'node': node, **reason}).debug(
+                'KSM overcommit ratio exceeded')
+            return False, reason
 
-        return True
+        return True, None
 
     def _has_sufficient_disk(self, log_ctx, inst, node):
         requested_disk = 0
@@ -167,13 +176,16 @@ class Scheduler:
         disk_free = int(self.metrics[node].get('disk_free_instances', '0')) / GiB
         disk_free -= config.MINIMUM_FREE_DISK
         if requested_disk > disk_free:
-            log_ctx.with_fields({
-                'node': node,
+            reason = {
+                'reason': 'insufficient disk',
                 'requested_disk_gb': requested_disk,
                 'disk_free_gb': disk_free,
-            }).debug('Node has insufficient disk')
-            return False
-        return True
+                'minimum_free_disk_gb': config.MINIMUM_FREE_DISK,
+            }
+            log_ctx.with_fields({'node': node, **reason}).debug(
+                'Node has insufficient disk')
+            return False, reason
+        return True, None
 
     def _has_idle_disk_bandwidth(self, log_ctx, inst, node):
         # We also avoid starting new instances on hypervisors with busy disk.
@@ -183,26 +195,34 @@ class Scheduler:
         busy_time = int(
             self.metrics[node].get('disk_busy_time_delta_per_sec', '0'))
         if busy_time > 1200:
-            log_ctx.with_fields({
-                'node': node,
-                'busy_time_delta_per_sec': busy_time
-            }).debug('Scheduling on node would exceed maximum disk bandwidth')
-            return False
+            reason = {
+                'reason': 'disk bandwidth saturated',
+                'busy_time_delta_per_sec': busy_time,
+                'busy_time_threshold': 1200,
+            }
+            log_ctx.with_fields({'node': node, **reason}).debug(
+                'Scheduling on node would exceed maximum disk bandwidth')
+            return False, reason
 
-        return True
+        return True, None
 
-    def _log_and_raise_on_error(self, related_objects, stage, candidates):
+    def _log_and_raise_on_error(
+            self, related_objects, stage, candidates, dropped=None):
+        extra = {'candidates': candidates}
+        if dropped:
+            extra['dropped'] = dropped
+
         if not candidates:
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
                 f'schedule has no candidates at stage {stage}, aborting',
-                extra={'candidates': candidates})
+                extra=extra)
             raise exceptions.LowResourceException(
                 f'No nodes remaining at scheduling stage {stage}')
 
         add_event_multi(
             EVENT_TYPE_AUDIT, related_objects,
-            f'schedule at stage {stage}', extra={'candidates': candidates})
+            f'schedule at stage {stage}', extra=extra)
 
     def find_candidates(self, inst, candidates=None):
         related_objects = [inst]
@@ -219,6 +239,26 @@ class Scheduler:
             diff = time.time() - self.metrics_updated
             if diff > config.SCHEDULER_CACHE_TIMEOUT or len(self.metrics) == 0:
                 self.refresh_metrics()
+
+            # Record the inputs to the scheduling decision so failures can be
+            # diagnosed from the event log alone.
+            requested_disk_gb = 0
+            for disk in inst.disk_spec:
+                if 'size' in disk and disk['size'] is not None:
+                    requested_disk_gb += int(disk['size'])
+            add_event_multi(
+                EVENT_TYPE_AUDIT, related_objects,
+                'schedule inputs',
+                extra={
+                    'requested_affinity': inst.affinity,
+                    'requested_cpus': inst.cpus,
+                    'requested_memory_mb': inst.memory,
+                    'requested_disk_gb': requested_disk_gb,
+                    'disk_spec': inst.disk_spec,
+                    'namespace': inst.namespace,
+                    'forced_candidates': bool(candidates),
+                    'metrics_age_seconds': diff,
+                })
 
             if candidates:
                 add_event_multi(
@@ -244,92 +284,176 @@ class Scheduler:
                 related_objects, 'pre_schedule', candidates)
 
             # Ensure all specified nodes are hypervisors
+            dropped = {}
             for c in list(candidates):
                 if not self.metrics[c].get('is_hypervisor', False):
+                    dropped[c] = {'reason': 'not a hypervisor'}
                     candidates.remove(c)
             self._log_and_raise_on_error(
-                related_objects, 'is_hypervisor', candidates)
+                related_objects, 'is_hypervisor', candidates, dropped=dropped)
 
             # Don't use nodes which aren't keeping up with queue jobs
+            dropped = {}
             for c in list(candidates):
-                if not self._has_reasonable_queue_state(log_ctx, c):
+                ok, reason = self._has_reasonable_queue_state(log_ctx, c)
+                if not ok:
+                    dropped[c] = reason
                     candidates.remove(c)
             self._log_and_raise_on_error(
-                related_objects, 'queue_state', candidates)
+                related_objects, 'queue_state', candidates, dropped=dropped)
 
             # Can we host that many vCPUs?
+            dropped = {}
             for c in list(candidates):
                 max_cpu = self.metrics[c].get('cpu_max_per_instance', 0)
                 if inst.cpus > max_cpu:
+                    dropped[c] = {
+                        'reason': 'requested vCPUs exceed per-instance max',
+                        'cpu_max_per_instance': max_cpu,
+                        'requested_cpus': inst.cpus,
+                    }
                     candidates.remove(c)
             self._log_and_raise_on_error(
-                related_objects, 'cpu_max_per_instance', candidates)
+                related_objects, 'cpu_max_per_instance', candidates,
+                dropped=dropped)
 
             # Do we have enough idle CPU?
+            dropped = {}
             for c in list(candidates):
-                if not self._has_sufficient_cpu(log_ctx, inst.cpus, c):
+                ok, reason = self._has_sufficient_cpu(log_ctx, inst.cpus, c)
+                if not ok:
+                    dropped[c] = reason
                     candidates.remove(c)
             self._log_and_raise_on_error(
-                related_objects, 'sufficient_idle_cpu', candidates)
+                related_objects, 'sufficient_idle_cpu', candidates,
+                dropped=dropped)
 
             # Do we have enough idle RAM?
+            dropped = {}
             for c in list(candidates):
-                if not self._has_sufficient_ram(log_ctx, inst.memory, c):
+                ok, reason = self._has_sufficient_ram(log_ctx, inst.memory, c)
+                if not ok:
+                    dropped[c] = reason
                     candidates.remove(c)
             self._log_and_raise_on_error(
-                related_objects, 'sufficient_idle_memory', candidates)
+                related_objects, 'sufficient_idle_memory', candidates,
+                dropped=dropped)
 
             # Do we have enough free disk?
+            dropped = {}
             for c in list(candidates):
-                if not self._has_sufficient_disk(log_ctx, inst, c):
+                ok, reason = self._has_sufficient_disk(log_ctx, inst, c)
+                if not ok:
+                    dropped[c] = reason
                     candidates.remove(c)
             self._log_and_raise_on_error(
-                related_objects, 'sufficient_free_disk', candidates)
+                related_objects, 'sufficient_free_disk', candidates,
+                dropped=dropped)
 
             # Are the disks really busy?
+            dropped = {}
             for c in list(candidates):
-                if not self._has_idle_disk_bandwidth(log_ctx, inst, c):
+                ok, reason = self._has_idle_disk_bandwidth(log_ctx, inst, c)
+                if not ok:
+                    dropped[c] = reason
                     candidates.remove(c)
             self._log_and_raise_on_error(
-                related_objects, 'sufficient_idle_disk', candidates)
+                related_objects, 'sufficient_idle_disk', candidates,
+                dropped=dropped)
 
-            # Filter by affinity, if any has been specified
+            # Filter by affinity, if any has been specified. We record the
+            # full per-candidate scoring breakdown so that incorrect placement
+            # decisions (e.g. a tagged neighbour being invisible) can be
+            # diagnosed from audit events.
             by_affinity = defaultdict(list)
             requested_affinity = inst.affinity
+            affinity_detail = {}
 
             for c in list(candidates):
                 n = Node.from_db(c)
-                if n:
-                    affinity = 0
-                    instances = n.instances
-                    for instance_uuid in instances:
-                        i = instance.Instance.from_db(instance_uuid)
-                        if not i:
-                            continue
-                        if i.uuid == inst.uuid:
-                            continue
-                        if not i.tags:
-                            continue
-                        if i.namespace != inst.namespace:
-                            continue
-
-                        for tag, val in requested_affinity.items():
-                            if tag in i.tags:
-                                affinity += int(val)
-
+                affinity = 0
+                considered = []
+                if n is None:
+                    affinity_detail[c] = {
+                        'score': 0,
+                        'reason': 'node row not found',
+                    }
                     by_affinity[affinity].append(c)
+                    continue
+
+                for instance_uuid in n.instances:
+                    i = instance.Instance.from_db(instance_uuid)
+                    if not i:
+                        considered.append({
+                            'instance_uuid': instance_uuid,
+                            'skipped': 'instance row not found',
+                        })
+                        continue
+                    if i.uuid == inst.uuid:
+                        considered.append({
+                            'instance_uuid': instance_uuid,
+                            'skipped': 'self',
+                        })
+                        continue
+                    if not i.tags:
+                        considered.append({
+                            'instance_uuid': instance_uuid,
+                            'skipped': 'no tags',
+                        })
+                        continue
+                    if i.namespace != inst.namespace:
+                        considered.append({
+                            'instance_uuid': instance_uuid,
+                            'skipped': 'different namespace',
+                            'namespace': i.namespace,
+                        })
+                        continue
+
+                    matched = {}
+                    contribution = 0
+                    for tag, val in requested_affinity.items():
+                        if tag in i.tags:
+                            matched[tag] = int(val)
+                            contribution += int(val)
+                    considered.append({
+                        'instance_uuid': instance_uuid,
+                        'tags': list(i.tags),
+                        'matched': matched,
+                        'contribution': contribution,
+                    })
+                    affinity += contribution
+
+                affinity_detail[c] = {
+                    'score': affinity,
+                    'instance_count': len(n.instances),
+                    'considered': considered,
+                }
+                by_affinity[affinity].append(c)
 
             highest_affinity = sorted(by_affinity, reverse=True)[0]
             candidates = by_affinity[highest_affinity]
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
                 'schedule have highest affinity',
-                extra={'candidates': candidates})
+                extra={
+                    'candidates': candidates,
+                    'requested_affinity': requested_affinity,
+                    'highest_affinity': highest_affinity,
+                    'by_affinity': {
+                        str(k): v for k, v in by_affinity.items()},
+                    'affinity_detail': affinity_detail,
+                })
 
             # Order candidates by current CPU load
             by_load = defaultdict(list)
+            load_detail = {}
             for c in list(candidates):
-                load = math.floor(self.metrics[c].get('cpu_load_1', 0))
+                raw_load = self.metrics[c].get('cpu_load_1', 0)
+                load = math.floor(raw_load)
+                load_detail[c] = {
+                    'cpu_load_1': raw_load,
+                    'cpu_load_1_floor': load,
+                }
                 by_load[load].append(c)
 
             lowest_load = sorted(by_load)[0]
@@ -337,7 +461,11 @@ class Scheduler:
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
                 'schedule have lowest cpu load',
-                extra={'candidates': candidates})
+                extra={
+                    'candidates': candidates,
+                    'lowest_load': lowest_load,
+                    'load_detail': load_detail,
+                })
 
             # Return a shuffled list of options
             random.shuffle(candidates)

@@ -18,6 +18,7 @@ import setproctitle
 from shakenfist_utilities import random      # noreorder
 from shakenfist_utilities import logs        # noreorder
 
+from shakenfist.daemons.daemon import force_clean_exit
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_stopping
 from shakenfist.daemons.privexec import util as privexec_util
@@ -609,6 +610,4 @@ def main():
     LOG.info(f'There are {len(workers)} remaining workers')
     LOG.info('Stopped')
 
-    # This is here because sometimes the grpc bits don't shut down cleanly
-    # by themselves.
-    raise SystemExit(0)
+    force_clean_exit()

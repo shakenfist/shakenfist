@@ -14,6 +14,7 @@ from google.protobuf.message import DecodeError
 import setproctitle
 from shakenfist_utilities import logs
 
+from shakenfist.daemons.daemon import force_clean_exit
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.protos import nodelock_pb2
 from shakenfist.util import exceptions as util_exceptions
@@ -122,6 +123,4 @@ def main():
 
     LOG.info('Stopped')
 
-    # This is here because sometimes the grpc bits don't shut down cleanly
-    # by themselves.
-    raise SystemExit(0)
+    force_clean_exit()

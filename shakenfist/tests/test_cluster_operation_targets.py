@@ -543,14 +543,16 @@ HOTPLUG_NODE_UUID = 'bbbb3333-3333-4333-8333-333333333333'
 
 
 class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
-    """Regression test for the hot-plug triple-target bug (commit 8923391c).
+    """Unit-level regression for the hot-plug triple-target bug.
 
-    Enqueueing a node_inst_net_iface_op must write three
-    cluster_operation_targets rows (instance, network, interface) via
-    the auto-targeting path in enqueue_cluster_operation(). Before
-    3a/3b, the network target was written by an explicit
-    set_last_cluster_operation() call that was sometimes omitted,
-    causing the network maintainer to race the queue worker.
+    This test mocks mariadb.create_cluster_operation_target so it
+    only proves the schema's target_fields declaration and the
+    enqueue_cluster_operation() call-site fan-out are correct. It
+    does NOT exercise the actual database UNIQUE constraint --
+    see HotPlugTargetWriteIntegrationTestCase below for that.
+
+    Originally added for commit 8923391c. Kept for fast feedback;
+    the integration test catches the deeper bug.
     """
 
     def setUp(self):
@@ -607,3 +609,288 @@ class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
              HOTPLUG_INTERFACE_UUID},
             target_uuids,
         )
+
+
+class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
+    """Integration regression: hot-plug must persist three target rows.
+
+    Drives _direct_create_cluster_operation_target() against a real
+    in-memory SQLite engine so the actual UNIQUE constraint is
+    exercised. The pre-fix schema (v1) declared operation_uuid UNIQUE,
+    which silently dropped every target row after the first --
+    masked by the IntegrityError-as-True handler in the writer. The
+    fixed schema (v2) replaces that with a composite UNIQUE on
+    (operation_uuid, target_object_type, target_uuid).
+
+    Also asserts has_pending_cluster_operation_target() sees the
+    network target while the op is queued -- the exact gate that
+    was being bypassed in the recurring "Recreating not okay
+    network on hypervisor" CI failure.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        # Late imports: sqlalchemy is heavy at import time and only
+        # this test class needs it; pulling it in lazily keeps the
+        # rest of the test suite's import phase fast. The shakenfist
+        # mariadb module is rebound locally as ``mariadb_mod`` so
+        # test methods can call ``self._mariadb.<fn>()`` without
+        # shadowing the module-level ``mariadb`` import the file
+        # uses elsewhere.
+        import sqlalchemy as sa
+        from shakenfist import mariadb as mariadb_mod
+
+        # Build an isolated MetaData for this test so the global
+        # module-level metadata (which other tests share) isn't
+        # affected. We rebuild the two tables under test against it.
+        self._sa = sa
+        self._mariadb = mariadb_mod
+        self._metadata = sa.MetaData()
+
+        # Use Integer (not BigInteger) so SQLite's rowid alias kicks
+        # in for AUTOINCREMENT. Production runs on MariaDB which uses
+        # BigInteger; the column type isn't what we're testing here.
+        self._targets_table = sa.Table(
+            'cluster_operation_targets',
+            self._metadata,
+            sa.Column('sequence_number', sa.Integer(),
+                      primary_key=True, autoincrement=True),
+            sa.Column('operation_uuid', sa.String(36), nullable=False),
+            sa.Column('operation_type', sa.String(64), nullable=False),
+            sa.Column('target_object_type', sa.String(64),
+                      nullable=False),
+            sa.Column('target_uuid', sa.String(36), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+            sa.UniqueConstraint(
+                'operation_uuid', 'target_object_type', 'target_uuid',
+                name='uq_cot_op_target'),
+        )
+        self._states_table = sa.Table(
+            'object_states',
+            self._metadata,
+            sa.Column('object_uuid', sa.String(36), nullable=False),
+            sa.Column('object_type', sa.String(64), nullable=False),
+            sa.Column('state_value', sa.String(64), nullable=False),
+            sa.Column('update_time', sa.Double(), nullable=False),
+            sa.Column('message', sa.String(1024), nullable=True),
+            sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
+        )
+
+        # SQLite :memory: databases are per-connection by default;
+        # pool with StaticPool so every checkout shares one DB.
+        # Late import for the same reason sa is late above -- only
+        # this fixture needs the pool class.
+        from sqlalchemy.pool import StaticPool
+        self._engine = sa.create_engine(
+            'sqlite:///:memory:',
+            connect_args={'check_same_thread': False},
+            poolclass=StaticPool)
+        self._metadata.create_all(self._engine)
+
+        # Route the mariadb helpers at the real in-memory engine and
+        # tables. The helpers under test (_direct_create_cluster_
+        # operation_target, _direct_has_pending_cluster_operation_
+        # target) read these accessors and the table objects each
+        # invocation.
+        self._patches = [
+            mock.patch(
+                'shakenfist.mariadb._get_engine',
+                return_value=self._engine),
+            mock.patch(
+                'shakenfist.mariadb._get_cluster_operation_targets_table',
+                return_value=self._targets_table),
+            mock.patch(
+                'shakenfist.mariadb._get_object_states_table',
+                return_value=self._states_table),
+            mock.patch(
+                'shakenfist.mariadb._use_database_service',
+                return_value=False),
+        ]
+        for p in self._patches:
+            p.start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _insert_op_state(self, op_uuid, state_value):
+        """Drop a row in the fake object_states table for an op."""
+        with self._engine.begin() as conn:
+            conn.execute(self._states_table.insert().values(
+                object_uuid=op_uuid,
+                object_type='node_inst_net_iface_op',
+                state_value=state_value,
+                update_time=1000.0,
+                message=None,
+            ))
+
+    def _count_target_rows(self):
+        with self._engine.connect() as conn:
+            return conn.execute(
+                self._sa.select(self._sa.func.count()).select_from(
+                    self._targets_table)).scalar()
+
+    def _target_rows(self):
+        with self._engine.connect() as conn:
+            return list(conn.execute(
+                self._sa.select(self._targets_table)).mappings())
+
+    def test_three_target_rows_persisted(self):
+        """All three (instance, network, interface) targets land in
+        the table -- the v1 schema dropped the latter two."""
+        op_uuid = 'cccc1111-1111-4111-8111-111111111111'
+        op_type = 'node_inst_net_iface_op'
+
+        for field, target_uuid, target_type in (
+                ('instance', HOTPLUG_INSTANCE_UUID, 'instance'),
+                ('network', HOTPLUG_NETWORK_UUID, 'network'),
+                ('interface', HOTPLUG_INTERFACE_UUID, 'interface')):
+            ok = self._mariadb._direct_create_cluster_operation_target(
+                operation_uuid=op_uuid,
+                operation_type=op_type,
+                target_object_type=target_type,
+                target_uuid=target_uuid,
+                created_at=1000.0)
+            self.assertTrue(ok, f'write for {field} target should succeed')
+
+        self.assertEqual(3, self._count_target_rows())
+
+        rows = self._target_rows()
+        target_uuids = {r['target_uuid'] for r in rows}
+        self.assertEqual(
+            {HOTPLUG_INSTANCE_UUID, HOTPLUG_NETWORK_UUID,
+             HOTPLUG_INTERFACE_UUID},
+            target_uuids)
+        target_types = {r['target_object_type'] for r in rows}
+        self.assertEqual({'instance', 'network', 'interface'},
+                         target_types)
+
+    def test_duplicate_op_target_pair_is_idempotent(self):
+        """Same (op_uuid, target_type, target_uuid) triple written
+        twice must not raise -- callers rely on idempotency."""
+        op_uuid = 'cccc1111-1111-4111-8111-111111111111'
+
+        ok = self._mariadb._direct_create_cluster_operation_target(
+            operation_uuid=op_uuid,
+            operation_type='node_inst_net_iface_op',
+            target_object_type='network',
+            target_uuid=HOTPLUG_NETWORK_UUID,
+            created_at=1000.0)
+        self.assertTrue(ok)
+
+        ok = self._mariadb._direct_create_cluster_operation_target(
+            operation_uuid=op_uuid,
+            operation_type='node_inst_net_iface_op',
+            target_object_type='network',
+            target_uuid=HOTPLUG_NETWORK_UUID,
+            created_at=2000.0)
+        self.assertTrue(ok)
+
+        self.assertEqual(1, self._count_target_rows())
+
+    def test_pending_network_target_visible_while_op_queued(self):
+        """has_pending_cluster_operation_target(NETWORK, uuid) must
+        return True while the op is in 'queued' state. This is the
+        gate Network.is_okay() uses to defer the maintainer. The
+        v1 schema bug dropped this target row, making the gate
+        useless for hot-plug.
+        """
+        op_uuid = 'cccc1111-1111-4111-8111-111111111111'
+
+        self._insert_op_state(op_uuid, 'queued')
+        ok = self._mariadb._direct_create_cluster_operation_target(
+            operation_uuid=op_uuid,
+            operation_type='node_inst_net_iface_op',
+            target_object_type='network',
+            target_uuid=HOTPLUG_NETWORK_UUID,
+            created_at=1000.0)
+        self.assertTrue(ok)
+
+        result = (
+            self._mariadb._direct_has_pending_cluster_operation_target(
+                'network', HOTPLUG_NETWORK_UUID))
+        self.assertTrue(result)
+
+    def test_pending_returns_false_after_op_completes(self):
+        """Once the op state moves to 'complete', the gate releases."""
+        op_uuid = 'cccc1111-1111-4111-8111-111111111111'
+
+        self._insert_op_state(op_uuid, 'complete')
+        self._mariadb._direct_create_cluster_operation_target(
+            operation_uuid=op_uuid,
+            operation_type='node_inst_net_iface_op',
+            target_object_type='network',
+            target_uuid=HOTPLUG_NETWORK_UUID,
+            created_at=1000.0)
+
+        result = (
+            self._mariadb._direct_has_pending_cluster_operation_target(
+                'network', HOTPLUG_NETWORK_UUID))
+        self.assertFalse(result)
+
+    def test_non_uniqueness_integrity_error_returns_false(self):
+        """A NOT NULL violation (or any non-uniqueness IntegrityError)
+        must surface as False, not be swallowed as idempotency.
+
+        Before the keyword-match was tightened, the writer's
+        IntegrityError handler returned True for any IntegrityError --
+        which hid bugs like passing None for a required column. The
+        narrowed match only forgives the composite UNIQUE we
+        actually want to be idempotent on.
+        """
+        ok = self._mariadb._direct_create_cluster_operation_target(
+            operation_uuid=None,
+            operation_type='node_inst_net_iface_op',
+            target_object_type='network',
+            target_uuid=HOTPLUG_NETWORK_UUID,
+            created_at=1000.0)
+        self.assertFalse(ok)
+        self.assertEqual(0, self._count_target_rows())
+
+    def test_full_enqueue_persists_three_rows(self):
+        """End-to-end: calling node_inst_net_iface_op.create_and_enqueue
+        must result in three persisted cluster_operation_targets rows
+        (instance, network, interface) in the real database, not just
+        three call-sites to create_cluster_operation_target.
+
+        This is the test the v1 schema bug would have failed: the
+        UNIQUE(operation_uuid) constraint silently dropped the
+        network and interface rows after the instance row landed.
+        """
+        # Late import to keep the schema module (and its transitive
+        # cluster-operation-target machinery) out of this test file's
+        # import path -- only this one method needs it, and pulling
+        # it at module scope would couple every test in the file to
+        # the operation-schema import chain.
+        from shakenfist.schema.operations.node_inst_net_iface_op import (
+            create_and_enqueue, model_tasks)
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+
+        # The op + state + work-queue write is its own MariaDB
+        # transaction; here we only care about the target writes,
+        # so stub it out as success.
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                return_value=True):
+            _, op_uuid = create_and_enqueue(
+                HOTPLUG_NODE_UUID,
+                HOTPLUG_INSTANCE_UUID,
+                HOTPLUG_NETWORK_UUID,
+                HOTPLUG_INTERFACE_UUID,
+                [model_tasks.hot_plug_instance_interface],
+                PRIORITY.user_waiting,
+            )
+
+        self.assertEqual(3, self._count_target_rows())
+
+        rows = self._target_rows()
+        for r in rows:
+            self.assertEqual(op_uuid, r['operation_uuid'])
+            self.assertEqual('node_inst_net_iface_op', r['operation_type'])
+
+        target_uuids = {r['target_uuid'] for r in rows}
+        self.assertEqual(
+            {HOTPLUG_INSTANCE_UUID, HOTPLUG_NETWORK_UUID,
+             HOTPLUG_INTERFACE_UUID},
+            target_uuids)
+        target_types = {r['target_object_type'] for r in rows}
+        self.assertEqual({'instance', 'network', 'interface'},
+                         target_types)

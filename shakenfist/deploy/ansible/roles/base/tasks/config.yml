@@ -158,12 +158,3 @@
   changed_when: _.rc == 1
   failed_when: _.rc == 2
   notify: Reload systemd
-
-- name: Ensure /var/run/sf exists for gunicorn
-  file:
-    path: /var/run/sf
-    state: directory
-    owner: root
-    group: root
-    mode: u=rw,g=r,o=r
-  when: not config_stat_result.stat.exists

@@ -156,6 +156,4 @@ def main():
     m = Monitor('net')
     m.run()
 
-    # This is here because sometimes the grpc bits don't shut down cleanly
-    # by themselves.
-    raise SystemExit(0)
+    daemon.force_clean_exit()

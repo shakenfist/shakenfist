@@ -86,7 +86,6 @@ def set_log_level(log, name):
 
 
 def write_pid_file(daemon_name):
-    os.makedirs('/run/sf/', exist_ok=True)
     with open(f'/run/sf/{daemon_name}.pid', 'w') as f:
         f.write(f'{os.getpid()}')
 
@@ -99,7 +98,6 @@ def clear_abort_path(abort_path):
 
 def set_abort_path(abort_path, source):
     LOG.info(f'Setting abort file: {abort_path} ({source})')
-    os.makedirs(os.path.basename(abort_path), exist_ok=True)
     with open(abort_path, 'w') as f:
         f.write('1')
 
@@ -302,6 +300,30 @@ class Daemon:
             self.check_daemon_state()
             if os.path.exists(self.abort_path):
                 break
+
+
+def force_clean_exit():
+    # Skip the interpreter's normal teardown and exit immediately.
+    #
+    # Some gRPC client channels (notably the thread-local eventlog channel
+    # in shakenfist.eventlog) leave C-level background threads alive that
+    # block ordinary interpreter shutdown when the server-side has already
+    # gone away. record_exit() has already flushed the audit state, so
+    # anything still running here is not productive work -- waiting for it
+    # only buys a systemd SIGKILL after TimeoutStopSec.
+    #
+    # Before exiting, log any non-daemon Python threads still alive. Those
+    # are leakers we control (the C++ gRPC event_engine threads we cannot)
+    # and naming them in syslog makes future regressions visible.
+    main_thread = threading.main_thread()
+    leakers = [
+        (t.name, t.ident) for t in threading.enumerate()
+        if t is not main_thread and not t.daemon
+    ]
+    if leakers:
+        LOG.warning(
+            f'Non-daemon Python threads still alive at exit: {leakers}')
+    os._exit(0)
 
 
 def _send_systemd_notification(message):
