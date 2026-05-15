@@ -216,6 +216,7 @@ nav:
             - "Configuration": components/ryll/configuration.md
             - "Installation": components/ryll/installation.md
             - "K1: tokio waker silently lost on main channel after T+465 s": components/ryll/TOKIO-WEDGING.md
+            - "macOS runtime-metrics verification runbook": components/ryll/macos-metrics-verification.md
             - "Multi-mode parity matrix": components/ryll/multi-mode-parity.md
             - "Releasing": components/ryll/releasing.md
             - "ryll --web operator guide": components/ryll/web-frontend.md
@@ -266,6 +267,7 @@ nav:
                 - "Phase 1: Paste-as-keystrokes translator": components/ryll/plans/PLAN-paste-as-keystrokes-phase-01-translator.md
                 - "Phase 1: Platform Portability": components/ryll/plans/PLAN-packaging-phase-01-portability.md
                 - "Phase 1: Plumbing": components/ryll/plans/PLAN-display-draw-ops-phase-01-plumbing.md
+                - "Phase 1: Process-level metrics on macOS": components/ryll/plans/PLAN-macos-runtime-metrics-phase-01-process.md
                 - "Phase 1: Renderer extraction (`shakenfist-spice-renderer`)": components/ryll/plans/PLAN-web-frontend-phase-01-extract.md
                 - "Phase 1: Ring buffer infrastructure": components/ryll/plans/PLAN-bug-reports-phase-01-ring-buffer.md
                 - "Phase 1: Screenshot hotkey and save dialog": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-01-screenshot.md
@@ -284,6 +286,7 @@ nav:
                 - "Phase 2: Move pcap writes to a dedicated writer task": components/ryll/plans/PLAN-video-keeping-up-phase-02-pcap-thread.md
                 - "Phase 2: Mux protocol (demux and remux)": components/ryll/plans/PLAN-webdav-phase-02-mux-protocol.md
                 - "Phase 2: Pcap packet capture": components/ryll/plans/PLAN-capture-phase-02-pcap.md
+                - "Phase 2: Per-thread enumeration and naming on macOS": components/ryll/plans/PLAN-macos-runtime-metrics-phase-02-threads.md
                 - "Phase 2: Render cursor as egui overlay": components/ryll/plans/PLAN-cursor-rendering-phase-02-render.md
                 - "Phase 2: Repaint cadence fix": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint.md
                 - "Phase 2: Reserve crate names on crates.io": components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names.md
@@ -303,6 +306,7 @@ nav:
                 - "Phase 3: Extract shakenfist-spice-compression": components/ryll/plans/PLAN-crate-extraction-phase-03-compression.md
                 - "Phase 3: GUI gesture for paste-as-keystrokes": components/ryll/plans/PLAN-paste-as-keystrokes-phase-03-gui.md
                 - "Phase 3: Input and session correctness": components/ryll/plans/PLAN-deferred-debt-phase-03-session.md
+                - "Phase 3: macOS metrics integration verification and soak": components/ryll/plans/PLAN-macos-runtime-metrics-phase-03-integration.md
                 - "Phase 3: migrate Gaps and bug-report status as sources": components/ryll/plans/PLAN-notifications-phase-03-existing-sources.md
                 - "Phase 3: Move MP4 video encoding off the GUI event loop": components/ryll/plans/PLAN-video-keeping-up-phase-03-video-encode-thread.md
                 - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
