@@ -788,6 +788,90 @@ Users comparing instar output against `qemu-img check` may notice these
 discrepancies, particularly for images with refcount issues or extensive
 L2 table corruption beyond the first sector.
 
+## measure subcommand quirks
+
+### `--image-opts` is rejected
+
+`qemu-img measure --image-opts driver=qcow2,file.filename=...`
+accepts a descriptor-based source specification. instar does
+not support this form and errors out with a clear message.
+Use the positional `INPUT` argument or `--size SIZE` instead.
+
+### `-o help` is rejected
+
+`qemu-img measure -o help -O qcow2` prints the available
+options for the target format. instar errors out with a
+clear message. Use `instar measure --help` for the available
+individual flags; see `docs/measure.md` for the `-o` key
+reference per target.
+
+### `bitmaps` field emission rule
+
+For `--output=json` with `-O qcow2` and a qcow2 v3 source
+image, instar emits a leading `"bitmaps": 0` field (and the
+equivalent `bitmaps size: 0` trailing line in human output).
+This matches qemu-img's behaviour exactly:
+
+- target = qcow2 AND source = qcow2 v3 (compat=1.1): emit
+  the field.
+- target = qcow2 AND source = qcow2 v2 (compat=0.10): omit.
+- target = qcow2 AND `--size SIZE` mode: omit.
+- target ≠ qcow2: omit.
+
+instar's gate is a 4+4 byte peek of the source's first
+sector (magic + version field). See `src/vmm/src/chain.rs`
+for the helper `peek_is_qcow2_v3`.
+
+### Convert-vs-measure size bounds for vmdk / vpc / vhdx
+
+For target formats qemu-img cannot measure, the bound that
+`instar measure` predicts must accommodate the convert
+writer's actual output size. The relationship is:
+
+- `instar convert -O <fmt>` output ≤
+  `fully_allocated + max(1 MiB, fully_allocated / 16)`.
+- The lower bound (`actual >= required`) is permissive:
+  instar's parser scanners can over-report `allocated_bytes`
+  and convert's zero-skipping can produce strictly less than
+  `required`. That is not a bug.
+
+The cushion absorbs the convert writer's per-block sector
+alignment slack — each allocated block and metadata region
+is padded to the output sector size (default 64 KiB), so the
+cumulative overhead scales with block count.
+`scripts/differential-fuzz.py::op_measure` and the round-
+trip tests in `tests/test_measure.py::TestMeasureRoundTrip`
+both use this same bound.
+
+### Known scanner divergences from qemu-img
+
+For raw and qcow2 targets, instar measure matches qemu-img
+exactly on the cross-version baseline matrix. A handful of
+source-image cases exhibit small numeric divergences because
+instar's parser scanners are simpler than qemu-img's. The
+canonical list lives at
+`tests/test_measure.py::KNOWN_SOURCE_SCANNER_DIVERGENCES`.
+Categories:
+
+- Raw sources with on-disk sparse extents: instar over-
+  reports `required` because the raw scanner does not use
+  `SEEK_HOLE`/`SEEK_DATA`.
+- QCOW2 sources for some real-world images: instar's
+  scanner counts allocated bytes slightly differently
+  (compressed-cluster or extended-L2 subcluster edge
+  case under investigation).
+- QCOW2 sources with backing chains: instar reports the
+  top layer's allocations only.
+- VHDX sources: instar treats every BAT block as fully
+  allocated.
+- VMDK multi-extent source layouts: instar's extent map
+  propagation differs.
+- VHD legacy CHS-only sources: instar's reported
+  virtual_size differs by approximately 2 MiB.
+
+See `docs/measure.md` for the user-facing presentation of
+these divergences.
+
 ## Future Additions
 
 Additional quirks will be documented here as they are discovered during
