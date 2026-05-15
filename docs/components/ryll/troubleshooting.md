@@ -395,6 +395,12 @@ ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
 └── runtime-metrics.json  — process and per-thread CPU / RSS
 ```
 
+**Mac-specific verification.** If you are debugging the
+runtime-metrics output specifically on a Mac, see
+[`macos-metrics-verification.md`](/components/ryll/macos-metrics-verification/)
+for a step-by-step acceptance-test runbook and a Mach
+port-leak soak procedure.
+
 **Timestamps.** `metadata.json` carries two timestamps:
 `timestamp` / `session_uptime_secs` are when the zip was
 written; `triggered_at` / `triggered_uptime_secs` are when the
