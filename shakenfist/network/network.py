@@ -823,8 +823,9 @@ class Network(dbowo):
 
     def remove_nat(self):
         if config.NODE_IS_NETWORK_NODE:
-            if self.floating_gateway:
-                self.unassign_floating_gateway()
+            with self.get_lock(op='Network remove NAT', global_scope=False):
+                if self.floating_gateway:
+                    self.unassign_floating_gateway()
 
         else:
             net_create_and_enqueue(
@@ -882,49 +883,50 @@ class Network(dbowo):
 
     @_not_on_floating_network
     def ensure_mesh(self):
-        # Determine which IPs should be on this mesh and where
-        instances = []
-        for ni in self.networkinterfaces:
-            if ni.instance_uuid not in instances:
-                instances.append(ni.instance_uuid)
+        with self.get_lock(op='Network ensure mesh', global_scope=False):
+            # Determine which IPs should be on this mesh and where
+            instances = []
+            for ni in self.networkinterfaces:
+                if ni.instance_uuid not in instances:
+                    instances.append(ni.instance_uuid)
 
-        node_fqdns = []
-        for inst_uuid in instances:
-            inst = instance.Instance.from_db(inst_uuid)
-            if not inst:
-                continue
-            placement = inst.placement
-            if not placement:
-                continue
-            if not placement.get('node'):
-                continue
+            node_fqdns = []
+            for inst_uuid in instances:
+                inst = instance.Instance.from_db(inst_uuid)
+                if not inst:
+                    continue
+                placement = inst.placement
+                if not placement:
+                    continue
+                if not placement.get('node'):
+                    continue
 
-            if not placement.get('node') in node_fqdns:
-                node_fqdns.append(placement.get('node'))
+                if not placement.get('node') in node_fqdns:
+                    node_fqdns.append(placement.get('node'))
 
-        # NOTE(mikal): why not use DNS here? Well, DNS might be outside
-        # the control of the deployer if we're running in a public cloud
-        # as an overlay cloud... Also, we don't include ourselves in the
-        # mesh as that would cause duplicate packets to reflect back to us.
-        # (see bug #859).
-        node_ips = set()
-        if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
-            # Always add Network node if it is not this node
-            node_ips.add(config.NETWORK_NODE_IP)
+            # NOTE(mikal): why not use DNS here? Well, DNS might be outside
+            # the control of the deployer if we're running in a public cloud
+            # as an overlay cloud... Also, we don't include ourselves in the
+            # mesh as that would cause duplicate packets to reflect back to us.
+            # (see bug #859).
+            node_ips = set()
+            if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
+                # Always add Network node if it is not this node
+                node_ips.add(config.NETWORK_NODE_IP)
 
-        for fqdn in node_fqdns:
-            n = Node.from_db(fqdn)
-            if n and n.ip != config.NODE_MESH_IP:
-                node_ips.add(n.ip)
+            for fqdn in node_fqdns:
+                n = Node.from_db(fqdn)
+                if n and n.ip != config.NODE_MESH_IP:
+                    node_ips.add(n.ip)
 
-        added, removed = util_concurrency.ensure_vxlan_mesh(
-            self.uuid, self.vxid, node_ips)
-        if removed:
-            self.add_event(EVENT_TYPE_MUTATE, 'remove mesh elements',
-                           extra={'removed': removed})
-        if added:
-            self.add_event(EVENT_TYPE_MUTATE, 'add mesh elements',
-                           extra={'added': added})
+            added, removed = util_concurrency.ensure_vxlan_mesh(
+                self.uuid, self.vxid, node_ips)
+            if removed:
+                self.add_event(EVENT_TYPE_MUTATE, 'remove mesh elements',
+                               extra={'removed': removed})
+            if added:
+                self.add_event(EVENT_TYPE_MUTATE, 'add mesh elements',
+                               extra={'added': added})
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
@@ -937,8 +939,9 @@ class Network(dbowo):
                 'floating': floating_address,
                 'inner': inner_address
             })
-        util_concurrency.add_floating_ip(
-            str(self.uuid), floating_address, inner_address)
+        with self.get_lock(op='Network add floating IP', global_scope=False):
+            util_concurrency.add_floating_ip(
+                str(self.uuid), floating_address, inner_address)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
@@ -951,7 +954,9 @@ class Network(dbowo):
                 'floating': floating_address,
                 'inner': inner_address
             })
-        util_concurrency.remove_floating_ip(str(self.uuid), floating_address)
+        with self.get_lock(op='Network remove floating IP', global_scope=False):
+            util_concurrency.remove_floating_ip(
+                str(self.uuid), floating_address)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
@@ -961,8 +966,10 @@ class Network(dbowo):
             extra={'floating': floating_address})
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
-        util_concurrency.execute(
-            'ip route add %(floating_address)s/32 dev %(vx_bridge)s' % subst)
+        with self.get_lock(op='Network route address', global_scope=False):
+            util_concurrency.execute(
+                'ip route add %(floating_address)s/32 dev %(vx_bridge)s'
+                % subst)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
@@ -972,8 +979,10 @@ class Network(dbowo):
             extra={'floating': floating_address})
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
-        util_concurrency.execute(
-            'ip route del %(floating_address)s/32 dev %(vx_bridge)s' % subst)
+        with self.get_lock(op='Network unroute address', global_scope=False):
+            util_concurrency.execute(
+                'ip route del %(floating_address)s/32 dev %(vx_bridge)s'
+                % subst)
 
 
 class Networks(dbo_iter):
