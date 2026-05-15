@@ -908,3 +908,31 @@ qemu-img_convert: CommandFilter, qemu-img, root
 - JSON output required for: info, measure, check, map
 - Progress output: `(XX.XX/100%)` format parsing
 - Human-readable parsing: oslo.utils QemuImgInfo for legacy support
+
+## instar Operations
+
+### measure
+
+```
+instar measure [OPTIONS] [INPUT]
+instar measure --size SIZE -O TARGET_FMT
+instar measure -O TARGET_FMT [--output=json] SOURCE_IMAGE
+```
+
+Predict the file size required to convert a source image (or a
+hypothetical image of a given size) to a target format.
+
+```bash
+# Predict size for a 1 GiB hypothetical qcow2
+instar measure --size 1G -O qcow2
+
+# Predict size for converting an existing image to raw
+instar measure -O raw mydisk.qcow2
+
+# JSON output for scripting
+instar measure -O qcow2 --output=json mydisk.vmdk
+```
+
+Supports raw and qcow2 targets (byte-identical output to qemu-img)
+plus vmdk, vpc, and vhdx targets that qemu-img cannot measure. See
+[docs/measure.md](/components/instar/measure/) for the full reference.

@@ -102,6 +102,7 @@ nav:
                 - "Title for the plan": components/development/plans/PLAN-consistency-audits-v2.md
         - Instar:
             - "Introduction": components/instar/index.md
+            - "`instar measure` — predict file size for a target format": components/instar/measure.md
             - "Announcement": components/instar/openstack-announcement-email.md
             - "Backing Chain Discovery": components/instar/chain-discovery.md
             - "Chain Config Protocol": components/instar/chain-config.md
@@ -127,10 +128,21 @@ nav:
                 - "qcow2-v2 Test Image": components/instar/image_notes/qcow2-v2.md
                 - "virtualpc-vhd Test Image": components/instar/image_notes/virtualpc-vhd.md
             - Plans:
+                - "`instar measure` subcommand": components/instar/plans/PLAN-measure.md
                 - "Automated fuzzer bug fix workflow": components/instar/plans/PLAN-fuzz-autofix.md
                 - "Convert follow-ups: deferred work after PLAN-convert.md": components/instar/plans/PLAN-convert-followups.md
                 - "Coverage-guided fuzzing of parser crates (Phase 6)": components/instar/plans/PLAN-coverage-fuzzing.md
                 - "Instar and qemu-img security audit": components/instar/plans/PLAN-audit.md
+                - "Phase 10: documentation, CHANGELOG polish, follow-ups": components/instar/plans/PLAN-measure-phase-10-docs.md
+                - "Phase 1: per-format size calculators (`crates/measure/`)": components/instar/plans/PLAN-measure-phase-01-calculators.md
+                - "Phase 2: source-allocation scanners on the parser crates": components/instar/plans/PLAN-measure-phase-02-allocation-scanners.md
+                - "Phase 3: guest `measure` operation + protobuf result + call-table boundary": components/instar/plans/PLAN-measure-phase-03-guest-op.md
+                - "Phase 4: host VMM subcommand and output formatting": components/instar/plans/PLAN-measure-phase-04-host-cli.md
+                - "Phase 5: `-o key=value,...` qemu-img-style option parsing": components/instar/plans/PLAN-measure-phase-05-target-options.md
+                - "Phase 6: cross-version `qemu-img measure` baselines": components/instar/plans/PLAN-measure-phase-06-baselines.md
+                - "Phase 7: integration tests against the cross-version baselines": components/instar/plans/PLAN-measure-phase-07-integration-tests.md
+                - "Phase 8: coverage-guided fuzzing for `crates/measure/` and the scanners": components/instar/plans/PLAN-measure-phase-08-fuzz-coverage.md
+                - "Phase 9: differential fuzzer extension for `instar measure`": components/instar/plans/PLAN-measure-phase-09-fuzz-differential.md
                 - "Plan: First Public Release of Instar": components/instar/plans/PLAN-release.md
                 - "Plan: Multi-distro install + qemu-img differential CI": components/instar/plans/PLAN-distro-matrix-ci.md
                 - "Release v0.2.0": components/instar/plans/PLAN-release-v0.2.md

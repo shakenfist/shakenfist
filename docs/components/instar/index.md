@@ -43,6 +43,7 @@ Features unique to instar that do not exist in qemu-img.
 | [Configuration Guide](/components/instar/configuration/) | Command-line flags, config files, quirk control |
 | [Chain Discovery](/components/instar/chain-discovery/) | `instar info --chain` - secure backing chain discovery |
 | [Chain Config Protocol](/components/instar/chain-config/) | Chain config structure layout and VMM-to-guest data flow |
+| [Measure](/components/instar/measure/) | `instar measure` - predict file size for a target format |
 
 ## Compatibility
 
