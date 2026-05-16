@@ -8,8 +8,10 @@ from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist import mariadb
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.config import config
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_all_network_queues
+from shakenfist.operations.baseoperation import get_node_network_queues
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -32,8 +34,20 @@ class Job(util_concurrency.Job):
         # of these jobs in parallel with a pool of workers, but I am not sure its
         # worth the complexity right now. Are we really going to be changing
         # networks that much?
+
+        # Safety property: each queue must be drained by exactly one worker.
+        # Per-node queues ({node_uuid}-network-*) are only drained by this
+        # node's net-worker, so they are always included here.  The cluster-wide
+        # networknode-* queues are only drained on the elected network node, so
+        # they are added conditionally — adding them on every node would cause
+        # multiple workers to race over the same queue and break the ordering
+        # guarantees that the back-off map (step 1e) depends on.
+        queue_names = list(get_node_network_queues(config.NODE_UUID))
+        if config.NODE_IS_NETWORK_NODE:
+            queue_names += get_all_network_queues()
+
         while daemon.check_abort_path(self.abort_path):
-            for queue_name in get_all_network_queues():
+            for queue_name in queue_names:
                 jobname_workitem = mariadb.dequeue_work_item(queue_name)
                 if jobname_workitem:
                     break
