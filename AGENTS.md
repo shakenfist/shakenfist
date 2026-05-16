@@ -117,6 +117,18 @@ Current hooks:
 - `ansible-lint` - Validates Ansible playbooks in the deployer
 - `mypy` - Type checking via tox (incremental rollout)
 
+### sf-net daemon topology
+
+`sf-net` runs a `net-worker` job on **every** cluster node (not only the
+elected network node). Each node's worker drains its own per-node
+`{node_uuid}-network-*` queues for hypervisor-local operations
+(`create_on_hypervisor`, `ensure_mesh`). Additionally, the elected network
+node's worker also drains the cluster-wide `networknode-clusteroperation-*`
+queues for network-node-only operations (`create_on_network_node`,
+`add_floating_ip`, etc.). This two-family design means per-hypervisor network
+mutations are parallelised across nodes while network-node-singleton operations
+remain serialised.
+
 ### Key Directories
 
 - `shakenfist/` - Core package

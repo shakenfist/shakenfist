@@ -225,6 +225,32 @@ To add a new enum value:
 2. Run `tox -e genprotos` to regenerate the protobuf definitions
 3. Never change or reuse existing `proto_id` values
 
+### Network Operation Queue Families
+
+Network operations are dispatched through two distinct queue families, both
+in the same priority taxonomy (`user_waiting`, `user_facing`,
+`user_facing_high_io`, `background`, `background_high_io`):
+
+| Family | Queue name pattern | Drained by | Used for |
+|--------|--------------------|------------|----------|
+| Per-node network | `{node_uuid}-network-{priority}` | net-worker on that node only | `create_on_hypervisor`, `ensure_mesh` — operations that mutate per-hypervisor state |
+| Network-node | `networknode-clusteroperation-{priority}` | net-worker on the elected network node only | `create_on_network_node`, `add_floating_ip`, `route_address` — operations that only the elected network node owns |
+
+The `enqueue_cluster_operation()` helper selects the family via its
+`family='network'` keyword argument. Passing `family='network'` produces
+`{node_uuid}-network-{priority}` queue names; the default
+`family='clusteroperation'` produces the existing node/cluster-operation queues.
+
+**Single-worker-per-queue safety property.** The net-worker's in-memory
+exponential back-off map (see the developer guide) is correct only because each
+queue it drains is serviced by exactly one worker. Per-node queues are drained
+by the net-worker on that specific node; cluster-wide `networknode-*` queues are
+drained only by the elected network node's net-worker. Introducing a second
+worker on the same queue would break the back-off schedule — see the prominent
+comment at the map's declaration in
+`shakenfist/daemons/network/workitem.py` for the authoritative statement of
+valid mitigation strategies.
+
 ### Networking
 
 Shaken Fist uses VXLAN mesh networking:
