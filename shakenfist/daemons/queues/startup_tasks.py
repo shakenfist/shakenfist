@@ -132,7 +132,8 @@ def restore_instances():
             if not n.is_dead():
                 LOG.with_fields({'network': n}).info('Restoring network')
                 n.create_on_hypervisor()
-                n.ensure_mesh()
+                mesh_op = n.ensure_mesh()
+                mesh_op.raise_for_error()
         except Exception as e:
             util_exceptions.ignore_exception(
                 'restore network %s' % network_uuid, e)

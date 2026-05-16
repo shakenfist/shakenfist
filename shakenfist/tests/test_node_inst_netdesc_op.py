@@ -1,0 +1,170 @@
+# Copyright 2019 Michael Still and contributors
+"""Regression tests for NodeInstNetdescOp — ensure_mesh caller update (step 2g).
+
+Verifies that when ``Network.ensure_mesh()`` returns an op whose
+``raise_for_error()`` raises ``NetworkOperationFailed``, the exception
+propagates through ``_instance_start`` and is captured by
+``dispatch_task``'s generic exception handler, ending the op in
+``STATE_ERROR``.
+"""
+
+from contextlib import contextmanager
+from unittest import mock
+from uuid import uuid4
+
+from shakenfist.exceptions import NetworkOperationFailed
+from shakenfist.operations.error_report import ErrorReport
+from shakenfist.operations.node_inst_netdesc_op import NodeInstNetdescOp
+from shakenfist.schema.operations.node_inst_netdesc_op import create_and_enqueue
+from shakenfist.schema.operations.node_inst_netdesc_op import model_tasks
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.tests import base
+from shakenfist.tests.mock_etcd import MockEtcd
+
+
+def _make_fake_error_report():
+    """Build a minimal ErrorReport for NetworkOperationFailed."""
+    return ErrorReport(
+        code='network.ensure_mesh.failed',
+        message='mesh could not be ensured',
+        details={},
+        origin_class='shakenfist.exceptions.EnsureMeshFailed',
+        traceback='',
+    )
+
+
+def _make_inst_mock():
+    """Build a minimal Instance-like mock in a non-terminal, non-error state."""
+    inst = mock.MagicMock()
+    mock_state = mock.MagicMock()
+    mock_state.value = 'created'
+    inst.state = mock_state
+    # Ensure TERMINAL_STATES check passes (inst.state.value not in TERMINAL_STATES)
+    inst.TERMINAL_STATES = {'deleted', 'delete-wait', 'error'}
+
+    @contextmanager
+    def fake_lock(**kwargs):
+        yield
+
+    inst.get_lock = fake_lock
+    return inst
+
+
+def _make_net_mock(network_uuid):
+    """Build a minimal Network-like mock in STATE_CREATED."""
+    n = mock.MagicMock()
+    mock_state = mock.MagicMock()
+    mock_state.value = 'created'
+    n.state = mock_state
+    n.STATE_CREATED = 'created'
+    n.uuid = network_uuid
+    return n
+
+
+def _make_ni_mock():
+    """Build a minimal NetworkInterface-like mock in an active state."""
+    ni = mock.MagicMock()
+    mock_state = mock.MagicMock()
+    mock_state.value = 'created'
+    ni.state = mock_state
+    ni.ACTIVE_STATES = {'initial', 'creating', 'created', 'error', 'delete-wait'}
+    ni.floating = {'floating_address': None}
+    return ni
+
+
+def _make_op(test_case, mock_etcd, node_uuid, instance_uuid, network_uuid, iface_uuid):
+    """Create a NodeInstNetdescOp with a single network in net_desc."""
+    net_desc = [{'network_uuid': str(network_uuid), 'iface_uuid': str(iface_uuid)}]
+    _, op_uuid = create_and_enqueue(
+        node_uuid=str(node_uuid),
+        instance_uuid=str(instance_uuid),
+        net_desc=net_desc,
+        tasks=[model_tasks.instance_start],
+        priority=PRIORITY.user_facing,
+    )
+    op = NodeInstNetdescOp.from_db(op_uuid)
+    test_case.assertIsNotNone(op)
+    return op
+
+
+class EnsureMeshRaiseForErrorPropagatesTestCase(base.ShakenFistTestCase):
+    """When raise_for_error() raises NetworkOperationFailed, dispatch_task
+    sets STATE_ERROR on the NodeInstNetdescOp."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+        self.node_uuid = uuid4()
+        self.instance_uuid = uuid4()
+        self.network_uuid = uuid4()
+        self.iface_uuid = uuid4()
+
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.NetworkInterface.from_db')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.Network.from_db')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.Instance.from_db')
+    def test_ensure_mesh_network_op_failed_sets_state_error(
+            self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db):
+        """NetworkOperationFailed from raise_for_error() results in STATE_ERROR."""
+        inst_mock = _make_inst_mock()
+        mock_inst_from_db.return_value = inst_mock
+
+        net_mock = _make_net_mock(self.network_uuid)
+        mock_net_from_db.return_value = net_mock
+
+        ni_mock = _make_ni_mock()
+        mock_ni_from_db.return_value = ni_mock
+
+        # ensure_mesh() returns an op handle; raise_for_error() raises
+        error_report = _make_fake_error_report()
+        fake_mesh_op = mock.MagicMock()
+        fake_mesh_op.raise_for_error.side_effect = NetworkOperationFailed(error_report)
+        net_mock.ensure_mesh.return_value = fake_mesh_op
+
+        op = _make_op(
+            self, self.mock_etcd,
+            self.node_uuid, self.instance_uuid,
+            self.network_uuid, self.iface_uuid,
+        )
+        op.state = NodeInstNetdescOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.instance_start)
+
+        # NetworkOperationFailed is not AbortInstanceStart; it hits the
+        # generic except branch and sets STATE_ERROR.
+        self.assertEqual(NodeInstNetdescOp.STATE_ERROR, op.state.value)
+        fake_mesh_op.raise_for_error.assert_called_once()
+
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.NetworkInterface.from_db')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.Network.from_db')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.Instance.from_db')
+    def test_ensure_mesh_success_continues_normally(
+            self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db):
+        """When raise_for_error() returns None, execution continues past ensure_mesh."""
+        inst_mock = _make_inst_mock()
+        mock_inst_from_db.return_value = inst_mock
+
+        net_mock = _make_net_mock(self.network_uuid)
+        mock_net_from_db.return_value = net_mock
+
+        ni_mock = _make_ni_mock()
+        mock_ni_from_db.return_value = ni_mock
+
+        # ensure_mesh() returns an op handle whose raise_for_error() is a no-op
+        fake_mesh_op = mock.MagicMock()
+        fake_mesh_op.raise_for_error.return_value = None
+        net_mock.ensure_mesh.return_value = fake_mesh_op
+
+        op = _make_op(
+            self, self.mock_etcd,
+            self.node_uuid, self.instance_uuid,
+            self.network_uuid, self.iface_uuid,
+        )
+        op.state = NodeInstNetdescOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.instance_start)
+
+        # ensure_mesh was called and raise_for_error was invoked
+        net_mock.ensure_mesh.assert_called_once()
+        fake_mesh_op.raise_for_error.assert_called_once()
+        # The op should NOT be in STATE_ERROR (it reached further into _instance_start)
+        self.assertNotEqual(NodeInstNetdescOp.STATE_ERROR, op.state.value)

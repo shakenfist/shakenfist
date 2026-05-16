@@ -10,6 +10,7 @@ from shakenfist.daemons import daemon
 from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import LockException
+from shakenfist.exceptions import NetworkOperationFailed
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
 from shakenfist.network import network
@@ -150,7 +151,8 @@ class Job(util_concurrency.Job):
                                 'recreating not okay network on hypervisor')
                             n.create_on_hypervisor()
 
-                    n.ensure_mesh()
+                    mesh_op = n.ensure_mesh()
+                    mesh_op.raise_for_error()
 
                 except CreateVXLANInterfaceFailed:
                     LOG.with_fields({'network': n}).warning(
@@ -162,6 +164,9 @@ class Job(util_concurrency.Job):
                 except DeadNetwork as e:
                     LOG.with_fields({'exception': e}).info(
                         'maintain_network attempted on dead network')
+                except NetworkOperationFailed as e:
+                    LOG.with_fields({'network': n, 'exception': e}).warning(
+                        'ensure_mesh failed during network maintenance, will retry')
                 except ProcessExecutionError as e:
                     LOG.error('Network maintenance failure: %s', e)
 

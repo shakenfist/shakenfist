@@ -240,7 +240,8 @@ class NodeInstNetdescOp(BaseClusterOperation):
 
                     ni.state = NetworkInterface.STATE_CREATED
                     n.create_on_hypervisor()
-                    n.ensure_mesh()
+                    mesh_op = n.ensure_mesh()
+                    mesh_op.raise_for_error()
                     n.update_dnsmasq()
 
                     if ni.floating['floating_address']:
