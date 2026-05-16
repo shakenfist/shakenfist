@@ -482,19 +482,11 @@ because the following statements will be true:
 - **mTLS for gRPC, TLS for MariaDB, graceful cert reload.**
   Tracked in `PLAN-embrace-tls.md`. This plan establishes the
   operator-provides-PKI surface that the TLS plan consumes.
-- **Removing `shakenfist/etcd.py` and the `DATA_MIGRATIONS`
-  drain code.** Blocked on this plan landing and on a
+- **Retiring `shakenfist/etcd.py` and the `DATA_MIGRATIONS`
+  drain code.** Tracked in `PLAN-remove-etcd.md`. Blocked
+  on this plan completing (through phase 7) and on a
   subsequent wipe-and-redeploy of the last known etcd-era
-  SF deployment. Mikal's preference is to wait so the
-  rebuild already uses the new BYO-infrastructure shape
-  rather than briefly standing up a primary node we know is
-  going away. Once the redeploy is done, `shakenfist/etcd.py`,
-  the `DATA_MIGRATIONS` drain functions, the `etcd_host`
-  config default, the `ETCDCTL_API=3` line in `sfrc`, and
-  the residual `from etcd...` comments throughout
-  `mariadb.py` all become a single satisfying deletion
-  commit. Track explicitly in the next-minor release plan
-  so it does not slip.
+  SF deployment against the new BYO shape.
 - **Health checks, readiness, and graceful drain semantics.**
   A precondition for the BYO-LB story being operationally
   honest: operators need a `/healthz` (or equivalent) that
