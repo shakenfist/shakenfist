@@ -94,6 +94,16 @@ def get_all_network_queues() -> list[str]:
     ]
 
 
+def get_node_network_queues(node_uuid: str) -> list[str]:
+    return [
+        f'{node_uuid}-network-user_waiting',
+        f'{node_uuid}-network-user_facing',
+        f'{node_uuid}-network-user_facing_high_io',
+        f'{node_uuid}-network-background',
+        f'{node_uuid}-network-background_high_io',
+    ]
+
+
 class BaseClusterOperation(BaseOperation):
     # Note that cluster operations are created in etcd transactions and don't
     # have .new() methods. They therefore jump straight to queued as an initial
