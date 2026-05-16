@@ -44,6 +44,11 @@ This section contains forward-looking roadmaps for Shaken Fist development. Thes
 | [Embrace TLS](PLAN-embrace-tls.md) | Phase 5: sf-api TLS | Not started | Optional native TLS on sf-api; document operator-LB story |
 | [Embrace TLS](PLAN-embrace-tls.md) | Phase 6: Expiry monitoring | Not started | Cert expiry warnings as events + prometheus metrics |
 | [Embrace TLS](PLAN-embrace-tls.md) | Phase 7: Dev CA | Not started | Repurpose `pki_internal_ca` as dev/test convenience only |
+| [Sticky blob transfers](PLAN-sticky-transfers.md) | Phase 0: Research and decisions | Not started | Resolve cookie format, LB coverage, and placement-interaction questions |
+| [Sticky blob transfers](PLAN-sticky-transfers.md) | Phase 1: Server-side cookies | Not started | sf-api emits and honours server-set sticky cookies |
+| [Sticky blob transfers](PLAN-sticky-transfers.md) | Phase 2: LB documentation | Not started | Document HAProxy / Envoy / cloud-LB / nginx configurations |
+| [Sticky blob transfers](PLAN-sticky-transfers.md) | Phase 3: Client verification | Not started | Verify SF Python client cookie handling end-to-end |
+| [Sticky blob transfers](PLAN-sticky-transfers.md) | Phase 4: Failover behaviour | Not started | Define recovery path when the sticky backend dies mid-session |
 
 ### Status Definitions
 

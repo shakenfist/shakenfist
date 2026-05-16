@@ -184,6 +184,27 @@ placement combined with consistent-hash routing on their
 existing LB. That work is out of scope for this plan and
 fits more naturally into the blob-storage roadmap.
 
+### Sticky session affinity as a refinement
+
+For multi-request transfer sessions — multi-chunk blob
+uploads, and ranged downloads that the SF client retries on
+connection drops — server-set sticky cookies on the
+operator's load balancer offer a refinement that eliminates
+the double-hop entirely for the session, without exposing
+per-node URLs to clients. The first request in a session
+lands on any node; that node decides which backend should
+own the session and emits a `Set-Cookie` value that the LB
+intercepts and honours for subsequent requests. The cookie
+is opaque to the client, so the perimeter property
+(clients see only the LB URL) is preserved. The streaming
+proxy above remains the universal fallback when the
+operator's LB does not support server-set sticky cookies
+(open-source nginx is the notable real-world example).
+This refinement has its own scope — LB-specific config,
+cookie format decisions, fallback detection, interaction
+with content-addressable placement — and is tracked
+separately in `PLAN-sticky-transfers.md`.
+
 ## Open questions
 
 1. **Galaxy-role packaging mechanics.** Does the SF project
@@ -459,6 +480,11 @@ because the following statements will be true:
   repo release cadence becomes a coupling. Reconsider
   whether utilities is the right home once phase 5 is
   designed in detail.
+- **Sticky session affinity for blob transfers.** Tracked in
+  `PLAN-sticky-transfers.md`. The streaming-proxy baseline
+  this plan delivers is the universal fallback; sticky
+  cookies are an optional refinement for multi-request
+  transfer sessions on LBs that support them.
 
 ### Bugs fixed during this work
 
