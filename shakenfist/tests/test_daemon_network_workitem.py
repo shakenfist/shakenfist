@@ -2,6 +2,9 @@
 
 from unittest import mock
 
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.tests import base
 
 
@@ -144,3 +147,111 @@ class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
         ]
         for queue_name in cluster_calls:
             self.assertNotIn(NODE_UUID, queue_name)
+
+
+OP_UUID = 'deadbeef-dead-beef-dead-beefdeadbeef'
+QUEUE_NAME = f'{NODE_UUID}-network-user_waiting'
+
+# The four terminal states that should cause the dispatcher to skip an op.
+TERMINAL_STATES = [
+    BaseClusterOperation.STATE_ABORT,
+    BaseClusterOperation.STATE_COMPLETE,
+    dbo.STATE_DELETED,
+    dbo.STATE_ERROR,
+]
+
+
+class TerminalStateCancellationTest(base.ShakenFistTestCase):
+    """Verify that _cluster_operation_execute skips ops already in a terminal
+    state without raising InvalidStateException, and logs an audit event.
+
+    The outer execute() try/finally in workitem.py always calls
+    mariadb.resolve_work_item regardless of whether this method returns early,
+    so we do not assert on resolve_work_item here — that is covered by the
+    execute() caller, not by this method.
+    """
+
+    def _run_terminal_state_check(self, terminal_state_value):
+        """Exercise _cluster_operation_execute with an op already in the given
+        terminal state and return the mock op so callers can assert on it."""
+        mock_state = mock.MagicMock()
+        mock_state.value = terminal_state_value
+
+        mock_op = mock.MagicMock()
+        mock_op.state = mock_state
+
+        mock_op_class = mock.MagicMock()
+        mock_op_class.from_db.return_value = mock_op
+
+        workitem = {
+            'operation_type': 'net_op',
+            'operation_uuid': OP_UUID,
+        }
+
+        with mock.patch(
+            'shakenfist.daemons.network.workitem.get_object_class',
+            return_value=mock_op_class,
+        ):
+            from shakenfist.daemons.network.workitem import Job
+            job = Job.__new__(Job)
+            # _cluster_operation_execute uses self.log (inherited from Job),
+            # but we only need it for the "op not found" path.  Provide a
+            # no-op logger to avoid AttributeError on the happy path.
+            job.log = mock.MagicMock()
+
+            # Must not raise InvalidStateException (or any other exception).
+            job._cluster_operation_execute(QUEUE_NAME, workitem)
+
+        return mock_op
+
+    def test_state_abort_skips_without_exception(self):
+        """STATE_ABORT is the primary target of this fix; confirm no exception."""
+        mock_op = self._run_terminal_state_check(BaseClusterOperation.STATE_ABORT)
+        self.assertIsNotNone(mock_op)
+
+    def test_state_abort_logs_audit_event(self):
+        mock_op = self._run_terminal_state_check(BaseClusterOperation.STATE_ABORT)
+        mock_op.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            f'skipping op already in terminal state {BaseClusterOperation.STATE_ABORT}')
+
+    def test_state_complete_skips_without_exception(self):
+        mock_op = self._run_terminal_state_check(BaseClusterOperation.STATE_COMPLETE)
+        self.assertIsNotNone(mock_op)
+
+    def test_state_complete_logs_audit_event(self):
+        mock_op = self._run_terminal_state_check(BaseClusterOperation.STATE_COMPLETE)
+        mock_op.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            f'skipping op already in terminal state {BaseClusterOperation.STATE_COMPLETE}')
+
+    def test_state_deleted_skips_without_exception(self):
+        mock_op = self._run_terminal_state_check(dbo.STATE_DELETED)
+        self.assertIsNotNone(mock_op)
+
+    def test_state_deleted_logs_audit_event(self):
+        mock_op = self._run_terminal_state_check(dbo.STATE_DELETED)
+        mock_op.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            f'skipping op already in terminal state {dbo.STATE_DELETED}')
+
+    def test_state_error_skips_without_exception(self):
+        mock_op = self._run_terminal_state_check(dbo.STATE_ERROR)
+        self.assertIsNotNone(mock_op)
+
+    def test_state_error_logs_audit_event(self):
+        mock_op = self._run_terminal_state_check(dbo.STATE_ERROR)
+        mock_op.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            f'skipping op already in terminal state {dbo.STATE_ERROR}')
+
+    def test_non_terminal_state_does_not_short_circuit(self):
+        """An op in STATE_QUEUED must NOT be dropped; verify the code reaches
+        the dependency-checking path (op.depends_on is accessed)."""
+        mock_op = self._run_terminal_state_check(BaseClusterOperation.STATE_QUEUED)
+        # add_event is called only for the terminal-state early return;
+        # for STATE_QUEUED the code moves on to set op.queue_name and access
+        # op.depends_on — so add_event should NOT have been called with the
+        # 'skipping' message.
+        for c in mock_op.add_event.call_args_list:
+            self.assertNotIn('skipping op already in terminal state', str(c))

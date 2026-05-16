@@ -2,6 +2,7 @@ import time
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
@@ -77,6 +78,18 @@ class Job(util_concurrency.Job):
 
         if not op:
             self.log.error('Operation not found')
+            return
+
+        terminal_states = {
+            BaseClusterOperation.STATE_ABORT,
+            BaseClusterOperation.STATE_COMPLETE,
+            dbo.STATE_DELETED,
+            dbo.STATE_ERROR,
+        }
+        if op.state.value in terminal_states:
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                f'skipping op already in terminal state {op.state.value}')
             return
 
         op.queue_name = queue_name
