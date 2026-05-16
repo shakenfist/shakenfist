@@ -198,6 +198,10 @@ class TerminalStateCancellationTest(base.ShakenFistTestCase):
             # but we only need it for the "op not found" path.  Provide a
             # no-op logger to avoid AttributeError on the happy path.
             job.log = mock.MagicMock()
+            # Step 1e: the dispatcher touches the back-off map both on
+            # terminal-state drops and just before op.execute(); the helper
+            # must provide an empty map so those calls don't AttributeError.
+            job._defer_delays = {}
 
             # Must not raise InvalidStateException (or any other exception).
             job._cluster_operation_execute(QUEUE_NAME, workitem)
@@ -255,3 +259,143 @@ class TerminalStateCancellationTest(base.ShakenFistTestCase):
         # 'skipping' message.
         for c in mock_op.add_event.call_args_list:
             self.assertNotIn('skipping op already in terminal state', str(c))
+
+
+class ExponentialBackoffMapTest(base.ShakenFistTestCase):
+    """Unit tests for the per-worker exponential back-off map.
+
+    Tests exercise the _apply_defer and _drop_defer_entry helpers directly
+    so we are not coupled to dispatcher-internal control flow.
+    """
+
+    def _make_job(self):
+        """Construct a Job without running __init__, then initialise just the
+        attributes the back-off helpers touch."""
+        from shakenfist.daemons.network.workitem import Job
+        job = Job.__new__(Job)
+        job._defer_delays = {}
+        return job
+
+    def _make_op(self, op_uuid):
+        mock_op = mock.MagicMock()
+        mock_op.uuid = op_uuid
+        return mock_op
+
+    def test_first_defer_uses_initial_delay(self):
+        """An op never seen before is deferred at INITIAL_DEFER_DELAY (0.1 s)."""
+        from shakenfist.daemons.network import workitem
+        job = self._make_job()
+        op = self._make_op('op-uuid-1')
+        dep = mock.MagicMock()
+
+        job._apply_defer(op, waiting_on=[dep])
+
+        op.defer.assert_called_once_with(
+            waiting_on=[dep], delay=workitem.INITIAL_DEFER_DELAY)
+        self.assertAlmostEqual(0.1, workitem.INITIAL_DEFER_DELAY)
+
+    def test_second_defer_doubles_delay(self):
+        """The second defer for the same op uses 2 x INITIAL_DEFER_DELAY."""
+        from shakenfist.daemons.network import workitem
+        job = self._make_job()
+        op = self._make_op('op-uuid-1')
+        dep = mock.MagicMock()
+
+        job._apply_defer(op, waiting_on=[dep])
+        op.defer.reset_mock()
+        job._apply_defer(op, waiting_on=[dep])
+
+        op.defer.assert_called_once_with(
+            waiting_on=[dep], delay=workitem.INITIAL_DEFER_DELAY * 2)
+
+    def test_defer_schedule_progression(self):
+        """The full schedule: 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8, 15.0,
+        15.0 — the last two clamp at MAX_DEFER_DELAY."""
+        job = self._make_job()
+        op = self._make_op('op-uuid-1')
+        dep = mock.MagicMock()
+
+        expected_delays = [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8, 15.0, 15.0]
+        observed_delays = []
+        for _ in expected_delays:
+            op.defer.reset_mock()
+            job._apply_defer(op, waiting_on=[dep])
+            observed_delays.append(op.defer.call_args.kwargs['delay'])
+
+        for expected, observed in zip(expected_delays, observed_delays):
+            self.assertAlmostEqual(expected, observed, places=6)
+
+    def test_advancing_to_executing_drops_entry(self):
+        """After _drop_defer_entry (which the dispatcher calls just before
+        op.execute()), the next defer for that op starts back at the initial
+        delay rather than carrying over."""
+        from shakenfist.daemons.network import workitem
+        job = self._make_job()
+        op = self._make_op('op-uuid-1')
+        dep = mock.MagicMock()
+
+        # Build up the back-off depth: 0.1 -> 0.2 -> 0.4 stored.
+        job._apply_defer(op, waiting_on=[dep])
+        job._apply_defer(op, waiting_on=[dep])
+        # Dispatcher would now run op.execute(), so it drops the entry.
+        job._drop_defer_entry(str(op.uuid))
+        self.assertNotIn(str(op.uuid), job._defer_delays)
+
+        # Next defer should be back at INITIAL_DEFER_DELAY.
+        op.defer.reset_mock()
+        job._apply_defer(op, waiting_on=[dep])
+        op.defer.assert_called_once_with(
+            waiting_on=[dep], delay=workitem.INITIAL_DEFER_DELAY)
+
+    def test_terminal_state_drops_entry(self):
+        """An op already in the back-off map that arrives at the dispatcher
+        in a terminal state has its entry dropped before the dispatcher
+        returns."""
+        terminal_op_uuid = 'terminal-op-uuid'
+
+        mock_state = mock.MagicMock()
+        mock_state.value = BaseClusterOperation.STATE_ABORT
+
+        mock_op = mock.MagicMock()
+        mock_op.uuid = terminal_op_uuid
+        mock_op.state = mock_state
+
+        mock_op_class = mock.MagicMock()
+        mock_op_class.from_db.return_value = mock_op
+
+        workitem_payload = {
+            'operation_type': 'net_op',
+            'operation_uuid': terminal_op_uuid,
+        }
+
+        with mock.patch(
+            'shakenfist.daemons.network.workitem.get_object_class',
+            return_value=mock_op_class,
+        ):
+            from shakenfist.daemons.network.workitem import Job
+            job = Job.__new__(Job)
+            job.log = mock.MagicMock()
+            job._defer_delays = {terminal_op_uuid: 6.4}
+
+            job._cluster_operation_execute(QUEUE_NAME, workitem_payload)
+
+        self.assertNotIn(terminal_op_uuid, job._defer_delays)
+
+    def test_map_cap_evicts_oldest(self):
+        """Inserting BACKOFF_MAP_CAP + 1 distinct op uuids via _apply_defer
+        evicts the first-inserted entry; the others remain."""
+        from shakenfist.daemons.network import workitem
+        job = self._make_job()
+        dep = mock.MagicMock()
+
+        first_uuid = 'op-uuid-0000'
+        # Insert BACKOFF_MAP_CAP + 1 distinct ops.
+        for i in range(workitem.BACKOFF_MAP_CAP + 1):
+            op = self._make_op(f'op-uuid-{i:04d}')
+            job._apply_defer(op, waiting_on=[dep])
+
+        # Oldest must be gone; everyone else must remain.
+        self.assertNotIn(first_uuid, job._defer_delays)
+        self.assertEqual(workitem.BACKOFF_MAP_CAP, len(job._defer_delays))
+        for i in range(1, workitem.BACKOFF_MAP_CAP + 1):
+            self.assertIn(f'op-uuid-{i:04d}', job._defer_delays)

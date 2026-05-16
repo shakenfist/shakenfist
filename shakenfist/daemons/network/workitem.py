@@ -19,6 +19,12 @@ from shakenfist.util import concurrency as util_concurrency
 LOG, _ = logs.setup(__name__)
 
 
+INITIAL_DEFER_DELAY = 0.1
+MAX_DEFER_DELAY = 15.0
+DEFER_DELAY_MULTIPLIER = 2.0
+BACKOFF_MAP_CAP = 1000
+
+
 class Job(util_concurrency.Job):
     def __init__(self, name):
         super().__init__()
@@ -26,6 +32,47 @@ class Job(util_concurrency.Job):
 
         self.abort_path = f'/run/sf/net-{name}.abort'
         daemon.clear_abort_path(self.abort_path)
+
+        # =====================================================================
+        # WARNING: SINGLE-WORKER SAFETY INVARIANT
+        # ---------------------------------------------------------------------
+        # The exponential back-off schedule for deferred ops below is correct
+        # ONLY because each queue this worker drains is serviced by exactly
+        # ONE worker process. Today that holds for two reasons:
+        #
+        #   1. Per-node {node_uuid}-network-* queues are drained only by the
+        #      net-worker on that specific node.
+        #   2. The cluster-wide networknode-* queues are drained only by the
+        #      net-worker on the elected network node (enforced by the
+        #      `if config.NODE_IS_NETWORK_NODE` guard in execute()).
+        #
+        # DO NOT move to multi-worker dequeue (worker pool inside one process,
+        # or multiple nodes voting on the same queue) without fixing this
+        # map. Two workers servicing the same queue can independently defer
+        # the same op and end up with inconsistent delays, double-enqueueing
+        # the op and breaking the back-off schedule.
+        #
+        # Valid mitigations if the topology ever changes:
+        #   * In-process worker pool -> share one map behind a lock.
+        #   * Cross-node voting       -> return to DB-backed back-off state.
+        # =====================================================================
+        self._defer_delays: dict[str, float] = {}
+
+    def _apply_defer(self, op, waiting_on):
+        op_uuid = str(op.uuid)
+        current_delay = self._defer_delays.get(op_uuid, INITIAL_DEFER_DELAY)
+        op.defer(waiting_on=waiting_on, delay=current_delay)
+        self._defer_delays[op_uuid] = min(
+            current_delay * DEFER_DELAY_MULTIPLIER, MAX_DEFER_DELAY)
+
+        if len(self._defer_delays) > BACKOFF_MAP_CAP:
+            # Python dicts preserve insertion order, so the first key is
+            # the oldest entry — FIFO eviction.
+            oldest_key = next(iter(self._defer_delays))
+            del self._defer_delays[oldest_key]
+
+    def _drop_defer_entry(self, op_uuid):
+        self._defer_delays.pop(op_uuid, None)
 
     def execute(self):
         LOG.info('Starting network worker')
@@ -90,6 +137,7 @@ class Job(util_concurrency.Job):
             op.add_event(
                 EVENT_TYPE_AUDIT,
                 f'skipping op already in terminal state {op.state.value}')
+            self._drop_defer_entry(str(op.uuid))
             return
 
         op.queue_name = queue_name
@@ -133,7 +181,7 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
                 # Dependency not yet ready, we should defer
-                op.defer(waiting_on=[dep_op])
+                self._apply_defer(op, waiting_on=[dep_op])
                 return
 
         # Ensure that we are running after any runs_after requirements.
@@ -158,12 +206,19 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
                 # Dependency not yet ready, we should defer
-                op.defer(waiting_on=[dep_op])
+                self._apply_defer(op, waiting_on=[dep_op])
                 return
 
-        # We're good to go!
+        # We're good to go! All dependencies are met, so we no longer need
+        # the back-off entry for this op — drop it so any later defer (e.g.
+        # this op chained onto a different dep) starts back at the initial
+        # delay rather than carrying over the previous chain's depth.
+        self._drop_defer_entry(str(op.uuid))
         start_time = time.time()
         op.execute()
+        # The op may have transitioned to a terminal state during execute();
+        # drop the entry again in case it was somehow re-populated.
+        self._drop_defer_entry(str(op.uuid))
         op.add_event(
             EVENT_TYPE_USAGE, 'execution duration',
             extra={
