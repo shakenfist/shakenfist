@@ -10,7 +10,7 @@ This section contains forward-looking roadmaps for Shaken Fist development. Thes
 The set of incomplete plans has grown to the point where the order they land in matters. The intended sequencing is:
 
 1. **[Network operations facade](PLAN-network-facade.md)** — in progress in a separate work session. Lands first.
-2. **Health checks, readiness, and graceful drain** — not yet drafted as a master plan. A precondition for the BYO load-balancer story in remove-primary being operationally honest; the dependency-aware readiness work is substantial enough to warrant its own plan, to be drafted closer to the start of work.
+2. **[Health checks, readiness, and graceful drain](PLAN-health-checks.md)** — a precondition for the BYO load-balancer story in remove-primary being operationally honest. The plan is partial: a phase 0 decisions pass resolves the open questions before the implementation phases are re-cut.
 3. **[Remove the primary node](PLAN-remove-primary.md)** — the BYO-infrastructure scope reduction. Naturally followed by a wipe-and-redeploy of the last known etcd-era SF deployment against the new shape.
 4. **[Retire etcd](PLAN-remove-etcd.md)** — a small, mechanical deletion sweep gated on remove-primary completing and the redeploy having happened.
 
@@ -42,6 +42,11 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Replace last_cluster_operation](PLAN-replace-last-cluster-operation.md) | Phase 5: Documentation and final audit | Complete | Update docs, verify CI |
 | [Fix cluster_operation_targets UNIQUE constraint](PLAN-fix-cluster-operation-targets-unique-constraint.md) | Schema fix | Complete | Replace column-level `UNIQUE(operation_uuid)` with composite `UNIQUE(operation_uuid, target_object_type, target_uuid)` so multi-target ops record all their target rows |
 | [Network operations facade](PLAN-network-facade.md) | Master plan | Planning | Split `Network` into a queue-enqueuing facade and a single-mutator worker so local daemons can no longer bypass `net-worker`'s serialisation |
+| [Health checks](PLAN-health-checks.md) | Phase 0: Research and decisions | Not started | Resolve per-daemon vs per-node endpoints, HTTP vs gRPC, readiness dependency model, drain grace, auth, mTLS interaction |
+| [Health checks](PLAN-health-checks.md) | Phase 1: sf-api endpoints and drain | Not started | `/livez`, `/readyz`, `/healthz` on sf-api with SIGTERM-driven drain semantics |
+| [Health checks](PLAN-health-checks.md) | Phase 2: gRPC health protocol | Not started | `grpc.health.v1.Health` on sf-database and sf-eventlog with leader / standby readiness semantics |
+| [Health checks](PLAN-health-checks.md) | Phase 3: Remaining daemons | Not started | Extend the pattern to every other SF daemon |
+| [Health checks](PLAN-health-checks.md) | Phase 4: Operator documentation | Not started | LB-config examples and the rolling-upgrade-with-drain procedure |
 | [Remove the primary node](PLAN-remove-primary.md) | Phase 1: Remove monitoring | Not started | Drop Grafana, Prometheus, rsyslog aggregation from the deployer |
 | [Remove the primary node](PLAN-remove-primary.md) | Phase 2: Bootstrap CLI | Not started | Idempotent `sf-ctl bootstrap-cluster` + `bootstrap_operations` table |
 | [Remove the primary node](PLAN-remove-primary.md) | Phase 3: Remove LB | Not started | Drop the Apache reverse proxy from the deployer |
