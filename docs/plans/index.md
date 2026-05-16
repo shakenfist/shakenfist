@@ -42,6 +42,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Replace last_cluster_operation](PLAN-replace-last-cluster-operation.md) | Phase 5: Documentation and final audit | Complete | Update docs, verify CI |
 | [Fix cluster_operation_targets UNIQUE constraint](PLAN-fix-cluster-operation-targets-unique-constraint.md) | Schema fix | Complete | Replace column-level `UNIQUE(operation_uuid)` with composite `UNIQUE(operation_uuid, target_object_type, target_uuid)` so multi-target ops record all their target rows |
 | [Network operations facade](PLAN-network-facade.md) | Master plan | Planning | Split `Network` into a queue-enqueuing facade and a single-mutator worker so local daemons can no longer bypass `net-worker`'s serialisation |
+| [Recurring cluster operations](PLAN-recurring-operations.md) | Master plan | Stub | Cron-like framework for recurring cluster operations; absorbs `scheduled_tasks.py` and `daemons/network/maintain.py`; adds user-facing recurring tasks (e.g. snapshot every 24 hours) |
 | [Health checks](PLAN-health-checks.md) | Phase 0: Research and decisions | Not started | Resolve per-daemon vs per-node endpoints, HTTP vs gRPC, readiness dependency model, drain grace, auth, mTLS interaction |
 | [Health checks](PLAN-health-checks.md) | Phase 1: sf-api endpoints and drain | Not started | `/livez`, `/readyz`, `/healthz` on sf-api with SIGTERM-driven drain semantics |
 | [Health checks](PLAN-health-checks.md) | Phase 2: gRPC health protocol | Not started | `grpc.health.v1.Health` on sf-database and sf-eventlog with leader / standby readiness semantics |
@@ -71,6 +72,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 
 ### Status Definitions
 
+- **Stub**: Framing recorded for future detailed planning; not yet ready to execute
 - **Not started**: Plan exists, work not yet begun
 - **Planning**: Design complete, implementation not yet started
 - **In Progress**: Currently being implemented

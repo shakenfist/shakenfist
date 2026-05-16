@@ -11,6 +11,7 @@
 - PLAN-sql-pushdown-filtering.md: SQL-pushdown filtering
 - PLAN-replace-last-cluster-operation.md: Replace last_cluster_operation with cluster_operation_targets gating
 - PLAN-network-facade.md: Network operations facade and queue-only mutation
+- PLAN-recurring-operations.md: Recurring cluster operations framework
 - PLAN-remove-etcd.md: Retire etcd from the Shaken Fist codebase
 - PLAN-health-checks.md: Health checks, readiness, and graceful drain for SF daemons
 - PLAN-remove-primary.md: Remove the primary node and adopt a BYO-infrastructure deployer
