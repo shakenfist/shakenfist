@@ -112,7 +112,10 @@ class NetOp(BaseClusterOperation):
             raise InvalidStateForTask(self)
 
         n.create_on_network_node()
-        n.ensure_mesh()
+        # Use BridgedVXLanNetwork directly to avoid re-entrancy: after step 2f
+        # Network.ensure_mesh() will enqueue a NetOp, which would deadlock the
+        # net-worker if called from within a handler.
+        BridgedVXLanNetwork(n)._apply_ensure_mesh()
 
     def _network_destroy(self, n):
         nis = n.networkinterfaces
@@ -129,7 +132,8 @@ class NetOp(BaseClusterOperation):
 
     def _network_update_dnsmasq(self, n):
         n.create_on_network_node()
-        n.ensure_mesh()
+        # Same re-entrancy guard as _network_deploy above.
+        BridgedVXLanNetwork(n)._apply_ensure_mesh()
 
     def _network_remove_dnsmasq(self, n):
         n.remove_dnsmasq()

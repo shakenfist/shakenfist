@@ -190,3 +190,56 @@ class CreateVXLANInterfaceFailedTestCase(base.ShakenFistTestCase):
         mock_set_error.assert_called_once()
         report_arg = mock_set_error.call_args[0][1]
         self.assertEqual('network.create_vxlan.failed', report_arg.code)
+
+
+class NetworkDeployEnsureMeshRoutingTestCase(base.ShakenFistTestCase):
+    """_network_deploy uses BridgedVXLanNetwork._apply_ensure_mesh, never n.ensure_mesh()."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_network_deploy_calls_apply_ensure_mesh_not_n_ensure_mesh(
+            self, mock_network_from_db, mock_apply, mock_set_error):
+        """_network_deploy delegates mesh setup to BridgedVXLanNetwork, not Network.ensure_mesh."""
+        network = _make_network_mock()
+        network.is_dead.return_value = False
+        mock_network_from_db.return_value = network
+
+        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_deploy])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_deploy)
+
+        mock_apply.assert_called_once_with()
+        network.ensure_mesh.assert_not_called()
+        mock_set_error.assert_not_called()
+
+
+class NetworkUpdateDnsmasqEnsureMeshRoutingTestCase(base.ShakenFistTestCase):
+    """_network_update_dnsmasq uses BridgedVXLanNetwork._apply_ensure_mesh, never n.ensure_mesh()."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_network_update_dnsmasq_calls_apply_ensure_mesh_not_n_ensure_mesh(
+            self, mock_network_from_db, mock_apply, mock_set_error):
+        """_network_update_dnsmasq delegates mesh setup to BridgedVXLanNetwork, not Network.ensure_mesh."""
+        network = _make_network_mock()
+        mock_network_from_db.return_value = network
+
+        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_update_dnsmasq])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_update_dnsmasq)
+
+        mock_apply.assert_called_once_with()
+        network.ensure_mesh.assert_not_called()
+        mock_set_error.assert_not_called()
