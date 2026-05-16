@@ -225,6 +225,86 @@ To add a new enum value:
 2. Run `tox -e genprotos` to regenerate the protobuf definitions
 3. Never change or reuse existing `proto_id` values
 
+### Network Operation Error Handling
+
+#### ErrorReport — structured failure at the queue boundary
+
+`ErrorReport` (`shakenfist/operations/error_report.py`) is the on-the-wire
+representation of a failed cluster operation. When an `_apply_*` method raises
+inside the dispatcher, `dispatch_task` catches the exception, calls
+`ErrorReport.from_exception(e)`, persists the result via
+`mariadb.set_cluster_operation_error`, and then transitions the op to
+`STATE_ERROR`. The report is stored in its own `cluster_operation_errors` table
+(one row per op UUID) and is never written to the `object_states` or
+`cluster_operations` tables.
+
+The crucial architectural property is that **errors are data, never rehydrated
+Python exception classes**. This converges with gRPC's status-code model (and
+JSON-RPC's error object model) and is an explicit rejection of the
+`oslo.messaging` rehydration pattern, which made exception types load-bearing
+across process boundaries. The stable `code` field (e.g.
+`'network.ensure_mesh.failed'`) is the contract; `message`, `details`,
+`origin_class`, and `traceback` are diagnostic and not part of the contract.
+
+The registry `_EXCEPTION_CODE_REGISTRY` in `error_report.py` is the single
+canonical place for the exception-to-code mapping. Extending support for a new
+typed exception is a one-line change: add a row to the dict.
+
+#### BridgedVXLanNetwork — worker-only mutation surface
+
+`BridgedVXLanNetwork` (`shakenfist/network/bridged_vxlan_network.py`) is the
+worker-side counterpart of `Network`. `Network` is the public facade that
+external callers interact with; from Phase 2 onwards it enqueues operations
+rather than mutating host state directly. `BridgedVXLanNetwork` wraps a
+`Network` instance and exposes `_apply_*` methods that actually mutate per-
+hypervisor state (VXLAN FDB table, dnsmasq, etc. as they migrate in later
+phases).
+
+The constructor is called **only** inside the workitem dispatcher (via the
+`NetOp` task handlers in `net_op.py`). This makes re-entrancy through the
+queue structurally impossible: the only way to bypass the queue and run a
+mutation inline is to construct a `BridgedVXLanNetwork`, and that is gated to
+the dispatcher. External callers always hold `Network`; in-worker callers
+always hold `BridgedVXLanNetwork`.
+
+#### op.error_report / op.raise_for_error — consumer-side API
+
+`BaseClusterOperation` exposes two methods for callers that need to observe an
+op's outcome:
+
+- `op.error_report` — property that reads the `ErrorReport` from MariaDB on
+  every access (no caching). Returns `None` for COMPLETE/ABORT ops.
+- `op.raise_for_error(timeout=None)` — blocks until the op reaches a terminal
+  state (using the `poll_until_terminal` helper underneath), then raises
+  `NetworkOperationFailed(error_report=...)` if the state is `STATE_ERROR`, or
+  returns silently on any other terminal state. The timeout defaults to
+  `config.API_ASYNC_WAIT` (15 seconds); callers can override for long-running
+  ops. Raises `OperationTimeout` if the deadline elapses.
+
+`poll_until_terminal` is the generic free function underneath. It polls
+`cls.from_db(op.uuid)` at a 0.1 s cadence until the state is in
+`{STATE_COMPLETE, STATE_ABORT, STATE_DELETED, STATE_ERROR}`.
+
+#### Per-method migration pattern
+
+During the per-method migration (Phases 2–7), each `Network` method is flipped
+one at a time from "do the work inline" to "enqueue a `NetOp` and return the
+op handle". External callers preserve synchronous-with-exception semantics by
+wrapping the call:
+
+```python
+op = n.ensure_mesh()
+op.raise_for_error()
+```
+
+In-worker callers in `net_op.py` use `BridgedVXLanNetwork(n)._apply_*`
+directly to avoid enqueueing from inside the dispatcher (which would deadlock
+the net-worker). Once enough methods have migrated, `depends_on` chains may
+replace some of the per-call `raise_for_error` waits, enabling proper async
+pipelines. The existing `get_lock` wrapper inside each `_apply_*` method is
+retained through Phase 8, at which point the per-node queue becomes the sole
+serialisation point and the locks are removed.
+
 ### Network Operation Queue Families
 
 Network operations are dispatched through two distinct queue families, both

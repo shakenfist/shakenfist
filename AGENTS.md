@@ -129,6 +129,24 @@ queues for network-node-only operations (`create_on_network_node`,
 mutations are parallelised across nodes while network-node-singleton operations
 remain serialised.
 
+### Phase 2 network facade additions
+
+Key new files from Phase 2 of the network-facade work:
+
+- `shakenfist/operations/error_report.py` — `ErrorReport` Pydantic model
+  (fields: `code`, `message`, `details`, `origin_class`, `traceback`).
+  Contains the `_EXCEPTION_CODE_REGISTRY` dict that maps typed exceptions to
+  stable codes. The principle: **errors are data, never rehydrated exceptions**.
+- `shakenfist/network/bridged_vxlan_network.py` — `BridgedVXLanNetwork`,
+  instantiated only inside the workitem dispatcher. External callers hold
+  `Network`; the dispatcher constructs `BridgedVXLanNetwork` and calls
+  `_apply_*` methods on it.
+
+The consumer-side API lives on `BaseClusterOperation`
+(`shakenfist/operations/baseoperation.py`): `op.error_report` reads the
+persisted report; `op.raise_for_error(timeout=None)` polls and raises
+`NetworkOperationFailed` if the op ended in `STATE_ERROR`.
+
 ### Key Directories
 
 - `shakenfist/` - Core package
