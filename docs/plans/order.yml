@@ -11,3 +11,5 @@
 - PLAN-sql-pushdown-filtering.md: SQL-pushdown filtering
 - PLAN-replace-last-cluster-operation.md: Replace last_cluster_operation with cluster_operation_targets gating
 - PLAN-network-facade.md: Network operations facade and queue-only mutation
+- PLAN-remove-primary.md: Remove the primary node and adopt a BYO-infrastructure deployer
+- PLAN-embrace-tls.md: Embrace TLS across Shaken Fist
