@@ -914,6 +914,16 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.CreateAndEnqueueClusterOperationRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.SetClusterOperationError = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/SetClusterOperationError',
+                request_serializer=database__pb2.SetClusterOperationErrorRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.GetClusterOperationError = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetClusterOperationError',
+                request_serializer=database__pb2.GetClusterOperationErrorRequest.SerializeToString,
+                response_deserializer=database__pb2.GetClusterOperationErrorReply.FromString,
+                _registered_method=True)
 
 
 class DatabaseServiceServicer(object):
@@ -2050,6 +2060,22 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetClusterOperationError(self, request, context):
+        """Cluster Operation Errors (MariaDB)
+        Persists the structured ErrorReport when an _apply_* method raises
+        inside the dispatcher. Upsert semantics: a retry that fails again
+        overwrites the prior report.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetClusterOperationError(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DatabaseServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -2932,6 +2958,16 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.CreateAndEnqueueClusterOperation,
                     request_deserializer=database__pb2.CreateAndEnqueueClusterOperationRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'SetClusterOperationError': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetClusterOperationError,
+                    request_deserializer=database__pb2.SetClusterOperationErrorRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
+            'GetClusterOperationError': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetClusterOperationError,
+                    request_deserializer=database__pb2.GetClusterOperationErrorRequest.FromString,
+                    response_serializer=database__pb2.GetClusterOperationErrorReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -7686,6 +7722,60 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/CreateAndEnqueueClusterOperation',
             database__pb2.CreateAndEnqueueClusterOperationRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetClusterOperationError(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/SetClusterOperationError',
+            database__pb2.SetClusterOperationErrorRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetClusterOperationError(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetClusterOperationError',
+            database__pb2.GetClusterOperationErrorRequest.SerializeToString,
+            database__pb2.GetClusterOperationErrorReply.FromString,
             options,
             channel_credentials,
             insecure,

@@ -997,6 +997,21 @@ class DatabaseServiceStub:
     the eventlog service after this RPC succeeds.
     """
 
+    SetClusterOperationError: grpc.UnaryUnaryMultiCallable[
+        database_pb2.SetClusterOperationErrorRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operation Errors (MariaDB)
+    Persists the structured ErrorReport when an _apply_* method raises
+    inside the dispatcher. Upsert semantics: a retry that fails again
+    overwrites the prior report.
+    """
+
+    GetClusterOperationError: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationErrorRequest,
+        database_pb2.GetClusterOperationErrorReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Enqueue: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.EnqueueRequest,
@@ -1975,6 +1990,21 @@ class DatabaseServiceAsyncStub:
     transaction. Audit events are emitted separately by the caller via
     the eventlog service after this RPC succeeds.
     """
+
+    SetClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.SetClusterOperationErrorRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operation Errors (MariaDB)
+    Persists the structured ErrorReport when an _apply_* method raises
+    inside the dispatcher. Upsert semantics: a retry that fails again
+    overwrites the prior report.
+    """
+
+    GetClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationErrorRequest,
+        database_pb2.GetClusterOperationErrorReply,
+    ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -3306,5 +3336,24 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         transaction. Audit events are emitted separately by the caller via
         the eventlog service after this RPC succeeds.
         """
+
+    @abc.abstractmethod
+    def SetClusterOperationError(
+        self,
+        request: database_pb2.SetClusterOperationErrorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Cluster Operation Errors (MariaDB)
+        Persists the structured ErrorReport when an _apply_* method raises
+        inside the dispatcher. Upsert semantics: a retry that fails again
+        overwrites the prior report.
+        """
+
+    @abc.abstractmethod
+    def GetClusterOperationError(
+        self,
+        request: database_pb2.GetClusterOperationErrorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetClusterOperationErrorReply, collections.abc.Awaitable[database_pb2.GetClusterOperationErrorReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

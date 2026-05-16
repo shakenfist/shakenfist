@@ -290,6 +290,13 @@ service DatabaseService {
   // transaction. Audit events are emitted separately by the caller via
   // the eventlog service after this RPC succeeds.
   rpc CreateAndEnqueueClusterOperation (CreateAndEnqueueClusterOperationRequest) returns (StatusReply) {}
+
+  // Cluster Operation Errors (MariaDB)
+  // Persists the structured ErrorReport when an _apply_* method raises
+  // inside the dispatcher. Upsert semantics: a retry that fails again
+  // overwrites the prior report.
+  rpc SetClusterOperationError (SetClusterOperationErrorRequest) returns (StatusReply) {}
+  rpc GetClusterOperationError (GetClusterOperationErrorRequest) returns (GetClusterOperationErrorReply) {}
 }
 
 // Generic status reply
@@ -1836,4 +1843,20 @@ message CreateAndEnqueueClusterOperationRequest {
   string queue_name = 4;     // Target work queue name
   double delay = 5;          // Seconds to defer before the job is eligible
   string metadata_json = 6;  // Full operation metadata dict as JSON
+}
+
+message SetClusterOperationErrorRequest {
+  string op_uuid = 1;             // Operation UUID as string
+  string error_report_json = 2;   // ErrorReport serialised as JSON
+  double created_at = 3;          // Unix timestamp the report was written
+}
+
+message GetClusterOperationErrorRequest {
+  string op_uuid = 1;             // Operation UUID as string
+}
+
+message GetClusterOperationErrorReply {
+  bool found = 1;
+  string error_report_json = 2;   // ErrorReport serialised as JSON
+  double created_at = 3;          // Unix timestamp the report was written
 }

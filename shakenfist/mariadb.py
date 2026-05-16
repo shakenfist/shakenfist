@@ -36,6 +36,7 @@ from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
@@ -132,6 +133,7 @@ _cluster_operation_targets_table: Optional[sa.Table] = None
 _node_metrics_table: Optional[sa.Table] = None
 _node_daemon_states_table: Optional[sa.Table] = None
 _cluster_operations_table: Optional[sa.Table] = None
+_cluster_operation_errors_table: Optional[sa.Table] = None
 _work_queue_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
@@ -181,6 +183,7 @@ NODE_METRICS_VERSION = 2
 # JSON column.
 NODE_DAEMON_STATES_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 2
+CLUSTER_OPERATION_ERRORS_VERSION = 1
 WORK_QUEUE_VERSION = 2
 # v3: leased locks. Adds expires_at, makes acquire steal-if-expired,
 # and introduces a refresh path so live holders can extend their lease.
@@ -853,6 +856,63 @@ def _ensure_cluster_operations_schema(engine: sa.Engine) -> dict[str, Any]:
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': CLUSTER_OPERATIONS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_cluster_operation_errors_table() -> sa.Table:
+    """Get or create the cluster_operation_errors table definition.
+
+    This table stores the structured failure record (``ErrorReport``)
+    for a cluster operation. There is at most one row per operation;
+    the row is written when the dispatcher catches an exception
+    escaping an ``_apply_*`` method and converts it via
+    ``ErrorReport.from_exception``.
+
+    ``cluster_operations`` rows are insert-only (the table doc on
+    ``_get_cluster_operations_table`` makes this contract explicit),
+    so the error report cannot live as a column there. Persisting it
+    separately also keeps the contract narrow: this table only exists
+    to surface failure data to the REST layer and to operators.
+
+    The ``op_uuid`` column is a natural foreign key to
+    ``cluster_operations.uuid`` but no SA-level FK constraint is
+    declared, matching the existing pattern across the other
+    cluster-operation tables (e.g. ``cluster_operation_targets``
+    does not declare an FK either).
+    """
+    global _cluster_operation_errors_table
+    if _cluster_operation_errors_table is None:
+        metadata = _get_metadata()
+        _cluster_operation_errors_table = sa.Table(
+            'cluster_operation_errors',
+            metadata,
+            sa.Column('op_uuid', sa.Uuid(), primary_key=True),
+            sa.Column('error_report', sa.JSON(), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+        )
+    return _cluster_operation_errors_table
+
+
+def _ensure_cluster_operation_errors_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the cluster_operation_errors table schema is up to date."""
+    table_name = 'cluster_operation_errors'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_operation_errors_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_OPERATION_ERRORS_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1915,6 +1975,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_node_metrics_schema(engine))
     results.append(_ensure_node_daemon_states_schema(engine))
     results.append(_ensure_cluster_operations_schema(engine))
+    results.append(_ensure_cluster_operation_errors_schema(engine))
     results.append(_ensure_work_queue_schema(engine))
     results.append(_ensure_cluster_locks_schema(engine))
     results.append(_ensure_cluster_config_schema(engine))
@@ -17373,6 +17434,66 @@ def _direct_create_and_enqueue_cluster_operation(
         return False
 
 
+def _direct_set_cluster_operation_error(
+        op_uuid: UUID, error_report: ErrorReport,
+        created_at: float) -> bool:
+    """Persist (or replace) the ErrorReport for a cluster operation.
+
+    Uses ``INSERT ... ON DUPLICATE KEY UPDATE`` so a retry that
+    fails again overwrites the prior row without the caller needing
+    to check-then-write. The dispatcher only writes once per terminal
+    failure today, but the upsert keeps the contract easy to reason
+    about.
+
+    The ErrorReport is JSON-serialised via Pydantic's
+    ``model_dump(mode='json')`` so the dict has only JSON-native
+    primitives (no datetimes/UUIDs sneaking through).
+    """
+    engine = _get_engine()
+    table = _get_cluster_operation_errors_table()
+    payload = error_report.model_dump(mode='json')
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                op_uuid=op_uuid,
+                error_report=payload,
+                created_at=created_at,
+            )
+            stmt = stmt.on_duplicate_key_update(
+                error_report=stmt.inserted.error_report,
+                created_at=stmt.inserted.created_at,
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB write failed for cluster_operation_error '
+            f'{op_uuid}: {e}')
+        return False
+
+
+def _direct_get_cluster_operation_error(
+        op_uuid: UUID) -> Optional[ErrorReport]:
+    """Read the ErrorReport for a cluster operation, or None if absent."""
+    engine = _get_engine()
+    table = _get_cluster_operation_errors_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.op_uuid == op_uuid)
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return None
+            return ErrorReport.model_validate(result.error_report)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for cluster_operation_error '
+            f'{op_uuid}: {e}')
+        return None
+
+
 # =============================================================================
 # Cluster Operations gRPC Client Functions
 # =============================================================================
@@ -17483,6 +17604,46 @@ def _grpc_create_and_enqueue_cluster_operation(
             f'gRPC CreateAndEnqueueClusterOperation failed for '
             f'{op_uuid}: {e}')
         return False
+
+
+def _grpc_set_cluster_operation_error(
+        op_uuid: UUID, error_report: ErrorReport,
+        created_at: float) -> bool:
+    """Persist the ErrorReport for an operation via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.SetClusterOperationErrorRequest(
+            op_uuid=str(op_uuid),
+            error_report_json=_json_dumps(
+                error_report.model_dump(mode='json')),
+            created_at=created_at,
+        )
+        reply = _grpc_call(stub.SetClusterOperationError, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC SetClusterOperationError failed for '
+            f'{op_uuid}: {e}')
+        return False
+
+
+def _grpc_get_cluster_operation_error(
+        op_uuid: UUID) -> Optional[ErrorReport]:
+    """Read the ErrorReport for an operation via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetClusterOperationErrorRequest(
+            op_uuid=str(op_uuid))
+        reply = _grpc_call(stub.GetClusterOperationError, request)
+        if not reply.found:
+            return None
+        return ErrorReport.model_validate(
+            json.loads(reply.error_report_json))
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetClusterOperationError failed for '
+            f'{op_uuid}: {e}')
+        return None
 
 
 # =============================================================================
@@ -17771,6 +17932,48 @@ def create_and_enqueue_cluster_operation(
     return _direct_create_and_enqueue_cluster_operation(
         u, operation_type, metadata, created_at,
         queue_name, delay)
+
+
+def set_cluster_operation_error(
+        op_uuid: 'str | UUID',
+        error_report: ErrorReport,
+        created_at: Optional[float] = None) -> bool:
+    """Persist the ErrorReport for a failed cluster operation.
+
+    Routes through the database microservice when the caller is not
+    the database daemon. Upserts the row keyed on op_uuid so a retry
+    that fails again overwrites the prior report cleanly.
+
+    Args:
+        op_uuid: The operation's UUID (str or UUID).
+        error_report: The structured failure record.
+        created_at: Unix timestamp the report was written. Defaults
+            to ``time.time()`` when omitted.
+
+    Returns:
+        True on success, False on MariaDB error.
+    """
+    u = _ensure_uuid(op_uuid)
+    ts = created_at if created_at is not None else time.time()
+    if _use_database_service():
+        return _grpc_set_cluster_operation_error(u, error_report, ts)
+    return _direct_set_cluster_operation_error(u, error_report, ts)
+
+
+def get_cluster_operation_error(
+        op_uuid: 'str | UUID') -> Optional[ErrorReport]:
+    """Read the ErrorReport for a cluster operation.
+
+    Args:
+        op_uuid: The operation's UUID (str or UUID).
+
+    Returns:
+        The persisted ``ErrorReport`` or ``None`` if no report exists.
+    """
+    u = _ensure_uuid(op_uuid)
+    if _use_database_service():
+        return _grpc_get_cluster_operation_error(u)
+    return _direct_get_cluster_operation_error(u)
 
 
 # =============================================================================

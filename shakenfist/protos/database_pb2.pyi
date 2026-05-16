@@ -5592,3 +5592,66 @@ class CreateAndEnqueueClusterOperationRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "queue_name", b"queue_name", "uuid", b"uuid"]) -> None: ...
 
 global___CreateAndEnqueueClusterOperationRequest = CreateAndEnqueueClusterOperationRequest
+
+@typing.final
+class SetClusterOperationErrorRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    ERROR_REPORT_JSON_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    """Operation UUID as string"""
+    error_report_json: builtins.str
+    """ErrorReport serialised as JSON"""
+    created_at: builtins.float
+    """Unix timestamp the report was written"""
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+        error_report_json: builtins.str = ...,
+        created_at: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "error_report_json", b"error_report_json", "op_uuid", b"op_uuid"]) -> None: ...
+
+global___SetClusterOperationErrorRequest = SetClusterOperationErrorRequest
+
+@typing.final
+class GetClusterOperationErrorRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    """Operation UUID as string"""
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["op_uuid", b"op_uuid"]) -> None: ...
+
+global___GetClusterOperationErrorRequest = GetClusterOperationErrorRequest
+
+@typing.final
+class GetClusterOperationErrorReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    ERROR_REPORT_JSON_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    error_report_json: builtins.str
+    """ErrorReport serialised as JSON"""
+    created_at: builtins.float
+    """Unix timestamp the report was written"""
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        error_report_json: builtins.str = ...,
+        created_at: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "error_report_json", b"error_report_json", "found", b"found"]) -> None: ...
+
+global___GetClusterOperationErrorReply = GetClusterOperationErrorReply

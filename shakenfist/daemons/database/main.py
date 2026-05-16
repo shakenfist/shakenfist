@@ -32,6 +32,7 @@ from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_status
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
@@ -4601,6 +4602,56 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def SetClusterOperationError(
+        self,
+        request: database_pb2.SetClusterOperationErrorRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Persist an ErrorReport for a failed cluster operation."""
+        try:
+            self.monitor.counters['set_cluster_operation_error'].inc()
+            report = ErrorReport.model_validate(
+                json.loads(request.error_report_json))
+            success = mariadb._direct_set_cluster_operation_error(
+                UUID(request.op_uuid),
+                report,
+                request.created_at,
+            )
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database SetClusterOperationError failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetClusterOperationError(
+        self,
+        request: database_pb2.GetClusterOperationErrorRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterOperationErrorReply:
+        """Read the ErrorReport for a cluster operation."""
+        try:
+            self.monitor.counters['get_cluster_operation_error'].inc()
+            report = mariadb._direct_get_cluster_operation_error(
+                UUID(request.op_uuid))
+            if report is None:
+                return database_pb2.GetClusterOperationErrorReply(
+                    found=False)
+            return database_pb2.GetClusterOperationErrorReply(
+                found=True,
+                error_report_json=json.dumps(
+                    report.model_dump(mode='json')),
+                created_at=0.0,
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterOperationError failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetClusterOperationErrorReply(
+                found=False)
+
     def _cluster_operation_to_proto(
             self,
             data: dict[str, Any]
@@ -4807,6 +4858,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_cluster_operation', 'get_cluster_operation',
             'get_cluster_operations_by_node', 'delete_cluster_operation',
             'create_and_enqueue_cluster_operation',
+            # MariaDB cluster operation error operations
+            'set_cluster_operation_error',
+            'get_cluster_operation_error',
             # MariaDB find (filter-pushdown) operations
             'find_artifacts', 'find_instances', 'find_networks',
             'find_network_interfaces',
