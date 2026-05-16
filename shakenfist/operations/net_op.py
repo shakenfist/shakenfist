@@ -1,12 +1,15 @@
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
 from shakenfist.schema.operations import net_op as schema
 from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import EnsureMeshFailed
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.util import exceptions as util_exceptions
 
 
@@ -81,20 +84,27 @@ class NetOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(n)
 
-        except CreateVXLANInterfaceFailed:
+        except CreateVXLANInterfaceFailed as e:
             self.log.warning(
                 'Failed to create VXLAN interface, will retry')
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetOp.STATE_ERROR
 
         except EnsureMeshFailed as e:
             if n.state.value in n.ACTIVE_STATES:
-                # This should not happen with an active network
+                # This should not happen with an active network; log but
+                # still record the error report before entering STATE_ERROR.
                 util_exceptions.ignore_exception('net_op', e)
 
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetOp.STATE_ERROR
 
         except Exception as e:
             util_exceptions.ignore_exception('net_op', e)
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetOp.STATE_ERROR
 
     def _network_deploy(self, n):
@@ -126,3 +136,6 @@ class NetOp(BaseClusterOperation):
 
     def _network_remove_nat(self, n):
         n.remove_nat()
+
+    def _network_ensure_mesh(self, n):
+        BridgedVXLanNetwork(n)._apply_ensure_mesh()

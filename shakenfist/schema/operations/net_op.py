@@ -30,6 +30,7 @@ class model_tasks(Enum):
     network_update_dnsmasq = 3
     network_remove_dnsmasq = 4
     network_remove_nat = 5
+    network_ensure_mesh = 6
 
 
 class model(BaseModel):
