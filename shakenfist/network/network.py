@@ -8,7 +8,6 @@ from uuid import uuid4
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import FLOATING_NETWORK_UUID
-from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import mariadb
 from shakenfist.network import interface
@@ -22,6 +21,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import get_object_class
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.net_op \
     import create_and_enqueue as net_create_and_enqueue
@@ -41,7 +41,6 @@ from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.managed_executables import dnsmasq
-from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
@@ -883,50 +882,26 @@ class Network(dbowo):
 
     @_not_on_floating_network
     def ensure_mesh(self):
-        with self.get_lock(op='Network ensure mesh', global_scope=False):
-            # Determine which IPs should be on this mesh and where
-            instances = []
-            for ni in self.networkinterfaces:
-                if ni.instance_uuid not in instances:
-                    instances.append(ni.instance_uuid)
+        """Enqueue a network_ensure_mesh NetOp for this network on this node.
 
-            node_fqdns = []
-            for inst_uuid in instances:
-                inst = instance.Instance.from_db(inst_uuid)
-                if not inst:
-                    continue
-                placement = inst.placement
-                if not placement:
-                    continue
-                if not placement.get('node'):
-                    continue
+        Returns the enqueued NetOp instance loaded from the database.
+        Callers needing the previous synchronous-with-exception semantics
+        call ``op.raise_for_error()`` to block until the operation reaches
+        a terminal state and to re-raise on error as
+        ``NetworkOperationFailed``.
 
-                if not placement.get('node') in node_fqdns:
-                    node_fqdns.append(placement.get('node'))
-
-            # NOTE(mikal): why not use DNS here? Well, DNS might be outside
-            # the control of the deployer if we're running in a public cloud
-            # as an overlay cloud... Also, we don't include ourselves in the
-            # mesh as that would cause duplicate packets to reflect back to us.
-            # (see bug #859).
-            node_ips = set()
-            if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
-                # Always add Network node if it is not this node
-                node_ips.add(config.NETWORK_NODE_IP)
-
-            for fqdn in node_fqdns:
-                n = Node.from_db(fqdn)
-                if n and n.ip != config.NODE_MESH_IP:
-                    node_ips.add(n.ip)
-
-            added, removed = util_concurrency.ensure_vxlan_mesh(
-                self.uuid, self.vxid, node_ips)
-            if removed:
-                self.add_event(EVENT_TYPE_MUTATE, 'remove mesh elements',
-                               extra={'removed': removed})
-            if added:
-                self.add_event(EVENT_TYPE_MUTATE, 'add mesh elements',
-                               extra={'added': added})
+        The actual host-mutating work is performed by
+        ``BridgedVXLanNetwork._apply_ensure_mesh`` inside the net-worker
+        dispatcher; nothing in this method mutates host state any more.
+        """
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_ensure_mesh],
+            priority=PRIORITY.user_facing,
+            target=config.NODE_UUID,
+            family='network',
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.

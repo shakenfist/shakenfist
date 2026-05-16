@@ -3,9 +3,12 @@ from unittest import mock
 
 import testtools
 from shakenfist import exceptions
+from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
+from shakenfist.operations.net_op import NetOp
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -313,3 +316,113 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         n.state = dbo.STATE_DELETED
         with testtools.ExpectedException(exceptions.InvalidStateException):
             n.state = dbo.STATE_CREATED
+
+
+class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
+    """Tests for the phase 2f flip of ``Network.ensure_mesh()``.
+
+    After phase 2f, ``Network.ensure_mesh()`` no longer mutates host
+    state inline. Instead it enqueues a ``NetOp`` with task
+    ``network_ensure_mesh`` on the calling node's per-node ``network``
+    queue and returns the enqueued op so callers can call
+    ``op.raise_for_error()``. These tests pin that contract.
+    """
+
+    NODE_UUID = '11111111-1111-4111-8111-aaaaaaaaaaaa'
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(NODE_UUID=self.NODE_UUID,
+                               NODE_EGRESS_IP='1.1.1.2',
+                               NODE_MESH_IP='1.1.1.2',
+                               NETWORK_NODE_IP='1.1.1.2',
+                               NODE_IS_NETWORK_NODE=False)
+        self.config = mock.patch(
+            'shakenfist.network.network.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        # The util.enqueue_cluster_operation helper also references
+        # the cluster_operation_targets writer; the MockEtcd fixture
+        # already mocks the underlying mariadb calls, but it does not
+        # mock the target writer. Patch it inert so calls succeed.
+        self.mock_create_target = mock.patch(
+            'shakenfist.mariadb.create_cluster_operation_target').start()
+        self.addCleanup(mock.patch.stopall)
+
+        # Guard the test against any accidental host mutation: the old
+        # implementation called util_concurrency.ensure_vxlan_mesh
+        # synchronously. The new implementation must not.
+        self.mock_ensure_vxlan_mesh = mock.patch(
+            'shakenfist.util.concurrency.ensure_vxlan_mesh').start()
+
+    def test_ensure_mesh_enqueues_netop_on_local_node_queue(self):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, provide_dhcp=True, provide_nat=False)
+        n = network.Network.from_db(network_uuid)
+
+        # Spy on the enqueue path. MockEtcd already wraps the underlying
+        # mariadb function via side_effect; we put another patch in front
+        # of it that delegates to the MockEtcd implementation and records
+        # the call. This lets us inspect arguments without losing the
+        # mock_etcd state-machine side effects (which NetOp.from_db
+        # depends on for state lookup).
+        original = (
+            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+        spy = mock.MagicMock(side_effect=original)
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.ensure_mesh()
+
+        spy.assert_called_once()
+
+        # Inspect the call that ensure_mesh issued.
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            f'{self.NODE_UUID}-network-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_ensure_mesh', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual(PRIORITY.user_facing.name, metadata['priority'])
+
+        # The new contract: ensure_mesh returns a NetOp instance
+        # constructed from the persisted operation record. The caller
+        # uses op.raise_for_error() to block on completion.
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        # The old, host-mutating call site must not fire from inside
+        # Network.ensure_mesh() any more.
+        self.mock_ensure_vxlan_mesh.assert_not_called()
+
+    def test_ensure_mesh_skips_for_floating_network(self):
+        # The floating network short-circuits via the
+        # @_not_on_floating_network decorator and must not enqueue.
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        self.mock_etcd.create_network(
+            'floatnet', str(FLOATING_NETWORK_UUID),
+            provide_dhcp=False, provide_nat=False)
+        n = network.Network.from_db(str(FLOATING_NETWORK_UUID))
+
+        original = (
+            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+        spy = mock.MagicMock(side_effect=original)
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            result = n.ensure_mesh()
+
+        # No enqueue happened: the decorator short-circuits.
+        spy.assert_not_called()
+        # The decorator returns None implicitly.
+        self.assertIsNone(result)
+        self.mock_ensure_vxlan_mesh.assert_not_called()

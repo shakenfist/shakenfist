@@ -57,7 +57,8 @@ class model(BaseModel):
 
 
 def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
-                       depends_on=None, runs_after=None):
+                       depends_on=None, runs_after=None,
+                       target='networknode', family='clusteroperation'):
     operation_uuid = str(uuid4())
 
     try:
@@ -86,6 +87,6 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         raise exc
 
     enqueue_cluster_operation(
-        object_type, m.model_dump(mode='json'), target='networknode',
-        model_class=model)
+        object_type, m.model_dump(mode='json'), target=target,
+        family=family, model_class=model)
     return object_type, operation_uuid
