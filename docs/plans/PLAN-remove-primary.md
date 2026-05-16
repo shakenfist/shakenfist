@@ -270,7 +270,13 @@ Phase notes:
   prometheus install steps, the rsyslog forwarder
   configuration in `roles/base/tasks/syslog`, and associated
   templates. Documents the metric and log endpoints
-  operators must scrape / collect themselves.
+  operators must scrape / collect themselves. Also flips
+  `shakenfist-utilities` JSON-formatted logging on by
+  default (and removes the non-JSON code path on the SF
+  side, on the assumption operators going to Loki / Elastic
+  / Splunk want structured logs), and documents the SF
+  log-record field-name contract so the operator's log
+  pipeline can index it.
 - **Phase 2** introduces the `bootstrap_operations` table
   in `mariadb.py`, the `sf-ctl bootstrap-cluster` subcommand,
   and replaces every `set-config` / `ensure-mariadb-schema` /
@@ -278,6 +284,15 @@ Phase notes:
   `register.yml` with a single call to the new command. The
   one-transaction-per-op invariant is the schema's central
   claim and must be enforced in the code, not just the docs.
+  Phase 2 also records the cluster's SF version on first
+  bootstrap (either as a `bootstrap_operations` row or as a
+  dedicated `cluster_version` table — phase 2's design
+  decision) and adds a startup check in every SF daemon
+  that compares its own version against the recorded
+  cluster version and refuses to start if outside the
+  supported window. The compatibility policy (the proposal
+  is "N-to-N+1 always supported; N-to-N+2 not assumed") is
+  decided as part of phase 2 and documented for operators.
 - **Phase 3** deletes `roles/primary/tasks/apache2.yml` and
   `files/apache-site-primary.conf`. Documents the
   load-balancing requirement for production operators and
@@ -468,13 +483,57 @@ because the following statements will be true:
   Tracked in `PLAN-embrace-tls.md`. This plan establishes the
   operator-provides-PKI surface that the TLS plan consumes.
 - **Removing `shakenfist/etcd.py` and the `DATA_MIGRATIONS`
-  drain code.** Tracked under the existing CLAUDE.md
-  commitment to remove in the next minor.
-- **Optional eventlog election.** The `sf-database` election
-  pattern in phase 5 is reusable. If `sf-eventlog` ever
-  becomes an HA bottleneck, the same candidate-list + leader-
-  referral pattern applies. Out of scope for this plan but
-  worth noting the reuse.
+  drain code.** Blocked on this plan landing and on a
+  subsequent wipe-and-redeploy of the last known etcd-era
+  SF deployment. Mikal's preference is to wait so the
+  rebuild already uses the new BYO-infrastructure shape
+  rather than briefly standing up a primary node we know is
+  going away. Once the redeploy is done, `shakenfist/etcd.py`,
+  the `DATA_MIGRATIONS` drain functions, the `etcd_host`
+  config default, the `ETCDCTL_API=3` line in `sfrc`, and
+  the residual `from etcd...` comments throughout
+  `mariadb.py` all become a single satisfying deletion
+  commit. Track explicitly in the next-minor release plan
+  so it does not slip.
+- **Health checks, readiness, and graceful drain semantics.**
+  A precondition for the BYO-LB story being operationally
+  honest: operators need a `/healthz` (or equivalent) that
+  distinguishes "I'm up," "I'm ready to serve," and "I'm
+  draining" so their LB can route correctly during rolling
+  upgrades. Touches every daemon, has its own design
+  depth (dependency-aware readiness: sf-api isn't ready
+  until sf-database is reachable, etc.), and is useful even
+  without remove-primary, so it wants its own plan. Should
+  land alongside this plan — ideally before phase 6 (the
+  galaxy role), so the role's documentation can point at
+  well-defined health endpoints.
+- **Eventlog state into MariaDB, then electable.** The
+  current `sf-eventlog` daemon stores events in per-object
+  sqlite databases on one host, making it both a singleton
+  and stateful. The clean answer is to move that storage
+  into MariaDB and then make the daemon electable on the
+  same `cluster_locks` pattern phase 5 introduces for
+  `sf-database`. This is a real architectural change
+  (schema design, migration, retire old storage) and wants
+  its own plan, not a paragraph here.
+- **Network node failover.** Unlike `sf-database`, the
+  network node owns layer-2/3 identities (egress NIC,
+  floating IPs, NAT/DHCP state). Its HA story is *VIP
+  failover*, not leader election — the well-known answer is
+  operator-provided keepalived / corosync / BGP. SF should
+  declare "exactly one node holds this role at a time" via
+  `cluster_locks` and document the recommended FOSS
+  failover mechanism. Its own plan, lower priority than
+  the eventlog change.
+- **OpenTelemetry instrumentation.** A systematic
+  replacement of the homegrown `RecordedOperation` plus
+  the ad-hoc prometheus exporters with otel spans and
+  metrics. Buys cross-daemon trace visibility (a user
+  operation traced from sf-api through sf-queues to
+  sf-net visible as one trace in Jaeger / Tempo /
+  Honeycomb) and stabilises the metrics surface as a
+  documented contract. Subsumes the originally-named
+  "metrics audit" thread. Its own plan.
 - **Discovery library home.** If the candidate-list client
   is published from `shakenfist-utilities`, the utilities
   repo release cadence becomes a coupling. Reconsider
