@@ -125,6 +125,65 @@ rotation — is **out of scope for this plan** and is tracked
 separately in `PLAN-embrace-tls.md`. This plan establishes
 the BYO-PKI surface that the TLS plan then consumes.
 
+## Alternatives considered
+
+### Smart, cluster-state-aware load balancing on the primary node
+
+An alternative direction would have retained the primary node
+as a smart load balancer that knows where every blob and
+which roles live on which nodes, routing each REST request
+directly to a node holding the relevant data. We reject this:
+
+- It preserves the central tier this plan is otherwise trying
+  to remove, and re-introduces a SPOF that must be made HA
+  and performant in its own right.
+- It conflates role-routing (network operations → the network
+  node) with data-routing (blob reads → any node holding a
+  replica). These problems want different mechanisms; the
+  network-facade plan already handles role-routing via
+  queue-enqueue.
+- It is a path no comparable distributed system has converged
+  on. S3, HDFS, Cassandra, Ceph and etcd all push routing
+  into the client or into HTTP-level redirects rather than
+  into a central, state-aware tier. The closest mainstream
+  example is GitHub's shard router, which is a custom
+  behemoth requiring an engineering investment incompatible
+  with SF's minimal-and-opinionated manifesto.
+
+### Client-following HTTP 307 redirects to specific nodes
+
+A second alternative would have each REST node redirect the
+client to a specific peer node when it doesn't hold the
+requested data — the pattern used by S3 (region routing) and
+etcd (write redirect to leader). We reject this for SF
+because it punches a hole through the operator's perimeter:
+SF nodes today are reachable only via the operator's load
+balancer (and any WAF / TLS terminator behind it). A 307 to
+a per-node hostname or IP exposes cluster topology to
+clients and bypasses the perimeter that operators rely on.
+Threading the redirect back through the LB would require the
+LB to understand a token that selects a backend, which is
+the smart-LB option above by another route.
+
+### Chosen direction for blob reads
+
+Receiving REST nodes act as a streaming reverse proxy: when
+sf-api is asked for a blob it doesn't hold, it opens a
+connection to a peer that does and streams bytes through
+without staging the blob to local storage. The bandwidth
+cost is a double-hop on the *cluster mesh*, which is
+typically an order of magnitude faster than the operator's
+outer network (10 GbE within a rack or two versus 1 GbE for
+the LAN/WAN that clients sit on is a common topology), so
+the cost lands where the bandwidth is cheap. Latency on the
+streamed bytes is unaffected once the first byte arrives.
+
+Operators who want to eliminate the double-hop entirely can,
+in a future iteration, opt into content-addressable blob
+placement combined with consistent-hash routing on their
+existing LB. That work is out of scope for this plan and
+fits more naturally into the blob-storage roadmap.
+
 ## Open questions
 
 1. **Galaxy-role packaging mechanics.** Does the SF project
