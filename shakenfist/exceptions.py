@@ -393,6 +393,25 @@ class ListingInterfaceAddressesFailed(Exception):
     ...
 
 
+class OperationTimeout(Exception):
+    """Raised when a cluster operation does not reach a terminal state
+    within the requested timeout."""
+    ...
+
+
+class NetworkOperationFailed(Exception):
+    """Raised by ``op.raise_for_error()`` when a cluster operation
+    reached ``STATE_ERROR``. Carries the persisted ``ErrorReport`` as
+    an attribute so callers can branch on its stable ``code`` field."""
+
+    def __init__(self, error_report):
+        super().__init__()
+        self.error_report = error_report
+
+    def __str__(self):
+        return f'{self.error_report.code}: {self.error_report.message}'
+
+
 class ProcessExecutionError(Exception):
     def __init__(self, stdout=None, stderr=None, exit_code=None, cmd=None):
         super().__init__(stdout, stderr, exit_code, cmd)

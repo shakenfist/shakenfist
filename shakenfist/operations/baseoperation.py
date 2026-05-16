@@ -1,12 +1,15 @@
+import time
 from enum import Enum
 from types import ModuleType
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist import exceptions
 from shakenfist import mariadb
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 
 
@@ -302,3 +305,84 @@ class BaseClusterOperation(BaseOperation):
                                 BaseClusterOperation.STATE_COMPLETE]:
             return False
         return True
+
+    @property
+    def error_report(self) -> Optional[ErrorReport]:
+        """The structured ErrorReport persisted for this op, if any.
+
+        Reads fresh from MariaDB on every access -- no caching --
+        because the worker may persist the report after this object
+        was loaded from the database. Returns ``None`` if no report
+        has been written (the common case for COMPLETE/ABORT ops).
+        """
+        return mariadb.get_cluster_operation_error(self.uuid)
+
+    def raise_for_error(self, timeout: Optional[float] = None) -> None:
+        """Block until terminal, then raise on ERROR.
+
+        Polls until this operation reaches a terminal state (bounded
+        by ``timeout`` -- defaults to ``config.API_ASYNC_WAIT``). On
+        ``STATE_ERROR`` raises :class:`NetworkOperationFailed` carrying
+        the persisted :class:`ErrorReport`. On any other terminal
+        state (``COMPLETE``, ``ABORT``, ``DELETED``) returns silently;
+        callers that need to distinguish ``ABORT`` from ``COMPLETE``
+        inspect ``op.state.value`` explicitly. Raises
+        :class:`OperationTimeout` if the deadline elapses without a
+        terminal transition.
+        """
+        refreshed = poll_until_terminal(self, timeout)
+        if refreshed.state.value == dbo.STATE_ERROR:
+            report = refreshed.error_report
+            if report is None:
+                # Fallback: error state with no persisted report. This
+                # shouldn't happen in practice -- the dispatcher writes
+                # the report before flipping state to ERROR -- but a
+                # race or an older worker could leave the row missing.
+                # Build a minimal report so callers still get a
+                # structured failure to branch on.
+                report = ErrorReport(
+                    code='internal.unknown',
+                    message=(
+                        f'operation {refreshed.uuid} ended in error '
+                        f'state'),
+                    details={},
+                    origin_class='',
+                    traceback='',
+                )
+            raise exceptions.NetworkOperationFailed(report)
+
+
+def poll_until_terminal(
+        op: 'BaseClusterOperation',
+        timeout: Optional[float] = None) -> 'BaseClusterOperation':
+    """Block until ``op`` reaches a terminal state, then return it refreshed.
+
+    Polls ``cls.from_db(op.uuid)`` (where ``cls`` is the concrete op
+    type) at a 0.1 second cadence so each iteration sees the freshest
+    state written by the worker. The terminal state set is
+    ``{STATE_COMPLETE, STATE_ABORT, STATE_DELETED, STATE_ERROR}``.
+
+    ``timeout`` defaults to ``config.API_ASYNC_WAIT`` (15 seconds) when
+    ``None`` is passed; callers can override for long-running ops.
+    Raises :class:`OperationTimeout` if the deadline elapses without
+    observing a terminal state.
+    """
+    if timeout is None:
+        timeout = config.API_ASYNC_WAIT
+    terminal_states = {
+        BaseClusterOperation.STATE_COMPLETE,
+        BaseClusterOperation.STATE_ABORT,
+        dbo.STATE_DELETED,
+        dbo.STATE_ERROR,
+    }
+    cls = type(op)
+    deadline = time.time() + timeout
+    while True:
+        refreshed = cls.from_db(op.uuid)
+        if refreshed is not None and refreshed.state.value in terminal_states:
+            return cast('BaseClusterOperation', refreshed)
+        if time.time() >= deadline:
+            raise exceptions.OperationTimeout(
+                f'operation {op.uuid} did not reach terminal state '
+                f'within {timeout}s')
+        time.sleep(0.1)
