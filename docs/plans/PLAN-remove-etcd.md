@@ -39,15 +39,23 @@ service `DATA_MIGRATIONS` entries which drain leftover
 etcd keys from older clusters" and "will be removed in the
 next minor version."
 
-There is exactly one known SF deployment still running on
-the etcd-era shape (Mikal's own production cluster). The
-plan to rebuild that deployment against the new BYO-
-infrastructure shape established by `PLAN-remove-primary.md`
-is in flight. Once that rebuild is complete, the etcd
-drain code is unambiguously dead weight: no remaining
-cluster can ever exercise it, and keeping it around clouds
-the codebase with stale references that have to be re-
-explained to every new contributor.
+The one known SF deployment still running on the etcd-era
+shape (Mikal's own production cluster) is going to be
+**wiped and reinstalled**, not upgraded in place, against
+the new BYO-infrastructure shape established by
+`PLAN-remove-primary.md`. Once that decision is made, the
+drain code is dead weight forever — there is no scenario
+in which it executes against a real cluster.
+
+The mitigation for any *unknown* etcd-era deployment is
+modest: pin the last release that still carries the drain
+code (the release immediately before this plan lands), and
+note in the changelog that anyone still on etcd-era SF
+must upgrade through that pinned release first or rebuild
+from scratch. Operators who have not surfaced their
+deployments to the project are accepting the
+responsibility to either follow the pinned-release path or
+do the rebuild themselves.
 
 ## Mission and problem statement
 
@@ -58,25 +66,31 @@ mechanical, and well-bounded; its only real complexity is
 
 ## Preconditions
 
-This plan **must not start** until all of the following are
-true:
+This plan needs only one thing to be true: **a recorded
+decision that in-place upgrade from etcd-era Shaken Fist
+is no longer supported.** The decision was made during
+the planning conversation that produced this document and
+its sibling plans. Operationally, that means:
 
-1. **`PLAN-remove-primary.md` is complete** through at
-   least phase 7 (the `etcd_master` → `database_node`
-   rename and final cleanup). Phase 7 removes the stale
-   *naming* throughout the deployer; this plan removes the
-   stale *code* and the genuine etcd-era references that
-   remain after the rename.
-2. **The last known etcd-era SF deployment has been
-   wiped and redeployed** against the new BYO shape. This
-   is the real gating condition: as long as one cluster
-   still needs the drain functions on next boot, the drain
-   code stays in the tree.
-3. **No new etcd-era SF clusters have appeared.** Confirm
-   on the day of by asking in the project's normal
-   channels.
+1. The PR that lands this deletion sweep notes the
+   pinned-release upgrade path in its description, so the
+   changelog / release notes for the release containing
+   this deletion can point at the prior release as the
+   intermediate-upgrade target for anyone still on
+   etcd-era SF.
+2. `CLAUDE.md`'s claim that the shim is "retained only to
+   service `DATA_MIGRATIONS` entries which drain leftover
+   etcd keys from older clusters" is updated as part of
+   the same PR, since it is no longer true.
 
-If any of these is not yet true, this plan does not start.
+This plan is **not** gated on `PLAN-remove-primary.md`
+landing. The two are independent: this plan removes the
+drain *code* in `shakenfist/`; phase 7 of remove-primary
+removes the stale `etcd_master` *naming* in the deployer.
+Either can land first. Practically, this plan is small and
+mechanical and should land **early in the sequence** so the
+remove-primary work is not navigating misleading etcd
+references while it tries to rename the ansible group.
 
 ## Scope
 
