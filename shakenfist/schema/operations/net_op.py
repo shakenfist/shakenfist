@@ -36,6 +36,8 @@ class model_tasks(Enum):
     network_remove_floating_ip = 8
     network_apply_update_dnsmasq = 9
     network_apply_remove_dnsmasq = 10
+    network_apply_create_network_node = 11
+    network_apply_delete_network_node = 12
 
 
 class model(BaseModel):

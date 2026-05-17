@@ -187,6 +187,11 @@ class ModelTasksEnumTestCase(base.ShakenFistTestCase):
         self.assertEqual(9, model_tasks.network_apply_update_dnsmasq.value)
         self.assertEqual(10, model_tasks.network_apply_remove_dnsmasq.value)
 
+    def test_new_lifecycle_apply_task_values(self):
+        """New lifecycle apply tasks have values 11 and 12."""
+        self.assertEqual(11, model_tasks.network_apply_create_network_node.value)
+        self.assertEqual(12, model_tasks.network_apply_delete_network_node.value)
+
 
 class ModelVersionTestCase(base.ShakenFistTestCase):
     """Version range acceptance tests for the schema model."""
