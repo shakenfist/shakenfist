@@ -437,3 +437,361 @@ class BridgedVXLanNetworkApplyDnsMasqTestCase(base.ShakenFistTestCase):
         network._get_dnsmasq_object.assert_called_once_with()
         fake_dnsmasq.remove_lease.assert_called_once_with(
             '10.0.0.5', '02:00:00:11:22:33')
+
+
+class BridgedVXLanNetworkApplyCreateOnHypervisorTestCase(
+        base.ShakenFistTestCase):
+    """Tests for ``_apply_create_on_hypervisor``.
+
+    Lifted from ``Network.create_on_hypervisor``. We confirm the
+    floating-network short-circuit, the dead-network raise, and the
+    ``create_vxlan_interface`` call under the expected lock.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_create_vxlan_interface = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.create_vxlan_interface').start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _make_network(self, uuid='dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                      vxid=42, mesh_nic='eth0', is_dead=False):
+        network = _make_network_mock(uuid=uuid, vxid=vxid)
+        network.mesh_nic = mesh_nic
+        network.is_dead.return_value = is_dead
+        network.subst_dict.return_value = {
+            'vx_bridge': 'br-%06x' % vxid,
+            'vx_interface': 'vxlan-%06x' % vxid,
+        }
+        return network
+
+    def test_floating_network_short_circuits(self):
+        network = self._make_network(uuid=FLOATING_NETWORK_UUID)
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_create_on_hypervisor()
+
+        self.mock_create_vxlan_interface.assert_not_called()
+        network.get_lock.assert_not_called()
+        network.add_event.assert_not_called()
+
+    def test_creates_vxlan_interface(self):
+        network = self._make_network(vxid=99, mesh_nic='eth0')
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_create_on_hypervisor()
+
+        network.get_lock.assert_called_once_with(
+            op='create_on_hypervisor', global_scope=False)
+        self.mock_create_vxlan_interface.assert_called_once_with(99, 'eth0')
+        # Two audit events: pre- and post-creation.
+        self.assertEqual(2, network.add_event.call_count)
+
+    def test_dead_network_raises(self):
+        from shakenfist.exceptions import DeadNetwork
+        network = self._make_network(is_dead=True)
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        self.assertRaises(DeadNetwork, bvn._apply_create_on_hypervisor)
+        self.mock_create_vxlan_interface.assert_not_called()
+
+
+class BridgedVXLanNetworkApplyCreateOnNetworkNodeTestCase(
+        base.ShakenFistTestCase):
+    """Tests for ``_apply_create_on_network_node``.
+
+    The body is ~110 lines and reaches into many helpers. We mock the
+    privexec / util_network layer wholesale and assert the high-level
+    behaviour: short-circuits, the namespace setup call, the dnsmasq
+    handoff, and the NAT enable handoff.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_create_vxlan_interface = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.create_vxlan_interface').start()
+        self.mock_create_network_namespace = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.create_network_namespace').start()
+        self.mock_execute = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.execute').start()
+        self.mock_enable_nat = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.enable_nat').start()
+        # util_network helpers: default to "interface already exists"
+        # so the body skips the create-interface branches.
+        self.mock_check_for_interface = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_network.check_for_interface', return_value=True).start()
+        self.mock_floating_network = mock.patch(
+            'shakenfist.network.network.floating_network').start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _make_network(self, uuid='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+                      vxid=42, state_value='created',
+                      provide_dhcp=False, provide_dns=False,
+                      provide_nat=False, is_dead=False):
+        network = _make_network_mock(uuid=uuid, vxid=vxid)
+        network.mesh_nic = 'eth0'
+        network.state = mock.Mock()
+        network.state.value = state_value
+        network.STATE_CREATED = 'created'
+        network.STATE_ERROR = 'error'
+        network.is_dead.return_value = is_dead
+        network.provide_dhcp = provide_dhcp
+        network.provide_dns = provide_dns
+        network.provide_nat = provide_nat
+        network.floating_gateway = None
+        network.subst_dict.return_value = {
+            'vx_bridge': 'br-vxlan-%06x' % vxid,
+            'vx_interface': 'vxlan-%06x' % vxid,
+            'vx_veth_outer': 'vx-%06x-o' % vxid,
+            'vx_veth_inner': 'vx-%06x-i' % vxid,
+            'egress_bridge': 'egr-%06x' % vxid,
+            'egress_veth_outer': 'eg-%06x-o' % vxid,
+            'egress_veth_inner': 'eg-%06x-i' % vxid,
+            'netns': str(uuid),
+            'router': '10.0.0.1',
+            'netmask': '255.255.255.0',
+        }
+        return network
+
+    def test_floating_network_short_circuits(self):
+        network = self._make_network(uuid=FLOATING_NETWORK_UUID)
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_create_on_network_node()
+
+        self.mock_create_vxlan_interface.assert_not_called()
+        self.mock_create_network_namespace.assert_not_called()
+        network.get_lock.assert_not_called()
+
+    def test_deleted_state_short_circuits(self):
+        network = self._make_network(state_value='deleted')
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_create_on_network_node()
+
+        self.mock_create_vxlan_interface.assert_not_called()
+        self.mock_create_network_namespace.assert_not_called()
+        network.get_lock.assert_not_called()
+        network.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            'refusing to create deleted network on network node')
+
+    def test_creates_vxlan_and_namespace(self):
+        network = self._make_network(vxid=77)
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_create_on_network_node()
+
+        self.mock_create_vxlan_interface.assert_called_once_with(77, 'eth0')
+        self.mock_create_network_namespace.assert_called_once_with(
+            network.uuid)
+        # No NAT / no dnsmasq path taken.
+        self.mock_enable_nat.assert_not_called()
+        # State transitioned to CREATED at the end.
+        self.assertEqual('created', network.state)
+
+    def test_provide_nat_invokes_enable_nat(self):
+        network = self._make_network(provide_nat=True)
+        network.floating_gateway = '203.0.113.10'
+        network.network_address = '10.0.0.0'
+        network.netmask = '255.255.255.0'
+
+        # floating_network() returns a stub with the bits the body reads.
+        fn = mock.Mock()
+        fn.ipam.get_address_at_index.return_value = '203.0.113.1'
+        fn.netmask = '255.255.255.0'
+        self.mock_floating_network.return_value = fn
+
+        # Hand back a non-matching default route so the body deletes it
+        # and adds the new one.
+        with mock.patch(
+                'shakenfist.network.bridged_vxlan_network.'
+                'util_network.get_interface_addresses', return_value=[]), \
+            mock.patch(
+                'shakenfist.network.bridged_vxlan_network.'
+                'util_network.add_address_to_interface'), \
+            mock.patch(
+                'shakenfist.network.bridged_vxlan_network.'
+                'util_network.get_default_routes', return_value=[]), \
+            mock.patch(
+                'shakenfist.network.bridged_vxlan_network.'
+                'util_network.add_default_route'):
+            bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+            bvn._apply_create_on_network_node()
+
+        # _apply_enable_nat under the hood calls util_concurrency.enable_nat.
+        self.mock_enable_nat.assert_called_once_with(
+            network.uuid, '10.0.0.0', '255.255.255.0', network.vxid)
+
+    def test_provide_dhcp_triggers_dnsmasq_update(self):
+        network = self._make_network(provide_dhcp=True)
+        fake_dnsmasq = mock.Mock()
+        network._get_dnsmasq_object.return_value = fake_dnsmasq
+
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        bvn._apply_create_on_network_node()
+
+        # _apply_update_dnsmasq fetches the dnsmasq object and restarts it.
+        fake_dnsmasq.restart.assert_called_once_with()
+
+    def test_provide_dns_triggers_dnsmasq_update(self):
+        network = self._make_network(provide_dns=True)
+        fake_dnsmasq = mock.Mock()
+        network._get_dnsmasq_object.return_value = fake_dnsmasq
+
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        bvn._apply_create_on_network_node()
+
+        fake_dnsmasq.restart.assert_called_once_with()
+
+
+class BridgedVXLanNetworkApplyDeleteOnHypervisorTestCase(
+        base.ShakenFistTestCase):
+    """Tests for ``_apply_delete_on_hypervisor``."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_execute = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.execute').start()
+        self.mock_check_for_interface = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_network.check_for_interface').start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _make_network(self, vxid=42):
+        network = _make_network_mock(vxid=vxid)
+        network.subst_dict.return_value = {
+            'vx_bridge': 'br-vxlan-%06x' % vxid,
+            'vx_interface': 'vxlan-%06x' % vxid,
+        }
+        return network
+
+    def test_deletes_bridge_and_interface_when_present(self):
+        self.mock_check_for_interface.return_value = True
+        network = self._make_network(vxid=0x123)
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_delete_on_hypervisor()
+
+        network.get_lock.assert_called_once_with(
+            op='Network delete', global_scope=False)
+        self.assertEqual(2, self.mock_execute.call_count)
+        self.mock_execute.assert_any_call('ip link delete br-vxlan-000123')
+        self.mock_execute.assert_any_call('ip link delete vxlan-000123')
+
+    def test_skips_deletes_when_interfaces_absent(self):
+        self.mock_check_for_interface.return_value = False
+        network = self._make_network()
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_delete_on_hypervisor()
+
+        # No `ip link delete` invocations.
+        self.mock_execute.assert_not_called()
+
+
+class BridgedVXLanNetworkApplyDeleteOnNetworkNodeTestCase(
+        base.ShakenFistTestCase):
+    """Tests for ``_apply_delete_on_network_node``."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_execute = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.execute').start()
+        self.mock_check_for_interface = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_network.check_for_interface',
+            return_value=False).start()
+        self.mock_os_path_exists = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.os.path.exists',
+            return_value=False).start()
+        self.mock_nodes = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.Nodes',
+            return_value=iter([])).start()
+        self.mock_nn_enqueue = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'nn_create_and_enqueue').start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _make_network(self, uuid='ffffffff-ffff-4fff-8fff-ffffffffffff',
+                      provide_dhcp=False, provide_dns=False):
+        network = _make_network_mock(uuid=uuid)
+        network.subst_dict.return_value = {
+            'vx_veth_outer': 'vx-outer',
+            'egress_veth_outer': 'egr-outer',
+        }
+        network.provide_dhcp = provide_dhcp
+        network.provide_dns = provide_dns
+        network.floating_gateway = None
+        network.STATE_DELETED = 'deleted'
+        network.ipam = mock.Mock()
+        network.ipam.STATE_DELETED = 'deleted'
+        return network
+
+    def test_calls_remove_nat_unconditionally(self):
+        network = self._make_network()
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_delete_on_network_node()
+
+        # The Network delete lock is acquired for the namespace teardown.
+        network.get_lock.assert_any_call(
+            op='Network delete', global_scope=False)
+        # Without provide_dhcp/dns, no dnsmasq teardown. But
+        # _apply_remove_nat always runs, which acquires its own lock.
+        network.get_lock.assert_any_call(
+            op='Network remove NAT', global_scope=False)
+        # State transitioned to DELETED.
+        self.assertEqual('deleted', network.state)
+        self.assertEqual('deleted', network.ipam.state)
+
+    def test_calls_remove_dnsmasq_when_dhcp(self):
+        network = self._make_network(provide_dhcp=True)
+        fake_dnsmasq = mock.Mock()
+        network._get_dnsmasq_object.return_value = fake_dnsmasq
+
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        bvn._apply_delete_on_network_node()
+
+        fake_dnsmasq.terminate.assert_called_once_with()
+
+    def test_fans_out_node_destroy_to_active_nodes(self):
+        node_a = mock.Mock()
+        node_a.uuid = 'node-a'
+        node_b = mock.Mock()
+        node_b.uuid = 'node-b'
+        self.mock_nodes.return_value = iter([node_a, node_b])
+
+        network = self._make_network()
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        bvn._apply_delete_on_network_node()
+
+        self.assertEqual(2, self.mock_nn_enqueue.call_count)
+
+
+class BridgedVXLanNetworkApplyEnableNATTestCase(base.ShakenFistTestCase):
+    """Tests for ``_apply_enable_nat``."""
+
+    def test_invokes_privexec(self):
+        with mock.patch(
+                'shakenfist.network.bridged_vxlan_network.'
+                'util_concurrency.enable_nat') as mock_enable_nat:
+            network = _make_network_mock(
+                uuid='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', vxid=77)
+            network.network_address = '10.0.0.0'
+            network.netmask = '255.255.255.0'
+
+            bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+            bvn._apply_enable_nat()
+
+            mock_enable_nat.assert_called_once_with(
+                'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                '10.0.0.0', '255.255.255.0', 77)

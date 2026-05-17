@@ -31,18 +31,30 @@ phases.
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import instance
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import FLOATING_NETWORK_UUID
+from shakenfist.exceptions import CongestedNetwork
+from shakenfist.exceptions import DeadNetwork
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
+from shakenfist.node import Nodes
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations.node_net_op \
+    import create_and_enqueue as nn_create_and_enqueue
+from shakenfist.schema.operations.node_net_op \
+    import model_tasks as nn_tasks
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import general as util_general
+from shakenfist.util import network as util_network
 
 if TYPE_CHECKING:
     from shakenfist.network.network import Network
@@ -258,3 +270,271 @@ class BridgedVXLanNetwork:
                 op='Network update DnsMasq', global_scope=False):
             d = self.network._get_dnsmasq_object()
             d.remove_lease(ipv4, macaddr)
+
+    def _apply_create_on_hypervisor(self) -> None:
+        """Set up the local VXLAN interface for the wrapped network.
+
+        Lifted verbatim from ``Network.create_on_hypervisor``
+        (network.py:575-589). The original method was decorated with
+        ``_not_on_floating_network``; we preserve that semantics inline
+        here (matching the pattern in ``_apply_ensure_mesh``). The
+        existing ``get_lock`` wrapper is preserved.
+        """
+        if self.network.uuid == FLOATING_NETWORK_UUID:
+            return
+
+        subst = self.network.subst_dict()
+        self.network.add_event(
+            EVENT_TYPE_AUDIT, 'creating network on hypervisor',
+            extra={'vx_bridge': subst['vx_bridge'],
+                   'vx_interface': subst['vx_interface'],
+                   'mesh_nic': self.network.mesh_nic})
+        with self.network.get_lock(
+                op='create_on_hypervisor', global_scope=False):
+            if self.network.is_dead():
+                raise DeadNetwork('network=%s' % self.network)
+            util_concurrency.create_vxlan_interface(
+                self.network.vxid, self.network.mesh_nic)
+        self.network.add_event(
+            EVENT_TYPE_AUDIT, 'created network on hypervisor',
+            extra={'vx_bridge': subst['vx_bridge'],
+                   'vx_interface': subst['vx_interface']})
+
+    def _apply_create_on_network_node(self) -> None:
+        """Set up the network namespace and routing on the network node.
+
+        Lifted from ``Network.create_on_network_node`` (network.py:591-719).
+        The original method was decorated with ``_not_on_floating_network``;
+        we preserve that semantics inline here. The Phase 4 late-import
+        workaround that constructed a fresh ``BridgedVXLanNetwork(self)``
+        to call ``_apply_update_dnsmasq`` becomes a clean
+        ``self._apply_update_dnsmasq()`` call, and the ``self.enable_nat()``
+        call becomes ``self._apply_enable_nat()``. The
+        ``self.assign_floating_gateway()`` helper stays on ``Network``.
+        """
+        if self.network.uuid == FLOATING_NETWORK_UUID:
+            return
+
+        if self.network.state.value == dbo.STATE_DELETED:
+            self.network.add_event(
+                EVENT_TYPE_AUDIT,
+                'refusing to create deleted network on network node')
+            return
+        self.network.add_event(
+            EVENT_TYPE_AUDIT, 'creating network on network node')
+
+        # Late import: floating_network is defined in network.py, which
+        # imports this module via the dispatcher path. Importing at
+        # module load would form a cycle.
+        from shakenfist.network.network import floating_network
+
+        with self.network.get_lock(
+                op='create_on_network_node', global_scope=False):
+            if self.network.is_dead():
+                raise DeadNetwork('network=%s' % self.network)
+
+            util_concurrency.create_vxlan_interface(
+                self.network.vxid, self.network.mesh_nic)
+            util_concurrency.create_network_namespace(self.network.uuid)
+
+            subst = self.network.subst_dict()
+
+            if not util_network.check_for_interface(subst['vx_veth_outer']):
+                util_network.create_interface(
+                    subst['vx_veth_outer'], 'veth',
+                    'peer name %(vx_veth_inner)s' % subst)
+                util_concurrency.execute(
+                    'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
+
+                # Refer to bug 952 for more details here, but it turns out
+                # that adding an interface to a bridge overwrites the MTU of
+                # the bridge in an undesirable way. So we lookup the existing
+                # MTU and then re-specify it here.
+                subst['vx_bridge_mtu'] = util_network.get_interface_mtu(
+                    subst['vx_bridge'])
+                util_concurrency.execute(
+                    'ip link set %(vx_veth_outer)s master %(vx_bridge)s '
+                    'mtu %(vx_bridge_mtu)s' % subst)
+
+                util_concurrency.execute(
+                    'ip link set %(vx_veth_outer)s up' % subst)
+                util_concurrency.execute(
+                    'ip link set %(vx_veth_inner)s up' % subst,
+                    netns=self.network.uuid)
+                util_network.add_address_to_interface(
+                    self.network.uuid, subst['router'], subst['netmask'],
+                    subst['vx_veth_inner'])
+
+            if not util_network.check_for_interface(subst['egress_veth_outer']):
+                util_network.create_interface(
+                    subst['egress_veth_outer'], 'veth',
+                    'peer name %(egress_veth_inner)s' % subst)
+
+                # Refer to bug 952 for more details here, but it turns out
+                # that adding an interface to a bridge overwrites the MTU of
+                # the bridge in an undesirable way. So we lookup the existing
+                # MTU and then re-specify it here.
+                subst['egress_bridge_mtu'] = util_network.get_interface_mtu(
+                    subst['egress_bridge'])
+                util_concurrency.execute(
+                    'ip link set %(egress_veth_outer)s master %(egress_bridge)s '
+                    'mtu %(egress_bridge_mtu)s' % subst)
+
+                util_concurrency.execute(
+                    'ip link set %(egress_veth_outer)s up' % subst)
+                util_concurrency.execute(
+                    'ip link set %(egress_veth_inner)s netns %(netns)s' % subst)
+
+            if self.network.provide_nat:
+                # We don't always need this lock, but acquiring it here means
+                # we don't need to construct two identical ipmanagers one after
+                # the other.
+                try:
+                    if not self.network.floating_gateway:
+                        self.network.assign_floating_gateway()
+
+                    fn = floating_network()
+                    subst.update({
+                        'floating_router': fn.ipam.get_address_at_index(1),
+                        'floating_gateway': self.network.floating_gateway,
+                        'floating_netmask': fn.netmask
+                    })
+                except CongestedNetwork:
+                    self.network.state = self.network.STATE_ERROR
+                    self.network.error = 'Unable to allocate floating gateway IP'
+                    return
+
+                addresses = list(util_network.get_interface_addresses(
+                    subst['egress_veth_inner'], netns=subst['netns']))
+                self.network.log.with_fields({
+                    'addresses': addresses,
+                    'current_address': subst['floating_gateway']}).debug(
+                        'Egress veth has these addresses')
+                if not subst['floating_gateway'] in list(addresses):
+                    util_network.add_address_to_interface(
+                        self.network.uuid, subst['floating_gateway'],
+                        subst['floating_netmask'],
+                        subst['egress_veth_inner'])
+
+                needs_default_route = True
+                default_routes = util_network.get_default_routes(
+                    self.network.uuid)
+                if default_routes == [subst['floating_router']]:
+                    needs_default_route = False
+                elif default_routes:
+                    for default_route in default_routes:
+                        if default_route == subst['floating_router']:
+                            needs_default_route = False
+                        else:
+                            util_network.delete_default_route(
+                                self.network.uuid, default_route)
+
+                if needs_default_route:
+                    util_network.add_default_route(
+                        self.network.uuid, subst['floating_router'])
+
+                self._apply_enable_nat()
+
+        # The Phase 4 late-import workaround for dnsmasq is no longer
+        # necessary: this body now lives inside the worker class, so we
+        # can call ``self._apply_update_dnsmasq()`` directly.
+        if self.network.provide_dhcp or self.network.provide_dns:
+            self._apply_update_dnsmasq()
+
+        # A final check to ensure we haven't raced with a delete
+        if self.network.is_dead():
+            raise DeadNetwork('network=%s' % self.network)
+        self.network.state = self.network.STATE_CREATED
+
+    def _apply_delete_on_hypervisor(self) -> None:
+        """Tear down the local VXLAN interfaces for the wrapped network.
+
+        Lifted verbatim from ``Network.delete_on_hypervisor``
+        (network.py:721-745). The existing ``get_lock`` wrapper is
+        preserved.
+        """
+        with self.network.get_lock(op='Network delete', global_scope=False):
+            subst = self.network.subst_dict()
+            self.network.add_event(
+                EVENT_TYPE_AUDIT, 'deleting network on hypervisor',
+                extra={'vx_bridge': subst['vx_bridge'],
+                       'vx_interface': subst['vx_interface']})
+
+            bridge_present = util_network.check_for_interface(
+                subst['vx_bridge'])
+            if bridge_present:
+                util_concurrency.execute(
+                    'ip link delete %(vx_bridge)s' % subst)
+
+            interface_present = util_network.check_for_interface(
+                subst['vx_interface'])
+            if interface_present:
+                util_concurrency.execute(
+                    'ip link delete %(vx_interface)s' % subst)
+
+            self.network.add_event(
+                EVENT_TYPE_AUDIT, 'deleted network on hypervisor',
+                extra={'vx_bridge': subst['vx_bridge'],
+                       'vx_interface': subst['vx_interface'],
+                       'bridge_was_present': bridge_present,
+                       'interface_was_present': interface_present})
+
+    def _apply_delete_on_network_node(self) -> None:
+        """Tear down the network namespace and fan out hypervisor cleanup.
+
+        Lifted from ``Network.delete_on_network_node`` (network.py:747-797).
+        The per-node fan-out loop (enqueueing ``node_net_op`` with
+        ``network_destroy`` to every active node) is preserved. The
+        Phase 4 late-import workarounds for ``_apply_remove_dnsmasq``
+        and ``_apply_remove_nat`` collapse into clean
+        ``self._apply_X()`` calls since this body now lives inside the
+        worker class.
+        """
+        with self.network.get_lock(op='Network delete', global_scope=False):
+            subst = self.network.subst_dict()
+
+            if util_network.check_for_interface(subst['vx_veth_outer']):
+                util_concurrency.execute(
+                    'ip link delete %(vx_veth_outer)s' % subst)
+
+            if util_network.check_for_interface(subst['egress_veth_outer']):
+                util_concurrency.execute(
+                    'ip link delete %(egress_veth_outer)s' % subst)
+
+            if os.path.exists('/var/run/netns/%s' % str(self.network.uuid)):
+                util_concurrency.execute(
+                    'ip netns del %s' % str(self.network.uuid))
+
+            self.network.ipam.state = self.network.ipam.STATE_DELETED
+            self.network.state = self.network.STATE_DELETED
+
+        # Ensure that all hypervisors remove this network. This is really
+        # just catching strays, apart from on the network node where we
+        # absolutely need to do this thing.
+        for n in Nodes([], prefilter='active'):
+            nn_create_and_enqueue(
+                str(n.uuid),
+                self.network.uuid,
+                [nn_tasks.network_destroy],
+                PRIORITY.user_facing,
+                request_id=util_general.get_request_id())
+
+        # The Phase 4 late-import workarounds are no longer necessary:
+        # this body now lives inside the worker class, so we can call
+        # the sibling apply methods directly on ``self``.
+        if self.network.provide_dhcp or self.network.provide_dns:
+            self._apply_remove_dnsmasq()
+        self._apply_remove_nat()
+
+    def _apply_enable_nat(self) -> None:
+        """Install the masquerade rules for the wrapped network.
+
+        Lifted from ``Network.enable_nat`` (network.py:873-877). The
+        ``if not config.NODE_IS_NETWORK_NODE: return`` guard from the
+        original is dropped: this worker class is only ever instantiated
+        inside the dispatcher, which only runs on the elected network
+        node for the tasks that invoke this method.
+        """
+        util_concurrency.enable_nat(
+            self.network.uuid, self.network.network_address,
+            self.network.netmask, self.network.vxid)
