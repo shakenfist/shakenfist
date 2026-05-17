@@ -2018,7 +2018,8 @@ class Instance(dbowo):
         return blob_uuid
 
     def hot_plug_interface(self, n, ni):
-        n.create_on_hypervisor()
+        create_op = n.create_on_hypervisor()
+        create_op.raise_for_error()
         mesh_op = n.ensure_mesh()
         mesh_op.raise_for_error()
 

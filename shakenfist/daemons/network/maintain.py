@@ -126,7 +126,9 @@ class Job(util_concurrency.Job):
                             n.add_event(
                                 EVENT_TYPE_STATUS,
                                 'Recreating not okay network on network node')
-                            n.create_on_network_node()
+                            create_nn_op = n.create_on_network_node()
+                            if create_nn_op is not None:
+                                create_nn_op.raise_for_error()
 
                             # If the network node was missing a network, then that implies
                             # that we also need to re-create all of the floating IPs for
@@ -151,7 +153,8 @@ class Job(util_concurrency.Job):
                             n.add_event(
                                 EVENT_TYPE_STATUS,
                                 'recreating not okay network on hypervisor')
-                            n.create_on_hypervisor()
+                            create_hyp_op = n.create_on_hypervisor()
+                            create_hyp_op.raise_for_error()
 
                     mesh_op = n.ensure_mesh()
                     mesh_op.raise_for_error()

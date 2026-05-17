@@ -131,7 +131,8 @@ def restore_instances():
             n = network.Network.from_db(network_uuid)
             if not n.is_dead():
                 LOG.with_fields({'network': n}).info('Restoring network')
-                n.create_on_hypervisor()
+                create_op = n.create_on_hypervisor()
+                create_op.raise_for_error()
                 mesh_op = n.ensure_mesh()
                 mesh_op.raise_for_error()
         except Exception as e:
