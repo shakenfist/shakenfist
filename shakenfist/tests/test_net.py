@@ -8,6 +8,7 @@ from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
 from shakenfist.operations.net_ip_op import NetIPOp
+from shakenfist.operations.net_macaddr_ip_op import NetMacaddrIPOp
 from shakenfist.operations.net_op import NetOp
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
@@ -614,3 +615,314 @@ class NetworkFloatingIPEnqueueTestCase(NetworkTestCase):
         self.mock_add_floating_ip.assert_not_called()
         self.mock_remove_floating_ip.assert_not_called()
         self.mock_execute.assert_not_called()
+
+
+class NetworkDnsmasqEnqueueTestCase(NetworkTestCase):
+    """Tests for the phase 4d flip of the five dnsmasq-related methods
+    on ``Network``.
+
+    After phase 4d, each of ``update_dnsmasq``, ``remove_dnsmasq``,
+    ``remove_dhcp_lease``, ``update_dns_entry``, and
+    ``remove_dns_entry`` no longer mutates dnsmasq state inline. Each
+    enqueues a cluster operation on the network-node queue family and
+    returns the loaded op so callers can call ``op.raise_for_error()``.
+    ``update_dns_entry`` and ``remove_dns_entry`` still mutate the
+    network's ``hosteddns`` attribute synchronously — that's DB-only
+    state.
+    """
+
+    NODE_UUID = '33333333-3333-4333-8333-cccccccccccc'
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(NODE_UUID=self.NODE_UUID,
+                               NODE_EGRESS_IP='1.1.1.2',
+                               NODE_MESH_IP='1.1.1.2',
+                               NETWORK_NODE_IP='1.1.1.2',
+                               NODE_IS_NETWORK_NODE=True)
+        self.config = mock.patch(
+            'shakenfist.network.network.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        # Inert mock for the cluster_operation_targets writer; the
+        # enqueue path calls it during ``enqueue_cluster_operation``.
+        self.mock_create_target = mock.patch(
+            'shakenfist.mariadb.create_cluster_operation_target').start()
+        self.addCleanup(mock.patch.stopall)
+
+        # Guard against any accidental dnsmasq host mutation. The
+        # ``_get_dnsmasq_object`` factory must not be called from the
+        # flipped methods — it stays in ``Network`` purely for
+        # ``BridgedVXLanNetwork`` to consume via ``self.network``.
+        self.mock_get_dnsmasq = mock.patch(
+            'shakenfist.network.network.Network._get_dnsmasq_object'
+        ).start()
+
+    def _make_network(self, provide_dhcp=True, provide_dns=True,
+                      provide_nat=True):
+        """Create a network and return the loaded ``Network``."""
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid,
+            provide_dhcp=provide_dhcp, provide_dns=provide_dns,
+            provide_nat=provide_nat)
+        return network.Network.from_db(network_uuid), network_uuid
+
+    def _enqueue_spy(self):
+        """Return a MagicMock wrapping the MockEtcd enqueue side-effect."""
+        original = (
+            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+        return mock.MagicMock(side_effect=original)
+
+    def test_update_dnsmasq_enqueues_netop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.update_dnsmasq()
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing_high_io',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_apply_update_dnsmasq', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual(
+            PRIORITY.user_facing_high_io.name, metadata['priority'])
+
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        # The dnsmasq lifecycle factory must not fire from inside
+        # Network.update_dnsmasq any more.
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_update_dnsmasq_skips_without_dhcp_or_dns(self):
+        n, _ = self._make_network(provide_dhcp=False, provide_dns=False,
+                                  provide_nat=False)
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            result = n.update_dnsmasq()
+
+        spy.assert_not_called()
+        self.assertIsNone(result)
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_remove_dnsmasq_enqueues_netop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.remove_dnsmasq()
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_apply_remove_dnsmasq', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual(PRIORITY.user_facing.name, metadata['priority'])
+
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_remove_dnsmasq_skips_without_dhcp_or_dns(self):
+        n, _ = self._make_network(provide_dhcp=False, provide_dns=False,
+                                  provide_nat=False)
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            result = n.remove_dnsmasq()
+
+        spy.assert_not_called()
+        self.assertIsNone(result)
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_remove_dhcp_lease_enqueues_netmacaddripop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.remove_dhcp_lease('192.168.1.10', 'aa:bb:cc:dd:ee:ff')
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_macaddr_ip_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('remove_dhcp_lease', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual('192.168.1.10', metadata['ip'])
+        self.assertEqual('aa:bb:cc:dd:ee:ff', metadata['mac_address'])
+        self.assertEqual(PRIORITY.user_facing.name, metadata['priority'])
+
+        self.assertIsInstance(op, NetMacaddrIPOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_remove_dhcp_lease_skips_without_dhcp_or_dns(self):
+        n, _ = self._make_network(provide_dhcp=False, provide_dns=False,
+                                  provide_nat=False)
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            result = n.remove_dhcp_lease('192.168.1.10', 'aa:bb:cc:dd:ee:ff')
+
+        spy.assert_not_called()
+        self.assertIsNone(result)
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_update_dns_entry_mutates_and_enqueues(self):
+        n, network_uuid = self._make_network()
+
+        # Spy on add_event so we can confirm the audit event fires.
+        with mock.patch.object(n, 'add_event') as mock_add_event:
+            spy = self._enqueue_spy()
+            with mock.patch(
+                    'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                    spy):
+                op = n.update_dns_entry('foo.example.com', '10.0.0.5')
+
+        # Synchronous attribute update happened.
+        attrs = n._ensure_attributes()
+        self.assertEqual('10.0.0.5', attrs.hosteddns.get('foo.example.com'))
+
+        # Audit event was emitted.
+        mock_add_event.assert_called_once()
+        event_args = mock_add_event.call_args
+        self.assertEqual('update dns entry', event_args.args[1])
+        self.assertEqual({'name': 'foo.example.com', 'value': '10.0.0.5'},
+                         event_args.kwargs['extra'])
+
+        # The dnsmasq restart was enqueued as
+        # network_apply_update_dnsmasq on the high-io queue.
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing_high_io',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_apply_update_dnsmasq', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_update_dns_entry_skips_without_dns(self):
+        n, _ = self._make_network(provide_dhcp=True, provide_dns=False,
+                                  provide_nat=False)
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            result = n.update_dns_entry('foo.example.com', '10.0.0.5')
+
+        spy.assert_not_called()
+        self.assertIsNone(result)
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_remove_dns_entry_mutates_and_enqueues(self):
+        n, network_uuid = self._make_network()
+
+        # Seed an entry to remove.
+        attrs = n._ensure_attributes()
+        attrs.hosteddns['foo.example.com'] = '10.0.0.5'
+        n._save_attributes()
+
+        with mock.patch.object(n, 'add_event') as mock_add_event:
+            spy = self._enqueue_spy()
+            with mock.patch(
+                    'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                    spy):
+                op = n.remove_dns_entry('foo.example.com')
+
+        # Synchronous attribute mutation: name removed.
+        attrs = n._ensure_attributes()
+        self.assertNotIn('foo.example.com', attrs.hosteddns)
+
+        # Audit event was emitted.
+        mock_add_event.assert_called_once()
+        event_args = mock_add_event.call_args
+        self.assertEqual('remove dns entry', event_args.args[1])
+        self.assertEqual({'name': 'foo.example.com'},
+                         event_args.kwargs['extra'])
+
+        # The dnsmasq restart was enqueued as
+        # network_apply_update_dnsmasq on the high-io queue.
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing_high_io',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_apply_update_dnsmasq', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_remove_dns_entry_enqueues_even_when_name_absent(self):
+        # The pre-flip behaviour always enqueues the dnsmasq restart,
+        # whether or not the named entry was actually present. The
+        # flipped method preserves that contract.
+        n, network_uuid = self._make_network()
+
+        with mock.patch.object(n, 'add_event') as mock_add_event:
+            spy = self._enqueue_spy()
+            with mock.patch(
+                    'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                    spy):
+                op = n.remove_dns_entry('does-not-exist.example.com')
+
+        # No audit event fired for the absent name.
+        mock_add_event.assert_not_called()
+
+        # But the dnsmasq restart still enqueued.
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        metadata = kwargs['metadata']
+        self.assertIn('network_apply_update_dnsmasq', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+
+        self.assertIsInstance(op, NetOp)
+        self.mock_get_dnsmasq.assert_not_called()
+
+    def test_remove_dns_entry_skips_without_dns(self):
+        n, _ = self._make_network(provide_dhcp=True, provide_dns=False,
+                                  provide_nat=False)
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            result = n.remove_dns_entry('foo.example.com')
+
+        spy.assert_not_called()
+        self.assertIsNone(result)
+        self.mock_get_dnsmasq.assert_not_called()

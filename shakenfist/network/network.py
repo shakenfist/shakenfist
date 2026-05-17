@@ -779,48 +779,60 @@ class Network(dbowo):
         return is_running
 
     def remove_dhcp_lease(self, ipv4, macaddr):
-        if not self.provide_dhcp and not self.provide_dns:
-            return
+        """Enqueue a remove_dhcp_lease NetMacaddrIPOp for this network.
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DnsMasq', global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.remove_lease(ipv4, macaddr)
-        else:
-            nmi_create_and_enqueue(
-                self.uuid, macaddr, ipv4, [nmi_tasks.remove_dhcp_lease],
-                PRIORITY.user_facing)
+        Returns the enqueued NetMacaddrIPOp loaded from the database, or
+        ``None`` if this network does not run dnsmasq. Callers wanting
+        the previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_remove_dhcp_lease``.
+        """
+        if not self.provide_dhcp and not self.provide_dns:
+            return None
+
+        op_type, op_uuid = nmi_create_and_enqueue(
+            self.uuid, macaddr, ipv4, [nmi_tasks.remove_dhcp_lease],
+            PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def update_dnsmasq(self):
-        if not self.provide_dhcp and not self.provide_dns:
-            return
+        """Enqueue a network_apply_update_dnsmasq NetOp for this network.
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DnsMasq', global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.restart()
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_update_dnsmasq],
-                priority=PRIORITY.user_facing_high_io
-            )
+        Returns the enqueued NetOp loaded from the database, or ``None``
+        if this network does not run dnsmasq. Callers wanting the
+        previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_update_dnsmasq``.
+        """
+        if not self.provide_dhcp and not self.provide_dns:
+            return None
+
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def remove_dnsmasq(self):
-        if not self.provide_dhcp and not self.provide_dns:
-            return
+        """Enqueue a network_apply_remove_dnsmasq NetOp for this network.
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network remove DnsMasq', global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.terminate()
-                d.state = dnsmasq.DnsMasq.STATE_DELETED
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_remove_dnsmasq],
-                priority=PRIORITY.user_facing
-            )
+        Returns the enqueued NetOp loaded from the database, or ``None``
+        if this network does not run dnsmasq. Callers wanting the
+        previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_remove_dnsmasq``.
+        """
+        if not self.provide_dhcp and not self.provide_dns:
+            return None
+
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_remove_dnsmasq],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def enable_nat(self):
         if not config.NODE_IS_NETWORK_NODE:
@@ -845,8 +857,16 @@ class Network(dbowo):
         return get_object_class(op_type).from_db(op_uuid)
 
     def update_dns_entry(self, name, value):
+        """Update a DNS entry and enqueue a dnsmasq restart.
+
+        The attribute mutation (``attrs.hosteddns[name] = value``) is
+        DB-only state and stays synchronous. The dnsmasq restart is
+        enqueued as a ``network_apply_update_dnsmasq`` NetOp. Returns
+        the enqueued NetOp loaded from the database, or ``None`` if
+        this network does not provide DNS.
+        """
         if not self.provide_dns:
-            return
+            return None
 
         attrs = self._ensure_attributes()
         attrs.hosteddns[name] = value
@@ -854,22 +874,25 @@ class Network(dbowo):
         self.add_event(EVENT_TYPE_MUTATE, 'update dns entry',
                        extra={'name': name, 'value': value})
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(
-                    op='Network update DnsMasq',
-                    global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.restart()
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_update_dnsmasq],
-                priority=PRIORITY.user_facing_high_io
-            )
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def remove_dns_entry(self, name):
+        """Remove a DNS entry and enqueue a dnsmasq restart.
+
+        The attribute mutation (the ``del attrs.hosteddns[name]``) is
+        DB-only state and stays synchronous. The dnsmasq restart is
+        enqueued as a ``network_apply_update_dnsmasq`` NetOp regardless
+        of whether the name was present (matching the pre-flip
+        behaviour). Returns the enqueued NetOp loaded from the
+        database, or ``None`` if this network does not provide DNS.
+        """
         if not self.provide_dns:
-            return
+            return None
 
         attrs = self._ensure_attributes()
         if name in attrs.hosteddns:
@@ -878,18 +901,12 @@ class Network(dbowo):
             self.add_event(EVENT_TYPE_MUTATE, 'remove dns entry',
                            extra={'name': name})
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(
-                    op='Network update DnsMasq',
-                    global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.restart()
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_update_dnsmasq],
-                priority=PRIORITY.user_facing_high_io
-            )
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     @_not_on_floating_network
     def ensure_mesh(self):
