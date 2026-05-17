@@ -432,13 +432,17 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        # Create two extra DNS entries, delete one
+        # Create two extra DNS entries, delete one. Each call writes the
+        # network attributes synchronously but enqueues the dnsmasq
+        # reload as a cluster op; we must wait for that to drain before
+        # querying DNS or we race the SIGHUP.
         self.test_client.update_network_dns_entry(
             extra_dns_net['uuid'], 'banana', '11.22.33.44')
         self.test_client.update_network_dns_entry(
             extra_dns_net['uuid'], 'mango', '55.66.77.88')
         self.test_client.delete_network_dns_entry(
             extra_dns_net['uuid'], 'banana')
+        self._await_network_operations_complete(extra_dns_net['uuid'])
 
         # Wait for the instance agent to report in
         self._await_instance_ready(inst1['uuid'])

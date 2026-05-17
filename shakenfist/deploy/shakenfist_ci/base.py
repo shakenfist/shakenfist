@@ -416,6 +416,36 @@ class BaseTestCase(testtools.TestCase):
             f'Instance operations did not complete within 5 minutes '
             f'for {instance_uuid}')
 
+    def _await_network_operations_complete(self, network_uuid):
+        # Network mutation API endpoints (DNS updates, route updates, NAT
+        # changes) write the static DB state synchronously but enqueue
+        # the actual network-node-side reconcile as a cluster op that
+        # runs later. Tests that assert on the post-mutation network
+        # node state must wait for that op to drain or they will race
+        # the dnsmasq/iptables/etc reload.
+        start_time = time.time()
+        while time.time() - start_time < 5 * 60:
+            n = self.system_client.get_network(network_uuid)
+            lco = n.get('last_cluster_operation')
+
+            if not lco:
+                return
+
+            lco_details = self.system_client.get_cluster_operation(
+                lco['op_type'], lco['op_uuid'])
+            if lco_details['state'] in ['complete', 'deleted', 'abort']:
+                return
+            if lco_details['state'] == 'error':
+                self.fail(
+                    f'Cluster operation {lco["op_uuid"]} for network '
+                    f'{network_uuid} ended in error state')
+
+            time.sleep(5)
+
+        self.fail(
+            f'Network operations did not complete within 5 minutes '
+            f'for {network_uuid}')
+
     def _await_image_download_success(self, image_uuid, after=None):
         return self._await_image_event(image_uuid, 'fetch', 'success', after)
 
