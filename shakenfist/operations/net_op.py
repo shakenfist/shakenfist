@@ -151,7 +151,13 @@ class NetOp(BaseClusterOperation):
         BridgedVXLanNetwork(n)._apply_ensure_mesh()
 
     def _network_remove_dnsmasq(self, n):
-        n.remove_dnsmasq()
+        BridgedVXLanNetwork(n)._apply_remove_dnsmasq()
+
+    def _network_apply_update_dnsmasq(self, n):
+        BridgedVXLanNetwork(n)._apply_update_dnsmasq()
+
+    def _network_apply_remove_dnsmasq(self, n):
+        BridgedVXLanNetwork(n)._apply_remove_dnsmasq()
 
     def _network_remove_nat(self, n):
         BridgedVXLanNetwork(n)._apply_remove_nat()

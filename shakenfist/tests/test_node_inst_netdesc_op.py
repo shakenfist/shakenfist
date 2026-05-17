@@ -168,3 +168,58 @@ class EnsureMeshRaiseForErrorPropagatesTestCase(base.ShakenFistTestCase):
         fake_mesh_op.raise_for_error.assert_called_once()
         # The op should NOT be in STATE_ERROR (it reached further into _instance_start)
         self.assertNotEqual(NodeInstNetdescOp.STATE_ERROR, op.state.value)
+
+
+class UpdateDnsmasqRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTestCase):
+    """The in-worker dnsmasq update routes through BridgedVXLanNetwork directly.
+
+    After step 4d flips ``Network.update_dnsmasq`` to enqueue, an inline
+    ``n.update_dnsmasq()`` call here would enqueue from inside the
+    dispatcher and deadlock. Step 4c switches the call to
+    ``BridgedVXLanNetwork(n)._apply_update_dnsmasq()`` to keep it
+    synchronous.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+        self.node_uuid = uuid4()
+        self.instance_uuid = uuid4()
+        self.network_uuid = uuid4()
+        self.iface_uuid = uuid4()
+
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_update_dnsmasq')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.NetworkInterface.from_db')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.Network.from_db')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.Instance.from_db')
+    def test_update_dnsmasq_calls_apply_update_dnsmasq_not_n_update_dnsmasq(
+            self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db,
+            mock_apply_update_dnsmasq):
+        """_instance_start invokes BridgedVXLanNetwork._apply_update_dnsmasq."""
+        inst_mock = _make_inst_mock()
+        mock_inst_from_db.return_value = inst_mock
+
+        net_mock = _make_net_mock(self.network_uuid)
+        mock_net_from_db.return_value = net_mock
+
+        ni_mock = _make_ni_mock()
+        mock_ni_from_db.return_value = ni_mock
+
+        fake_mesh_op = mock.MagicMock()
+        fake_mesh_op.raise_for_error.return_value = None
+        net_mock.ensure_mesh.return_value = fake_mesh_op
+
+        op = _make_op(
+            self, self.mock_etcd,
+            self.node_uuid, self.instance_uuid,
+            self.network_uuid, self.iface_uuid,
+        )
+        op.state = NodeInstNetdescOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.instance_start)
+
+        mock_apply_update_dnsmasq.assert_called_once_with()
+        # Network.update_dnsmasq must never be invoked from this in-worker
+        # dispatcher path -- after step 4d it would enqueue and deadlock.
+        net_mock.update_dnsmasq.assert_not_called()

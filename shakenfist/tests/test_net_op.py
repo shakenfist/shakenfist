@@ -332,6 +332,89 @@ class NetworkRemoveFloatingIPTaskDispatchTestCase(base.ShakenFistTestCase):
         mock_set_error.assert_not_called()
 
 
+class NetworkRemoveDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
+    """``_network_remove_dnsmasq`` routes through BridgedVXLanNetwork._apply_remove_dnsmasq."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_remove_dnsmasq')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_remove_dnsmasq_handler_calls_apply_remove_dnsmasq(
+            self, mock_network_from_db, mock_apply, mock_set_error):
+        """Dispatching network_remove_dnsmasq delegates to BridgedVXLanNetwork."""
+        network = _make_network_mock()
+        mock_network_from_db.return_value = network
+
+        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_remove_dnsmasq])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_remove_dnsmasq)
+
+        mock_apply.assert_called_once_with()
+        # Network.remove_dnsmasq must never be invoked from the dispatcher.
+        network.remove_dnsmasq.assert_not_called()
+        mock_set_error.assert_not_called()
+
+
+class NetworkApplyUpdateDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
+    """``_network_apply_update_dnsmasq`` routes through BridgedVXLanNetwork._apply_update_dnsmasq."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_update_dnsmasq')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_apply_update_dnsmasq_handler_calls_apply_update_dnsmasq(
+            self, mock_network_from_db, mock_apply, mock_set_error):
+        """Dispatching network_apply_update_dnsmasq delegates to BridgedVXLanNetwork."""
+        network = _make_network_mock()
+        mock_network_from_db.return_value = network
+
+        op, _ = _make_net_op(
+            self, self.mock_etcd, [model_tasks.network_apply_update_dnsmasq])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_apply_update_dnsmasq)
+
+        mock_apply.assert_called_once_with()
+        # Network.update_dnsmasq must never be invoked from the dispatcher.
+        network.update_dnsmasq.assert_not_called()
+        mock_set_error.assert_not_called()
+
+
+class NetworkApplyRemoveDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
+    """``_network_apply_remove_dnsmasq`` routes through BridgedVXLanNetwork._apply_remove_dnsmasq."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_remove_dnsmasq')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_apply_remove_dnsmasq_handler_calls_apply_remove_dnsmasq(
+            self, mock_network_from_db, mock_apply, mock_set_error):
+        """Dispatching network_apply_remove_dnsmasq delegates to BridgedVXLanNetwork."""
+        network = _make_network_mock()
+        mock_network_from_db.return_value = network
+
+        op, _ = _make_net_op(
+            self, self.mock_etcd, [model_tasks.network_apply_remove_dnsmasq])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_apply_remove_dnsmasq)
+
+        mock_apply.assert_called_once_with()
+        # Network.remove_dnsmasq must never be invoked from the dispatcher.
+        network.remove_dnsmasq.assert_not_called()
+        mock_set_error.assert_not_called()
+
+
 class NetworkUpdateDnsmasqEnsureMeshRoutingTestCase(base.ShakenFistTestCase):
     """_network_update_dnsmasq uses BridgedVXLanNetwork._apply_ensure_mesh, never n.ensure_mesh()."""
 

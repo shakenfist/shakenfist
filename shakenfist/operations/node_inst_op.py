@@ -10,6 +10,7 @@ from shakenfist.schema.operations import node_inst_op as schema
 from shakenfist.instance import Instance
 from shakenfist.instance import Instances
 from shakenfist.instance import this_node_filter
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -234,7 +235,7 @@ class NodeInstOp(BaseClusterOperation):
                 if n.state.value == Network.STATE_DELETE_WAIT:
                     continue
 
-                n.update_dnsmasq()
+                BridgedVXLanNetwork(n)._apply_update_dnsmasq()
 
                 if (not config.NODE_IS_NETWORK_NODE and
                         network_uuid not in host_networks):

@@ -9,6 +9,7 @@ from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import LowResourceException
 from shakenfist.instance import Instance
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -242,7 +243,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
                     n.create_on_hypervisor()
                     mesh_op = n.ensure_mesh()
                     mesh_op.raise_for_error()
-                    n.update_dnsmasq()
+                    BridgedVXLanNetwork(n)._apply_update_dnsmasq()
 
                     if ni.floating['floating_address']:
                         ni_create_and_enqueue(
