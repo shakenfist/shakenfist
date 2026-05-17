@@ -10,9 +10,9 @@ This section contains forward-looking roadmaps for Shaken Fist development. Thes
 The set of incomplete plans has grown to the point where the order they land in matters. The intended sequencing is:
 
 1. **[Network operations facade](PLAN-network-facade.md)** — in progress in a separate work session. Lands first.
-2. **[Health checks, readiness, and graceful drain](PLAN-health-checks.md)** — a precondition for the BYO load-balancer story in remove-primary being operationally honest. The plan is partial: a phase 0 decisions pass resolves the open questions before the implementation phases are re-cut.
-3. **[Remove the primary node](PLAN-remove-primary.md)** — the BYO-infrastructure scope reduction. Naturally followed by a wipe-and-redeploy of the last known etcd-era SF deployment against the new shape.
-4. **[Retire etcd](PLAN-remove-etcd.md)** — a small, mechanical deletion sweep gated on remove-primary completing and the redeploy having happened.
+2. **[Retire etcd](PLAN-remove-etcd.md)** — a small, mechanical deletion sweep. Originally gated on the etcd-era cluster redeploy; that gating has been dropped because the in-place upgrade path is being closed deliberately. Lands early in the sequence so the remove-primary work below is not navigating misleading etcd references while it renames the ansible group.
+3. **[Health checks, readiness, and graceful drain](PLAN-health-checks.md)** — a precondition for the BYO load-balancer story in remove-primary being operationally honest. The plan is partial: a phase 0 decisions pass resolves the open questions before the implementation phases are re-cut.
+4. **[Remove the primary node](PLAN-remove-primary.md)** — the BYO-infrastructure scope reduction. Phase 7 finishes the deployer-level `etcd_master` → `database_node` rename, by which point the drain code itself is long gone. Naturally followed by a wipe-and-redeploy of Mikal's production cluster against the new shape.
 
 The remaining incomplete plans — [Embrace TLS](PLAN-embrace-tls.md), [Sticky blob transfers](PLAN-sticky-transfers.md), and the not-yet-drafted threads for eventlog-into-MariaDB, network-node failover, and OpenTelemetry instrumentation — are intentionally **not ordered relative to each other** here. They each have specific dependencies on remove-primary having established the BYO shape (the operator-provides-PKI surface for TLS, the streaming-proxy baseline for sticky transfers, the sf-database election pattern for the others), but among themselves the order is a triage decision best made when remove-primary is close to landing rather than now.
 
@@ -54,7 +54,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Remove the primary node](PLAN-remove-primary.md) | Phase 5: Elect sf-database | Not started | Candidate-list discovery and leader election for sf-database |
 | [Remove the primary node](PLAN-remove-primary.md) | Phase 6: Galaxy role | Not started | Repackage deployer as a per-node ansible-galaxy-style role |
 | [Remove the primary node](PLAN-remove-primary.md) | Phase 7: Rename and cleanup | Not started | `etcd_master` → `database_node`; final dead-code sweep |
-| [Retire etcd](PLAN-remove-etcd.md) | Single sweep | Blocked on preconditions | Delete `shakenfist/etcd.py`, the `DATA_MIGRATIONS` drain code, residual etcd references and dependencies once remove-primary lands and the last etcd-era deployment is redeployed |
+| [Retire etcd](PLAN-remove-etcd.md) | Single sweep | Not started | Delete `shakenfist/etcd.py`, the `DATA_MIGRATIONS` drain code, residual etcd references and the `etcd3gw` dependency in one coordinated sweep |
 | [Embrace TLS](PLAN-embrace-tls.md) | Phase 0: Research and decisions | Not started | Resolve open TLS questions into a decisions document |
 | [Embrace TLS](PLAN-embrace-tls.md) | Phase 1: Cert reload | Not started | Graceful TLS material reload across daemons |
 | [Embrace TLS](PLAN-embrace-tls.md) | Phase 2: sf-database mTLS | Not started | Canary mTLS path for the highest-traffic gRPC channel |

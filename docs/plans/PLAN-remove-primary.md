@@ -317,10 +317,14 @@ Phase notes:
   consumers.
 - **Phase 7** is mostly mechanical: rename `etcd_master` →
   `database_node` across `deploy.py`, `deploy.yml`, all
-  roles, and comments. Delete dead `etcd_host` default and
-  `ETCDCTL_API=3` line in `sfrc`. Leaves
-  `shakenfist/etcd.py` alone (handled separately, per
-  CLAUDE.md).
+  roles, and comments. By the time phase 7 runs,
+  `PLAN-remove-etcd.md` will already have landed and the
+  drain code, `etcd_host` default, `ETCDCTL_API=3` line in
+  `sfrc`, and `etcd3gw` dependency will be gone. Phase 7's
+  scope is therefore *only* the deployer-level naming and
+  comments — the ansible group rename, the inventory.yaml
+  `etcd:` children-group rename, and the residual
+  `etcd_master` mentions in role comments.
 
 ## Agent guidance
 
@@ -483,10 +487,14 @@ because the following statements will be true:
   Tracked in `PLAN-embrace-tls.md`. This plan establishes the
   operator-provides-PKI surface that the TLS plan consumes.
 - **Retiring `shakenfist/etcd.py` and the `DATA_MIGRATIONS`
-  drain code.** Tracked in `PLAN-remove-etcd.md`. Blocked
-  on this plan completing (through phase 7) and on a
-  subsequent wipe-and-redeploy of the last known etcd-era
-  SF deployment against the new BYO shape.
+  drain code.** Tracked in `PLAN-remove-etcd.md`. No longer
+  blocked on this plan landing: the decision to close
+  in-place upgrade from etcd-era SF means the drain code
+  is dead weight forever and can be deleted at any time.
+  Sequenced *before* this plan in `index.md` so the
+  remove-primary work is not navigating misleading etcd
+  references while it does the `etcd_master` rename in
+  phase 7.
 - **Health checks, readiness, and graceful drain semantics.**
   A precondition for the BYO-LB story being operationally
   honest: operators need a `/healthz` (or equivalent) that
