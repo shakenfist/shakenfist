@@ -240,7 +240,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
                             self, 'Inactive network interface')
 
                     ni.state = NetworkInterface.STATE_CREATED
-                    n.create_on_hypervisor()
+                    BridgedVXLanNetwork(n)._apply_create_on_hypervisor()
                     mesh_op = n.ensure_mesh()
                     mesh_op.raise_for_error()
                     BridgedVXLanNetwork(n)._apply_update_dnsmasq()

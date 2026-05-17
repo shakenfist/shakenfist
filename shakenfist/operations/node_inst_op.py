@@ -246,4 +246,4 @@ class NodeInstOp(BaseClusterOperation):
                         'host_networks': host_networks,
                     }).debug('Last instance on host using this network, '
                              'deleting on hypervisor')
-                    n.delete_on_hypervisor()
+                    BridgedVXLanNetwork(n)._apply_delete_on_hypervisor()

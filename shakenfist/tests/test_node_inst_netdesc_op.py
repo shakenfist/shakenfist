@@ -101,11 +101,14 @@ class EnsureMeshRaiseForErrorPropagatesTestCase(base.ShakenFistTestCase):
         self.network_uuid = uuid4()
         self.iface_uuid = uuid4()
 
+    @mock.patch(
+        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_create_on_hypervisor')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.NetworkInterface.from_db')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.Network.from_db')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.Instance.from_db')
     def test_ensure_mesh_network_op_failed_sets_state_error(
-            self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db):
+            self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db,
+            mock_apply_create):
         """NetworkOperationFailed from raise_for_error() results in STATE_ERROR."""
         inst_mock = _make_inst_mock()
         mock_inst_from_db.return_value = inst_mock
@@ -135,11 +138,15 @@ class EnsureMeshRaiseForErrorPropagatesTestCase(base.ShakenFistTestCase):
         self.assertEqual(NodeInstNetdescOp.STATE_ERROR, op.state.value)
         fake_mesh_op.raise_for_error.assert_called_once()
 
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_update_dnsmasq')
+    @mock.patch(
+        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_create_on_hypervisor')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.NetworkInterface.from_db')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.Network.from_db')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.Instance.from_db')
     def test_ensure_mesh_success_continues_normally(
-            self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db):
+            self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db,
+            mock_apply_create, mock_apply_update_dnsmasq):
         """When raise_for_error() returns None, execution continues past ensure_mesh."""
         inst_mock = _make_inst_mock()
         mock_inst_from_db.return_value = inst_mock
@@ -190,13 +197,15 @@ class UpdateDnsmasqRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTestC
         self.network_uuid = uuid4()
         self.iface_uuid = uuid4()
 
+    @mock.patch(
+        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_create_on_hypervisor')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_update_dnsmasq')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.NetworkInterface.from_db')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.Network.from_db')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.Instance.from_db')
     def test_update_dnsmasq_calls_apply_update_dnsmasq_not_n_update_dnsmasq(
             self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db,
-            mock_apply_update_dnsmasq):
+            mock_apply_update_dnsmasq, mock_apply_create):
         """_instance_start invokes BridgedVXLanNetwork._apply_update_dnsmasq."""
         inst_mock = _make_inst_mock()
         mock_inst_from_db.return_value = inst_mock
@@ -223,3 +232,61 @@ class UpdateDnsmasqRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTestC
         # Network.update_dnsmasq must never be invoked from this in-worker
         # dispatcher path -- after step 4d it would enqueue and deadlock.
         net_mock.update_dnsmasq.assert_not_called()
+
+
+class CreateOnHypervisorRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTestCase):
+    """The in-worker create_on_hypervisor call routes through BridgedVXLanNetwork.
+
+    After step 5d flips ``Network.create_on_hypervisor`` to enqueue, an
+    inline ``n.create_on_hypervisor()`` call here would enqueue from
+    inside the dispatcher and deadlock. Step 5c switches the call to
+    ``BridgedVXLanNetwork(n)._apply_create_on_hypervisor()`` to keep it
+    synchronous.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+        self.node_uuid = uuid4()
+        self.instance_uuid = uuid4()
+        self.network_uuid = uuid4()
+        self.iface_uuid = uuid4()
+
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_update_dnsmasq')
+    @mock.patch(
+        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_create_on_hypervisor')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.NetworkInterface.from_db')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.Network.from_db')
+    @mock.patch('shakenfist.operations.node_inst_netdesc_op.Instance.from_db')
+    def test_create_on_hypervisor_calls_apply_not_n_create_on_hypervisor(
+            self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db,
+            mock_apply_create, mock_apply_update_dnsmasq):
+        """_instance_start invokes BridgedVXLanNetwork._apply_create_on_hypervisor."""
+        inst_mock = _make_inst_mock()
+        mock_inst_from_db.return_value = inst_mock
+
+        net_mock = _make_net_mock(self.network_uuid)
+        mock_net_from_db.return_value = net_mock
+
+        ni_mock = _make_ni_mock()
+        mock_ni_from_db.return_value = ni_mock
+
+        fake_mesh_op = mock.MagicMock()
+        fake_mesh_op.raise_for_error.return_value = None
+        net_mock.ensure_mesh.return_value = fake_mesh_op
+
+        op = _make_op(
+            self, self.mock_etcd,
+            self.node_uuid, self.instance_uuid,
+            self.network_uuid, self.iface_uuid,
+        )
+        op.state = NodeInstNetdescOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.instance_start)
+
+        mock_apply_create.assert_called_once_with()
+        # Network.create_on_hypervisor must never be invoked from this
+        # in-worker dispatcher path -- after step 5d it would enqueue
+        # and deadlock.
+        net_mock.create_on_hypervisor.assert_not_called()
