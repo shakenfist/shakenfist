@@ -1,10 +1,11 @@
 # Copyright 2019 Michael Still and contributors
 
-"""Regression tests for shakenfist.daemons.network.maintain.
+"""Tests for shakenfist.daemons.network.maintain.
 
-Focus: confirm that the maintain loop calls op.raise_for_error() after each
-of the enqueuing calls introduced in Phase 3 (add_floating_ip and
-route_address).
+Phase 6 rewrote maintain.py as a discovery-only pass governed by the
+five-guard pipeline: queue-depth, pending-op, cooldown, circuit-breaker
+and (on success) enqueue at PRIORITY.background. These tests exercise
+each guard.
 """
 
 from unittest import mock
@@ -12,192 +13,286 @@ from unittest import mock
 from shakenfist.tests import base
 
 
-class AddFloatingIpRaiseForErrorTest(base.ShakenFistTestCase):
-    """After add_floating_ip is called in the maintain loop the returned op
-    must have raise_for_error() called on it."""
+def _build_mock_network(uuid='net-uuid-001', vxid=42, state='created',
+                        is_okay=False, interfaces=None):
+    n = mock.MagicMock()
+    n.uuid = uuid
+    n.vxid = vxid
+    n.state.value = state
+    n.state.update_time = 0.0
+    n.is_okay.return_value = is_okay
+    n.networkinterfaces = interfaces if interfaces is not None else []
+    return n
 
-    def _run_maintain_once_not_okay_network_node(
-        self, floating_addr, ipv4, instance_uuid
-    ):
-        """Drive one iteration of the maintain loop with a not-okay network on
-        the network node.  The network has one interface with a floating address
-        so the add_floating_ip path is exercised.
 
-        Returns the mock op returned by n.add_floating_ip so the caller can
-        assert on it.
+def _patch_maintain_module(network_node=True, queue_depth_per_queue=0,
+                           pending_op=False, recent_history=None,
+                           networks=None, floating_network=None):
+    """Build the standard set of mock.patch context managers for one
+    pass through Job.execute(). Returns the context manager objects so
+    callers can use them with ``contextlib.ExitStack`` or by manually
+    entering them.
+    """
+    patches = {
+        'config': mock.patch('shakenfist.daemons.network.maintain.config'),
+        'daemon': mock.patch('shakenfist.daemons.network.maintain.daemon'),
+        'network': mock.patch('shakenfist.daemons.network.maintain.network'),
+        'util_network': mock.patch(
+            'shakenfist.daemons.network.maintain.util_network'),
+        'util_concurrency': mock.patch(
+            'shakenfist.daemons.network.maintain.util_concurrency'),
+        'time': mock.patch('shakenfist.daemons.network.maintain.time'),
+        'mariadb': mock.patch('shakenfist.daemons.network.maintain.mariadb'),
+        'node': mock.patch('shakenfist.daemons.network.maintain.Node'),
+        'get_node_network_queues': mock.patch(
+            'shakenfist.daemons.network.maintain.get_node_network_queues'),
+        'get_all_network_queues': mock.patch(
+            'shakenfist.daemons.network.maintain.get_all_network_queues'),
+        'net_create_and_enqueue': mock.patch(
+            'shakenfist.daemons.network.maintain.net_create_and_enqueue'),
+        'nn_create_and_enqueue': mock.patch(
+            'shakenfist.daemons.network.maintain.nn_create_and_enqueue'),
+        'net_ip_create_and_enqueue': mock.patch(
+            'shakenfist.daemons.network.maintain.net_ip_create_and_enqueue'),
+        'instance': mock.patch(
+            'shakenfist.daemons.network.maintain.instance'),
+    }
+    return patches
+
+
+class MaintainPipelineTest(base.ShakenFistTestCase):
+    """Exercise the five-guard pipeline in
+    shakenfist.daemons.network.maintain.Job.execute().
+    """
+
+    def _run_one_iteration(self, *, network_node=True,
+                           queue_depth_per_queue=0,
+                           pending_op=False, recent_history=None,
+                           networks=None, floating_network=None):
+        """Drive Job.execute() through exactly one pass of the outer loop
+        and return a dict of the mocks that callers will most likely
+        want to assert on.
         """
-        mock_add_op = mock.MagicMock()
+        if networks is None:
+            networks = []
+        if recent_history is None:
+            recent_history = []
 
-        # Build a minimal mock network interface.
-        mock_ni = mock.MagicMock()
-        mock_ni.floating = {'floating_address': floating_addr}
-        mock_ni.ipv4 = ipv4
-        mock_ni.instance_uuid = instance_uuid
+        patches = _patch_maintain_module()
+        active = {name: p.start() for name, p in patches.items()}
+        try:
+            mc = active['config']
+            mc.NODE_IS_NETWORK_NODE = network_node
+            mc.NODE_UUID = 'node-uuid-test'
+            mc.NODE_NAME = 'node-name-test'
+            mc.MAINTAIN_QUEUE_DEPTH_THRESHOLD = 50
+            mc.MAINTAIN_RECONCILE_COOLDOWN_SECONDS = 60
+            mc.MAINTAIN_RECONCILE_CIRCUIT_K = 5
 
-        # Build a minimal mock network.
-        mock_network = mock.MagicMock()
-        mock_network.uuid = 'net-uuid-001'
-        mock_network.vxid = 42
-        mock_network.state.value = 'created'
-        mock_network.state.update_time = 0.0   # old enough to pass the 60-s guard
-        mock_network.is_okay.return_value = False
-        mock_network.networkinterfaces = [mock_ni]
-        mock_network.add_floating_ip.return_value = mock_add_op
+            md = active['daemon']
+            md.check_abort_path.side_effect = [True, False]
+            md.clear_abort_path.return_value = None
 
-        # ensure_mesh op — also needs raise_for_error.
-        mock_mesh_op = mock.MagicMock()
-        mock_network.ensure_mesh.return_value = mock_mesh_op
+            mt = active['time']
+            mt.time.return_value = 10_000.0
+            mt.sleep.return_value = None
 
-        with mock.patch(
-            'shakenfist.daemons.network.maintain.config'
-        ) as mock_config, mock.patch(
-            'shakenfist.daemons.network.maintain.daemon'
-        ) as mock_daemon, mock.patch(
-            'shakenfist.daemons.network.maintain.network'
-        ) as mock_net_module, mock.patch(
-            'shakenfist.daemons.network.maintain.util_network'
-        ) as mock_util_net, mock.patch(
-            'shakenfist.daemons.network.maintain.util_concurrency'
-        ), mock.patch(
-            'shakenfist.daemons.network.maintain.time'
-        ) as mock_time:
-            mock_config.NODE_IS_NETWORK_NODE = True
-            # Allow exactly one pass through the outer while-loop.
-            mock_daemon.check_abort_path.side_effect = [True, False]
-            mock_daemon.clear_abort_path.return_value = None
-            # time.time() is called for the loop throttle and the state-age
-            # guard; return a large value so both checks pass immediately.
-            mock_time.time.return_value = 10_000.0
-            mock_time.sleep.return_value = None
+            active['util_network'].discover_interfaces.return_value = (
+                None, None, {})
 
-            # discover_interfaces returns (None, None, {}) — no extra vxids.
-            mock_util_net.discover_interfaces.return_value = (None, None, {})
+            active['network'].Networks.return_value = networks
+            # Network.from_db should return the matching mock by uuid
+            uuid_to_net = {n.uuid: n for n in networks}
+            active['network'].Network.from_db.side_effect = (
+                lambda uuid, **kw: uuid_to_net.get(uuid))
+            active['network'].floating_network.return_value = floating_network
 
-            # The network node path iterates over Networks([]).
-            mock_net_module.Networks.return_value = [mock_network]
-            mock_net_module.Network.from_db.return_value = mock_network
+            # For the non-network-node path, surface one instance whose
+            # interfaces reference each test network.
+            if not network_node:
+                fake_instances = []
+                fake_inst = mock.MagicMock()
+                fake_inst.state.value = 'created'
+                fake_inst.interfaces = []
+                for net in networks:
+                    ni = mock.MagicMock()
+                    ni.network_uuid = net.uuid
+                    fake_inst.interfaces.append(ni)
+                fake_instances.append(fake_inst)
+                active['instance'].Instances.return_value = fake_instances
+                active['instance'].Instance.STATE_PREFLIGHT = 'preflight'
 
-            # No floating network (avoids IPAM lookup).
-            mock_net_module.floating_network.return_value = None
+            active['get_node_network_queues'].return_value = [
+                'q-node-a', 'q-node-b']
+            active['get_all_network_queues'].return_value = [
+                'q-cluster-a']
 
-            # routed_by_network will be empty because floating_network is None.
+            mar = active['mariadb']
+            mar.get_work_queue_length.return_value = (
+                queue_depth_per_queue, 0, 0)
+            mar.has_pending_cluster_operation_target.return_value = pending_op
+            mar.get_recent_terminal_op_states_for_target.return_value = (
+                recent_history)
+
+            active['node'].from_db.return_value = mock.MagicMock()
 
             from shakenfist.daemons.network.maintain import Job
             job = Job.__new__(Job)
             job.name = 'test-maintain'
             job.abort_path = '/run/sf/net-test-maintain.abort'
-
             job.execute()
 
-        return mock_add_op
+            return active
+        finally:
+            for p in patches.values():
+                p.stop()
 
-    def test_add_floating_ip_raise_for_error_is_called(self):
-        """raise_for_error() must be called on the op returned by
-        add_floating_ip."""
-        mock_add_op = self._run_maintain_once_not_okay_network_node(
-            floating_addr='10.0.0.50',
-            ipv4='192.168.1.10',
-            instance_uuid='inst-uuid-001',
-        )
-        mock_add_op.raise_for_error.assert_called_once()
-
-    def test_add_floating_ip_called_with_correct_args(self):
-        """add_floating_ip must be invoked with the correct floating address,
-        inner IPv4, and affected-objects list."""
-        floating_addr = '10.0.0.50'
-        ipv4 = '192.168.1.10'
-        instance_uuid = 'inst-uuid-001'
-
-        mock_add_op = self._run_maintain_once_not_okay_network_node(
-            floating_addr=floating_addr,
-            ipv4=ipv4,
-            instance_uuid=instance_uuid,
-        )
-        # Retrieve the network mock to inspect calls on it.
-        # (We can do this via the mock_add_op's parent if needed; here we
-        # simply confirm raise_for_error was called — the args are tested
-        # implicitly through the return-value wiring.)
-        mock_add_op.raise_for_error.assert_called_once()
-
-
-class RouteAddressRaiseForErrorTest(base.ShakenFistTestCase):
-    """After route_address is called in the maintain loop the returned op must
-    have raise_for_error() called on it."""
-
-    def _run_maintain_once_with_routed_ip(self, routed_addr):
-        """Drive one iteration of the maintain loop with a not-okay network on
-        the network node.  The floating-network IPAM contains one ROUTED
-        reservation so the route_address path is exercised.
-
-        Returns the mock op returned by n.route_address.
+    def test_queue_depth_guard_skips_pass(self):
+        """When summed queue depth exceeds the threshold the per-network
+        loop is skipped entirely and an audit event fires on the Node.
         """
-        from shakenfist.schema.ipam_reservation import ReservationType
+        n = _build_mock_network()
+        # Threshold is 50; three queues each reporting 25 sums to 75.
+        active = self._run_one_iteration(
+            network_node=True,
+            queue_depth_per_queue=25,
+            networks=[n],
+        )
 
-        mock_route_op = mock.MagicMock()
+        # No enqueues happened.
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+        active['net_ip_create_and_enqueue'].assert_not_called()
+        # Network.from_db never reached -- the pass was skipped before
+        # discovery.
+        active['network'].Network.from_db.assert_not_called()
+        # Audit event recorded on the Node.
+        node = active['node'].from_db.return_value
+        node.add_event.assert_called_once()
 
-        # Build a minimal mock network (no floating interfaces this time).
-        mock_network = mock.MagicMock()
-        net_uuid = 'net-uuid-002'
-        mock_network.uuid = net_uuid
-        mock_network.vxid = 43
-        mock_network.state.value = 'created'
-        mock_network.state.update_time = 0.0
-        mock_network.is_okay.return_value = False
-        mock_network.networkinterfaces = []   # no floating IPs
-        mock_network.route_address.return_value = mock_route_op
+    def test_pending_op_gate_skips_network(self):
+        """If a cluster operation is in flight for a network we do not
+        enqueue another reconciliation."""
+        n = _build_mock_network()
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            pending_op=True,
+        )
 
-        # ensure_mesh op.
-        mock_mesh_op = mock.MagicMock()
-        mock_network.ensure_mesh.return_value = mock_mesh_op
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
 
-        # Build a floating network whose IPAM has one ROUTED reservation
-        # pointing at our test network.
-        mock_resv = mock.MagicMock()
-        mock_resv.reservation_type = ReservationType.ROUTED
-        mock_resv.user_uuid = net_uuid
+    def test_cooldown_gate_skips_recent_error(self):
+        """If the most recent terminal op ended in ERROR within the
+        cooldown window we skip the network and emit an audit event."""
+        n = _build_mock_network()
+        # update_time well within the 60-second cooldown window of
+        # the patched time.time() == 10_000.0
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            recent_history=[('op-uuid-1', 'error', 9_995.0)],
+        )
 
-        mock_ipam = mock.MagicMock()
-        mock_ipam.in_use = [routed_addr]
-        mock_ipam.get_reservation.return_value = mock_resv
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+        n.add_event.assert_called()
 
-        mock_floating_net = mock.MagicMock()
-        mock_floating_net.ipam = mock_ipam
+    def test_circuit_breaker_fires_after_k_failures(self):
+        """K consecutive ERROR terminal ops quiesce the network with a
+        prominent audit event."""
+        n = _build_mock_network()
 
-        with mock.patch(
-            'shakenfist.daemons.network.maintain.config'
-        ) as mock_config, mock.patch(
-            'shakenfist.daemons.network.maintain.daemon'
-        ) as mock_daemon, mock.patch(
-            'shakenfist.daemons.network.maintain.network'
-        ) as mock_net_module, mock.patch(
-            'shakenfist.daemons.network.maintain.util_network'
-        ) as mock_util_net, mock.patch(
-            'shakenfist.daemons.network.maintain.util_concurrency'
-        ), mock.patch(
-            'shakenfist.daemons.network.maintain.time'
-        ) as mock_time:
-            mock_config.NODE_IS_NETWORK_NODE = True
-            mock_daemon.check_abort_path.side_effect = [True, False]
-            mock_daemon.clear_abort_path.return_value = None
-            mock_time.time.return_value = 10_000.0
-            mock_time.sleep.return_value = None
-            mock_util_net.discover_interfaces.return_value = (None, None, {})
+        # First helper call (cooldown, limit=1) sees an old error -- no
+        # cooldown skip -- but the circuit-breaker call (limit=K) sees K
+        # back-to-back errors.
+        history_old = [('op-old', 'error', 0.0)]
+        history_circuit = [
+            ('op-1', 'error', 0.0),
+            ('op-2', 'error', 0.0),
+            ('op-3', 'error', 0.0),
+            ('op-4', 'error', 0.0),
+            ('op-5', 'error', 0.0),
+        ]
 
-            mock_net_module.Networks.return_value = [mock_network]
-            mock_net_module.Network.from_db.return_value = mock_network
-            mock_net_module.floating_network.return_value = mock_floating_net
+        def helper_side_effect(*, target_object_type, target_uuid, limit,
+                               op_type=None):
+            if limit == 1:
+                return history_old
+            return history_circuit
+
+        patches = _patch_maintain_module()
+        active = {name: p.start() for name, p in patches.items()}
+        try:
+            mc = active['config']
+            mc.NODE_IS_NETWORK_NODE = True
+            mc.NODE_UUID = 'node-uuid-test'
+            mc.NODE_NAME = 'node-name-test'
+            mc.MAINTAIN_QUEUE_DEPTH_THRESHOLD = 50
+            mc.MAINTAIN_RECONCILE_COOLDOWN_SECONDS = 60
+            mc.MAINTAIN_RECONCILE_CIRCUIT_K = 5
+
+            active['daemon'].check_abort_path.side_effect = [True, False]
+            active['daemon'].clear_abort_path.return_value = None
+            active['time'].time.return_value = 10_000.0
+            active['time'].sleep.return_value = None
+            active['util_network'].discover_interfaces.return_value = (
+                None, None, {})
+            active['network'].Networks.return_value = [n]
+            active['network'].Network.from_db.return_value = n
+            active['network'].floating_network.return_value = None
+            active['get_node_network_queues'].return_value = ['q-a']
+            active['get_all_network_queues'].return_value = []
+            active['mariadb'].get_work_queue_length.return_value = (0, 0, 0)
+            active['mariadb'].has_pending_cluster_operation_target.\
+                return_value = False
+            active['mariadb'].get_recent_terminal_op_states_for_target.\
+                side_effect = helper_side_effect
 
             from shakenfist.daemons.network.maintain import Job
             job = Job.__new__(Job)
             job.name = 'test-maintain'
             job.abort_path = '/run/sf/net-test-maintain.abort'
-
             job.execute()
 
-        return mock_route_op
+            active['net_create_and_enqueue'].assert_not_called()
+            active['nn_create_and_enqueue'].assert_not_called()
+            # The most recent add_event call should be the
+            # circuit-breaker message.
+            event_messages = [
+                call.args[1] for call in n.add_event.call_args_list]
+            self.assertTrue(
+                any('quiesced pending operator attention' in m
+                    for m in event_messages),
+                f'expected circuit-breaker event, got: {event_messages}')
+        finally:
+            for p in patches.values():
+                p.stop()
 
-    def test_route_address_raise_for_error_is_called(self):
-        """raise_for_error() must be called on the op returned by
-        route_address."""
-        mock_route_op = self._run_maintain_once_with_routed_ip('203.0.113.5')
-        mock_route_op.raise_for_error.assert_called_once()
+    def test_happy_path_enqueues_at_background_priority(self):
+        """A drifting network with no in-flight op and no recent errors
+        is reconciled by enqueueing the appropriate task at background
+        priority."""
+        n = _build_mock_network()
+        active = self._run_one_iteration(
+            network_node=False,
+            networks=[n],
+        )
+
+        # Hypervisor-side reconciliation goes through
+        # nn_create_and_enqueue with network_apply_create_hypervisor.
+        active['nn_create_and_enqueue'].assert_called_once()
+        call = active['nn_create_and_enqueue'].call_args
+        # Positional arguments: (node_uuid, network_uuid, tasks, priority)
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+        from shakenfist.schema.operations.node_net_op \
+            import model_tasks as nn_tasks
+        self.assertEqual(call.args[2], [nn_tasks.network_apply_create_hypervisor])
+        self.assertEqual(call.args[3], PRIORITY.background)
+
+        # The mesh ensure-call should also fire at background priority.
+        mesh_calls = [
+            c for c in active['net_create_and_enqueue'].call_args_list
+            if c.kwargs.get('priority') == PRIORITY.background]
+        self.assertTrue(mesh_calls)
