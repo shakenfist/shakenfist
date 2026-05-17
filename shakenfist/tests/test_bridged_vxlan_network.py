@@ -11,6 +11,7 @@ arguments and that event emission is gated on non-empty diff sets.
 from unittest import mock
 
 from shakenfist.config import SFConfig
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.network import bridged_vxlan_network
@@ -249,3 +250,133 @@ class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
         # Only NETWORK_NODE_IP (10.0.0.1) ends up in the mesh.
         self.mock_ensure_vxlan_mesh.assert_called_once_with(
             network.uuid, network.vxid, {'10.0.0.1'})
+
+
+class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):
+    """Tests for ``_apply_add_floating_ip`` and ``_apply_remove_floating_ip``.
+
+    Both methods are simple lift-and-shifts of the floating-IP host-mutation
+    bodies. The dispatcher (not the apply layer) is responsible for event
+    correlation under the migrated design, so these methods do **not** emit
+    audit events themselves.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_add_floating_ip = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.add_floating_ip').start()
+        self.mock_remove_floating_ip = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.remove_floating_ip').start()
+        self.addCleanup(mock.patch.stopall)
+
+    def test_apply_add_floating_ip_invokes_privexec(self):
+        network = _make_network_mock(
+            uuid='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_add_floating_ip('203.0.113.5', '10.0.0.5')
+
+        network.get_lock.assert_called_once_with(
+            op='Network add floating IP', global_scope=False)
+        self.mock_add_floating_ip.assert_called_once_with(
+            'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            '203.0.113.5', '10.0.0.5')
+        # The apply layer does NOT emit events; that is the dispatcher's job.
+        network.add_event.assert_not_called()
+
+    def test_apply_remove_floating_ip_invokes_privexec(self):
+        network = _make_network_mock(
+            uuid='cccccccc-cccc-4ccc-8ccc-cccccccccccc')
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_remove_floating_ip('203.0.113.6', '10.0.0.6')
+
+        network.get_lock.assert_called_once_with(
+            op='Network remove floating IP', global_scope=False)
+        # remove_floating_ip in util_concurrency only takes uuid + floating
+        # address (the inner address is informational at the dispatcher
+        # level only).
+        self.mock_remove_floating_ip.assert_called_once_with(
+            'cccccccc-cccc-4ccc-8ccc-cccccccccccc', '203.0.113.6')
+        network.add_event.assert_not_called()
+
+
+class BridgedVXLanNetworkApplyRouteAddressTestCase(base.ShakenFistTestCase):
+    """Tests for ``_apply_route_address`` and ``_apply_unroute_address``."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_execute = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_concurrency.execute').start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _make_network_with_subst(self, vxid=0x123):
+        network = _make_network_mock(vxid=vxid)
+        network.subst_dict.return_value = {
+            'vx_bridge': 'br-vxlan-%06x' % vxid,
+        }
+        return network
+
+    def test_apply_route_address_runs_ip_route_add(self):
+        network = self._make_network_with_subst(vxid=0xabc)
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_route_address('203.0.113.10')
+
+        network.get_lock.assert_called_once_with(
+            op='Network route address', global_scope=False)
+        self.mock_execute.assert_called_once_with(
+            'ip route add 203.0.113.10/32 dev br-vxlan-000abc')
+        # The single-target audit event is preserved at the apply layer.
+        network.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT, 'routing floating ip to network',
+            extra={'floating': '203.0.113.10'})
+
+    def test_apply_unroute_address_runs_ip_route_del(self):
+        network = self._make_network_with_subst(vxid=0xdef)
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_unroute_address('203.0.113.11')
+
+        network.get_lock.assert_called_once_with(
+            op='Network unroute address', global_scope=False)
+        self.mock_execute.assert_called_once_with(
+            'ip route del 203.0.113.11/32 dev br-vxlan-000def')
+        network.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
+            extra={'floating': '203.0.113.11'})
+
+
+class BridgedVXLanNetworkApplyRemoveNATTestCase(base.ShakenFistTestCase):
+    """Tests for ``_apply_remove_nat``.
+
+    The body unassigns the floating gateway if one is currently assigned,
+    inside the existing ``Network remove NAT`` lock.
+    """
+
+    def test_apply_remove_nat_unassigns_floating_gateway(self):
+        network = _make_network_mock()
+        network.floating_gateway = '203.0.113.100'
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_remove_nat()
+
+        network.get_lock.assert_called_once_with(
+            op='Network remove NAT', global_scope=False)
+        network.unassign_floating_gateway.assert_called_once_with()
+
+    def test_apply_remove_nat_noop_when_no_floating_gateway(self):
+        network = _make_network_mock()
+        network.floating_gateway = None
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_remove_nat()
+
+        # Lock is still acquired (we may race with assignment), but no
+        # gateway-release call is made.
+        network.get_lock.assert_called_once_with(
+            op='Network remove NAT', global_scope=False)
+        network.unassign_floating_gateway.assert_not_called()

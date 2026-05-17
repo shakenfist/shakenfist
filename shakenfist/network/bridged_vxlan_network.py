@@ -19,8 +19,12 @@ bypass the queue and run a mutation inline is to construct a
 dispatcher itself. Public code paths must continue to use `Network` and
 its enqueueing methods.
 
-Phase 2 implements ``_apply_ensure_mesh`` only; the other ``_apply_*``
-methods (floating IP, dnsmasq, lifecycle, ...) move across in later phases.
+Phase 2 implements ``_apply_ensure_mesh``. Phase 3 adds the floating-IP
+and route methods: ``_apply_add_floating_ip``,
+``_apply_remove_floating_ip``, ``_apply_route_address``,
+``_apply_unroute_address`` and ``_apply_remove_nat``. The remaining
+``_apply_*`` methods (dnsmasq, lifecycle, ...) move across in later
+phases.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import instance
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.node import Node
@@ -122,3 +127,86 @@ class BridgedVXLanNetwork:
                 self.network.add_event(
                     EVENT_TYPE_MUTATE, 'add mesh elements',
                     extra={'added': added})
+
+    def _apply_add_floating_ip(
+            self, floating_address: str, inner_address: str) -> None:
+        """Add a floating IP mapping on the network node.
+
+        Lifted from ``Network.add_floating_ip`` (network.py:908-921). The
+        ``affected_objects`` parameter and the multi-target audit event are
+        intentionally stripped here: event correlation is the dispatcher's
+        responsibility under the migrated design, not the apply layer's.
+        The existing ``get_lock`` wrapper is preserved (Phase 8 removes it).
+        """
+        with self.network.get_lock(
+                op='Network add floating IP', global_scope=False):
+            util_concurrency.add_floating_ip(
+                str(self.network.uuid), floating_address, inner_address)
+
+    def _apply_remove_floating_ip(
+            self, floating_address: str, inner_address: str) -> None:
+        """Remove a floating IP mapping on the network node.
+
+        Lifted from ``Network.remove_floating_ip`` (network.py:923-934). The
+        ``affected_objects`` parameter and the multi-target audit event are
+        stripped for the same reason as ``_apply_add_floating_ip``. The
+        ``inner_address`` argument is retained on the signature for symmetry
+        with the add case (the underlying privexec helper only needs the
+        floating address, but dispatchers pass both for event-emission
+        purposes).
+        """
+        with self.network.get_lock(
+                op='Network remove floating IP', global_scope=False):
+            util_concurrency.remove_floating_ip(
+                str(self.network.uuid), floating_address)
+
+    def _apply_route_address(self, ip: str) -> None:
+        """Add a host route for a floating IP onto the network's vx bridge.
+
+        Lifted from ``Network.route_address`` (network.py:938-947). The
+        single-target audit event on the wrapped network is preserved here
+        (it is not multi-target, so no dispatcher fan-out is required).
+        """
+        self.network.add_event(
+            EVENT_TYPE_AUDIT, 'routing floating ip to network',
+            extra={'floating': ip})
+        subst = self.network.subst_dict()
+        subst['floating_address'] = ip
+        with self.network.get_lock(
+                op='Network route address', global_scope=False):
+            util_concurrency.execute(
+                'ip route add %(floating_address)s/32 dev %(vx_bridge)s'
+                % subst)
+
+    def _apply_unroute_address(self, ip: str) -> None:
+        """Remove a host route for a floating IP from the network's vx bridge.
+
+        Lifted from ``Network.unroute_address`` (network.py:950-960). As with
+        ``_apply_route_address``, the single-target audit event on the
+        wrapped network is preserved.
+        """
+        self.network.add_event(
+            EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
+            extra={'floating': ip})
+        subst = self.network.subst_dict()
+        subst['floating_address'] = ip
+        with self.network.get_lock(
+                op='Network unroute address', global_scope=False):
+            util_concurrency.execute(
+                'ip route del %(floating_address)s/32 dev %(vx_bridge)s'
+                % subst)
+
+    def _apply_remove_nat(self) -> None:
+        """Tear down the network node's NAT for the wrapped network.
+
+        Lifted from ``Network.remove_nat`` (network.py:823-834). Today the
+        method has a `NODE_IS_NETWORK_NODE` guard and a `not-on-this-node`
+        enqueue fallback; under the migrated design the dispatcher only
+        ever invokes ``_apply_*`` on the elected network node, so the guard
+        is unnecessary here and the body collapses to the network-node
+        branch only. The ``get_lock`` wrapper is preserved.
+        """
+        with self.network.get_lock(
+                op='Network remove NAT', global_scope=False):
+            if self.network.floating_gateway:
+                self.network.unassign_floating_gateway()
