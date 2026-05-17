@@ -686,7 +686,9 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
         if not valid_hostname:
             return sf_api.error(406, 'invalid DNS name')
 
-        network_from_db.update_dns_entry(name, value)
+        op = network_from_db.update_dns_entry(name, value)
+        if op is not None:
+            op.raise_for_error()
 
     @swag_from(api_base.swagger_helper(
         'networks', 'Remove a custom DNS entry for this network.',
@@ -713,7 +715,9 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
         if not valid_hostname:
             return sf_api.error(406, 'invalid DNS name')
 
-        network_from_db.remove_dns_entry(name)
+        op = network_from_db.remove_dns_entry(name)
+        if op is not None:
+            op.raise_for_error()
 
 
 network_outstanding_operations_example = """[

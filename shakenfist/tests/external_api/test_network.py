@@ -7,6 +7,7 @@ from uuid import uuid4
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.config import SFConfig
+from shakenfist.exceptions import NetworkOperationFailed
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
@@ -139,3 +140,118 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
                                   }))
         self.assertEqual([self.network_id], resp.get_json())
         self.assertEqual(200, resp.status_code)
+
+
+class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
+    """Regression tests for step 4f: REST handlers call raise_for_error()
+    after update_dns_entry / remove_dns_entry."""
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        fake_config = SFConfig(
+            NODE_NAME='seriously',
+            NODE_EGRESS_IP='127.0.0.1',
+            NETWORK_NODE_IP='127.0.0.1',
+            NODE_EGRESS_NIC='eth0',
+            NODE_MESH_NIC='eth1',
+            NODE_IS_NETWORK_NODE=True,
+            ETCD_HOST='127.0.0.1'
+        )
+        self.config = mock.patch(
+            'shakenfist.external_api.base.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        self.client = external_api.app.test_client()
+
+        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+
+        self.network_id = str(uuid4())
+        self.mock_etcd.create_network(
+            'dnsnet',
+            uuid=self.network_id,
+            namespace='foo',
+            provide_dns=True,
+            set_state=dbo.STATE_CREATED)
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+    @mock.patch('shakenfist.network.network.Network.update_dns_entry')
+    def test_post_dns_entry_success(self, mock_update):
+        """update_dns_entry returns an op; raise_for_error() succeeds."""
+        fake_op = mock.MagicMock()
+        fake_op.raise_for_error.return_value = None
+        mock_update.return_value = fake_op
+
+        resp = self.client.post(
+            '/networks/%s/dns' % self.network_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'name': 'test.example', 'value': '10.0.0.1'}))
+        self.assertEqual(200, resp.status_code)
+        mock_update.assert_called_once_with('test.example', '10.0.0.1')
+        fake_op.raise_for_error.assert_called_once()
+
+    @mock.patch('shakenfist.network.network.Network.update_dns_entry')
+    def test_post_dns_entry_operation_failed(self, mock_update):
+        """When raise_for_error() raises NetworkOperationFailed, the REST
+        endpoint returns HTTP 500."""
+        fake_op = mock.MagicMock()
+        fake_report = mock.MagicMock()
+        fake_report.code = 'network.dnsmasq.restart_failed'
+        fake_report.message = 'dnsmasq restart failed'
+        fake_op.raise_for_error.side_effect = NetworkOperationFailed(fake_report)
+        mock_update.return_value = fake_op
+
+        resp = self.client.post(
+            '/networks/%s/dns' % self.network_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'name': 'fail.example', 'value': '10.0.0.2'}))
+        self.assertEqual(500, resp.status_code)
+
+    @mock.patch('shakenfist.network.network.Network.remove_dns_entry')
+    def test_delete_dns_entry_success(self, mock_remove):
+        """remove_dns_entry returns an op; raise_for_error() succeeds."""
+        fake_op = mock.MagicMock()
+        fake_op.raise_for_error.return_value = None
+        mock_remove.return_value = fake_op
+
+        resp = self.client.delete(
+            '/networks/%s/dns' % self.network_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'name': 'test.example'}))
+        self.assertEqual(200, resp.status_code)
+        mock_remove.assert_called_once_with('test.example')
+        fake_op.raise_for_error.assert_called_once()
+
+    @mock.patch('shakenfist.network.network.Network.remove_dns_entry')
+    def test_delete_dns_entry_operation_failed(self, mock_remove):
+        """When raise_for_error() raises NetworkOperationFailed, the REST
+        endpoint returns HTTP 500."""
+        fake_op = mock.MagicMock()
+        fake_report = mock.MagicMock()
+        fake_report.code = 'network.dnsmasq.restart_failed'
+        fake_report.message = 'dnsmasq restart failed'
+        fake_op.raise_for_error.side_effect = NetworkOperationFailed(fake_report)
+        mock_remove.return_value = fake_op
+
+        resp = self.client.delete(
+            '/networks/%s/dns' % self.network_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'name': 'fail.example'}))
+        self.assertEqual(500, resp.status_code)
