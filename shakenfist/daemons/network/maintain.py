@@ -135,15 +135,17 @@ class Job(util_concurrency.Job):
                                 floating_addr = ni.floating.get(
                                     'floating_address')
                                 if floating_addr:
-                                    n.add_floating_ip(
+                                    add_op = n.add_floating_ip(
                                         floating_addr, ni.ipv4,
                                         [ni, ('instance', ni.instance_uuid)])
+                                    add_op.raise_for_error()
 
                             # It also implies we should create all the routed IPs
                             # for that network too.
                             if n.uuid in routed_by_network:
                                 for addr in routed_by_network[n.uuid]:
-                                    n.route_address(addr)
+                                    route_op = n.route_address(addr)
+                                    route_op.raise_for_error()
 
                         else:
                             n.add_event(
