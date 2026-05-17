@@ -928,16 +928,187 @@ class NetworkDnsmasqEnqueueTestCase(NetworkTestCase):
         self.mock_get_dnsmasq.assert_not_called()
 
 
-class NetworkInternalSiblingCallsTestCase(NetworkTestCase):
-    """Tests for the phase 4e migration of internal sibling calls.
+class NetworkLifecycleEnqueueTestCase(NetworkTestCase):
+    """Tests for the phase 5d flip of the four ``Network`` lifecycle
+    methods.
 
-    After phase 4e, the in-worker host-mutating methods
-    ``create_on_network_node``, ``delete_on_network_node`` and
-    ``remove_networkinterface_lease`` no longer call the enqueueing
-    public ``Network`` methods for dnsmasq/nat work. They call the
-    ``BridgedVXLanNetwork._apply_*`` methods directly to avoid the
-    same-queue self-enqueue that would deadlock (or, for the
-    Phase 3 latent bug, time out after ASYNC_OP_TIMEOUT).
+    After phase 5d, each of ``create_on_hypervisor``,
+    ``create_on_network_node``, ``delete_on_hypervisor`` and
+    ``delete_on_network_node`` no longer mutates host state inline.
+    Each enqueues a cluster operation (a ``node_net_op`` for the
+    per-hypervisor pair, a ``net_op`` for the network-node pair) and
+    returns the loaded op so callers can call ``op.raise_for_error()``.
+    ``Network.enable_nat`` is gone from the public surface entirely.
+    """
+
+    NODE_UUID = '55555555-5555-4555-8555-eeeeeeeeeeee'
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(NODE_UUID=self.NODE_UUID,
+                               NODE_EGRESS_IP='1.1.1.2',
+                               NODE_MESH_IP='1.1.1.2',
+                               NETWORK_NODE_IP='1.1.1.2',
+                               NODE_IS_NETWORK_NODE=True)
+        self.config = mock.patch(
+            'shakenfist.network.network.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        # Inert mock for the cluster_operation_targets writer; the
+        # enqueue path calls it during ``enqueue_cluster_operation``.
+        self.mock_create_target = mock.patch(
+            'shakenfist.mariadb.create_cluster_operation_target').start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _make_network(self, provide_dhcp=True, provide_dns=True,
+                      provide_nat=True):
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid,
+            provide_dhcp=provide_dhcp, provide_dns=provide_dns,
+            provide_nat=provide_nat)
+        return network.Network.from_db(network_uuid), network_uuid
+
+    def _enqueue_spy(self):
+        original = (
+            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+        return mock.MagicMock(side_effect=original)
+
+    def test_create_on_hypervisor_enqueues_node_net_op(self):
+        from shakenfist.operations.node_net_op import NodeNetOp
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.create_on_hypervisor()
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            f'{self.NODE_UUID}-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('node_net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_apply_create_hypervisor', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual(self.NODE_UUID, str(metadata['node_uuid']))
+        self.assertEqual(PRIORITY.user_facing.name, metadata['priority'])
+
+        self.assertIsInstance(op, NodeNetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+    def test_create_on_network_node_enqueues_netop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.create_on_network_node()
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn(
+            'network_apply_create_network_node', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual(PRIORITY.user_facing.name, metadata['priority'])
+
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+    def test_create_on_network_node_skips_when_deleted(self):
+        """A deleted network must not be re-created on the network node.
+
+        ``create_on_network_node`` short-circuits when the network's
+        state is ``deleted`` and returns ``None`` without enqueueing
+        anything.
+        """
+        n, _ = self._make_network()
+        n.state = dbo.STATE_DELETED
+
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            result = n.create_on_network_node()
+
+        spy.assert_not_called()
+        self.assertIsNone(result)
+
+    def test_delete_on_hypervisor_enqueues_node_net_op(self):
+        from shakenfist.operations.node_net_op import NodeNetOp
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.delete_on_hypervisor()
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            f'{self.NODE_UUID}-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('node_net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_destroy', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual(self.NODE_UUID, str(metadata['node_uuid']))
+        self.assertEqual(PRIORITY.user_facing.name, metadata['priority'])
+
+        self.assertIsInstance(op, NodeNetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+    def test_delete_on_network_node_enqueues_netop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.delete_on_network_node()
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn(
+            'network_apply_delete_network_node', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual(PRIORITY.user_facing.name, metadata['priority'])
+
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+    def test_enable_nat_method_is_removed(self):
+        """``Network.enable_nat`` is no longer part of the public API.
+
+        Phase 5b lifted the only call site into
+        ``BridgedVXLanNetwork._apply_enable_nat``; phase 5d deletes
+        the method from ``Network`` entirely.
+        """
+        n, _ = self._make_network()
+        self.assertIsNone(getattr(n, 'enable_nat', None))
+
+
+class NetworkInternalSiblingCallsTestCase(NetworkTestCase):
+    """Tests for ``remove_networkinterface_lease``.
+
+    The phase 4e sibling-call tests for ``create_on_network_node`` and
+    ``delete_on_network_node`` were removed by phase 5d when those
+    method bodies moved to ``BridgedVXLanNetwork``. The
+    ``remove_networkinterface_lease`` tests remain — that method still
+    enqueues via ``Network.remove_dhcp_lease`` and blocks on the op.
     """
 
     NODE_UUID = '44444444-4444-4444-8444-dddddddddddd'
@@ -958,63 +1129,6 @@ class NetworkInternalSiblingCallsTestCase(NetworkTestCase):
             'shakenfist.mariadb.create_cluster_operation_target').start()
         self.addCleanup(mock.patch.stopall)
 
-        # ``get_lock(global_scope=False)`` returns a NodeLock which
-        # requires a real socket. Replace it with a no-op context
-        # manager for the duration of these tests.
-        self.mock_node_lock = mock.patch(
-            'shakenfist.util.concurrency.NodeLock',
-            return_value=mock.MagicMock()).start()
-        # The MagicMock returned by NodeLock() will support the
-        # context-manager protocol automatically.
-
-        # Stub the heavy host-mutation helpers used by
-        # create_on_network_node and delete_on_network_node so the
-        # tests can exercise the dnsmasq/nat call paths without
-        # running real host commands.
-        self.mock_create_vxlan = mock.patch(
-            'shakenfist.util.concurrency.create_vxlan_interface').start()
-        self.mock_create_ns = mock.patch(
-            'shakenfist.util.concurrency.create_network_namespace').start()
-        self.mock_execute = mock.patch(
-            'shakenfist.util.concurrency.execute').start()
-        self.mock_enable_nat = mock.patch(
-            'shakenfist.util.concurrency.enable_nat').start()
-        self.mock_check_for_interface = mock.patch(
-            'shakenfist.util.network.check_for_interface',
-            return_value=True).start()
-        self.mock_create_interface = mock.patch(
-            'shakenfist.util.network.create_interface').start()
-        self.mock_get_interface_mtu = mock.patch(
-            'shakenfist.util.network.get_interface_mtu',
-            return_value=1500).start()
-        self.mock_add_address = mock.patch(
-            'shakenfist.util.network.add_address_to_interface').start()
-        self.mock_get_default_routes = mock.patch(
-            'shakenfist.util.network.get_default_routes',
-            return_value=[]).start()
-        self.mock_add_default_route = mock.patch(
-            'shakenfist.util.network.add_default_route').start()
-        self.mock_delete_default_route = mock.patch(
-            'shakenfist.util.network.delete_default_route').start()
-        self.mock_get_iface_addresses = mock.patch(
-            'shakenfist.util.network.get_interface_addresses',
-            return_value=[]).start()
-        self.mock_os_path_exists = mock.patch(
-            'os.path.exists', return_value=False).start()
-
-        # Network.is_dead must report False so create_on_network_node
-        # does not raise DeadNetwork mid-way.
-        self.mock_is_dead = mock.patch(
-            'shakenfist.network.network.Network.is_dead',
-            return_value=False).start()
-        # Suppress the per-active-node enqueue inside
-        # delete_on_network_node so it does not assert on Nodes
-        # iteration during the test.
-        self.mock_nn_enqueue = mock.patch(
-            'shakenfist.network.network.nn_create_and_enqueue').start()
-        self.mock_nodes = mock.patch(
-            'shakenfist.network.network.Nodes', return_value=[]).start()
-
     def _make_network(self, provide_dhcp=True, provide_dns=True,
                       provide_nat=False):
         self.mock_etcd = MockEtcd(self, node_count=4)
@@ -1025,104 +1139,6 @@ class NetworkInternalSiblingCallsTestCase(NetworkTestCase):
             provide_dhcp=provide_dhcp, provide_dns=provide_dns,
             provide_nat=provide_nat)
         return network.Network.from_db(network_uuid), network_uuid
-
-    def test_create_on_network_node_calls_apply_update_dnsmasq(self):
-        """create_on_network_node must route dnsmasq startup through
-        BridgedVXLanNetwork directly, not via the enqueueing
-        Network.update_dnsmasq().
-        """
-        n, _ = self._make_network(provide_dhcp=True, provide_dns=True,
-                                  provide_nat=False)
-
-        with mock.patch(
-                'shakenfist.network.bridged_vxlan_network.'
-                'BridgedVXLanNetwork._apply_update_dnsmasq') as mock_apply, \
-                mock.patch.object(network.Network, 'update_dnsmasq') as \
-                mock_public:
-            n.create_on_network_node()
-
-        mock_apply.assert_called_once_with()
-        mock_public.assert_not_called()
-
-    def test_create_on_network_node_skips_dnsmasq_when_not_required(self):
-        """When neither DHCP nor DNS is provided, no dnsmasq work is
-        kicked off at all.
-        """
-        n, _ = self._make_network(provide_dhcp=False, provide_dns=False,
-                                  provide_nat=False)
-
-        with mock.patch(
-                'shakenfist.network.bridged_vxlan_network.'
-                'BridgedVXLanNetwork._apply_update_dnsmasq') as mock_apply, \
-                mock.patch.object(network.Network, 'update_dnsmasq') as \
-                mock_public:
-            n.create_on_network_node()
-
-        mock_apply.assert_not_called()
-        mock_public.assert_not_called()
-
-    def test_delete_on_network_node_calls_apply_remove_dnsmasq(self):
-        """delete_on_network_node must route dnsmasq shutdown through
-        BridgedVXLanNetwork directly, not via the enqueueing
-        Network.remove_dnsmasq().
-        """
-        n, _ = self._make_network(provide_dhcp=True, provide_dns=True,
-                                  provide_nat=False)
-
-        with mock.patch(
-                'shakenfist.network.bridged_vxlan_network.'
-                'BridgedVXLanNetwork._apply_remove_dnsmasq') as mock_apply, \
-                mock.patch(
-                    'shakenfist.network.bridged_vxlan_network.'
-                    'BridgedVXLanNetwork._apply_remove_nat'), \
-                mock.patch.object(network.Network, 'remove_dnsmasq') as \
-                mock_public:
-            n.delete_on_network_node()
-
-        mock_apply.assert_called_once_with()
-        mock_public.assert_not_called()
-
-    def test_delete_on_network_node_calls_apply_remove_nat(self):
-        """Phase 3 latent-bug fix regression test.
-
-        ``delete_on_network_node`` previously did
-        ``remove_nat_op = self.remove_nat(); remove_nat_op.raise_for_error()``
-        from inside the ``_network_destroy`` dispatcher. Both ops live on
-        the same networknode queue, so the new ``remove_nat`` op could
-        never dequeue while the current handler was blocked --
-        ``raise_for_error`` timed out after ASYNC_OP_TIMEOUT and the
-        destroy op ended in ERROR. Phase 4e calls
-        ``BridgedVXLanNetwork(self)._apply_remove_nat()`` directly.
-        """
-        n, _ = self._make_network(provide_dhcp=True, provide_dns=True,
-                                  provide_nat=True)
-
-        with mock.patch(
-                'shakenfist.network.bridged_vxlan_network.'
-                'BridgedVXLanNetwork._apply_remove_nat') as mock_apply, \
-                mock.patch(
-                    'shakenfist.network.bridged_vxlan_network.'
-                    'BridgedVXLanNetwork._apply_remove_dnsmasq'), \
-                mock.patch.object(network.Network, 'remove_nat') as \
-                mock_public:
-            n.delete_on_network_node()
-
-        mock_apply.assert_called_once_with()
-        mock_public.assert_not_called()
-
-    def test_delete_on_network_node_skips_dnsmasq_when_not_required(self):
-        n, _ = self._make_network(provide_dhcp=False, provide_dns=False,
-                                  provide_nat=False)
-
-        with mock.patch(
-                'shakenfist.network.bridged_vxlan_network.'
-                'BridgedVXLanNetwork._apply_remove_dnsmasq') as mock_apply, \
-                mock.patch(
-                    'shakenfist.network.bridged_vxlan_network.'
-                    'BridgedVXLanNetwork._apply_remove_nat'):
-            n.delete_on_network_node()
-
-        mock_apply.assert_not_called()
 
     def test_remove_networkinterface_lease_blocks_on_op(self):
         """remove_networkinterface_lease enqueues a NetMacaddrIPOp via
