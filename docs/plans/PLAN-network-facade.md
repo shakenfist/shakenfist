@@ -925,7 +925,7 @@ begins.
 |-------|------|--------|
 | 0. Stability-branch lock fix (separate, lands now) | (not a sub-plan — see commit on `stability`) | Complete |
 | 1. Per-node `sf-net` queue family (five priority lanes mirroring the existing taxonomy) + dispatcher changes: exponential back-off map (100 ms → 15 s, ×2, single-worker safety comment) and cancellation-check on dequeue (drop aborted/deleted ops, fix the latent `InvalidStateException` from executing a pre-aborted op) | PLAN-network-facade-phase-01-per-node-queues.md | Complete |
-| 2. `BridgedVXLanNetwork` scaffold, `ErrorReport` infrastructure (class, `from_exception` registry, `to_http` mapping, `op.error_report` / `op.raise_for_error` API), and `ensure_mesh` migration | PLAN-network-facade-phase-02-ensure-mesh.md | Planning |
+| 2. `BridgedVXLanNetwork` scaffold, `ErrorReport` infrastructure (class, `from_exception` registry, `to_http` mapping, `op.error_report` / `op.raise_for_error` API), and `ensure_mesh` migration | PLAN-network-facade-phase-02-ensure-mesh.md | Complete |
 | 3. Floating-IP and route migration | PLAN-network-facade-phase-03-floating-ip.md | Planning |
 | 4. dnsmasq operation migration | PLAN-network-facade-phase-04-dnsmasq.md | Planning |
 | 5. `create_on_*` and `delete_on_*` migration | PLAN-network-facade-phase-05-lifecycle.md | Planning |
