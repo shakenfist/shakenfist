@@ -1,6 +1,9 @@
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import mariadb
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import FLOATING_NETWORK_UUID
+from shakenfist.eventlog import add_event_multi
 from shakenfist.schema.operations import net_op as schema
 from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import DeadNetwork
@@ -49,6 +52,8 @@ class NetOp(BaseClusterOperation):
         super().__init__(static_values, schema)
 
         self.__network_uuid = static_values['network_uuid']
+        self.__floating_address = static_values.get('floating_address')
+        self.__inner_address = static_values.get('inner_address')
 
         self.log = LOG.with_fields({
             'operation_type': self.object_type,
@@ -62,11 +67,21 @@ class NetOp(BaseClusterOperation):
     def network_uuid(self):
         return self.__network_uuid
 
+    @property
+    def floating_address(self):
+        return self.__floating_address
+
+    @property
+    def inner_address(self):
+        return self.__inner_address
+
     # API
     def external_view(self):
         retval = super().external_view()
         retval.update({
-            'network_uuid': self.network_uuid
+            'network_uuid': self.network_uuid,
+            'floating_address': self.floating_address,
+            'inner_address': self.inner_address,
         })
         return retval
 
@@ -139,7 +154,35 @@ class NetOp(BaseClusterOperation):
         n.remove_dnsmasq()
 
     def _network_remove_nat(self, n):
-        n.remove_nat()
+        BridgedVXLanNetwork(n)._apply_remove_nat()
 
     def _network_ensure_mesh(self, n):
         BridgedVXLanNetwork(n)._apply_ensure_mesh()
+
+    def _network_add_floating_ip(self, n):
+        # Multi-target audit event preserves today's correlation between
+        # the wrapped network and the floating-network metadata object. The
+        # caller-side affected_objects (interface, instance) are emitted by
+        # net_iface_op._interface_float on the dispatch path it owns.
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [n, ('network', FLOATING_NETWORK_UUID)],
+            'add floating IP',
+            extra={
+                'floating': self.floating_address,
+                'inner': self.inner_address,
+            })
+        BridgedVXLanNetwork(n)._apply_add_floating_ip(
+            self.floating_address, self.inner_address)
+
+    def _network_remove_floating_ip(self, n):
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [n, ('network', FLOATING_NETWORK_UUID)],
+            'remove floating IP',
+            extra={
+                'floating': self.floating_address,
+                'inner': self.inner_address,
+            })
+        BridgedVXLanNetwork(n)._apply_remove_floating_ip(
+            self.floating_address, self.inner_address)

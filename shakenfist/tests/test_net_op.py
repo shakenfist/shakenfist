@@ -31,7 +31,8 @@ def _make_network_mock(state_value='created', active=True):
     return network
 
 
-def _make_net_op(test_case, mock_etcd, tasks, network_uuid=None):
+def _make_net_op(test_case, mock_etcd, tasks, network_uuid=None,
+                 floating_address=None, inner_address=None):
     """Enqueue and load a NetOp with the given tasks."""
     if network_uuid is None:
         network_uuid = str(uuid4())
@@ -39,6 +40,8 @@ def _make_net_op(test_case, mock_etcd, tasks, network_uuid=None):
         network_uuid=network_uuid,
         tasks=tasks,
         priority=PRIORITY.user_waiting,
+        floating_address=floating_address,
+        inner_address=inner_address,
     )
     op = NetOp.from_db(op_uuid)
     test_case.assertIsNotNone(op)
@@ -216,6 +219,116 @@ class NetworkDeployEnsureMeshRoutingTestCase(base.ShakenFistTestCase):
 
         mock_apply.assert_called_once_with()
         network.ensure_mesh.assert_not_called()
+        mock_set_error.assert_not_called()
+
+
+class NetworkRemoveNatTaskDispatchTestCase(base.ShakenFistTestCase):
+    """``_network_remove_nat`` routes through BridgedVXLanNetwork._apply_remove_nat."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_remove_nat')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_remove_nat_handler_calls_apply_remove_nat(
+            self, mock_network_from_db, mock_apply, mock_set_error):
+        """Dispatching network_remove_nat delegates to BridgedVXLanNetwork."""
+        network = _make_network_mock()
+        mock_network_from_db.return_value = network
+
+        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_remove_nat])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_remove_nat)
+
+        mock_apply.assert_called_once_with()
+        # Network.remove_nat must never be invoked from the dispatcher.
+        network.remove_nat.assert_not_called()
+        mock_set_error.assert_not_called()
+
+
+class NetworkAddFloatingIPTaskDispatchTestCase(base.ShakenFistTestCase):
+    """``_network_add_floating_ip`` reads static-value fields and applies them."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+    @mock.patch('shakenfist.operations.net_op.add_event_multi')
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_add_floating_ip')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_add_floating_ip_handler_calls_apply_with_static_values(
+            self, mock_network_from_db, mock_apply, mock_set_error,
+            mock_add_event_multi):
+        """The handler passes floating_address and inner_address through to BridgedVXLanNetwork."""
+        network = _make_network_mock()
+        mock_network_from_db.return_value = network
+
+        op, _ = _make_net_op(
+            self, self.mock_etcd, [model_tasks.network_add_floating_ip],
+            floating_address='192.0.2.5', inner_address='10.0.0.5')
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_add_floating_ip)
+
+        mock_apply.assert_called_once_with('192.0.2.5', '10.0.0.5')
+        # The dispatcher must emit a multi-target audit event referencing
+        # the wrapped network and the floating-network metadata object.
+        mock_add_event_multi.assert_called_once()
+        args, kwargs = mock_add_event_multi.call_args
+        targets = args[1]
+        self.assertIn(network, targets)
+        mock_set_error.assert_not_called()
+
+    def test_floating_address_and_inner_address_properties_expose_static_values(self):
+        """NetOp.floating_address / inner_address read from static_values."""
+        op, _ = _make_net_op(
+            self, self.mock_etcd, [model_tasks.network_add_floating_ip],
+            floating_address='192.0.2.6', inner_address='10.0.0.6')
+        self.assertEqual('192.0.2.6', op.floating_address)
+        self.assertEqual('10.0.0.6', op.inner_address)
+
+    def test_floating_fields_default_to_none_for_other_tasks(self):
+        """Tasks that don't carry floating fields see None for those properties."""
+        op, _ = _make_net_op(
+            self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+        self.assertIsNone(op.floating_address)
+        self.assertIsNone(op.inner_address)
+
+
+class NetworkRemoveFloatingIPTaskDispatchTestCase(base.ShakenFistTestCase):
+    """``_network_remove_floating_ip`` reads static-value fields and applies them."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_etcd = MockEtcd(self, node_count=1)
+        self.mock_etcd.setup()
+
+    @mock.patch('shakenfist.operations.net_op.add_event_multi')
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_remove_floating_ip')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_remove_floating_ip_handler_calls_apply_with_static_values(
+            self, mock_network_from_db, mock_apply, mock_set_error,
+            mock_add_event_multi):
+        """The handler passes floating_address and inner_address through to BridgedVXLanNetwork."""
+        network = _make_network_mock()
+        mock_network_from_db.return_value = network
+
+        op, _ = _make_net_op(
+            self, self.mock_etcd, [model_tasks.network_remove_floating_ip],
+            floating_address='192.0.2.7', inner_address='10.0.0.7')
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_remove_floating_ip)
+
+        mock_apply.assert_called_once_with('192.0.2.7', '10.0.0.7')
+        mock_add_event_multi.assert_called_once()
+        args, kwargs = mock_add_event_multi.call_args
+        targets = args[1]
+        self.assertIn(network, targets)
         mock_set_error.assert_not_called()
 
 
