@@ -422,9 +422,23 @@ class Network(dbowo):
         NetworkInterface lifecycle; all that remains for the
         owning Network is the DHCP-lease housekeeping that used
         to live alongside the list mutation.
+
+        Callers of this method live outside the net-worker
+        dispatcher: ``NetworkInterface.delete`` is invoked from
+        ``node_inst_op._instance_delete`` (the node-queue worker,
+        a different queue from the networknode queue that
+        ``remove_dhcp_lease`` enqueues onto), and from the
+        ``stray_nics`` reaper and cluster-maintainer long-running
+        threads. None of those contexts share a queue with the
+        enqueued ``net_macaddr_ip_op``, so blocking on the op via
+        ``raise_for_error()`` is safe (no self-enqueue deadlock)
+        and preserves the previous synchronous-with-exception
+        semantics.
         """
         if ni.ipv4:
-            self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
+            op = self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
+            if op is not None:
+                op.raise_for_error()
 
     def _update_floating_gateway(self, gateway):
         attrs = self._ensure_attributes()
@@ -685,7 +699,19 @@ class Network(dbowo):
 
                 self.enable_nat()
 
-        self.update_dnsmasq()
+        # create_on_network_node is called from the _network_deploy
+        # dispatcher (in-worker). Use BridgedVXLanNetwork directly
+        # rather than self.update_dnsmasq(): the latter enqueues a
+        # NetOp on the same single-threaded networknode queue, which
+        # would defer dnsmasq startup until after this method returns
+        # and surprise callers expecting dnsmasq to be running.
+        if self.provide_dhcp or self.provide_dns:
+            # Late import: bridged_vxlan_network depends on
+            # shakenfist.instance which depends on this module, so a
+            # top-level import would form a cycle.
+            from shakenfist.network.bridged_vxlan_network import \
+                BridgedVXLanNetwork
+            BridgedVXLanNetwork(self)._apply_update_dnsmasq()
 
         # A final check to ensure we haven't raced with a delete
         if self.is_dead():
@@ -750,14 +776,24 @@ class Network(dbowo):
                 PRIORITY.user_facing,
                 request_id=util_general.get_request_id())
 
-        self.remove_dnsmasq()
-        # Call _apply_remove_nat() directly to avoid re-entrancy:
-        # delete_on_network_node() runs inside the net-worker dispatcher
-        # (via _network_destroy), so enqueuing a nested NetOp and blocking
-        # on it would deadlock the worker.
-        # Late import to avoid circular dependency (network -> bridged_vxlan
-        # -> network).
-        from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
+        # delete_on_network_node is called from the _network_destroy
+        # dispatcher (in-worker). Use BridgedVXLanNetwork directly
+        # rather than self.remove_dnsmasq() / self.remove_nat(): each
+        # of those enqueues a NetOp on the same single-threaded
+        # networknode queue, which would deadlock-by-timeout the
+        # current dispatcher (the new op cannot dequeue while the
+        # current handler is blocked waiting on raise_for_error). This
+        # fixes the latent phase 3 deadlock-via-timeout bug for the
+        # remove_nat case; phase 5 revisits this when
+        # delete_on_network_node itself migrates.
+        #
+        # Late import: bridged_vxlan_network depends on
+        # shakenfist.instance which depends on this module, so a
+        # top-level import would form a cycle.
+        from shakenfist.network.bridged_vxlan_network import \
+            BridgedVXLanNetwork
+        if self.provide_dhcp or self.provide_dns:
+            BridgedVXLanNetwork(self)._apply_remove_dnsmasq()
         BridgedVXLanNetwork(self)._apply_remove_nat()
 
     def hard_delete(self):
