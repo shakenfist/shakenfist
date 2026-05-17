@@ -245,6 +245,7 @@ nav:
                 - "Diagnosing "video stream not keeping up" reports": components/ryll/plans/PLAN-video-keeping-up.md
                 - "Display draw-op coverage": components/ryll/plans/PLAN-display-draw-ops.md
                 - "Display Iteration Follow-ups": components/ryll/plans/PLAN-display-iteration-followups.md
+                - "egui / eframe 0.34 follow-up cleanup": components/ryll/plans/PLAN-egui-0.34-followups.md
                 - "Extract reusable crates from ryll": components/ryll/plans/PLAN-crate-extraction.md
                 - "Hamburger menu for status-bar actions": components/ryll/plans/PLAN-hamburger-menu.md
                 - "Idle CPU reduction and real latency measurement": components/ryll/plans/PLAN-idle-cpu-and-latency.md
