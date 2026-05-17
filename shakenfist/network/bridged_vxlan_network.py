@@ -22,8 +22,10 @@ its enqueueing methods.
 Phase 2 implements ``_apply_ensure_mesh``. Phase 3 adds the floating-IP
 and route methods: ``_apply_add_floating_ip``,
 ``_apply_remove_floating_ip``, ``_apply_route_address``,
-``_apply_unroute_address`` and ``_apply_remove_nat``. The remaining
-``_apply_*`` methods (dnsmasq, lifecycle, ...) move across in later
+``_apply_unroute_address`` and ``_apply_remove_nat``. Phase 4 adds the
+dnsmasq lifecycle methods: ``_apply_update_dnsmasq``,
+``_apply_remove_dnsmasq`` and ``_apply_remove_dhcp_lease``. The
+remaining ``_apply_*`` methods (lifecycle, ...) move across in later
 phases.
 """
 
@@ -38,6 +40,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import FLOATING_NETWORK_UUID
+from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.util import concurrency as util_concurrency
 
@@ -210,3 +213,48 @@ class BridgedVXLanNetwork:
                 op='Network remove NAT', global_scope=False):
             if self.network.floating_gateway:
                 self.network.unassign_floating_gateway()
+
+    def _apply_update_dnsmasq(self) -> None:
+        """Restart dnsmasq for the wrapped network on the network node.
+
+        Lifted from the ``if config.NODE_IS_NETWORK_NODE`` branch of
+        ``Network.update_dnsmasq`` (network.py:793-806). The
+        ``if not self.provide_dhcp and not self.provide_dns: return`` guard
+        at the top of the original ``Network`` method stays at the caller
+        level (it gates whether the work is even enqueued); the apply
+        method assumes work is needed. The ``get_lock`` wrapper is
+        preserved.
+        """
+        with self.network.get_lock(
+                op='Network update DnsMasq', global_scope=False):
+            d = self.network._get_dnsmasq_object()
+            d.restart()
+
+    def _apply_remove_dnsmasq(self) -> None:
+        """Terminate dnsmasq for the wrapped network on the network node.
+
+        Lifted from the ``if config.NODE_IS_NETWORK_NODE`` branch of
+        ``Network.remove_dnsmasq`` (network.py:808-822). The state
+        transition to ``DnsMasq.STATE_DELETED`` is part of the lifted
+        body. As with ``_apply_update_dnsmasq``, the provide-guard remains
+        at the caller level.
+        """
+        with self.network.get_lock(
+                op='Network remove DnsMasq', global_scope=False):
+            d = self.network._get_dnsmasq_object()
+            d.terminate()
+            d.state = dnsmasq.DnsMasq.STATE_DELETED
+
+    def _apply_remove_dhcp_lease(self, ipv4: str, macaddr: str) -> None:
+        """Release a DHCP lease for ``ipv4``/``macaddr`` on the network node.
+
+        Lifted from the ``if config.NODE_IS_NETWORK_NODE`` branch of
+        ``Network.remove_dhcp_lease`` (network.py:780-791). As with the
+        other dnsmasq apply methods, the provide-guard stays at the
+        caller level. The lock op name matches the original ('Network
+        update DnsMasq') for continuity with existing audit trails.
+        """
+        with self.network.get_lock(
+                op='Network update DnsMasq', global_scope=False):
+            d = self.network._get_dnsmasq_object()
+            d.remove_lease(ipv4, macaddr)

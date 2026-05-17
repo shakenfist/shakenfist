@@ -380,3 +380,60 @@ class BridgedVXLanNetworkApplyRemoveNATTestCase(base.ShakenFistTestCase):
         network.get_lock.assert_called_once_with(
             op='Network remove NAT', global_scope=False)
         network.unassign_floating_gateway.assert_not_called()
+
+
+class BridgedVXLanNetworkApplyDnsMasqTestCase(base.ShakenFistTestCase):
+    """Tests for the dnsmasq lifecycle apply methods.
+
+    ``_apply_update_dnsmasq``, ``_apply_remove_dnsmasq`` and
+    ``_apply_remove_dhcp_lease`` each wrap a single call on the dnsmasq
+    object returned from ``Network._get_dnsmasq_object``. We mock that
+    method on the wrapped network and assert the corresponding lifecycle
+    call is dispatched under the appropriate ``get_lock`` op.
+    """
+
+    def test_apply_update_dnsmasq_restarts(self):
+        network = _make_network_mock()
+        fake_dnsmasq = mock.Mock()
+        network._get_dnsmasq_object.return_value = fake_dnsmasq
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_update_dnsmasq()
+
+        network.get_lock.assert_called_once_with(
+            op='Network update DnsMasq', global_scope=False)
+        network._get_dnsmasq_object.assert_called_once_with()
+        fake_dnsmasq.restart.assert_called_once_with()
+
+    def test_apply_remove_dnsmasq_terminates_and_marks_deleted(self):
+        network = _make_network_mock()
+        fake_dnsmasq = mock.Mock()
+        network._get_dnsmasq_object.return_value = fake_dnsmasq
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_remove_dnsmasq()
+
+        network.get_lock.assert_called_once_with(
+            op='Network remove DnsMasq', global_scope=False)
+        network._get_dnsmasq_object.assert_called_once_with()
+        fake_dnsmasq.terminate.assert_called_once_with()
+        # The state transition to STATE_DELETED is part of the lifted body.
+        self.assertEqual(
+            bridged_vxlan_network.dnsmasq.DnsMasq.STATE_DELETED,
+            fake_dnsmasq.state)
+
+    def test_apply_remove_dhcp_lease_invokes_remove_lease(self):
+        network = _make_network_mock()
+        fake_dnsmasq = mock.Mock()
+        network._get_dnsmasq_object.return_value = fake_dnsmasq
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_remove_dhcp_lease('10.0.0.5', '02:00:00:11:22:33')
+
+        # The lock op name intentionally matches the original
+        # Network.remove_dhcp_lease wording ('Network update DnsMasq').
+        network.get_lock.assert_called_once_with(
+            op='Network update DnsMasq', global_scope=False)
+        network._get_dnsmasq_object.assert_called_once_with()
+        fake_dnsmasq.remove_lease.assert_called_once_with(
+            '10.0.0.5', '02:00:00:11:22:33')
