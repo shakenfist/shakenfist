@@ -27,6 +27,7 @@ from shakenfist.schema.operations.net_op \
     import create_and_enqueue as net_create_and_enqueue
 from shakenfist.schema.operations.net_op \
     import model_tasks as net_tasks
+from shakenfist.schema.operations import net_ip_op as net_ip_op_schema
 from shakenfist.schema.operations.net_macaddr_ip_op \
     import create_and_enqueue as nmi_create_and_enqueue
 from shakenfist.schema.operations.net_macaddr_ip_op \
@@ -750,7 +751,13 @@ class Network(dbowo):
                 request_id=util_general.get_request_id())
 
         self.remove_dnsmasq()
-        self.remove_nat()
+        # remove_nat() now enqueues a cluster operation rather than
+        # mutating host state inline. Preserve today's synchronous
+        # semantics here by blocking on the op until it reaches a
+        # terminal state; phase 5 revisits this when
+        # delete_on_network_node itself migrates.
+        remove_nat_op = self.remove_nat()
+        remove_nat_op.raise_for_error()
 
     def hard_delete(self):
         mariadb.delete_network_attributes(UUID(str(self.uuid)))
@@ -821,17 +828,20 @@ class Network(dbowo):
             self.uuid, self.network_address, self.netmask, self.vxid)
 
     def remove_nat(self):
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network remove NAT', global_scope=False):
-                if self.floating_gateway:
-                    self.unassign_floating_gateway()
+        """Enqueue a network_remove_nat NetOp for this network.
 
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_remove_nat],
-                priority=PRIORITY.user_facing
-            )
+        Returns the enqueued NetOp loaded from the database. Callers
+        wanting the previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_remove_nat`` and now runs in the
+        net-worker dispatcher on the elected network node.
+        """
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_remove_nat],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def update_dns_entry(self, name, value):
         if not self.provide_dns:
@@ -903,61 +913,103 @@ class Network(dbowo):
         )
         return get_object_class(op_type).from_db(op_uuid)
 
-    # NOTE(mikal): this call only works on the network node, the API
-    # server redirects there.
     def add_floating_ip(self, floating_address, inner_address, affected_objects):
+        """Enqueue a network_add_floating_ip NetOp for this network.
+
+        Emits a synchronous "requesting add floating IP" audit event on
+        the caller-supplied ``affected_objects`` to preserve today's
+        multi-target correlation for the *requesting* event, then
+        enqueues a NetOp. The host-mutating work lives in
+        ``BridgedVXLanNetwork._apply_add_floating_ip`` and runs in the
+        net-worker dispatcher. Returns the loaded NetOp; callers may
+        call ``op.raise_for_error()`` for sync-with-exception semantics.
+        """
         affected_objects.append(self)
         affected_objects.append(('network', FLOATING_NETWORK_UUID))
         add_event_multi(
-            EVENT_TYPE_AUDIT, affected_objects, 'adding floating ip',
+            EVENT_TYPE_AUDIT, affected_objects,
+            'requesting add floating IP',
             extra={
                 'floating': floating_address,
                 'inner': inner_address
             })
-        with self.get_lock(op='Network add floating IP', global_scope=False):
-            util_concurrency.add_floating_ip(
-                str(self.uuid), floating_address, inner_address)
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_add_floating_ip],
+            priority=PRIORITY.user_facing,
+            floating_address=floating_address,
+            inner_address=inner_address,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
-    # NOTE(mikal): this call only works on the network node, the API
-    # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address, affected_objects):
+        """Enqueue a network_remove_floating_ip NetOp for this network.
+
+        Emits a synchronous "requesting remove floating IP" audit event
+        on the caller-supplied ``affected_objects`` to preserve today's
+        multi-target correlation for the *requesting* event, then
+        enqueues a NetOp. The host-mutating work lives in
+        ``BridgedVXLanNetwork._apply_remove_floating_ip``. Returns the
+        loaded NetOp; callers may call ``op.raise_for_error()``.
+        """
         affected_objects.append(self)
         affected_objects.append(('network', FLOATING_NETWORK_UUID))
         add_event_multi(
-            EVENT_TYPE_AUDIT, affected_objects, 'remove floating ip',
+            EVENT_TYPE_AUDIT, affected_objects,
+            'requesting remove floating IP',
             extra={
                 'floating': floating_address,
                 'inner': inner_address
             })
-        with self.get_lock(op='Network remove floating IP', global_scope=False):
-            util_concurrency.remove_floating_ip(
-                str(self.uuid), floating_address)
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_remove_floating_ip],
+            priority=PRIORITY.user_facing,
+            floating_address=floating_address,
+            inner_address=inner_address,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
-    # NOTE(mikal): this call only works on the network node, the API
-    # server redirects there.
     def route_address(self, floating_address):
+        """Enqueue a route_address NetIPOp for this network.
+
+        Emits a synchronous "routing floating ip to network" audit
+        event on this Network, then enqueues a NetIPOp. The host-
+        mutating work lives in ``BridgedVXLanNetwork._apply_route_address``
+        and runs in the net-worker dispatcher. Returns the loaded
+        NetIPOp; callers may call ``op.raise_for_error()``.
+        """
         self.add_event(
             EVENT_TYPE_AUDIT, 'routing floating ip to network',
             extra={'floating': floating_address})
-        subst = self.subst_dict()
-        subst['floating_address'] = floating_address
-        with self.get_lock(op='Network route address', global_scope=False):
-            util_concurrency.execute(
-                'ip route add %(floating_address)s/32 dev %(vx_bridge)s'
-                % subst)
+        op_type, op_uuid = net_ip_op_schema.create_and_enqueue(
+            network_uuid=str(self.uuid),
+            ip=floating_address,
+            tasks=[net_ip_op_schema.model_tasks.route_address],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
-    # NOTE(mikal): this call only works on the network node, the API
-    # server redirects there.
     def unroute_address(self, floating_address):
+        """Enqueue an unroute_address NetIPOp for this network.
+
+        Emits a synchronous "unrouting floating ip to network" audit
+        event on this Network, then enqueues a NetIPOp. The host-
+        mutating work lives in
+        ``BridgedVXLanNetwork._apply_unroute_address`` and runs in the
+        net-worker dispatcher. Returns the loaded NetIPOp; callers may
+        call ``op.raise_for_error()``.
+        """
         self.add_event(
             EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
             extra={'floating': floating_address})
-        subst = self.subst_dict()
-        subst['floating_address'] = floating_address
-        with self.get_lock(op='Network unroute address', global_scope=False):
-            util_concurrency.execute(
-                'ip route del %(floating_address)s/32 dev %(vx_bridge)s'
-                % subst)
+        op_type, op_uuid = net_ip_op_schema.create_and_enqueue(
+            network_uuid=str(self.uuid),
+            ip=floating_address,
+            tasks=[net_ip_op_schema.model_tasks.unroute_address],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
 
 class Networks(dbo_iter):

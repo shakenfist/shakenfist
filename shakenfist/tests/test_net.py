@@ -7,6 +7,7 @@ from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
+from shakenfist.operations.net_ip_op import NetIPOp
 from shakenfist.operations.net_op import NetOp
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
@@ -426,3 +427,190 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         # The decorator returns None implicitly.
         self.assertIsNone(result)
         self.mock_ensure_vxlan_mesh.assert_not_called()
+
+
+class NetworkFloatingIPEnqueueTestCase(NetworkTestCase):
+    """Tests for the phase 3e flip of the five floating-IP / route
+    methods on ``Network``.
+
+    After phase 3e, each of ``add_floating_ip``, ``remove_floating_ip``,
+    ``route_address``, ``unroute_address``, and ``remove_nat`` no longer
+    mutates host state inline. Instead each enqueues a cluster operation
+    on ``networknode-clusteroperation-user_facing`` (the existing
+    network-node queue family) and returns the loaded op so callers can
+    call ``op.raise_for_error()``. These tests pin that contract.
+    """
+
+    NODE_UUID = '22222222-2222-4222-8222-bbbbbbbbbbbb'
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(NODE_UUID=self.NODE_UUID,
+                               NODE_EGRESS_IP='1.1.1.2',
+                               NODE_MESH_IP='1.1.1.2',
+                               NETWORK_NODE_IP='1.1.1.2',
+                               NODE_IS_NETWORK_NODE=True)
+        self.config = mock.patch(
+            'shakenfist.network.network.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        # Inert mock for the cluster_operation_targets writer; the
+        # enqueue path calls it during ``enqueue_cluster_operation``.
+        self.mock_create_target = mock.patch(
+            'shakenfist.mariadb.create_cluster_operation_target').start()
+        self.addCleanup(mock.patch.stopall)
+
+        # Guards against any accidental host mutation from inside
+        # ``Network.<method>``: the old implementations called these
+        # synchronously, the new implementations must not.
+        self.mock_add_floating_ip = mock.patch(
+            'shakenfist.util.concurrency.add_floating_ip').start()
+        self.mock_remove_floating_ip = mock.patch(
+            'shakenfist.util.concurrency.remove_floating_ip').start()
+        self.mock_execute = mock.patch(
+            'shakenfist.util.concurrency.execute').start()
+
+    def _make_network(self):
+        """Create a network and return the loaded ``Network``."""
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'bobnet', network_uuid, provide_dhcp=True, provide_nat=True)
+        return network.Network.from_db(network_uuid), network_uuid
+
+    def _enqueue_spy(self):
+        """Return a MagicMock wrapping the MockEtcd enqueue side-effect."""
+        original = (
+            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+        return mock.MagicMock(side_effect=original)
+
+    def test_add_floating_ip_enqueues_netop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.add_floating_ip('10.0.0.5', '192.168.1.10', [])
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_add_floating_ip', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual('10.0.0.5', metadata['floating_address'])
+        self.assertEqual('192.168.1.10', metadata['inner_address'])
+        self.assertEqual(PRIORITY.user_facing.name, metadata['priority'])
+
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        # Host mutation must not fire from inside Network.add_floating_ip
+        # any more — the work has moved to BridgedVXLanNetwork.
+        self.mock_add_floating_ip.assert_not_called()
+
+    def test_remove_floating_ip_enqueues_netop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.remove_floating_ip('10.0.0.5', '192.168.1.10', [])
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_remove_floating_ip', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual('10.0.0.5', metadata['floating_address'])
+        self.assertEqual('192.168.1.10', metadata['inner_address'])
+
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        self.mock_remove_floating_ip.assert_not_called()
+
+    def test_route_address_enqueues_netipop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.route_address('10.0.0.5')
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_ip_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('route_address', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual('10.0.0.5', metadata['ip'])
+
+        self.assertIsInstance(op, NetIPOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        # No ``ip route add`` execute calls should have fired from
+        # inside Network.route_address.
+        self.mock_execute.assert_not_called()
+
+    def test_unroute_address_enqueues_netipop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.unroute_address('10.0.0.5')
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_ip_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('unroute_address', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+        self.assertEqual('10.0.0.5', metadata['ip'])
+
+        self.assertIsInstance(op, NetIPOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        self.mock_execute.assert_not_called()
+
+    def test_remove_nat_enqueues_netop(self):
+        n, network_uuid = self._make_network()
+        spy = self._enqueue_spy()
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.remove_nat()
+
+        spy.assert_called_once()
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(
+            'networknode-clusteroperation-user_facing',
+            kwargs['queue_name'])
+        self.assertEqual('net_op', kwargs['operation_type'])
+        metadata = kwargs['metadata']
+        self.assertIn('network_remove_nat', metadata['tasks'])
+        self.assertEqual(str(network_uuid), str(metadata['network_uuid']))
+
+        self.assertIsInstance(op, NetOp)
+        self.assertEqual(metadata['uuid'], str(op.uuid))
+
+        # No host-mutation utilities should fire inline.
+        self.mock_add_floating_ip.assert_not_called()
+        self.mock_remove_floating_ip.assert_not_called()
+        self.mock_execute.assert_not_called()
