@@ -1,3 +1,4 @@
+# Copyright 2019 Michael Still and contributors
 from enum import Enum
 from typing import ClassVar, Optional
 from uuid import uuid4
@@ -21,7 +22,7 @@ LOG, HANDLER = logs.setup(__name__)
 
 object_type = ObjectType.NET_OP
 initial_version = 1
-current_version = 1
+current_version = 2
 
 
 class model_tasks(Enum):
@@ -31,6 +32,8 @@ class model_tasks(Enum):
     network_remove_dnsmasq = 4
     network_remove_nat = 5
     network_ensure_mesh = 6
+    network_add_floating_ip = 7
+    network_remove_floating_ip = 8
 
 
 class model(BaseModel):
@@ -40,6 +43,8 @@ class model(BaseModel):
 
     uuid: UUID4
     network_uuid: UUID4
+    floating_address: Optional[str] = None
+    inner_address: Optional[str] = None
     priority: PRIORITY
     request_id: Optional[str]
     tasks: list[model_tasks]
@@ -58,7 +63,8 @@ class model(BaseModel):
 
 def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
                        depends_on=None, runs_after=None,
-                       target='networknode', family='clusteroperation'):
+                       target='networknode', family='clusteroperation',
+                       floating_address=None, inner_address=None):
     operation_uuid = str(uuid4())
 
     try:
@@ -66,6 +72,8 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         m = model(
             uuid=operation_uuid,
             network_uuid=network_uuid,
+            floating_address=floating_address,
+            inner_address=inner_address,
             priority=priority,
             request_id=request_id,
             tasks=tasks,
@@ -77,6 +85,8 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         LOG.with_fields({
             'uuid': operation_uuid,
             'network_uuid': network_uuid,
+            'floating_address': floating_address,
+            'inner_address': inner_address,
             'priority': priority,
             'request_id': request_id,
             'tasks': tasks,
