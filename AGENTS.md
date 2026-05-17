@@ -129,9 +129,9 @@ queues for network-node-only operations (`create_on_network_node`,
 mutations are parallelised across nodes while network-node-singleton operations
 remain serialised.
 
-### Network facade (Phases 2–3)
+### Network facade (Phases 2–4)
 
-Key new files introduced across Phases 2–3 of the network-facade work:
+Key new files introduced across Phases 2–4 of the network-facade work:
 
 - `shakenfist/operations/error_report.py` — `ErrorReport` Pydantic model
   (fields: `code`, `message`, `details`, `origin_class`, `traceback`).
@@ -147,12 +147,21 @@ The consumer-side API lives on `BaseClusterOperation`
 persisted report; `op.raise_for_error(timeout=None)` polls and raises
 `NetworkOperationFailed` if the op ended in `STATE_ERROR`.
 
-**Migrated `Network` methods after Phase 3**: `ensure_mesh`, `add_floating_ip`,
-`remove_floating_ip`, `route_address`, `unroute_address`, `remove_nat`.
+**Migrated `Network` methods after Phase 4**: `ensure_mesh`, `add_floating_ip`,
+`remove_floating_ip`, `route_address`, `unroute_address`, `remove_nat`,
+`update_dnsmasq`, `remove_dnsmasq`, `remove_dhcp_lease`, `update_dns_entry`,
+`remove_dns_entry`.
 
-**Op-type dispatchers after Phase 3**: `net_op`, `net_ip_op`, `net_iface_op`,
-`net_iface_ip_op`. All four route through `BridgedVXLanNetwork` and persist
-`ErrorReport` on their outer exception branch.
+**Op-type dispatchers after Phase 4**: `net_op`, `net_ip_op`, `net_iface_op`,
+`net_iface_ip_op`, `net_macaddr_ip_op`. All five route through
+`BridgedVXLanNetwork` and persist `ErrorReport` on their outer exception branch.
+
+**In-worker sibling call pattern**: when a `Network` method needs to invoke
+another host-mutating operation from inside an executing worker context (e.g.
+`create_on_network_node` calling `update_dnsmasq`), re-enqueueing would deadlock
+the single-worker queue. The correct pattern is
+`BridgedVXLanNetwork(self)._apply_X()` directly — host mutation stays inside
+the worker-only surface and the queue round-trip is avoided.
 
 ### Key Directories
 

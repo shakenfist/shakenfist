@@ -305,12 +305,35 @@ pipelines. The existing `get_lock` wrapper inside each `_apply_*` method is
 retained through Phase 8, at which point the per-node queue becomes the sole
 serialisation point and the locks are removed.
 
-**Migrated methods after Phase 3**: `ensure_mesh`, `add_floating_ip`,
-`remove_floating_ip`, `route_address`, `unroute_address`, `remove_nat`.
+**Migrated methods after Phase 4**: `ensure_mesh`, `add_floating_ip`,
+`remove_floating_ip`, `route_address`, `unroute_address`, `remove_nat`,
+`update_dnsmasq`, `remove_dnsmasq`, `remove_dhcp_lease`, `update_dns_entry`,
+`remove_dns_entry` (eleven of the twelve `Network` host-mutating methods).
 
-**Op-type dispatchers after Phase 3**: `net_op`, `net_ip_op`, `net_iface_op`,
-`net_iface_ip_op`. All four route through `BridgedVXLanNetwork` and persist
-`ErrorReport` on their outer exception branch.
+**Op-type dispatchers after Phase 4**: `net_op`, `net_ip_op`, `net_iface_op`,
+`net_iface_ip_op`, `net_macaddr_ip_op`. All five route through
+`BridgedVXLanNetwork` and persist `ErrorReport` on their outer exception branch.
+
+#### In-worker sibling call pattern
+
+When a `Network` method needs to invoke another host-mutating operation from
+inside an already-executing worker context — for example, `create_on_network_node`
+calling `update_dnsmasq` as part of `_network_deploy`, or `delete_on_network_node`
+calling `remove_dnsmasq` — re-enqueueing through the normal `Network.X()` facade
+would deadlock: the worker is already holding the queue slot and cannot dequeue
+its own dependency. The correct pattern is to construct a `BridgedVXLanNetwork`
+wrapper and call the `_apply_*` method directly:
+
+```python
+BridgedVXLanNetwork(self)._apply_update_dnsmasq(context)
+```
+
+This keeps host mutation inside `BridgedVXLanNetwork` (the worker-only surface),
+avoids a queue round-trip, and eliminates the deadlock-by-timeout that existed in
+Phase 3 where `create_on_network_node` enqueued `update_dnsmasq` and then waited
+for it to complete — but the network-node queue has only one worker, so the
+dependency could never be dequeued while the parent op was still executing. The
+Phase 3 latent bug was fixed when this pattern was adopted in Phase 4.
 
 #### Dual-event emission pattern
 

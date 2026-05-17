@@ -196,3 +196,71 @@ The requesting event gives operators an immediate audit trail that the call
 was received; the dispatch-time event records when the work actually ran and
 on which worker node. The two events are correlated by the shared op UUID
 present in both.
+
+## Phase 4 additions — dnsmasq operations
+
+Phase 4 migrates all dnsmasq-related `Network` methods. The full set of
+migrated methods now spans:
+
+| Method | Op type | Queue family |
+|--------|---------|--------------|
+| `ensure_mesh` | `net_op` | per-node network |
+| `add_floating_ip` | `net_ip_op` | network-node |
+| `remove_floating_ip` | `net_ip_op` | network-node |
+| `route_address` | `net_ip_op` | network-node |
+| `unroute_address` | `net_ip_op` | network-node |
+| `remove_nat` | `net_op` | network-node |
+| `update_dnsmasq` | `net_op` (task 9) | network-node |
+| `remove_dnsmasq` | `net_op` (task 10) | network-node |
+| `remove_dhcp_lease` | `net_macaddr_ip_op` | network-node |
+| `update_dns_entry` | `net_op` (task 9) | network-node |
+| `remove_dns_entry` | `net_op` (task 10) | network-node |
+
+### New NetOp task types
+
+Two new task constants were added in Phase 4:
+
+- **`network_apply_update_dnsmasq` (9)** — applies a dnsmasq configuration
+  refresh on the network node, used by both `update_dnsmasq` and
+  `update_dns_entry`.
+- **`network_apply_remove_dnsmasq` (10)** — tears down the dnsmasq instance on
+  the network node, used by both `remove_dnsmasq` and `remove_dns_entry`.
+
+The historical `network_update_dnsmasq` (3) and `network_remove_dnsmasq` (4)
+task constants remain in place for the broader reconciliation path used by
+`maintain.py`. Phase 6's `maintain.py` rewrite will retire them.
+
+### In-worker sibling call pattern
+
+Some `Network` lifecycle methods need to invoke dnsmasq operations as part of
+a larger compound operation. For example, `create_on_network_node` calls
+`update_dnsmasq` at the end of `_network_deploy`, and `delete_on_network_node`
+calls `remove_dnsmasq` during teardown.
+
+Re-enqueueing through the normal `Network.update_dnsmasq()` facade from inside
+these callers would deadlock: the network-node queue has a single worker, and
+that worker is already executing the parent op. The enqueued child op would
+never be dequeued until the parent completes — but the parent is waiting for
+the child. The cluster operation reaper would eventually kill one of them, but
+only after `CLUSTER_OP_STUCK_THRESHOLD` seconds.
+
+The correct pattern is to construct `BridgedVXLanNetwork` directly and call the
+`_apply_*` method inline:
+
+```python
+# Inside create_on_network_node / _network_deploy
+BridgedVXLanNetwork(self)._apply_update_dnsmasq(context)
+
+# Inside delete_on_network_node
+BridgedVXLanNetwork(self)._apply_remove_dnsmasq(context)
+```
+
+This keeps all host mutation inside `BridgedVXLanNetwork` (the worker-only
+mutation surface), avoids a queue round-trip, and eliminates the
+deadlock-by-timeout. The Phase 3 incarnation of these callers used the old
+inline mutation path; Phase 4 adopted this pattern when dnsmasq methods
+migrated, fixing the latent deadlock at the same time.
+
+The general rule: **never call `Network.X()` from inside a dispatcher handler
+if `X()` enqueues to the same queue family**. Always use
+`BridgedVXLanNetwork(self)._apply_X()` instead.
