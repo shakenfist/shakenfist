@@ -305,6 +305,30 @@ pipelines. The existing `get_lock` wrapper inside each `_apply_*` method is
 retained through Phase 8, at which point the per-node queue becomes the sole
 serialisation point and the locks are removed.
 
+**Migrated methods after Phase 3**: `ensure_mesh`, `add_floating_ip`,
+`remove_floating_ip`, `route_address`, `unroute_address`, `remove_nat`.
+
+**Op-type dispatchers after Phase 3**: `net_op`, `net_ip_op`, `net_iface_op`,
+`net_iface_ip_op`. All four route through `BridgedVXLanNetwork` and persist
+`ErrorReport` on their outer exception branch.
+
+#### Dual-event emission pattern
+
+Each migrated `Network` method emits two audit events:
+
+1. **Requesting event** — emitted synchronously inside `Network.X()` on the
+   caller's thread, before the op is enqueued. Uses `affected_objects=` so that
+   the event is recorded against all relevant objects (e.g. both the network and
+   the floating network for floating-IP ops).
+2. **Dispatch-time event** — emitted by the dispatcher once the op actually
+   executes. The dispatcher has access to only the objects it has in scope: the
+   `Network` itself plus `('network', FLOATING_NETWORK_UUID)` for floating-IP
+   ops; the `NetworkInterface` for `net_iface_op` / `net_iface_ip_op` ops.
+
+This split is intentional: the requesting event gives operators an immediate
+audit trail that the call was received, while the dispatch-time event records
+when the work actually ran and on which worker node.
+
 ### Network Operation Queue Families
 
 Network operations are dispatched through two distinct queue families, both

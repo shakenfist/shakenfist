@@ -157,3 +157,42 @@ typed exception:
 
 Typed `except` branches in `dispatch_task` exist only where additional
 behaviour beyond the report is needed (e.g. logging at a different severity).
+
+## Phase 3 additions — floating-IP and route operations
+
+After Phase 3, the following `Network` methods enqueue cluster operations and
+return op handles rather than performing host mutations inline:
+
+| Method | Op type | Queue family |
+|--------|---------|--------------|
+| `ensure_mesh` | `net_op` | per-node network |
+| `add_floating_ip` | `net_ip_op` | network-node |
+| `remove_floating_ip` | `net_ip_op` | network-node |
+| `route_address` | `net_ip_op` | network-node |
+| `unroute_address` | `net_ip_op` | network-node |
+| `remove_nat` | `net_op` | network-node |
+
+All four op-type dispatchers (`net_op`, `net_ip_op`, `net_iface_op`,
+`net_iface_ip_op`) now route through `BridgedVXLanNetwork` and persist
+`ErrorReport` on their outer exception branch.
+
+### Event-correlation split
+
+Each migrated `Network` method produces two audit events:
+
+1. **Requesting event** (synchronous, emitted on the caller's thread inside
+   `Network.X()`). Recorded against all objects relevant to the call via
+   `affected_objects=`. For floating-IP and route methods this includes both
+   the network being acted on and the floating network
+   (`('network', FLOATING_NETWORK_UUID)`).
+
+2. **Dispatch-time event** (emitted by the dispatcher when the op actually
+   executes). The dispatcher has access only to the objects it has in scope:
+   - `net_op` / `net_ip_op`: the `Network` itself, plus
+     `('network', FLOATING_NETWORK_UUID)` for floating-IP ops.
+   - `net_iface_op` / `net_iface_ip_op`: the `NetworkInterface`.
+
+The requesting event gives operators an immediate audit trail that the call
+was received; the dispatch-time event records when the work actually ran and
+on which worker node. The two events are correlated by the shared op UUID
+present in both.
