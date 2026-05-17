@@ -142,6 +142,12 @@ class BaseClusterOperation(BaseOperation):
         # We only know this if we have been dequeued
         self._queue_name: Optional[str] = None
 
+        # Set by the queue dispatcher from the work_item payload so that
+        # defer_with_backoff() knows how many times this operation has
+        # already been deferred. Each defer() bumps the counter that gets
+        # written into the next work_item.
+        self.current_defer_count: int = 0
+
         # Convert tasks names back into enum entries
         self.__tasks: list[Enum] = []
         for task_name in static_values['tasks']:
@@ -226,18 +232,58 @@ class BaseClusterOperation(BaseOperation):
             for wobj in waiting_on:
                 wo.append(wobj.unique_label())
 
+        next_defer_count = self.current_defer_count + 1
         self.add_event(
             EVENT_TYPE_STATUS, f'Execution deferred for {delay} seconds',
             extra={
-                'waiting_on': wo
+                'waiting_on': wo,
+                'defer_count': next_defer_count
             })
         work_item = {
             'operation_type': self.object_type,
-            'operation_uuid': str(self.uuid)
+            'operation_uuid': str(self.uuid),
+            'defer_count': next_defer_count
         }
         mariadb.enqueue_work_item(
             self.queue_name, work_item, delay=delay)
         self.state = self.STATE_QUEUED  # type: ignore[misc]
+
+    def defer_with_backoff(
+            self,
+            delays: tuple[int, ...] = (15, 30, 60),
+            reason: Optional[str] = None
+    ) -> bool:
+        """Schedule a retry of this operation with backoff.
+
+        Uses self.current_defer_count to look up the next delay from
+        delays. Returns True if a retry was scheduled (and the op is
+        now back in STATE_QUEUED), or False if the retry budget has
+        been exhausted (in which case the caller should error the op
+        out itself).
+        """
+        if self.current_defer_count >= len(delays):
+            self.add_event(
+                EVENT_TYPE_STATUS,
+                'retry budget exhausted, will not defer further',
+                extra={
+                    'defer_count': self.current_defer_count,
+                    'max_defers': len(delays),
+                    'reason': reason
+                })
+            return False
+
+        delay = delays[self.current_defer_count]
+        self.add_event(
+            EVENT_TYPE_STATUS,
+            'scheduling retry after transient failure',
+            extra={
+                'defer_count': self.current_defer_count + 1,
+                'max_defers': len(delays),
+                'delay': delay,
+                'reason': reason
+            })
+        self.defer(delay=delay)
+        return True
 
     def is_outstanding(self) -> bool:
         if self.state.value in [BaseClusterOperation.STATE_ERROR,
