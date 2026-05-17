@@ -34,6 +34,8 @@ class model_tasks(Enum):
     network_ensure_mesh = 6
     network_add_floating_ip = 7
     network_remove_floating_ip = 8
+    network_apply_update_dnsmasq = 9
+    network_apply_remove_dnsmasq = 10
 
 
 class model(BaseModel):

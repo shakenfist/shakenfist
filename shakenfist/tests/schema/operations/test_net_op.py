@@ -182,6 +182,11 @@ class ModelTasksEnumTestCase(base.ShakenFistTestCase):
         self.assertEqual(7, model_tasks.network_add_floating_ip.value)
         self.assertEqual(8, model_tasks.network_remove_floating_ip.value)
 
+    def test_new_dnsmasq_apply_task_values(self):
+        """New dnsmasq apply tasks have values 9 and 10."""
+        self.assertEqual(9, model_tasks.network_apply_update_dnsmasq.value)
+        self.assertEqual(10, model_tasks.network_apply_remove_dnsmasq.value)
+
 
 class ModelVersionTestCase(base.ShakenFistTestCase):
     """Version range acceptance tests for the schema model."""
