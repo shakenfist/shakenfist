@@ -751,13 +751,14 @@ class Network(dbowo):
                 request_id=util_general.get_request_id())
 
         self.remove_dnsmasq()
-        # remove_nat() now enqueues a cluster operation rather than
-        # mutating host state inline. Preserve today's synchronous
-        # semantics here by blocking on the op until it reaches a
-        # terminal state; phase 5 revisits this when
-        # delete_on_network_node itself migrates.
-        remove_nat_op = self.remove_nat()
-        remove_nat_op.raise_for_error()
+        # Call _apply_remove_nat() directly to avoid re-entrancy:
+        # delete_on_network_node() runs inside the net-worker dispatcher
+        # (via _network_destroy), so enqueuing a nested NetOp and blocking
+        # on it would deadlock the worker.
+        # Late import to avoid circular dependency (network -> bridged_vxlan
+        # -> network).
+        from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
+        BridgedVXLanNetwork(self)._apply_remove_nat()
 
     def hard_delete(self):
         mariadb.delete_network_attributes(UUID(str(self.uuid)))
