@@ -66,6 +66,7 @@ class Job(util_concurrency.Job):
             return
 
         op.queue_name = queue_name
+        op.current_defer_count = workitem.get('defer_count', 0)
 
         # Ensure our dependencies are met.
         for dep in op.depends_on:

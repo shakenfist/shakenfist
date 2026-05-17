@@ -132,6 +132,19 @@ class ArtifactFetchOp(BaseClusterOperation):
             if (a.state.value in [Artifact.STATE_INITIAL,
                                   Artifact.STATE_CREATING] or
                     msg != 'DNS error'):
+                # Transient network/upstream failures are common during
+                # OS patch reboots and brief upstream outages. Retry a
+                # handful of times before declaring the artifact dead.
+                if self.defer_with_backoff(reason=msg):
+                    a.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'transient fetch failure, will retry',
+                        extra={
+                            'message': msg,
+                            'defer_count': self.current_defer_count + 1
+                        })
+                    return
+
                 a.state = Artifact.STATE_ERROR
                 a.error = msg
                 if inst:
