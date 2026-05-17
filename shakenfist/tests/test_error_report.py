@@ -9,11 +9,18 @@ from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
 from shakenfist.config import BaseSettings
+from shakenfist.exceptions import AddFloatingIPFailed
 from shakenfist.exceptions import CannotAssignFloatingGateway
+from shakenfist.exceptions import CongestedNetwork
+from shakenfist.exceptions import CreateNetworkNamespaceFailed
 from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import DeadNetwork
+from shakenfist.exceptions import EnableNATFailed
 from shakenfist.exceptions import EnsureMeshFailed
+from shakenfist.exceptions import ListingInterfaceAddressesFailed
+from shakenfist.exceptions import RemoveFloatingIPFailed
 from shakenfist.operations.error_report import ErrorReport
+from shakenfist.operations.error_report import _EXCEPTION_CODE_REGISTRY
 from shakenfist.tests import base
 
 
@@ -59,6 +66,52 @@ class ErrorReportFromExceptionTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             'shakenfist.exceptions.CannotAssignFloatingGateway',
             report.origin_class)
+
+    def test_add_floating_ip_failed_maps_to_floating_add_failed(self):
+        report = ErrorReport.from_exception(AddFloatingIPFailed('add failed'))
+        self.assertEqual('network.floating.add_failed', report.code)
+        self.assertEqual(
+            'shakenfist.exceptions.AddFloatingIPFailed', report.origin_class)
+
+    def test_remove_floating_ip_failed_maps_to_floating_remove_failed(self):
+        report = ErrorReport.from_exception(
+            RemoveFloatingIPFailed('remove failed'))
+        self.assertEqual('network.floating.remove_failed', report.code)
+        self.assertEqual(
+            'shakenfist.exceptions.RemoveFloatingIPFailed',
+            report.origin_class)
+
+    def test_enable_nat_failed_maps_to_nat_enable_failed(self):
+        report = ErrorReport.from_exception(EnableNATFailed('nat failed'))
+        self.assertEqual('network.nat.enable_failed', report.code)
+        self.assertEqual(
+            'shakenfist.exceptions.EnableNATFailed', report.origin_class)
+
+    def test_congested_network_maps_to_network_congested(self):
+        report = ErrorReport.from_exception(CongestedNetwork('congested'))
+        self.assertEqual('network.congested', report.code)
+        self.assertEqual(
+            'shakenfist.exceptions.CongestedNetwork', report.origin_class)
+
+    def test_create_network_namespace_failed_maps_to_create_namespace_failed(self):
+        report = ErrorReport.from_exception(
+            CreateNetworkNamespaceFailed('ns failed'))
+        self.assertEqual('network.create_namespace.failed', report.code)
+        self.assertEqual(
+            'shakenfist.exceptions.CreateNetworkNamespaceFailed',
+            report.origin_class)
+
+    def test_listing_interface_addresses_failed_maps_to_list_interface_addresses_failed(
+            self):
+        report = ErrorReport.from_exception(
+            ListingInterfaceAddressesFailed('list failed'))
+        self.assertEqual('network.list_interface_addresses.failed', report.code)
+        self.assertEqual(
+            'shakenfist.exceptions.ListingInterfaceAddressesFailed',
+            report.origin_class)
+
+    def test_registry_contains_exactly_ten_entries(self):
+        self.assertEqual(10, len(_EXCEPTION_CODE_REGISTRY))
 
     def test_unregistered_exception_becomes_internal_unknown(self):
         report = ErrorReport.from_exception(ValueError('test'))
@@ -113,6 +166,31 @@ class ErrorReportToHttpTestCase(base.ShakenFistTestCase):
 
     def test_network_floating_assign_failed_returns_500(self):
         status, _ = self._build('network.floating.assign_failed').to_http()
+        self.assertEqual(500, status)
+
+    def test_network_floating_add_failed_returns_500(self):
+        status, _ = self._build('network.floating.add_failed').to_http()
+        self.assertEqual(500, status)
+
+    def test_network_floating_remove_failed_returns_500(self):
+        status, _ = self._build('network.floating.remove_failed').to_http()
+        self.assertEqual(500, status)
+
+    def test_network_nat_enable_failed_returns_500(self):
+        status, _ = self._build('network.nat.enable_failed').to_http()
+        self.assertEqual(500, status)
+
+    def test_network_congested_returns_503(self):
+        status, _ = self._build('network.congested').to_http()
+        self.assertEqual(503, status)
+
+    def test_network_create_namespace_failed_returns_500(self):
+        status, _ = self._build('network.create_namespace.failed').to_http()
+        self.assertEqual(500, status)
+
+    def test_network_list_interface_addresses_failed_returns_500(self):
+        status, _ = self._build(
+            'network.list_interface_addresses.failed').to_http()
         self.assertEqual(500, status)
 
     def test_internal_unknown_returns_500(self):

@@ -28,10 +28,16 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from shakenfist.exceptions import AddFloatingIPFailed
 from shakenfist.exceptions import CannotAssignFloatingGateway
+from shakenfist.exceptions import CongestedNetwork
+from shakenfist.exceptions import CreateNetworkNamespaceFailed
 from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import DeadNetwork
+from shakenfist.exceptions import EnableNATFailed
 from shakenfist.exceptions import EnsureMeshFailed
+from shakenfist.exceptions import ListingInterfaceAddressesFailed
+from shakenfist.exceptions import RemoveFloatingIPFailed
 
 
 # Stable code namespace for known exception classes. Unknown exception
@@ -43,6 +49,12 @@ _EXCEPTION_CODE_REGISTRY: dict[type[Exception], str] = {
     DeadNetwork: 'network.dead',
     CreateVXLANInterfaceFailed: 'network.create_vxlan.failed',
     CannotAssignFloatingGateway: 'network.floating.assign_failed',
+    AddFloatingIPFailed: 'network.floating.add_failed',
+    RemoveFloatingIPFailed: 'network.floating.remove_failed',
+    EnableNATFailed: 'network.nat.enable_failed',
+    CongestedNetwork: 'network.congested',
+    CreateNetworkNamespaceFailed: 'network.create_namespace.failed',
+    ListingInterfaceAddressesFailed: 'network.list_interface_addresses.failed',
 }
 
 
@@ -55,6 +67,12 @@ _CODE_HTTP_STATUS: dict[str, int] = {
     'network.ensure_mesh.failed': 500,
     'network.create_vxlan.failed': 500,
     'network.floating.assign_failed': 500,
+    'network.floating.add_failed': 500,
+    'network.floating.remove_failed': 500,
+    'network.nat.enable_failed': 500,
+    'network.congested': 503,
+    'network.create_namespace.failed': 500,
+    'network.list_interface_addresses.failed': 500,
     'internal.unknown': 500,
 }
 
