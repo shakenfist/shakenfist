@@ -129,9 +129,9 @@ queues for network-node-only operations (`create_on_network_node`,
 mutations are parallelised across nodes while network-node-singleton operations
 remain serialised.
 
-### Network facade (Phases 2–4)
+### Network facade (Phases 2–5)
 
-Key new files introduced across Phases 2–4 of the network-facade work:
+Key new files introduced across Phases 2–5 of the network-facade work:
 
 - `shakenfist/operations/error_report.py` — `ErrorReport` Pydantic model
   (fields: `code`, `message`, `details`, `origin_class`, `traceback`).
@@ -147,14 +147,21 @@ The consumer-side API lives on `BaseClusterOperation`
 persisted report; `op.raise_for_error(timeout=None)` polls and raises
 `NetworkOperationFailed` if the op ended in `STATE_ERROR`.
 
-**Migrated `Network` methods after Phase 4**: `ensure_mesh`, `add_floating_ip`,
-`remove_floating_ip`, `route_address`, `unroute_address`, `remove_nat`,
-`update_dnsmasq`, `remove_dnsmasq`, `remove_dhcp_lease`, `update_dns_entry`,
-`remove_dns_entry`.
+**Migrated `Network` methods after Phase 5 (complete — all 15 host-mutating
+methods)**: `ensure_mesh`, `add_floating_ip`, `remove_floating_ip`,
+`route_address`, `unroute_address`, `remove_nat`, `update_dnsmasq`,
+`remove_dnsmasq`, `remove_dhcp_lease`, `update_dns_entry`, `remove_dns_entry`,
+`create_on_hypervisor`, `delete_on_hypervisor`, `create_on_network_node`,
+`delete_on_network_node`.
 
-**Op-type dispatchers after Phase 4**: `net_op`, `net_ip_op`, `net_iface_op`,
-`net_iface_ip_op`, `net_macaddr_ip_op`. All five route through
-`BridgedVXLanNetwork` and persist `ErrorReport` on their outer exception branch.
+`Network.enable_nat` has been removed from the public surface; it is now the
+private `BridgedVXLanNetwork._apply_enable_nat` method, called only from
+`_apply_create_on_network_node`.
+
+**Op-type dispatchers after Phase 5**: `net_op`, `net_ip_op`, `net_iface_op`,
+`net_iface_ip_op`, `net_macaddr_ip_op`, plus `node_net_op` and `node_inst_op` /
+`node_inst_netdesc_op`. All route through `BridgedVXLanNetwork` and persist
+`ErrorReport` on their outer exception branch.
 
 **In-worker sibling call pattern**: when a `Network` method needs to invoke
 another host-mutating operation from inside an executing worker context (e.g.

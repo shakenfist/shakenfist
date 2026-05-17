@@ -264,3 +264,75 @@ migrated, fixing the latent deadlock at the same time.
 The general rule: **never call `Network.X()` from inside a dispatcher handler
 if `X()` enqueues to the same queue family**. Always use
 `BridgedVXLanNetwork(self)._apply_X()` instead.
+
+## Phase 5 additions — lifecycle operations
+
+Phase 5 migrates the four remaining host-mutating `Network` lifecycle methods,
+completing the full migration of all 15 host-mutating methods.
+
+### Method-to-queue-family mapping
+
+| Method | Op type | Queue family |
+|--------|---------|--------------|
+| `create_on_hypervisor` | `node_net_op` (task 2) | per-node network |
+| `delete_on_hypervisor` | `node_net_op` (task 1 — reused `network_destroy`) | per-node network |
+| `create_on_network_node` | `net_op` (task 11) | network-node |
+| `delete_on_network_node` | `net_op` (task 12) | network-node |
+
+`create_on_hypervisor` and `delete_on_hypervisor` route to the per-node
+`{node_uuid}-network-{priority}` queues because they mutate per-hypervisor
+state (local VXLAN interface, bridge membership, FDB entries).
+`create_on_network_node` and `delete_on_network_node` route to the cluster-wide
+`networknode-clusteroperation-{priority}` queues because they configure state
+that only the elected network node owns (dnsmasq, NAT rules, floating-IP
+routing).
+
+### New task constants
+
+Two new `NetOp` task constants were added:
+
+- **`network_apply_create_network_node` (11)** — provisions the network on the
+  network node (dnsmasq start, NAT/floating-IP plumbing, DNS zone). Calls
+  `BridgedVXLanNetwork._apply_create_on_network_node`, which internally calls
+  `self._apply_enable_nat` (formerly the public `Network.enable_nat`) as part
+  of the same in-worker pass.
+- **`network_apply_delete_network_node` (12)** — tears down the network on the
+  network node (dnsmasq stop, NAT/routing cleanup). Calls
+  `BridgedVXLanNetwork._apply_delete_on_network_node`.
+
+One new `node_net_op` task constant was added:
+
+- **`network_apply_create_hypervisor` (2)** — creates the local VXLAN interface
+  and bridge on a hypervisor node. Calls
+  `BridgedVXLanNetwork._apply_create_on_hypervisor`.
+
+The existing **`network_destroy` (1)** on `node_net_op` is reused for
+`delete_on_hypervisor`; no new constant was needed.
+
+### `enable_nat` removal from public surface
+
+`Network.enable_nat` no longer exists as a public method. The logic lives in
+`BridgedVXLanNetwork._apply_enable_nat`, called only from within
+`_apply_create_on_network_node`. External callers that previously called
+`enable_nat` directly should use `create_on_network_node` instead; NAT
+enablement is an implementation detail of network creation, not a separately
+callable operation.
+
+### Broader reconciliation path
+
+The existing `network_deploy` (5), `network_destroy` (6 — network-node variant),
+and `network_update_dnsmasq` (3) task constants on `NetOp` continue to do
+broader reconciliation: `network_deploy` calls `create_on_network_node` +
+`ensure_mesh` for all cluster nodes; `network_update_dnsmasq` refreshes dnsmasq
+across the cluster. These reconciliation paths are used by `maintain.py` and will
+be revisited during the Phase 6 `maintain.py` rewrite.
+
+### In-class `_apply_X` cleanup
+
+`_apply_create_on_network_node` and `_apply_delete_on_network_node` call other
+`_apply_*` helpers directly on `self` (e.g. `self._apply_enable_nat`,
+`self._apply_update_dnsmasq`, `self._apply_remove_dnsmasq`) rather than going
+through `Network.X()`. This replaces the Phase 3-era pattern of late imports and
+the Phase 4-era workaround of constructing a fresh `BridgedVXLanNetwork(self)`
+inside the handler. The in-class call is cleaner, avoids the redundant wrapper
+construction, and makes the call graph explicit.
