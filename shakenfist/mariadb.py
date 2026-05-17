@@ -5656,6 +5656,69 @@ def _direct_has_pending_cluster_operation_target(
         return True
 
 
+# Terminal states for cluster operations -- mirror the set used by the
+# operation state machine (shakenfist/operations/baseoperation.py). An op
+# in any of these states is no longer executing and is safe to consider
+# for cooldown / circuit-breaker queries.
+_TERMINAL_OPERATION_STATES = ('complete', 'abort', 'deleted', 'error')
+
+
+def _direct_get_recent_terminal_op_states_for_target(
+    target_object_type: ObjectType,
+    target_uuid: str,
+    limit: int,
+    op_type: Optional[str] = None
+) -> list[tuple[str, str, float]]:
+    """Return up to ``limit`` most recent terminal op states for an object.
+
+    Joins ``cluster_operation_targets`` against ``object_states`` and
+    filters to terminal cluster operation states (complete, abort,
+    deleted, error). Results are ordered newest first by
+    ``object_states.update_time``. If ``op_type`` is provided, results
+    are additionally narrowed to that operation type (e.g. ``'net_op'``).
+
+    Returns a list of ``(op_uuid, state_value, update_time)`` tuples.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+    states_table = _get_object_states_table()
+
+    conditions = [
+        table.c.target_object_type == target_object_type,
+        table.c.target_uuid == target_uuid,
+        states_table.c.state_value.in_(_TERMINAL_OPERATION_STATES),
+    ]
+    if op_type is not None:
+        conditions.append(table.c.operation_type == op_type)
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(
+                table.c.operation_uuid,
+                states_table.c.state_value,
+                states_table.c.update_time,
+            ).select_from(
+                table.join(
+                    states_table,
+                    table.c.operation_uuid == states_table.c.object_uuid
+                )
+            ).where(
+                sa.and_(*conditions)
+            ).order_by(
+                states_table.c.update_time.desc()
+            ).limit(limit)
+            results = conn.execute(stmt).fetchall()
+            return [
+                (r.operation_uuid, r.state_value, float(r.update_time))
+                for r in results
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for get_recent_terminal_op_states '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return []
+
+
 def _direct_delete_cluster_operation_target(
     operation_uuid: str
 ) -> bool:
@@ -5887,6 +5950,36 @@ def _grpc_has_pending_cluster_operation_target(
         return True
 
 
+def _grpc_get_recent_terminal_op_states_for_target(
+    target_object_type: ObjectType,
+    target_uuid: str,
+    limit: int,
+    op_type: Optional[str] = None
+) -> list[tuple[str, str, float]]:
+    """gRPC variant of get_recent_terminal_op_states_for_target."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetRecentTerminalOpStatesForTargetRequest(
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid,
+            limit=limit,
+            op_type=op_type if op_type is not None else '',
+        )
+        reply = _grpc_call(
+            stub.GetRecentTerminalOpStatesForTarget, request)
+        return [
+            (entry.op_uuid, entry.state_value, float(entry.update_time))
+            for entry in reply.entries
+        ]
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetRecentTerminalOpStatesForTarget failed for '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return []
+
+
 def _grpc_delete_cluster_operation_target(
     operation_uuid: str
 ) -> bool:
@@ -6036,6 +6129,35 @@ def has_pending_cluster_operation_target(
             target_object_type, target_uuid)
     return _direct_has_pending_cluster_operation_target(
         target_object_type, target_uuid)
+
+
+def get_recent_terminal_op_states_for_target(
+    target_object_type: ObjectType,
+    target_uuid: str,
+    limit: int,
+    op_type: Optional[str] = None
+) -> list[tuple[str, str, float]]:
+    """Return up to ``limit`` most recent terminal op states for an object.
+
+    Joins ``cluster_operation_targets`` against ``object_states`` and
+    filters to terminal cluster operation states (complete, abort,
+    deleted, error). Results are ordered newest first by
+    ``object_states.update_time``. If ``op_type`` is provided, results
+    are additionally narrowed to that operation type (e.g. ``'net_op'``).
+
+    This is a generic helper -- it targets any object type. The
+    maintain pass uses ``target_object_type='network'`` and
+    ``op_type='net_op'`` to power its cooldown and circuit-breaker
+    queries.
+
+    Returns a list of ``(op_uuid, state_value, update_time)`` tuples,
+    newest first. Returns an empty list on database error.
+    """
+    if _use_database_service():
+        return _grpc_get_recent_terminal_op_states_for_target(
+            target_object_type, target_uuid, limit, op_type)
+    return _direct_get_recent_terminal_op_states_for_target(
+        target_object_type, target_uuid, limit, op_type)
 
 
 def delete_cluster_operation_target(

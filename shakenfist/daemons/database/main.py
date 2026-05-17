@@ -4298,6 +4298,45 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.HasPendingClusterOperationTargetReply(
                 pending=True)
 
+    def GetRecentTerminalOpStatesForTarget(
+        self,
+        request: database_pb2.GetRecentTerminalOpStatesForTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetRecentTerminalOpStatesForTargetReply:
+        """Return recent terminal op states for an object."""
+        try:
+            self.monitor.counters[
+                'get_recent_terminal_op_states_for_target'].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                return database_pb2.GetRecentTerminalOpStatesForTargetReply(
+                    entries=[])
+            op_type = request.op_type if request.op_type else None
+            rows = (
+                mariadb
+                ._direct_get_recent_terminal_op_states_for_target(
+                    target_object_type,
+                    request.target_uuid,
+                    request.limit,
+                    op_type))
+            return database_pb2.GetRecentTerminalOpStatesForTargetReply(
+                entries=[
+                    database_pb2.TerminalOpState(
+                        op_uuid=op_uuid,
+                        state_value=state_value,
+                        update_time=update_time)
+                    for op_uuid, state_value, update_time in rows
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetRecentTerminalOpStatesForTarget'
+                ' failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetRecentTerminalOpStatesForTargetReply(
+                entries=[])
+
     def DeleteClusterOperationTarget(
         self,
         request: database_pb2.DeleteClusterOperationTargetRequest,
@@ -4851,6 +4890,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_cluster_operation_targets_for_object',
             'get_latest_cluster_operation_target',
             'has_pending_cluster_operation_target',
+            'get_recent_terminal_op_states_for_target',
             'delete_cluster_operation_target',
             'delete_cluster_operation_targets_for_object',
             'delete_stale_cluster_operation_targets',

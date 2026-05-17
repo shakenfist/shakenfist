@@ -5252,6 +5252,68 @@ class HasPendingClusterOperationTargetReply(google.protobuf.message.Message):
 global___HasPendingClusterOperationTargetReply = HasPendingClusterOperationTargetReply
 
 @typing.final
+class GetRecentTerminalOpStatesForTargetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    OP_TYPE_FIELD_NUMBER: builtins.int
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    limit: builtins.int
+    op_type: builtins.str
+    """Empty string means "no op_type filter"."""
+    def __init__(
+        self,
+        *,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+        limit: builtins.int = ...,
+        op_type: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["limit", b"limit", "op_type", b"op_type", "target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___GetRecentTerminalOpStatesForTargetRequest = GetRecentTerminalOpStatesForTargetRequest
+
+@typing.final
+class TerminalOpState(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    STATE_VALUE_FIELD_NUMBER: builtins.int
+    UPDATE_TIME_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    state_value: builtins.str
+    update_time: builtins.float
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+        state_value: builtins.str = ...,
+        update_time: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["op_uuid", b"op_uuid", "state_value", b"state_value", "update_time", b"update_time"]) -> None: ...
+
+global___TerminalOpState = TerminalOpState
+
+@typing.final
+class GetRecentTerminalOpStatesForTargetReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTRIES_FIELD_NUMBER: builtins.int
+    @property
+    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TerminalOpState]: ...
+    def __init__(
+        self,
+        *,
+        entries: collections.abc.Iterable[global___TerminalOpState] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
+
+global___GetRecentTerminalOpStatesForTargetReply = GetRecentTerminalOpStatesForTargetReply
+
+@typing.final
 class DeleteClusterOperationTargetRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

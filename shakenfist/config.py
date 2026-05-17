@@ -198,6 +198,33 @@ class SFConfig(BaseSettings):
         300,
         description='How long an IP is unusable for after being released.'
     )
+    MAINTAIN_QUEUE_DEPTH_THRESHOLD: int = Field(
+        50,
+        description=(
+            'Maintain pass is skipped if the combined depth of the network '
+            'queue family exceeds this threshold. Prevents piling '
+            'reconciliation requests on top of an already backed-up queue.'
+        )
+    )
+    MAINTAIN_RECONCILE_COOLDOWN_SECONDS: int = Field(
+        60,
+        description=(
+            'If the most recent terminal reconciliation op for a network '
+            'ended in ERROR within this many seconds, maintain skips '
+            'enqueueing another reconciliation for that network. Lets a '
+            'previous failure breathe before retrying.'
+        )
+    )
+    MAINTAIN_RECONCILE_CIRCUIT_K: int = Field(
+        5,
+        description=(
+            'If the last K terminal reconciliations for a network all '
+            'ended in ERROR, maintain quiesces that network with an '
+            'operator-visible event. The next maintain pass naturally '
+            're-checks once a fresh reconciliation succeeds, which closes '
+            'the circuit.'
+        )
+    )
 
     # Database Options
     CLEANER_DELAY: int = Field(

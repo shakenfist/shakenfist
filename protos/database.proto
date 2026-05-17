@@ -264,6 +264,7 @@ service DatabaseService {
   rpc GetClusterOperationTargetsForObject (GetClusterOperationTargetsForObjectRequest) returns (GetClusterOperationTargetsForObjectReply) {}
   rpc GetLatestClusterOperationTarget (GetLatestClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
   rpc HasPendingClusterOperationTarget (HasPendingClusterOperationTargetRequest) returns (HasPendingClusterOperationTargetReply) {}
+  rpc GetRecentTerminalOpStatesForTarget (GetRecentTerminalOpStatesForTargetRequest) returns (GetRecentTerminalOpStatesForTargetReply) {}
   rpc DeleteClusterOperationTarget (DeleteClusterOperationTargetRequest) returns (StatusReply) {}
   rpc DeleteClusterOperationTargetsForObject (DeleteClusterOperationTargetsForObjectRequest) returns (StatusReply) {}
   rpc DeleteStaleClusterOperationTargets (DeleteStaleClusterOperationTargetsRequest) returns (DeleteCountReply) {}
@@ -1751,6 +1752,24 @@ message HasPendingClusterOperationTargetRequest {
 
 message HasPendingClusterOperationTargetReply {
   bool pending = 1;
+}
+
+message GetRecentTerminalOpStatesForTargetRequest {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
+  int32 limit = 3;
+  // Empty string means "no op_type filter".
+  string op_type = 4;
+}
+
+message TerminalOpState {
+  string op_uuid = 1;
+  string state_value = 2;
+  double update_time = 3;
+}
+
+message GetRecentTerminalOpStatesForTargetReply {
+  repeated TerminalOpState entries = 1;
 }
 
 message DeleteClusterOperationTargetRequest {

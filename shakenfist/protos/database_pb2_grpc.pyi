@@ -923,6 +923,11 @@ class DatabaseServiceStub:
         database_pb2.HasPendingClusterOperationTargetReply,
     ]
 
+    GetRecentTerminalOpStatesForTarget: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetRecentTerminalOpStatesForTargetRequest,
+        database_pb2.GetRecentTerminalOpStatesForTargetReply,
+    ]
+
     DeleteClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteClusterOperationTargetRequest,
         database_pb2.StatusReply,
@@ -1915,6 +1920,11 @@ class DatabaseServiceAsyncStub:
     HasPendingClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.HasPendingClusterOperationTargetRequest,
         database_pb2.HasPendingClusterOperationTargetReply,
+    ]
+
+    GetRecentTerminalOpStatesForTarget: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetRecentTerminalOpStatesForTargetRequest,
+        database_pb2.GetRecentTerminalOpStatesForTargetReply,
     ]
 
     DeleteClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
@@ -3238,6 +3248,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.HasPendingClusterOperationTargetRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.HasPendingClusterOperationTargetReply, collections.abc.Awaitable[database_pb2.HasPendingClusterOperationTargetReply]]: ...
+
+    @abc.abstractmethod
+    def GetRecentTerminalOpStatesForTarget(
+        self,
+        request: database_pb2.GetRecentTerminalOpStatesForTargetRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetRecentTerminalOpStatesForTargetReply, collections.abc.Awaitable[database_pb2.GetRecentTerminalOpStatesForTargetReply]]: ...
 
     @abc.abstractmethod
     def DeleteClusterOperationTarget(
