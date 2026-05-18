@@ -312,10 +312,58 @@ serialisation point and the locks are removed.
 `create_on_hypervisor`, `delete_on_hypervisor`,
 `create_on_network_node`, `delete_on_network_node`.
 
-Every host-mutating `Network` method is now flipped to enqueue. The remaining
-phases are cleanups: Phase 7 removes the `redirect_to_network_node` helper,
-and Phase 8 removes the per-operation `NodeLock` guards that are now
-superseded by the single-worker queue serialisation guarantee.
+Every host-mutating `Network` method is now flipped to enqueue. Phase 8 (the
+only remaining phase) removes the per-operation `NodeLock` guards that are
+now superseded by the single-worker queue serialisation guarantee.
+
+#### Phase 7 — REST contract
+
+Phase 7 completed the user-facing REST contract changes that make the async
+queue-based design visible at the API boundary.
+
+**202+poll contract for delete endpoints.** `DELETE /networks/<uuid>` and
+`DELETE /networks` now return HTTP 202 (Accepted) instead of 200. The response
+body carries the cluster-operation handle so clients can poll for completion:
+
+- Single delete: `{'op_type': 'net_op', 'op_uuid': '<uuid>'}`.
+- Bulk delete: a list of `{'network_uuid': '...', 'op_type': 'net_op',
+  'op_uuid': '...'}` entries, one per network.
+
+**Two new cluster-operation discovery endpoints** were added under
+`/cluster_operations/`:
+
+- `GET /cluster_operations/<op_uuid>/chain` — walks the `depends_on` graph
+  from `<op_uuid>` and returns the full transitive ancestor closure as a list
+  of op-summary dicts. Namespace-scoped: admin callers see everything;
+  non-admin callers receive HTTP 403 if any chain member belongs to a foreign
+  namespace.
+- `GET /cluster_operations?target_object_type=<type>&target_uuid=<uuid>` —
+  returns all ops that targeted the given object. Namespace filtering is
+  applied at the SQL layer (via a JOIN on `cluster_operation_targets` against
+  namespace-carrying static-values tables) so large result sets are never
+  materialised in Python.
+
+**`redirect_to_network_node` removal.** The `@redirect_to_network_node`
+decorator (which proxied HTTP requests from the receiving API server to the
+network node's gunicorn) has been removed from three of its four call sites:
+`InterfaceEndpoint.get` (synchronous DB read — no proxy needed), and the two
+network delete endpoints (now 202+poll). The decorator remains on
+`NetworkPingEndpoint.get` because the ping handler executes
+`ip netns exec <network_uuid> ping` directly and the network namespace exists
+only on the elected network node. Migrating the ping endpoint to be queue-based
+requires new op-output infrastructure (today the queue carries only error
+reports, not command output) and is deferred to future work. The decorator
+definition in `shakenfist/external_api/base.py` is retained for this one
+remaining use.
+
+**Client-python (sibling repo, feature branch `network-facade-phase-07`).**
+`delete_network` and `delete_all_networks` in `apiclient.py` handle the new
+202 response transparently by default: they detect 202, extract the op UUID,
+and poll `GET /cluster_operations/<op_uuid>` until the op reaches a terminal
+state, raising `ClusterOperationFailed` on error. Advanced callers can opt
+out of polling with `wait=False` to receive the op handle directly. Two new
+methods `get_cluster_operation_chain` and `list_cluster_operations_for_target`
+expose the discovery endpoints.
 
 **Phase 6 — maintain.py is now discovery-only.** `shakenfist/daemons/network/maintain.py` no
 longer calls `raise_for_error()` after enqueuing. Each maintain pass runs a five-guard pipeline

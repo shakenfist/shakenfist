@@ -459,6 +459,138 @@ stops enqueuing reconciliation ops for it. The quiescence resolves automatically
 There is no separate "reset" command. The circuit-breaker is a read-only
 assessment of recent history — it never mutates state.
 
+## Phase 7: REST contract
+
+Phase 7 completes the user-facing REST contract changes that make the async
+queue-based dispatch visible at the API boundary.
+
+### 202+poll response shape for the two delete endpoints
+
+`DELETE /networks/<uuid>` and `DELETE /networks` now return HTTP 202 (Accepted)
+instead of 200. The delete work has always been queue-based after Phase 5, but
+the previous response shape falsely implied synchronous completion. The new shapes
+are:
+
+**Single-network delete** (`DELETE /networks/<uuid>`):
+
+```json
+{"op_type": "net_op", "op_uuid": "<cluster-operation-uuid>"}
+```
+
+**Bulk delete** (`DELETE /networks` — all networks in a namespace):
+
+```json
+[
+  {"network_uuid": "<n1>", "op_type": "net_op", "op_uuid": "<op1>"},
+  {"network_uuid": "<n2>", "op_type": "net_op", "op_uuid": "<op2>"}
+]
+```
+
+Clients that need synchronous-completion semantics should poll
+`GET /cluster_operations/<op_uuid>` until the `state` field is in a terminal
+set (`complete`, `abort`, `deleted`, or `error`). On `error`, retrieve the
+`ErrorReport` from `GET /cluster_operations/<op_uuid>/error_report`.
+
+### Two new cluster-operation discovery endpoints
+
+#### GET /cluster_operations/\<op_uuid\>/chain
+
+Returns the transitive `depends_on` ancestor closure starting at `<op_uuid>`,
+as a list of op-summary dicts. The walk follows each op's `depends_on` field
+until no new ancestors are found. The result is unordered with respect to
+execution order; clients must reconstruct the DAG from the `depends_on` fields
+in the response if ordering matters.
+
+**Namespace scoping**: non-admin callers receive HTTP 403 if any chain member
+targets an object in a namespace they do not own. Admin callers see the full
+closure. HTTP 404 is returned if the starting op UUID does not exist.
+
+Example:
+
+```
+GET /cluster_operations/abc123.../chain
+→ 200 [
+    {"uuid": "abc123...", "op_type": "net_op", "state": "complete", ...},
+    {"uuid": "def456...", "op_type": "net_op", "state": "complete", ...}
+  ]
+```
+
+#### GET /cluster_operations?target_object_type=\<type\>&target_uuid=\<uuid\>
+
+Returns all cluster operations that targeted the given object, ordered newest
+first. The `target_object_type` parameter must be a valid `ObjectType` string
+(e.g. `'network'`, `'instance'`).
+
+**Namespace scoping**: the filter is applied at the SQL layer by joining
+`cluster_operation_targets` against the namespace-carrying static-values table
+for the given object type. Large result sets are never materialised in Python
+before filtering — the query is always indexed.
+
+Example:
+
+```
+GET /cluster_operations?target_object_type=network&target_uuid=abc123...
+→ 200 [
+    {"uuid": "ghi789...", "op_type": "net_op", "state": "complete", ...},
+    {"uuid": "abc123...", "op_type": "net_op", "state": "complete", ...}
+  ]
+```
+
+The new MariaDB helper `list_cluster_operations_for_target` (added in Phase 7)
+follows the same three-layer pattern (Python helper → gRPC → MariaDB) as the
+existing `has_pending_cluster_operation` and `get_recent_terminal_op_states_for_target`
+helpers from Phase 6.
+
+### redirect_to_network_node — three sites removed, one retained
+
+The `@api_base.redirect_to_network_node` decorator proxied HTTP requests from
+the receiving API server to the network node's gunicorn on port 13000. After
+Phases 2–5 moved all host-mutating work into the queue, the decorator is no
+longer needed on most endpoints. Phase 7 removed it from three sites:
+
+| Endpoint | Reason for removal |
+|----------|--------------------|
+| `InterfaceEndpoint.get` (`interface.py`) | Synchronous DB read; can run on any node. |
+| `NetworkEndpoint.delete` (`network.py`) | Now 202+poll; enqueue works from any node. |
+| `NetworksEndpoint.delete` (`network.py`) | Same as single-network delete. |
+
+The decorator **remains** on `NetworkPingEndpoint.get` (`network.py`). The ping
+handler executes `ip netns exec <network_uuid> ping -c 10 <addr>` directly and
+returns its stdout/stderr synchronously. The network namespace exists only on
+the elected network node, so this handler genuinely needs to run there.
+
+Migrating the ping endpoint to be queue-based requires new op-output
+infrastructure: today the queue carries only error reports, not arbitrary command
+output. Until that infrastructure exists, the redirect is a tactical necessity.
+The decorator definition in `shakenfist/external_api/base.py` is retained for
+this one remaining use. Future work can either:
+
+- Introduce an op-output storage layer (e.g. a `cluster_operation_outputs` table)
+  and migrate ping to enqueue a `NetOp` task that captures the ping result, or
+- Retain the redirect indefinitely if ping latency requirements make async
+  delivery unacceptable.
+
+### client-python transparent polling (feature branch network-facade-phase-07)
+
+The sibling `client-python` repo carries matching changes on the
+`network-facade-phase-07` feature branch:
+
+- `delete_network(wait=True)` (default) detects the 202 response, extracts the
+  op UUID, and polls `GET /cluster_operations/<op_uuid>` at 1-second intervals
+  until a terminal state is reached. On `STATE_ERROR` it raises
+  `ClusterOperationFailed` carrying the `ErrorReport`. This preserves the
+  synchronous-with-exception behaviour that existing callers expect.
+- `delete_network(wait=False)` returns the `(op_type, op_uuid)` handle
+  immediately without polling. Advanced callers use this for fire-and-forget
+  patterns or when building their own polling loops.
+- `delete_all_networks` follows the same pattern; the bulk response list is
+  polled sequentially (one poll loop per op UUID).
+- New methods `get_cluster_operation_chain(op_uuid)` and
+  `list_cluster_operations_for_target(target_object_type, target_uuid)` call
+  the two new discovery endpoints.
+- New exceptions `ClusterOperationFailed` and `ClusterOperationTimeout` carry
+  structured error information for callers that need to branch on failure codes.
+
 ### Retired NetOp handlers
 
 Three handler bodies that pre-Phase-6 `maintain.py` enqueued have been removed
