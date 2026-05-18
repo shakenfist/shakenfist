@@ -330,14 +330,16 @@ body carries the cluster-operation handle so clients can poll for completion:
   'op_uuid': '...'}` entries, one per network.
 
 **Two new cluster-operation discovery endpoints** were added under
-`/cluster_operations/`:
+`/clusteroperations/` (same prefix as the existing single-op retrieval
+endpoint — these are siblings, not a new namespace):
 
-- `GET /cluster_operations/<op_uuid>/chain` — walks the `depends_on` graph
+- `GET /clusteroperations/<op_uuid>/chain` — walks the `depends_on` graph
   from `<op_uuid>` and returns the full transitive ancestor closure as a list
   of op-summary dicts. Namespace-scoped: admin callers see everything;
   non-admin callers receive HTTP 403 if any chain member belongs to a foreign
-  namespace.
-- `GET /cluster_operations?target_object_type=<type>&target_uuid=<uuid>` —
+  namespace. The op uuid is sufficient (no `<op_type>` segment) because op
+  uuids are globally unique.
+- `GET /clusteroperations?target_object_type=<type>&target_uuid=<uuid>` —
   returns all ops that targeted the given object. Namespace filtering is
   applied at the SQL layer (via a JOIN on `cluster_operation_targets` against
   namespace-carrying static-values tables) so large result sets are never
@@ -359,8 +361,8 @@ remaining use.
 **Client-python (sibling repo, feature branch `network-facade-phase-07`).**
 `delete_network` and `delete_all_networks` in `apiclient.py` handle the new
 202 response transparently by default: they detect 202, extract the op UUID,
-and poll `GET /cluster_operations/<op_uuid>` until the op reaches a terminal
-state, raising `ClusterOperationFailed` on error. Advanced callers can opt
+and poll `GET /clusteroperations/<op_type>/<op_uuid>` until the op reaches a
+terminal state, raising `ClusterOperationFailed` on error. Advanced callers can opt
 out of polling with `wait=False` to receive the op handle directly. Two new
 methods `get_cluster_operation_chain` and `list_cluster_operations_for_target`
 expose the discovery endpoints.

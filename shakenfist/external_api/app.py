@@ -183,14 +183,16 @@ class Root(api_base.Resource):
              '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
              'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events, '
              'blob-checksums, blob-single-checksum</li>'
-             '<li>cluster-operations: get-cluster-operations</li>'
+             '<li>cluster-operations: get-cluster-operations, '
+             'cluster-operation-chain, cluster-operations-by-target</li>'
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
              'instance-put-blob, instance-execute, instance-get, instance-screenshot, '
              'get-instance-namespace, hot-plug-interface, '
              'include-queued-agent-operations, instance-clusteroperations</li>'
              '<li>networks: list-addresses, route-addresses, get-network-namespace, '
-             'provide-dns, extra-dns-entries, network-clusteroperations'
+             'provide-dns, extra-dns-entries, network-clusteroperations, '
+             'network-delete-async</li>'
              '<li>networkinterfaces: interface-metadata</li>'
              '<li>nodes: node-get, node-metadata, node-process-metrics</li>'
              '</ul></p></body></html>'),
@@ -261,9 +263,9 @@ api.add_resource(api_blob.BlobMetadataEndpoint, '/blobs/<blob_uuid>/metadata/<ke
 api.add_resource(api_clusteroperation.ClusterOperationEndpoint,
                  '/clusteroperations/<operation_type>/<operation_uuid>')
 api.add_resource(api_clusteroperation.ClusterOperationChainEndpoint,
-                 '/cluster_operations/<op_uuid>/chain')
+                 '/clusteroperations/<op_uuid>/chain')
 api.add_resource(api_clusteroperation.ClusterOperationsEndpoint,
-                 '/cluster_operations')
+                 '/clusteroperations')
 
 api.add_resource(api_instance.InstancesEndpoint, '/instances')
 api.add_resource(api_instance.InstanceEndpoint, '/instances/<instance_ref>')

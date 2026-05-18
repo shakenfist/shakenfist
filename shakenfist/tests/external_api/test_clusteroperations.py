@@ -31,7 +31,7 @@ def _fake_op(uuid_, operation_type, depends_on=None, created_at=1.0,
 
 
 class ClusterOperationChainTestCase(base.ShakenFistTestCase):
-    """Tests for ``GET /cluster_operations/<op_uuid>/chain``."""
+    """Tests for ``GET /clusteroperations/<op_uuid>/chain``."""
 
     def setUp(self):
         super().setUp()
@@ -177,7 +177,7 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
         self._patch_chain(ops, targets)
 
         resp = self.client.get(
-            '/cluster_operations/%s/chain' % uuid_a,
+            '/clusteroperations/%s/chain' % uuid_a,
             headers={'Authorization': self.foo_token})
         self.assertEqual(200, resp.status_code)
         body = resp.get_json()
@@ -194,7 +194,7 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
                 '.get_cluster_operation',
                 return_value=None):
             resp = self.client.get(
-                '/cluster_operations/%s/chain' % str(uuid4()),
+                '/clusteroperations/%s/chain' % str(uuid4()),
                 headers={'Authorization': self.foo_token})
         self.assertEqual(404, resp.status_code)
 
@@ -214,7 +214,7 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
         self._patch_chain(ops, targets)
 
         resp = self.client.get(
-            '/cluster_operations/%s/chain' % uuid_a,
+            '/clusteroperations/%s/chain' % uuid_a,
             headers={'Authorization': self.foo_token})
         self.assertEqual(403, resp.status_code)
 
@@ -233,7 +233,7 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
         self._patch_chain(ops, targets)
 
         resp = self.client.get(
-            '/cluster_operations/%s/chain' % uuid_a,
+            '/clusteroperations/%s/chain' % uuid_a,
             headers={'Authorization': self.admin_token})
         self.assertEqual(200, resp.status_code)
         body = resp.get_json()
@@ -242,7 +242,7 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
 
 
 class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
-    """Tests for ``GET /cluster_operations?target_object_type=&target_uuid=``."""
+    """Tests for ``GET /clusteroperations?target_object_type=&target_uuid=``."""
 
     def setUp(self):
         super().setUp()
@@ -344,7 +344,7 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         ])
 
         resp = self.client.get(
-            '/cluster_operations?target_object_type=network'
+            '/clusteroperations?target_object_type=network'
             '&target_uuid=%s' % self.network_uuid,
             headers={'Authorization': self.foo_token})
         self.assertEqual(200, resp.status_code)
@@ -357,7 +357,7 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         # No hydration patches needed -- the access check fails before
         # we'd consult mariadb.list_cluster_operations_for_target.
         resp = self.client.get(
-            '/cluster_operations?target_object_type=network'
+            '/clusteroperations?target_object_type=network'
             '&target_uuid=%s' % self.other_network_uuid,
             headers={'Authorization': self.foo_token})
         self.assertEqual(403, resp.status_code)
@@ -367,7 +367,7 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         self._patch_list_and_hydrate([(op_uuid, 'net_op', 1.0)])
 
         resp = self.client.get(
-            '/cluster_operations?target_object_type=network'
+            '/clusteroperations?target_object_type=network'
             '&target_uuid=%s' % self.other_network_uuid,
             headers={'Authorization': self.admin_token})
         self.assertEqual(200, resp.status_code)
@@ -378,7 +378,7 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         self._patch_list_and_hydrate([])
 
         resp = self.client.get(
-            '/cluster_operations?target_object_type=network'
+            '/clusteroperations?target_object_type=network'
             '&target_uuid=%s' % self.network_uuid,
             headers={'Authorization': self.foo_token})
         self.assertEqual(200, resp.status_code)
@@ -386,13 +386,13 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
 
     def test_invalid_target_object_type_returns_400(self):
         resp = self.client.get(
-            '/cluster_operations?target_object_type=nonsense'
+            '/clusteroperations?target_object_type=nonsense'
             '&target_uuid=%s' % self.network_uuid,
             headers={'Authorization': self.foo_token})
         self.assertEqual(400, resp.status_code)
 
     def test_missing_target_uuid_returns_400(self):
         resp = self.client.get(
-            '/cluster_operations?target_object_type=network',
+            '/clusteroperations?target_object_type=network',
             headers={'Authorization': self.foo_token})
         self.assertEqual(400, resp.status_code)

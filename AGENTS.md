@@ -187,9 +187,9 @@ sites (`InterfaceEndpoint.get`, `NetworkEndpoint.delete`, `NetworksEndpoint.dele
 decorator remains on `NetworkPingEndpoint.get` because the ping handler runs `ip netns exec`
 directly on the network node — migrating it to queue-based requires op-output infrastructure
 not yet built (deferred future work). Two new REST endpoints were added:
-`GET /cluster_operations/<op_uuid>/chain` (transitive `depends_on` ancestor closure,
+`GET /clusteroperations/<op_uuid>/chain` (transitive `depends_on` ancestor closure,
 namespace-scoped — admin sees all, non-admin gets 403 on foreign-namespace members) and
-`GET /cluster_operations?target_object_type=<type>&target_uuid=<uuid>` (ops targeting an
+`GET /clusteroperations?target_object_type=<type>&target_uuid=<uuid>` (ops targeting an
 object, SQL-layer namespace filtering). The companion client-python changes (sibling repo,
 feature branch `network-facade-phase-07`) make `delete_network` and `delete_all_networks`
 handle 202 transparently by default (poll until terminal, raise on error); `wait=False`

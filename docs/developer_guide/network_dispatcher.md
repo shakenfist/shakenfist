@@ -487,13 +487,14 @@ are:
 ```
 
 Clients that need synchronous-completion semantics should poll
-`GET /cluster_operations/<op_uuid>` until the `state` field is in a terminal
-set (`complete`, `abort`, `deleted`, or `error`). On `error`, retrieve the
-`ErrorReport` from `GET /cluster_operations/<op_uuid>/error_report`.
+`GET /clusteroperations/<op_type>/<op_uuid>` until the `state` field is in a
+terminal set (`complete`, `abort`, `deleted`, or `error`). On `error`, the
+op's `external_view` carries an `error_report` field with the structured
+failure information.
 
 ### Two new cluster-operation discovery endpoints
 
-#### GET /cluster_operations/\<op_uuid\>/chain
+#### GET /clusteroperations/\<op_uuid\>/chain
 
 Returns the transitive `depends_on` ancestor closure starting at `<op_uuid>`,
 as a list of op-summary dicts. The walk follows each op's `depends_on` field
@@ -508,14 +509,14 @@ closure. HTTP 404 is returned if the starting op UUID does not exist.
 Example:
 
 ```
-GET /cluster_operations/abc123.../chain
+GET /clusteroperations/abc123.../chain
 → 200 [
     {"uuid": "abc123...", "op_type": "net_op", "state": "complete", ...},
     {"uuid": "def456...", "op_type": "net_op", "state": "complete", ...}
   ]
 ```
 
-#### GET /cluster_operations?target_object_type=\<type\>&target_uuid=\<uuid\>
+#### GET /clusteroperations?target_object_type=\<type\>&target_uuid=\<uuid\>
 
 Returns all cluster operations that targeted the given object, ordered newest
 first. The `target_object_type` parameter must be a valid `ObjectType` string
@@ -529,7 +530,7 @@ before filtering — the query is always indexed.
 Example:
 
 ```
-GET /cluster_operations?target_object_type=network&target_uuid=abc123...
+GET /clusteroperations?target_object_type=network&target_uuid=abc123...
 → 200 [
     {"uuid": "ghi789...", "op_type": "net_op", "state": "complete", ...},
     {"uuid": "abc123...", "op_type": "net_op", "state": "complete", ...}
@@ -576,7 +577,7 @@ The sibling `client-python` repo carries matching changes on the
 `network-facade-phase-07` feature branch:
 
 - `delete_network(wait=True)` (default) detects the 202 response, extracts the
-  op UUID, and polls `GET /cluster_operations/<op_uuid>` at 1-second intervals
+  op UUID, and polls `GET /clusteroperations/<op_type>/<op_uuid>` at 1-second intervals
   until a terminal state is reached. On `STATE_ERROR` it raises
   `ClusterOperationFailed` carrying the `ErrorReport`. This preserves the
   synchronous-with-exception behaviour that existing callers expect.
