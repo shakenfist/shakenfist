@@ -313,10 +313,39 @@ serialisation point and the locks are removed.
 `create_on_network_node`, `delete_on_network_node`.
 
 Every host-mutating `Network` method is now flipped to enqueue. The remaining
-phases are cleanups: Phase 6 rewrites `maintain.py` to use the new op types,
-Phase 7 removes the `redirect_to_network_node` helper, and Phase 8 removes
-the per-operation `NodeLock` guards that are now superseded by the
-single-worker queue serialisation guarantee.
+phases are cleanups: Phase 7 removes the `redirect_to_network_node` helper,
+and Phase 8 removes the per-operation `NodeLock` guards that are now
+superseded by the single-worker queue serialisation guarantee.
+
+**Phase 6 — maintain.py is now discovery-only.** `shakenfist/daemons/network/maintain.py` no
+longer calls `raise_for_error()` after enqueuing. Each maintain pass runs a five-guard pipeline
+for every network with detected drift:
+
+1. **Queue-depth guard.** If the combined depth of the network queue families this node services
+   exceeds `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50), the entire pass is skipped with an
+   audit event against the node.
+2. **Per-network gating.** `has_pending_cluster_operation(target='network', uuid=...)` — if a
+   reconciliation op is already in flight for this network (via `cluster_operation_targets`
+   history), skip it for this pass.
+3. **Cooldown.** `get_recent_terminal_op_states_for_target(..., limit=1)` — if the most recent
+   terminal op ended in `STATE_ERROR` within the last `MAINTAIN_RECONCILE_COOLDOWN_SECONDS`
+   (default 60 s), skip enqueueing to let the previous failure breathe.
+4. **Circuit breaker.** `get_recent_terminal_op_states_for_target(..., limit=K)` — if the last
+   `MAINTAIN_RECONCILE_CIRCUIT_K` (default 5) terminal ops for this network all ended in
+   `STATE_ERROR`, skip and emit a prominent audit event. The circuit closes naturally once a
+   fresh reconciliation succeeds.
+5. **Enqueue at background priority.** If all guards pass, the reconciliation op is enqueued
+   using `PRIORITY.background` via the schema helpers. The maintain thread does not wait.
+
+The three new config knobs are: `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (int, default 50),
+`MAINTAIN_RECONCILE_COOLDOWN_SECONDS` (int, default 60), `MAINTAIN_RECONCILE_CIRCUIT_K`
+(int, default 5).
+
+**Retired NetOp handlers.** The `_network_deploy` (task 1), `_network_destroy` (task 2), and
+`_network_update_dnsmasq` (task 3) handler bodies on `NetOp` have been removed. The
+task-enum values are retained in `shakenfist/schema/operations/net_op.py` for on-disk record
+compatibility; any in-flight op referencing these tasks now raises `InvalidStateForTask`, which
+the dispatcher's outer exception handler converts to `STATE_ERROR` via `ErrorReport`.
 
 Note: `Network.enable_nat` no longer exists as a public method. It is now
 a private internal helper (`_apply_enable_nat`) on `BridgedVXLanNetwork`,

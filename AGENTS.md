@@ -129,7 +129,7 @@ queues for network-node-only operations (`create_on_network_node`,
 mutations are parallelised across nodes while network-node-singleton operations
 remain serialised.
 
-### Network facade (Phases 2–5)
+### Network facade (Phases 2–6)
 
 Key new files introduced across Phases 2–5 of the network-facade work:
 
@@ -169,6 +169,17 @@ another host-mutating operation from inside an executing worker context (e.g.
 the single-worker queue. The correct pattern is
 `BridgedVXLanNetwork(self)._apply_X()` directly — host mutation stays inside
 the worker-only surface and the queue round-trip is avoided.
+
+**Phase 6 — maintain is discovery-only.** `shakenfist/daemons/network/maintain.py` no
+longer blocks on `raise_for_error()`. Each maintain pass applies a five-guard pipeline
+(queue-depth, per-network gating, cooldown, circuit-breaker) before enqueueing any
+reconciliation op, always at `PRIORITY.background`. Three new config knobs control the
+guards: `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50), `MAINTAIN_RECONCILE_COOLDOWN_SECONDS`
+(default 60), `MAINTAIN_RECONCILE_CIRCUIT_K` (default 5). The three legacy reconciliation
+handlers `_network_deploy`, `_network_destroy`, and `_network_update_dnsmasq` (NetOp tasks
+1, 2, 3) have been retired — their bodies now raise `InvalidStateForTask`; the task-enum
+values are kept for on-disk record compatibility. Phases 7 and 8 remain: redirect removal
+and NodeLock removal respectively.
 
 ### Key Directories
 

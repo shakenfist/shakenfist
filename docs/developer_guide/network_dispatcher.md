@@ -336,3 +336,150 @@ through `Network.X()`. This replaces the Phase 3-era pattern of late imports and
 the Phase 4-era workaround of constructing a fresh `BridgedVXLanNetwork(self)`
 inside the handler. The in-class call is cleaner, avoids the redundant wrapper
 construction, and makes the call graph explicit.
+
+## Phase 6: maintain.py and the discovery-only model
+
+Phase 6 rewrites `shakenfist/daemons/network/maintain.py` so that the maintain
+thread is **discovery-only**: it detects drift and enqueues reconciliation ops,
+but never waits for them to complete. All `raise_for_error()` calls have been
+removed from the maintain loop. The net-worker dispatcher handles async
+reconciliation; the maintain thread's only job is to notice drift and express
+intent via the queue.
+
+### The five-guard pipeline
+
+For every network with detected drift, maintain applies five guards in order
+before enqueuing:
+
+#### Guard 1 — Queue-depth safety
+
+Before the per-network loop, maintain queries `mariadb.get_work_queue_length`
+across all network queue families this node services:
+
+- Always: `get_node_network_queues(config.NODE_UUID)` — per-node queues for
+  hypervisor-local ops.
+- When `config.NODE_IS_NETWORK_NODE`: `get_all_network_queues()` — cluster-wide
+  `networknode-clusteroperation-*` queues.
+
+The `processing + queued + deferred` counts are summed across all queues. If
+the total exceeds `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50), the entire
+maintain pass is skipped with an audit event against the node. Rationale: piling
+reconciliation requests on top of an already backed-up queue would worsen
+head-of-line blocking without improving convergence speed.
+
+#### Guard 2 — Per-network gating
+
+For each network with detected drift, `mariadb.has_pending_cluster_operation(
+target_object_type='network', target_uuid=n.uuid)` is called. This queries the
+`cluster_operation_targets` table (history-aware, not a single-pointer) and
+returns `True` if any in-flight op (`queued`, `preflight`, or `executing`) is
+already targeting this network. If `True`, the network is skipped for this pass:
+the in-flight op will fix the drift when it executes.
+
+#### Guard 3 — Cooldown
+
+`mariadb.get_recent_terminal_op_states_for_target('network', n.uuid, limit=1)`
+returns the most recent terminal op for the network as a
+`(op_uuid, state_value, update_time)` tuple. If the most recent terminal op
+ended in `STATE_ERROR` within the last `MAINTAIN_RECONCILE_COOLDOWN_SECONDS`
+(default 60 s), maintain skips enqueueing for this network on this pass. This
+prevents tight retry loops against a consistently misbehaving network — the
+previous failure is given time to breathe before another attempt is enqueued.
+
+#### Guard 4 — Circuit breaker
+
+`mariadb.get_recent_terminal_op_states_for_target('network', n.uuid,
+limit=config.MAINTAIN_RECONCILE_CIRCUIT_K)` returns the most recent K terminal
+ops. If **all K** terminal ops ended in `STATE_ERROR`, maintain skips this
+network and emits a prominent audit event:
+
+> "network has failed reconciliation K times in a row; quiesced pending operator attention"
+
+The circuit closes naturally: on the next maintain pass, if an operator has
+intervened and a fresh reconciliation has succeeded, the most recent terminal op
+is `STATE_COMPLETE` and the pipeline proceeds. There is no manual circuit-reset
+command — the history naturally re-evaluates.
+
+#### Guard 5 — Enqueue at background priority
+
+If all four guards pass, maintain enqueues the reconciliation via the schema
+helpers using `PRIORITY.background` (not `user_facing`). The maintain thread
+does not wait. Per-hypervisor drift uses `nn_create_and_enqueue`; network-node
+drift uses `net_create_and_enqueue` plus per-floating-IP and per-route ops.
+
+### New config knobs
+
+| Knob | Default | Description |
+|------|---------|-------------|
+| `MAINTAIN_QUEUE_DEPTH_THRESHOLD` | `50` | Skip the entire pass if the combined network-queue depth exceeds this value |
+| `MAINTAIN_RECONCILE_COOLDOWN_SECONDS` | `60` | Skip a network if its most recent terminal op was `STATE_ERROR` within this window |
+| `MAINTAIN_RECONCILE_CIRCUIT_K` | `5` | Quiesce a network if the last K terminal ops are all `STATE_ERROR` |
+
+### The `get_recent_terminal_op_states_for_target` MariaDB helper
+
+A new three-layer helper was added in Phase 6:
+
+```python
+mariadb.get_recent_terminal_op_states_for_target(
+    target_object_type: str,
+    target_uuid: str,
+    limit: int,
+    op_type: str | None = None,
+) -> list[tuple[str, str, float]]
+```
+
+Returns up to `limit` most recent terminal op state records targeting the given
+object, as `(op_uuid, state_value, update_time)` tuples ordered newest first.
+The query joins `cluster_operation_targets` against `object_states` filtered to
+terminal states (`STATE_COMPLETE`, `STATE_ABORT`, `STATE_DELETED`, `STATE_ERROR`),
+ordered by `update_time DESC`. If `op_type` is provided, results are further
+filtered by `cluster_operation_targets.operation_type`.
+
+The same helper powers both the cooldown and circuit-breaker queries — they
+differ only in `limit`: cooldown calls it with `limit=1`, circuit-breaker with
+`limit=config.MAINTAIN_RECONCILE_CIRCUIT_K`. This avoids code duplication and
+ensures both checks see the same ordered history.
+
+The helper is generic: it works for any `target_object_type`, not just networks.
+The maintain caller passes `target_object_type='network'`.
+
+### Operator note: clearing the circuit-breaker quiescence
+
+When a network enters the circuit-breaker quiesced state, the maintain thread
+stops enqueuing reconciliation ops for it. The quiescence resolves automatically:
+
+1. The operator investigates the network (e.g. checks event log, inspects host
+   state, corrects a misconfiguration).
+2. The operator manually triggers a reconciliation via the REST API or CLI, or
+   the underlying host condition resolves on its own.
+3. When that reconciliation succeeds, the most recent terminal op for the network
+   is no longer `STATE_ERROR`, and the next maintain pass re-evaluates all guards
+   cleanly.
+
+There is no separate "reset" command. The circuit-breaker is a read-only
+assessment of recent history — it never mutates state.
+
+### Retired NetOp handlers
+
+Three handler bodies that pre-Phase-6 `maintain.py` enqueued have been removed
+from `shakenfist/operations/net_op.py`:
+
+| Task constant | Enum value | Former purpose |
+|---------------|------------|----------------|
+| `network_deploy` | `1` | Broader network-node deploy: `create_on_network_node` + `ensure_mesh` for all nodes |
+| `network_destroy` | `2` | Broader network-node destroy |
+| `network_update_dnsmasq` | `3` | Cluster-wide dnsmasq refresh |
+
+The **enum values are preserved** in `shakenfist/schema/operations/net_op.py` so
+that any `cluster_operations` rows still on disk from a prior deploy continue to
+parse correctly. The handler bodies now consist of a single line:
+
+```python
+raise InvalidStateForTask(self, task)
+```
+
+The dispatcher's outer `except Exception` branch converts this to `STATE_ERROR`
+via `ErrorReport`, so in-flight ops at deploy time fail gracefully rather than
+hanging or producing unhandled exceptions. Operators who see `STATE_ERROR` on one
+of these task types after a rolling upgrade can safely re-deploy the affected
+network via the standard `Network.create_on_network_node()` / `ensure_mesh()` API.
