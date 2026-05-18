@@ -4584,6 +4584,38 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetClusterOperationsByNodeReply(
                 items=[])
 
+    def ListClusterOperationsForTarget(
+        self,
+        request: database_pb2.ListClusterOperationsForTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ListClusterOperationsForTargetReply:
+        """List cluster operation headers targeting an object, newest first."""
+        try:
+            self.monitor.counters[
+                'list_cluster_operations_for_target'].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                return database_pb2.ListClusterOperationsForTargetReply(
+                    items=[])
+            items = (
+                mariadb
+                ._direct_list_cluster_operations_for_target(
+                    target_object_type,
+                    request.target_uuid))
+            return database_pb2.ListClusterOperationsForTargetReply(
+                items=[
+                    self._cluster_operation_to_proto(d)
+                    for d in items
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ListClusterOperationsForTarget failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.ListClusterOperationsForTargetReply(
+                items=[])
+
     def DeleteClusterOperation(
         self,
         request: database_pb2.DeleteClusterOperationRequest,
@@ -4896,7 +4928,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_stale_cluster_operation_targets',
             # MariaDB cluster operation operations
             'create_cluster_operation', 'get_cluster_operation',
-            'get_cluster_operations_by_node', 'delete_cluster_operation',
+            'get_cluster_operations_by_node',
+            'list_cluster_operations_for_target',
+            'delete_cluster_operation',
             'create_and_enqueue_cluster_operation',
             # MariaDB cluster operation error operations
             'set_cluster_operation_error',

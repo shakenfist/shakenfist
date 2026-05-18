@@ -284,6 +284,7 @@ service DatabaseService {
   rpc CreateClusterOperation (CreateClusterOperationRequest) returns (StatusReply) {}
   rpc GetClusterOperation (GetClusterOperationRequest) returns (GetClusterOperationReply) {}
   rpc GetClusterOperationsByNode (GetClusterOperationsByNodeRequest) returns (GetClusterOperationsByNodeReply) {}
+  rpc ListClusterOperationsForTarget (ListClusterOperationsForTargetRequest) returns (ListClusterOperationsForTargetReply) {}
   rpc DeleteClusterOperation (DeleteClusterOperationRequest) returns (StatusReply) {}
 
   // Atomic create + enqueue for cluster operations (MariaDB).
@@ -1848,6 +1849,16 @@ message GetClusterOperationsByNodeRequest {
 }
 
 message GetClusterOperationsByNodeReply {
+  repeated ClusterOperationData items = 1;
+}
+
+message ListClusterOperationsForTargetRequest {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
+}
+
+message ListClusterOperationsForTargetReply {
+  // Items are ordered newest-first by created_at.
   repeated ClusterOperationData items = 1;
 }
 

@@ -17434,6 +17434,44 @@ def _direct_get_cluster_operations_by_node(
         return []
 
 
+def _direct_list_cluster_operations_for_target(
+        target_object_type: ObjectType,
+        target_uuid: str) -> list[dict[str, Any]]:
+    """List cluster operation headers targeting an object, newest first.
+
+    Joins ``cluster_operation_targets`` against ``cluster_operations`` to
+    return the full op metadata for every operation that has touched the
+    given target, ordered by ``cluster_operations.created_at DESC``.
+    Namespace scoping is the caller's responsibility (handled in the REST
+    layer by validating access to the target object before issuing the
+    query).
+    """
+    engine = _get_engine()
+    targets_table = _get_cluster_operation_targets_table()
+    ops_table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(ops_table).select_from(
+                targets_table.join(
+                    ops_table,
+                    targets_table.c.operation_uuid == ops_table.c.uuid
+                )
+            ).where(
+                sa.and_(
+                    targets_table.c.target_object_type == target_object_type,
+                    targets_table.c.target_uuid == target_uuid
+                )
+            ).order_by(ops_table.c.created_at.desc())
+            result = conn.execute(stmt).fetchall()
+            return [_cluster_operation_row_to_dict(row) for row in result]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for list_cluster_operations_for_target '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return []
+
+
 def _direct_delete_cluster_operation(uuid: UUID) -> bool:
     """Delete a cluster operation header from MariaDB."""
     engine = _get_engine()
@@ -17680,6 +17718,35 @@ def _grpc_get_cluster_operations_by_node(
         LOG.warning(
             f'gRPC GetClusterOperationsByNode failed '
             f'for {node_uuid}: {e}')
+        return []
+
+
+def _grpc_list_cluster_operations_for_target(
+        target_object_type: ObjectType,
+        target_uuid: str) -> list[dict[str, Any]]:
+    """List cluster operation headers targeting an object via gRPC.
+
+    Items are returned newest-first by ``created_at``.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ListClusterOperationsForTargetRequest(
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid,
+        )
+        reply = _grpc_call(
+            stub.ListClusterOperationsForTarget, request)
+        return [
+            json.loads(item.metadata_json)
+            if item.metadata_json else {}
+            for item in reply.items
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ListClusterOperationsForTarget failed for '
+            f'{target_object_type}/{target_uuid}: {e}')
         return []
 
 
@@ -17988,6 +18055,34 @@ def get_cluster_operations_by_node(
     if _use_database_service():
         return _grpc_get_cluster_operations_by_node(u)
     return _direct_get_cluster_operations_by_node(u)
+
+
+def list_cluster_operations_for_target(
+        target_object_type: ObjectType,
+        target_uuid: str) -> list[dict[str, Any]]:
+    """List cluster operation headers targeting an object, newest-first.
+
+    Joins ``cluster_operation_targets`` against ``cluster_operations``
+    to return the full op metadata for every operation that has touched
+    the given target. Ordered by ``cluster_operations.created_at DESC``.
+
+    Namespace scoping is the caller's responsibility. The REST handler
+    that consumes this helper validates the caller's access to the
+    target object before issuing the query (Approach (b) from the
+    Phase 7 plan), so this function does no namespace filtering itself.
+
+    Args:
+        target_object_type: The ObjectType of the target object.
+        target_uuid: UUID of the target object.
+
+    Returns:
+        List of operation dicts ordered newest-first by ``created_at``.
+    """
+    if _use_database_service():
+        return _grpc_list_cluster_operations_for_target(
+            target_object_type, target_uuid)
+    return _direct_list_cluster_operations_for_target(
+        target_object_type, target_uuid)
 
 
 def delete_cluster_operation(uuid: 'str | UUID') -> bool:

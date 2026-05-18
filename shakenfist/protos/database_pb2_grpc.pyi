@@ -987,6 +987,11 @@ class DatabaseServiceStub:
         database_pb2.GetClusterOperationsByNodeReply,
     ]
 
+    ListClusterOperationsForTarget: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ListClusterOperationsForTargetRequest,
+        database_pb2.ListClusterOperationsForTargetReply,
+    ]
+
     DeleteClusterOperation: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteClusterOperationRequest,
         database_pb2.StatusReply,
@@ -1984,6 +1989,11 @@ class DatabaseServiceAsyncStub:
     GetClusterOperationsByNode: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetClusterOperationsByNodeRequest,
         database_pb2.GetClusterOperationsByNodeReply,
+    ]
+
+    ListClusterOperationsForTarget: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ListClusterOperationsForTargetRequest,
+        database_pb2.ListClusterOperationsForTargetReply,
     ]
 
     DeleteClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
@@ -3334,6 +3344,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetClusterOperationsByNodeRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetClusterOperationsByNodeReply, collections.abc.Awaitable[database_pb2.GetClusterOperationsByNodeReply]]: ...
+
+    @abc.abstractmethod
+    def ListClusterOperationsForTarget(
+        self,
+        request: database_pb2.ListClusterOperationsForTargetRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.ListClusterOperationsForTargetReply, collections.abc.Awaitable[database_pb2.ListClusterOperationsForTargetReply]]: ...
 
     @abc.abstractmethod
     def DeleteClusterOperation(

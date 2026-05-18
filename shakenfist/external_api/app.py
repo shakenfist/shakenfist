@@ -260,6 +260,10 @@ api.add_resource(api_blob.BlobMetadataEndpoint, '/blobs/<blob_uuid>/metadata/<ke
 
 api.add_resource(api_clusteroperation.ClusterOperationEndpoint,
                  '/clusteroperations/<operation_type>/<operation_uuid>')
+api.add_resource(api_clusteroperation.ClusterOperationChainEndpoint,
+                 '/cluster_operations/<op_uuid>/chain')
+api.add_resource(api_clusteroperation.ClusterOperationsEndpoint,
+                 '/cluster_operations')
 
 api.add_resource(api_instance.InstancesEndpoint, '/instances')
 api.add_resource(api_instance.InstanceEndpoint, '/instances/<instance_ref>')

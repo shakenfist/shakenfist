@@ -909,6 +909,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.GetClusterOperationsByNodeRequest.SerializeToString,
                 response_deserializer=database__pb2.GetClusterOperationsByNodeReply.FromString,
                 _registered_method=True)
+        self.ListClusterOperationsForTarget = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ListClusterOperationsForTarget',
+                request_serializer=database__pb2.ListClusterOperationsForTargetRequest.SerializeToString,
+                response_deserializer=database__pb2.ListClusterOperationsForTargetReply.FromString,
+                _registered_method=True)
         self.DeleteClusterOperation = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteClusterOperation',
                 request_serializer=database__pb2.DeleteClusterOperationRequest.SerializeToString,
@@ -2055,6 +2060,12 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListClusterOperationsForTarget(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteClusterOperation(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -2964,6 +2975,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetClusterOperationsByNode,
                     request_deserializer=database__pb2.GetClusterOperationsByNodeRequest.FromString,
                     response_serializer=database__pb2.GetClusterOperationsByNodeReply.SerializeToString,
+            ),
+            'ListClusterOperationsForTarget': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListClusterOperationsForTarget,
+                    request_deserializer=database__pb2.ListClusterOperationsForTargetRequest.FromString,
+                    response_serializer=database__pb2.ListClusterOperationsForTargetReply.SerializeToString,
             ),
             'DeleteClusterOperation': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteClusterOperation,
@@ -7711,6 +7727,33 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/GetClusterOperationsByNode',
             database__pb2.GetClusterOperationsByNodeRequest.SerializeToString,
             database__pb2.GetClusterOperationsByNodeReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListClusterOperationsForTarget(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ListClusterOperationsForTarget',
+            database__pb2.ListClusterOperationsForTargetRequest.SerializeToString,
+            database__pb2.ListClusterOperationsForTargetReply.FromString,
             options,
             channel_credentials,
             insecure,

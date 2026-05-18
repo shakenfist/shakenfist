@@ -5605,6 +5605,42 @@ class GetClusterOperationsByNodeReply(google.protobuf.message.Message):
 global___GetClusterOperationsByNodeReply = GetClusterOperationsByNodeReply
 
 @typing.final
+class ListClusterOperationsForTargetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___ListClusterOperationsForTargetRequest = ListClusterOperationsForTargetRequest
+
+@typing.final
+class ListClusterOperationsForTargetReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEMS_FIELD_NUMBER: builtins.int
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ClusterOperationData]:
+        """Items are ordered newest-first by created_at."""
+
+    def __init__(
+        self,
+        *,
+        items: collections.abc.Iterable[global___ClusterOperationData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
+
+global___ListClusterOperationsForTargetReply = ListClusterOperationsForTargetReply
+
+@typing.final
 class DeleteClusterOperationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
