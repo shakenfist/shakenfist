@@ -195,8 +195,12 @@ class CreateVXLANInterfaceFailedTestCase(base.ShakenFistTestCase):
         self.assertEqual('network.create_vxlan.failed', report_arg.code)
 
 
-class NetworkDeployEnsureMeshRoutingTestCase(base.ShakenFistTestCase):
-    """_network_deploy uses BridgedVXLanNetwork._apply_ensure_mesh, never n.ensure_mesh()."""
+class RetiredHandlersTestCase(base.ShakenFistTestCase):
+    """Phase 6 retired _network_deploy, _network_destroy, and
+    _network_update_dnsmasq. The handlers stay so on-disk in-flight ops
+    parse, but dispatching them now raises InvalidStateForTask, which the
+    outer Exception handler converts to STATE_ERROR plus an ErrorReport.
+    """
 
     def setUp(self):
         super().setUp()
@@ -204,27 +208,49 @@ class NetworkDeployEnsureMeshRoutingTestCase(base.ShakenFistTestCase):
         self.mock_etcd.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
-    @mock.patch(
-        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_create_on_network_node')
-    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
     @mock.patch('shakenfist.operations.net_op.Network.from_db')
-    def test_network_deploy_calls_apply_ensure_mesh_not_n_ensure_mesh(
-            self, mock_network_from_db, mock_apply_mesh, mock_apply_create,
-            mock_set_error):
-        """_network_deploy delegates mesh setup to BridgedVXLanNetwork, not Network.ensure_mesh."""
-        network = _make_network_mock()
-        network.is_dead.return_value = False
-        mock_network_from_db.return_value = network
+    def test_network_deploy_raises_invalid_state(
+            self, mock_network_from_db, mock_set_error):
+        """_network_deploy is retired; dispatch transitions to STATE_ERROR."""
+        mock_network_from_db.return_value = _make_network_mock()
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_deploy])
+        op, _ = _make_net_op(
+            self, self.mock_etcd, [model_tasks.network_deploy])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_deploy)
 
-        mock_apply_mesh.assert_called_once_with()
-        mock_apply_create.assert_called_once_with()
-        network.ensure_mesh.assert_not_called()
-        network.create_on_network_node.assert_not_called()
-        mock_set_error.assert_not_called()
+        self.assertEqual(NetOp.STATE_ERROR, op.state.value)
+        mock_set_error.assert_called_once()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_network_destroy_raises_invalid_state(
+            self, mock_network_from_db, mock_set_error):
+        """_network_destroy is retired; dispatch transitions to STATE_ERROR."""
+        mock_network_from_db.return_value = _make_network_mock()
+
+        op, _ = _make_net_op(
+            self, self.mock_etcd, [model_tasks.network_destroy])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_destroy)
+
+        self.assertEqual(NetOp.STATE_ERROR, op.state.value)
+        mock_set_error.assert_called_once()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_network_update_dnsmasq_raises_invalid_state(
+            self, mock_network_from_db, mock_set_error):
+        """_network_update_dnsmasq is retired; dispatch transitions to STATE_ERROR."""
+        mock_network_from_db.return_value = _make_network_mock()
+
+        op, _ = _make_net_op(
+            self, self.mock_etcd, [model_tasks.network_update_dnsmasq])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_update_dnsmasq)
+
+        self.assertEqual(NetOp.STATE_ERROR, op.state.value)
+        mock_set_error.assert_called_once()
 
 
 class NetworkRemoveNatTaskDispatchTestCase(base.ShakenFistTestCase):
@@ -420,67 +446,6 @@ class NetworkApplyRemoveDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
         mock_set_error.assert_not_called()
 
 
-class NetworkDeployCreateOnNetworkNodeRoutingTestCase(base.ShakenFistTestCase):
-    """_network_deploy routes through BridgedVXLanNetwork._apply_create_on_network_node."""
-
-    def setUp(self):
-        super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
-
-    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
-    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
-    @mock.patch(
-        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_create_on_network_node')
-    @mock.patch('shakenfist.operations.net_op.Network.from_db')
-    def test_network_deploy_calls_apply_create_on_network_node(
-            self, mock_network_from_db, mock_apply_create, mock_apply_mesh,
-            mock_set_error):
-        """_network_deploy must route create through BridgedVXLanNetwork."""
-        network = _make_network_mock()
-        network.is_dead.return_value = False
-        mock_network_from_db.return_value = network
-
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_deploy])
-        op.state = NetOp.STATE_EXECUTING
-        op.dispatch_task(model_tasks.network_deploy)
-
-        mock_apply_create.assert_called_once_with()
-        mock_apply_mesh.assert_called_once_with()
-        # Network.create_on_network_node must never be invoked directly.
-        network.create_on_network_node.assert_not_called()
-        mock_set_error.assert_not_called()
-
-
-class NetworkDestroyDeleteOnNetworkNodeRoutingTestCase(base.ShakenFistTestCase):
-    """_network_destroy routes through BridgedVXLanNetwork._apply_delete_on_network_node."""
-
-    def setUp(self):
-        super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
-
-    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
-    @mock.patch(
-        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_delete_on_network_node')
-    @mock.patch('shakenfist.operations.net_op.Network.from_db')
-    def test_network_destroy_calls_apply_delete_on_network_node(
-            self, mock_network_from_db, mock_apply_delete, mock_set_error):
-        """_network_destroy must route delete through BridgedVXLanNetwork."""
-        network = _make_network_mock()
-        # No outstanding network interfaces so the handler proceeds.
-        network.networkinterfaces = []
-        mock_network_from_db.return_value = network
-
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_destroy])
-        op.state = NetOp.STATE_EXECUTING
-        op.dispatch_task(model_tasks.network_destroy)
-
-        mock_apply_delete.assert_called_once_with()
-        network.delete_on_network_node.assert_not_called()
-        mock_set_error.assert_not_called()
-
-
 class NetworkApplyCreateNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase):
     """``_network_apply_create_network_node`` calls _apply_create_on_network_node."""
 
@@ -536,35 +501,4 @@ class NetworkApplyDeleteNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
 
         mock_apply.assert_called_once_with()
         network.delete_on_network_node.assert_not_called()
-        mock_set_error.assert_not_called()
-
-
-class NetworkUpdateDnsmasqEnsureMeshRoutingTestCase(base.ShakenFistTestCase):
-    """_network_update_dnsmasq uses BridgedVXLanNetwork._apply_ensure_mesh, never n.ensure_mesh()."""
-
-    def setUp(self):
-        super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
-
-    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
-    @mock.patch(
-        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_create_on_network_node')
-    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
-    @mock.patch('shakenfist.operations.net_op.Network.from_db')
-    def test_network_update_dnsmasq_calls_apply_ensure_mesh_not_n_ensure_mesh(
-            self, mock_network_from_db, mock_apply_mesh, mock_apply_create,
-            mock_set_error):
-        """_network_update_dnsmasq delegates mesh setup to BridgedVXLanNetwork, not Network.ensure_mesh."""
-        network = _make_network_mock()
-        mock_network_from_db.return_value = network
-
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_update_dnsmasq])
-        op.state = NetOp.STATE_EXECUTING
-        op.dispatch_task(model_tasks.network_update_dnsmasq)
-
-        mock_apply_create.assert_called_once_with()
-        mock_apply_mesh.assert_called_once_with()
-        network.ensure_mesh.assert_not_called()
-        network.create_on_network_node.assert_not_called()
         mock_set_error.assert_not_called()

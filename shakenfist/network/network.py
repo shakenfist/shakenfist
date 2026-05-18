@@ -300,10 +300,15 @@ class Network(dbowo):
         n = Network.from_db(network_uuid)
         n.state = Network.STATE_INITIAL
 
-        # Networks should immediately appear on the network node
+        # Networks should immediately appear on the network node. Phase 6
+        # of `PLAN-network-facade.md` retired the `network_deploy` composite
+        # task; the explicit task list preserves the original semantic
+        # (create on the network node, then ensure the mesh FDB) without
+        # going through the obsolete handler.
         net_create_and_enqueue(
             n.uuid,
-            [net_tasks.network_deploy],
+            [net_tasks.network_apply_create_network_node,
+             net_tasks.network_ensure_mesh],
             PRIORITY.user_waiting,
             runs_after=[n.last_cluster_operation],
             request_id=util_general.get_request_id())

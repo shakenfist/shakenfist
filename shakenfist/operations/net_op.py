@@ -6,7 +6,6 @@ from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.eventlog import add_event_multi
 from shakenfist.schema.operations import net_op as schema
 from shakenfist.exceptions import CreateVXLANInterfaceFailed
-from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
@@ -123,34 +122,25 @@ class NetOp(BaseClusterOperation):
             self.state = NetOp.STATE_ERROR
 
     def _network_deploy(self, n):
-        if n.is_dead():
-            raise InvalidStateForTask(self)
-
-        # Route through BridgedVXLanNetwork to avoid re-entrancy: after step 5d
-        # Network.create_on_network_node() / ensure_mesh() will enqueue a NetOp,
-        # which would deadlock the net-worker if called from within a handler.
-        bvn = BridgedVXLanNetwork(n)
-        bvn._apply_create_on_network_node()
-        bvn._apply_ensure_mesh()
+        # This task is no longer enqueued by any production code path as of
+        # phase 6 of `PLAN-network-facade.md`. Any in-flight op at deploy
+        # time gracefully transitions to STATE_ERROR via the dispatcher's
+        # outer Exception handler, which persists an ErrorReport. The
+        # task-enum value stays in the schema for on-disk record
+        # compatibility.
+        raise InvalidStateForTask(self)
 
     def _network_destroy(self, n):
-        nis = n.networkinterfaces
-        if nis:
-            self.defer(waiting_on=nis)
-            return
-
-        try:
-            BridgedVXLanNetwork(n)._apply_delete_on_network_node()
-        except DeadNetwork as e:
-            self.log.with_fields({
-                'exception': e
-            }).warning('Attempted destroy on a dead network')
+        # Phase 6: superseded by network_apply_delete_network_node (task
+        # 12). See _network_deploy above for the rationale.
+        raise InvalidStateForTask(self)
 
     def _network_update_dnsmasq(self, n):
-        # Same re-entrancy guard as _network_deploy above.
-        bvn = BridgedVXLanNetwork(n)
-        bvn._apply_create_on_network_node()
-        bvn._apply_ensure_mesh()
+        # Phase 6: this misleadingly-named composite task was superseded
+        # by the explicit [network_apply_create_network_node,
+        # network_ensure_mesh] task list. See _network_deploy above for
+        # the rationale.
+        raise InvalidStateForTask(self)
 
     def _network_apply_create_network_node(self, n):
         BridgedVXLanNetwork(n)._apply_create_on_network_node()

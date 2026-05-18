@@ -142,6 +142,81 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
 
 
+class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
+    """Phase 6 step 6c: DELETE /networks/<uuid> enqueues
+    network_apply_delete_network_node (task 12) directly, not the retired
+    network_destroy composite task (task 2).
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        fake_config = SFConfig(
+            NODE_NAME='seriously',
+            NODE_EGRESS_IP='127.0.0.1',
+            NETWORK_NODE_IP='127.0.0.1',
+            NODE_EGRESS_NIC='eth0',
+            NODE_MESH_NIC='eth1',
+            NODE_IS_NETWORK_NODE=True,
+            ETCD_HOST='127.0.0.1'
+        )
+        self.config = mock.patch(
+            'shakenfist.external_api.base.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        self.client = external_api.app.test_client()
+
+        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+
+        self.network_id = str(uuid4())
+        self.mock_etcd.create_network(
+            name='foonet',
+            uuid=self.network_id,
+            namespace='foo',
+            set_state=dbo.STATE_CREATED)
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+    @mock.patch('shakenfist.external_api.network.net_create_and_enqueue')
+    def test_delete_network_enqueues_apply_delete_network_node(
+            self, mock_enqueue):
+        # The mocked enqueue returns the (op_type, op_uuid) tuple the real
+        # function returns; the DELETE handler does not consume it but we
+        # still provide a plausible value for safety.
+        mock_enqueue.return_value = ('net_op', str(uuid4()))
+
+        resp = self.client.delete(
+            '/networks/%s' % self.network_id,
+            headers={'Authorization': self.auth_token})
+        self.assertEqual(200, resp.status_code)
+
+        mock_enqueue.assert_called_once()
+        args, kwargs = mock_enqueue.call_args
+        # Positional args: (network_uuid, tasks, priority)
+        tasks = args[1]
+        # Late import to avoid pulling the schema into the module-level
+        # imports when the rest of this file does not need it.
+        from shakenfist.schema.operations.net_op import model_tasks
+        self.assertEqual(
+            [model_tasks.network_apply_delete_network_node], tasks)
+
+
 class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
     """Regression tests for step 4f: REST handlers call raise_for_error()
     after update_dns_entry / remove_dns_entry."""

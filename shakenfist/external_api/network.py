@@ -65,9 +65,12 @@ def _delete_network(network_from_db, wait_interfaces=None):
     if wait_interfaces:
         n.state = network.Network.STATE_DELETE_WAIT
     else:
+        # Phase 6 of `PLAN-network-facade.md` retired the
+        # `network_destroy` composite; `network_apply_delete_network_node`
+        # is the direct behavioural equivalent.
         net_create_and_enqueue(
             n.uuid,
-            [net_tasks.network_destroy],
+            [net_tasks.network_apply_delete_network_node],
             PRIORITY.user_facing,
             request_id=util_general.get_request_id())
 
