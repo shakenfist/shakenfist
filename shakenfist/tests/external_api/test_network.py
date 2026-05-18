@@ -74,6 +74,10 @@ class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
                                       'confirm': True,
                                       'namespace': 'foo'
                                   }))
+        # Phase 7 contract: bulk delete returns 202 with a list of
+        # {network_uuid, op_type, op_uuid} entries. When the namespace
+        # has no active networks the list is empty.
+        self.assertEqual(202, resp.status_code)
         self.assertEqual([], resp.get_json())
 
 
@@ -125,12 +129,17 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
+    @mock.patch('shakenfist.external_api.network.net_create_and_enqueue')
     @mock.patch('shakenfist.network.network.Network.remove_dnsmasq')
     @mock.patch('shakenfist.network.network.Network.delete_on_network_node')
     @mock.patch('shakenfist.network.network.Network.delete_on_hypervisor')
     def test_delete_all_networks(self, mock_delete_on_hypervisor,
                                  mock_delete_on_network_node,
-                                 mock_remove_dnsmasq):
+                                 mock_remove_dnsmasq,
+                                 mock_enqueue):
+        fake_op_uuid = str(uuid4())
+        mock_enqueue.return_value = ('net_op', fake_op_uuid)
+
         self.client = external_api.app.test_client()
         resp = self.client.delete('/networks',
                                   headers={'Authorization': self.auth_token},
@@ -138,8 +147,16 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
                                       'confirm': True,
                                       'namespace': 'foo'
                                   }))
-        self.assertEqual([self.network_id], resp.get_json())
-        self.assertEqual(200, resp.status_code)
+        # Phase 7 contract: bulk delete returns HTTP 202 with a list of
+        # {network_uuid, op_type, op_uuid} entries.
+        self.assertEqual(202, resp.status_code)
+        self.assertEqual(
+            [{
+                'network_uuid': self.network_id,
+                'op_type': 'net_op',
+                'op_uuid': fake_op_uuid,
+            }],
+            resp.get_json())
 
 
 class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
@@ -197,14 +214,20 @@ class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
     def test_delete_network_enqueues_apply_delete_network_node(
             self, mock_enqueue):
         # The mocked enqueue returns the (op_type, op_uuid) tuple the real
-        # function returns; the DELETE handler does not consume it but we
-        # still provide a plausible value for safety.
-        mock_enqueue.return_value = ('net_op', str(uuid4()))
+        # function returns; the Phase 7 DELETE handler surfaces these as
+        # `op_type` / `op_uuid` in the 202 response body.
+        fake_op_uuid = str(uuid4())
+        mock_enqueue.return_value = ('net_op', fake_op_uuid)
 
         resp = self.client.delete(
             '/networks/%s' % self.network_id,
             headers={'Authorization': self.auth_token})
-        self.assertEqual(200, resp.status_code)
+        # Phase 7 contract: single-network delete returns HTTP 202 with
+        # `{op_type, op_uuid}` identifying the queued cluster operation.
+        self.assertEqual(202, resp.status_code)
+        self.assertEqual(
+            {'op_type': 'net_op', 'op_uuid': fake_op_uuid},
+            resp.get_json())
 
         mock_enqueue.assert_called_once()
         args, kwargs = mock_enqueue.call_args
