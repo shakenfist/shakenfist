@@ -929,7 +929,7 @@ begins.
 | 3. Floating-IP and route migration | PLAN-network-facade-phase-03-floating-ip.md | Complete |
 | 4. dnsmasq operation migration | PLAN-network-facade-phase-04-dnsmasq.md | Complete |
 | 5. `create_on_*` and `delete_on_*` migration | PLAN-network-facade-phase-05-lifecycle.md | Complete |
-| 6. `maintain.py` rewrite as discovery-only | PLAN-network-facade-phase-06-maintain.md | Planning |
+| 6. `maintain.py` rewrite as discovery-only | PLAN-network-facade-phase-06-maintain.md | Complete |
 | 7. REST contract: remove `redirect_to_network_node`, flip the four endpoints to 202+poll, add `/cluster_operations/<uuid>/chain` and `/cluster_operations?target_*=` endpoints, update `client-python` | PLAN-network-facade-phase-07-rest-contract.md | Planning |
 | 8. Remove the temporary `NodeLock`s from the stability fix and the per-method migration flags | PLAN-network-facade-phase-08-cleanup.md | Planning |
 | 9. Documentation and tests | PLAN-network-facade-phase-09-docs.md | Planning |
