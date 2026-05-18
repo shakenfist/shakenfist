@@ -200,9 +200,9 @@ method having its own wait shim. After the change:
   terminal op uuid and the client polls"; the client
   (`shakenfist/client-python`) is updated to match.
 * Two new REST endpoints expose ClusterOperation chains:
-  GET `/cluster_operations/<uuid>/chain` returns the
+  GET `/clusteroperations/<uuid>/chain` returns the
   transitive `depends_on` closure; GET
-  `/cluster_operations?target_object_type=&target_uuid=`
+  `/clusteroperations?target_object_type=&target_uuid=`
   lists ops targeting an object. Both are namespace-scoped
   at the SQL layer using the existing
   `cluster_operation_targets` table.
@@ -839,13 +839,13 @@ Scope boundaries:
     today.
 
     Two minimal additions appear sufficient:
-    * **GET `/cluster_operations/<uuid>/chain`** — return
+    * **GET `/clusteroperations/<uuid>/chain`** — return
       the transitive closure of `depends_on` starting from
       `<uuid>`, scoped to the caller's namespace (admin
       sees everything; non-admin sees only ops targeting
       objects in their namespaces). Useful for the
       "something in this chain failed; where" lookup.
-    * **GET `/cluster_operations?target_object_type=...
+    * **GET `/clusteroperations?target_object_type=...
       &target_uuid=...`** — list ops targeting a given
       object, scoped by namespace. Useful for "what's
       currently happening on this network/instance". The
@@ -930,7 +930,7 @@ begins.
 | 4. dnsmasq operation migration | PLAN-network-facade-phase-04-dnsmasq.md | Complete |
 | 5. `create_on_*` and `delete_on_*` migration | PLAN-network-facade-phase-05-lifecycle.md | Complete |
 | 6. `maintain.py` rewrite as discovery-only | PLAN-network-facade-phase-06-maintain.md | Complete |
-| 7. REST contract: remove `redirect_to_network_node`, flip the four endpoints to 202+poll, add `/cluster_operations/<uuid>/chain` and `/cluster_operations?target_*=` endpoints, update `client-python` | PLAN-network-facade-phase-07-rest-contract.md | Planning |
+| 7. REST contract: remove `redirect_to_network_node` from three of its four sites, flip the two delete endpoints to 202+poll, add `/clusteroperations/<uuid>/chain` and `/clusteroperations?target_*=` endpoints, update `client-python` | PLAN-network-facade-phase-07-rest-contract.md | Complete |
 | 8. Remove the temporary `NodeLock`s from the stability fix and the per-method migration flags | PLAN-network-facade-phase-08-cleanup.md | Planning |
 | 9. Documentation and tests | PLAN-network-facade-phase-09-docs.md | Planning |
 
@@ -1113,9 +1113,9 @@ because the following statements will be true:
   fully-applied result. The `shakenfist/client-python`
   client transparently polls these handles for callers that
   want synchronous semantics.
-* `GET /cluster_operations/<uuid>/chain` returns the
+* `GET /clusteroperations/<uuid>/chain` returns the
   transitive `depends_on` closure scoped to the caller's
-  namespace. `GET /cluster_operations?target_object_type=
+  namespace. `GET /clusteroperations?target_object_type=
   &target_uuid=` lists ops targeting a given object, also
   scoped. Filtering is done at the SQL layer using
   `cluster_operation_targets` — no Python-side filtering of
