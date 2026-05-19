@@ -1493,6 +1493,7 @@ class Instance(dbowo):
             machine_type=self.machine_type,
             vdi_type=vdi_type,
             spice_concurrent=(vdi_type == 'spiceconcurrent'),
+            spice_debug=(vdi_type == 'spicedebug'),
             extradevices=extradevices
         )
 
