@@ -296,3 +296,159 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             c for c in active['net_create_and_enqueue'].call_args_list
             if c.kwargs.get('priority') == PRIORITY.background]
         self.assertTrue(mesh_calls)
+
+    def test_delete_wait_no_interfaces_enqueues_delete_network_node(self):
+        """A delete_wait network with no interfaces triggers
+        network_apply_delete_network_node and then skips maintenance."""
+        from shakenfist.schema.operations.net_op \
+            import model_tasks as net_tasks
+
+        # Use the canonical 'delete-wait' value from dbo.STATE_DELETE_WAIT.
+        n = _build_mock_network(state='delete-wait', interfaces=[])
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+        )
+
+        # Must enqueue a delete op.
+        active['net_create_and_enqueue'].assert_called_once()
+        call = active['net_create_and_enqueue'].call_args
+        self.assertIn(
+            net_tasks.network_apply_delete_network_node,
+            call.kwargs.get('tasks', call.args[1]
+                            if len(call.args) > 1 else []))
+        # No hypervisor or mesh ops enqueued.
+        active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_delete_wait_with_interfaces_skips_maintenance_only(self):
+        """A delete_wait network that still has interfaces is skipped
+        without enqueueing the delete op."""
+        ni = mock.MagicMock()
+        n = _build_mock_network(
+            state='delete-wait', interfaces=[ni])
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+        )
+
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_recent_state_change_skips_network(self):
+        """Networks whose state changed within the last 60 seconds are
+        skipped (the 60-second punt guard)."""
+        n = _build_mock_network(is_okay=False)
+        # state.update_time must be within 60 s of time.time() == 10_000.
+        n.state.update_time = 9_990.0
+
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+        )
+
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_is_okay_skips_reconciliation(self):
+        """When is_okay() returns True no reconciliation is enqueued."""
+        n = _build_mock_network(is_okay=True)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+        )
+
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_hypervisor_node_enqueues_network_apply_create_hypervisor(self):
+        """On a non-network-node (hypervisor) a drifting network must be
+        reconciled via nn_create_and_enqueue with the
+        network_apply_create_hypervisor task at background priority."""
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+        from shakenfist.schema.operations.node_net_op \
+            import model_tasks as nn_tasks
+
+        n = _build_mock_network(is_okay=False)
+        active = self._run_one_iteration(
+            network_node=False,
+            networks=[n],
+        )
+
+        active['nn_create_and_enqueue'].assert_called_once()
+        call = active['nn_create_and_enqueue'].call_args
+        self.assertEqual(
+            [nn_tasks.network_apply_create_hypervisor], call.args[2])
+        self.assertEqual(PRIORITY.background, call.args[3])
+
+    def test_network_node_re_enqueues_floating_ips(self):
+        """When a network node finds a drifting network it also re-enqueues
+        floating-IP restoration for each interface that has one."""
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+        from shakenfist.schema.operations.net_op \
+            import model_tasks as net_tasks
+
+        ni = mock.MagicMock()
+        ni.floating = {'floating_address': '10.0.0.5'}
+        ni.ipv4 = '192.168.1.10'
+        n = _build_mock_network(is_okay=False, interfaces=[ni])
+
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+        )
+
+        calls = active['net_create_and_enqueue'].call_args_list
+        floating_calls = [
+            c for c in calls
+            if net_tasks.network_add_floating_ip in
+            c.kwargs.get('tasks', c.args[1] if len(c.args) > 1 else [])
+        ]
+        self.assertTrue(
+            floating_calls,
+            'Expected network_add_floating_ip enqueue, '
+            f'got calls: {calls}')
+        # The floating-IP enqueue must carry the correct addresses.
+        fc = floating_calls[0]
+        self.assertEqual('10.0.0.5', fc.kwargs.get('floating_address'))
+        self.assertEqual('192.168.1.10', fc.kwargs.get('inner_address'))
+        self.assertEqual(PRIORITY.background, fc.kwargs.get('priority'))
+
+    def test_network_node_re_enqueues_routed_ips(self):
+        """When a network node finds a drifting network it also re-enqueues
+        routed-IP restoration for all routed addresses on that network."""
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+        from shakenfist.schema.operations.net_ip_op \
+            import model_tasks as net_ip_tasks
+
+        n = _build_mock_network(is_okay=False, interfaces=[])
+
+        # Build a fake floating network whose IPAM reports one routed
+        # reservation for our test network.
+        fake_addr = '10.10.10.1'
+        fake_resv = mock.MagicMock()
+        from shakenfist.schema.ipam_reservation import ReservationType
+        fake_resv.reservation_type = ReservationType.ROUTED
+        fake_resv.user_uuid = n.uuid
+
+        fake_fn = mock.MagicMock()
+        fake_fn.ipam.in_use = [fake_addr]
+        fake_fn.ipam.get_reservation.return_value = fake_resv
+
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            floating_network=fake_fn,
+        )
+
+        calls = active['net_ip_create_and_enqueue'].call_args_list
+        routed_calls = [
+            c for c in calls
+            if net_ip_tasks.route_address in
+            c.kwargs.get('tasks', c.args[2] if len(c.args) > 2 else [])
+        ]
+        self.assertTrue(
+            routed_calls,
+            f'Expected route_address enqueue, got calls: {calls}')
+        rc = routed_calls[0]
+        self.assertEqual(fake_addr, rc.kwargs.get('ip'))
+        self.assertEqual(PRIORITY.background, rc.kwargs.get('priority'))

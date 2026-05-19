@@ -1136,3 +1136,261 @@ class GetRecentTerminalOpStatesRoutingTestCase(base.ShakenFistTestCase):
         self.assertEqual([], result)
         mock_grpc.assert_called_once_with(
             'network', NETWORK_UUID, 1, None)
+
+
+# ---------------------------------------------------------------------------
+# list_cluster_operations_for_target — SQL layer and routing tests
+# ---------------------------------------------------------------------------
+
+LIST_TARGET_UUID = 'dddd8888-8888-4888-8888-888888888888'
+LIST_OP_UUID_1 = 'eeee8888-8888-4888-8888-000000000001'
+LIST_OP_UUID_2 = 'eeee8888-8888-4888-8888-000000000002'
+LIST_OP_UUID_3 = 'eeee8888-8888-4888-8888-000000000003'
+
+
+class DirectListClusterOperationsForTargetTestCase(
+        base.ShakenFistTestCase):
+    """SQL-layer tests for _direct_list_cluster_operations_for_target.
+
+    Drives the helper against a real in-memory SQLite engine so the
+    actual JOIN, ORDER BY, and the target_object_type / target_uuid
+    WHERE filters are exercised.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        import sqlalchemy as sa
+        from shakenfist import mariadb as mariadb_mod
+        from sqlalchemy.pool import StaticPool
+
+        self._sa = sa
+        self._mariadb = mariadb_mod
+        self._metadata = sa.MetaData()
+
+        self._targets_table = sa.Table(
+            'cluster_operation_targets',
+            self._metadata,
+            sa.Column('sequence_number', sa.Integer(),
+                      primary_key=True, autoincrement=True),
+            sa.Column('operation_uuid', sa.String(36), nullable=False),
+            sa.Column('operation_type', sa.String(64), nullable=False),
+            sa.Column('target_object_type', sa.String(64),
+                      nullable=False),
+            sa.Column('target_uuid', sa.String(36), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+        )
+        self._ops_table = sa.Table(
+            'cluster_operations',
+            self._metadata,
+            sa.Column('uuid', sa.String(36), primary_key=True),
+            sa.Column('operation_type', sa.String(64), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('node_uuid', sa.String(36), nullable=True),
+            sa.Column('instance_uuid', sa.String(36), nullable=True),
+            sa.Column('network_uuid', sa.String(36), nullable=True),
+            sa.Column('priority', sa.String(32), nullable=True),
+            sa.Column('metadata_json', sa.JSON(), nullable=False),
+        )
+
+        self._engine = sa.create_engine(
+            'sqlite:///:memory:',
+            connect_args={'check_same_thread': False},
+            poolclass=StaticPool)
+        self._metadata.create_all(self._engine)
+
+        self._patches = [
+            mock.patch(
+                'shakenfist.mariadb._get_engine',
+                return_value=self._engine),
+            mock.patch(
+                'shakenfist.mariadb._get_cluster_operation_targets_table',
+                return_value=self._targets_table),
+            mock.patch(
+                'shakenfist.mariadb._get_cluster_operations_table',
+                return_value=self._ops_table),
+            mock.patch(
+                'shakenfist.mariadb._use_database_service',
+                return_value=False),
+        ]
+        for p in self._patches:
+            p.start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _insert_op(self, op_uuid, op_type, created_at,
+                   metadata=None):
+        if metadata is None:
+            metadata = {}
+        with self._engine.begin() as conn:
+            conn.execute(self._ops_table.insert().values(
+                uuid=op_uuid,
+                operation_type=op_type,
+                created_at=created_at,
+                node_uuid=None,
+                instance_uuid=None,
+                network_uuid=None,
+                priority=None,
+                metadata_json=metadata,
+            ))
+
+    def _insert_target(self, op_uuid, op_type, target_type,
+                       target_uuid, created_at):
+        with self._engine.begin() as conn:
+            conn.execute(self._targets_table.insert().values(
+                operation_uuid=op_uuid,
+                operation_type=op_type,
+                target_object_type=target_type,
+                target_uuid=target_uuid,
+                created_at=created_at,
+            ))
+
+    def test_empty_when_no_matches(self):
+        """Empty list when no target rows exist for the given uuid."""
+        results = (
+            self._mariadb._direct_list_cluster_operations_for_target(
+                'network', LIST_TARGET_UUID))
+        self.assertEqual([], results)
+
+    def test_filters_by_target_object_type(self):
+        """Rows for a different target_object_type are excluded."""
+        self._insert_op(LIST_OP_UUID_1, 'net_op', 1000.0)
+        self._insert_op(LIST_OP_UUID_2, 'instance_preflight', 2000.0)
+        # Same target_uuid but different target_object_types.
+        self._insert_target(
+            LIST_OP_UUID_1, 'net_op', 'network',
+            LIST_TARGET_UUID, 1000.0)
+        self._insert_target(
+            LIST_OP_UUID_2, 'instance_preflight', 'instance',
+            LIST_TARGET_UUID, 2000.0)
+
+        results = (
+            self._mariadb._direct_list_cluster_operations_for_target(
+                'network', LIST_TARGET_UUID))
+        self.assertEqual(1, len(results))
+        self.assertEqual(str(LIST_OP_UUID_1), results[0]['uuid'])
+
+    def test_filters_by_target_uuid(self):
+        """Rows for a different target_uuid are excluded."""
+        other_uuid = 'ffff8888-8888-4888-8888-000000000099'
+        self._insert_op(LIST_OP_UUID_1, 'net_op', 1000.0)
+        self._insert_op(LIST_OP_UUID_2, 'net_op', 2000.0)
+        self._insert_target(
+            LIST_OP_UUID_1, 'net_op', 'network',
+            LIST_TARGET_UUID, 1000.0)
+        self._insert_target(
+            LIST_OP_UUID_2, 'net_op', 'network',
+            other_uuid, 2000.0)
+
+        results = (
+            self._mariadb._direct_list_cluster_operations_for_target(
+                'network', LIST_TARGET_UUID))
+        self.assertEqual(1, len(results))
+        self.assertEqual(str(LIST_OP_UUID_1), results[0]['uuid'])
+
+    def test_returns_newest_first_by_created_at(self):
+        """Results are ordered by cluster_operations.created_at DESC."""
+        self._insert_op(LIST_OP_UUID_1, 'net_op', 1000.0)
+        self._insert_op(LIST_OP_UUID_2, 'net_op', 3000.0)
+        self._insert_op(LIST_OP_UUID_3, 'net_op', 2000.0)
+        for op_uuid, ts in [
+            (LIST_OP_UUID_1, 1000.0),
+            (LIST_OP_UUID_2, 3000.0),
+            (LIST_OP_UUID_3, 2000.0),
+        ]:
+            self._insert_target(
+                op_uuid, 'net_op', 'network',
+                LIST_TARGET_UUID, ts)
+
+        results = (
+            self._mariadb._direct_list_cluster_operations_for_target(
+                'network', LIST_TARGET_UUID))
+        self.assertEqual(3, len(results))
+        # Newest first: OP2 (3000) -> OP3 (2000) -> OP1 (1000).
+        self.assertEqual(str(LIST_OP_UUID_2), results[0]['uuid'])
+        self.assertEqual(str(LIST_OP_UUID_3), results[1]['uuid'])
+        self.assertEqual(str(LIST_OP_UUID_1), results[2]['uuid'])
+
+    @mock.patch('shakenfist.mariadb._get_cluster_operations_table')
+    @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_returns_empty_list_on_operational_error(
+            self, mock_get_engine, mock_get_table, mock_get_ops_table):
+        """OperationalError is caught and an empty list is returned."""
+        from sqlalchemy.exc import OperationalError as SAOperationalError
+        import sqlalchemy as sa
+        from shakenfist.config import BaseSettings
+
+        class _FakeConfig(BaseSettings):
+            DATABASE_NODE_IP: str = '192.168.1.1'
+            DATABASE_API_PORT: int = 13005
+            MARIADB_HOST: str = 'localhost'
+            NODE_NAME: str = 'testnode'
+
+        # Build minimal table stubs for SQLAlchemy to construct the
+        # JOIN statement without complaining about missing columns.
+        metadata = sa.MetaData()
+        targets_table = sa.Table(
+            'cluster_operation_targets_err',
+            metadata,
+            sa.Column('operation_uuid', sa.String(36), primary_key=True),
+            sa.Column('target_object_type', sa.String(64)),
+            sa.Column('target_uuid', sa.String(36)),
+        )
+        ops_table = sa.Table(
+            'cluster_operations_err',
+            metadata,
+            sa.Column('uuid', sa.String(36), primary_key=True),
+            sa.Column('operation_type', sa.String(64)),
+            sa.Column('created_at', sa.Double()),
+            sa.Column('metadata_json', sa.JSON()),
+        )
+        mock_get_table.return_value = targets_table
+        mock_get_ops_table.return_value = ops_table
+
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.side_effect = SAOperationalError(
+            'stmt', {}, Exception('db down'))
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        with mock.patch('shakenfist.mariadb.config', _FakeConfig()):
+            result = (
+                mariadb._direct_list_cluster_operations_for_target(
+                    'network', LIST_TARGET_UUID))
+
+        self.assertEqual([], result)
+
+
+class PublicListClusterOperationsForTargetTestCase(
+        base.ShakenFistTestCase):
+    """Public wrapper routes to _direct_* or _grpc_* correctly."""
+
+    @mock.patch(
+        'shakenfist.mariadb._direct_list_cluster_operations_for_target',
+        return_value=[{'uuid': LIST_OP_UUID_1, 'operation_type': 'net_op',
+                       'created_at': 1000.0}])
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_routes_to_direct_when_no_service(
+            self, mock_use_svc, mock_direct):
+        result = mariadb.list_cluster_operations_for_target(
+            'network', LIST_TARGET_UUID)
+        self.assertEqual(1, len(result))
+        self.assertEqual(LIST_OP_UUID_1, result[0]['uuid'])
+        mock_direct.assert_called_once_with('network', LIST_TARGET_UUID)
+
+    @mock.patch(
+        'shakenfist.mariadb._grpc_list_cluster_operations_for_target',
+        return_value=[])
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_routes_to_grpc_when_service_enabled(
+            self, mock_use_svc, mock_grpc):
+        result = mariadb.list_cluster_operations_for_target(
+            'network', LIST_TARGET_UUID)
+        self.assertEqual([], result)
+        mock_grpc.assert_called_once_with('network', LIST_TARGET_UUID)
