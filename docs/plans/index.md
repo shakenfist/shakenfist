@@ -14,7 +14,7 @@ The set of incomplete plans has grown to the point where the order they land in 
 3. **[Health checks, readiness, and graceful drain](PLAN-health-checks.md)** — a precondition for the BYO load-balancer story in remove-primary being operationally honest. The plan is partial: a phase 0 decisions pass resolves the open questions before the implementation phases are re-cut.
 4. **[Remove the primary node](PLAN-remove-primary.md)** — the BYO-infrastructure scope reduction. Phase 7 finishes the deployer-level `etcd_master` → `database_node` rename, by which point the drain code itself is long gone. Naturally followed by a wipe-and-redeploy of Mikal's production cluster against the new shape.
 
-The remaining incomplete plans — [Embrace TLS](PLAN-embrace-tls.md), [Sticky blob transfers](PLAN-sticky-transfers.md), and the not-yet-drafted threads for eventlog-into-MariaDB, network-node failover, and OpenTelemetry instrumentation — are intentionally **not ordered relative to each other** here. They each have specific dependencies on remove-primary having established the BYO shape (the operator-provides-PKI surface for TLS, the streaming-proxy baseline for sticky transfers, the sf-database election pattern for the others), but among themselves the order is a triage decision best made when remove-primary is close to landing rather than now.
+The remaining incomplete plans — [Embrace TLS](PLAN-embrace-tls.md), [Sticky blob transfers](PLAN-sticky-transfers.md), [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md), and the not-yet-drafted threads for eventlog-into-MariaDB, network-node failover, and OpenTelemetry instrumentation — are intentionally **not ordered relative to each other** here. They each have specific dependencies on either remove-primary having established the BYO shape (the operator-provides-PKI surface for TLS, the streaming-proxy baseline for sticky transfers, the sf-database election pattern for the others) or network-facade having landed (the netlink plan, whose privilege-separation phases need network-facade's single-mutator property), but among themselves the order is a triage decision best made when remove-primary is close to landing rather than now.
 
 The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on their own cadence and are not part of this sequencing.
 
@@ -68,6 +68,13 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Sticky blob transfers](PLAN-sticky-transfers.md) | Phase 2: LB documentation | Not started | Document HAProxy / Envoy / cloud-LB / nginx configurations |
 | [Sticky blob transfers](PLAN-sticky-transfers.md) | Phase 3: Client verification | Not started | Verify SF Python client cookie handling end-to-end |
 | [Sticky blob transfers](PLAN-sticky-transfers.md) | Phase 4: Failover behaviour | Not started | Define recovery path when the sticky backend dies mid-session |
+| [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md) | Phase 0: Research and decisions | Not started | Pick `pyroute2.nftables` vs `python-nftables`, handle sysctl / arping corners, scope the privexec split, pick auth model |
+| [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md) | Phase 1: rtnetlink for link / addr / route / neigh | Not started | Port `ip` exec sites to `pyroute2.IPRoute` |
+| [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md) | Phase 2: Bridge attributes via `IFLA_BR_*` | Not started | Replace `brctl` with rtnetlink bridge link attributes |
+| [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md) | Phase 3: nftables rules via netlink | Not started | Port iptables rules to nftables in atomic transactions |
+| [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md) | Phase 4: Stand up `sf-net-privexec` | Not started | New typed-API daemon holding `CAP_NET_ADMIN`, with `net-worker` as its only client |
+| [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md) | Phase 5: Shrink `sf-privexec` | Not started | Drop `CAP_NET_ADMIN` and network RPCs from the existing privexec daemon |
+| [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md) | Phase 6: Cleanup | Not started | Close out remaining `sf-net` direct-exec sites and the sysctl / arping corners |
 
 ### Status Definitions
 

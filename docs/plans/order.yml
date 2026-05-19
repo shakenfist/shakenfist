@@ -16,3 +16,4 @@
 - PLAN-remove-primary.md: Remove the primary node and adopt a BYO-infrastructure deployer
 - PLAN-embrace-tls.md: Embrace TLS across Shaken Fist
 - PLAN-sticky-transfers.md: Sticky session affinity for SF blob transfers
+- PLAN-replace-exec-with-netlink.md: Replace exec'd network commands with native netlink operations
