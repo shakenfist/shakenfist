@@ -140,12 +140,22 @@ class BaseClusterOperation(BaseOperation):
     }
 
     def hard_delete(self) -> None:
-        # Clean up the cluster_operations row and the
-        # cluster_operation_errors row (if any) so neither table grows
+        # Clean up the cluster_operations row, the
+        # cluster_operation_errors row (if any), and the per-op
+        # cluster_operation_targets rows so none of these tables grow
         # unbounded as the cleaner sweeps terminal-state operations.
         # ``delete_cluster_operation_error`` is idempotent — ops that
         # never failed have no row to remove.
+        #
+        # The order matters: delete targets first so any concurrent
+        # reader of cluster_operation_targets observes the absence and
+        # skips this op, rather than dereferencing a stale target row
+        # whose op has already gone. The reader is still expected to
+        # tolerate a torn read (see scheduled_tasks._process_per_blob_queue,
+        # which passes suppress_failure_audit=True for this reason),
+        # but ordering removes the easy half of the race.
         uuid_str = str(self.uuid)
+        mariadb.delete_cluster_operation_target(uuid_str)
         mariadb.delete_cluster_operation_error(uuid_str)
         mariadb.delete_cluster_operation(uuid_str)
         super().hard_delete()

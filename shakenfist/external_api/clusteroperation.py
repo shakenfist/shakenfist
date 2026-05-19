@@ -83,7 +83,13 @@ def _namespace_for_target(target_object_type, target_uuid):
 
 
 def _hydrate_op(op_uuid):
-    """Load a cluster operation by uuid, returning the dbo instance or None."""
+    """Load a cluster operation by uuid, returning the dbo instance or None.
+
+    The from_db lookup suppresses the "non-existent object" audit event
+    because the op may have been hard-deleted between the
+    ``get_cluster_operation`` row read above and the load below
+    (the cluster cleaner runs concurrently with this endpoint).
+    """
     record = mariadb.get_cluster_operation(op_uuid)
     if not record:
         return None
@@ -91,7 +97,8 @@ def _hydrate_op(op_uuid):
     if operation_type not in OPERATION_NAMES_TO_CLASSES:
         return None
     try:
-        return get_object_class(operation_type).from_db(op_uuid)
+        return get_object_class(operation_type).from_db(
+            op_uuid, suppress_failure_audit=True)
     except NoSuchObject:
         return None
 

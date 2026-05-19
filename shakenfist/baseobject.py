@@ -720,6 +720,12 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
                 )
 
     def get_cluster_operations(self, outstanding_only=True):
+        # All ``from_db`` lookups here are best-effort: an op can be
+        # hard-deleted between when we read its target row (or its
+        # depends_on / runs_after reference) and when we try to load
+        # it. The "non-existent object" audit event is therefore
+        # suppressed for these lookups — treating the absent op as
+        # not-outstanding is the correct behaviour.
         last_op = self.last_cluster_operation
         if not last_op:
             return []
@@ -727,7 +733,7 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
             return []
 
         op = get_object_class(last_op.get('op_type')).from_db(
-            last_op.get('op_uuid'))
+            last_op.get('op_uuid'), suppress_failure_audit=True)
         if not op:
             return []
         if outstanding_only and not op.is_outstanding():
@@ -736,7 +742,8 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
         outstanding = [op]
 
         for dep in op.depends_on:
-            dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
+            dep_op = get_object_class(dep['op_type']).from_db(
+                dep['op_uuid'], suppress_failure_audit=True)
             if not dep_op:
                 continue
             if outstanding_only and not dep_op.is_outstanding():
@@ -744,7 +751,8 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
             outstanding.append(dep_op)
 
         for dep in op.runs_after:
-            dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
+            dep_op = get_object_class(dep['op_type']).from_db(
+                dep['op_uuid'], suppress_failure_audit=True)
             if not dep_op:
                 continue
             if outstanding_only and not dep_op.is_outstanding():

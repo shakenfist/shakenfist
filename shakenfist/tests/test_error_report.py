@@ -410,6 +410,8 @@ class BaseClusterOperationHardDeleteTestCase(base.ShakenFistTestCase):
     """
 
     @mock.patch('shakenfist.operations.baseoperation.mariadb'
+                '.delete_cluster_operation_target')
+    @mock.patch('shakenfist.operations.baseoperation.mariadb'
                 '.delete_cluster_operation_error')
     @mock.patch('shakenfist.operations.baseoperation.mariadb'
                 '.delete_cluster_operation')
@@ -417,7 +419,7 @@ class BaseClusterOperationHardDeleteTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.mariadb.delete_object_metadata')
     def test_hard_delete_removes_error_and_operation_rows(
             self, mock_delete_metadata, mock_delete_state,
-            mock_delete_op, mock_delete_error):
+            mock_delete_op, mock_delete_error, mock_delete_target):
         from shakenfist.operations.baseoperation import BaseClusterOperation
 
         # A concrete subclass is required because ``super().hard_delete()``
@@ -439,6 +441,7 @@ class BaseClusterOperationHardDeleteTestCase(base.ShakenFistTestCase):
 
         op.hard_delete()
 
+        mock_delete_target.assert_called_once_with(op_uuid)
         mock_delete_error.assert_called_once_with(op_uuid)
         mock_delete_op.assert_called_once_with(op_uuid)
         # ``super().hard_delete()`` walks up to DatabaseBackedObject,
