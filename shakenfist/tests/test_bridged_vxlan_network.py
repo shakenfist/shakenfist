@@ -114,9 +114,8 @@ class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
 
         bvn._apply_ensure_mesh()
 
-        # Lock acquired with the expected op name.
-        network.get_lock.assert_called_once_with(
-            op='Network ensure mesh', global_scope=False)
+        # No lock taken; the single-threaded dispatcher provides serialisation.
+        network.get_lock.assert_not_called()
 
         # The expected node IP set:
         # - 10.0.0.1 (NETWORK_NODE_IP, since != NODE_MESH_IP)
@@ -278,8 +277,7 @@ class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):
 
         bvn._apply_add_floating_ip('203.0.113.5', '10.0.0.5')
 
-        network.get_lock.assert_called_once_with(
-            op='Network add floating IP', global_scope=False)
+        network.get_lock.assert_not_called()
         self.mock_add_floating_ip.assert_called_once_with(
             'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
             '203.0.113.5', '10.0.0.5')
@@ -293,8 +291,7 @@ class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):
 
         bvn._apply_remove_floating_ip('203.0.113.6', '10.0.0.6')
 
-        network.get_lock.assert_called_once_with(
-            op='Network remove floating IP', global_scope=False)
+        network.get_lock.assert_not_called()
         # remove_floating_ip in util_concurrency only takes uuid + floating
         # address (the inner address is informational at the dispatcher
         # level only).
@@ -326,8 +323,7 @@ class BridgedVXLanNetworkApplyRouteAddressTestCase(base.ShakenFistTestCase):
 
         bvn._apply_route_address('203.0.113.10')
 
-        network.get_lock.assert_called_once_with(
-            op='Network route address', global_scope=False)
+        network.get_lock.assert_not_called()
         self.mock_execute.assert_called_once_with(
             'ip route add 203.0.113.10/32 dev br-vxlan-000abc')
         # The single-target audit event is preserved at the apply layer.
@@ -341,8 +337,7 @@ class BridgedVXLanNetworkApplyRouteAddressTestCase(base.ShakenFistTestCase):
 
         bvn._apply_unroute_address('203.0.113.11')
 
-        network.get_lock.assert_called_once_with(
-            op='Network unroute address', global_scope=False)
+        network.get_lock.assert_not_called()
         self.mock_execute.assert_called_once_with(
             'ip route del 203.0.113.11/32 dev br-vxlan-000def')
         network.add_event.assert_called_once_with(
@@ -364,8 +359,7 @@ class BridgedVXLanNetworkApplyRemoveNATTestCase(base.ShakenFistTestCase):
 
         bvn._apply_remove_nat()
 
-        network.get_lock.assert_called_once_with(
-            op='Network remove NAT', global_scope=False)
+        network.get_lock.assert_not_called()
         network.unassign_floating_gateway.assert_called_once_with()
 
     def test_apply_remove_nat_noop_when_no_floating_gateway(self):
@@ -375,10 +369,8 @@ class BridgedVXLanNetworkApplyRemoveNATTestCase(base.ShakenFistTestCase):
 
         bvn._apply_remove_nat()
 
-        # Lock is still acquired (we may race with assignment), but no
-        # gateway-release call is made.
-        network.get_lock.assert_called_once_with(
-            op='Network remove NAT', global_scope=False)
+        # No lock taken; the dispatcher serialises all callers.
+        network.get_lock.assert_not_called()
         network.unassign_floating_gateway.assert_not_called()
 
 
@@ -400,8 +392,7 @@ class BridgedVXLanNetworkApplyDnsMasqTestCase(base.ShakenFistTestCase):
 
         bvn._apply_update_dnsmasq()
 
-        network.get_lock.assert_called_once_with(
-            op='Network update DnsMasq', global_scope=False)
+        network.get_lock.assert_not_called()
         network._get_dnsmasq_object.assert_called_once_with()
         fake_dnsmasq.restart.assert_called_once_with()
 
@@ -413,8 +404,7 @@ class BridgedVXLanNetworkApplyDnsMasqTestCase(base.ShakenFistTestCase):
 
         bvn._apply_remove_dnsmasq()
 
-        network.get_lock.assert_called_once_with(
-            op='Network remove DnsMasq', global_scope=False)
+        network.get_lock.assert_not_called()
         network._get_dnsmasq_object.assert_called_once_with()
         fake_dnsmasq.terminate.assert_called_once_with()
         # The state transition to STATE_DELETED is part of the lifted body.
@@ -430,10 +420,8 @@ class BridgedVXLanNetworkApplyDnsMasqTestCase(base.ShakenFistTestCase):
 
         bvn._apply_remove_dhcp_lease('10.0.0.5', '02:00:00:11:22:33')
 
-        # The lock op name intentionally matches the original
-        # Network.remove_dhcp_lease wording ('Network update DnsMasq').
-        network.get_lock.assert_called_once_with(
-            op='Network update DnsMasq', global_scope=False)
+        # No lock taken; the dispatcher serialises all callers.
+        network.get_lock.assert_not_called()
         network._get_dnsmasq_object.assert_called_once_with()
         fake_dnsmasq.remove_lease.assert_called_once_with(
             '10.0.0.5', '02:00:00:11:22:33')
@@ -482,8 +470,7 @@ class BridgedVXLanNetworkApplyCreateOnHypervisorTestCase(
 
         bvn._apply_create_on_hypervisor()
 
-        network.get_lock.assert_called_once_with(
-            op='create_on_hypervisor', global_scope=False)
+        network.get_lock.assert_not_called()
         self.mock_create_vxlan_interface.assert_called_once_with(99, 'eth0')
         # Two audit events: pre- and post-creation.
         self.assertEqual(2, network.add_event.call_count)
@@ -680,8 +667,7 @@ class BridgedVXLanNetworkApplyDeleteOnHypervisorTestCase(
 
         bvn._apply_delete_on_hypervisor()
 
-        network.get_lock.assert_called_once_with(
-            op='Network delete', global_scope=False)
+        network.get_lock.assert_not_called()
         self.assertEqual(2, self.mock_execute.call_count)
         self.mock_execute.assert_any_call('ip link delete br-vxlan-000123')
         self.mock_execute.assert_any_call('ip link delete vxlan-000123')
@@ -742,13 +728,8 @@ class BridgedVXLanNetworkApplyDeleteOnNetworkNodeTestCase(
 
         bvn._apply_delete_on_network_node()
 
-        # The Network delete lock is acquired for the namespace teardown.
-        network.get_lock.assert_any_call(
-            op='Network delete', global_scope=False)
-        # Without provide_dhcp/dns, no dnsmasq teardown. But
-        # _apply_remove_nat always runs, which acquires its own lock.
-        network.get_lock.assert_any_call(
-            op='Network remove NAT', global_scope=False)
+        # No lock taken; the dispatcher serialises all callers.
+        network.get_lock.assert_not_called()
         # State transitioned to DELETED.
         self.assertEqual('deleted', network.state)
         self.assertEqual('deleted', network.ipam.state)

@@ -77,9 +77,9 @@ class BridgedVXLanNetwork:
         """Ensure the VXLAN FDB mesh for the wrapped network is correct.
 
         Lifted verbatim (modulo ``self`` -> ``self.network``) from the
-        original ``Network.ensure_mesh()`` body. The `get_lock` wrapper is
-        retained here for now; Phase 8 removes it once the per-node queue
-        is the sole serialisation point for in-worker mutations.
+        original ``Network.ensure_mesh()`` body. The single-threaded
+        net-worker dispatcher is the only caller of this method and
+        provides natural serialisation; no explicit lock is required.
 
         Raises the same typed exceptions as the original implementation:
         ``EnsureMeshFailed`` (from the underlying privexec layer) and
@@ -95,53 +95,51 @@ class BridgedVXLanNetwork:
         if self.network.uuid == FLOATING_NETWORK_UUID:
             return
 
-        with self.network.get_lock(
-                op='Network ensure mesh', global_scope=False):
-            # Determine which IPs should be on this mesh and where
-            instances = []
-            for ni in self.network.networkinterfaces:
-                if ni.instance_uuid not in instances:
-                    instances.append(ni.instance_uuid)
+        # Determine which IPs should be on this mesh and where
+        instances = []
+        for ni in self.network.networkinterfaces:
+            if ni.instance_uuid not in instances:
+                instances.append(ni.instance_uuid)
 
-            node_fqdns = []
-            for inst_uuid in instances:
-                inst = instance.Instance.from_db(inst_uuid)
-                if not inst:
-                    continue
-                placement = inst.placement
-                if not placement:
-                    continue
-                if not placement.get('node'):
-                    continue
+        node_fqdns = []
+        for inst_uuid in instances:
+            inst = instance.Instance.from_db(inst_uuid)
+            if not inst:
+                continue
+            placement = inst.placement
+            if not placement:
+                continue
+            if not placement.get('node'):
+                continue
 
-                if not placement.get('node') in node_fqdns:
-                    node_fqdns.append(placement.get('node'))
+            if not placement.get('node') in node_fqdns:
+                node_fqdns.append(placement.get('node'))
 
-            # NOTE(mikal): why not use DNS here? Well, DNS might be outside
-            # the control of the deployer if we're running in a public cloud
-            # as an overlay cloud... Also, we don't include ourselves in the
-            # mesh as that would cause duplicate packets to reflect back to us.
-            # (see bug #859).
-            node_ips = set()
-            if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
-                # Always add Network node if it is not this node
-                node_ips.add(config.NETWORK_NODE_IP)
+        # NOTE(mikal): why not use DNS here? Well, DNS might be outside
+        # the control of the deployer if we're running in a public cloud
+        # as an overlay cloud... Also, we don't include ourselves in the
+        # mesh as that would cause duplicate packets to reflect back to us.
+        # (see bug #859).
+        node_ips = set()
+        if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
+            # Always add Network node if it is not this node
+            node_ips.add(config.NETWORK_NODE_IP)
 
-            for fqdn in node_fqdns:
-                n = Node.from_db(fqdn)
-                if n and n.ip != config.NODE_MESH_IP:
-                    node_ips.add(n.ip)
+        for fqdn in node_fqdns:
+            n = Node.from_db(fqdn)
+            if n and n.ip != config.NODE_MESH_IP:
+                node_ips.add(n.ip)
 
-            added, removed = util_concurrency.ensure_vxlan_mesh(
-                self.network.uuid, self.network.vxid, node_ips)
-            if removed:
-                self.network.add_event(
-                    EVENT_TYPE_MUTATE, 'remove mesh elements',
-                    extra={'removed': removed})
-            if added:
-                self.network.add_event(
-                    EVENT_TYPE_MUTATE, 'add mesh elements',
-                    extra={'added': added})
+        added, removed = util_concurrency.ensure_vxlan_mesh(
+            self.network.uuid, self.network.vxid, node_ips)
+        if removed:
+            self.network.add_event(
+                EVENT_TYPE_MUTATE, 'remove mesh elements',
+                extra={'removed': removed})
+        if added:
+            self.network.add_event(
+                EVENT_TYPE_MUTATE, 'add mesh elements',
+                extra={'added': added})
 
     def _apply_add_floating_ip(
             self, floating_address: str, inner_address: str) -> None:
@@ -151,12 +149,12 @@ class BridgedVXLanNetwork:
         ``affected_objects`` parameter and the multi-target audit event are
         intentionally stripped here: event correlation is the dispatcher's
         responsibility under the migrated design, not the apply layer's.
-        The existing ``get_lock`` wrapper is preserved (Phase 8 removes it).
+        The single-threaded net-worker dispatcher is the only caller of
+        this method and provides natural serialisation; no explicit lock
+        is required.
         """
-        with self.network.get_lock(
-                op='Network add floating IP', global_scope=False):
-            util_concurrency.add_floating_ip(
-                str(self.network.uuid), floating_address, inner_address)
+        util_concurrency.add_floating_ip(
+            str(self.network.uuid), floating_address, inner_address)
 
     def _apply_remove_floating_ip(
             self, floating_address: str, inner_address: str) -> None:
@@ -168,12 +166,12 @@ class BridgedVXLanNetwork:
         ``inner_address`` argument is retained on the signature for symmetry
         with the add case (the underlying privexec helper only needs the
         floating address, but dispatchers pass both for event-emission
-        purposes).
+        purposes). The single-threaded net-worker dispatcher is the only
+        caller of this method and provides natural serialisation; no
+        explicit lock is required.
         """
-        with self.network.get_lock(
-                op='Network remove floating IP', global_scope=False):
-            util_concurrency.remove_floating_ip(
-                str(self.network.uuid), floating_address)
+        util_concurrency.remove_floating_ip(
+            str(self.network.uuid), floating_address)
 
     def _apply_route_address(self, ip: str) -> None:
         """Add a host route for a floating IP onto the network's vx bridge.
@@ -181,35 +179,36 @@ class BridgedVXLanNetwork:
         Lifted from ``Network.route_address`` (network.py:938-947). The
         single-target audit event on the wrapped network is preserved here
         (it is not multi-target, so no dispatcher fan-out is required).
+        The single-threaded net-worker dispatcher is the only caller of
+        this method and provides natural serialisation; no explicit lock
+        is required.
         """
         self.network.add_event(
             EVENT_TYPE_AUDIT, 'routing floating ip to network',
             extra={'floating': ip})
         subst = self.network.subst_dict()
         subst['floating_address'] = ip
-        with self.network.get_lock(
-                op='Network route address', global_scope=False):
-            util_concurrency.execute(
-                'ip route add %(floating_address)s/32 dev %(vx_bridge)s'
-                % subst)
+        util_concurrency.execute(
+            'ip route add %(floating_address)s/32 dev %(vx_bridge)s'
+            % subst)
 
     def _apply_unroute_address(self, ip: str) -> None:
         """Remove a host route for a floating IP from the network's vx bridge.
 
         Lifted from ``Network.unroute_address`` (network.py:950-960). As with
         ``_apply_route_address``, the single-target audit event on the
-        wrapped network is preserved.
+        wrapped network is preserved. The single-threaded net-worker
+        dispatcher is the only caller of this method and provides natural
+        serialisation; no explicit lock is required.
         """
         self.network.add_event(
             EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
             extra={'floating': ip})
         subst = self.network.subst_dict()
         subst['floating_address'] = ip
-        with self.network.get_lock(
-                op='Network unroute address', global_scope=False):
-            util_concurrency.execute(
-                'ip route del %(floating_address)s/32 dev %(vx_bridge)s'
-                % subst)
+        util_concurrency.execute(
+            'ip route del %(floating_address)s/32 dev %(vx_bridge)s'
+            % subst)
 
     def _apply_remove_nat(self) -> None:
         """Tear down the network node's NAT for the wrapped network.
@@ -219,12 +218,12 @@ class BridgedVXLanNetwork:
         enqueue fallback; under the migrated design the dispatcher only
         ever invokes ``_apply_*`` on the elected network node, so the guard
         is unnecessary here and the body collapses to the network-node
-        branch only. The ``get_lock`` wrapper is preserved.
+        branch only. The single-threaded net-worker dispatcher is the only
+        caller of this method and provides natural serialisation; no
+        explicit lock is required.
         """
-        with self.network.get_lock(
-                op='Network remove NAT', global_scope=False):
-            if self.network.floating_gateway:
-                self.network.unassign_floating_gateway()
+        if self.network.floating_gateway:
+            self.network.unassign_floating_gateway()
 
     def _apply_update_dnsmasq(self) -> None:
         """Restart dnsmasq for the wrapped network on the network node.
@@ -234,13 +233,12 @@ class BridgedVXLanNetwork:
         ``if not self.provide_dhcp and not self.provide_dns: return`` guard
         at the top of the original ``Network`` method stays at the caller
         level (it gates whether the work is even enqueued); the apply
-        method assumes work is needed. The ``get_lock`` wrapper is
-        preserved.
+        method assumes work is needed. The single-threaded net-worker
+        dispatcher is the only caller of this method and provides natural
+        serialisation; no explicit lock is required.
         """
-        with self.network.get_lock(
-                op='Network update DnsMasq', global_scope=False):
-            d = self.network._get_dnsmasq_object()
-            d.restart()
+        d = self.network._get_dnsmasq_object()
+        d.restart()
 
     def _apply_remove_dnsmasq(self) -> None:
         """Terminate dnsmasq for the wrapped network on the network node.
@@ -249,13 +247,13 @@ class BridgedVXLanNetwork:
         ``Network.remove_dnsmasq`` (network.py:808-822). The state
         transition to ``DnsMasq.STATE_DELETED`` is part of the lifted
         body. As with ``_apply_update_dnsmasq``, the provide-guard remains
-        at the caller level.
+        at the caller level. The single-threaded net-worker dispatcher is
+        the only caller of this method and provides natural serialisation;
+        no explicit lock is required.
         """
-        with self.network.get_lock(
-                op='Network remove DnsMasq', global_scope=False):
-            d = self.network._get_dnsmasq_object()
-            d.terminate()
-            d.state = dnsmasq.DnsMasq.STATE_DELETED
+        d = self.network._get_dnsmasq_object()
+        d.terminate()
+        d.state = dnsmasq.DnsMasq.STATE_DELETED
 
     def _apply_remove_dhcp_lease(self, ipv4: str, macaddr: str) -> None:
         """Release a DHCP lease for ``ipv4``/``macaddr`` on the network node.
@@ -263,13 +261,12 @@ class BridgedVXLanNetwork:
         Lifted from the ``if config.NODE_IS_NETWORK_NODE`` branch of
         ``Network.remove_dhcp_lease`` (network.py:780-791). As with the
         other dnsmasq apply methods, the provide-guard stays at the
-        caller level. The lock op name matches the original ('Network
-        update DnsMasq') for continuity with existing audit trails.
+        caller level. The single-threaded net-worker dispatcher is the
+        only caller of this method and provides natural serialisation;
+        no explicit lock is required.
         """
-        with self.network.get_lock(
-                op='Network update DnsMasq', global_scope=False):
-            d = self.network._get_dnsmasq_object()
-            d.remove_lease(ipv4, macaddr)
+        d = self.network._get_dnsmasq_object()
+        d.remove_lease(ipv4, macaddr)
 
     def _apply_create_on_hypervisor(self) -> None:
         """Set up the local VXLAN interface for the wrapped network.
@@ -278,7 +275,9 @@ class BridgedVXLanNetwork:
         (network.py:575-589). The original method was decorated with
         ``_not_on_floating_network``; we preserve that semantics inline
         here (matching the pattern in ``_apply_ensure_mesh``). The
-        existing ``get_lock`` wrapper is preserved.
+        single-threaded net-worker dispatcher is the only caller of this
+        method and provides natural serialisation; no explicit lock is
+        required.
         """
         if self.network.uuid == FLOATING_NETWORK_UUID:
             return
@@ -289,12 +288,10 @@ class BridgedVXLanNetwork:
             extra={'vx_bridge': subst['vx_bridge'],
                    'vx_interface': subst['vx_interface'],
                    'mesh_nic': self.network.mesh_nic})
-        with self.network.get_lock(
-                op='create_on_hypervisor', global_scope=False):
-            if self.network.is_dead():
-                raise DeadNetwork('network=%s' % self.network)
-            util_concurrency.create_vxlan_interface(
-                self.network.vxid, self.network.mesh_nic)
+        if self.network.is_dead():
+            raise DeadNetwork('network=%s' % self.network)
+        util_concurrency.create_vxlan_interface(
+            self.network.vxid, self.network.mesh_nic)
         self.network.add_event(
             EVENT_TYPE_AUDIT, 'created network on hypervisor',
             extra={'vx_bridge': subst['vx_bridge'],
@@ -311,6 +308,9 @@ class BridgedVXLanNetwork:
         ``self._apply_update_dnsmasq()`` call, and the ``self.enable_nat()``
         call becomes ``self._apply_enable_nat()``. The
         ``self.assign_floating_gateway()`` helper stays on ``Network``.
+        The single-threaded net-worker dispatcher is the only caller of
+        this method and provides natural serialisation; no explicit lock
+        is required.
         """
         if self.network.uuid == FLOATING_NETWORK_UUID:
             return
@@ -328,112 +328,107 @@ class BridgedVXLanNetwork:
         # module load would form a cycle.
         from shakenfist.network.network import floating_network
 
-        with self.network.get_lock(
-                op='create_on_network_node', global_scope=False):
-            if self.network.is_dead():
-                raise DeadNetwork('network=%s' % self.network)
+        if self.network.is_dead():
+            raise DeadNetwork('network=%s' % self.network)
 
-            util_concurrency.create_vxlan_interface(
-                self.network.vxid, self.network.mesh_nic)
-            util_concurrency.create_network_namespace(self.network.uuid)
+        util_concurrency.create_vxlan_interface(
+            self.network.vxid, self.network.mesh_nic)
+        util_concurrency.create_network_namespace(self.network.uuid)
 
-            subst = self.network.subst_dict()
+        subst = self.network.subst_dict()
 
-            if not util_network.check_for_interface(subst['vx_veth_outer']):
-                util_network.create_interface(
-                    subst['vx_veth_outer'], 'veth',
-                    'peer name %(vx_veth_inner)s' % subst)
-                util_concurrency.execute(
-                    'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
+        if not util_network.check_for_interface(subst['vx_veth_outer']):
+            util_network.create_interface(
+                subst['vx_veth_outer'], 'veth',
+                'peer name %(vx_veth_inner)s' % subst)
+            util_concurrency.execute(
+                'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
 
-                # Refer to bug 952 for more details here, but it turns out
-                # that adding an interface to a bridge overwrites the MTU of
-                # the bridge in an undesirable way. So we lookup the existing
-                # MTU and then re-specify it here.
-                subst['vx_bridge_mtu'] = util_network.get_interface_mtu(
-                    subst['vx_bridge'])
-                util_concurrency.execute(
-                    'ip link set %(vx_veth_outer)s master %(vx_bridge)s '
-                    'mtu %(vx_bridge_mtu)s' % subst)
+            # Refer to bug 952 for more details here, but it turns out
+            # that adding an interface to a bridge overwrites the MTU of
+            # the bridge in an undesirable way. So we lookup the existing
+            # MTU and then re-specify it here.
+            subst['vx_bridge_mtu'] = util_network.get_interface_mtu(
+                subst['vx_bridge'])
+            util_concurrency.execute(
+                'ip link set %(vx_veth_outer)s master %(vx_bridge)s '
+                'mtu %(vx_bridge_mtu)s' % subst)
 
-                util_concurrency.execute(
-                    'ip link set %(vx_veth_outer)s up' % subst)
-                util_concurrency.execute(
-                    'ip link set %(vx_veth_inner)s up' % subst,
-                    netns=self.network.uuid)
+            util_concurrency.execute(
+                'ip link set %(vx_veth_outer)s up' % subst)
+            util_concurrency.execute(
+                'ip link set %(vx_veth_inner)s up' % subst,
+                netns=self.network.uuid)
+            util_network.add_address_to_interface(
+                self.network.uuid, subst['router'], subst['netmask'],
+                subst['vx_veth_inner'])
+
+        if not util_network.check_for_interface(subst['egress_veth_outer']):
+            util_network.create_interface(
+                subst['egress_veth_outer'], 'veth',
+                'peer name %(egress_veth_inner)s' % subst)
+
+            # Refer to bug 952 for more details here, but it turns out
+            # that adding an interface to a bridge overwrites the MTU of
+            # the bridge in an undesirable way. So we lookup the existing
+            # MTU and then re-specify it here.
+            subst['egress_bridge_mtu'] = util_network.get_interface_mtu(
+                subst['egress_bridge'])
+            util_concurrency.execute(
+                'ip link set %(egress_veth_outer)s master %(egress_bridge)s '
+                'mtu %(egress_bridge_mtu)s' % subst)
+
+            util_concurrency.execute(
+                'ip link set %(egress_veth_outer)s up' % subst)
+            util_concurrency.execute(
+                'ip link set %(egress_veth_inner)s netns %(netns)s' % subst)
+
+        if self.network.provide_nat:
+            try:
+                if not self.network.floating_gateway:
+                    self.network.assign_floating_gateway()
+
+                fn = floating_network()
+                subst.update({
+                    'floating_router': fn.ipam.get_address_at_index(1),
+                    'floating_gateway': self.network.floating_gateway,
+                    'floating_netmask': fn.netmask
+                })
+            except CongestedNetwork:
+                self.network.state = self.network.STATE_ERROR
+                self.network.error = 'Unable to allocate floating gateway IP'
+                return
+
+            addresses = list(util_network.get_interface_addresses(
+                subst['egress_veth_inner'], netns=subst['netns']))
+            self.network.log.with_fields({
+                'addresses': addresses,
+                'current_address': subst['floating_gateway']}).debug(
+                    'Egress veth has these addresses')
+            if not subst['floating_gateway'] in list(addresses):
                 util_network.add_address_to_interface(
-                    self.network.uuid, subst['router'], subst['netmask'],
-                    subst['vx_veth_inner'])
+                    self.network.uuid, subst['floating_gateway'],
+                    subst['floating_netmask'],
+                    subst['egress_veth_inner'])
 
-            if not util_network.check_for_interface(subst['egress_veth_outer']):
-                util_network.create_interface(
-                    subst['egress_veth_outer'], 'veth',
-                    'peer name %(egress_veth_inner)s' % subst)
+            needs_default_route = True
+            default_routes = util_network.get_default_routes(
+                self.network.uuid)
+            if default_routes == [subst['floating_router']]:
+                needs_default_route = False
+            elif default_routes:
+                for default_route in default_routes:
+                    if default_route == subst['floating_router']:
+                        needs_default_route = False
+                    else:
+                        util_network.delete_default_route(
+                            self.network.uuid, default_route)
 
-                # Refer to bug 952 for more details here, but it turns out
-                # that adding an interface to a bridge overwrites the MTU of
-                # the bridge in an undesirable way. So we lookup the existing
-                # MTU and then re-specify it here.
-                subst['egress_bridge_mtu'] = util_network.get_interface_mtu(
-                    subst['egress_bridge'])
-                util_concurrency.execute(
-                    'ip link set %(egress_veth_outer)s master %(egress_bridge)s '
-                    'mtu %(egress_bridge_mtu)s' % subst)
+            if needs_default_route:
+                util_network.add_default_route(
+                    self.network.uuid, subst['floating_router'])
 
-                util_concurrency.execute(
-                    'ip link set %(egress_veth_outer)s up' % subst)
-                util_concurrency.execute(
-                    'ip link set %(egress_veth_inner)s netns %(netns)s' % subst)
-
-            if self.network.provide_nat:
-                # We don't always need this lock, but acquiring it here means
-                # we don't need to construct two identical ipmanagers one after
-                # the other.
-                try:
-                    if not self.network.floating_gateway:
-                        self.network.assign_floating_gateway()
-
-                    fn = floating_network()
-                    subst.update({
-                        'floating_router': fn.ipam.get_address_at_index(1),
-                        'floating_gateway': self.network.floating_gateway,
-                        'floating_netmask': fn.netmask
-                    })
-                except CongestedNetwork:
-                    self.network.state = self.network.STATE_ERROR
-                    self.network.error = 'Unable to allocate floating gateway IP'
-                    return
-
-                addresses = list(util_network.get_interface_addresses(
-                    subst['egress_veth_inner'], netns=subst['netns']))
-                self.network.log.with_fields({
-                    'addresses': addresses,
-                    'current_address': subst['floating_gateway']}).debug(
-                        'Egress veth has these addresses')
-                if not subst['floating_gateway'] in list(addresses):
-                    util_network.add_address_to_interface(
-                        self.network.uuid, subst['floating_gateway'],
-                        subst['floating_netmask'],
-                        subst['egress_veth_inner'])
-
-                needs_default_route = True
-                default_routes = util_network.get_default_routes(
-                    self.network.uuid)
-                if default_routes == [subst['floating_router']]:
-                    needs_default_route = False
-                elif default_routes:
-                    for default_route in default_routes:
-                        if default_route == subst['floating_router']:
-                            needs_default_route = False
-                        else:
-                            util_network.delete_default_route(
-                                self.network.uuid, default_route)
-
-                if needs_default_route:
-                    util_network.add_default_route(
-                        self.network.uuid, subst['floating_router'])
-
-                self._apply_enable_nat()
+            self._apply_enable_nat()
 
         # The Phase 4 late-import workaround for dnsmasq is no longer
         # necessary: this body now lives inside the worker class, so we
@@ -450,34 +445,34 @@ class BridgedVXLanNetwork:
         """Tear down the local VXLAN interfaces for the wrapped network.
 
         Lifted verbatim from ``Network.delete_on_hypervisor``
-        (network.py:721-745). The existing ``get_lock`` wrapper is
-        preserved.
+        (network.py:721-745). The single-threaded net-worker dispatcher
+        is the only caller of this method and provides natural
+        serialisation; no explicit lock is required.
         """
-        with self.network.get_lock(op='Network delete', global_scope=False):
-            subst = self.network.subst_dict()
-            self.network.add_event(
-                EVENT_TYPE_AUDIT, 'deleting network on hypervisor',
-                extra={'vx_bridge': subst['vx_bridge'],
-                       'vx_interface': subst['vx_interface']})
+        subst = self.network.subst_dict()
+        self.network.add_event(
+            EVENT_TYPE_AUDIT, 'deleting network on hypervisor',
+            extra={'vx_bridge': subst['vx_bridge'],
+                   'vx_interface': subst['vx_interface']})
 
-            bridge_present = util_network.check_for_interface(
-                subst['vx_bridge'])
-            if bridge_present:
-                util_concurrency.execute(
-                    'ip link delete %(vx_bridge)s' % subst)
+        bridge_present = util_network.check_for_interface(
+            subst['vx_bridge'])
+        if bridge_present:
+            util_concurrency.execute(
+                'ip link delete %(vx_bridge)s' % subst)
 
-            interface_present = util_network.check_for_interface(
-                subst['vx_interface'])
-            if interface_present:
-                util_concurrency.execute(
-                    'ip link delete %(vx_interface)s' % subst)
+        interface_present = util_network.check_for_interface(
+            subst['vx_interface'])
+        if interface_present:
+            util_concurrency.execute(
+                'ip link delete %(vx_interface)s' % subst)
 
-            self.network.add_event(
-                EVENT_TYPE_AUDIT, 'deleted network on hypervisor',
-                extra={'vx_bridge': subst['vx_bridge'],
-                       'vx_interface': subst['vx_interface'],
-                       'bridge_was_present': bridge_present,
-                       'interface_was_present': interface_present})
+        self.network.add_event(
+            EVENT_TYPE_AUDIT, 'deleted network on hypervisor',
+            extra={'vx_bridge': subst['vx_bridge'],
+                   'vx_interface': subst['vx_interface'],
+                   'bridge_was_present': bridge_present,
+                   'interface_was_present': interface_present})
 
     def _apply_delete_on_network_node(self) -> None:
         """Tear down the network namespace and fan out hypervisor cleanup.
@@ -488,25 +483,26 @@ class BridgedVXLanNetwork:
         Phase 4 late-import workarounds for ``_apply_remove_dnsmasq``
         and ``_apply_remove_nat`` collapse into clean
         ``self._apply_X()`` calls since this body now lives inside the
-        worker class.
+        worker class. The single-threaded net-worker dispatcher is the
+        only caller of this method and provides natural serialisation;
+        no explicit lock is required.
         """
-        with self.network.get_lock(op='Network delete', global_scope=False):
-            subst = self.network.subst_dict()
+        subst = self.network.subst_dict()
 
-            if util_network.check_for_interface(subst['vx_veth_outer']):
-                util_concurrency.execute(
-                    'ip link delete %(vx_veth_outer)s' % subst)
+        if util_network.check_for_interface(subst['vx_veth_outer']):
+            util_concurrency.execute(
+                'ip link delete %(vx_veth_outer)s' % subst)
 
-            if util_network.check_for_interface(subst['egress_veth_outer']):
-                util_concurrency.execute(
-                    'ip link delete %(egress_veth_outer)s' % subst)
+        if util_network.check_for_interface(subst['egress_veth_outer']):
+            util_concurrency.execute(
+                'ip link delete %(egress_veth_outer)s' % subst)
 
-            if os.path.exists('/var/run/netns/%s' % str(self.network.uuid)):
-                util_concurrency.execute(
-                    'ip netns del %s' % str(self.network.uuid))
+        if os.path.exists('/var/run/netns/%s' % str(self.network.uuid)):
+            util_concurrency.execute(
+                'ip netns del %s' % str(self.network.uuid))
 
-            self.network.ipam.state = self.network.ipam.STATE_DELETED
-            self.network.state = self.network.STATE_DELETED
+        self.network.ipam.state = self.network.ipam.STATE_DELETED
+        self.network.state = self.network.STATE_DELETED
 
         # Ensure that all hypervisors remove this network. This is really
         # just catching strays, apart from on the network node where we
