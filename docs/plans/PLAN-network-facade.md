@@ -507,16 +507,16 @@ Scope boundaries:
    instantiated only by the net-worker dispatcher.
 
 5. **Migration order.** Resolved: per-method migration,
-   with a temporary internal flag on each `Network`
-   method that lets us flip it from direct-call to
-   enqueue independently. Each phase covers one method
-   (or a small tightly-coupled group); intermediate phase
-   commits leave `Network` carrying both shapes in
-   parallel for unmigrated methods. The instance-start
-   path is migrated last because it is the largest
-   beneficiary of any batching optimisation we may add
-   later and we want measured latency data on the smaller
-   migrations first.
+   one method (or a small tightly-coupled group) per
+   phase. Phases 2–5 migrated each method cleanly
+   in-place without leaving temporary feature flags
+   behind. The per-method migration flag approach
+   discussed during planning was not needed in
+   practice — each phase replaced the method body
+   directly, leaving the public `Network` surface
+   unchanged while the implementation moved to
+   `BridgedVXLanNetwork`. The instance-start path was
+   migrated last (Phase 5) as planned.
 
    **Safety: per-phase PR runs cluster_ci.** The "leaves
    the cluster in a runnable state, passes CI" rule for
@@ -526,8 +526,8 @@ Scope boundaries:
    that change observable behaviour (e.g. enqueue+poll
    semantics replacing direct calls) are precisely the
    places where unit tests will pass but functional tests
-   may catch a regression. Phase plans should treat
-   cluster_ci as a required gate, not a courtesy run.
+   may catch a regression. Phase plans treated cluster_ci
+   as a required gate, not a courtesy run.
 
 6. **Behaviour of `maintain.py`.** The reconciliation
    thread today walks all networks every interval and
@@ -673,9 +673,9 @@ Scope boundaries:
    `add_floating_ip`, `route_address`, `enable_nat`, etc.
    But `create_on_hypervisor` and `ensure_mesh` are
    per-hypervisor mutations — they need to run on each
-   node that has interfaces on the network. We therefore
-   need a second queue family, scoped to each node, that
-   the local sf-net's net-worker services.
+   node that has interfaces on the network. A second
+   queue family, scoped to each node, was added in
+   Phase 1 for the local sf-net's net-worker.
 
    The new family mirrors the existing five-priority
    taxonomy exactly (the priority enum is
@@ -690,16 +690,16 @@ Scope boundaries:
    * `<node_uuid>-network-background`
    * `<node_uuid>-network-background_high_io`
 
-   The existing dispatcher already drains queues in
-   priority order by iterating the list returned from the
-   queue-list helper (`workitem.py:36-39`); the new
-   per-node family is added at the front of that
-   iteration before the network-node-only family, so a
-   local user-facing op outranks a network-node background
-   op. Within a family, the established priority semantics
-   apply unchanged.
+   The existing dispatcher drains queues in priority
+   order by iterating the list returned from the
+   queue-list helper (`workitem.py:36-39`); the per-node
+   family is added at the front of that iteration before
+   the network-node-only family, so a local user-facing
+   op outranks a network-node background op. Within a
+   family, the established priority semantics apply
+   unchanged.
 
-   Priority assignment for our callers:
+   Priority assignment:
 
    * REST handlers that have returned 202 to a waiting
      client enqueue at `user_facing` (or
@@ -716,30 +716,24 @@ Scope boundaries:
      inherit the priority of their parent op rather than
      defaulting to a fixed value.
 
-   **Current leaning:** add the queue family as Phase 1
-   before any `Network` API surface changes. We rely on
-   the existing priority drain to keep user-facing chains
-   ahead of background reconciliation; if background ops
-   are observed to starve in practice, that is a generic
-   work-queue fairness issue and we fix it generically
-   (e.g. weighted draining across priority lanes), not as
-   a special case for the network family.
-
 10. **Scope of API redirect removal.** The
-    `redirect_to_network_node` decorator and its four
-    applications (network.py × 3, interface.py × 1) come
-    out as part of this plan; after the facade lands those
-    handlers no longer need to be on the network node.
-    `redirect_instance_request` (~10 sites in
-    instance.py), `redirect_to_eventlog_node` (several
-    sites), and `redirect_upload_request` (two sites) are
-    the same class of bypass and the queue-based pattern
+    `redirect_to_network_node` decorator and three of its
+    four applications were removed in Phase 7; after the
+    facade landed those handlers no longer needed to be on
+    the network node. The one remaining application —
+    `NetworkPingEndpoint.get` — was explicitly retained
+    because migrating the synchronous ping to a
+    queue-based op requires op-output infrastructure
+    not yet built; it remains deferred future work (see
+    Future work section). `redirect_instance_request`
+    (~10 sites in instance.py),
+    `redirect_to_eventlog_node` (several sites), and
+    `redirect_upload_request` (two sites) are the same
+    class of bypass and the queue-based pattern
     established here is the future direction for them, but
     each has its own caller fan-out and its own correctness
-    concerns. **Current leaning:** remove only
-    `redirect_to_network_node` in this plan; record the
-    others as explicit future work, with a note that this
-    plan establishes the migration pattern.
+    concerns. These remain out of scope for this plan
+    and are recorded as explicit future work.
 
 11. **Defer delay for chained ops.** The existing
     dispatcher (`baseoperation.py:212-240`) defers a not-
@@ -824,9 +818,10 @@ Scope boundaries:
 
     Option (C) from the earlier framing — dispatcher
     re-dequeues dependents on terminal-state transition —
-    remains the right long-term answer and is recorded as
-    future work. It removes the need for back-off entirely
-    because dependents wake on signal rather than retry.
+    remains the right long-term answer and is recorded in
+    the Future work section. It would remove the need for
+    back-off entirely because dependents wake on signal
+    rather than retry.
 
 12. **API endpoints for chain discoverability.** A REST
     client that gets a 202 + terminal-op uuid needs a way
@@ -838,15 +833,15 @@ Scope boundaries:
     But there's no "give me the whole chain" endpoint
     today.
 
-    Two minimal additions appear sufficient:
-    * **GET `/clusteroperations/<uuid>/chain`** — return
+    Both endpoints were added in Phase 7:
+    * **GET `/clusteroperations/<uuid>/chain`** — returns
       the transitive closure of `depends_on` starting from
       `<uuid>`, scoped to the caller's namespace (admin
       sees everything; non-admin sees only ops targeting
       objects in their namespaces). Useful for the
       "something in this chain failed; where" lookup.
     * **GET `/clusteroperations?target_object_type=...
-      &target_uuid=...`** — list ops targeting a given
+      &target_uuid=...`** — lists ops targeting a given
       object, scoped by namespace. Useful for "what's
       currently happening on this network/instance". The
       backing query is the same one
@@ -856,14 +851,9 @@ Scope boundaries:
     Authorisation follows the existing
     namespace-ownership pattern (admin sees all; users see
     ops on objects they own). The
-    `cluster_operation_targets` table already records
-    enough to scope the query at the DB layer; we should
-    not pull rows back to Python and filter there.
-
-    **Current leaning:** add both endpoints as part of
-    Phase 7 (the redirect-removal / REST-contract-change
-    phase) so REST clients have what they need from day
-    one of the new contract.
+    `cluster_operation_targets` table records enough to
+    scope the query at the DB layer; no Python-side
+    filtering of full-table scans.
 
 13. **Broader cluster-operation cancellation.** Out of
     scope for this plan, but flagged here so the
@@ -905,19 +895,16 @@ Scope boundaries:
     declarations or the sweep-on-delete behaviour.
 
 Notes:
-* **REST contract change is in.** Since we own both server
-  and client (`shakenfist/client-python`), we change the
-  contract for the four affected endpoints from "block
-  until the host change is done" to "return 202 + terminal
-  op uuid and the client polls". A capability-negotiation
+* **REST contract change.** Since we own both server and
+  client (`shakenfist/client-python`), the contract for
+  the affected delete endpoints changed from "block until
+  the host change is done" to "return 202 + terminal op
+  uuid and the client polls". A capability-negotiation
   scheme on the server (so old clients still get the
   blocking behaviour) was considered but explicitly
-  declined: we are the only consumer of this API and would
-  rather not carry the dual code path. It can be revisited
-  if external consumers ever appear.
-
-Please confirm the leanings above before phase 1 planning
-begins.
+  declined: we are the only consumer of this API and
+  would rather not carry the dual code path. It can be
+  revisited if external consumers ever appear.
 
 ## Execution
 
@@ -931,7 +918,7 @@ begins.
 | 5. `create_on_*` and `delete_on_*` migration | PLAN-network-facade-phase-05-lifecycle.md | Complete |
 | 6. `maintain.py` rewrite as discovery-only | PLAN-network-facade-phase-06-maintain.md | Complete |
 | 7. REST contract: remove `redirect_to_network_node` from three of its four sites, flip the two delete endpoints to 202+poll, add `/clusteroperations/<uuid>/chain` and `/clusteroperations?target_*=` endpoints, update `client-python` | PLAN-network-facade-phase-07-rest-contract.md | Complete |
-| 8. Remove the temporary `NodeLock`s from the stability fix | PLAN-network-facade-phase-08-cleanup.md | Complete |
+| 8. Remove the temporary `NodeLock`s from the stability fix (no per-method migration flags existed to remove — Phases 2–5 migrated each method cleanly in-place) | PLAN-network-facade-phase-08-cleanup.md | Complete |
 | 9. Documentation and tests | PLAN-network-facade-phase-09-docs.md | Planning |
 
 Phase numbering reflects dependency ordering. Phase 1 is
@@ -1022,8 +1009,10 @@ Per-phase guidance:
   fix locks and removes the migration flags. Each removal is
   a small targeted diff.
 * Phase 9 (docs) — **medium effort**. Updates
-  `ARCHITECTURE.md`, `AGENTS.md`, README, the developer guide
-  state-machine docs, and the operator-guide network docs.
+  `ARCHITECTURE.md`, `AGENTS.md`, the API reference docs,
+  and the master plan itself. README, the developer guide
+  state-machine docs, and the operator-guide network docs
+  required no changes (confirmed during Phase 9 planning).
 
 ### Step-level guidance
 
@@ -1310,6 +1299,14 @@ because the following statements will be true:
 * **Apply the facade pattern to `NetworkInterface` and
   `IPAM`.** Each has its own audit work but the same
   bypass problem exists in principle.
+* **Queue-based ping endpoint migration.** Phase 7
+  retained the `@redirect_to_network_node` decorator on
+  `NetworkPingEndpoint.get` because migrating a
+  synchronous ping to the queue-based op model requires
+  op-output infrastructure (a way to surface the ping
+  result back through the op terminal state) that is not
+  yet built. This remains deferred beyond this master
+  plan.
 * **Remove the remaining API redirect decorators.**
   `redirect_instance_request`,
   `redirect_to_eventlog_node`, and
@@ -1330,10 +1327,14 @@ because the following statements will be true:
 
 ### Bugs fixed during this work
 
-This section will list any bugs we encounter during
-development that we fix.
-
-* (none yet)
+* **Latent `InvalidStateException` on pre-aborted ops.**
+  (Fixed in Phase 1.) Before the cancellation-check on
+  dequeue was added, the dispatcher could pick up an op
+  already in `STATE_ABORT`, call `self.state =
+  STATE_EXECUTING`, and hit `InvalidStateException`
+  because `state_targets[STATE_ABORT] = (STATE_DELETED,)`
+  only. The Phase 1 cancellation-check drops such ops
+  cleanly before attempting to execute them.
 
 ### Documentation index maintenance
 
