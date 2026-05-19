@@ -5,6 +5,20 @@ Neutron -- its more like the old OpenStack Compute nova-network implementation
 if you're looking for a mental model. Let's work through some examples to explain
 what it is doing.
 
+!!! note "Asynchronous network deletion (REST API)"
+    `DELETE /networks/{network_ref}` and `DELETE /networks` now return
+    HTTP 202 (Accepted) with a cluster-operation handle in the body
+    rather than performing the work synchronously. Operators scripting
+    directly against the REST API (rather than via the Python client)
+    must poll the returned op uuid at
+    `GET /clusteroperations/{op_type}/{op_uuid}` until the op reaches a
+    terminal state (`complete`, `abort`, `deleted`, or `error`). The
+    Python client (`shakenfist_client`) handles this transparently —
+    `delete_network()` polls by default and raises
+    `ClusterOperationFailed` on a terminal-error state. See the
+    [clusteroperations API reference](/developer_guide/api_reference/clusteroperations)
+    for the full polling contract.
+
 ## Single node install, no networks or instances
 
 ```bash
