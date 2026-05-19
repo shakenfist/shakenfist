@@ -139,6 +139,17 @@ class BaseClusterOperation(BaseOperation):
         dbo.STATE_DELETED: None,
     }
 
+    def hard_delete(self) -> None:
+        # Clean up the cluster_operations row and the
+        # cluster_operation_errors row (if any) so neither table grows
+        # unbounded as the cleaner sweeps terminal-state operations.
+        # ``delete_cluster_operation_error`` is idempotent — ops that
+        # never failed have no row to remove.
+        uuid_str = str(self.uuid)
+        mariadb.delete_cluster_operation_error(uuid_str)
+        mariadb.delete_cluster_operation(uuid_str)
+        super().hard_delete()
+
     def __init__(
             self,
             static_values: dict[str, Any],

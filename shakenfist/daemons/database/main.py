@@ -4723,6 +4723,23 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetClusterOperationErrorReply(
                 found=False)
 
+    def DeleteClusterOperationError(
+        self,
+        request: database_pb2.DeleteClusterOperationErrorRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete the ErrorReport row for a cluster operation."""
+        try:
+            self.monitor.counters['delete_cluster_operation_error'].inc()
+            success = mariadb._direct_delete_cluster_operation_error(
+                UUID(request.op_uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteClusterOperationError failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     def _cluster_operation_to_proto(
             self,
             data: dict[str, Any]
@@ -4935,6 +4952,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB cluster operation error operations
             'set_cluster_operation_error',
             'get_cluster_operation_error',
+            'delete_cluster_operation_error',
             # MariaDB find (filter-pushdown) operations
             'find_artifacts', 'find_instances', 'find_networks',
             'find_network_interfaces',

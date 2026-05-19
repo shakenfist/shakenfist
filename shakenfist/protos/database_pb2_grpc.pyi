@@ -1022,6 +1022,11 @@ class DatabaseServiceStub:
         database_pb2.GetClusterOperationErrorReply,
     ]
 
+    DeleteClusterOperationError: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationErrorRequest,
+        database_pb2.StatusReply,
+    ]
+
 class DatabaseServiceAsyncStub:
     Enqueue: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.EnqueueRequest,
@@ -2024,6 +2029,11 @@ class DatabaseServiceAsyncStub:
     GetClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetClusterOperationErrorRequest,
         database_pb2.GetClusterOperationErrorReply,
+    ]
+
+    DeleteClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationErrorRequest,
+        database_pb2.StatusReply,
     ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
@@ -3389,5 +3399,12 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetClusterOperationErrorRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetClusterOperationErrorReply, collections.abc.Awaitable[database_pb2.GetClusterOperationErrorReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteClusterOperationError(
+        self,
+        request: database_pb2.DeleteClusterOperationErrorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

@@ -17654,6 +17654,28 @@ def _direct_get_cluster_operation_error(
         return None
 
 
+def _direct_delete_cluster_operation_error(op_uuid: UUID) -> bool:
+    """Delete the cluster_operation_errors row for an op.
+
+    Idempotent: returns True whether or not a row existed, so callers
+    can use it from ``hard_delete`` without checking first.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operation_errors_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.op_uuid == op_uuid)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for cluster_operation_error '
+            f'{op_uuid}: {e}')
+        return False
+
+
 # =============================================================================
 # Cluster Operations gRPC Client Functions
 # =============================================================================
@@ -17833,6 +17855,21 @@ def _grpc_get_cluster_operation_error(
             f'gRPC GetClusterOperationError failed for '
             f'{op_uuid}: {e}')
         return None
+
+
+def _grpc_delete_cluster_operation_error(op_uuid: UUID) -> bool:
+    """Delete an ErrorReport row via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteClusterOperationErrorRequest(
+            op_uuid=str(op_uuid))
+        reply = _grpc_call(stub.DeleteClusterOperationError, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteClusterOperationError failed for '
+            f'{op_uuid}: {e}')
+        return False
 
 
 # =============================================================================
@@ -18191,6 +18228,26 @@ def get_cluster_operation_error(
     if _use_database_service():
         return _grpc_get_cluster_operation_error(u)
     return _direct_get_cluster_operation_error(u)
+
+
+def delete_cluster_operation_error(op_uuid: 'str | UUID') -> bool:
+    """Delete the ErrorReport row for a cluster operation.
+
+    Idempotent. Called from ``BaseClusterOperation.hard_delete`` when
+    the cluster cleaner reaps a terminal-state op so the
+    ``cluster_operation_errors`` table does not grow unbounded.
+
+    Args:
+        op_uuid: The operation's UUID (str or UUID).
+
+    Returns:
+        True on success (whether or not a row existed), False on
+        MariaDB error.
+    """
+    u = _ensure_uuid(op_uuid)
+    if _use_database_service():
+        return _grpc_delete_cluster_operation_error(u)
+    return _direct_delete_cluster_operation_error(u)
 
 
 # =============================================================================

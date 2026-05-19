@@ -299,6 +299,7 @@ service DatabaseService {
   // overwrites the prior report.
   rpc SetClusterOperationError (SetClusterOperationErrorRequest) returns (StatusReply) {}
   rpc GetClusterOperationError (GetClusterOperationErrorRequest) returns (GetClusterOperationErrorReply) {}
+  rpc DeleteClusterOperationError (DeleteClusterOperationErrorRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -1889,4 +1890,8 @@ message GetClusterOperationErrorReply {
   bool found = 1;
   string error_report_json = 2;   // ErrorReport serialised as JSON
   double created_at = 3;          // Unix timestamp the report was written
+}
+
+message DeleteClusterOperationErrorRequest {
+  string op_uuid = 1;             // Operation UUID as string
 }

@@ -5753,3 +5753,19 @@ class GetClusterOperationErrorReply(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "error_report_json", b"error_report_json", "found", b"found"]) -> None: ...
 
 global___GetClusterOperationErrorReply = GetClusterOperationErrorReply
+
+@typing.final
+class DeleteClusterOperationErrorRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    """Operation UUID as string"""
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["op_uuid", b"op_uuid"]) -> None: ...
+
+global___DeleteClusterOperationErrorRequest = DeleteClusterOperationErrorRequest
