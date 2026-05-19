@@ -27,6 +27,14 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
+# Maximum number of ops returned by the chain endpoint. A malformed or
+# maliciously crafted ``depends_on`` graph could otherwise force the
+# API process to expand a very large chain (one DB round trip per
+# node). The cap is also the maximum result size; callers needing
+# deeper history must walk the graph themselves via repeated calls.
+MAX_CHAIN_NODES = 256
+
+
 clusteroperation_get_example = """{
 }"""
 
@@ -125,9 +133,10 @@ class ClusterOperationChainEndpoint(api_base.Resource):
         [('op_uuid', 'query', 'uuid', 'The UUID of the operation.', True)],
         [(200, 'A list of cluster operation summary dicts, newest-first.',
           clusteroperation_chain_example),
-         (400, 'Malformed depends_on entry on a chain member.', None),
-         (403, 'Chain crosses into a namespace the caller cannot see.',
-          None),
+         (400, 'Malformed depends_on entry, or chain exceeds the '
+          'configured maximum size.', None),
+         (403, 'Chain crosses into a namespace the caller cannot see, '
+          'or includes an op without a recorded target.', None),
          (404, 'Operation not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
@@ -139,37 +148,65 @@ class ClusterOperationChainEndpoint(api_base.Resource):
         caller_namespace = request_namespace()
         is_admin = (caller_namespace == 'system')
 
+        # created_at is cached here during the BFS so the post-walk
+        # sort does not re-query the database once per visited node.
         visited: dict[str, object] = {}
+        created_at: dict[str, float] = {}
         order: list[str] = []
         queue: list[str] = [op_uuid]
         visited[op_uuid] = root
         order.append(op_uuid)
 
         while queue:
+            if len(visited) > MAX_CHAIN_NODES:
+                return sf_api.error(
+                    400,
+                    'cluster operation chain exceeds maximum size of '
+                    f'{MAX_CHAIN_NODES} nodes')
+
             current_uuid = queue.pop(0)
             current_op = visited[current_uuid]
 
             # Namespace check: every visited op must be in the caller's
             # namespace (or the caller must be admin). We resolve the
             # op's namespace via its cluster_operation_targets row.
+            #
+            # If no target row exists (older ops written before the
+            # target table existed, or ops created by a code path that
+            # bypassed ``enqueue_cluster_operation``) we *fail closed*
+            # for non-admins: without target information we cannot
+            # prove the op belongs to the caller's namespace, and
+            # exposing the chain regardless would leak cluster-scoped
+            # ancestor uuids.
             if not is_admin:
                 target = mariadb.get_cluster_operation_target(current_uuid)
-                if target is not None:
-                    target_namespace = _namespace_for_target(
-                        target.target_object_type, target.target_uuid)
-                    if (target_namespace is not None and
-                            target_namespace != caller_namespace):
-                        return sf_api.error(
-                            403,
-                            'cluster operation chain crosses into a '
-                            'namespace you cannot see')
-                    if target_namespace is None:
-                        # Cluster-scoped target (e.g. node, blob) -- only
-                        # admins can see ops touching these.
-                        return sf_api.error(
-                            403,
-                            'cluster operation chain includes a '
-                            'cluster-scoped target you cannot see')
+                if target is None:
+                    return sf_api.error(
+                        403,
+                        'cluster operation chain includes an op with no '
+                        'recorded target; namespace cannot be verified')
+                target_namespace = _namespace_for_target(
+                    target.target_object_type, target.target_uuid)
+                if (target_namespace is not None and
+                        target_namespace != caller_namespace):
+                    return sf_api.error(
+                        403,
+                        'cluster operation chain crosses into a '
+                        'namespace you cannot see')
+                if target_namespace is None:
+                    # Cluster-scoped target (e.g. node, blob) -- only
+                    # admins can see ops touching these.
+                    return sf_api.error(
+                        403,
+                        'cluster operation chain includes a '
+                        'cluster-scoped target you cannot see')
+
+            # Cache created_at for the post-walk sort.
+            record = mariadb.get_cluster_operation(current_uuid)
+            if record and 'created_at' in record:
+                created_at[current_uuid] = float(record['created_at'])
+            else:
+                created_at[current_uuid] = 0.0
 
             # Expand depends_on entries onto the queue.
             try:
@@ -196,15 +233,10 @@ class ClusterOperationChainEndpoint(api_base.Resource):
                 order.append(dep_uuid)
                 queue.append(dep_uuid)
 
-        # Sort the visited ops newest-first by created_at. Fall back to
-        # insertion order if created_at is missing.
-        def _sort_key(u: str) -> float:
-            record = mariadb.get_cluster_operation(u)
-            if record and 'created_at' in record:
-                return float(record['created_at'])
-            return 0.0
-
-        ordered_uuids = sorted(order, key=_sort_key, reverse=True)
+        # Sort the visited ops newest-first by created_at (cached
+        # during the BFS, no further DB round trips here).
+        ordered_uuids = sorted(
+            order, key=lambda u: created_at.get(u, 0.0), reverse=True)
         return [visited[u].external_view() for u in ordered_uuids]
 
 

@@ -240,6 +240,136 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
         self.assertEqual(2, len(body))
         self.assertEqual({uuid_a, uuid_b}, {entry['uuid'] for entry in body})
 
+    def test_chain_no_target_row_returns_403_for_non_admin(self):
+        # An op with no cluster_operation_targets row cannot have its
+        # namespace verified. The endpoint must fail closed for
+        # non-admin callers rather than expose the chain blindly.
+        uuid_a = str(uuid4())
+        ops = {
+            uuid_a: ('net_op', [], 1.0),
+        }
+        # No targets entry for uuid_a.
+        targets: dict = {}
+        self._patch_chain(ops, targets)
+
+        resp = self.client.get(
+            '/clusteroperations/%s/chain' % uuid_a,
+            headers={'Authorization': self.foo_token})
+        self.assertEqual(403, resp.status_code)
+
+    def test_chain_no_target_row_admin_sees_full_chain(self):
+        # Admins are not affected by the target-missing 403; the
+        # namespace check is skipped entirely for the admin namespace.
+        uuid_a = str(uuid4())
+        ops = {
+            uuid_a: ('net_op', [], 1.0),
+        }
+        targets: dict = {}
+        self._patch_chain(ops, targets)
+
+        resp = self.client.get(
+            '/clusteroperations/%s/chain' % uuid_a,
+            headers={'Authorization': self.admin_token})
+        self.assertEqual(200, resp.status_code)
+        body = resp.get_json()
+        self.assertEqual(1, len(body))
+        self.assertEqual(uuid_a, body[0]['uuid'])
+
+    def test_chain_cluster_scoped_target_returns_403_for_non_admin(self):
+        # A target like ``node`` or ``blob`` is cluster-scoped (no
+        # namespace attribute), so non-admins must not see ops touching
+        # it. Verified at the chain root rather than only on deep
+        # ancestors.
+        uuid_a = str(uuid4())
+        ops = {
+            uuid_a: ('net_op', [], 1.0),
+        }
+        # ``node`` returns ``None`` from _namespace_for_target because
+        # Node objects have no namespace attribute.
+        targets = {
+            uuid_a: ('node', str(uuid4())),
+        }
+        self._patch_chain(ops, targets)
+
+        resp = self.client.get(
+            '/clusteroperations/%s/chain' % uuid_a,
+            headers={'Authorization': self.foo_token})
+        self.assertEqual(403, resp.status_code)
+
+    def test_chain_self_referential_cycle_does_not_loop(self):
+        # A self-referential ``depends_on`` (op refers to itself) must
+        # be handled by the visited-set guard; the response is the
+        # single-node chain rather than an infinite walk.
+        uuid_a = str(uuid4())
+        ops = {
+            uuid_a: ('net_op',
+                     [{'op_type': 'net_op', 'op_uuid': uuid_a}],
+                     1.0),
+        }
+        targets = {
+            uuid_a: ('network', self.network_uuid),
+        }
+        self._patch_chain(ops, targets)
+
+        resp = self.client.get(
+            '/clusteroperations/%s/chain' % uuid_a,
+            headers={'Authorization': self.foo_token})
+        self.assertEqual(200, resp.status_code)
+        body = resp.get_json()
+        self.assertEqual(1, len(body))
+        self.assertEqual(uuid_a, body[0]['uuid'])
+
+    def test_chain_two_node_cycle_returns_both_nodes(self):
+        # A two-node cycle (A -> B -> A) terminates with both nodes
+        # visited exactly once, in created_at order.
+        uuid_a = str(uuid4())
+        uuid_b = str(uuid4())
+        ops = {
+            uuid_a: ('net_op',
+                     [{'op_type': 'net_op', 'op_uuid': uuid_b}],
+                     2.0),
+            uuid_b: ('net_op',
+                     [{'op_type': 'net_op', 'op_uuid': uuid_a}],
+                     1.0),
+        }
+        targets = {
+            uuid_a: ('network', self.network_uuid),
+            uuid_b: ('network', self.network_uuid),
+        }
+        self._patch_chain(ops, targets)
+
+        resp = self.client.get(
+            '/clusteroperations/%s/chain' % uuid_a,
+            headers={'Authorization': self.foo_token})
+        self.assertEqual(200, resp.status_code)
+        body = resp.get_json()
+        self.assertEqual(2, len(body))
+        self.assertEqual({uuid_a, uuid_b}, {entry['uuid'] for entry in body})
+
+    def test_chain_exceeds_max_returns_400(self):
+        # A chain longer than MAX_CHAIN_NODES nodes terminates with a
+        # 400. Patch the limit down to something small for the test.
+        chain_len = 6
+        uuids = [str(uuid4()) for _ in range(chain_len)]
+        ops = {}
+        targets = {}
+        for i, u in enumerate(uuids):
+            next_u = uuids[i + 1] if i + 1 < chain_len else None
+            deps = (
+                [{'op_type': 'net_op', 'op_uuid': next_u}]
+                if next_u else [])
+            ops[u] = ('net_op', deps, float(chain_len - i))
+            targets[u] = ('network', self.network_uuid)
+        self._patch_chain(ops, targets)
+
+        with mock.patch(
+                'shakenfist.external_api.clusteroperation.MAX_CHAIN_NODES',
+                3):
+            resp = self.client.get(
+                '/clusteroperations/%s/chain' % uuids[0],
+                headers={'Authorization': self.foo_token})
+        self.assertEqual(400, resp.status_code)
+
 
 class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
     """Tests for ``GET /clusteroperations?target_object_type=&target_uuid=``."""
