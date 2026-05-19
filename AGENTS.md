@@ -193,7 +193,21 @@ namespace-scoped — admin sees all, non-admin gets 403 on foreign-namespace mem
 object, SQL-layer namespace filtering). The companion client-python changes (sibling repo,
 feature branch `network-facade-phase-07`) make `delete_network` and `delete_all_networks`
 handle 202 transparently by default (poll until terminal, raise on error); `wait=False`
-returns the op handle without polling. Phase 8 (NodeLock removal) is the only remaining phase.
+returns the op handle without polling. Phase 8 is complete; Phase 9 (documentation sweep)
+is the only remaining phase.
+
+**Phase 8 — NodeLock removal.** The 13 `NodeLock(global_scope=False)` wrappers
+inside `BridgedVXLanNetwork._apply_*` methods have been removed (commit `277b0572`).
+The load-bearing reason is the single-threaded dispatcher in
+`shakenfist/daemons/network/workitem.py`: its single-worker-per-queue invariant
+(see the comment block at `self._defer_delays`) guarantees that exactly one
+caller executes any `_apply_*` method at a time, making the per-network locks
+redundant. Cross-daemon serialisation is now via the queue itself — only `sf-net`
+dequeues and executes network work, so concurrent invocation across daemons cannot
+happen by construction. Note that this reasoning is specific to
+`NodeLock(global_scope=False)`; it does not extend to `ClusterLock`s, which
+serialise across the cluster and remain in use elsewhere. Phase 9 (full
+documentation sweep) is the only remaining phase.
 
 ### Key Directories
 

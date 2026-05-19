@@ -616,3 +616,26 @@ via `ErrorReport`, so in-flight ops at deploy time fail gracefully rather than
 hanging or producing unhandled exceptions. Operators who see `STATE_ERROR` on one
 of these task types after a rolling upgrade can safely re-deploy the affected
 network via the standard `Network.create_on_network_node()` / `ensure_mesh()` API.
+
+## Phase 8: NodeLock removal
+
+Phase 8 removed the 13 `NodeLock(global_scope=False)` wrappers from all
+`BridgedVXLanNetwork._apply_*` methods (commit `277b0572`). Those wrappers were
+added by stability-branch commit `bd9e1869` as a short-term guard against
+concurrent callers from four daemons (`sf-net`, `sf-queues`, `sf-api`, and
+`instance.py`). With Phases 2–7 landed, the dispatcher loop in this file is the
+**only** caller of every `_apply_*` method, and it is single-threaded by
+construction. The load-bearing invariant is the single-worker safety property
+documented in the "Single-worker safety invariant" section above (and in the
+comment block at `self._defer_delays` in this file): each queue is drained by
+exactly one worker, so no two `_apply_*` invocations can race. Cross-daemon
+serialisation is now provided by the queue itself — only `sf-net` dequeues and
+executes network work, so concurrent host-mutating calls from other daemons
+(`sf-queues`, `sf-api`, `instance.py`) cannot bypass the dispatcher by
+construction.
+
+An important scope note: all 13 removed locks used `global_scope=False`, making
+them per-node `NodeLock`s, not `ClusterLock`s. The single-threaded-dispatcher
+argument covers per-node serialisation only. `ClusterLock`s serialise across the
+whole cluster via a different mechanism and remain in use for operations that
+require cluster-wide exclusion; the Phase 8 reasoning does not apply to them.

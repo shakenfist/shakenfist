@@ -312,9 +312,10 @@ serialisation point and the locks are removed.
 `create_on_hypervisor`, `delete_on_hypervisor`,
 `create_on_network_node`, `delete_on_network_node`.
 
-Every host-mutating `Network` method is now flipped to enqueue. Phase 8 (the
-only remaining phase) removes the per-operation `NodeLock` guards that are
-now superseded by the single-worker queue serialisation guarantee.
+Every host-mutating `Network` method is now flipped to enqueue. Phase 8
+removed the per-operation `NodeLock` guards that were superseded by the
+single-worker queue serialisation guarantee; Phase 9 (documentation sweep)
+is the only remaining phase.
 
 #### Phase 7 — REST contract
 
@@ -405,6 +406,23 @@ called only from within `_apply_create_on_network_node`.
 `net_iface_ip_op`, `net_macaddr_ip_op`, plus `node_net_op` and `node_inst_op` /
 `node_inst_netdesc_op`. All route through `BridgedVXLanNetwork` and persist
 `ErrorReport` on their outer exception branch.
+
+#### Phase 8 — NodeLock removal
+
+The 13 per-network `NodeLock` wrappers inside `BridgedVXLanNetwork._apply_*`
+methods were removed in Phase 8 (commit `277b0572`). Each wrapper originated
+in stability-branch commit `bd9e1869`, which added them as a short-term fix to
+serialise concurrent host-mutating callers from four daemons (`sf-net`,
+`sf-queues`, `sf-api`, and `instance.py`). With Phases 2–7 landed, the
+net-worker dispatcher loop in `shakenfist/daemons/network/workitem.py` is the
+only caller of every `_apply_*` method, and that loop is single-threaded by
+construction — so the locks became provably redundant. Cross-daemon
+serialisation is now provided by the queue itself: only one daemon (`sf-net`)
+dequeues and executes work for any given network, making concurrent invocation
+across daemons structurally impossible. The removed locks were all
+`NodeLock(global_scope=False)` (per-node), not `ClusterLock`s; the
+single-threaded-dispatcher argument does not extend to `ClusterLock`s, which
+remain in use elsewhere.
 
 #### In-worker sibling call pattern
 
