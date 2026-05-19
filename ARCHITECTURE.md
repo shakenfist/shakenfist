@@ -254,11 +254,10 @@ typed exception is a one-line change: add a row to the dict.
 
 `BridgedVXLanNetwork` (`shakenfist/network/bridged_vxlan_network.py`) is the
 worker-side counterpart of `Network`. `Network` is the public facade that
-external callers interact with; from Phase 2 onwards it enqueues operations
-rather than mutating host state directly. `BridgedVXLanNetwork` wraps a
-`Network` instance and exposes `_apply_*` methods that actually mutate per-
-hypervisor state (VXLAN FDB table, dnsmasq, etc. as they migrate in later
-phases).
+external callers interact with; it enqueues operations rather than mutating
+host state directly. `BridgedVXLanNetwork` wraps a `Network` instance and
+exposes `_apply_*` methods that actually mutate per-hypervisor state (VXLAN
+FDB table, dnsmasq, etc.).
 
 The constructor is called **only** inside the workitem dispatcher (via the
 `NetOp` task handlers in `net_op.py`). This makes re-entrancy through the
@@ -266,6 +265,46 @@ queue structurally impossible: the only way to bypass the queue and run a
 mutation inline is to construct a `BridgedVXLanNetwork`, and that is gated to
 the dispatcher. External callers always hold `Network`; in-worker callers
 always hold `BridgedVXLanNetwork`.
+
+All 15 host-mutating `Network` methods now enqueue rather than mutate
+directly: `ensure_mesh`, `add_floating_ip`, `remove_floating_ip`,
+`route_address`, `unroute_address`, `remove_nat`, `update_dnsmasq`,
+`remove_dnsmasq`, `remove_dhcp_lease`, `update_dns_entry`,
+`remove_dns_entry`, `create_on_hypervisor`, `delete_on_hypervisor`,
+`create_on_network_node`, `delete_on_network_node`. Note that
+`Network.enable_nat` no longer exists as a public method; it is now the
+private internal helper `BridgedVXLanNetwork._apply_enable_nat`, called
+only from within `_apply_create_on_network_node`.
+
+The retired NetOp handler bodies (`_network_deploy` task 1,
+`_network_destroy` task 2, `_network_update_dnsmasq` task 3) have been
+removed. Their task-enum values are retained in
+`shakenfist/schema/operations/net_op.py` for on-disk record compatibility;
+any in-flight op referencing these tasks now raises `InvalidStateForTask`,
+which the dispatcher's outer exception handler converts to `STATE_ERROR`
+via `ErrorReport`. Active op-type dispatchers are: `net_op`, `net_ip_op`,
+`net_iface_op`, `net_iface_ip_op`, `net_macaddr_ip_op`, plus
+`node_net_op` and `node_inst_op` / `node_inst_netdesc_op`. All route
+through `BridgedVXLanNetwork` and persist `ErrorReport` on their outer
+exception branch.
+
+The worker-only mutation surface is also why cross-daemon serialisation
+can be queue-based rather than lock-based. The 13 per-network
+`NodeLock(global_scope=False)` wrappers that existed inside
+`BridgedVXLanNetwork._apply_*` methods originated in stability-branch
+commit `bd9e1869`, which added them as a short-term fix to serialise
+concurrent host-mutating callers from four daemons (`sf-net`, `sf-queues`,
+`sf-api`, and `instance.py`). With all 15 `Network` methods now enqueuing
+exclusively through `BridgedVXLanNetwork`, the net-worker dispatcher loop
+in `shakenfist/daemons/network/workitem.py` is the only caller of every
+`_apply_*` method, and that loop is single-threaded by construction — so
+those locks became provably redundant and were removed (commit `277b0572`).
+Cross-daemon serialisation is now provided by the queue itself: only one
+daemon (`sf-net`) dequeues and executes work for any given network, making
+concurrent invocation across daemons structurally impossible. The
+single-threaded-dispatcher argument is specific to
+`NodeLock(global_scope=False)`; it does not extend to `ClusterLock`s,
+which serialise across the cluster and remain in use elsewhere.
 
 #### op.error_report / op.raise_for_error — consumer-side API
 
@@ -287,10 +326,9 @@ op's outcome:
 
 #### Per-method migration pattern
 
-During the per-method migration (Phases 2–7), each `Network` method is flipped
-one at a time from "do the work inline" to "enqueue a `NetOp` and return the
-op handle". External callers preserve synchronous-with-exception semantics by
-wrapping the call:
+Each `Network` method is implemented as "enqueue a `NetOp` and return the
+op handle" rather than mutating host state inline. External callers preserve
+synchronous-with-exception semantics by wrapping the call:
 
 ```python
 op = n.ensure_mesh()
@@ -299,130 +337,13 @@ op.raise_for_error()
 
 In-worker callers in `net_op.py` use `BridgedVXLanNetwork(n)._apply_*`
 directly to avoid enqueueing from inside the dispatcher (which would deadlock
-the net-worker). Once enough methods have migrated, `depends_on` chains may
-replace some of the per-call `raise_for_error` waits, enabling proper async
-pipelines. The existing `get_lock` wrapper inside each `_apply_*` method is
-retained through Phase 8, at which point the per-node queue becomes the sole
-serialisation point and the locks are removed.
+the net-worker). `depends_on` chains may replace some of the per-call
+`raise_for_error` waits where proper async pipelines are needed. All 15
+host-mutating `Network` methods are now enqueue-only; the per-network
+`NodeLock` guards that formerly serialised concurrent callers are no longer
+needed and have been removed — the single-worker queue is the sole
+serialisation point (see the `BridgedVXLanNetwork` subsection above).
 
-**Migrated methods (all 15 host-mutating `Network` methods — complete after Phase 5)**:
-`ensure_mesh`, `add_floating_ip`, `remove_floating_ip`, `route_address`,
-`unroute_address`, `remove_nat`, `update_dnsmasq`, `remove_dnsmasq`,
-`remove_dhcp_lease`, `update_dns_entry`, `remove_dns_entry`,
-`create_on_hypervisor`, `delete_on_hypervisor`,
-`create_on_network_node`, `delete_on_network_node`.
-
-Every host-mutating `Network` method is now flipped to enqueue. Phase 8
-removed the per-operation `NodeLock` guards that were superseded by the
-single-worker queue serialisation guarantee; Phase 9 (documentation sweep)
-is the only remaining phase.
-
-#### Phase 7 — REST contract
-
-Phase 7 completed the user-facing REST contract changes that make the async
-queue-based design visible at the API boundary.
-
-**202+poll contract for delete endpoints.** `DELETE /networks/<uuid>` and
-`DELETE /networks` now return HTTP 202 (Accepted) instead of 200. The response
-body carries the cluster-operation handle so clients can poll for completion:
-
-- Single delete: `{'op_type': 'net_op', 'op_uuid': '<uuid>'}`.
-- Bulk delete: a list of `{'network_uuid': '...', 'op_type': 'net_op',
-  'op_uuid': '...'}` entries, one per network.
-
-**Two new cluster-operation discovery endpoints** were added under
-`/clusteroperations/` (same prefix as the existing single-op retrieval
-endpoint — these are siblings, not a new namespace):
-
-- `GET /clusteroperations/<op_uuid>/chain` — walks the `depends_on` graph
-  from `<op_uuid>` and returns the full transitive ancestor closure as a list
-  of op-summary dicts. Namespace-scoped: admin callers see everything;
-  non-admin callers receive HTTP 403 if any chain member belongs to a foreign
-  namespace. The op uuid is sufficient (no `<op_type>` segment) because op
-  uuids are globally unique.
-- `GET /clusteroperations?target_object_type=<type>&target_uuid=<uuid>` —
-  returns all ops that targeted the given object. Namespace filtering is
-  applied at the SQL layer (via a JOIN on `cluster_operation_targets` against
-  namespace-carrying static-values tables) so large result sets are never
-  materialised in Python.
-
-**`redirect_to_network_node` removal.** The `@redirect_to_network_node`
-decorator (which proxied HTTP requests from the receiving API server to the
-network node's gunicorn) has been removed from three of its four call sites:
-`InterfaceEndpoint.get` (synchronous DB read — no proxy needed), and the two
-network delete endpoints (now 202+poll). The decorator remains on
-`NetworkPingEndpoint.get` because the ping handler executes
-`ip netns exec <network_uuid> ping` directly and the network namespace exists
-only on the elected network node. Migrating the ping endpoint to be queue-based
-requires new op-output infrastructure (today the queue carries only error
-reports, not command output) and is deferred to future work. The decorator
-definition in `shakenfist/external_api/base.py` is retained for this one
-remaining use.
-
-**Client-python (sibling repo, feature branch `network-facade-phase-07`).**
-`delete_network` and `delete_all_networks` in `apiclient.py` handle the new
-202 response transparently by default: they detect 202, extract the op UUID,
-and poll `GET /clusteroperations/<op_type>/<op_uuid>` until the op reaches a
-terminal state, raising `ClusterOperationFailed` on error. Advanced callers can opt
-out of polling with `wait=False` to receive the op handle directly. Two new
-methods `get_cluster_operation_chain` and `list_cluster_operations_for_target`
-expose the discovery endpoints.
-
-**Phase 6 — maintain.py is now discovery-only.** `shakenfist/daemons/network/maintain.py` no
-longer calls `raise_for_error()` after enqueuing. Each maintain pass runs a five-guard pipeline
-for every network with detected drift:
-
-1. **Queue-depth guard.** If the combined depth of the network queue families this node services
-   exceeds `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50), the entire pass is skipped with an
-   audit event against the node.
-2. **Per-network gating.** `has_pending_cluster_operation(target='network', uuid=...)` — if a
-   reconciliation op is already in flight for this network (via `cluster_operation_targets`
-   history), skip it for this pass.
-3. **Cooldown.** `get_recent_terminal_op_states_for_target(..., limit=1)` — if the most recent
-   terminal op ended in `STATE_ERROR` within the last `MAINTAIN_RECONCILE_COOLDOWN_SECONDS`
-   (default 60 s), skip enqueueing to let the previous failure breathe.
-4. **Circuit breaker.** `get_recent_terminal_op_states_for_target(..., limit=K)` — if the last
-   `MAINTAIN_RECONCILE_CIRCUIT_K` (default 5) terminal ops for this network all ended in
-   `STATE_ERROR`, skip and emit a prominent audit event. The circuit closes naturally once a
-   fresh reconciliation succeeds.
-5. **Enqueue at background priority.** If all guards pass, the reconciliation op is enqueued
-   using `PRIORITY.background` via the schema helpers. The maintain thread does not wait.
-
-The three new config knobs are: `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (int, default 50),
-`MAINTAIN_RECONCILE_COOLDOWN_SECONDS` (int, default 60), `MAINTAIN_RECONCILE_CIRCUIT_K`
-(int, default 5).
-
-**Retired NetOp handlers.** The `_network_deploy` (task 1), `_network_destroy` (task 2), and
-`_network_update_dnsmasq` (task 3) handler bodies on `NetOp` have been removed. The
-task-enum values are retained in `shakenfist/schema/operations/net_op.py` for on-disk record
-compatibility; any in-flight op referencing these tasks now raises `InvalidStateForTask`, which
-the dispatcher's outer exception handler converts to `STATE_ERROR` via `ErrorReport`.
-
-Note: `Network.enable_nat` no longer exists as a public method. It is now
-a private internal helper (`_apply_enable_nat`) on `BridgedVXLanNetwork`,
-called only from within `_apply_create_on_network_node`.
-
-**Op-type dispatchers after Phase 5**: `net_op`, `net_ip_op`, `net_iface_op`,
-`net_iface_ip_op`, `net_macaddr_ip_op`, plus `node_net_op` and `node_inst_op` /
-`node_inst_netdesc_op`. All route through `BridgedVXLanNetwork` and persist
-`ErrorReport` on their outer exception branch.
-
-#### Phase 8 — NodeLock removal
-
-The 13 per-network `NodeLock` wrappers inside `BridgedVXLanNetwork._apply_*`
-methods were removed in Phase 8 (commit `277b0572`). Each wrapper originated
-in stability-branch commit `bd9e1869`, which added them as a short-term fix to
-serialise concurrent host-mutating callers from four daemons (`sf-net`,
-`sf-queues`, `sf-api`, and `instance.py`). With Phases 2–7 landed, the
-net-worker dispatcher loop in `shakenfist/daemons/network/workitem.py` is the
-only caller of every `_apply_*` method, and that loop is single-threaded by
-construction — so the locks became provably redundant. Cross-daemon
-serialisation is now provided by the queue itself: only one daemon (`sf-net`)
-dequeues and executes work for any given network, making concurrent invocation
-across daemons structurally impossible. The removed locks were all
-`NodeLock(global_scope=False)` (per-node), not `ClusterLock`s; the
-single-threaded-dispatcher argument does not extend to `ClusterLock`s, which
-remain in use elsewhere.
 
 #### In-worker sibling call pattern
 
@@ -487,6 +408,53 @@ worker on the same queue would break the back-off schedule — see the prominent
 comment at the map's declaration in
 `shakenfist/daemons/network/workitem.py` for the authoritative statement of
 valid mitigation strategies.
+
+### REST API surface
+
+**202+poll contract for delete endpoints.** `DELETE /networks/<uuid>` and
+`DELETE /networks` return HTTP 202 (Accepted). The response body carries
+the cluster-operation handle so clients can poll for completion:
+
+- Single delete: `{'op_type': 'net_op', 'op_uuid': '<uuid>'}`.
+- Bulk delete: a list of `{'network_uuid': '...', 'op_type': 'net_op',
+  'op_uuid': '...'}` entries, one per network.
+
+**Cluster-operation discovery endpoints.** Two endpoints under
+`/clusteroperations/` allow callers to inspect op history:
+
+- `GET /clusteroperations/<op_uuid>/chain` — walks the `depends_on` graph
+  from `<op_uuid>` and returns the full transitive ancestor closure as a
+  list of op-summary dicts. Namespace-scoped: admin callers see everything;
+  non-admin callers receive HTTP 403 if any chain member belongs to a
+  foreign namespace. The op uuid is sufficient (no `<op_type>` segment)
+  because op uuids are globally unique.
+- `GET /clusteroperations?target_object_type=<type>&target_uuid=<uuid>` —
+  returns all ops that targeted the given object. Namespace filtering is
+  applied at the SQL layer (via a JOIN on `cluster_operation_targets`
+  against namespace-carrying static-values tables) so large result sets
+  are never materialised in Python.
+
+**`redirect_to_network_node` status.** The `@redirect_to_network_node`
+decorator (which proxies HTTP requests from the receiving API server to the
+network node's gunicorn) has been removed from three of its four historical
+call sites: `InterfaceEndpoint.get` (synchronous DB read — no proxy needed),
+and the two network delete endpoints (now 202+poll, dispatched via the
+queue). The decorator remains on `NetworkPingEndpoint.get` because the ping
+handler executes `ip netns exec <network_uuid> ping` directly and the
+network namespace exists only on the elected network node. Migrating the
+ping endpoint to be queue-based requires new op-output infrastructure
+(today the queue carries only error reports, not command output) and is
+deferred to future work. The decorator definition in
+`shakenfist/external_api/base.py` is retained for this one remaining use.
+
+**Client-python.** `delete_network` and `delete_all_networks` in
+`apiclient.py` (sibling `client-python` repo) handle the 202 response
+transparently by default: they detect 202, extract the op UUID, and poll
+`GET /clusteroperations/<op_type>/<op_uuid>` until the op reaches a
+terminal state, raising `ClusterOperationFailed` on error. Advanced callers
+can opt out of polling with `wait=False` to receive the op handle directly.
+Two client methods `get_cluster_operation_chain` and
+`list_cluster_operations_for_target` expose the discovery endpoints.
 
 ### Networking
 
