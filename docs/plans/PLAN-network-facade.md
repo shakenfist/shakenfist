@@ -931,7 +931,7 @@ begins.
 | 5. `create_on_*` and `delete_on_*` migration | PLAN-network-facade-phase-05-lifecycle.md | Complete |
 | 6. `maintain.py` rewrite as discovery-only | PLAN-network-facade-phase-06-maintain.md | Complete |
 | 7. REST contract: remove `redirect_to_network_node` from three of its four sites, flip the two delete endpoints to 202+poll, add `/clusteroperations/<uuid>/chain` and `/clusteroperations?target_*=` endpoints, update `client-python` | PLAN-network-facade-phase-07-rest-contract.md | Complete |
-| 8. Remove the temporary `NodeLock`s from the stability fix and the per-method migration flags | PLAN-network-facade-phase-08-cleanup.md | Planning |
+| 8. Remove the temporary `NodeLock`s from the stability fix | PLAN-network-facade-phase-08-cleanup.md | Complete |
 | 9. Documentation and tests | PLAN-network-facade-phase-09-docs.md | Planning |
 
 Phase numbering reflects dependency ordering. Phase 1 is
