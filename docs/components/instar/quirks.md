@@ -872,6 +872,127 @@ Categories:
 See `docs/measure.md` for the user-facing presentation of
 these divergences.
 
+## create subcommand quirks
+
+### Raw `create` runs entirely host-side
+
+`instar create -f raw` opens the output file with
+`O_CREAT|O_TRUNC|O_RDWR`, calls `ftruncate(virtual_size)`, and
+optionally applies `posix_fallocate` (`--preallocation falloc`)
+or zero-fills via `fallocate(FALLOC_FL_ZERO_RANGE)` with a
+`pwrite` fallback (`--preallocation full`). No KVM guest is
+launched — raw has no metadata to emit, so the single-code-path
+principle yields to a pure host-side shortcut. Every other target
+format runs `create.bin` in the sandbox. See open question 6 in
+`docs/plans/PLAN-create.md` for the design rationale.
+
+### Backing-file path is written verbatim
+
+The user-typed `-b BACKING` argument lands in the new image's
+metadata verbatim — relative paths stay relative, absolute paths
+stay absolute. The host resolves the path **relative to the new
+image's directory** when opening the backing file for the
+parser, so the resulting reference is portable across moves of
+the parent. Matches qemu-img exactly.
+
+### Backing-file format inference requires `-F` or `-u`
+
+`instar create -b BACKING ...` requires either `-F BACKING_FMT`
+(explicit format hint) or `-u` (unsafe; assume raw). Newer
+qemu-img versions enforce the same rule. The hint is the
+initial format guess; if the backing file's first sector
+contradicts the hint via its magic bytes, auto-detection wins
+and the metadata records the detected format. Three-level
+chains record only the immediate parent — instar does not
+recurse, matching qemu-img.
+
+### Preallocation accept set
+
+| Mode | raw | qcow2 | vmdk / vpc / vhdx |
+|------|-----|-------|-------------------|
+| `off` | yes | yes | yes |
+| `metadata` | rejected | yes | rejected (future work) |
+| `falloc` | yes | yes | rejected (future work) |
+| `full` | yes | yes | rejected (future work) |
+
+`raw + metadata` is rejected because raw has no metadata to
+preallocate. Non-qcow2 sparse formats reject non-`off`
+preallocation with a "future work" pointer — each format needs
+its own BAT-population pattern plus the same host
+`apply_preallocation` post-pass qcow2 already uses.
+
+### VHD `virtual_size` diverges from qemu-img by CHS rounding
+
+`qemu-img create -f vpc` rounds the requested `virtual_size` up
+to the next CHS-aligned multiple (legacy VHD geometry layout);
+`instar create -f vpc` emits exact bytes. The divergence is
+typically < 256 KiB across the supported size range. Both files
+are valid VHDs — the difference surfaces only in the
+`virtual-size` field reported by `qemu-img info`. Phase 8b's
+`tests/test_create.py::KNOWN_WRITER_DIVERGENCES` skips every
+affected case; closing this gap is documented future work.
+
+### qcow2 `refcount_bits` is hardcoded to 16
+
+`crates/qcow2::create::build_header` emits `refcount_order = 4`
+(=> 16-bit refcount entries on disk) regardless of the user's
+`-o refcount_bits=...` value. Honoured values that don't cause
+visible divergence: `1` and `8` (smaller widths still fit the
+16-bit encoding and produce valid files). `refcount_bits=64`
+produces a header `instar check` rejects on round-trip — the
+only entry in `tests/test_create.py::KNOWN_CHECK_FAILURES`.
+Closing the gap requires parameterising the L1/L2/refcount math
+over the user's choice. Future work.
+
+### qcow2 `compat=0.10` is silently upgraded to `1.1`
+
+The writer hardcodes `compat=1.1` in the header. qemu-img
+honours `compat=0.10` for compatibility with pre-3.0 qemu
+releases. instar always emits the v3 header. Future work.
+
+### qcow2 `compression_type=zstd` is accept-ignored
+
+The `-o compression_type=zstd` option is accepted at parse
+time but the header records `zlib` regardless. A fresh image
+has no compressed cluster data so the field-only divergence
+has no functional impact — the discrepancy only surfaces in
+`qemu-img info`'s `format-specific.data.compression-type`
+field. Future work: drop the accept-ignore and emit the zstd
+header bit so a subsequent convert / write into the image can
+emit zstd-compressed clusters.
+
+### vhdx default `block_size` differs from qemu-img
+
+At virtual sizes ≤ 1 GiB, `instar create -f vhdx` defaults to
+an 8 MiB block size; `qemu-img create -f vhdx` always defaults
+to 32 MiB. Specifying `-o block_size=...` (or `--block-size`)
+explicitly avoids the divergence — phase 8b's matrix
+demonstrates clean round-trip for explicit block-size cases
+(`1G-block-16M`, `1G-block-32M`). Future work is to match
+qemu's 32 MiB default at all virtual sizes.
+
+### VHD fixed subformat carries footer-only metadata
+
+`instar create -f vpc -o subformat=fixed FILENAME SIZE` produces
+a file of `SIZE + 512` bytes — zero data plus a 512-byte footer
+at end-of-file. The footer is the only metadata.
+`qemu-img info` without an explicit `-f` flag auto-detects the
+file as `format=raw` because the leading bytes carry no magic;
+pass `-f vpc` explicitly to surface the vhd format. This is
+qemu's native behaviour and not a bug in either tool. Phase 7's
+baselines were recorded without `-f`, so phase 8's matrix
+comparison naturally agrees on both sides.
+
+### Known check failure: qcow2 `refcount_bits=64`
+
+`instar create -f qcow2 -o refcount_bits=64 ...` produces a
+file whose internal validator rejects on `instar check`
+("image check failed: errors detected"). The header claims
+64-bit refcounts but the on-disk entries are 16-bit
+(refcount_bits hardcode, above). This is the only entry in
+`tests/test_create.py::KNOWN_CHECK_FAILURES`; `refcount_bits=1`
+and `=8` fit the encoding and pass.
+
 ## Future Additions
 
 Additional quirks will be documented here as they are discovered during
