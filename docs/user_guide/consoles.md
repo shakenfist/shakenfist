@@ -84,6 +84,11 @@ experimental support for multiple users accessing the same SPICE console at the
 same time is enabled. For more details about the experimental nature of concurrent
 SPICE consoles, see https://www.spice-space.org/multiple-clients.html.
 
+If you set `vdi=spicedebug`, the SPICE console behaves like `spice` but the qemu
+process is started with `G_MESSAGES_DEBUG=all` so the SPICE server emits verbose
+debug logs to the qemu log. This is useful when diagnosing SPICE connectivity
+issues but is otherwise too noisy for normal use.
+
 And example video specification would be:
 
 ```

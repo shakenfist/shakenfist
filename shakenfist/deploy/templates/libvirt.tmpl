@@ -217,6 +217,9 @@
   {%- if spice_concurrent -%}
     <qemu:env name='SPICE_DEBUG_ALLOW_MC' value='1'/>
   {%- endif -%}
+  {%- if spice_debug -%}
+    <qemu:env name='G_MESSAGES_DEBUG' value='all'/>
+  {%- endif -%}
   {%- for extra in extracommands %}
     <qemu:arg value='{{extra}}'/>
   {%- endfor %}
