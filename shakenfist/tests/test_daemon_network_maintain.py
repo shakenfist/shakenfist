@@ -334,6 +334,22 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         active['net_create_and_enqueue'].assert_not_called()
         active['nn_create_and_enqueue'].assert_not_called()
 
+    def test_delete_wait_no_interfaces_with_pending_op_skips_enqueue(self):
+        """A delete_wait network with no interfaces but an in-flight op
+        does NOT get a second delete op enqueued. The REST DELETE
+        handler enqueues the op when transitioning to DELETE_WAIT and
+        the maintainer must not race a duplicate against it.
+        """
+        n = _build_mock_network(state='delete-wait', interfaces=[])
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            pending_op=True,
+        )
+
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+
     def test_recent_state_change_skips_network(self):
         """Networks whose state changed within the last 60 seconds are
         skipped (the 60-second punt guard)."""

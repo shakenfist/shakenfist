@@ -491,6 +491,9 @@ class NetworkApplyDeleteNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
             self, mock_network_from_db, mock_apply, mock_set_error):
         """Dispatching the new task routes through BridgedVXLanNetwork."""
         network = _make_network_mock()
+        # No interfaces attached -- the delete proceeds without
+        # deferring (see _DELETE_DRAIN_DELAYS path below).
+        network.networkinterfaces = []
         mock_network_from_db.return_value = network
 
         op, _ = _make_net_op(
@@ -502,3 +505,58 @@ class NetworkApplyDeleteNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
         mock_apply.assert_called_once_with()
         network.delete_on_network_node.assert_not_called()
         mock_set_error.assert_not_called()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch(
+        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_delete_on_network_node')
+    @mock.patch('shakenfist.operations.net_op.NetOp.defer_with_backoff')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_apply_delete_network_node_with_interfaces_defers(
+            self, mock_network_from_db, mock_defer, mock_apply, mock_set_error):
+        """If interfaces remain the delete op defers itself rather than
+        tearing the network down underneath them."""
+        network = _make_network_mock()
+        # One interface still attached -- delete must wait for it to drain.
+        network.networkinterfaces = ['some-iface-uuid']
+        mock_network_from_db.return_value = network
+        # defer_with_backoff returns True when a retry was scheduled, so
+        # the task must not call the apply method or persist an error.
+        mock_defer.return_value = True
+
+        op, _ = _make_net_op(
+            self, self.mock_etcd,
+            [model_tasks.network_apply_delete_network_node])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_apply_delete_network_node)
+
+        mock_defer.assert_called_once()
+        mock_apply.assert_not_called()
+        mock_set_error.assert_not_called()
+
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch(
+        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_delete_on_network_node')
+    @mock.patch('shakenfist.operations.net_op.NetOp.defer_with_backoff')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_apply_delete_network_node_defer_budget_exhausted_errors(
+            self, mock_network_from_db, mock_defer, mock_apply, mock_set_error):
+        """When defer_with_backoff returns False the op errors out via
+        the dispatcher's outer Exception handler instead of looping."""
+        network = _make_network_mock()
+        network.networkinterfaces = ['some-iface-uuid']
+        mock_network_from_db.return_value = network
+        # Budget exhausted -- defer_with_backoff returns False.
+        mock_defer.return_value = False
+
+        op, _ = _make_net_op(
+            self, self.mock_etcd,
+            [model_tasks.network_apply_delete_network_node])
+        op.state = NetOp.STATE_EXECUTING
+        op.dispatch_task(model_tasks.network_apply_delete_network_node)
+
+        mock_defer.assert_called_once()
+        mock_apply.assert_not_called()
+        # The outer Exception handler in dispatch_task catches the
+        # InvalidStateForTask raise and persists the ErrorReport.
+        self.assertEqual(NetOp.STATE_ERROR, op.state.value)
+        mock_set_error.assert_called_once()

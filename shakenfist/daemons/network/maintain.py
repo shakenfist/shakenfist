@@ -153,9 +153,19 @@ class Job(util_concurrency.Job):
                     continue
 
                 # If this network is in state delete_wait, then we should
-                # remove it if it has no interfaces left.
+                # remove it if it has no interfaces left. The REST DELETE
+                # handler already enqueues a delete op when transitioning a
+                # network into DELETE_WAIT (see external_api/network.py),
+                # so the per-target gate below avoids racing a duplicate op
+                # against the in-flight one. This path therefore only fires
+                # for genuinely orphaned DELETE_WAIT networks -- e.g. ones
+                # left over from a crashed API request, or upgrades from
+                # before the API began self-enqueuing.
                 if n.state.value == dbo.STATE_DELETE_WAIT:
-                    if not n.networkinterfaces:
+                    if (not n.networkinterfaces
+                            and not mariadb.has_pending_cluster_operation_target(
+                                target_object_type=ObjectType.NETWORK,
+                                target_uuid=str(n.uuid))):
                         LOG.with_fields({'network': n}).info(
                             'Removing stray delete_wait network')
                         net_create_and_enqueue(

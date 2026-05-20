@@ -51,13 +51,15 @@ def _delete_network(network_from_db, wait_interfaces=None):
 
     Returns a ``(result, op_type, op_uuid)`` tuple:
 
-    * On success with no interfaces to wait on, the network deletion has
-      been enqueued and ``op_type`` / ``op_uuid`` identify the cluster
-      operation that will perform the work.
-    * On success with ``wait_interfaces`` set, the network is moved to
-      ``STATE_DELETE_WAIT`` and the actual delete op will be enqueued
-      later by the network maintainer. There is no op uuid yet, so
-      ``op_type`` and ``op_uuid`` are ``None``.
+    * On success, the network deletion has been enqueued and
+      ``op_type`` / ``op_uuid`` identify the cluster operation that
+      will perform the work.
+    * If ``wait_interfaces`` is truthy the network is also moved to
+      ``STATE_DELETE_WAIT`` to stop new interfaces being attached;
+      the enqueued op defers itself in the worker until the existing
+      interfaces drain, then performs the delete. The Phase 7 REST
+      contract guarantees the caller always receives an op handle to
+      poll, even on this slow path.
     * On failure (network missing or already deleted), ``result`` is the
       Flask error response to return; ``op_type`` / ``op_uuid`` are
       ``None``.
@@ -79,8 +81,12 @@ def _delete_network(network_from_db, wait_interfaces=None):
 
     network_from_db.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
     if wait_interfaces:
+        # The interfaces still attached belong to instances that are
+        # being deleted concurrently. Block new interfaces from being
+        # attached by entering DELETE_WAIT; the enqueued op below
+        # checks for interfaces at execution time and defers itself
+        # until they drain.
         n.state = network.Network.STATE_DELETE_WAIT
-        return None, None, None
 
     # Phase 6 of `PLAN-network-facade.md` retired the
     # `network_destroy` composite; `network_apply_delete_network_node`

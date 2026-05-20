@@ -239,6 +239,30 @@ class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [model_tasks.network_apply_delete_network_node], tasks)
 
+    @mock.patch('shakenfist.external_api.network.net_create_and_enqueue')
+    @mock.patch(
+        'shakenfist.network.network.Network.networkinterfaces',
+        new_callable=mock.PropertyMock)
+    def test_delete_network_with_interfaces_still_enqueues_op(
+            self, mock_interfaces, mock_enqueue):
+        """When a network still has interfaces, the DELETE handler must
+        return a real op handle (not None/None) so the client can poll
+        the 202+op-handle contract. The op itself will defer in the
+        worker until the interfaces drain.
+        """
+        mock_interfaces.return_value = ['some-interface-uuid']
+        fake_op_uuid = str(uuid4())
+        mock_enqueue.return_value = ('net_op', fake_op_uuid)
+
+        resp = self.client.delete(
+            '/networks/%s' % self.network_id,
+            headers={'Authorization': self.auth_token})
+        self.assertEqual(202, resp.status_code)
+        self.assertEqual(
+            {'op_type': 'net_op', 'op_uuid': fake_op_uuid},
+            resp.get_json())
+        mock_enqueue.assert_called_once()
+
 
 class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
     """Regression tests for step 4f: REST handlers call raise_for_error()

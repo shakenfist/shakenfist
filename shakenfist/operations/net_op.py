@@ -145,7 +145,28 @@ class NetOp(BaseClusterOperation):
     def _network_apply_create_network_node(self, n):
         BridgedVXLanNetwork(n)._apply_create_on_network_node()
 
+    # Defer schedule for delete ops waiting on network interfaces to drain.
+    # Roughly nine minutes total before we give up and error the op out --
+    # generous enough to absorb concurrent instance deletes even when the
+    # cluster is under load, but bounded so a wedged delete eventually
+    # surfaces a failure to the caller rather than spinning forever.
+    _DELETE_DRAIN_DELAYS = (15, 30, 60, 60, 60, 60, 60, 60, 60, 60)
+
     def _network_apply_delete_network_node(self, n):
+        # If interfaces are still attached the network is mid-drain
+        # (delete_all_networks(clean_wait=True) is the common case --
+        # the API enqueues this op while the matching instance deletes
+        # are still in flight). Defer rather than tear the network down
+        # underneath those interfaces; defer_with_backoff re-enqueues
+        # the op and returns control to the worker.
+        if n.networkinterfaces:
+            if not self.defer_with_backoff(
+                    delays=self._DELETE_DRAIN_DELAYS,
+                    reason='waiting for network interfaces to drain'):
+                # Retry budget exhausted -- the worker's outer Exception
+                # handler will persist an ErrorReport and set STATE_ERROR.
+                raise InvalidStateForTask(self)
+            return
         BridgedVXLanNetwork(n)._apply_delete_on_network_node()
 
     def _network_remove_dnsmasq(self, n):
