@@ -250,6 +250,24 @@ complete list of SPICE link error codes.
 | 2 | AuthSASL | SASL auth |
 | 3 | MiniHeader | Compact message headers |
 
+## Related Projects
+
+[ryll](https://github.com/shakenfist/ryll) is a purpose-built SPICE test
+client, written in Rust, originally built to performance-test Kerbside. It
+runs on Linux, macOS, and Windows in three modes: a desktop GUI, a headless
+mode suited to automation and benchmarking, and a `--web` mode that hosts a
+browser frontend tunnelling SPICE over WebRTC (serving the signalling page
+directly over HTTPS via `--web-tls-cert`/`--web-tls-key`, with no reverse
+proxy required). It operates independently of Kerbside — no Kerbside
+installation is needed — but Kerbside operators may find it useful both for
+exercising the proxy under realistic workloads from headless mode and, via
+the web mode, for providing browser-based access to the same SPICE consoles
+in scenarios where installing a native client is not practical. See the
+[ryll documentation](https://github.com/shakenfist/ryll/blob/main/docs/index.md)
+for an overview, or the
+[ryll web frontend guide](https://github.com/shakenfist/ryll/blob/main/docs/web-frontend.md)
+for browser-deployment specifics.
+
 ## External References
 
 Official SPICE protocol resources:
