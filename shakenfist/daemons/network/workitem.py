@@ -1,3 +1,4 @@
+import threading
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -37,51 +38,51 @@ class Job(util_concurrency.Job):
         # WARNING: SINGLE-WORKER SAFETY INVARIANT
         # ---------------------------------------------------------------------
         # The exponential back-off schedule for deferred ops below is correct
-        # ONLY because each queue this worker drains is serviced by exactly
-        # ONE worker process. Today that holds for two reasons:
+        # ONLY because each queue is serviced by exactly ONE drainer thread.
+        # Today that holds for two reasons:
         #
         #   1. Per-node {node_uuid}-network-* queues are drained only by the
-        #      net-worker on that specific node.
+        #      net-worker on that specific node, and within that process by
+        #      exactly one drainer thread (see ``execute()`` below).
         #   2. The cluster-wide networknode-* queues are drained only by the
-        #      net-worker on the elected network node (enforced by the
-        #      `if config.NODE_IS_NETWORK_NODE` guard in execute()).
+        #      net-worker on the elected network node, again with exactly one
+        #      drainer thread per queue.
         #
-        # DO NOT move to multi-worker dequeue (worker pool inside one process,
-        # or multiple nodes voting on the same queue) without fixing this
-        # map. Two workers servicing the same queue can independently defer
-        # the same op and end up with inconsistent delays, double-enqueueing
-        # the op and breaking the back-off schedule.
+        # The drainer fan-out in ``execute()`` deliberately spawns one thread
+        # per queue, not multiple threads per queue, so the per-op back-off
+        # state below stays internally consistent. The lock makes the map
+        # safe to read/write from sibling drainer threads but does not relax
+        # the one-thread-per-queue rule.
         #
         # Valid mitigations if the topology ever changes:
-        #   * In-process worker pool -> share one map behind a lock.
-        #   * Cross-node voting       -> return to DB-backed back-off state.
+        #   * Multiple drainer threads per queue -> move the back-off state
+        #     into the work_item itself (it already carries defer_count) and
+        #     drop this map entirely.
+        #   * Cross-node voting -> return to DB-backed back-off state.
         # =====================================================================
         self._defer_delays: dict[str, float] = {}
+        self._defer_delays_lock = threading.Lock()
 
     def _apply_defer(self, op, waiting_on):
         op_uuid = str(op.uuid)
-        current_delay = self._defer_delays.get(op_uuid, INITIAL_DEFER_DELAY)
-        op.defer(waiting_on=waiting_on, delay=current_delay)
-        self._defer_delays[op_uuid] = min(
-            current_delay * DEFER_DELAY_MULTIPLIER, MAX_DEFER_DELAY)
+        with self._defer_delays_lock:
+            current_delay = self._defer_delays.get(op_uuid, INITIAL_DEFER_DELAY)
+            self._defer_delays[op_uuid] = min(
+                current_delay * DEFER_DELAY_MULTIPLIER, MAX_DEFER_DELAY)
 
-        if len(self._defer_delays) > BACKOFF_MAP_CAP:
-            # Python dicts preserve insertion order, so the first key is
-            # the oldest entry — FIFO eviction.
-            oldest_key = next(iter(self._defer_delays))
-            del self._defer_delays[oldest_key]
+            if len(self._defer_delays) > BACKOFF_MAP_CAP:
+                # Python dicts preserve insertion order, so the first key is
+                # the oldest entry — FIFO eviction.
+                oldest_key = next(iter(self._defer_delays))
+                del self._defer_delays[oldest_key]
+        op.defer(waiting_on=waiting_on, delay=current_delay)
 
     def _drop_defer_entry(self, op_uuid):
-        self._defer_delays.pop(op_uuid, None)
+        with self._defer_delays_lock:
+            self._defer_delays.pop(op_uuid, None)
 
     def execute(self):
         LOG.info('Starting network worker')
-        was_previously_idle = False
-
-        # NOTE(mikal): there's really nothing stopping us from processing a bunch
-        # of these jobs in parallel with a pool of workers, but I am not sure its
-        # worth the complexity right now. Are we really going to be changing
-        # networks that much?
 
         # Safety property: each queue must be drained by exactly one worker.
         # Per-node queues ({node_uuid}-network-*) are only drained by this
@@ -94,29 +95,55 @@ class Job(util_concurrency.Job):
         if config.NODE_IS_NETWORK_NODE:
             queue_names += get_all_network_queues()
 
+        # Fan out one drainer thread per queue. A long-running op on one
+        # priority lane no longer blocks the others: while the network
+        # node was previously bottlenecked on a single thread dispatching
+        # all five cluster-wide lanes serially, each lane now drains
+        # independently. The one-thread-per-queue invariant the back-off
+        # map depends on is preserved -- a queue still has exactly one
+        # drainer -- and the lock makes the shared map safe.
+        threads = []
+        for queue_name in queue_names:
+            thread = threading.Thread(
+                target=self._drain_queue, args=(queue_name,),
+                daemon=True, name=f'net-{queue_name[-32:]}')
+            thread.start()
+            threads.append(thread)
+
+        # Block here until every drainer exits. Each drainer polls
+        # ``daemon.check_abort_path`` on the shared abort file, so a
+        # single ``set_abort_path`` from the daemon controller stops
+        # them all.
+        for thread in threads:
+            thread.join()
+
+    def _drain_queue(self, queue_name):
+        """Inner loop for one queue. Runs in its own thread."""
+        was_previously_idle = False
+
         while daemon.check_abort_path(self.abort_path):
-            for queue_name in queue_names:
-                jobname_workitem = mariadb.dequeue_work_item(queue_name)
-                if jobname_workitem:
-                    break
+            jobname_workitem = mariadb.dequeue_work_item(queue_name)
 
             if not jobname_workitem:
                 if not was_previously_idle:
-                    util_concurrency.set_thread_name('idle')
-                    LOG.debug('This network thread is now idle')
+                    util_concurrency.set_thread_name(
+                        f'idle:{queue_name[-32:]}')
+                    LOG.debug(
+                        f'Drainer for {queue_name} is now idle')
                     was_previously_idle = True
                 time.sleep(0.2)
+                continue
 
-            else:
-                jobname, workitem = jobname_workitem
-                util_concurrency.set_thread_name(jobname)
-                LOG.debug(
-                    f'This network thread is now processing job {jobname}')
+            was_previously_idle = False
+            jobname, workitem = jobname_workitem
+            util_concurrency.set_thread_name(jobname)
+            LOG.debug(
+                f'Drainer for {queue_name} is now processing job {jobname}')
 
-                try:
-                    self._cluster_operation_execute(queue_name, workitem)
-                finally:
-                    mariadb.resolve_work_item(queue_name, jobname)
+            try:
+                self._cluster_operation_execute(queue_name, workitem)
+            finally:
+                mariadb.resolve_work_item(queue_name, jobname)
 
     def _cluster_operation_execute(self, queue_name, workitem):
         op_type = workitem.get('operation_type')
