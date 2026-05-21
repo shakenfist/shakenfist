@@ -30,13 +30,9 @@ EXPECTED_QUEUE_ORDER_NETWORK_NODE = EXPECTED_PER_NODE_QUEUES + EXPECTED_CLUSTER_
 
 
 class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
-    """Assert that the net-worker drains the correct queues depending on
+    """Assert that the net-worker dequeues per-node queues before cluster-wide
+    network-node queues, and that the correct queues are polled depending on
     whether this node is the elected network node.
-
-    Each queue now has its own drainer thread (one thread per queue), so
-    there is no across-queue dispatch order to assert. The tests verify
-    the *set* of queues that get drained: per-node queues on every node,
-    plus cluster-wide queues on the elected network node.
 
     Safety property: each queue is drained by exactly one worker.
       - Per-node queues ({node_uuid}-network-*): drained by this node's
@@ -46,14 +42,12 @@ class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
     """
 
     def _run_one_iteration(self, node_uuid, is_network_node):
-        """Spin up Job.execute(), let each per-queue drainer make one
-        dequeue call, and return the mocked dequeue stub.
+        """Run one iteration of Job.execute() then break the loop.
 
         Patches:
         - mariadb.dequeue_work_item  -> always returns None (no work)
-        - daemon.check_abort_path    -> True on the first call from each
-                                        drainer, False on the second so
-                                        the inner loop exits cleanly
+        - daemon.check_abort_path    -> True on the first call, False on the
+                                        second so the while-loop exits cleanly
         - daemon.clear_abort_path    -> no-op
         - time.sleep                 -> no-op
         - config.NODE_UUID           -> stable test UUID
@@ -71,24 +65,10 @@ class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
         ), mock.patch(
             'shakenfist.daemons.network.workitem.util_concurrency'
         ):
-            import threading as _threading
-
             mock_config.NODE_UUID = node_uuid
             mock_config.NODE_IS_NETWORK_NODE = is_network_node
-            # Each drainer thread runs an independent while loop and
-            # calls check_abort_path on every iteration. We return
-            # True once per drainer thread (letting it make exactly
-            # one dequeue attempt) and False thereafter, so the inner
-            # loop exits cleanly. Thread-local storage keeps the
-            # one-shot semantics per drainer rather than global.
-            _per_thread = _threading.local()
-
-            def _flip(*_args, **_kwargs):
-                if not getattr(_per_thread, 'seen', False):
-                    _per_thread.seen = True
-                    return True
-                return False
-            mock_daemon.check_abort_path.side_effect = _flip
+            # Allow exactly one pass through the while loop.
+            mock_daemon.check_abort_path.side_effect = [True, False]
             mock_daemon.clear_abort_path.return_value = None
             mock_mariadb.dequeue_work_item.return_value = None
 
@@ -97,8 +77,6 @@ class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
             job = Job.__new__(Job)
             job.name = 'test-worker'
             job.abort_path = '/run/sf/net-test-worker.abort'
-            job._defer_delays = {}
-            job._defer_delays_lock = _threading.Lock()
 
             job.execute()
 
@@ -115,13 +93,11 @@ class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
         """
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=False)
 
-        actual_queues = {call.args[0] for call in mock_dequeue.call_args_list}
-        self.assertEqual(set(EXPECTED_PER_NODE_QUEUES), actual_queues)
+        actual_queues = [call.args[0] for call in mock_dequeue.call_args_list]
+        self.assertEqual(EXPECTED_PER_NODE_QUEUES, actual_queues)
 
     def test_non_network_node_exactly_five_dequeue_calls(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=False)
-        # One drainer per queue, each makes one dequeue call before
-        # check_abort_path returns False.
         self.assertEqual(5, mock_dequeue.call_count)
 
     def test_non_network_node_no_cluster_queues(self):
@@ -132,50 +108,44 @@ class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
             self.assertNotIn('networknode', queue_name)
 
     # -------------------------------------------------------------------------
-    # Network-node: per-node *and* cluster-wide queues are drained (in
-    # parallel; no across-queue ordering to assert).
+    # Network-node: per-node queues first, then cluster-wide queues
     # -------------------------------------------------------------------------
 
-    def test_network_node_drains_both_families(self):
+    def test_network_node_dequeue_call_order_per_node_first(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
 
-        actual_queues = {call.args[0] for call in mock_dequeue.call_args_list}
-        self.assertEqual(
-            set(EXPECTED_QUEUE_ORDER_NETWORK_NODE), actual_queues)
+        actual_queues = [call.args[0] for call in mock_dequeue.call_args_list]
+        self.assertEqual(EXPECTED_QUEUE_ORDER_NETWORK_NODE, actual_queues)
 
-    def test_network_node_drains_per_node_queues(self):
+    def test_network_node_per_node_queues_come_before_cluster_queues(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
 
-        actual_queues = {call.args[0] for call in mock_dequeue.call_args_list}
-        for q in EXPECTED_PER_NODE_QUEUES:
-            self.assertIn(q, actual_queues)
-
-    def test_network_node_drains_cluster_queues(self):
-        mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
-
-        actual_queues = {call.args[0] for call in mock_dequeue.call_args_list}
-        for q in EXPECTED_CLUSTER_QUEUES:
-            self.assertIn(q, actual_queues)
+        actual_queues = [call.args[0] for call in mock_dequeue.call_args_list]
+        self.assertEqual(EXPECTED_PER_NODE_QUEUES, actual_queues[:5])
+        self.assertEqual(EXPECTED_CLUSTER_QUEUES, actual_queues[5:])
 
     def test_network_node_exactly_ten_dequeue_calls_per_iteration(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
-        # One drainer per queue: 5 per-node + 5 cluster-wide.
         self.assertEqual(10, mock_dequeue.call_count)
 
     def test_network_node_uuid_embedded_in_per_node_queue_names(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
 
-        actual_queues = {call.args[0] for call in mock_dequeue.call_args_list}
-        per_node = {q for q in actual_queues if 'networknode' not in q}
-        for queue_name in per_node:
+        per_node_calls = [
+            call.args[0]
+            for call in mock_dequeue.call_args_list[:5]
+        ]
+        for queue_name in per_node_calls:
             self.assertIn(NODE_UUID, queue_name)
 
     def test_network_node_cluster_queues_do_not_contain_node_uuid(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
 
-        actual_queues = {call.args[0] for call in mock_dequeue.call_args_list}
-        cluster = {q for q in actual_queues if 'networknode' in q}
-        for queue_name in cluster:
+        cluster_calls = [
+            call.args[0]
+            for call in mock_dequeue.call_args_list[5:]
+        ]
+        for queue_name in cluster_calls:
             self.assertNotIn(NODE_UUID, queue_name)
 
 
@@ -231,9 +201,7 @@ class TerminalStateCancellationTest(base.ShakenFistTestCase):
             # Step 1e: the dispatcher touches the back-off map both on
             # terminal-state drops and just before op.execute(); the helper
             # must provide an empty map so those calls don't AttributeError.
-            import threading as _threading
             job._defer_delays = {}
-            job._defer_delays_lock = _threading.Lock()
 
             # Must not raise InvalidStateException (or any other exception).
             job._cluster_operation_execute(QUEUE_NAME, workitem)
@@ -303,11 +271,9 @@ class ExponentialBackoffMapTest(base.ShakenFistTestCase):
     def _make_job(self):
         """Construct a Job without running __init__, then initialise just the
         attributes the back-off helpers touch."""
-        import threading as _threading
         from shakenfist.daemons.network.workitem import Job
         job = Job.__new__(Job)
         job._defer_delays = {}
-        job._defer_delays_lock = _threading.Lock()
         return job
 
     def _make_op(self, op_uuid):
@@ -406,12 +372,10 @@ class ExponentialBackoffMapTest(base.ShakenFistTestCase):
             'shakenfist.daemons.network.workitem.get_object_class',
             return_value=mock_op_class,
         ):
-            import threading as _threading
             from shakenfist.daemons.network.workitem import Job
             job = Job.__new__(Job)
             job.log = mock.MagicMock()
             job._defer_delays = {terminal_op_uuid: 6.4}
-            job._defer_delays_lock = _threading.Lock()
 
             job._cluster_operation_execute(QUEUE_NAME, workitem_payload)
 
