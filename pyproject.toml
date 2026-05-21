@@ -200,7 +200,7 @@ test = [
     "mypy-protobuf==3.6.0",     # apache2
     "grpc-stubs==1.53.0.6",     # mit
     "types-protobuf==5.29.1.20250403",    # apache2
-    "types-PyYAML==6.0.12.20260510",      # apache2
+    "types-PyYAML==6.0.12.20260518",      # apache2
     "types-requests==2.33.0.20260513",    # apache2
 ]
 
