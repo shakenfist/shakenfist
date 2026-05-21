@@ -264,6 +264,70 @@ class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
         mock_enqueue.assert_called_once()
 
 
+class NetworkDeleteAlreadyDeletedTestCase(base.ShakenFistTestCase):
+    """DELETE on a network whose state is already 'deleted' must not
+    return a 200 ``null`` body -- that crashed the client on
+    ``handle['op_type']``. The endpoint should now surface
+    ``_delete_network``'s 404 response instead.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        fake_config = SFConfig(
+            NODE_NAME='seriously',
+            NODE_EGRESS_IP='127.0.0.1',
+            NETWORK_NODE_IP='127.0.0.1',
+            NODE_EGRESS_NIC='eth0',
+            NODE_MESH_NIC='eth1',
+            NODE_IS_NETWORK_NODE=True,
+            ETCD_HOST='127.0.0.1'
+        )
+        self.config = mock.patch(
+            'shakenfist.external_api.base.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        self.client = external_api.app.test_client()
+
+        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+
+        self.network_id = str(uuid4())
+        # Note the state -- the whole point of this test class.
+        self.mock_etcd.create_network(
+            name='foonet',
+            uuid=self.network_id,
+            namespace='foo',
+            set_state=dbo.STATE_DELETED)
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+    def test_delete_already_deleted_returns_404_not_null(self):
+        resp = self.client.delete(
+            '/networks/%s' % self.network_id,
+            headers={'Authorization': self.auth_token})
+        # Specifically NOT 200 + null body -- that's the bug.
+        self.assertEqual(404, resp.status_code)
+        body = resp.get_json()
+        self.assertIsNotNone(body)
+        self.assertIn('error', body)
+
+
 class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
     """Regression tests for step 4f: REST handlers call raise_for_error()
     after update_dns_entry / remove_dns_entry."""

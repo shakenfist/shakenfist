@@ -21,7 +21,6 @@ from shakenfist import baseobject
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist.network import network
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
@@ -175,10 +174,13 @@ class NetworkEndpoint(api_base.Resource):
             if network_from_db.namespace != namespace:
                 return sf_api.error(404, 'network not in namespace')
 
-        # Check if network has already been deleted
-        if network_from_db.state.value in dbo.STATE_DELETED:
-            return
-
+        # An already-deleted network has nothing left to enqueue, but the
+        # Phase 7 client contract is "DELETE returns 202+op-handle and
+        # the client polls"; returning a bare ``return`` here produced a
+        # 200 ``null`` body that crashed the client on
+        # ``handle['op_type']``. ``_delete_network`` itself emits a clean
+        # 404 for dead networks (other than DELETE_WAIT, which it lets
+        # through), so just delegate.
         err, op_type, op_uuid = _delete_network(
             network_from_db, wait_interfaces=network_from_db.networkinterfaces)
         if err is not None:
