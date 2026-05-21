@@ -1643,7 +1643,16 @@ jobs:
               -o UserKnownHostsFile=/dev/null \
               ${GITHUB_WORKSPACE}/shakenfist \
               debian@$primary:shakenfist
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          # ServerAliveInterval/ServerAliveCountMax: if the remote host
+          # halts itself (e.g. the lifecycle test does `halt --force --force`
+          # on a victim that turns out to be the script's own host), the
+          # TCP connection can sit half-open until the default TCP
+          # keepalive eventually times out -- hours later, well past the
+          # GitHub step budget. With these options ssh notices a dead
+          # connection in roughly 30 s and the step fails fast instead.
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ServerAliveInterval=10 -o ServerAliveCountMax=3 \
               debian@$primary "cd shakenfist/shakenfist/deploy; . /etc/sf/sfrc; bash nodelifecycletests.sh"
 
       - name: Check logs
