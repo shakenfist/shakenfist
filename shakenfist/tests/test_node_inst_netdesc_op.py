@@ -177,14 +177,21 @@ class EnsureMeshRaiseForErrorPropagatesTestCase(base.ShakenFistTestCase):
         self.assertNotEqual(NodeInstNetdescOp.STATE_ERROR, op.state.value)
 
 
-class UpdateDnsmasqRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTestCase):
-    """The in-worker dnsmasq update routes through BridgedVXLanNetwork directly.
+class UpdateDnsmasqRoutesThroughNetworkUpdateDnsmasqTestCase(
+        base.ShakenFistTestCase):
+    """Dnsmasq updates from ``instance_start`` enqueue a network-node op.
 
-    After step 4d flips ``Network.update_dnsmasq`` to enqueue, an inline
-    ``n.update_dnsmasq()`` call here would enqueue from inside the
-    dispatcher and deadlock. Step 4c switches the call to
-    ``BridgedVXLanNetwork(n)._apply_update_dnsmasq()`` to keep it
-    synchronous.
+    ``_instance_start`` runs on the hypervisor where the instance is
+    being placed. dnsmasq config files only live on the elected network
+    node, so calling ``BridgedVXLanNetwork._apply_update_dnsmasq``
+    directly here silently writes to an empty/absent local dnsmasq
+    state -- the bug ``test_provided_dns`` was tripping over (see the
+    ``_require_network_node`` guard added in
+    ``BridgedVXLanNetwork``). The correct path is to call
+    ``Network.update_dnsmasq`` which enqueues a ``net_op`` against the
+    cluster-wide ``networknode-*`` queue. This is not a self-enqueue
+    deadlock because the calling op is on a per-node queue, not on the
+    network-node queue.
     """
 
     def setUp(self):
@@ -199,14 +206,16 @@ class UpdateDnsmasqRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTestC
 
     @mock.patch(
         'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_create_on_hypervisor')
-    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_update_dnsmasq')
+    @mock.patch(
+        'shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_update_dnsmasq')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.NetworkInterface.from_db')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.Network.from_db')
     @mock.patch('shakenfist.operations.node_inst_netdesc_op.Instance.from_db')
-    def test_update_dnsmasq_calls_apply_update_dnsmasq_not_n_update_dnsmasq(
+    def test_update_dnsmasq_enqueues_via_network_update_dnsmasq(
             self, mock_inst_from_db, mock_net_from_db, mock_ni_from_db,
             mock_apply_update_dnsmasq, mock_apply_create):
-        """_instance_start invokes BridgedVXLanNetwork._apply_update_dnsmasq."""
+        """_instance_start enqueues Network.update_dnsmasq, not the
+        worker-only _apply_ method."""
         inst_mock = _make_inst_mock()
         mock_inst_from_db.return_value = inst_mock
 
@@ -220,6 +229,13 @@ class UpdateDnsmasqRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTestC
         fake_mesh_op.raise_for_error.return_value = None
         net_mock.ensure_mesh.return_value = fake_mesh_op
 
+        # update_dnsmasq returns either an op (to poll) or None
+        # (network has neither dhcp nor dns). The handler must call
+        # raise_for_error on the non-None case.
+        fake_dnsmasq_op = mock.MagicMock()
+        fake_dnsmasq_op.raise_for_error.return_value = None
+        net_mock.update_dnsmasq.return_value = fake_dnsmasq_op
+
         op = _make_op(
             self, self.mock_etcd,
             self.node_uuid, self.instance_uuid,
@@ -228,10 +244,11 @@ class UpdateDnsmasqRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTestC
         op.state = NodeInstNetdescOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.instance_start)
 
-        mock_apply_update_dnsmasq.assert_called_once_with()
-        # Network.update_dnsmasq must never be invoked from this in-worker
-        # dispatcher path -- after step 4d it would enqueue and deadlock.
-        net_mock.update_dnsmasq.assert_not_called()
+        net_mock.update_dnsmasq.assert_called_once_with()
+        fake_dnsmasq_op.raise_for_error.assert_called_once()
+        # The worker-only direct apply must NOT be called from a
+        # hypervisor-side op -- the guard would raise if it were.
+        mock_apply_update_dnsmasq.assert_not_called()
 
 
 class CreateOnHypervisorRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTestCase):

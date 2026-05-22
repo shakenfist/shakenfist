@@ -14,6 +14,7 @@ from shakenfist.config import SFConfig
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import FLOATING_NETWORK_UUID
+from shakenfist.exceptions import NotOnNetworkNode
 from shakenfist.network import bridged_vxlan_network
 from shakenfist.tests import base
 
@@ -31,10 +32,77 @@ def _make_network_mock(uuid='11111111-1111-4111-8111-111111111111', vxid=42,
     return network
 
 
+def _patch_network_node_config(test_case, **overrides):
+    """Patch ``bridged_vxlan_network.config`` with NODE_IS_NETWORK_NODE=True.
+
+    Almost every ``_apply_*`` method now asserts ``NODE_IS_NETWORK_NODE``
+    on entry (see ``BridgedVXLanNetwork._require_network_node``) so tests
+    that exercise those methods need to run as if they were the network
+    node. Callers can override individual fields via ``overrides`` when
+    they need to.
+    """
+    defaults = {
+        'NODE_EGRESS_IP': '10.0.0.1',
+        'NODE_MESH_IP': '10.0.0.1',
+        'NETWORK_NODE_IP': '10.0.0.1',
+        'NODE_IS_NETWORK_NODE': True,
+    }
+    defaults.update(overrides)
+    patcher = mock.patch(
+        'shakenfist.network.bridged_vxlan_network.config',
+        SFConfig(**defaults))
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
+
+
 def _make_interface(instance_uuid):
     iface = mock.Mock()
     iface.instance_uuid = instance_uuid
     return iface
+
+
+class BridgedVXLanNetworkRequireNetworkNodeTestCase(base.ShakenFistTestCase):
+    """The ``_apply_*`` guard refuses to run on a non-network-node.
+
+    These are the cases that previously surfaced as silent network bugs
+    (DNS misses, floating IP not appearing); the guard turns them into
+    a loud :class:`NotOnNetworkNode` at the call site.
+    """
+
+    def test_guard_raises_on_non_network_node(self):
+        _patch_network_node_config(self, NODE_IS_NETWORK_NODE=False)
+        network = _make_network_mock()
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        self.assertRaises(
+            NotOnNetworkNode, bvn._apply_update_dnsmasq)
+
+    def test_guard_message_names_the_method(self):
+        _patch_network_node_config(self, NODE_IS_NETWORK_NODE=False)
+        network = _make_network_mock()
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        try:
+            bvn._apply_remove_nat()
+        except NotOnNetworkNode as e:
+            self.assertIn('_apply_remove_nat', str(e))
+            return
+        self.fail('expected NotOnNetworkNode')
+
+    def test_guard_lets_hypervisor_methods_through(self):
+        """``_apply_*_on_hypervisor`` legitimately run on hypervisors and
+        must not be guarded."""
+        _patch_network_node_config(self, NODE_IS_NETWORK_NODE=False)
+        with mock.patch(
+                'shakenfist.network.bridged_vxlan_network.'
+                'util_concurrency.create_vxlan_interface'):
+            network = _make_network_mock()
+            network.mesh_nic = 'eth1'
+            network.is_dead.return_value = False
+            network.subst_dict.return_value = {
+                'vx_bridge': 'br', 'vx_interface': 'vx',
+            }
+            bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+            # No exception expected.
+            bvn._apply_create_on_hypervisor()
 
 
 class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
@@ -42,16 +110,15 @@ class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        # Most tests assume we are *not* the network node, so the network
-        # node's IP gets added to the mesh.
-        fake_config = SFConfig(NODE_EGRESS_IP='10.0.0.2',
-                               NODE_MESH_IP='10.0.0.2',
-                               NETWORK_NODE_IP='10.0.0.1',
-                               NODE_IS_NETWORK_NODE=False)
-        self.config_patcher = mock.patch(
-            'shakenfist.network.bridged_vxlan_network.config', fake_config)
-        self.config_patcher.start()
-        self.addCleanup(self.config_patcher.stop)
+        # ``_apply_ensure_mesh`` now asserts ``NODE_IS_NETWORK_NODE``;
+        # NODE_MESH_IP is offset from NETWORK_NODE_IP so the network-node
+        # IP is still included in the computed mesh (this is what the
+        # original 'we are not the network node' phrasing was checking
+        # -- but with the guard the right shape is "the elected
+        # network node sees a hypervisor IP in its mesh, not its own").
+        _patch_network_node_config(
+            self, NODE_EGRESS_IP='10.0.0.2', NODE_MESH_IP='10.0.0.2',
+            NETWORK_NODE_IP='10.0.0.1')
 
         self.mock_ensure_vxlan_mesh = mock.patch(
             'shakenfist.network.bridged_vxlan_network.'
@@ -262,6 +329,7 @@ class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
+        _patch_network_node_config(self)
         self.mock_add_floating_ip = mock.patch(
             'shakenfist.network.bridged_vxlan_network.'
             'util_concurrency.add_floating_ip').start()
@@ -305,6 +373,7 @@ class BridgedVXLanNetworkApplyRouteAddressTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
+        _patch_network_node_config(self)
         self.mock_execute = mock.patch(
             'shakenfist.network.bridged_vxlan_network.'
             'util_concurrency.execute').start()
@@ -352,6 +421,10 @@ class BridgedVXLanNetworkApplyRemoveNATTestCase(base.ShakenFistTestCase):
     inside the existing ``Network remove NAT`` lock.
     """
 
+    def setUp(self):
+        super().setUp()
+        _patch_network_node_config(self)
+
     def test_apply_remove_nat_unassigns_floating_gateway(self):
         network = _make_network_mock()
         network.floating_gateway = '203.0.113.100'
@@ -383,6 +456,10 @@ class BridgedVXLanNetworkApplyDnsMasqTestCase(base.ShakenFistTestCase):
     method on the wrapped network and assert the corresponding lifecycle
     call is dispatched under the appropriate ``get_lock`` op.
     """
+
+    def setUp(self):
+        super().setUp()
+        _patch_network_node_config(self)
 
     def test_apply_update_dnsmasq_restarts(self):
         network = _make_network_mock()
@@ -496,6 +573,7 @@ class BridgedVXLanNetworkApplyCreateOnNetworkNodeTestCase(
 
     def setUp(self):
         super().setUp()
+        _patch_network_node_config(self)
         self.mock_create_vxlan_interface = mock.patch(
             'shakenfist.network.bridged_vxlan_network.'
             'util_concurrency.create_vxlan_interface').start()
@@ -689,6 +767,7 @@ class BridgedVXLanNetworkApplyDeleteOnNetworkNodeTestCase(
 
     def setUp(self):
         super().setUp()
+        _patch_network_node_config(self)
         self.mock_execute = mock.patch(
             'shakenfist.network.bridged_vxlan_network.'
             'util_concurrency.execute').start()
@@ -760,6 +839,10 @@ class BridgedVXLanNetworkApplyDeleteOnNetworkNodeTestCase(
 
 class BridgedVXLanNetworkApplyEnableNATTestCase(base.ShakenFistTestCase):
     """Tests for ``_apply_enable_nat``."""
+
+    def setUp(self):
+        super().setUp()
+        _patch_network_node_config(self)
 
     def test_invokes_privexec(self):
         with mock.patch(

@@ -44,6 +44,7 @@ from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
+from shakenfist.exceptions import NotOnNetworkNode
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.node import Nodes
@@ -73,6 +74,34 @@ class BridgedVXLanNetwork:
     def __init__(self, network: 'Network') -> None:
         self.network = network
 
+    @staticmethod
+    def _require_network_node(method_name: str) -> None:
+        """Refuse to run a network-node-only ``_apply_*`` on a host that
+        is not the elected network node.
+
+        The dnsmasq config, NAT rules, floating-network bindings and
+        per-network netns these methods touch only exist on the
+        elected network node. When the same method is called from a
+        hypervisor (e.g. from a ``node_inst_*`` handler) it silently
+        mutates only that host's state, which for network-node-only
+        operations is just an absent set of files / rules / namespaces
+        -- so the call appears to succeed while the cluster-wide
+        effect never lands. Raising here surfaces the bug at the call
+        site instead of at test-failure time, in the spirit of the
+        ``MARIADB_HOST`` check in :mod:`shakenfist.mariadb` that pins
+        direct database access to the database daemon.
+
+        ``method_name`` is included in the message so the offending
+        ``_apply_*`` is named in the traceback without forcing the
+        helper to introspect its frame.
+        """
+        if not config.NODE_IS_NETWORK_NODE:
+            raise NotOnNetworkNode(
+                f'{method_name} must run on the elected network node; '
+                'this host is not it. Use the public Network.* method '
+                'that enqueues a net_op against the cluster-wide '
+                'networknode-* queue.')
+
     def _apply_ensure_mesh(self) -> None:
         """Ensure the VXLAN FDB mesh for the wrapped network is correct.
 
@@ -86,6 +115,8 @@ class BridgedVXLanNetwork:
         ``DeadNetwork`` (if the network has been torn down out from under
         us).
         """
+        self._require_network_node('_apply_ensure_mesh')
+
         # The original method was decorated with `_not_on_floating_network`
         # which short-circuits when invoked on the floating network. We
         # preserve that semantics inline here rather than copying the
@@ -153,6 +184,8 @@ class BridgedVXLanNetwork:
         this method and provides natural serialisation; no explicit lock
         is required.
         """
+        self._require_network_node('_apply_add_floating_ip')
+
         util_concurrency.add_floating_ip(
             str(self.network.uuid), floating_address, inner_address)
 
@@ -170,6 +203,8 @@ class BridgedVXLanNetwork:
         caller of this method and provides natural serialisation; no
         explicit lock is required.
         """
+        self._require_network_node('_apply_remove_floating_ip')
+
         util_concurrency.remove_floating_ip(
             str(self.network.uuid), floating_address)
 
@@ -183,6 +218,8 @@ class BridgedVXLanNetwork:
         this method and provides natural serialisation; no explicit lock
         is required.
         """
+        self._require_network_node('_apply_route_address')
+
         self.network.add_event(
             EVENT_TYPE_AUDIT, 'routing floating ip to network',
             extra={'floating': ip})
@@ -201,6 +238,8 @@ class BridgedVXLanNetwork:
         dispatcher is the only caller of this method and provides natural
         serialisation; no explicit lock is required.
         """
+        self._require_network_node('_apply_unroute_address')
+
         self.network.add_event(
             EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
             extra={'floating': ip})
@@ -222,6 +261,8 @@ class BridgedVXLanNetwork:
         caller of this method and provides natural serialisation; no
         explicit lock is required.
         """
+        self._require_network_node('_apply_remove_nat')
+
         if self.network.floating_gateway:
             self.network.unassign_floating_gateway()
 
@@ -237,6 +278,8 @@ class BridgedVXLanNetwork:
         dispatcher is the only caller of this method and provides natural
         serialisation; no explicit lock is required.
         """
+        self._require_network_node('_apply_update_dnsmasq')
+
         d = self.network._get_dnsmasq_object()
         d.restart()
 
@@ -251,6 +294,8 @@ class BridgedVXLanNetwork:
         the only caller of this method and provides natural serialisation;
         no explicit lock is required.
         """
+        self._require_network_node('_apply_remove_dnsmasq')
+
         d = self.network._get_dnsmasq_object()
         d.terminate()
         d.state = dnsmasq.DnsMasq.STATE_DELETED
@@ -265,6 +310,8 @@ class BridgedVXLanNetwork:
         only caller of this method and provides natural serialisation;
         no explicit lock is required.
         """
+        self._require_network_node('_apply_remove_dhcp_lease')
+
         d = self.network._get_dnsmasq_object()
         d.remove_lease(ipv4, macaddr)
 
@@ -312,6 +359,8 @@ class BridgedVXLanNetwork:
         this method and provides natural serialisation; no explicit lock
         is required.
         """
+        self._require_network_node('_apply_create_on_network_node')
+
         if self.network.uuid == FLOATING_NETWORK_UUID:
             return
 
@@ -487,6 +536,8 @@ class BridgedVXLanNetwork:
         only caller of this method and provides natural serialisation;
         no explicit lock is required.
         """
+        self._require_network_node('_apply_delete_on_network_node')
+
         subst = self.network.subst_dict()
 
         if util_network.check_for_interface(subst['vx_veth_outer']):
@@ -531,6 +582,8 @@ class BridgedVXLanNetwork:
         inside the dispatcher, which only runs on the elected network
         node for the tasks that invoke this method.
         """
+        self._require_network_node('_apply_enable_nat')
+
         util_concurrency.enable_nat(
             self.network.uuid, self.network.network_address,
             self.network.netmask, self.network.vxid)

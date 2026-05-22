@@ -235,7 +235,13 @@ class NodeInstOp(BaseClusterOperation):
                 if n.state.value == Network.STATE_DELETE_WAIT:
                     continue
 
-                BridgedVXLanNetwork(n)._apply_update_dnsmasq()
+                # dnsmasq config files live on the network node only,
+                # so invoking the worker's ``_apply_update_dnsmasq``
+                # method directly from this hypervisor mutates nothing
+                # useful. Enqueue a net_op instead so the network
+                # node's dispatcher picks up the stale lease prune
+                # after the instance is gone.
+                n.update_dnsmasq()
 
                 if (not config.NODE_IS_NETWORK_NODE and
                         network_uuid not in host_networks):

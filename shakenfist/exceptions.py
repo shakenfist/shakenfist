@@ -11,6 +11,18 @@ class NoNetworkNode(Exception):
     ...
 
 
+class NotOnNetworkNode(Exception):
+    """A network-node-only ``_apply_*`` method was invoked on a host that
+    is not the elected network node. The cluster-wide effect of these
+    methods (dnsmasq config, NAT/floating-IP rules, network-namespace
+    state) only lives on the network node, so calling them elsewhere
+    silently does nothing -- which used to manifest as DNS lookups
+    missing entries and floating IPs not appearing, with no error.
+    Raising at the call site instead surfaces the bug immediately.
+    """
+    ...
+
+
 # Objects
 class ObjectException(Exception):
     ...

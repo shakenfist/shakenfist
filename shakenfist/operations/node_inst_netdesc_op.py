@@ -243,7 +243,16 @@ class NodeInstNetdescOp(BaseClusterOperation):
                     BridgedVXLanNetwork(n)._apply_create_on_hypervisor()
                     mesh_op = n.ensure_mesh()
                     mesh_op.raise_for_error()
-                    BridgedVXLanNetwork(n)._apply_update_dnsmasq()
+                    # dnsmasq lives on the network node only. Calling
+                    # ``_apply_update_dnsmasq`` here directly silently
+                    # wrote to this hypervisor's (absent) dnsmasq state
+                    # and the actual network-node dnsmasq never learned
+                    # about the new lease -- exactly the bug surfaced by
+                    # ``test_provided_dns``. Enqueue a net_op instead so
+                    # the network node's dispatcher runs the refresh.
+                    dnsmasq_op = n.update_dnsmasq()
+                    if dnsmasq_op is not None:
+                        dnsmasq_op.raise_for_error()
 
                     if ni.floating['floating_address']:
                         ni_create_and_enqueue(
