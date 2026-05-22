@@ -106,16 +106,10 @@ class SFConfig(BaseSettings):
 
     # API Options
     API_ASYNC_WAIT: int = Field(
-        60,
+        15,
         description=(
-            'Default deadline for ``BaseClusterOperation.raise_for_error()``: '
-            'how long an internal caller (or REST handler) will block waiting '
-            'for an enqueued cluster operation to reach a terminal state. The '
-            '15 s value used through phases 1-9 of the network-facade refactor '
-            'was too aggressive for the cascading wait-on-op patterns -- under '
-            'cluster load a ``net_op`` that took 16 s to dispatch tripped '
-            'a 15 s waiter even though the op itself was healthy. Long-running '
-            'startup paths still override this explicitly.'
+            'How long we wait for an async operation to complete  before '
+            'returning to the user.'
         )
     )
     AUTH_SECRET_SEED: str = Field(

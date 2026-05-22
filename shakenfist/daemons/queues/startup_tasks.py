@@ -126,23 +126,15 @@ def restore_instances():
         else:
             instances.append(inst)
 
-    # Restore each network sequentially, with a generous per-op
-    # deadline. Startup is not a user-facing context so the default
-    # ``API_ASYNC_WAIT`` is the wrong yardstick here -- if the cluster
-    # is busy bringing other nodes up, individual ops can sit in the
-    # queue minutes before they reach a worker. A timeout that fires
-    # here drops the exception on the floor (see the except below) and
-    # leaves the network restored only partially, which manifests as
-    # broken VXLAN connectivity in subsequent tests.
     for network_uuid in networks:
         try:
             n = network.Network.from_db(network_uuid)
             if not n.is_dead():
                 LOG.with_fields({'network': n}).info('Restoring network')
                 create_op = n.create_on_hypervisor()
-                create_op.raise_for_error(timeout=600)
+                create_op.raise_for_error()
                 mesh_op = n.ensure_mesh()
-                mesh_op.raise_for_error(timeout=600)
+                mesh_op.raise_for_error()
         except Exception as e:
             util_exceptions.ignore_exception(
                 'restore network %s' % network_uuid, e)
