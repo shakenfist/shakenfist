@@ -403,6 +403,20 @@ because the following statements will be true:
 - **Reservation-aware autoscaling signals.** A persistent
   reservation backlog (batches waiting on capacity) is a real
   scale-out signal an external system could consume.
+- **Network bandwidth as a scheduling input.** Today's
+  scheduler considers CPU, memory, and disk capacity but not
+  ingress / egress bandwidth. With the smeared-carrier model
+  from `PLAN-network-carrier-model`, network bandwidth on
+  carrier nodes becomes a meaningful constraint — a carrier
+  hosting many high-traffic networks can saturate its NIC
+  while showing plenty of CPU / RAM / disk headroom. Worth
+  *tracking* as a reservation dimension (so placement can
+  avoid worsening hot spots) even if actively *limiting*
+  network throughput is out of scope (rate-limiting at the
+  hypervisor is operationally complicated and probably not
+  worth the effort versus capacity-aware placement). Out of
+  scope here pending the carrier model and OpenTelemetry
+  measurements; revisit once those land.
 
 ### Bugs fixed during this work
 
