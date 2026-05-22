@@ -507,15 +507,20 @@ because the following statements will be true:
   land alongside this plan — ideally before phase 6 (the
   galaxy role), so the role's documentation can point at
   well-defined health endpoints.
-- **Eventlog state into MariaDB, then electable.** The
-  current `sf-eventlog` daemon stores events in per-object
-  sqlite databases on one host, making it both a singleton
-  and stateful. The clean answer is to move that storage
-  into MariaDB and then make the daemon electable on the
-  same `cluster_locks` pattern phase 5 introduces for
-  `sf-database`. This is a real architectural change
-  (schema design, migration, retire old storage) and wants
-  its own plan, not a paragraph here.
+- **Remove the eventlog service entirely.** Tracked in
+  [`PLAN-eventlog-direct-mariadb.md`](PLAN-eventlog-direct-mariadb.md).
+  The original framing of this stub was "move sqlite to
+  MariaDB and make the daemon electable," but on closer
+  inspection `sf-eventlog` is a thin gRPC wrapper in front
+  of sqlite whose only remaining job once storage moves is
+  proxying writes that could go directly to `sf-database`.
+  The plan therefore deletes the daemon, routes calling-site
+  `eventlog.add_event*` calls directly through `sf-database`,
+  moves pruning into the cluster daemon's maintenance loop,
+  and removes the local-sqlite read path that today forces
+  sf-api to be co-located with the eventlog node. No hard
+  ordering against this plan, but the two are mutually
+  reinforcing.
 - **Network node failover.** Unlike `sf-database`, the
   network node owns layer-2/3 identities (egress NIC,
   floating IPs, NAT/DHCP state). Its HA story is *VIP
