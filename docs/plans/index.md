@@ -108,7 +108,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Network service ports](PLAN-network-service-ports.md) | Phase 4: Reaper and reconciler | Not started | Drift detection and repair across DB and iptables state |
 | [Network service ports](PLAN-network-service-ports.md) | Phase 5: Validation surface | Not started | Smoke-test caller or first real caller |
 | [Network service ports](PLAN-network-service-ports.md) | Phase 6: Documentation | Not started | Operator and developer docs including threat-surface change |
-| [Network carrier model](PLAN-network-carrier-model.md) | Phase 0: Research and decisions | Not started | Resolve pool config, lease TTL, advertisement modes, DHCP state, VLAN-trunk forward compatibility, work-queue routing |
+| [Network carrier model](PLAN-network-carrier-model.md) | Phase 0: Research and decisions | Not started | Resolve pool config, lease TTL, advertisement modes, DHCP state, VLAN-trunk forward compatibility |
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 1: Carrier pool config | Not started | Eligible-carrier set and node-capability declaration |
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 2: Per-network carrier lease | Not started | Lease primitive backed by `cluster_locks` and the generic allocator |
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 3: Renderer process | Not started | Carrier-side process that materialises leased state to kernel |

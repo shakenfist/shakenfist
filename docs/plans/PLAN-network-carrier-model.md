@@ -166,6 +166,21 @@ Concretely, after this plan lands:
   - L2 GARP / VRRP-style, OR
   - Manual (operator handles it; SF emits events but
     doesn't program advertisement)
+- **Cluster-wide network work queue uses assignment-at-
+  enqueue routing.** The enqueuer looks up the network's
+  current carrier and stamps `assigned_node_uuid` on the
+  queue row at insert time. Carriers pull
+  `WHERE assigned_node_uuid = me AND status = pending` —
+  a single equality predicate, cost independent of how many
+  networks a carrier ends up holding. Carrier change
+  triggers a re-route step on lease acquire: the new
+  carrier issues `UPDATE ... WHERE network_uuid = ? AND
+  status = pending SET assigned_node_uuid = me`, bounded by
+  in-flight queue depth. Chosen over filter-on-read
+  (`WHERE network_uuid IN (...)`) — which works but has a
+  cost-grows-with-fan-out shape — and over hash-partitioned
+  queues, which carry rebalance overhead this design
+  doesn't need.
 - The legacy "network node" config is removed (or kept as
   the degenerate-single-carrier case for small
   deployments).
@@ -281,37 +296,6 @@ has the most open questions. Phase 0 will resolve at least:
     for misconfiguration. Phase 0 decides whether v1
     removes it or whether removal is a separate cleanup
     plan.
-16. **Cluster-wide network work queue routing.** Today the
-    network work queue is consumed by the singleton
-    network node — no filtering, no routing. In the
-    smeared-carrier model a single carrier might lease
-    100 networks, and the obvious "add `network_uuid` to
-    the queue row and filter by `WHERE network_uuid IN
-    (...)`" pattern looks expensive at first glance. Real
-    shape of the decision:
-    - **Filter-on-read** (`WHERE network_uuid IN (...)`).
-      Cheap with the right index — a hundred indexed
-      lookups is sub-millisecond — but worst-case scales
-      with carrier fan-out.
-    - **Subscription / JOIN** against a carrier-owns-which-
-      networks table. Same plan cost as filter-on-read,
-      different read shape.
-    - **Assignment at enqueue** — the enqueuer looks up the
-      network's current carrier and stamps
-      `assigned_node_uuid` on the queue row. Carriers pull
-      `WHERE assigned_node_uuid = me AND status = pending`,
-      a single equality predicate. Carrier-change requires
-      a re-route step (new carrier on lease acquire issues
-      `UPDATE ... WHERE network_uuid = ? AND assigned_node_uuid
-      = old AND status = pending SET assigned_node_uuid = me`).
-    - **Hash-partitioned queue** with carriers owning
-      partitions. More coordination overhead, probably not
-      worth it unless queue churn is genuinely high.
-    Phase 0 picks. Default lean is assignment-at-enqueue —
-    read path is the cheapest possible predicate, re-route
-    cost is bounded by in-flight queue depth, no `IN` lists
-    grow with carrier fan-out. Confirm against actual
-    expected queue rates.
 
 ## Execution
 
