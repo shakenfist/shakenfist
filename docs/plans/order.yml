@@ -18,3 +18,7 @@
 - PLAN-sticky-transfers.md: Sticky session affinity for SF blob transfers
 - PLAN-replace-exec-with-netlink.md: Replace exec'd network commands with native netlink operations
 - PLAN-scheduler-reservations.md: Atomic scheduling via a reservations table
+- PLAN-eventlog-direct-mariadb.md: Remove the eventlog service and write events directly to MariaDB
+- PLAN-generic-allocator.md: Unify finite-resource allocation onto one primitive
+- PLAN-network-service-ports.md: Per-network DNAT'd service ports for managed services
+- PLAN-network-carrier-model.md: Lease-based per-network carrier model with VIP advertisement
