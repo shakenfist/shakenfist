@@ -110,12 +110,12 @@ class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        # ``_apply_ensure_mesh`` now asserts ``NODE_IS_NETWORK_NODE``;
-        # NODE_MESH_IP is offset from NETWORK_NODE_IP so the network-node
-        # IP is still included in the computed mesh (this is what the
-        # original 'we are not the network node' phrasing was checking
-        # -- but with the guard the right shape is "the elected
-        # network node sees a hypervisor IP in its mesh, not its own").
+        # ``_apply_ensure_mesh`` is per-hypervisor (not network-node-only),
+        # so no ``NODE_IS_NETWORK_NODE`` guard fires. NODE_MESH_IP is
+        # offset from NETWORK_NODE_IP so the network-node IP is included
+        # in the computed mesh -- the body excludes the running host from
+        # its own mesh, so distinct values are required to exercise the
+        # "network node IP makes it into the mesh" branch.
         _patch_network_node_config(
             self, NODE_EGRESS_IP='10.0.0.2', NODE_MESH_IP='10.0.0.2',
             NETWORK_NODE_IP='10.0.0.1')

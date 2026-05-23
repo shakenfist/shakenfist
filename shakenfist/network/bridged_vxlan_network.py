@@ -114,9 +114,17 @@ class BridgedVXLanNetwork:
         ``EnsureMeshFailed`` (from the underlying privexec layer) and
         ``DeadNetwork`` (if the network has been torn down out from under
         us).
-        """
-        self._require_network_node('_apply_ensure_mesh')
 
+        Unlike the dnsmasq / NAT / floating-IP / netns ``_apply_*`` methods
+        on this class, this one is **not** network-node-only: every
+        hypervisor with an interface on the network maintains its own
+        VXLAN FDB entries for the mesh (which is why ``Network.ensure_mesh``
+        enqueues the op against the per-node ``network`` family, not the
+        cluster-wide ``networknode`` family). The body excludes ``self`` from
+        the mesh to avoid duplicate-packet reflection (see bug #859), which
+        only makes sense when the method runs on every participating host.
+        Consequently there is no ``_require_network_node`` guard here.
+        """
         # The original method was decorated with `_not_on_floating_network`
         # which short-circuits when invoked on the floating network. We
         # preserve that semantics inline here rather than copying the
