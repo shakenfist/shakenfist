@@ -30,9 +30,10 @@ EXPECTED_QUEUE_ORDER_NETWORK_NODE = EXPECTED_PER_NODE_QUEUES + EXPECTED_CLUSTER_
 
 
 class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
-    """Assert that the net-worker dequeues per-node queues before cluster-wide
-    network-node queues, and that the correct queues are polled depending on
-    whether this node is the elected network node.
+    """Assert that the net-worker requests per-node queues before cluster-wide
+    network-node queues in a single ``dequeue_work_items`` call, and that the
+    correct queues are included depending on whether this node is the
+    elected network node.
 
     Safety property: each queue is drained by exactly one worker.
       - Per-node queues ({node_uuid}-network-*): drained by this node's
@@ -45,7 +46,7 @@ class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
         """Run one iteration of Job.execute() then break the loop.
 
         Patches:
-        - mariadb.dequeue_work_item  -> always returns None (no work)
+        - mariadb.dequeue_work_items -> always returns [] (no work)
         - daemon.check_abort_path    -> True on the first call, False on the
                                         second so the while-loop exits cleanly
         - daemon.clear_abort_path    -> no-op
@@ -70,7 +71,7 @@ class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
             # Allow exactly one pass through the while loop.
             mock_daemon.check_abort_path.side_effect = [True, False]
             mock_daemon.clear_abort_path.return_value = None
-            mock_mariadb.dequeue_work_item.return_value = None
+            mock_mariadb.dequeue_work_items.return_value = []
 
             # Import here so the module-level config mock takes effect.
             from shakenfist.daemons.network.workitem import Job
@@ -80,72 +81,68 @@ class NetWorkerDequeueOrderTest(base.ShakenFistTestCase):
 
             job.execute()
 
-            return mock_mariadb.dequeue_work_item
+            return mock_mariadb.dequeue_work_items
 
     # -------------------------------------------------------------------------
-    # Non-network-node: only per-node queues should be visited
+    # Non-network-node: only per-node queues should be requested
     # -------------------------------------------------------------------------
 
-    def test_non_network_node_visits_only_per_node_queues(self):
-        """A hypervisor that is not the network node must only poll its own
-        per-node queues.  Polling the cluster-wide networknode-* queues on
+    def test_non_network_node_requests_only_per_node_queues(self):
+        """A hypervisor that is not the network node must only ask for its own
+        per-node queues. Including the cluster-wide networknode-* queues on
         every node would cause multiple workers to race over the same queue.
         """
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=False)
 
-        actual_queues = [call.args[0] for call in mock_dequeue.call_args_list]
-        self.assertEqual(EXPECTED_PER_NODE_QUEUES, actual_queues)
+        self.assertEqual(1, mock_dequeue.call_count)
+        queue_names = mock_dequeue.call_args.args[0]
+        self.assertEqual(EXPECTED_PER_NODE_QUEUES, queue_names)
 
-    def test_non_network_node_exactly_five_dequeue_calls(self):
+    def test_non_network_node_single_batched_call(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=False)
-        self.assertEqual(5, mock_dequeue.call_count)
+        self.assertEqual(1, mock_dequeue.call_count)
 
     def test_non_network_node_no_cluster_queues(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=False)
 
-        actual_queues = [call.args[0] for call in mock_dequeue.call_args_list]
-        for queue_name in actual_queues:
+        queue_names = mock_dequeue.call_args.args[0]
+        for queue_name in queue_names:
             self.assertNotIn('networknode', queue_name)
 
     # -------------------------------------------------------------------------
     # Network-node: per-node queues first, then cluster-wide queues
     # -------------------------------------------------------------------------
 
-    def test_network_node_dequeue_call_order_per_node_first(self):
+    def test_network_node_queue_order_per_node_first(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
 
-        actual_queues = [call.args[0] for call in mock_dequeue.call_args_list]
-        self.assertEqual(EXPECTED_QUEUE_ORDER_NETWORK_NODE, actual_queues)
+        self.assertEqual(1, mock_dequeue.call_count)
+        queue_names = mock_dequeue.call_args.args[0]
+        self.assertEqual(EXPECTED_QUEUE_ORDER_NETWORK_NODE, queue_names)
 
     def test_network_node_per_node_queues_come_before_cluster_queues(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
 
-        actual_queues = [call.args[0] for call in mock_dequeue.call_args_list]
-        self.assertEqual(EXPECTED_PER_NODE_QUEUES, actual_queues[:5])
-        self.assertEqual(EXPECTED_CLUSTER_QUEUES, actual_queues[5:])
+        queue_names = mock_dequeue.call_args.args[0]
+        self.assertEqual(EXPECTED_PER_NODE_QUEUES, queue_names[:5])
+        self.assertEqual(EXPECTED_CLUSTER_QUEUES, queue_names[5:])
 
-    def test_network_node_exactly_ten_dequeue_calls_per_iteration(self):
+    def test_network_node_single_batched_call_per_iteration(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
-        self.assertEqual(10, mock_dequeue.call_count)
+        self.assertEqual(1, mock_dequeue.call_count)
 
     def test_network_node_uuid_embedded_in_per_node_queue_names(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
 
-        per_node_calls = [
-            call.args[0]
-            for call in mock_dequeue.call_args_list[:5]
-        ]
-        for queue_name in per_node_calls:
+        per_node_queues = mock_dequeue.call_args.args[0][:5]
+        for queue_name in per_node_queues:
             self.assertIn(NODE_UUID, queue_name)
 
     def test_network_node_cluster_queues_do_not_contain_node_uuid(self):
         mock_dequeue = self._run_one_iteration(NODE_UUID, is_network_node=True)
 
-        cluster_calls = [
-            call.args[0]
-            for call in mock_dequeue.call_args_list[5:]
-        ]
-        for queue_name in cluster_calls:
+        cluster_queues = mock_dequeue.call_args.args[0][5:]
+        for queue_name in cluster_queues:
             self.assertNotIn(NODE_UUID, queue_name)
 
 

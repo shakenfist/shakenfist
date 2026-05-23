@@ -96,24 +96,31 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.DequeueRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.DequeueReply:
-        """Claim the next available job from a queue."""
+        """Claim up to ``request.limit`` jobs across ``request.queue_names``.
+
+        Queue order in the request is the caller's priority order
+        (index 0 = top priority); the MariaDB query honours it via
+        ``FIELD()``. Items are returned in the same order.
+        """
         try:
             self.monitor.counters['dequeue'].inc()
-            result = mariadb._direct_work_queue_dequeue(
-                request.queue_name, config.NODE_NAME)
-            if result is None:
-                return database_pb2.DequeueReply(
-                    found=False, job_name='', work_item='')
-            job_name, workitem = result
+            results = mariadb._direct_work_queue_dequeue_batch(
+                list(request.queue_names),
+                config.NODE_NAME,
+                request.limit)
             return database_pb2.DequeueReply(
-                found=True,
-                job_name=job_name,
-                work_item=util_json.json_dump(workitem)
+                items=[
+                    database_pb2.DequeuedItem(
+                        queue_name=queue_name,
+                        job_name=job_name,
+                        work_item=util_json.json_dump(workitem),
+                    )
+                    for queue_name, job_name, workitem in results
+                ]
             )
         except Exception as e:
             util_exceptions.ignore_exception('database Dequeue failed', e)
-            return database_pb2.DequeueReply(
-                found=False, job_name='', work_item='')
+            return database_pb2.DequeueReply(items=[])
 
     def Resolve(
         self,

@@ -892,12 +892,12 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_enqueue_work_item.stop)
 
-        self.mariadb_dequeue_work_item = mock.patch(
-            'shakenfist.mariadb.dequeue_work_item',
-            side_effect=self._mariadb_dequeue_work_item)
-        self.mariadb_dequeue_work_item.start()
+        self.mariadb_dequeue_work_items = mock.patch(
+            'shakenfist.mariadb.dequeue_work_items',
+            side_effect=self._mariadb_dequeue_work_items)
+        self.mariadb_dequeue_work_items.start()
         self.test_obj.addCleanup(
-            self.mariadb_dequeue_work_item.stop)
+            self.mariadb_dequeue_work_items.stop)
 
         self.mariadb_resolve_work_item = mock.patch(
             'shakenfist.mariadb.resolve_work_item',
@@ -2571,35 +2571,47 @@ class MockEtcd():
             f'MockMariaDB.enqueue_work_item({queue_name}, '
             f'{work_item}, delay={delay}): id={row["id"]}')
 
-    def _mariadb_dequeue_work_item(self, queue_name):
-        """Mock implementation of mariadb.dequeue_work_item().
+    def _mariadb_dequeue_work_items(self, queue_names, limit=10):
+        """Mock implementation of mariadb.dequeue_work_items().
 
-        Returns (job_name, payload) for the earliest eligible row
-        in queue_name or None. 'Eligible' means claimed_at is None
-        and scheduled_at <= now. Iterates in insertion order, which
-        matches the SQL ORDER BY scheduled_at ASC for ties created
-        at the same logical moment.
+        Returns up to ``limit`` ``(queue_name, job_name, payload)``
+        tuples for the highest-priority eligible rows. Priority is
+        the caller-supplied order of ``queue_names``: index 0 is
+        top priority, matching the SQL ORDER BY
+        FIELD(queue_name, ...). Within a single queue_name, ties are
+        broken by ``scheduled_at`` ASC (insertion order in practice).
+        'Eligible' means ``claimed_at`` is None and ``scheduled_at``
+        <= now.
         """
         now = time.time()
+        priority = {q: i for i, q in enumerate(queue_names)}
         eligible = [
             r for r in self.work_queue_store
-            if r['queue_name'] == queue_name
+            if r['queue_name'] in priority
             and r['claimed_at'] is None
             and r['scheduled_at'] <= now
         ]
         if not eligible:
             self._trace(
-                f'MockMariaDB.dequeue_work_item({queue_name}): empty')
-            return None
-        eligible.sort(key=lambda r: r['scheduled_at'])
-        row = eligible[0]
-        row['claimed_at'] = now
-        row['claimed_by'] = 'mock'
-        row['attempts'] = row.get('attempts', 0) + 1
+                f'MockMariaDB.dequeue_work_items('
+                f'{queue_names}, limit={limit}): empty')
+            return []
+        eligible.sort(key=lambda r: (
+            priority[r['queue_name']], r['scheduled_at']))
+        claimed = eligible[:limit]
+        result = []
+        for row in claimed:
+            row['claimed_at'] = now
+            row['claimed_by'] = 'mock'
+            row['attempts'] = row.get('attempts', 0) + 1
+            result.append(
+                (row['queue_name'], str(row['id']),
+                 dict(row['payload'] or {})))
         self._trace(
-            f'MockMariaDB.dequeue_work_item({queue_name}): '
-            f'id={row["id"]}')
-        return str(row['id']), dict(row['payload'] or {})
+            f'MockMariaDB.dequeue_work_items('
+            f'{queue_names}, limit={limit}): '
+            f'returned {len(result)} items')
+        return result
 
     def _mariadb_resolve_work_item(self, queue_name, job_name):
         """Mock implementation of mariadb.resolve_work_item()."""

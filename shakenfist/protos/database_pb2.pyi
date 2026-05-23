@@ -61,36 +61,66 @@ global___EnqueueRequest = EnqueueRequest
 class DequeueRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    QUEUE_NAME_FIELD_NUMBER: builtins.int
-    queue_name: builtins.str
+    QUEUE_NAMES_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    limit: builtins.int
+    """Maximum number of items to claim in this call. Callers that
+    want one-at-a-time behaviour pass 1; pool workers pass their
+    free-slot count so they fill the pool in one round trip.
+    """
+    @property
+    def queue_names(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Queue names in caller-supplied priority order: index 0 is the
+        highest priority. The server uses this order in ORDER BY
+        FIELD(queue_name, ...) so a single SELECT returns the most
+        important eligible work first.
+        """
+
     def __init__(
         self,
         *,
-        queue_name: builtins.str = ...,
+        queue_names: collections.abc.Iterable[builtins.str] | None = ...,
+        limit: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["queue_name", b"queue_name"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["limit", b"limit", "queue_names", b"queue_names"]) -> None: ...
 
 global___DequeueRequest = DequeueRequest
 
 @typing.final
-class DequeueReply(google.protobuf.message.Message):
+class DequeuedItem(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    FOUND_FIELD_NUMBER: builtins.int
+    QUEUE_NAME_FIELD_NUMBER: builtins.int
     JOB_NAME_FIELD_NUMBER: builtins.int
     WORK_ITEM_FIELD_NUMBER: builtins.int
-    found: builtins.bool
+    queue_name: builtins.str
     job_name: builtins.str
     work_item: builtins.str
     """JSON-encoded data"""
     def __init__(
         self,
         *,
-        found: builtins.bool = ...,
+        queue_name: builtins.str = ...,
         job_name: builtins.str = ...,
         work_item: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["found", b"found", "job_name", b"job_name", "work_item", b"work_item"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["job_name", b"job_name", "queue_name", b"queue_name", "work_item", b"work_item"]) -> None: ...
+
+global___DequeuedItem = DequeuedItem
+
+@typing.final
+class DequeueReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEMS_FIELD_NUMBER: builtins.int
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DequeuedItem]: ...
+    def __init__(
+        self,
+        *,
+        items: collections.abc.Iterable[global___DequeuedItem] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
 
 global___DequeueReply = DequeueReply
 

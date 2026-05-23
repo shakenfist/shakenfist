@@ -17897,24 +17897,31 @@ def _grpc_work_queue_enqueue(
             f'gRPC Enqueue failed for {queue_name}: {e}')
 
 
-def _grpc_work_queue_dequeue(
-        queue_name: str) -> Optional[tuple[str, dict[str, Any]]]:
-    """Claim the next available job via the database microservice.
+def _grpc_work_queue_dequeue_batch(
+        queue_names: list[str],
+        limit: int) -> list[tuple[str, str, dict[str, Any]]]:
+    """Claim up to ``limit`` available jobs via the database microservice.
 
-    The database daemon uses its own NODE_NAME as worker_id; the
-    gRPC contract does not carry a caller-supplied worker_id.
+    The database daemon uses its own NODE_NAME as worker_id; the gRPC
+    contract does not carry a caller-supplied worker_id. Returns a
+    list of ``(queue_name, job_name, payload)`` tuples in the
+    server-supplied priority order (top-priority first).
     """
+    if not queue_names or limit <= 0:
+        return []
     try:
         stub = _get_database_stub()
-        request = database_pb2.DequeueRequest(queue_name=queue_name)
+        request = database_pb2.DequeueRequest(
+            queue_names=queue_names, limit=limit)
         reply = _grpc_call(stub.Dequeue, request)
-        if not reply.found:
-            return None
-        return reply.job_name, json.loads(reply.work_item)
+        return [
+            (item.queue_name, item.job_name, json.loads(item.work_item))
+            for item in reply.items
+        ]
     except grpc.RpcError as e:
         LOG.warning(
-            f'gRPC Dequeue failed for {queue_name}: {e}')
-        return None
+            f'gRPC Dequeue failed across {len(queue_names)} queues: {e}')
+        return []
 
 
 def _grpc_work_queue_resolve(
@@ -18254,7 +18261,7 @@ def delete_cluster_operation_error(op_uuid: 'str | UUID') -> bool:
 # Work Queue Direct Access Functions
 # Replaces the /sf/queue/... and /sf/processing/... etcd prefixes with a
 # single row-locked table. Claim state lives on the row itself. Public
-# callers use the enqueue_work_item/dequeue_work_item/resolve_work_item/
+# callers use the enqueue_work_item/dequeue_work_items/resolve_work_item/
 # get_work_queue_length/restart_work_queue wrappers at the bottom of this
 # module.
 # =============================================================================
@@ -18293,43 +18300,58 @@ def _direct_work_queue_enqueue(
             f'work_queue insert failed for {queue_name}') from e
 
 
-def _direct_work_queue_dequeue(
-        queue_name: str,
-        worker_id: str) -> Optional[tuple[str, dict[str, Any]]]:
-    """Claim the next eligible job on a queue.
+def _direct_work_queue_dequeue_batch(
+        queue_names: list[str],
+        worker_id: str,
+        limit: int) -> list[tuple[str, str, dict[str, Any]]]:
+    """Claim up to ``limit`` eligible jobs across ``queue_names``.
 
-    Uses SELECT ... FOR UPDATE SKIP LOCKED so two simultaneous
-    callers either get distinct rows or at least one gets None.
-    Increments attempts on the claim.
+    Returns a list of ``(queue_name, job_name, payload_dict)`` tuples,
+    possibly empty. Rows are ordered by the caller-supplied position
+    of ``queue_name`` in ``queue_names`` (index 0 = top priority) and
+    then by ``scheduled_at``, so a single SELECT returns the most
+    important eligible work first. Uses ``FOR UPDATE SKIP LOCKED`` so
+    parallel workers can't double-claim a row. ``attempts`` is
+    incremented on the claim. ``job_name`` is the stringified
+    autoincrement id, opaque to callers; pass it back -- with the
+    matching ``queue_name`` -- to ``resolve_work_item``.
 
-    Returns (jobname, payload_dict) on success, None if the queue
-    is empty or every eligible row is locked by another worker.
-    The returned jobname is the stringified autoincrement id;
-    callers treat it as opaque and pass it back to resolve().
+    The ``FIELD(queue_name, ...)`` order clause materialises the
+    caller's priority order at the SQL layer. Lower priorities are
+    only returned when the higher-priority queues yield fewer rows
+    than ``limit``; sustained high-priority load can still starve
+    them. Fairness (bounded staleness etc.) is left to the caller's
+    queue_names composition for now.
     """
+    if not queue_names or limit <= 0:
+        return []
+
     engine = _get_engine()
     table = _get_work_queue_table()
 
     try:
         with engine.connect() as conn:
             select_stmt = (
-                sa.select(table.c.id, table.c.payload)
-                .where(table.c.queue_name == queue_name)
+                sa.select(table.c.id, table.c.queue_name, table.c.payload)
+                .where(table.c.queue_name.in_(queue_names))
                 .where(table.c.claimed_at.is_(None))
                 .where(
                     table.c.scheduled_at
                     <= sa.func.unix_timestamp(sa.func.now(6)))
-                .order_by(table.c.scheduled_at.asc())
-                .limit(1)
+                .order_by(
+                    sa.func.field(table.c.queue_name, *queue_names),
+                    table.c.scheduled_at.asc())
+                .limit(limit)
                 .with_for_update(skip_locked=True)
             )
-            row = conn.execute(select_stmt).fetchone()
-            if row is None:
-                return None
+            rows = conn.execute(select_stmt).fetchall()
+            if not rows:
+                return []
 
+            row_ids = [r.id for r in rows]
             update_stmt = (
                 sa.update(table)
-                .where(table.c.id == row.id)
+                .where(table.c.id.in_(row_ids))
                 .values(
                     claimed_at=sa.func.unix_timestamp(
                         sa.func.now(6)),
@@ -18339,12 +18361,15 @@ def _direct_work_queue_dequeue(
             )
             conn.execute(update_stmt)
             conn.commit()
-            return str(row.id), dict(row.payload or {})
+            return [
+                (r.queue_name, str(r.id), dict(r.payload or {}))
+                for r in rows
+            ]
     except OperationalError as e:
         LOG.warning(
-            f'MariaDB dequeue failed for work_queue '
-            f'{queue_name}: {e}')
-        return None
+            f'MariaDB dequeue failed for work_queue across '
+            f'{len(queue_names)} queues: {e}')
+        return []
 
 
 def _direct_work_queue_resolve(
@@ -19523,20 +19548,31 @@ def enqueue_work_item(
     _direct_work_queue_enqueue(queue_name, work_item, delay)
 
 
-def dequeue_work_item(
-        queue_name: str,
-) -> Optional[tuple[str, dict[str, Any]]]:
-    """Claim the next eligible job on a queue.
+def dequeue_work_items(
+        queue_names: list[str],
+        limit: int = 10,
+) -> list[tuple[str, str, dict[str, Any]]]:
+    """Claim up to ``limit`` eligible jobs across ``queue_names``.
 
-    Returns (job_name, payload) on success or None if the queue is
-    empty / every eligible row is locked. The direct path uses
-    config.NODE_NAME as worker_id; the gRPC path relies on the
-    database daemon's NODE_NAME (the proto does not carry a
-    caller-supplied worker_id).
+    Returns a list of ``(queue_name, job_name, payload)`` tuples,
+    possibly empty. Items are returned in caller-supplied priority
+    order: the first queue_name in the list is highest priority. The
+    direct path uses ``config.NODE_NAME`` as worker_id; the gRPC
+    path relies on the database daemon's NODE_NAME (the proto does
+    not carry a caller-supplied worker_id).
+
+    This single query replaces the previous per-queue dequeue loop;
+    a sf-net or sf-queues worker that used to issue 10 sequential
+    gRPC calls per idle iteration now issues one. The trade-off is
+    that a worker which doesn't immediately execute every returned
+    item holds the others claimed until it does -- crashes between
+    receive and execute are recovered by the stuck-row reaper
+    (``list_stuck_work_queue_rows``).
     """
     if _use_database_service():
-        return _grpc_work_queue_dequeue(queue_name)
-    return _direct_work_queue_dequeue(queue_name, config.NODE_NAME)
+        return _grpc_work_queue_dequeue_batch(queue_names, limit)
+    return _direct_work_queue_dequeue_batch(
+        queue_names, config.NODE_NAME, limit)
 
 
 def resolve_work_item(queue_name: str, job_name: str) -> None:

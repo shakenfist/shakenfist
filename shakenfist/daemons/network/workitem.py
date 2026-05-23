@@ -25,6 +25,13 @@ MAX_DEFER_DELAY = 15.0
 DEFER_DELAY_MULTIPLIER = 2.0
 BACKOFF_MAP_CAP = 1000
 
+# Maximum jobs claimed per dequeue round trip. Chosen so the worst-
+# case orphan window on worker crash (BATCH_SIZE items sitting with
+# claimed_at set until the stuck-row reaper finds them) stays small,
+# while the per-iteration dequeue cost is amortised across enough
+# work to matter under load.
+BATCH_SIZE = 10
+
 
 class Job(util_concurrency.Job):
     def __init__(self, name):
@@ -95,21 +102,31 @@ class Job(util_concurrency.Job):
         if config.NODE_IS_NETWORK_NODE:
             queue_names += get_all_network_queues()
 
+        # Pulled out of the per-iteration body: this list is constant for
+        # the worker's lifetime (NODE_UUID and NODE_IS_NETWORK_NODE don't
+        # change at runtime), so there's no reason to materialise it on
+        # every poll. The first entry is highest priority -- the MariaDB
+        # query honours that order via FIELD().
         while daemon.check_abort_path(self.abort_path):
-            for queue_name in queue_names:
-                jobname_workitem = mariadb.dequeue_work_item(queue_name)
-                if jobname_workitem:
-                    break
+            # One round trip claims up to BATCH_SIZE items in priority
+            # order. Since this worker is single-threaded the batch is
+            # then drained sequentially; the win is the dispatcher
+            # gRPC count (1 instead of len(queue_names)) and that
+            # lower-priority queues spill in once the higher ones are
+            # exhausted within a single batch.
+            items = mariadb.dequeue_work_items(
+                queue_names, limit=BATCH_SIZE)
 
-            if not jobname_workitem:
+            if not items:
                 if not was_previously_idle:
                     util_concurrency.set_thread_name('idle')
                     LOG.debug('This network thread is now idle')
                     was_previously_idle = True
                 time.sleep(0.2)
+                continue
 
-            else:
-                jobname, workitem = jobname_workitem
+            was_previously_idle = False
+            for queue_name, jobname, workitem in items:
                 util_concurrency.set_thread_name(jobname)
                 LOG.debug(
                     f'This network thread is now processing job {jobname}')
@@ -118,6 +135,11 @@ class Job(util_concurrency.Job):
                     self._cluster_operation_execute(queue_name, workitem)
                 finally:
                     mariadb.resolve_work_item(queue_name, jobname)
+
+                # Honour abort mid-batch so shutdown is responsive even
+                # when a batch is large.
+                if not daemon.check_abort_path(self.abort_path):
+                    break
 
     def _cluster_operation_execute(self, queue_name, workitem):
         op_type = workitem.get('operation_type')

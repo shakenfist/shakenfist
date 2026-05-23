@@ -357,11 +357,17 @@ class Monitor(daemon.Daemon):
                     b.remove_location(n.fqdn)
                     b.request_replication()
 
-                # Clean up any lingering queue tasks
-                for queue_name in get_all_node_queues(n.fqdn):
-                    while jobname_workitem := mariadb.dequeue_work_item(
-                            queue_name):
-                        jobname, workitem = jobname_workitem
+                # Clean up any lingering queue tasks. Drain in batches of
+                # 100 -- this only runs once per deleted node, so a
+                # larger batch amortises the dequeue cost without
+                # growing the orphan window noticeably (this code path
+                # is the only consumer of the dead node's queues, so a
+                # crash mid-batch just leaves the rows for the next
+                # cluster pass).
+                node_queues = list(get_all_node_queues(n.fqdn))
+                while items := mariadb.dequeue_work_items(
+                        node_queues, limit=100):
+                    for queue_name, jobname, workitem in items:
                         n.add_event(
                             EVENT_TYPE_AUDIT,
                             'deleting work item for deleted node',
@@ -371,7 +377,7 @@ class Monitor(daemon.Daemon):
                             })
 
                         # Cluster operations might have dependencies
-                        if queue_name.find('-clusteroperation-') != -1:
+                        if '-clusteroperation-' in queue_name:
                             op_type = workitem.get('operation_type')
                             op_uuid = workitem.get('operation_uuid')
                             op = get_object_class(op_type).from_db(op_uuid)

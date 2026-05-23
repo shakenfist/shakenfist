@@ -317,13 +317,25 @@ message EnqueueRequest {
 }
 
 message DequeueRequest {
+  // Queue names in caller-supplied priority order: index 0 is the
+  // highest priority. The server uses this order in ORDER BY
+  // FIELD(queue_name, ...) so a single SELECT returns the most
+  // important eligible work first.
+  repeated string queue_names = 1;
+  // Maximum number of items to claim in this call. Callers that
+  // want one-at-a-time behaviour pass 1; pool workers pass their
+  // free-slot count so they fill the pool in one round trip.
+  int32 limit = 2;
+}
+
+message DequeuedItem {
   string queue_name = 1;
+  string job_name = 2;
+  string work_item = 3;  // JSON-encoded data
 }
 
 message DequeueReply {
-  bool found = 1;
-  string job_name = 2;
-  string work_item = 3;  // JSON-encoded data
+  repeated DequeuedItem items = 1;
 }
 
 message ResolveRequest {

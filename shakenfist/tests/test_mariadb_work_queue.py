@@ -103,8 +103,8 @@ class WorkQueueEnqueueTestCase(base.ShakenFistTestCase):
             {'task': 'x'})
 
 
-class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
-    """Tests for _direct_work_queue_dequeue()."""
+class WorkQueueDequeueBatchTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_work_queue_dequeue_batch()."""
 
     def setUp(self):
         super().setUp()
@@ -113,42 +113,64 @@ class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.config.stop)
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_dequeue_empty_returns_none(self, mock_get_engine):
+    def test_dequeue_empty_returns_empty_list(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
-        mock_conn.execute.return_value.fetchone.return_value = None
+        mock_conn.execute.return_value.fetchall.return_value = []
         mock_get_engine.return_value = mock_engine
 
-        result = mariadb._direct_work_queue_dequeue(
-            'my-queue', 'worker-1')
+        result = mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
-        self.assertIsNone(result)
+        self.assertEqual([], result)
         # Only the SELECT runs when the queue is empty; no UPDATE.
         self.assertEqual(mock_conn.execute.call_count, 1)
         mock_conn.commit.assert_not_called()
 
+    def test_dequeue_empty_queue_names_is_no_op(self):
+        # No engine call, no SQL emitted -- a defensive short-circuit.
+        self.assertEqual(
+            [], mariadb._direct_work_queue_dequeue_batch(
+                [], 'worker-1', 10))
+
+    def test_dequeue_zero_limit_is_no_op(self):
+        self.assertEqual(
+            [], mariadb._direct_work_queue_dequeue_batch(
+                ['my-queue'], 'worker-1', 0))
+
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_dequeue_claims_row_and_returns_payload(
+    def test_dequeue_claims_rows_and_returns_payloads(
             self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
-        mock_row = mock.Mock()
-        mock_row.id = 42
-        mock_row.payload = {'task': 'do-thing'}
+        row_a = mock.Mock()
+        row_a.id = 42
+        row_a.queue_name = 'my-queue'
+        row_a.payload = {'task': 'do-thing-a'}
+        row_b = mock.Mock()
+        row_b.id = 43
+        row_b.queue_name = 'my-queue'
+        row_b.payload = {'task': 'do-thing-b'}
         mock_select_result = mock.Mock()
-        mock_select_result.fetchone.return_value = mock_row
+        mock_select_result.fetchall.return_value = [row_a, row_b]
         mock_update_result = mock.Mock()
         mock_conn.execute.side_effect = [
             mock_select_result, mock_update_result]
         mock_get_engine.return_value = mock_engine
 
-        result = mariadb._direct_work_queue_dequeue(
-            'my-queue', 'worker-1')
+        result = mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
-        self.assertEqual(result, ('42', {'task': 'do-thing'}))
+        self.assertEqual(
+            [
+                ('my-queue', '42', {'task': 'do-thing-a'}),
+                ('my-queue', '43', {'task': 'do-thing-b'}),
+            ],
+            result)
         self.assertEqual(mock_conn.execute.call_count, 2)
         mock_conn.commit.assert_called_once()
 
         update_stmt = mock_conn.execute.call_args_list[1][0][0]
-        # The UPDATE must claim the specific row and bump attempts.
+        # The UPDATE must claim both rows in a single statement and
+        # bump attempts.
         compiled = update_stmt.compile()
         self.assertEqual(compiled.params['claimed_by'], 'worker-1')
         compiled_sql = str(compiled).replace('`', '').replace(' ', '')
@@ -159,10 +181,11 @@ class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_dequeue_sql_uses_skip_locked(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
-        mock_conn.execute.return_value.fetchone.return_value = None
+        mock_conn.execute.return_value.fetchall.return_value = []
         mock_get_engine.return_value = mock_engine
 
-        mariadb._direct_work_queue_dequeue('my-queue', 'worker-1')
+        mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
         select_stmt = mock_conn.execute.call_args[0][0]
         compiled_sql = str(select_stmt.compile(
@@ -176,10 +199,11 @@ class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_dequeue_sql_filters_deferred_jobs(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
-        mock_conn.execute.return_value.fetchone.return_value = None
+        mock_conn.execute.return_value.fetchall.return_value = []
         mock_get_engine.return_value = mock_engine
 
-        mariadb._direct_work_queue_dequeue('my-queue', 'worker-1')
+        mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
         select_stmt = mock_conn.execute.call_args[0][0]
         compiled_sql = str(select_stmt.compile(
@@ -193,16 +217,39 @@ class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
         self.assertIn('unix_timestamp', compiled_sql)
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_dequeue_returns_none_on_error(self, mock_get_engine):
+    def test_dequeue_sql_orders_by_priority_then_age(
+            self, mock_get_engine):
+        # The FIELD(queue_name, ...) ordering is what makes the batched
+        # SELECT honour the caller-supplied priority list.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.return_value.fetchall.return_value = []
+        mock_get_engine.return_value = mock_engine
+
+        mariadb._direct_work_queue_dequeue_batch(
+            ['high', 'low'], 'worker-1', 10)
+
+        select_stmt = mock_conn.execute.call_args[0][0]
+        compiled_sql = str(select_stmt.compile(
+            dialect=__import__(
+                'sqlalchemy.dialects.mysql',
+                fromlist=['dialect']).dialect()
+        )).lower()
+        self.assertIn('order by field(', compiled_sql)
+        # scheduled_at is the secondary sort key (tie-break within
+        # the same priority).
+        self.assertIn('scheduled_at asc', compiled_sql)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_dequeue_returns_empty_list_on_error(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
         mock_conn.execute.side_effect = OperationalError(
             'select', {}, Exception('DB down'))
         mock_get_engine.return_value = mock_engine
 
-        result = mariadb._direct_work_queue_dequeue(
-            'my-queue', 'worker-1')
+        result = mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
-        self.assertIsNone(result)
+        self.assertEqual([], result)
 
 
 class WorkQueueResolveTestCase(base.ShakenFistTestCase):
