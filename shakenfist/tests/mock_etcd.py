@@ -941,6 +941,13 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_delete_work_queue_row.stop)
 
+        self.mariadb_claim_coalescible_siblings = mock.patch(
+            'shakenfist.mariadb.claim_coalescible_siblings',
+            side_effect=self._mariadb_claim_coalescible_siblings)
+        self.mariadb_claim_coalescible_siblings.start()
+        self.test_obj.addCleanup(
+            self.mariadb_claim_coalescible_siblings.stop)
+
         # Mock cluster lock operations (used by locks.ClusterLock)
         self.db_acquire_lock = mock.patch(
             'shakenfist.mariadb.acquire_cluster_lock',
@@ -2718,6 +2725,48 @@ class MockEtcd():
             f'MockMariaDB.delete_work_queue_row({row_id}): '
             f'{"removed" if removed else "not found"}')
         return removed
+
+    def _mariadb_claim_coalescible_siblings(
+            self, operation_type, target_column, target_uuid,
+            task_names, exclude_op_uuid):
+        """Mock implementation of mariadb.claim_coalescible_siblings().
+
+        Mirrors the SQL safety guards in
+        ``mariadb._direct_claim_coalescible_siblings``: only single-
+        task ops in state ``queued`` matching one of ``task_names``
+        on the same target are folded; the excluded op is never
+        affected. Transitions the matched ops to ``complete`` in
+        ``mariadb_states`` and returns their uuids.
+        """
+        if not task_names or target_column not in {
+                'network_uuid', 'instance_uuid', 'node_uuid'}:
+            return []
+
+        folded: list[str] = []
+        for op_uuid, op_row in list(self.cluster_operations_store.items()):
+            if op_uuid == exclude_op_uuid:
+                continue
+            if op_row.get('operation_type') != operation_type:
+                continue
+            if str(op_row.get(target_column) or '') != str(target_uuid):
+                continue
+            metadata = op_row.get('metadata_json') or {}
+            tasks = metadata.get('tasks') or []
+            if len(tasks) != 1 or tasks[0] not in task_names:
+                continue
+            state_key = f'{operation_type}/{op_uuid}'
+            state_row = self.mariadb_states.get(state_key)
+            if not state_row or state_row.get('state_value') != 'queued':
+                continue
+            state_row['state_value'] = 'complete'
+            state_row['update_time'] = time.time()
+            state_row['message'] = 'coalesced into sibling op'
+            folded.append(op_uuid)
+        self._trace(
+            f'MockMariaDB.claim_coalescible_siblings('
+            f'{operation_type}, {target_column}={target_uuid}): '
+            f'folded {len(folded)} ops')
+        return folded
 
     def _mariadb_enqueue_event_dlq(
             self, object_type, object_uuid, event_timestamp, event_json):

@@ -273,7 +273,68 @@ class BaseClusterOperation(BaseOperation):
 
     def execute(self) -> None:
         self.state = BaseClusterOperation.STATE_EXECUTING  # type: ignore[misc]
-        for t in self.tasks:
+
+        # Coalescing happens here at the entry to execute() rather than
+        # in the dispatcher because both sf-net and sf-queues invoke
+        # this method -- doing it once here keeps the behaviour uniform
+        # across all op types and both daemons. The two passes are:
+        #
+        # 1. Within-job: if our own task list repeats a coalescible task,
+        #    drop the duplicates. Today's enqueue sites mostly send a
+        #    unique task per op so this is defensive, but step 6 of the
+        #    plan may surface call sites that legitimately send
+        #    ``[update_dnsmasq, update_dnsmasq, ...]``.
+        # 2. Cross-op: ask MariaDB to fold any *other* pending ops on
+        #    the same target whose entire task list is a single
+        #    coalescible task we're about to run. Their state gets
+        #    transitioned to ``complete``; when their work_queue row
+        #    eventually surfaces the dispatcher's terminal-state branch
+        #    drops it cleanly. Logged as a single "coalesced sibling
+        #    ops" status event on the survivor.
+        coalescible = type(self).coalescible_tasks
+        target_column = type(self).coalescible_target_column
+
+        if coalescible:
+            unique_tasks: list[Enum] = []
+            seen_coalescible: set[Enum] = set()
+            for t in self.tasks:
+                if t in coalescible:
+                    if t in seen_coalescible:
+                        self.add_event(
+                            EVENT_TYPE_STATUS,
+                            'within-job: dropped duplicate coalescible task',
+                            extra={'task': t.name})
+                        continue
+                    seen_coalescible.add(t)
+                unique_tasks.append(t)
+        else:
+            unique_tasks = list(self.tasks)
+
+        if coalescible and target_column:
+            survivor_coalescible_tasks = [
+                t for t in unique_tasks if t in coalescible]
+            target_uuid_attr = getattr(self, target_column, None)
+            if survivor_coalescible_tasks and target_uuid_attr is not None:
+                folded = mariadb.claim_coalescible_siblings(
+                    operation_type=self.object_type,
+                    target_column=target_column,
+                    target_uuid=str(target_uuid_attr),
+                    task_names=[
+                        t.name for t in survivor_coalescible_tasks],
+                    exclude_op_uuid=str(self.uuid))
+                if folded:
+                    self.add_event(
+                        EVENT_TYPE_STATUS,
+                        'coalesced sibling ops',
+                        extra={
+                            'sibling_count': len(folded),
+                            'sibling_uuids': folded,
+                            'tasks': [
+                                t.name
+                                for t in survivor_coalescible_tasks],
+                        })
+
+        for t in unique_tasks:
             self.dispatch_task(t)  # type: ignore[attr-defined]
             if self.state.value in [BaseClusterOperation.STATE_ABORT,  # type: ignore[attr-defined]
                                     BaseClusterOperation.STATE_DELETED,

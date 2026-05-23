@@ -14,6 +14,7 @@ service DatabaseService {
   rpc ListStuckWorkQueueRows (ListStuckWorkQueueRowsRequest) returns (ListStuckWorkQueueRowsReply) {}
   rpc ClearWorkQueueClaim (ClearWorkQueueClaimRequest) returns (StatusReply) {}
   rpc DeleteWorkQueueRow (DeleteWorkQueueRowRequest) returns (StatusReply) {}
+  rpc ClaimCoalescibleSiblings (ClaimCoalescibleSiblingsRequest) returns (ClaimCoalescibleSiblingsReply) {}
 
   // Lock Operations
   rpc AcquireLock (ClusterLockRequest) returns (ClusterLockReply) {}
@@ -380,6 +381,30 @@ message ClearWorkQueueClaimRequest {
 
 message DeleteWorkQueueRowRequest {
   int64 row_id = 1;
+}
+
+message ClaimCoalescibleSiblingsRequest {
+  // The op_type, target column (e.g. "network_uuid"), target uuid
+  // and uuid of the surviving op together identify "other ops on
+  // the same target object whose work the survivor is about to do."
+  // The server folds anything matching by transitioning its state
+  // to ``complete`` -- the worker that eventually picks that row
+  // up out of the queue will see the terminal state and skip it
+  // cleanly (see workitem.py terminal-state branch).
+  string operation_type = 1;
+  string target_column = 2;
+  string target_uuid = 3;
+  // Tasks the survivor is about to run that are flagged
+  // coalescible. Only sibling ops whose entire task list is exactly
+  // one of these names are folded -- multi-task siblings might
+  // also carry non-coalescible work and must be left alone.
+  repeated string task_names = 4;
+  string exclude_op_uuid = 5;
+}
+
+message ClaimCoalescibleSiblingsReply {
+  // Op uuids whose state was transitioned to ``complete``.
+  repeated string folded_op_uuids = 1;
 }
 
 // Lock Operations

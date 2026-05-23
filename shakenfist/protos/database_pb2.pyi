@@ -285,6 +285,66 @@ class DeleteWorkQueueRowRequest(google.protobuf.message.Message):
 global___DeleteWorkQueueRowRequest = DeleteWorkQueueRowRequest
 
 @typing.final
+class ClaimCoalescibleSiblingsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_COLUMN_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    TASK_NAMES_FIELD_NUMBER: builtins.int
+    EXCLUDE_OP_UUID_FIELD_NUMBER: builtins.int
+    operation_type: builtins.str
+    """The op_type, target column (e.g. "network_uuid"), target uuid
+    and uuid of the surviving op together identify "other ops on
+    the same target object whose work the survivor is about to do."
+    The server folds anything matching by transitioning its state
+    to ``complete`` -- the worker that eventually picks that row
+    up out of the queue will see the terminal state and skip it
+    cleanly (see workitem.py terminal-state branch).
+    """
+    target_column: builtins.str
+    target_uuid: builtins.str
+    exclude_op_uuid: builtins.str
+    @property
+    def task_names(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Tasks the survivor is about to run that are flagged
+        coalescible. Only sibling ops whose entire task list is exactly
+        one of these names are folded -- multi-task siblings might
+        also carry non-coalescible work and must be left alone.
+        """
+
+    def __init__(
+        self,
+        *,
+        operation_type: builtins.str = ...,
+        target_column: builtins.str = ...,
+        target_uuid: builtins.str = ...,
+        task_names: collections.abc.Iterable[builtins.str] | None = ...,
+        exclude_op_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["exclude_op_uuid", b"exclude_op_uuid", "operation_type", b"operation_type", "target_column", b"target_column", "target_uuid", b"target_uuid", "task_names", b"task_names"]) -> None: ...
+
+global___ClaimCoalescibleSiblingsRequest = ClaimCoalescibleSiblingsRequest
+
+@typing.final
+class ClaimCoalescibleSiblingsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOLDED_OP_UUIDS_FIELD_NUMBER: builtins.int
+    @property
+    def folded_op_uuids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Op uuids whose state was transitioned to ``complete``."""
+
+    def __init__(
+        self,
+        *,
+        folded_op_uuids: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["folded_op_uuids", b"folded_op_uuids"]) -> None: ...
+
+global___ClaimCoalescibleSiblingsReply = ClaimCoalescibleSiblingsReply
+
+@typing.final
 class ClusterLockRequest(google.protobuf.message.Message):
     """Lock Operations"""
 

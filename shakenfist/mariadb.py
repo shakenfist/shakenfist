@@ -18031,6 +18031,37 @@ def _grpc_work_queue_delete_row(row_id: int) -> bool:
         return False
 
 
+def _grpc_claim_coalescible_siblings(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_names: list[str],
+        exclude_op_uuid: str) -> list[str]:
+    """Fold sibling pending coalescible ops via the database microservice.
+
+    Returns the list of uuids that were folded (state transitioned
+    to ``complete``). See
+    ``_direct_claim_coalescible_siblings`` for the safety guards.
+    """
+    if not task_names:
+        return []
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ClaimCoalescibleSiblingsRequest(
+            operation_type=operation_type,
+            target_column=target_column,
+            target_uuid=target_uuid,
+            task_names=task_names,
+            exclude_op_uuid=exclude_op_uuid)
+        reply = _grpc_call(stub.ClaimCoalescibleSiblings, request)
+        return list(reply.folded_op_uuids)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ClaimCoalescibleSiblings failed for '
+            f'{operation_type}/{target_column}={target_uuid}: {e}')
+        return []
+
+
 # =============================================================================
 # Cluster Operations Public API Functions
 # =============================================================================
@@ -18581,6 +18612,104 @@ def _direct_work_queue_delete_row(row_id: int) -> bool:
             f'MariaDB delete_row failed for work_queue '
             f'row {row_id}: {e}')
         return False
+
+
+def _direct_claim_coalescible_siblings(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_names: list[str],
+        exclude_op_uuid: str) -> list[str]:
+    """Atomically transition sibling pending coalescible ops to COMPLETE.
+
+    Used by the dispatcher (``BaseClusterOperation.execute``) before
+    running a coalescible task: any other ops in the queue targeting
+    the same object with the same single-task work get their state
+    flipped to ``complete`` here, so when their work_queue row is
+    eventually picked up the dispatcher's terminal-state branch
+    (``shakenfist/daemons/network/workitem.py``) drops them cleanly.
+
+    Returns the list of uuids that were folded so the caller can
+    audit-log a "coalesced N siblings" event on the survivor.
+
+    Safety guards baked into the SQL:
+
+    * ``co.uuid != exclude_op_uuid`` -- never fold the survivor.
+    * ``os.state_value = 'queued'`` -- skip anything already being
+      executed by another worker, or already terminal. Combined with
+      ``FOR UPDATE`` on the SELECT, this serialises against the
+      dispatcher's own ``state = STATE_EXECUTING`` write.
+    * ``JSON_LENGTH(metadata_json, '$.tasks') = 1`` -- only fold
+      ops whose entire task list is one task. A multi-task sibling
+      might also carry non-coalescible work that we mustn't drop.
+    * Task name must be in the caller-supplied ``task_names``, which
+      callers pre-filter to ``op_class.coalescible_tasks``.
+
+    ``target_column`` is restricted to a small whitelist
+    (``network_uuid``, ``instance_uuid``, ``node_uuid``) so it can
+    be interpolated into the ORDER BY safely; SQLAlchemy's
+    ``getattr(table.c, ...)`` does the column lookup and refuses
+    unknown columns with ``AttributeError``.
+    """
+    if not task_names or target_column not in {
+            'network_uuid', 'instance_uuid', 'node_uuid'}:
+        return []
+
+    engine = _get_engine()
+    cluster_ops_table = _get_cluster_operations_table()
+    states_table = _get_object_states_table()
+    target_col = getattr(cluster_ops_table.c, target_column)
+
+    try:
+        with engine.connect() as conn:
+            select_stmt = (
+                sa.select(cluster_ops_table.c.uuid)
+                .select_from(
+                    cluster_ops_table.join(
+                        states_table,
+                        sa.and_(
+                            states_table.c.object_uuid == sa.cast(
+                                cluster_ops_table.c.uuid, sa.String(36)),
+                            states_table.c.object_type
+                            == cluster_ops_table.c.operation_type,
+                        )))
+                .where(cluster_ops_table.c.operation_type == operation_type)
+                .where(target_col == target_uuid)
+                .where(cluster_ops_table.c.uuid != exclude_op_uuid)
+                .where(states_table.c.state_value == 'queued')
+                .where(
+                    sa.func.json_length(
+                        cluster_ops_table.c.metadata_json,
+                        '$.tasks') == 1)
+                .where(
+                    sa.func.json_unquote(
+                        sa.func.json_extract(
+                            cluster_ops_table.c.metadata_json,
+                            '$.tasks[0]')).in_(task_names))
+                .with_for_update()
+            )
+            rows = conn.execute(select_stmt).fetchall()
+            if not rows:
+                return []
+
+            folded_uuids = [str(r.uuid) for r in rows]
+            update_stmt = (
+                sa.update(states_table)
+                .where(states_table.c.object_type == operation_type)
+                .where(states_table.c.object_uuid.in_(folded_uuids))
+                .values(
+                    state_value='complete',
+                    update_time=sa.func.unix_timestamp(sa.func.now(6)),
+                    message='coalesced into sibling op')
+            )
+            conn.execute(update_stmt)
+            conn.commit()
+            return folded_uuids
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB claim_coalescible_siblings failed for '
+            f'{operation_type}/{target_column}={target_uuid}: {e}')
+        return []
 
 
 # =============================================================================
@@ -19639,3 +19768,33 @@ def delete_work_queue_row(row_id: int) -> bool:
     if _use_database_service():
         return _grpc_work_queue_delete_row(row_id)
     return _direct_work_queue_delete_row(row_id)
+
+
+def claim_coalescible_siblings(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_names: list[str],
+        exclude_op_uuid: str) -> list[str]:
+    """Atomically fold sibling pending coalescible ops.
+
+    Used by ``BaseClusterOperation.execute`` before running a
+    coalescible task. The server transitions every matching
+    sibling's ``object_states`` row to ``complete`` in one
+    statement, then returns the affected uuids. See
+    ``_direct_claim_coalescible_siblings`` for the safety guards
+    (matched only single-task siblings in state ``queued``, never
+    folds the survivor).
+
+    Callers pre-filter ``task_names`` to the op class's
+    ``coalescible_tasks`` set and pre-supply
+    ``coalescible_target_column`` so this helper stays generic
+    across op types.
+    """
+    if _use_database_service():
+        return _grpc_claim_coalescible_siblings(
+            operation_type, target_column, target_uuid,
+            task_names, exclude_op_uuid)
+    return _direct_claim_coalescible_siblings(
+        operation_type, target_column, target_uuid,
+        task_names, exclude_op_uuid)

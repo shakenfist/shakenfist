@@ -237,6 +237,35 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def ClaimCoalescibleSiblings(
+        self,
+        request: database_pb2.ClaimCoalescibleSiblingsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ClaimCoalescibleSiblingsReply:
+        """Fold sibling pending coalescible ops.
+
+        Transitions every matching sibling's ``object_states`` row
+        to ``complete`` in a single statement and returns the
+        affected uuids. See
+        ``mariadb._direct_claim_coalescible_siblings`` for the
+        safety guards.
+        """
+        try:
+            self.monitor.counters['claim_coalescible_siblings'].inc()
+            folded = mariadb._direct_claim_coalescible_siblings(
+                request.operation_type,
+                request.target_column,
+                request.target_uuid,
+                list(request.task_names),
+                request.exclude_op_uuid)
+            return database_pb2.ClaimCoalescibleSiblingsReply(
+                folded_op_uuids=folded)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ClaimCoalescibleSiblings failed', e)
+            return database_pb2.ClaimCoalescibleSiblingsReply(
+                folded_op_uuids=[])
+
     # Lock Operations
 
     def AcquireLock(
@@ -4832,6 +4861,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'enqueue', 'dequeue', 'resolve', 'get_queue_length',
             'restart_queue', 'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
+            'claim_coalescible_siblings',
             'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',

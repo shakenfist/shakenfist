@@ -60,6 +60,11 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    ClaimCoalescibleSiblings: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ClaimCoalescibleSiblingsRequest,
+        database_pb2.ClaimCoalescibleSiblingsReply,
+    ]
+
     AcquireLock: grpc.UnaryUnaryMultiCallable[
         database_pb2.ClusterLockRequest,
         database_pb2.ClusterLockReply,
@@ -1067,6 +1072,11 @@ class DatabaseServiceAsyncStub:
     DeleteWorkQueueRow: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteWorkQueueRowRequest,
         database_pb2.StatusReply,
+    ]
+
+    ClaimCoalescibleSiblings: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ClaimCoalescibleSiblingsRequest,
+        database_pb2.ClaimCoalescibleSiblingsReply,
     ]
 
     AcquireLock: grpc.aio.UnaryUnaryMultiCallable[
@@ -2093,6 +2103,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteWorkQueueRowRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def ClaimCoalescibleSiblings(
+        self,
+        request: database_pb2.ClaimCoalescibleSiblingsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.ClaimCoalescibleSiblingsReply, collections.abc.Awaitable[database_pb2.ClaimCoalescibleSiblingsReply]]: ...
 
     @abc.abstractmethod
     def AcquireLock(
