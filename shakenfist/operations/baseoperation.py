@@ -173,6 +173,16 @@ class BaseClusterOperation(BaseOperation):
         self.__runs_after: Optional[list[dict[str, Any]]] = \
             static_values.get('runs_after')
 
+        # ``created_at`` is overlaid onto the static_values dict by
+        # ``_cluster_operation_row_to_dict`` in shakenfist.mariadb and is the
+        # canonical "this op was first inserted" timestamp. It is the
+        # baseline the dispatcher subtracts from execute-start time to
+        # report queue-wait latency in the per-op "started executing"
+        # event. ``None`` is tolerated for backwards compatibility with
+        # any in-flight payload written before the column existed; the
+        # dispatcher just skips emitting wait_seconds in that case.
+        self.__created_at: Optional[float] = static_values.get('created_at')
+
         # We only know this if we have been dequeued
         self._queue_name: Optional[str] = None
 
@@ -196,6 +206,10 @@ class BaseClusterOperation(BaseOperation):
     @property
     def priority(self) -> PRIORITY:
         return self.__priority
+
+    @property
+    def created_at(self) -> Optional[float]:
+        return self.__created_at
 
     @property
     def request_id(self) -> Optional[str]:

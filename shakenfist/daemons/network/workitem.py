@@ -4,6 +4,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
@@ -215,6 +216,21 @@ class Job(util_concurrency.Job):
         # delay rather than carrying over the previous chain's depth.
         self._drop_defer_entry(str(op.uuid))
         start_time = time.time()
+        # Emit one event at the dispatcher-pickup boundary carrying the
+        # queue-wait time (start - created_at). This is the only place
+        # in the pipeline that can observe that delta -- the caller side
+        # has created_at but not start_time, the apply side has neither.
+        # ``current_defer_count`` is included so a deferred-and-retried op
+        # is distinguishable in eventlog from a first-time pickup with the
+        # same wait_seconds value.
+        if op.created_at is not None:
+            op.add_event(
+                EVENT_TYPE_STATUS, 'started executing',
+                extra={
+                    'wait_seconds': start_time - op.created_at,
+                    'defer_count': op.current_defer_count,
+                    'queue_name': queue_name,
+                })
         op.execute()
         # The op may have transitioned to a terminal state during execute();
         # drop the entry again in case it was somehow re-populated.
