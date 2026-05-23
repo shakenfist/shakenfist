@@ -237,6 +237,31 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def FindExistingCoalescibleOp(
+        self,
+        request: database_pb2.FindExistingCoalescibleOpRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindExistingCoalescibleOpReply:
+        """Read-only enqueue-side dedup lookup.
+
+        Returns the uuid of an existing pending coalescible op on
+        the same target, or an empty string when there's no match.
+        See ``mariadb._direct_find_existing_coalescible_op``.
+        """
+        try:
+            self.monitor.counters['find_existing_coalescible_op'].inc()
+            uuid = mariadb._direct_find_existing_coalescible_op(
+                request.operation_type,
+                request.target_column,
+                request.target_uuid,
+                request.task_name)
+            return database_pb2.FindExistingCoalescibleOpReply(
+                op_uuid=uuid or '')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindExistingCoalescibleOp failed', e)
+            return database_pb2.FindExistingCoalescibleOpReply(op_uuid='')
+
     def ClaimCoalescibleSiblings(
         self,
         request: database_pb2.ClaimCoalescibleSiblingsRequest,
@@ -4862,6 +4887,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'restart_queue', 'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
             'claim_coalescible_siblings',
+            'find_existing_coalescible_op',
             'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',

@@ -65,6 +65,11 @@ class DatabaseServiceStub:
         database_pb2.ClaimCoalescibleSiblingsReply,
     ]
 
+    FindExistingCoalescibleOp: grpc.UnaryUnaryMultiCallable[
+        database_pb2.FindExistingCoalescibleOpRequest,
+        database_pb2.FindExistingCoalescibleOpReply,
+    ]
+
     AcquireLock: grpc.UnaryUnaryMultiCallable[
         database_pb2.ClusterLockRequest,
         database_pb2.ClusterLockReply,
@@ -1077,6 +1082,11 @@ class DatabaseServiceAsyncStub:
     ClaimCoalescibleSiblings: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.ClaimCoalescibleSiblingsRequest,
         database_pb2.ClaimCoalescibleSiblingsReply,
+    ]
+
+    FindExistingCoalescibleOp: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.FindExistingCoalescibleOpRequest,
+        database_pb2.FindExistingCoalescibleOpReply,
     ]
 
     AcquireLock: grpc.aio.UnaryUnaryMultiCallable[
@@ -2110,6 +2120,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.ClaimCoalescibleSiblingsRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.ClaimCoalescibleSiblingsReply, collections.abc.Awaitable[database_pb2.ClaimCoalescibleSiblingsReply]]: ...
+
+    @abc.abstractmethod
+    def FindExistingCoalescibleOp(
+        self,
+        request: database_pb2.FindExistingCoalescibleOpRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.FindExistingCoalescibleOpReply, collections.abc.Awaitable[database_pb2.FindExistingCoalescibleOpReply]]: ...
 
     @abc.abstractmethod
     def AcquireLock(

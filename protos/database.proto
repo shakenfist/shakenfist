@@ -15,6 +15,7 @@ service DatabaseService {
   rpc ClearWorkQueueClaim (ClearWorkQueueClaimRequest) returns (StatusReply) {}
   rpc DeleteWorkQueueRow (DeleteWorkQueueRowRequest) returns (StatusReply) {}
   rpc ClaimCoalescibleSiblings (ClaimCoalescibleSiblingsRequest) returns (ClaimCoalescibleSiblingsReply) {}
+  rpc FindExistingCoalescibleOp (FindExistingCoalescibleOpRequest) returns (FindExistingCoalescibleOpReply) {}
 
   // Lock Operations
   rpc AcquireLock (ClusterLockRequest) returns (ClusterLockReply) {}
@@ -405,6 +406,23 @@ message ClaimCoalescibleSiblingsRequest {
 message ClaimCoalescibleSiblingsReply {
   // Op uuids whose state was transitioned to ``complete``.
   repeated string folded_op_uuids = 1;
+}
+
+message FindExistingCoalescibleOpRequest {
+  // Read-only lookup used by enqueue-side dedup: "is there already
+  // a pending op on the same target whose entire task list is just
+  // this one coalescible task?" -- if so the caller returns that
+  // op's uuid to its caller instead of inserting a duplicate.
+  string operation_type = 1;
+  string target_column = 2;
+  string target_uuid = 3;
+  string task_name = 4;
+}
+
+message FindExistingCoalescibleOpReply {
+  // Empty string when no match was found (proto3 has no string
+  // null).
+  string op_uuid = 1;
 }
 
 // Lock Operations

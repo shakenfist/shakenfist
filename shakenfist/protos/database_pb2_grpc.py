@@ -79,6 +79,11 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.ClaimCoalescibleSiblingsRequest.SerializeToString,
                 response_deserializer=database__pb2.ClaimCoalescibleSiblingsReply.FromString,
                 _registered_method=True)
+        self.FindExistingCoalescibleOp = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindExistingCoalescibleOp',
+                request_serializer=database__pb2.FindExistingCoalescibleOpRequest.SerializeToString,
+                response_deserializer=database__pb2.FindExistingCoalescibleOpReply.FromString,
+                _registered_method=True)
         self.AcquireLock = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/AcquireLock',
                 request_serializer=database__pb2.ClusterLockRequest.SerializeToString,
@@ -999,6 +1004,12 @@ class DatabaseServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def ClaimCoalescibleSiblings(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FindExistingCoalescibleOp(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2168,6 +2179,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.ClaimCoalescibleSiblingsRequest.FromString,
                     response_serializer=database__pb2.ClaimCoalescibleSiblingsReply.SerializeToString,
             ),
+            'FindExistingCoalescibleOp': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindExistingCoalescibleOp,
+                    request_deserializer=database__pb2.FindExistingCoalescibleOpRequest.FromString,
+                    response_serializer=database__pb2.FindExistingCoalescibleOpReply.SerializeToString,
+            ),
             'AcquireLock': grpc.unary_unary_rpc_method_handler(
                     servicer.AcquireLock,
                     request_deserializer=database__pb2.ClusterLockRequest.FromString,
@@ -3277,6 +3293,33 @@ class DatabaseService(object):
             '/shakenfist.protos.DatabaseService/ClaimCoalescibleSiblings',
             database__pb2.ClaimCoalescibleSiblingsRequest.SerializeToString,
             database__pb2.ClaimCoalescibleSiblingsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindExistingCoalescibleOp(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindExistingCoalescibleOp',
+            database__pb2.FindExistingCoalescibleOpRequest.SerializeToString,
+            database__pb2.FindExistingCoalescibleOpReply.FromString,
             options,
             channel_credentials,
             insecure,

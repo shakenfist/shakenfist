@@ -948,6 +948,13 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_claim_coalescible_siblings.stop)
 
+        self.mariadb_find_existing_coalescible_op = mock.patch(
+            'shakenfist.mariadb.find_existing_coalescible_op',
+            side_effect=self._mariadb_find_existing_coalescible_op)
+        self.mariadb_find_existing_coalescible_op.start()
+        self.test_obj.addCleanup(
+            self.mariadb_find_existing_coalescible_op.stop)
+
         # Mock cluster lock operations (used by locks.ClusterLock)
         self.db_acquire_lock = mock.patch(
             'shakenfist.mariadb.acquire_cluster_lock',
@@ -2726,6 +2733,56 @@ class MockEtcd():
             f'{"removed" if removed else "not found"}')
         return removed
 
+    def _mariadb_find_existing_coalescible_op(
+            self, operation_type, target_column, target_uuid, task_name):
+        """Mock implementation of mariadb.find_existing_coalescible_op().
+
+        Mirrors the SQL guards in
+        ``mariadb._direct_find_existing_coalescible_op``: returns
+        the uuid of the oldest single-task pending op on the same
+        target whose task equals ``task_name``, or ``None``. The
+        oldest-first order matches the SQL
+        ``ORDER BY created_at ASC LIMIT 1``.
+        """
+        if target_column not in {
+                'network_uuid', 'instance_uuid', 'node_uuid'}:
+            return None
+        candidates: list[tuple[float, str]] = []
+        for op_uuid, op_row in self.cluster_operations_store.items():
+            if op_row.get('operation_type') != operation_type:
+                continue
+            if str(op_row.get(target_column) or '') != str(target_uuid):
+                continue
+            # The mock stores metadata fields flat on the row (see
+            # ``_mariadb_create_and_enqueue_cluster_operation``),
+            # while the real cluster_operations table has a
+            # ``metadata_json`` blob. Read from whichever shape is
+            # populated so the mock matches both today's flat layout
+            # and any future migration.
+            metadata = op_row.get('metadata_json') or op_row
+            tasks = metadata.get('tasks') or []
+            if len(tasks) != 1 or tasks[0] != task_name:
+                continue
+            state_key = f'{operation_type}/{op_uuid}'
+            state_row = self.mariadb_states.get(state_key)
+            if not state_row or state_row.get('state_value') != 'queued':
+                continue
+            candidates.append(
+                (op_row.get('created_at', 0.0), op_uuid))
+        if not candidates:
+            self._trace(
+                f'MockMariaDB.find_existing_coalescible_op('
+                f'{operation_type}, {target_column}={target_uuid}, '
+                f'{task_name}): no match')
+            return None
+        candidates.sort()
+        chosen_uuid = candidates[0][1]
+        self._trace(
+            f'MockMariaDB.find_existing_coalescible_op('
+            f'{operation_type}, {target_column}={target_uuid}, '
+            f'{task_name}): reusing {chosen_uuid}')
+        return chosen_uuid
+
     def _mariadb_claim_coalescible_siblings(
             self, operation_type, target_column, target_uuid,
             task_names, exclude_op_uuid):
@@ -2750,7 +2807,9 @@ class MockEtcd():
                 continue
             if str(op_row.get(target_column) or '') != str(target_uuid):
                 continue
-            metadata = op_row.get('metadata_json') or {}
+            # See ``_mariadb_find_existing_coalescible_op`` for the
+            # rationale behind the metadata_json-vs-flat fallback.
+            metadata = op_row.get('metadata_json') or op_row
             tasks = metadata.get('tasks') or []
             if len(tasks) != 1 or tasks[0] not in task_names:
                 continue

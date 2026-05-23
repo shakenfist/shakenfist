@@ -345,6 +345,53 @@ class ClaimCoalescibleSiblingsReply(google.protobuf.message.Message):
 global___ClaimCoalescibleSiblingsReply = ClaimCoalescibleSiblingsReply
 
 @typing.final
+class FindExistingCoalescibleOpRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_COLUMN_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    TASK_NAME_FIELD_NUMBER: builtins.int
+    operation_type: builtins.str
+    """Read-only lookup used by enqueue-side dedup: "is there already
+    a pending op on the same target whose entire task list is just
+    this one coalescible task?" -- if so the caller returns that
+    op's uuid to its caller instead of inserting a duplicate.
+    """
+    target_column: builtins.str
+    target_uuid: builtins.str
+    task_name: builtins.str
+    def __init__(
+        self,
+        *,
+        operation_type: builtins.str = ...,
+        target_column: builtins.str = ...,
+        target_uuid: builtins.str = ...,
+        task_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["operation_type", b"operation_type", "target_column", b"target_column", "target_uuid", b"target_uuid", "task_name", b"task_name"]) -> None: ...
+
+global___FindExistingCoalescibleOpRequest = FindExistingCoalescibleOpRequest
+
+@typing.final
+class FindExistingCoalescibleOpReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    """Empty string when no match was found (proto3 has no string
+    null).
+    """
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["op_uuid", b"op_uuid"]) -> None: ...
+
+global___FindExistingCoalescibleOpReply = FindExistingCoalescibleOpReply
+
+@typing.final
 class ClusterLockRequest(google.protobuf.message.Message):
     """Lock Operations"""
 

@@ -18031,6 +18031,37 @@ def _grpc_work_queue_delete_row(row_id: int) -> bool:
         return False
 
 
+def _grpc_find_existing_coalescible_op(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_name: str) -> Optional[str]:
+    """Read-only enqueue-side dedup lookup via the database microservice.
+
+    See ``_direct_find_existing_coalescible_op`` for semantics. A
+    return of ``None`` either means no match or an RPC failure;
+    enqueue callers fall back to inserting a new op in both cases
+    (the dispatcher folds the duplicate at execute time).
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.FindExistingCoalescibleOpRequest(
+            operation_type=operation_type,
+            target_column=target_column,
+            target_uuid=target_uuid,
+            task_name=task_name)
+        reply = _grpc_call(stub.FindExistingCoalescibleOp, request)
+        if not reply.op_uuid:
+            return None
+        return str(reply.op_uuid)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC FindExistingCoalescibleOp failed for '
+            f'{operation_type}/{target_column}={target_uuid}/{task_name}: '
+            f'{e}')
+        return None
+
+
 def _grpc_claim_coalescible_siblings(
         operation_type: str,
         target_column: str,
@@ -18612,6 +18643,82 @@ def _direct_work_queue_delete_row(row_id: int) -> bool:
             f'MariaDB delete_row failed for work_queue '
             f'row {row_id}: {e}')
         return False
+
+
+def _direct_find_existing_coalescible_op(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_name: str) -> Optional[str]:
+    """Read-only enqueue-side dedup lookup.
+
+    Returns the uuid of the oldest pending cluster operation that:
+
+    * has ``operation_type``
+    * is targeted at ``target_uuid`` via the indexed
+      ``{target_column}`` (one of ``network_uuid``,
+      ``instance_uuid``, ``node_uuid``)
+    * has a single-task list whose entry equals ``task_name``
+    * is currently in state ``queued`` (not yet picked up)
+
+    Returns ``None`` when there's no match. Callers use this to skip
+    a new ``create_and_enqueue`` insert when an equivalent op is
+    already in the queue: both eventual ``raise_for_error`` waiters
+    block on the same op, the worker runs it once.
+
+    There is a benign race: two concurrent callers can both look up
+    and not find anything, and both create new rows. The
+    dispatcher's ``claim_coalescible_siblings`` (step 4) catches the
+    duplicate on the way out -- at most one extra row gets inserted
+    per race window, never an unbounded fan-out.
+    """
+    if target_column not in {
+            'network_uuid', 'instance_uuid', 'node_uuid'}:
+        return None
+
+    engine = _get_engine()
+    cluster_ops_table = _get_cluster_operations_table()
+    states_table = _get_object_states_table()
+    target_col = getattr(cluster_ops_table.c, target_column)
+
+    try:
+        with engine.connect() as conn:
+            stmt = (
+                sa.select(cluster_ops_table.c.uuid)
+                .select_from(
+                    cluster_ops_table.join(
+                        states_table,
+                        sa.and_(
+                            states_table.c.object_uuid == sa.cast(
+                                cluster_ops_table.c.uuid, sa.String(36)),
+                            states_table.c.object_type
+                            == cluster_ops_table.c.operation_type,
+                        )))
+                .where(cluster_ops_table.c.operation_type == operation_type)
+                .where(target_col == target_uuid)
+                .where(states_table.c.state_value == 'queued')
+                .where(
+                    sa.func.json_length(
+                        cluster_ops_table.c.metadata_json,
+                        '$.tasks') == 1)
+                .where(
+                    sa.func.json_unquote(
+                        sa.func.json_extract(
+                            cluster_ops_table.c.metadata_json,
+                            '$.tasks[0]')) == task_name)
+                .order_by(cluster_ops_table.c.created_at.asc())
+                .limit(1)
+            )
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return str(row.uuid)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find_existing_coalescible_op failed for '
+            f'{operation_type}/{target_column}={target_uuid}/{task_name}: '
+            f'{e}')
+        return None
 
 
 def _direct_claim_coalescible_siblings(
@@ -19768,6 +19875,26 @@ def delete_work_queue_row(row_id: int) -> bool:
     if _use_database_service():
         return _grpc_work_queue_delete_row(row_id)
     return _direct_work_queue_delete_row(row_id)
+
+
+def find_existing_coalescible_op(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_name: str) -> Optional[str]:
+    """Look up an existing pending coalescible op on the same target.
+
+    Returns its uuid if found, otherwise ``None``. Used by
+    ``create_and_enqueue`` for ops whose entire task list is a
+    single coalescible task: if a sibling is already in the queue,
+    skip the insert and return the existing op's uuid so all
+    waiters block on the same op.
+    """
+    if _use_database_service():
+        return _grpc_find_existing_coalescible_op(
+            operation_type, target_column, target_uuid, task_name)
+    return _direct_find_existing_coalescible_op(
+        operation_type, target_column, target_uuid, task_name)
 
 
 def claim_coalescible_siblings(

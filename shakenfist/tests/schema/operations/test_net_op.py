@@ -164,6 +164,82 @@ class NetOpTestCase(base.ShakenFistTestCase):
         self.assertTrue(NetOp.object_type in OPERATION_NAMES_TO_CLASSES)
         self.assertTrue(NetOp.object_type in OBJECT_NAMES_TO_CLASSES)
 
+    def test_enqueue_side_dedup_reuses_existing_pending_op(self):
+        # Two consecutive enqueues for the same network and a
+        # coalescible task: the second call must short-circuit and
+        # return the first op's uuid instead of inserting a new row.
+        u1 = str(uuid4())
+
+        _, first_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+
+        _, second_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+
+        # Same uuid handed back; only one cluster_operations row was
+        # actually inserted.
+        self.assertEqual(first_uuid, second_uuid)
+        self.assertEqual(
+            1,
+            sum(
+                1 for row
+                in self.mock_etcd.cluster_operations_store.values()
+                if row.get('operation_type') == 'net_op'
+                and row.get('network_uuid') == u1
+            ))
+
+    def test_enqueue_side_dedup_skipped_for_non_coalescible_task(self):
+        # network_remove_dnsmasq is *not* in COALESCIBLE_TASKS, so two
+        # enqueues must produce two distinct rows.
+        u1 = str(uuid4())
+
+        _, first_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_remove_dnsmasq],
+            priority=PRIORITY.user_facing,
+        )
+        _, second_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_remove_dnsmasq],
+            priority=PRIORITY.user_facing,
+        )
+
+        self.assertNotEqual(first_uuid, second_uuid)
+
+    def test_enqueue_side_dedup_skipped_when_dependencies_present(self):
+        # An op with depends_on encodes an ordering constraint the
+        # caller cares about; reusing a sibling without that
+        # constraint would erase it. Dedup must skip this case.
+        u1 = str(uuid4())
+        u2 = str(uuid4())
+
+        # The pre-existing op is a vanilla single-task enqueue.
+        _, baseline_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+
+        # The new caller wants the same work but ordered against
+        # another op; dedup must NOT reuse the baseline.
+        from shakenfist.schema.operations.baseclusteroperation \
+            import dependency
+        _, new_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+            depends_on=[
+                dependency(op_type=ObjectType.NET_OP, op_uuid=u2)],
+        )
+
+        self.assertNotEqual(baseline_uuid, new_uuid)
+
 
 class ModelTasksEnumTestCase(base.ShakenFistTestCase):
     """Verify all model_tasks enum values are correct and stable."""

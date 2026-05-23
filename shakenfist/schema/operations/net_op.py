@@ -10,6 +10,7 @@ from pydantic import UUID4
 from pydantic import ValidationError
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import _convert_deps
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -65,6 +66,12 @@ COALESCIBLE_TASKS: frozenset[model_tasks] = frozenset({
     model_tasks.network_apply_create_network_node,
 })
 
+# Indexed column on the ``cluster_operations`` table used by both the
+# enqueue-side dedup lookup (this module) and the worker-side fold
+# (``BaseClusterOperation.coalescible_target_column``) to identify
+# "same target". For NetOp every op is scoped to exactly one network.
+COALESCIBLE_TARGET_COLUMN: str = 'network_uuid'
+
 
 class model(BaseModel):
     target_fields: ClassVar[dict[str, ObjectType]] = {
@@ -95,6 +102,34 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
                        depends_on=None, runs_after=None,
                        target='networknode', family='clusteroperation',
                        floating_address=None, inner_address=None):
+    # Enqueue-side dedup: if this enqueue is a single coalescible task
+    # on a network that already has an equivalent pending op in the
+    # queue, return that op's uuid instead of inserting a duplicate.
+    # All callers' ``raise_for_error`` waits then block on the same
+    # op and the worker runs it once. ``depends_on`` and
+    # ``runs_after`` are skipped here -- an op with dependencies is
+    # intentionally distinct from a bare reconciliation enqueue, and
+    # collapsing them would erase the ordering constraint the caller
+    # encoded. See ``BaseClusterOperation.execute``'s cross-op fold
+    # (worker-side dedup, step 4) for the safety net that catches the
+    # race where two callers both miss the lookup.
+    if (len(tasks) == 1
+            and tasks[0] in COALESCIBLE_TASKS
+            and depends_on is None
+            and runs_after is None):
+        existing_uuid = mariadb.find_existing_coalescible_op(
+            operation_type=object_type.name.lower(),
+            target_column=COALESCIBLE_TARGET_COLUMN,
+            target_uuid=str(network_uuid),
+            task_name=tasks[0].name)
+        if existing_uuid is not None:
+            LOG.with_fields({
+                'existing_op_uuid': existing_uuid,
+                'network_uuid': network_uuid,
+                'task': tasks[0].name,
+            }).info('Enqueue-side dedup: reusing existing pending op')
+            return object_type, existing_uuid
+
     operation_uuid = str(uuid4())
 
     try:
