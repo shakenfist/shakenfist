@@ -111,6 +111,25 @@ class BaseClusterOperation(BaseOperation):
     # Note that cluster operations are created in etcd transactions and don't
     # have .new() methods. They therefore jump straight to queued as an initial
     # state.
+
+    # Tasks whose effect is idempotent against a single target -- i.e. running
+    # one op suffices for any number of sibling ops with the same task on the
+    # same target. The canonical example is ``network_apply_update_dnsmasq``:
+    # the config is regenerated from current DB state, so 6 enqueued ops on
+    # the same network produce the same final config as 1. Subclasses
+    # override with a frozenset of their schema's ``model_tasks``; the base
+    # default is empty (no coalescing).
+    #
+    # ``coalescible_target_column`` names the indexed column on the
+    # ``cluster_operations`` table to group by when finding sibling ops --
+    # typically the foreign key for the target object (``network_uuid``,
+    # ``instance_uuid``, ``node_uuid``). It must be set whenever
+    # ``coalescible_tasks`` is non-empty; both are read together by the
+    # dispatcher (worker-side dedup) and ``create_and_enqueue`` (enqueue-
+    # side dedup) in the next two steps of this plan.
+    coalescible_tasks: 'frozenset[Enum]' = frozenset()
+    coalescible_target_column: Optional[str] = None
+
     @classmethod
     def _db_get(cls, object_uuid: str) -> Optional[dict[str, Any]]:
         o = mariadb.get_cluster_operation(object_uuid)

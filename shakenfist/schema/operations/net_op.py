@@ -40,6 +40,32 @@ class model_tasks(Enum):
     network_apply_delete_network_node = 12
 
 
+# Tasks for which N pending ops on the same network can be folded
+# into a single execution by the worker (step 4) or skipped at
+# enqueue time (step 5):
+#
+# * ``network_apply_update_dnsmasq`` regenerates the dnsmasq config
+#   from current DB state. Six instance starts on the same network
+#   each enqueue one of these; the final config covers every lease
+#   regardless of how many runs landed.
+# * ``network_ensure_mesh`` diffs the FDB against the current set of
+#   participating hypervisors. Same property: the result only
+#   depends on the current snapshot.
+# * ``network_apply_create_network_node`` is idempotent network-node
+#   setup -- running it twice in a row leaves the same state as
+#   running it once.
+#
+# The remaining tasks are *not* coalescible -- they carry per-op
+# parameters (specific floating IPs, specific mac/ip lease pairs)
+# or are order-sensitive against an opposite task (remove vs
+# update / delete vs create).
+COALESCIBLE_TASKS: frozenset[model_tasks] = frozenset({
+    model_tasks.network_apply_update_dnsmasq,
+    model_tasks.network_ensure_mesh,
+    model_tasks.network_apply_create_network_node,
+})
+
+
 class model(BaseModel):
     target_fields: ClassVar[dict[str, ObjectType]] = {
         'network_uuid': ObjectType.NETWORK,

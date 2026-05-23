@@ -46,6 +46,17 @@ class NetOp(BaseClusterOperation):
     initial_version = schema.initial_version
     current_version = schema.current_version
 
+    # See ``BaseClusterOperation.coalescible_tasks`` and the
+    # ``COALESCIBLE_TASKS`` block in
+    # ``shakenfist/schema/operations/net_op.py`` for the rationale
+    # behind which tasks fold. The target column is ``network_uuid``
+    # -- every NetOp targets exactly one network, and the
+    # ``cluster_operations`` table already has an indexed
+    # ``network_uuid`` column for the sibling-finding query the
+    # dispatcher / enqueue path will issue.
+    coalescible_tasks = schema.COALESCIBLE_TASKS
+    coalescible_target_column = 'network_uuid'
+
     def __init__(self, static_values):
         self.upgrade(static_values)
         super().__init__(static_values, schema)
