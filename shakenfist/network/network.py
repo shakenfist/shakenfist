@@ -869,14 +869,22 @@ class Network(dbowo):
     def route_address(self, floating_address):
         """Enqueue a route_address NetIPOp for this network.
 
-        Emits a synchronous "routing floating ip to network" audit
+        Emits a synchronous "requesting route floating ip" audit
         event on this Network, then enqueues a NetIPOp. The host-
         mutating work lives in ``BridgedVXLanNetwork._apply_route_address``
-        and runs in the net-worker dispatcher. Returns the loaded
-        NetIPOp; callers may call ``op.raise_for_error()``.
+        and emits its own "routing floating ip to network" event at
+        apply time. Returns the loaded NetIPOp; callers may call
+        ``op.raise_for_error()``.
+
+        The "requesting ..." naming mirrors the floating-IP
+        ``add_floating_ip`` / ``remove_floating_ip`` pair above:
+        the enqueue-side event proves the request was accepted, the
+        apply-side event proves the work landed. Using the same
+        message string on both sides would emit a duplicate audit
+        line and lose that distinction.
         """
         self.add_event(
-            EVENT_TYPE_AUDIT, 'routing floating ip to network',
+            EVENT_TYPE_AUDIT, 'requesting route floating ip',
             extra={'floating': floating_address})
         op_type, op_uuid = net_ip_op_schema.create_and_enqueue(
             network_uuid=str(self.uuid),
@@ -889,15 +897,17 @@ class Network(dbowo):
     def unroute_address(self, floating_address):
         """Enqueue an unroute_address NetIPOp for this network.
 
-        Emits a synchronous "unrouting floating ip to network" audit
+        Emits a synchronous "requesting unroute floating ip" audit
         event on this Network, then enqueues a NetIPOp. The host-
         mutating work lives in
-        ``BridgedVXLanNetwork._apply_unroute_address`` and runs in the
-        net-worker dispatcher. Returns the loaded NetIPOp; callers may
-        call ``op.raise_for_error()``.
+        ``BridgedVXLanNetwork._apply_unroute_address`` and emits its
+        own "unrouting floating ip to network" event at apply time.
+        Returns the loaded NetIPOp; callers may call
+        ``op.raise_for_error()``. See ``route_address`` for the
+        naming rationale.
         """
         self.add_event(
-            EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
+            EVENT_TYPE_AUDIT, 'requesting unroute floating ip',
             extra={'floating': floating_address})
         op_type, op_uuid = net_ip_op_schema.create_and_enqueue(
             network_uuid=str(self.uuid),
