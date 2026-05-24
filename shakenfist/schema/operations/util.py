@@ -19,6 +19,7 @@ def enqueue_cluster_operation(
         metadata: dict[str, Any],
         target: Optional[str] = None,
         model_class: Optional[Type[BaseModel]] = None,
+        family: str = 'clusteroperation',
 ) -> None:
     """Create a cluster operation and enqueue its work item.
 
@@ -39,7 +40,7 @@ def enqueue_cluster_operation(
 
     object_type_str = object_type.name.lower()
     creation_time = time.time()
-    queue_name = f'{target}-clusteroperation-{metadata["priority"]}'
+    queue_name = f'{target}-{family}-{metadata["priority"]}'
 
     success = mariadb.create_and_enqueue_cluster_operation(
         op_uuid=metadata['uuid'],

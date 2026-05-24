@@ -117,6 +117,75 @@ Current hooks:
 - `ansible-lint` - Validates Ansible playbooks in the deployer
 - `mypy` - Type checking via tox (incremental rollout)
 
+### sf-net daemon topology
+
+`sf-net` runs a `net-worker` job on **every** cluster node (not only the
+elected network node). Each node's worker drains its own per-node
+`{node_uuid}-network-*` queues for hypervisor-local operations
+(`create_on_hypervisor`, `ensure_mesh`). Additionally, the elected network
+node's worker also drains the cluster-wide `networknode-clusteroperation-*`
+queues for network-node-only operations (`create_on_network_node`,
+`add_floating_ip`, etc.). This two-family design means per-hypervisor network
+mutations are parallelised across nodes while network-node-singleton operations
+remain serialised.
+
+### Network facade architecture
+
+**Worker-only mutation surface.** `BridgedVXLanNetwork`
+(`shakenfist/network/bridged_vxlan_network.py`) is the only place that
+mutates host network state. Its constructor is called exclusively from the
+single-threaded net-worker dispatcher
+(`shakenfist/daemons/network/workitem.py`) — making re-entrancy through
+the queue structurally impossible. External callers always hold `Network`;
+the dispatcher constructs `BridgedVXLanNetwork` and calls `_apply_*`
+methods on it. The single-worker-per-queue invariant (see the comment
+block at `self._defer_delays` in workitem.py) is a load-bearing property:
+it is why the dispatcher's in-memory exponential back-off map is correct,
+and why cross-daemon serialisation can be queue-based rather than
+lock-based. All `NodeLock(global_scope=False)` wrappers that formerly
+existed inside `_apply_*` methods have been removed — only `sf-net`
+dequeues and executes network work, so concurrent invocation across
+daemons cannot happen by construction. The cancellation check on dequeue
+runs before the `_apply_*` call; if the op is already cancelled, the
+worker skips execution and transitions the op to `STATE_ABORT`.
+
+**Network methods enqueue; maintain is discovery-only.** All 15
+host-mutating `Network` methods enqueue a cluster operation and return an
+op handle rather than mutating state directly. `shakenfist/daemons/network/maintain.py`
+is discovery-only: it never blocks on `raise_for_error()`. Each maintain
+pass applies a five-guard pipeline before enqueueing any reconciliation op
+at `PRIORITY.background` — (1) queue-depth safety, (2) per-network gating
+via `has_pending_cluster_operation`, (3) cooldown on recent errors,
+(4) circuit-breaker on repeated errors, (5) enqueue. Three config knobs
+control the guards: `MAINTAIN_QUEUE_DEPTH_THRESHOLD` (default 50),
+`MAINTAIN_RECONCILE_COOLDOWN_SECONDS` (default 60),
+`MAINTAIN_RECONCILE_CIRCUIT_K` (default 5).
+
+**REST API surface.** The two network delete endpoints
+(`DELETE /networks/<uuid>` and `DELETE /networks`) return HTTP 202
+(Accepted) with an op-handle body; callers poll
+`GET /clusteroperations/<op_uuid>` for completion. Two discovery endpoints
+are available: `GET /clusteroperations/<op_uuid>/chain` (transitive
+`depends_on` ancestor closure, namespace-scoped) and
+`GET /clusteroperations?target_object_type=<type>&target_uuid=<uuid>`
+(ops targeting an object, SQL-layer namespace filtering). The only
+surviving `@redirect_to_network_node` is on `NetworkPingEndpoint.get`
+because the ping handler runs `ip netns exec` directly on the network
+node; migrating it to queue-based requires op-output infrastructure not
+yet built (deferred future work).
+
+**Error handling.** `ErrorReport` (`shakenfist/operations/error_report.py`)
+is the on-the-wire shape for failed cluster operations: fields `code`,
+`message`, `details`, `origin_class`, `traceback`. Errors are data, never
+rehydrated Python exception types. The `_EXCEPTION_CODE_REGISTRY` dict
+maps typed exceptions to stable string codes (e.g.
+`'network.ensure_mesh.failed'`). The op carries `error_report` in its
+`external_view`; `op.raise_for_error(timeout=None)` polls until terminal
+and raises `NetworkOperationFailed` if the op ended in `STATE_ERROR`,
+letting callers that want exception-flow control use a familiar `try/raise`
+pattern without the error type being load-bearing across process
+boundaries.
+
 ### Key Directories
 
 - `shakenfist/` - Core package

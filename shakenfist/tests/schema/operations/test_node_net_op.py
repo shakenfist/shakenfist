@@ -130,3 +130,37 @@ class NodeNetOpTestCase(base.ShakenFistTestCase):
     def test_object_mapping(self):
         self.assertTrue(NodeNetOp.object_type in OPERATION_NAMES_TO_CLASSES)
         self.assertTrue(NodeNetOp.object_type in OBJECT_NAMES_TO_CLASSES)
+
+
+class ModelTasksEnumTestCase(base.ShakenFistTestCase):
+    """Verify all model_tasks enum values are correct and stable."""
+
+    def test_existing_task_values_are_unchanged(self):
+        """network_destroy must remain value 1 (breaks in-flight records if changed)."""
+        self.assertEqual(1, model_tasks.network_destroy.value)
+
+    def test_new_lifecycle_apply_task_value(self):
+        """network_apply_create_hypervisor must have value 2."""
+        self.assertEqual(2, model_tasks.network_apply_create_hypervisor.value)
+
+    def test_model_accepts_network_apply_create_hypervisor(self):
+        """model accepts network_apply_create_hypervisor as a task."""
+        node_uuid = str(uuid4())
+        network_uuid = str(uuid4())
+
+        m = model(
+            uuid=str(uuid4()),
+            node_uuid=node_uuid,
+            network_uuid=network_uuid,
+            priority=PRIORITY.user_facing,
+            request_id=None,
+            tasks=[model_tasks.network_apply_create_hypervisor],
+            depends_on=None,
+            runs_after=None,
+            version=current_version
+        )
+
+        serialized = m.model_dump(mode='json')
+        self.assertEqual(node_uuid, serialized['node_uuid'])
+        self.assertEqual(network_uuid, serialized['network_uuid'])
+        self.assertEqual(['network_apply_create_hypervisor'], serialized['tasks'])

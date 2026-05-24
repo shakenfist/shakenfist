@@ -1,10 +1,16 @@
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import FLOATING_NETWORK_UUID
+from shakenfist.eventlog import add_event_multi
 from shakenfist.schema.operations import net_iface_ip_op as schema
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.util import exceptions as util_exceptions
 
 
@@ -106,8 +112,19 @@ class NetIfaceIPOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(n, ni)
         except Exception as e:
             util_exceptions.ignore_exception('net_iface_ip_op', e)
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetIfaceIPOp.STATE_ERROR
 
     def _interface_defloat(self, n, ni):
-        n.remove_floating_ip(
-            self.ip, ni.ipv4, [ni, ('instance', ni.instance_uuid)])
+        # Multi-target audit event preserves the correlation that today's
+        # Network.remove_floating_ip(... affected_objects=[ni, ('instance',
+        # ni.instance_uuid)]) emits, plus the wrapped network and the
+        # floating-network metadata object.
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [ni, ('instance', ni.instance_uuid), ('network', str(n.uuid)),
+             ('network', FLOATING_NETWORK_UUID)],
+            'remove floating IP',
+            extra={'floating': self.ip, 'inner': ni.ipv4})
+        BridgedVXLanNetwork(n)._apply_remove_floating_ip(self.ip, ni.ipv4)

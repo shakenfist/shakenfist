@@ -1,9 +1,12 @@
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
 from shakenfist.schema.operations import net_ip_op as schema
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.util import exceptions as util_exceptions
 
 
@@ -87,13 +90,15 @@ class NetIPOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(n)
         except Exception as e:
             util_exceptions.ignore_exception('net_ip_op', e)
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetIPOp.STATE_ERROR
 
     def _route_address(self, n):
         if n.is_dead():
             raise InvalidStateForTask(self)
 
-        n.route_address(self.ip)
+        BridgedVXLanNetwork(n)._apply_route_address(self.ip)
 
     def _unroute_address(self, n):
-        n.unroute_address(self.ip)
+        BridgedVXLanNetwork(n)._apply_unroute_address(self.ip)

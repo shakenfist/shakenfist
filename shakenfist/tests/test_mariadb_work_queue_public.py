@@ -1,7 +1,7 @@
 # Copyright 2026 Michael Still and contributors
 #
 # Tests for the public mariadb.enqueue_work_item /
-# dequeue_work_item / resolve_work_item / get_work_queue_length /
+# dequeue_work_items / resolve_work_item / get_work_queue_length /
 # restart_work_queue wrappers introduced in phase 6 of the
 # etcd-removal ops-queues plan.
 #
@@ -41,43 +41,44 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
         direct.assert_called_once_with('q', {'a': 1}, 0.0)
         grpc.assert_not_called()
 
-    @mock.patch('shakenfist.mariadb._grpc_work_queue_dequeue')
-    @mock.patch('shakenfist.mariadb._direct_work_queue_dequeue')
+    @mock.patch('shakenfist.mariadb._grpc_work_queue_dequeue_batch')
+    @mock.patch('shakenfist.mariadb._direct_work_queue_dequeue_batch')
     @mock.patch(
         'shakenfist.mariadb._use_database_service',
         return_value=True)
     def test_dequeue_service_mode_goes_to_grpc(
             self, _svc, direct, grpc):
-        grpc.return_value = ('42', {'payload': True})
-        result = mariadb.dequeue_work_item('q')
-        self.assertEqual(('42', {'payload': True}), result)
-        grpc.assert_called_once_with('q')
+        grpc.return_value = [('q', '42', {'payload': True})]
+        result = mariadb.dequeue_work_items(['q'], limit=5)
+        self.assertEqual([('q', '42', {'payload': True})], result)
+        grpc.assert_called_once_with(['q'], 5)
         direct.assert_not_called()
 
     @mock.patch('shakenfist.mariadb.config')
-    @mock.patch('shakenfist.mariadb._grpc_work_queue_dequeue')
-    @mock.patch('shakenfist.mariadb._direct_work_queue_dequeue')
+    @mock.patch('shakenfist.mariadb._grpc_work_queue_dequeue_batch')
+    @mock.patch('shakenfist.mariadb._direct_work_queue_dequeue_batch')
     @mock.patch(
         'shakenfist.mariadb._use_database_service',
         return_value=False)
     def test_dequeue_direct_mode_defaults_worker_to_node_name(
             self, _svc, direct, grpc, mock_config):
         mock_config.NODE_NAME = 'node-alpha'
-        direct.return_value = ('7', {'op': 'x'})
+        direct.return_value = [('q', '7', {'op': 'x'})]
 
-        result = mariadb.dequeue_work_item('q')
+        result = mariadb.dequeue_work_items(['q'])
 
-        self.assertEqual(('7', {'op': 'x'}), result)
-        direct.assert_called_once_with('q', 'node-alpha')
+        self.assertEqual([('q', '7', {'op': 'x'})], result)
+        # Default limit is 10 -- see dequeue_work_items signature.
+        direct.assert_called_once_with(['q'], 'node-alpha', 10)
         grpc.assert_not_called()
 
-    @mock.patch('shakenfist.mariadb._direct_work_queue_dequeue')
+    @mock.patch('shakenfist.mariadb._direct_work_queue_dequeue_batch')
     @mock.patch(
         'shakenfist.mariadb._use_database_service',
         return_value=False)
-    def test_dequeue_returns_none_when_empty(self, _svc, direct):
-        direct.return_value = None
-        self.assertIsNone(mariadb.dequeue_work_item('q'))
+    def test_dequeue_returns_empty_when_no_items(self, _svc, direct):
+        direct.return_value = []
+        self.assertEqual([], mariadb.dequeue_work_items(['q']))
 
     @mock.patch('shakenfist.mariadb._grpc_work_queue_resolve')
     @mock.patch('shakenfist.mariadb._direct_work_queue_resolve')
@@ -226,9 +227,9 @@ class MockEtcdWorkQueueTestCase(base.ShakenFistTestCase):
 
     These tests exercise the mock's own implementation of the
     public queue API end to end through mariadb.enqueue_work_item
-    / dequeue_work_item / resolve_work_item, so every consumer
+    / dequeue_work_items / resolve_work_item, so every consumer
     that drives work through MockEtcd continues to see a working
-    queue after phase 6.
+    queue after the unified batched-dequeue change.
     """
 
     def setUp(self):
@@ -247,43 +248,65 @@ class MockEtcdWorkQueueTestCase(base.ShakenFistTestCase):
             'q1')
         self.assertEqual((0, 2, 0), (processing, queued, deferred))
 
-        job1 = mariadb.dequeue_work_item('q1')
-        self.assertIsNotNone(job1)
-        name1, payload1 = job1
+        # limit=1 to exercise the "one at a time" pattern.
+        items = mariadb.dequeue_work_items(['q1'], limit=1)
+        self.assertEqual(1, len(items))
+        qn1, name1, payload1 = items[0]
+        self.assertEqual('q1', qn1)
         self.assertEqual({'task': 't1'}, payload1)
 
         processing, queued, deferred = mariadb.get_work_queue_length(
             'q1')
         self.assertEqual((1, 1, 0), (processing, queued, deferred))
 
-        job2 = mariadb.dequeue_work_item('q1')
-        self.assertIsNotNone(job2)
-        _, payload2 = job2
+        items = mariadb.dequeue_work_items(['q1'], limit=1)
+        self.assertEqual(1, len(items))
+        _, _, payload2 = items[0]
         self.assertEqual({'task': 't2'}, payload2)
 
-        self.assertIsNone(mariadb.dequeue_work_item('q1'))
+        self.assertEqual([], mariadb.dequeue_work_items(['q1']))
 
         mariadb.resolve_work_item('q1', name1)
         processing, queued, deferred = mariadb.get_work_queue_length(
             'q1')
         self.assertEqual((1, 0, 0), (processing, queued, deferred))
 
+    def test_batched_dequeue_returns_priority_ordered(self):
+        # Insert in low-then-high priority order; the dequeue must
+        # still return high first because q_high is at index 0 in
+        # the caller-supplied queue_names list.
+        mariadb.enqueue_work_item('q_low', {'task': 'low_a'})
+        mariadb.enqueue_work_item('q_high', {'task': 'high_a'})
+        mariadb.enqueue_work_item('q_high', {'task': 'high_b'})
+        mariadb.enqueue_work_item('q_low', {'task': 'low_b'})
+
+        items = mariadb.dequeue_work_items(
+            ['q_high', 'q_low'], limit=4)
+        self.assertEqual(4, len(items))
+        # Both q_high rows first (in insertion order), then q_low.
+        self.assertEqual(
+            ['q_high', 'q_high', 'q_low', 'q_low'],
+            [qn for qn, _, _ in items])
+        self.assertEqual(
+            ['high_a', 'high_b', 'low_a', 'low_b'],
+            [payload['task'] for _, _, payload in items])
+
     def test_deferred_job_is_not_dequeued_until_ready(self):
         mariadb.enqueue_work_item('q', {'task': 'later'}, delay=60.0)
-        self.assertIsNone(mariadb.dequeue_work_item('q'))
+        self.assertEqual([], mariadb.dequeue_work_items(['q']))
         processing, queued, deferred = mariadb.get_work_queue_length(
             'q')
         self.assertEqual((0, 0, 1), (processing, queued, deferred))
 
     def test_restart_clears_claims(self):
         mariadb.enqueue_work_item('q', {'task': 't'})
-        name, _ = mariadb.dequeue_work_item('q')
-        self.assertIsNotNone(name)
+        items = mariadb.dequeue_work_items(['q'], limit=1)
+        self.assertEqual(1, len(items))
 
         mariadb.restart_work_queue('q')
         processing, queued, _ = mariadb.get_work_queue_length('q')
         self.assertEqual(0, processing)
         self.assertEqual(1, queued)
 
-        name2, _ = mariadb.dequeue_work_item('q')
-        self.assertIsNotNone(name2)
+        items2 = mariadb.dequeue_work_items(['q'], limit=1)
+        self.assertEqual(1, len(items2))

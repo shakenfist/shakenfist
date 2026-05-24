@@ -418,48 +418,71 @@ class WorkerPoolDaemon(Daemon):
         worker_thread.start()
 
     def dequeue_job(self, processing_class):
+        """Fill spare worker slots from the highest-priority eligible work.
+
+        Composes the list of eligible queues based on current
+        capacity and local disk pressure, then issues a single
+        ``dequeue_work_items`` call with ``limit`` set to the number
+        of free slots. The MariaDB-side ``ORDER BY FIELD()`` means
+        the highest-priority work is returned first; lower-priority
+        rows only fill remaining limit slots if the higher ones are
+        exhausted (so a steady stream of user-facing work still
+        crowds background out, exactly as before).
+
+        Returns True if at least one job was started, False if the
+        pool is full or there was nothing eligible to claim.
+        """
         max_workers = max(3, self.present_cpus / 2)
         num_workers = len(self.workers)
 
         if num_workers > max_workers:
             return False
 
-        for queue_name in get_all_user_facing_node_queues(config.NODE_UUID):
-            jobname_workitem = mariadb.dequeue_work_item(queue_name)
-            if jobname_workitem:
-                args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
-                self.start_job(processing_class, args, jobname_workitem[0])
-                return True
+        # Compose the queue list in caller-supplied priority order.
+        # ``get_all_user_facing_node_queues`` always participates;
+        # background queues are added only when we have headroom past
+        # the user-facing reservation. This preserves the previous
+        # behaviour where 2 worker slots are reserved for user-facing
+        # work, but does it by gating *what we ask for* rather than
+        # making a second round trip.
+        queue_names = list(
+            get_all_user_facing_node_queues(config.NODE_UUID))
 
-        # Lower priority jobs reserve a number of workers for user facing things
-        if num_workers > max_workers - 2:
+        if num_workers <= max_workers - 2:
+            # Refresh disk metrics on the same 30 s cadence as before.
+            # ``disk_busy_time_delta_per_seconds`` reports milliseconds
+            # per second; a value over 800 (~80%) gates ``high_io``
+            # background work so a saturated disk doesn't get more
+            # piled onto it.
+            if time.time() - self.metrics_acquired_at > 30:
+                new_metrics = mariadb.get_node_metrics(config.NODE_UUID)
+                if new_metrics:
+                    self.metrics = new_metrics
+                    self.metrics_acquired_at = time.time()
+                else:
+                    self.metrics = {}
+                    self.metrics_acquired_at = 0
+
+            metrics_values = self.metrics.get('metrics', {})
+            disk_busy = int(metrics_values.get(
+                'disk_busy_time_delta_per_seconds', '0'))
+            for queue_name in get_all_background_node_queues(
+                    config.NODE_UUID):
+                if 'high_io' in queue_name and disk_busy > 800:
+                    LOG.debug(
+                        f'Skipping {queue_name} queue as local disk '
+                        f'is busy')
+                    continue
+                queue_names.append(queue_name)
+
+        # Ask for one job per free slot. ``int()`` because
+        # ``max_workers`` is a float (``cpus / 2``).
+        free_slots = max(1, int(max_workers) - num_workers)
+        items = mariadb.dequeue_work_items(queue_names, limit=free_slots)
+        if not items:
             return False
 
-        # We also wont do background high_io jobs if the disks are really busy.
-        # busy_time is in milliseconds per second, so a value of 1,000 is 100%
-        # busy. You can record more than 100% if there is more than one disk
-        # in the system doing IO at the time.
-        if time.time() - self.metrics_acquired_at > 30:
-            new_metrics = mariadb.get_node_metrics(config.NODE_UUID)
-            if new_metrics:
-                self.metrics = new_metrics
-                self.metrics_acquired_at = time.time()
-            else:
-                self.metrics = {}
-                self.metrics_acquired_at = 0
-
-        metrics_values = self.metrics.get('metrics', {})
-        disk_busy = int(metrics_values.get(
-            'disk_busy_time_delta_per_seconds', '0'))
-        for queue_name in get_all_background_node_queues(config.NODE_UUID):
-            if queue_name.find('high_io') != -1 and disk_busy > 800:
-                LOG.debug('Skipping {queue_name} queue as local disk is busy')
-                continue
-
-            jobname_workitem = mariadb.dequeue_work_item(queue_name)
-            if jobname_workitem:
-                args = [queue_name, jobname_workitem[0], jobname_workitem[1]]
-                self.start_job(processing_class, args, jobname_workitem[0])
-                return True
-
-        return False
+        for queue_name, jobname, workitem in items:
+            args = [queue_name, jobname, workitem]
+            self.start_job(processing_class, args, jobname)
+        return True

@@ -9,6 +9,7 @@
 import ipaddress
 from functools import partial
 
+import flask
 import validators
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
@@ -20,7 +21,6 @@ from shakenfist import baseobject
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist.network import network
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
@@ -46,12 +46,29 @@ daemon.set_log_level(LOG, 'api')
 
 
 def _delete_network(network_from_db, wait_interfaces=None):
+    """Initiate deletion of a network.
+
+    Returns a ``(result, op_type, op_uuid)`` tuple:
+
+    * On success, the network deletion has been enqueued and
+      ``op_type`` / ``op_uuid`` identify the cluster operation that
+      will perform the work.
+    * If ``wait_interfaces`` is truthy the network is also moved to
+      ``STATE_DELETE_WAIT`` to stop new interfaces being attached;
+      the enqueued op defers itself in the worker until the existing
+      interfaces drain, then performs the delete. The Phase 7 REST
+      contract guarantees the caller always receives an op handle to
+      poll, even on this slow path.
+    * On failure (network missing or already deleted), ``result`` is the
+      Flask error response to return; ``op_type`` / ``op_uuid`` are
+      ``None``.
+    """
     # Load network from DB to ensure obtaining correct lock.
     n = network.Network.from_db(network_from_db.uuid)
     if not n:
         LOG.with_fields({'network_uuid': n.uuid}).warning(
             'delete_network: network does not exist')
-        return sf_api.error(404, 'network does not exist')
+        return sf_api.error(404, 'network does not exist'), None, None
 
     if n.is_dead() and n.state.value != network.Network.STATE_DELETE_WAIT:
         # The network has been deleted. No need to attempt further effort.
@@ -59,17 +76,26 @@ def _delete_network(network_from_db, wait_interfaces=None):
         LOG.with_fields({'network_uuid': n.uuid,
                          'state': n.state.value
                          }).warning('delete_network: network is dead')
-        return sf_api.error(404, 'network is deleted')
+        return sf_api.error(404, 'network is deleted'), None, None
 
     network_from_db.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
     if wait_interfaces:
+        # The interfaces still attached belong to instances that are
+        # being deleted concurrently. Block new interfaces from being
+        # attached by entering DELETE_WAIT; the enqueued op below
+        # checks for interfaces at execution time and defers itself
+        # until they drain.
         n.state = network.Network.STATE_DELETE_WAIT
-    else:
-        net_create_and_enqueue(
-            n.uuid,
-            [net_tasks.network_destroy],
-            PRIORITY.user_facing,
-            request_id=util_general.get_request_id())
+
+    # Phase 6 of `PLAN-network-facade.md` retired the
+    # `network_destroy` composite; `network_apply_delete_network_node`
+    # is the direct behavioural equivalent.
+    op_type, op_uuid = net_create_and_enqueue(
+        n.uuid,
+        [net_tasks.network_apply_delete_network_node],
+        PRIORITY.user_facing,
+        request_id=util_general.get_request_id())
+    return None, str(op_type), str(op_uuid)
 
 
 network_get_example = """{
@@ -129,15 +155,15 @@ class NetworkEndpoint(api_base.Resource):
         'networks', 'Delete a network.',
         [('artifact_ref', 'query', 'uuidorname',
           'The UUID or name of the network.', True)],
-        [(200,
-          'Information about a single network, this may not immediately indicate '
-          'the network is deleted.', network_delete_example),
+        [(202,
+          'Deletion has been queued. The response body identifies the cluster '
+          'operation that will perform the work; clients should poll the '
+          'cluster-operations endpoints to observe completion.', None),
          (404, 'Network not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.requires_namespace_exist_if_specified
-    @api_base.redirect_to_network_node
     @api_base.log_token_use
     def delete(self, network_ref=None, network_from_db=None, namespace=None):
         if network_ref == str(FLOATING_NETWORK_UUID):
@@ -148,15 +174,25 @@ class NetworkEndpoint(api_base.Resource):
             if network_from_db.namespace != namespace:
                 return sf_api.error(404, 'network not in namespace')
 
-        # Check if network has already been deleted
-        if network_from_db.state.value in dbo.STATE_DELETED:
-            return
-
-        _delete_network(
+        # An already-deleted network has nothing left to enqueue, but the
+        # Phase 7 client contract is "DELETE returns 202+op-handle and
+        # the client polls"; returning a bare ``return`` here produced a
+        # 200 ``null`` body that crashed the client on
+        # ``handle['op_type']``. ``_delete_network`` itself emits a clean
+        # 404 for dead networks (other than DELETE_WAIT, which it lets
+        # through), so just delegate.
+        err, op_type, op_uuid = _delete_network(
             network_from_db, wait_interfaces=network_from_db.networkinterfaces)
+        if err is not None:
+            return err
 
-        # Return UUID in case API call was made using object name
-        return network_from_db.external_view()
+        # Phase 7 of `PLAN-network-facade.md` flipped this endpoint to the
+        # 202+poll contract: the delete work runs asynchronously via the
+        # cluster operation queue, so the response acknowledges receipt
+        # and returns the op handle the client can poll.
+        resp = flask.jsonify({'op_type': op_type, 'op_uuid': op_uuid})
+        resp.status_code = 202
+        return resp
 
 
 networks_get_example = """[
@@ -254,12 +290,14 @@ class NetworksEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           'The namespace to delete networks from.', False),
          ('clean_wait', 'body', 'boolean',  'Block until complete.', False)],
-        [(200, 'A list of the UUIDs of networks awaiting deletion.', None),
+        [(202, 'A list of {network_uuid, op_type, op_uuid} entries identifying '
+               'the cluster operations that will perform the per-network deletes. '
+               'Clients should poll the cluster-operations endpoints to observe '
+               'completion.', None),
          (400, 'The confirm parameter is not True or a administrative user has '
                'not specified a namespace.', None)]))
     @api_base.verify_token
     @api_base.requires_namespace_exist_if_specified
-    @api_base.redirect_to_network_node
     @api_base.log_token_use
     def delete(self, confirm=False, namespace=None, clean_wait=False):
         """Delete all networks in the namespace.
@@ -288,23 +326,34 @@ class NetworksEndpoint(api_base.Resource):
         networks_unable = []
         for n in network.Networks(namespace=namespace, prefilter='active'):
             if not n.networkinterfaces:
-                _delete_network(n)
+                _, op_type, op_uuid = _delete_network(n)
             else:
                 if clean_wait:
-                    _delete_network(n, n.networkinterfaces)
+                    _, op_type, op_uuid = _delete_network(n, n.networkinterfaces)
                 else:
                     LOG.with_fields({'network': n}).warning(
                         'Network in use, cannot be deleted by delete-all')
                     networks_unable.append(str(n.uuid))
                     continue
 
-            networks_del.append(str(n.uuid))
+            networks_del.append({
+                'network_uuid': str(n.uuid),
+                'op_type': op_type,
+                'op_uuid': op_uuid,
+            })
 
         if networks_unable:
             return sf_api.error(403, {'deleted': networks_del,
                                       'unable': networks_unable})
 
-        return networks_del
+        # Phase 7 of `PLAN-network-facade.md` flipped this endpoint to the
+        # 202+poll contract: each network's delete work runs asynchronously
+        # via the cluster operation queue, so the response acknowledges
+        # receipt and returns one op handle per network for the client to
+        # poll.
+        resp = flask.jsonify(networks_del)
+        resp.status_code = 202
+        return resp
 
 
 network_events_example = """    [
@@ -540,6 +589,16 @@ class NetworkPingEndpoint(api_base.Resource):
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
+    # NOTE(phase-7): this is the sole remaining `redirect_to_network_node`
+    # site. The ping handler shells out to `ip netns exec <network_uuid>
+    # ping -c 10 <address>`, so it genuinely needs to execute on the
+    # elected network node where the network namespace exists. Migrating
+    # to a queue-based ping requires op-output infrastructure that does
+    # not yet exist -- today the operation queue carries error reports
+    # only, not arbitrary command stdout/stderr. See
+    # `docs/plans/PLAN-network-facade.md` future work for the migration
+    # plan; Phase 7 intentionally kept the redirect here as a tactical
+    # exception while removing it from the other three sites.
     @api_base.redirect_to_network_node
     @api_base.requires_network_active
     @api_base.log_token_use
@@ -686,7 +745,9 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
         if not valid_hostname:
             return sf_api.error(406, 'invalid DNS name')
 
-        network_from_db.update_dns_entry(name, value)
+        op = network_from_db.update_dns_entry(name, value)
+        if op is not None:
+            op.raise_for_error()
 
     @swag_from(api_base.swagger_helper(
         'networks', 'Remove a custom DNS entry for this network.',
@@ -713,7 +774,9 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
         if not valid_hostname:
             return sf_api.error(406, 'invalid DNS name')
 
-        network_from_db.remove_dns_entry(name)
+        op = network_from_db.remove_dns_entry(name)
+        if op is not None:
+            op.raise_for_error()
 
 
 network_outstanding_operations_example = """[

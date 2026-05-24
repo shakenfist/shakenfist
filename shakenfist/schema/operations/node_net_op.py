@@ -28,6 +28,7 @@ current_version = 1
 
 class model_tasks(Enum):
     network_destroy = 1
+    network_apply_create_hypervisor = 2
 
 
 class model(BaseModel):
