@@ -5118,8 +5118,20 @@ def main() -> None:
     # the default 2-strike limit (e.g., during reconnect bursts), producing
     # GOAWAY too_many_pings. Our clients are trusted internal daemons, so
     # disabling the kill switch is the recommended pattern.
+    # 64 worker threads. Profiling a 70-minute functional-test bundle
+    # showed the previous 20-worker pool getting starved by slow MariaDB
+    # queries: 456 GOAWAY ping_timeout frames in 70 minutes (~1 every
+    # 9 seconds) because every worker was blocked on a SQL round-trip
+    # and there was nobody left to service the keepalive-ping frame in
+    # time. With the buffer-pool tuning landed alongside this commit
+    # most queries fall to <10 ms, but bursty workloads (multiple
+    # parallel instance deletes draining DHCP leases, the maintainer
+    # passing every 30 s) still spike concurrent request counts above
+    # 20. Going to 64 leaves daylight above the worst case we saw
+    # without requiring tuning per-deployment, and each idle thread
+    # costs only ~8 KiB of Python stack.
     server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=20),
+        futures.ThreadPoolExecutor(max_workers=64),
         options=[
             ('grpc.http2.min_recv_ping_interval_without_data_ms', 5000),
             ('grpc.keepalive_permit_without_calls', 1),
