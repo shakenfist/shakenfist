@@ -579,6 +579,18 @@ class FindExistingCoalescibleOpTestCase(base.ShakenFistTestCase):
             self.assertIsNone(result)
             mock_get_engine.assert_not_called()
 
+    def test_malformed_uuid_returns_none_without_query(self):
+        # The *_uuid columns are SQLAlchemy Uuid-typed; an unparseable
+        # uuid would otherwise blow up in the bind processor and kill
+        # the worker thread, so it is skipped before any query runs.
+        with mock.patch(
+                'shakenfist.mariadb._get_engine') as mock_get_engine:
+            self.assertIsNone(
+                mariadb._direct_find_existing_coalescible_op(
+                    'net_op', 'network_uuid', 'not-a-uuid',
+                    'network_apply_update_dnsmasq'))
+            mock_get_engine.assert_not_called()
+
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_returns_none_when_no_match(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()

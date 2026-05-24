@@ -18695,6 +18695,23 @@ def _direct_find_existing_coalescible_op(
             'network_uuid', 'instance_uuid', 'node_uuid'}:
         return None
 
+    # cluster_operations' *_uuid columns are SQLAlchemy Uuid columns,
+    # whose bind processor calls value.hex -- the filter value therefore
+    # has to be a uuid.UUID object, but callers pass it as a plain string
+    # (e.g. create_and_enqueue passes str(network_uuid)). Coerce here
+    # (matching the insert path's _maybe_uuid usage and the sibling
+    # _direct_claim_coalescible_siblings) before it reaches the WHERE
+    # clause. A malformed uuid means there is nothing meaningful to
+    # coalesce against, so skip the lookup rather than letting a
+    # StatementError kill the worker thread.
+    try:
+        target_uuid_val = _maybe_uuid(target_uuid)
+    except (ValueError, AttributeError, TypeError) as e:
+        LOG.warning(
+            f'find_existing_coalescible_op skipped, malformed uuid '
+            f'({target_column}={target_uuid!r}): {e}')
+        return None
+
     engine = _get_engine()
     cluster_ops_table = _get_cluster_operations_table()
     states_table = _get_object_states_table()
@@ -18714,7 +18731,7 @@ def _direct_find_existing_coalescible_op(
                             == cluster_ops_table.c.operation_type,
                         )))
                 .where(cluster_ops_table.c.operation_type == operation_type)
-                .where(target_col == target_uuid)
+                .where(target_col == target_uuid_val)
                 .where(states_table.c.state_value == 'queued')
                 .where(
                     sa.func.json_length(
