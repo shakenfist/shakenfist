@@ -16,12 +16,20 @@ LOG, _ = logs.setup(__name__)
 
 
 class Job(util_concurrency.Job):
-    def __init__(self, queue_name, jobname, workitem):
+    def __init__(self, queue_name, jobname, workitem, batch_size=None):
         super().__init__()
 
         self.queue_name = queue_name
         self.jobname = jobname
         self.workitem = workitem
+        # Size of the dispatcher's dequeue batch that delivered this
+        # job. Propagated onto ``op.dispatcher_batch_size`` so the
+        # coalescing fold in ``BaseClusterOperation.execute`` can skip
+        # its SQL round-trip when the dispatcher just observed an empty
+        # queue. ``None`` (the default) is preserved for callers that
+        # haven't been updated -- the fold runs conservatively in that
+        # case.
+        self.batch_size = batch_size
 
         self.log = LOG.with_fields({
             'queue': self.queue_name,
@@ -53,6 +61,7 @@ class Job(util_concurrency.Job):
 
         op.queue_name = self.queue_name
         op.current_defer_count = self.workitem.get('defer_count', 0)
+        op.dispatcher_batch_size = self.batch_size
 
         # Ensure our dependencies are met.
         for dep in op.depends_on:

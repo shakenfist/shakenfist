@@ -258,3 +258,31 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.execute()
 
         self.mock_claim.assert_not_called()
+
+    def test_no_coalescing_call_when_dispatcher_batch_was_one(self):
+        # Dispatcher hint says we were the only item in the batch, so
+        # no sibling can possibly be ready. Skip the SQL round-trip.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.dispatcher_batch_size = 1
+        op.execute()
+
+        self.mock_claim.assert_not_called()
+
+    def test_coalescing_runs_when_dispatcher_batch_was_multiple(self):
+        # Dispatcher hint says >1 ready items, so contention is
+        # possible -- the fold runs.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.dispatcher_batch_size = 5
+        op.execute()
+
+        self.mock_claim.assert_called_once()
+
+    def test_coalescing_runs_when_dispatcher_batch_unknown(self):
+        # ``None`` means the op was loaded outside the queue path
+        # (e.g. a unit test or REST endpoint); be conservative and
+        # run the fold.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.dispatcher_batch_size = None
+        op.execute()
+
+        self.mock_claim.assert_called_once()

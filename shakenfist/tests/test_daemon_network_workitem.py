@@ -201,7 +201,7 @@ class TerminalStateCancellationTest(base.ShakenFistTestCase):
             job._defer_delays = {}
 
             # Must not raise InvalidStateException (or any other exception).
-            job._cluster_operation_execute(QUEUE_NAME, workitem)
+            job._cluster_operation_execute(QUEUE_NAME, workitem, 1)
 
         return mock_op
 
@@ -374,7 +374,7 @@ class ExponentialBackoffMapTest(base.ShakenFistTestCase):
             job.log = mock.MagicMock()
             job._defer_delays = {terminal_op_uuid: 6.4}
 
-            job._cluster_operation_execute(QUEUE_NAME, workitem_payload)
+            job._cluster_operation_execute(QUEUE_NAME, workitem_payload, 1)
 
         self.assertNotIn(terminal_op_uuid, job._defer_delays)
 

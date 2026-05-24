@@ -211,6 +211,18 @@ class BaseClusterOperation(BaseOperation):
         # written into the next work_item.
         self.current_defer_count: int = 0
 
+        # Set by the queue dispatcher to the number of items it dequeued in
+        # the same batch as this op. ``None`` means the op was loaded
+        # outside the queue dispatch path (e.g. from a unit test or a REST
+        # endpoint). The cross-op coalescing branch in ``execute()`` reads
+        # this to skip the ``claim_coalescible_siblings`` SQL when the
+        # dispatcher just observed an empty queue (``batch == 1`` -- this
+        # op is the only ready item), since no sibling could possibly be
+        # ready to fold. A new sibling enqueued after our dequeue will be
+        # picked up by the next dispatcher cycle with a batch >= 2, where
+        # the fold will run.
+        self.dispatcher_batch_size: Optional[int] = None
+
         # Convert tasks names back into enum entries
         self.__tasks: list[Enum] = []
         for task_name in static_values['tasks']:
@@ -310,7 +322,16 @@ class BaseClusterOperation(BaseOperation):
         else:
             unique_tasks = list(self.tasks)
 
-        if coalescible and target_column:
+        # Skip the cross-op fold when the dispatcher just dequeued only us
+        # (``dispatcher_batch_size == 1``). The ``claim_coalescible_siblings``
+        # call costs ~200 ms under load and almost always returns empty in
+        # the uncontended case -- profiling the latest CI bundle showed it
+        # was the largest single per-op cost we added in this branch. A
+        # ``None`` value (e.g. op loaded outside the queue path) is treated
+        # as "we don't know, be conservative" and the fold runs.
+        skip_due_to_empty_queue = self.dispatcher_batch_size == 1
+
+        if coalescible and target_column and not skip_due_to_empty_queue:
             survivor_coalescible_tasks = [
                 t for t in unique_tasks if t in coalescible]
             target_uuid_attr = getattr(self, target_column, None)

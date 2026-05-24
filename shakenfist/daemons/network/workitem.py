@@ -126,13 +126,15 @@ class Job(util_concurrency.Job):
                 continue
 
             was_previously_idle = False
+            batch_size = len(items)
             for queue_name, jobname, workitem in items:
                 util_concurrency.set_thread_name(jobname)
                 LOG.debug(
                     f'This network thread is now processing job {jobname}')
 
                 try:
-                    self._cluster_operation_execute(queue_name, workitem)
+                    self._cluster_operation_execute(
+                        queue_name, workitem, batch_size)
                 finally:
                     mariadb.resolve_work_item(queue_name, jobname)
 
@@ -141,7 +143,7 @@ class Job(util_concurrency.Job):
                 if not daemon.check_abort_path(self.abort_path):
                     break
 
-    def _cluster_operation_execute(self, queue_name, workitem):
+    def _cluster_operation_execute(self, queue_name, workitem, batch_size):
         op_type = workitem.get('operation_type')
         op_uuid = workitem.get('operation_uuid')
         op = get_object_class(op_type).from_db(op_uuid)
@@ -165,6 +167,11 @@ class Job(util_concurrency.Job):
 
         op.queue_name = queue_name
         op.current_defer_count = workitem.get('defer_count', 0)
+        # Hint for the cross-op coalescing fold in
+        # ``BaseClusterOperation.execute()``: when the dispatcher's
+        # batch was size 1 (this op was the only ready item) the fold
+        # skips its SQL round-trip.
+        op.dispatcher_batch_size = batch_size
 
         # Ensure our dependencies are met.
         for dep in op.depends_on:

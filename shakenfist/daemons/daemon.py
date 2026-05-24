@@ -482,7 +482,11 @@ class WorkerPoolDaemon(Daemon):
         if not items:
             return False
 
+        # Pass the batch size to each spawned worker so its op's
+        # ``execute()`` can skip the coalescing fold when the dispatcher
+        # just saw an empty queue (see ``BaseClusterOperation.execute``).
+        batch_size = len(items)
         for queue_name, jobname, workitem in items:
-            args = [queue_name, jobname, workitem]
+            args = [queue_name, jobname, workitem, batch_size]
             self.start_job(processing_class, args, jobname)
         return True
