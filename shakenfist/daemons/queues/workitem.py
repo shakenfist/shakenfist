@@ -3,7 +3,7 @@ import time
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist import mariadb
@@ -133,20 +133,16 @@ class Job(util_concurrency.Job):
         if op.state.value != BaseClusterOperation.STATE_QUEUED:
             return
 
-        # We're good to go! Emit one event at the dispatcher-pickup
-        # boundary carrying the queue-wait time (start - created_at).
-        # See the matching block in shakenfist/daemons/network/workitem.py
-        # for the rationale (this is the only place that can observe
-        # the delta). ``current_defer_count`` distinguishes a deferred-
-        # and-retried op from a first-time pickup with the same
-        # wait_seconds value.
+        # We're good to go!
         start_time = time.time()
-        if op.created_at is not None:
-            op.add_event(
-                EVENT_TYPE_STATUS, 'started executing',
-                extra={
-                    'wait_seconds': start_time - op.created_at,
-                    'defer_count': op.current_defer_count,
-                    'queue_name': self.queue_name,
-                })
         op.execute()
+        # One end-of-op event carries both the queue-wait time and the
+        # execution duration. See the matching block in
+        # ``shakenfist/daemons/network/workitem.py`` for the rationale
+        # (combining halves the eventlog gRPC cost on the critical path).
+        extra = {'seconds': time.time() - start_time}
+        if op.created_at is not None:
+            extra['wait_seconds'] = start_time - op.created_at
+            extra['defer_count'] = op.current_defer_count
+            extra['queue_name'] = self.queue_name
+        op.add_event(EVENT_TYPE_USAGE, 'execution duration', extra=extra)

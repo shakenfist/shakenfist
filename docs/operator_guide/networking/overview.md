@@ -386,13 +386,16 @@ events emitted directly by the queue dispatcher (in addition to the
 operation-specific audit and mutate events emitted by the operation
 itself):
 
-* **`started executing`** (`EVENT_TYPE_STATUS`). Emitted when the
-  dispatcher claims an op out of the queue and is about to call
-  `op.execute()`. Carries three fields in `extra`:
+* **`execution duration`** (`EVENT_TYPE_USAGE`). Emitted when the
+  dispatcher finishes running an op. Carries four fields in `extra`:
+    * `seconds` — wall-clock time spent inside `op.execute()`
+      (state writes, coalescing fold, the `_apply_*` work, the
+      terminal state write).
     * `wait_seconds` — time between when the op was first inserted
-      into `cluster_operations` and now. Large values (>10 s) mean
-      the queue was backed up; very large values point at either
-      worker saturation or a stuck op blocking the worker.
+      into `cluster_operations` and when the dispatcher claimed it.
+      Large values (>10 s) mean the queue was backed up; very
+      large values point at either worker saturation or a stuck
+      op blocking the worker.
     * `defer_count` — how many times this op was re-enqueued via
       `defer()` / `defer_with_backoff()` before finally running. A
       first-time pickup is `0`; non-zero values indicate dependency
@@ -400,6 +403,16 @@ itself):
     * `queue_name` — the queue the op was claimed from. Useful for
       attributing wait time to a specific priority lane (e.g.
       `networknode-clusteroperation-user_facing_high_io`).
+
+  The combined event replaces an earlier split into separate
+  `'started executing'` and `'execution duration'` events. The
+  combined form halves the eventlog gRPC cost on the dispatcher's
+  critical path -- profiling identified that cost as the largest
+  per-op overhead added during the queue-performance work. Ops
+  loaded outside the dispatch path (unit tests, REST endpoints)
+  still emit `'execution duration'` with `seconds` only; the
+  wait fields are populated only when the dispatcher set the
+  hints.
 
 * **`coalesced sibling ops`** (`EVENT_TYPE_STATUS`). Emitted on a
   surviving op when one or more *other* pending ops on the same
@@ -419,5 +432,13 @@ itself):
   (`mariadb.find_existing_coalescible_op`) or the worker-side fold
   (`mariadb.claim_coalescible_siblings`).
 
-Both events are tagged with `EVENT_TYPE_STATUS` and are retained
-for `MAX_STATUS_EVENT_AGE` (default: 7 days).
+  Note that the worker-side fold also skips itself when the
+  dispatcher just observed an empty queue
+  (`dispatcher_batch_size == 1`). A new sibling arriving after our
+  dequeue will be folded on the next dispatcher cycle, not this
+  one, so a moderate gap between sibling-arriving and
+  `coalesced sibling ops` firing is expected.
+
+The `execution duration` event is retained for
+`MAX_USAGE_EVENT_AGE` (default 30 days); the `coalesced sibling
+ops` event for `MAX_STATUS_EVENT_AGE` (default 7 days).
