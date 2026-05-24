@@ -203,8 +203,26 @@ class NodeInstNetdescOp(BaseClusterOperation):
 
         with inst.get_lock(op='Instance start', global_scope=False):
             try:
-                # Ensure networks are connected to this node
+                # Ensure networks are connected to this node.
+                #
+                # ``net_desc`` is per-interface, so an instance with N
+                # interfaces on the same network used to enqueue N
+                # ``ensure_mesh`` / ``update_dnsmasq`` ops. After the
+                # enqueue-side dedup landed in
+                # ``shakenfist/schema/operations/net_op.py`` those
+                # second-and-subsequent enqueues collapse onto the
+                # first op's uuid anyway, but we still pay the gRPC
+                # round-trip for the lookup, the
+                # ``_apply_create_on_hypervisor`` no-op (and its
+                # eventlog noise) and the redundant ``raise_for_error``
+                # poll. Tracking which networks we've already
+                # reconciled in this start eliminates all three on the
+                # rare multi-interface-same-network case without
+                # touching the common one-interface-per-network case
+                # at all. Interface-level work (state flip, floating
+                # IP fan-out) stays per-interface inside the loop.
                 float_tasks = []
+                reconciled_network_uuids: 'set[str]' = set()
                 for netdesc in self.net_desc:
                     n = Network.from_db(netdesc['network_uuid'])
                     if not n:
@@ -240,19 +258,24 @@ class NodeInstNetdescOp(BaseClusterOperation):
                             self, 'Inactive network interface')
 
                     ni.state = NetworkInterface.STATE_CREATED
-                    BridgedVXLanNetwork(n)._apply_create_on_hypervisor()
-                    mesh_op = n.ensure_mesh()
-                    mesh_op.raise_for_error()
-                    # dnsmasq lives on the network node only. Calling
-                    # ``_apply_update_dnsmasq`` here directly silently
-                    # wrote to this hypervisor's (absent) dnsmasq state
-                    # and the actual network-node dnsmasq never learned
-                    # about the new lease -- exactly the bug surfaced by
-                    # ``test_provided_dns``. Enqueue a net_op instead so
-                    # the network node's dispatcher runs the refresh.
-                    dnsmasq_op = n.update_dnsmasq()
-                    if dnsmasq_op is not None:
-                        dnsmasq_op.raise_for_error()
+
+                    if n.uuid not in reconciled_network_uuids:
+                        BridgedVXLanNetwork(n)._apply_create_on_hypervisor()
+                        mesh_op = n.ensure_mesh()
+                        mesh_op.raise_for_error()
+                        # dnsmasq lives on the network node only.
+                        # Calling ``_apply_update_dnsmasq`` here
+                        # directly silently wrote to this
+                        # hypervisor's (absent) dnsmasq state and the
+                        # actual network-node dnsmasq never learned
+                        # about the new lease -- exactly the bug
+                        # surfaced by ``test_provided_dns``. Enqueue a
+                        # net_op instead so the network node's
+                        # dispatcher runs the refresh.
+                        dnsmasq_op = n.update_dnsmasq()
+                        if dnsmasq_op is not None:
+                            dnsmasq_op.raise_for_error()
+                        reconciled_network_uuids.add(n.uuid)
 
                     if ni.floating['floating_address']:
                         ni_create_and_enqueue(
