@@ -138,6 +138,30 @@ class WorkQueueDequeueBatchTestCase(base.ShakenFistTestCase):
                 ['my-queue'], 'worker-1', 0))
 
     @mock.patch('shakenfist.mariadb._get_engine')
+    def test_dequeue_limit_is_clamped(self, mock_get_engine):
+        # ``limit`` above MAX_DEQUEUE_BATCH must be silently clamped
+        # so a misbehaving caller cannot stage an unbounded in-flight
+        # batch. The SELECT statement's LIMIT clause should carry the
+        # clamped value, not the caller-supplied one.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.return_value.fetchall.return_value = []
+        mock_get_engine.return_value = mock_engine
+
+        mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1',
+            mariadb.MAX_DEQUEUE_BATCH * 10)
+
+        select_stmt = mock_conn.execute.call_args[0][0]
+        compiled = select_stmt.compile(
+            dialect=__import__(
+                'sqlalchemy.dialects.mysql',
+                fromlist=['dialect']).dialect())
+        # The LIMIT bind param name varies across SQLAlchemy
+        # versions; assert the value is present rather than the name.
+        self.assertIn(
+            mariadb.MAX_DEQUEUE_BATCH, compiled.params.values())
+
+    @mock.patch('shakenfist.mariadb._get_engine')
     def test_dequeue_claims_rows_and_returns_payloads(
             self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()

@@ -18328,6 +18328,19 @@ def delete_cluster_operation_error(op_uuid: 'str | UUID') -> bool:
 # module.
 # =============================================================================
 
+# Server-side ceiling on a single dequeue batch. The two production
+# callers ask for far less today (``BATCH_SIZE = 10`` in sf-net,
+# ``max(3, cpus/2)`` in the sf-queues pool), so this cap exists purely
+# to bound the worst-case orphan window if any caller -- direct or via
+# gRPC -- ever asks for an unreasonably large limit. Each claimed-but-
+# not-yet-executed row stays invisible to other workers until the
+# stuck-row reaper finds it (CLUSTER_OP_STUCK_THRESHOLD seconds), so
+# the ceiling caps how much work can be stranded on a single worker
+# crash. 256 is well above every legitimate caller and well below
+# anything that would meaningfully exhaust the queue.
+MAX_DEQUEUE_BATCH = 256
+
+
 def _direct_work_queue_enqueue(
         queue_name: str, payload: dict[str, Any],
         delay: float = 0.0) -> None:
@@ -18387,6 +18400,12 @@ def _direct_work_queue_dequeue_batch(
     """
     if not queue_names or limit <= 0:
         return []
+    # Defence-in-depth clamp: see MAX_DEQUEUE_BATCH above. Production
+    # callers never reach this, but the gRPC handler is the trust
+    # boundary and an unbounded ``limit`` would otherwise let any
+    # caller stage an arbitrarily large in-flight batch.
+    if limit > MAX_DEQUEUE_BATCH:
+        limit = MAX_DEQUEUE_BATCH
 
     engine = _get_engine()
     table = _get_work_queue_table()
