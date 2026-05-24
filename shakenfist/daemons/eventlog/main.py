@@ -169,6 +169,54 @@ class EventService(event_pb2_grpc.EventServiceServicer):
 
         return event_pb2.EventReply(ack=True)
 
+    def RecordMultiEventBatch(self, request, context):
+        """Persist a batch of EventMultiRequest items in one RPC.
+
+        Called only by the local eventlog spool drainer (see
+        ``shakenfist.eventlog.spool``). The drainer is the
+        single producer for any given client process and sizes
+        batches at ~100 events so partial-failure replay is
+        cheap.
+
+        Semantics: ack=true means every event in the batch
+        was persisted (each via the same code path as a
+        single ``RecordMultiEvent`` call would take, including
+        the DLQ fallback). ack=false means at least one
+        sub-event raised; the drainer treats the whole batch
+        as not-delivered and replays. The sub-event-level DLQ
+        fallback inside ``_record_with_dlq`` still applies, so
+        a transient sub-write failure does not bubble up if
+        the DLQ accepts the write.
+
+        This handler runs synchronously on the gRPC server's
+        worker thread; the per-batch wall time is roughly
+        ``batch_size * per-event sqlite write`` plus one RPC
+        round trip rather than ``batch_size * (RPC + sqlite
+        write)``, which is the win for the caller.
+        """
+        try:
+            for inner in request.events:
+                # Reuse the per-event handler so we get the
+                # same correlation_id logic, the same
+                # request-id piggyback, and the same DLQ
+                # fallback semantics. ``context`` is reused
+                # but neither path consumes anything from it
+                # today.
+                reply = self.RecordMultiEvent(inner, context)
+                if not reply.ack:
+                    # One sub-event raised in a way the DLQ
+                    # couldn't absorb. Treat the whole batch
+                    # as not-delivered so the drainer
+                    # replays.
+                    return event_pb2.EventReply(ack=False)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'failed to write event batch of size %d'
+                % len(request.events), e)
+            return event_pb2.EventReply(ack=False)
+
+        return event_pb2.EventReply(ack=True)
+
 
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the eventlog daemon.

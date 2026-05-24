@@ -5,6 +5,12 @@ package shakenfist.protos;
 service EventService {
   rpc RecordEvent (EventRequest) returns (EventReply) {}
   rpc RecordMultiEvent (EventMultiRequest) returns (EventReply) {}
+  // Batched form: ack=true means *every* event in the batch was
+  // persisted. Partial failure is reported as ack=false and the
+  // client must replay the whole batch. The local eventlog spool
+  // drainer is the only expected caller; it sizes the batch
+  // small enough (~100) that whole-batch replay is cheap.
+  rpc RecordMultiEventBatch (EventMultiBatchRequest) returns (EventReply) {}
 }
 
 // An event against a single object, should be removed one day
@@ -34,6 +40,15 @@ message EventMultiRequest {
   string message = 5;
   string extra = 6;
   double timestamp = 7;
+}
+
+// Batched submission of multiple ``EventMultiRequest`` items in a
+// single RPC. The eventlog daemon persists the whole batch in one
+// transaction; either all succeed or none do. Used by the local
+// eventlog spool drainer to amortise the per-event RPC cost; sized
+// at ~100 events per batch by the caller.
+message EventMultiBatchRequest {
+  repeated EventMultiRequest events = 1;
 }
 
 // An ack from the eventlog daemon
