@@ -10,6 +10,7 @@
 # since a pure engine mock cannot exercise row locking behaviour.
 
 from unittest import mock
+from uuid import UUID
 
 from sqlalchemy.exc import OperationalError
 
@@ -689,6 +690,18 @@ class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
                     'some-uuid', ['task'], 'exclude-uuid'))
             mock_get_engine.assert_not_called()
 
+    def test_malformed_uuid_returns_empty_without_query(self):
+        # The *_uuid columns are SQLAlchemy Uuid-typed; an unparseable
+        # uuid would otherwise blow up in the bind processor and kill
+        # the worker thread, so it is skipped before any query runs.
+        with mock.patch(
+                'shakenfist.mariadb._get_engine') as mock_get_engine:
+            self.assertEqual(
+                [], mariadb._direct_claim_coalescible_siblings(
+                    'net_op', 'network_uuid', 'not-a-uuid',
+                    ['network_apply_update_dnsmasq'], 'also-not-a-uuid'))
+            mock_get_engine.assert_not_called()
+
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_returns_empty_when_no_siblings(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
@@ -761,10 +774,11 @@ class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
         )).upper()
         self.assertIn('FOR UPDATE', compiled_sql)
         # exclude_op_uuid is a bind param; check it shows up in
-        # the compiled params rather than the SQL text.
+        # the compiled params rather than the SQL text. It is coerced
+        # to a uuid.UUID before binding because the column is Uuid-typed.
         params = select_stmt.compile().params
         self.assertIn(
-            '99999999-9999-4999-8999-999999999999', params.values())
+            UUID('99999999-9999-4999-8999-999999999999'), params.values())
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_returns_empty_on_error(self, mock_get_engine):

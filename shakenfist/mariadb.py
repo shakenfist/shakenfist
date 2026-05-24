@@ -18781,6 +18781,23 @@ def _direct_claim_coalescible_siblings(
             'network_uuid', 'instance_uuid', 'node_uuid'}:
         return []
 
+    # cluster_operations.uuid and its *_uuid columns are SQLAlchemy Uuid
+    # columns, whose bind processor calls value.hex -- the filter values
+    # therefore have to be uuid.UUID objects, but callers pass them as
+    # plain strings. Coerce here (matching the insert path's _maybe_uuid
+    # usage) before they reach the WHERE clause. A malformed uuid means
+    # there is nothing meaningful to coalesce against, so skip the fold
+    # rather than letting a StatementError kill the worker thread.
+    try:
+        target_uuid_val = _maybe_uuid(target_uuid)
+        exclude_op_uuid_val = _maybe_uuid(exclude_op_uuid)
+    except (ValueError, AttributeError, TypeError) as e:
+        LOG.warning(
+            f'claim_coalescible_siblings skipped, malformed uuid '
+            f'({target_column}={target_uuid!r}, '
+            f'exclude_op_uuid={exclude_op_uuid!r}): {e}')
+        return []
+
     engine = _get_engine()
     cluster_ops_table = _get_cluster_operations_table()
     states_table = _get_object_states_table()
@@ -18800,8 +18817,8 @@ def _direct_claim_coalescible_siblings(
                             == cluster_ops_table.c.operation_type,
                         )))
                 .where(cluster_ops_table.c.operation_type == operation_type)
-                .where(target_col == target_uuid)
-                .where(cluster_ops_table.c.uuid != exclude_op_uuid)
+                .where(target_col == target_uuid_val)
+                .where(cluster_ops_table.c.uuid != exclude_op_uuid_val)
                 .where(states_table.c.state_value == 'queued')
                 .where(
                     sa.func.json_length(
