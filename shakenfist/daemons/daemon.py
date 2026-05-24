@@ -89,6 +89,24 @@ def write_pid_file(daemon_name):
     with open(f'/run/sf/{daemon_name}.pid', 'w') as f:
         f.write(f'{os.getpid()}')
 
+    # Initialise the local eventlog spool + drainer for this
+    # process. The drainer is started once per daemon process,
+    # at the same time as the pid file is written, so any
+    # downstream startup events land in the spool rather than
+    # paying the synchronous gRPC tax on the critical path. The
+    # call is intentionally inside ``write_pid_file`` so every
+    # daemon picks it up without per-daemon boilerplate -- this
+    # function is already the one universal startup hook.
+    #
+    # Late import (rather than top-of-file) because the
+    # ``eventlog_drainer`` -> ``eventlog_spool`` chain pulls in
+    # the proto stubs, and not every site that imports
+    # ``shakenfist.daemons.daemon`` wants to load those at
+    # module-import time. We accept the per-daemon-startup
+    # import cost.
+    from shakenfist import eventlog_drainer  # noqa: E402
+    eventlog_drainer.start(daemon_name)
+
 
 def clear_abort_path(abort_path):
     if os.path.exists(abort_path):
