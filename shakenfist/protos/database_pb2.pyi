@@ -5874,20 +5874,16 @@ class GetClusterOperationErrorReply(google.protobuf.message.Message):
 
     FOUND_FIELD_NUMBER: builtins.int
     ERROR_REPORT_JSON_FIELD_NUMBER: builtins.int
-    CREATED_AT_FIELD_NUMBER: builtins.int
     found: builtins.bool
     error_report_json: builtins.str
     """ErrorReport serialised as JSON"""
-    created_at: builtins.float
-    """Unix timestamp the report was written"""
     def __init__(
         self,
         *,
         found: builtins.bool = ...,
         error_report_json: builtins.str = ...,
-        created_at: builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "error_report_json", b"error_report_json", "found", b"found"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error_report_json", b"error_report_json", "found", b"found"]) -> None: ...
 
 global___GetClusterOperationErrorReply = GetClusterOperationErrorReply
 

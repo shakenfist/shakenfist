@@ -4774,7 +4774,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 found=True,
                 error_report_json=json.dumps(
                     report.model_dump(mode='json')),
-                created_at=0.0,
             )
         except Exception as e:
             util_exceptions.ignore_exception(

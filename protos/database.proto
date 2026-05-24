@@ -1944,7 +1944,12 @@ message GetClusterOperationErrorRequest {
 message GetClusterOperationErrorReply {
   bool found = 1;
   string error_report_json = 2;   // ErrorReport serialised as JSON
-  double created_at = 3;          // Unix timestamp the report was written
+  // ``created_at`` is intentionally not exposed on the wire: no
+  // caller of ``mariadb.get_cluster_operation_error`` consumes it,
+  // and the table column stays for forensic queries by operators
+  // hitting MariaDB directly. If a programmatic caller later wants
+  // the timestamp, add it back here and thread it through
+  // ``_direct_get_cluster_operation_error``.
 }
 
 message DeleteClusterOperationErrorRequest {
