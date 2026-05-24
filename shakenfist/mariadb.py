@@ -29,6 +29,7 @@ from uuid import uuid4
 
 import grpc
 import sqlalchemy as sa
+from sqlalchemy import event as sa_event
 from sqlalchemy.dialects.mysql import INET4
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
@@ -316,6 +317,74 @@ def _get_connection_url() -> str:
     )
 
 
+# Queries that take longer than this (in seconds) are logged at WARN.
+# Chosen to surface the tail without filling syslog under healthy load:
+# a sub-millisecond indexed lookup that drifts to 100 ms is already a
+# leading indicator of buffer-pool pressure or sf-database contention,
+# but a small number of legitimately heavy queries (the maintainer's
+# ``find_*`` scans, schema migrations) are slower than that and not
+# interesting. 100 ms is the same threshold as the MariaDB-side
+# slow_query_log (``long_query_time = 0.1`` in
+# ``roles/mariadb/files/90-shakenfist-tuning.cnf``) so the two logs
+# can be correlated by time.
+SLOW_QUERY_THRESHOLD_SECONDS = 0.1
+
+
+def _log_slow_query(
+        _conn: Any,
+        _cursor: Any,
+        statement: str,
+        parameters: Any,
+        context: Any,
+        _executemany: bool) -> None:
+    """Log queries that exceed ``SLOW_QUERY_THRESHOLD_SECONDS`` to syslog.
+
+    SQLAlchemy event listener attached to every engine created by
+    ``_get_engine``. We stash a start timestamp on the
+    ``ExecutionContext`` in the ``before_cursor_execute`` listener
+    (``_record_query_start_time`` below) and compute the duration here.
+
+    Logging at WARN sends the line to per-node syslog, which the CI
+    bundle already captures. This complements the MariaDB-side
+    slow_query_log -- the MariaDB log measures pure server-side query
+    time, this listener measures client-perceived latency (round-trip
+    + serialisation + server). Both at 100 ms threshold so they line
+    up by timestamp.
+
+    The statement is truncated to 400 chars so a giant ``IN (...)``
+    clause does not flood syslog. Parameters are not logged: they may
+    contain blob hashes or UUIDs that have lookup value in eventlog
+    only.
+    """
+    start = getattr(context, '_sf_query_start', None)
+    if start is None:
+        return
+    duration = time.time() - start
+    if duration < SLOW_QUERY_THRESHOLD_SECONDS:
+        return
+    LOG.with_fields({
+        'duration_seconds': duration,
+        'statement': statement[:400],
+    }).warning('Slow MariaDB query')
+
+
+def _record_query_start_time(
+        _conn: Any,
+        _cursor: Any,
+        _statement: str,
+        _parameters: Any,
+        context: Any,
+        _executemany: bool) -> None:
+    """Stash a start timestamp for ``_log_slow_query`` to read.
+
+    SQLAlchemy's ``ExecutionContext`` survives across the
+    before/after cursor events for a single statement, so it is the
+    correct place to keep the per-query timing state without a
+    thread-local.
+    """
+    context._sf_query_start = time.time()
+
+
 def _get_engine() -> sa.Engine:
     """Get or create a thread-local SQLAlchemy engine.
 
@@ -338,6 +407,12 @@ def _get_engine() -> sa.Engine:
       ``OperationalError`` -> invalidate-and-retry behaviour on the
       first failed query post-disconnect gives us equivalent
       robustness without the per-query overhead.
+    * Slow-query listeners (``_record_query_start_time`` /
+      ``_log_slow_query``) are attached to every engine on creation,
+      so any query exceeding ``SLOW_QUERY_THRESHOLD_SECONDS`` (100 ms)
+      lands in syslog at WARN. Equivalent to MariaDB's
+      ``slow_query_log`` but client-side, available without editing
+      the clingwrap collection target.
     """
     if not hasattr(_local, 'engine') or _local.engine is None:
         url = _get_connection_url()
@@ -346,6 +421,12 @@ def _get_engine() -> sa.Engine:
             pool_recycle=1800,   # Recycle connections after 30 minutes
             echo=False           # Set True for SQL debugging
         )
+        sa_event.listen(
+            _local.engine, 'before_cursor_execute',
+            _record_query_start_time)
+        sa_event.listen(
+            _local.engine, 'after_cursor_execute',
+            _log_slow_query)
         LOG.debug('Created new MariaDB engine for thread')
     engine: sa.Engine = _local.engine
     return engine
