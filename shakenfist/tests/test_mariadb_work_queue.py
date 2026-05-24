@@ -103,8 +103,8 @@ class WorkQueueEnqueueTestCase(base.ShakenFistTestCase):
             {'task': 'x'})
 
 
-class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
-    """Tests for _direct_work_queue_dequeue()."""
+class WorkQueueDequeueBatchTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_work_queue_dequeue_batch()."""
 
     def setUp(self):
         super().setUp()
@@ -113,42 +113,88 @@ class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.config.stop)
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_dequeue_empty_returns_none(self, mock_get_engine):
+    def test_dequeue_empty_returns_empty_list(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
-        mock_conn.execute.return_value.fetchone.return_value = None
+        mock_conn.execute.return_value.fetchall.return_value = []
         mock_get_engine.return_value = mock_engine
 
-        result = mariadb._direct_work_queue_dequeue(
-            'my-queue', 'worker-1')
+        result = mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
-        self.assertIsNone(result)
+        self.assertEqual([], result)
         # Only the SELECT runs when the queue is empty; no UPDATE.
         self.assertEqual(mock_conn.execute.call_count, 1)
         mock_conn.commit.assert_not_called()
 
+    def test_dequeue_empty_queue_names_is_no_op(self):
+        # No engine call, no SQL emitted -- a defensive short-circuit.
+        self.assertEqual(
+            [], mariadb._direct_work_queue_dequeue_batch(
+                [], 'worker-1', 10))
+
+    def test_dequeue_zero_limit_is_no_op(self):
+        self.assertEqual(
+            [], mariadb._direct_work_queue_dequeue_batch(
+                ['my-queue'], 'worker-1', 0))
+
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_dequeue_claims_row_and_returns_payload(
+    def test_dequeue_limit_is_clamped(self, mock_get_engine):
+        # ``limit`` above MAX_DEQUEUE_BATCH must be silently clamped
+        # so a misbehaving caller cannot stage an unbounded in-flight
+        # batch. The SELECT statement's LIMIT clause should carry the
+        # clamped value, not the caller-supplied one.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.return_value.fetchall.return_value = []
+        mock_get_engine.return_value = mock_engine
+
+        mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1',
+            mariadb.MAX_DEQUEUE_BATCH * 10)
+
+        select_stmt = mock_conn.execute.call_args[0][0]
+        compiled = select_stmt.compile(
+            dialect=__import__(
+                'sqlalchemy.dialects.mysql',
+                fromlist=['dialect']).dialect())
+        # The LIMIT bind param name varies across SQLAlchemy
+        # versions; assert the value is present rather than the name.
+        self.assertIn(
+            mariadb.MAX_DEQUEUE_BATCH, compiled.params.values())
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_dequeue_claims_rows_and_returns_payloads(
             self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
-        mock_row = mock.Mock()
-        mock_row.id = 42
-        mock_row.payload = {'task': 'do-thing'}
+        row_a = mock.Mock()
+        row_a.id = 42
+        row_a.queue_name = 'my-queue'
+        row_a.payload = {'task': 'do-thing-a'}
+        row_b = mock.Mock()
+        row_b.id = 43
+        row_b.queue_name = 'my-queue'
+        row_b.payload = {'task': 'do-thing-b'}
         mock_select_result = mock.Mock()
-        mock_select_result.fetchone.return_value = mock_row
+        mock_select_result.fetchall.return_value = [row_a, row_b]
         mock_update_result = mock.Mock()
         mock_conn.execute.side_effect = [
             mock_select_result, mock_update_result]
         mock_get_engine.return_value = mock_engine
 
-        result = mariadb._direct_work_queue_dequeue(
-            'my-queue', 'worker-1')
+        result = mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
-        self.assertEqual(result, ('42', {'task': 'do-thing'}))
+        self.assertEqual(
+            [
+                ('my-queue', '42', {'task': 'do-thing-a'}),
+                ('my-queue', '43', {'task': 'do-thing-b'}),
+            ],
+            result)
         self.assertEqual(mock_conn.execute.call_count, 2)
         mock_conn.commit.assert_called_once()
 
         update_stmt = mock_conn.execute.call_args_list[1][0][0]
-        # The UPDATE must claim the specific row and bump attempts.
+        # The UPDATE must claim both rows in a single statement and
+        # bump attempts.
         compiled = update_stmt.compile()
         self.assertEqual(compiled.params['claimed_by'], 'worker-1')
         compiled_sql = str(compiled).replace('`', '').replace(' ', '')
@@ -159,10 +205,11 @@ class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_dequeue_sql_uses_skip_locked(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
-        mock_conn.execute.return_value.fetchone.return_value = None
+        mock_conn.execute.return_value.fetchall.return_value = []
         mock_get_engine.return_value = mock_engine
 
-        mariadb._direct_work_queue_dequeue('my-queue', 'worker-1')
+        mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
         select_stmt = mock_conn.execute.call_args[0][0]
         compiled_sql = str(select_stmt.compile(
@@ -176,10 +223,11 @@ class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_dequeue_sql_filters_deferred_jobs(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
-        mock_conn.execute.return_value.fetchone.return_value = None
+        mock_conn.execute.return_value.fetchall.return_value = []
         mock_get_engine.return_value = mock_engine
 
-        mariadb._direct_work_queue_dequeue('my-queue', 'worker-1')
+        mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
         select_stmt = mock_conn.execute.call_args[0][0]
         compiled_sql = str(select_stmt.compile(
@@ -193,16 +241,39 @@ class WorkQueueDequeueTestCase(base.ShakenFistTestCase):
         self.assertIn('unix_timestamp', compiled_sql)
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_dequeue_returns_none_on_error(self, mock_get_engine):
+    def test_dequeue_sql_orders_by_priority_then_age(
+            self, mock_get_engine):
+        # The FIELD(queue_name, ...) ordering is what makes the batched
+        # SELECT honour the caller-supplied priority list.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.return_value.fetchall.return_value = []
+        mock_get_engine.return_value = mock_engine
+
+        mariadb._direct_work_queue_dequeue_batch(
+            ['high', 'low'], 'worker-1', 10)
+
+        select_stmt = mock_conn.execute.call_args[0][0]
+        compiled_sql = str(select_stmt.compile(
+            dialect=__import__(
+                'sqlalchemy.dialects.mysql',
+                fromlist=['dialect']).dialect()
+        )).lower()
+        self.assertIn('order by field(', compiled_sql)
+        # scheduled_at is the secondary sort key (tie-break within
+        # the same priority).
+        self.assertIn('scheduled_at asc', compiled_sql)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_dequeue_returns_empty_list_on_error(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
         mock_conn.execute.side_effect = OperationalError(
             'select', {}, Exception('DB down'))
         mock_get_engine.return_value = mock_engine
 
-        result = mariadb._direct_work_queue_dequeue(
-            'my-queue', 'worker-1')
+        result = mariadb._direct_work_queue_dequeue_batch(
+            ['my-queue'], 'worker-1', 10)
 
-        self.assertIsNone(result)
+        self.assertEqual([], result)
 
 
 class WorkQueueResolveTestCase(base.ShakenFistTestCase):
@@ -473,3 +544,239 @@ class WorkQueueDeleteRowTestCase(base.ShakenFistTestCase):
 
         self.assertFalse(
             mariadb._direct_work_queue_delete_row(1))
+
+
+class FindExistingCoalescibleOpTestCase(base.ShakenFistTestCase):
+    """Tests for ``_direct_find_existing_coalescible_op``.
+
+    Read-only enqueue-side dedup lookup. The mock cannot exercise
+    JOIN behaviour, so the contract is verified by inspecting the
+    compiled SQL for the guard clauses (target column equality,
+    state filter, JSON_LENGTH single-task constraint, exclusion
+    via uuid != / IN, and ORDER BY created_at ASC).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch(
+            'shakenfist.mariadb.config', fake_config)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+    def test_invalid_target_column_returns_none_without_query(self):
+        # Whitelist: only network_uuid / instance_uuid / node_uuid
+        # are valid target columns. Anything else is rejected
+        # before any SQL is emitted -- the function must not
+        # touch the engine at all.
+        with mock.patch(
+                'shakenfist.mariadb._get_engine') as mock_get_engine:
+            result = mariadb._direct_find_existing_coalescible_op(
+                'net_op',
+                'arbitrary_user_supplied_column',
+                'some-uuid',
+                'some_task')
+            self.assertIsNone(result)
+            mock_get_engine.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_returns_none_when_no_match(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.return_value.fetchone.return_value = None
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_find_existing_coalescible_op(
+            'net_op', 'network_uuid',
+            '11111111-1111-4111-8111-111111111111',
+            'network_apply_update_dnsmasq')
+
+        self.assertIsNone(result)
+        # One SELECT, no commit needed (read-only).
+        self.assertEqual(mock_conn.execute.call_count, 1)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_returns_uuid_when_match(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_row = mock.Mock()
+        mock_row.uuid = '99999999-9999-4999-8999-999999999999'
+        mock_conn.execute.return_value.fetchone.return_value = mock_row
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_find_existing_coalescible_op(
+            'net_op', 'network_uuid',
+            '11111111-1111-4111-8111-111111111111',
+            'network_apply_update_dnsmasq')
+
+        self.assertEqual(
+            '99999999-9999-4999-8999-999999999999', result)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_sql_filters_to_queued_state_and_single_task(
+            self, mock_get_engine):
+        # The lookup must NOT match ops in EXECUTING / COMPLETE /
+        # ERROR / DELETED states, and must NOT match multi-task ops.
+        # Both filters live in the SELECT WHERE clause.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.return_value.fetchone.return_value = None
+        mock_get_engine.return_value = mock_engine
+
+        mariadb._direct_find_existing_coalescible_op(
+            'net_op', 'network_uuid',
+            '11111111-1111-4111-8111-111111111111',
+            'network_apply_update_dnsmasq')
+
+        select_stmt = mock_conn.execute.call_args[0][0]
+        compiled_sql = str(select_stmt.compile(
+            dialect=__import__(
+                'sqlalchemy.dialects.mysql',
+                fromlist=['dialect']).dialect()
+        )).lower()
+        self.assertIn("state_value", compiled_sql)
+        self.assertIn("json_length", compiled_sql)
+        self.assertIn("json_extract", compiled_sql)
+        # Ordered oldest-first so concurrent storms converge on
+        # the same survivor.
+        self.assertIn("order by", compiled_sql)
+        self.assertIn("created_at", compiled_sql)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_returns_none_on_error(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = OperationalError(
+            'select', {}, Exception('DB down'))
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_find_existing_coalescible_op(
+            'net_op', 'network_uuid',
+            '11111111-1111-4111-8111-111111111111',
+            'network_apply_update_dnsmasq')
+
+        self.assertIsNone(result)
+
+
+class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
+    """Tests for ``_direct_claim_coalescible_siblings``.
+
+    Atomic worker-side fold: SELECT FOR UPDATE the matching
+    sibling rows then UPDATE their object_states to ``complete``
+    in the same transaction. The mock cannot exercise FOR UPDATE
+    locking, so the SQL-shape assertions cover the WHERE/JOIN
+    clauses, the FOR UPDATE marker, and that the survivor is
+    excluded from the UPDATE.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch(
+            'shakenfist.mariadb.config', fake_config)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+    def test_empty_task_names_returns_empty_without_query(self):
+        with mock.patch(
+                'shakenfist.mariadb._get_engine') as mock_get_engine:
+            self.assertEqual(
+                [], mariadb._direct_claim_coalescible_siblings(
+                    'net_op', 'network_uuid',
+                    'some-uuid', [], 'exclude-uuid'))
+            mock_get_engine.assert_not_called()
+
+    def test_invalid_target_column_returns_empty_without_query(self):
+        with mock.patch(
+                'shakenfist.mariadb._get_engine') as mock_get_engine:
+            self.assertEqual(
+                [], mariadb._direct_claim_coalescible_siblings(
+                    'net_op', 'malicious_column',
+                    'some-uuid', ['task'], 'exclude-uuid'))
+            mock_get_engine.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_returns_empty_when_no_siblings(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.return_value.fetchall.return_value = []
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_claim_coalescible_siblings(
+            'net_op', 'network_uuid',
+            '11111111-1111-4111-8111-111111111111',
+            ['network_apply_update_dnsmasq'],
+            '99999999-9999-4999-8999-999999999999')
+
+        self.assertEqual([], result)
+        # Only the SELECT runs when there's nothing to fold; no
+        # UPDATE and no commit.
+        self.assertEqual(mock_conn.execute.call_count, 1)
+        mock_conn.commit.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_returns_folded_uuids_and_runs_update(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        sibling_a = mock.Mock()
+        sibling_a.uuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+        sibling_b = mock.Mock()
+        sibling_b.uuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+        mock_select_result = mock.Mock()
+        mock_select_result.fetchall.return_value = [sibling_a, sibling_b]
+        mock_update_result = mock.Mock()
+        mock_conn.execute.side_effect = [
+            mock_select_result, mock_update_result]
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_claim_coalescible_siblings(
+            'net_op', 'network_uuid',
+            '11111111-1111-4111-8111-111111111111',
+            ['network_apply_update_dnsmasq'],
+            '99999999-9999-4999-8999-999999999999')
+
+        self.assertEqual(
+            [
+                'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            ],
+            result)
+        # SELECT + UPDATE.
+        self.assertEqual(mock_conn.execute.call_count, 2)
+        mock_conn.commit.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_sql_uses_for_update_and_excludes_survivor(
+            self, mock_get_engine):
+        # FOR UPDATE serialises the row read against the dispatcher
+        # on every other node writing object_states. uuid != survivor
+        # makes sure the surviving op is not folded against itself.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.return_value.fetchall.return_value = []
+        mock_get_engine.return_value = mock_engine
+
+        mariadb._direct_claim_coalescible_siblings(
+            'net_op', 'network_uuid',
+            '11111111-1111-4111-8111-111111111111',
+            ['network_apply_update_dnsmasq'],
+            '99999999-9999-4999-8999-999999999999')
+
+        select_stmt = mock_conn.execute.call_args[0][0]
+        compiled_sql = str(select_stmt.compile(
+            dialect=__import__(
+                'sqlalchemy.dialects.mysql',
+                fromlist=['dialect']).dialect()
+        )).upper()
+        self.assertIn('FOR UPDATE', compiled_sql)
+        # exclude_op_uuid is a bind param; check it shows up in
+        # the compiled params rather than the SQL text.
+        params = select_stmt.compile().params
+        self.assertIn(
+            '99999999-9999-4999-8999-999999999999', params.values())
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_returns_empty_on_error(self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = OperationalError(
+            'select', {}, Exception('DB down'))
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_claim_coalescible_siblings(
+            'net_op', 'network_uuid',
+            '11111111-1111-4111-8111-111111111111',
+            ['network_apply_update_dnsmasq'],
+            '99999999-9999-4999-8999-999999999999')
+
+        self.assertEqual([], result)

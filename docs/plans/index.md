@@ -9,7 +9,7 @@ This section contains forward-looking roadmaps for Shaken Fist development. Thes
 
 The set of incomplete plans has grown to the point where the order they land in matters. The intended sequencing is:
 
-1. **[Network operations facade](PLAN-network-facade.md)** — in progress in a separate work session. Lands first.
+1. **[Network operations facade](PLAN-network-facade.md)** — complete. Landed via the `network-facade` branch.
 2. **[Retire etcd](PLAN-remove-etcd.md)** — a small, mechanical deletion sweep. Originally gated on the etcd-era cluster redeploy; that gating has been dropped because the in-place upgrade path is being closed deliberately. Lands early in the sequence so the remove-primary work below is not navigating misleading etcd references while it renames the ansible group.
 3. **[Health checks, readiness, and graceful drain](PLAN-health-checks.md)** — a precondition for the BYO load-balancer story in remove-primary being operationally honest. The plan is partial: a phase 0 decisions pass resolves the open questions before the implementation phases are re-cut.
 4. **[Remove the primary node](PLAN-remove-primary.md)** — the BYO-infrastructure scope reduction. Phase 7 finishes the deployer-level `etcd_master` → `database_node` rename, by which point the drain code itself is long gone. Naturally followed by a wipe-and-redeploy of Mikal's production cluster against the new shape.
@@ -43,7 +43,9 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Replace last_cluster_operation](PLAN-replace-last-cluster-operation.md) | Phase 4: Remove explicit setters | Complete | Drop redundant `set_last_cluster_operation` callers |
 | [Replace last_cluster_operation](PLAN-replace-last-cluster-operation.md) | Phase 5: Documentation and final audit | Complete | Update docs, verify CI |
 | [Fix cluster_operation_targets UNIQUE constraint](PLAN-fix-cluster-operation-targets-unique-constraint.md) | Schema fix | Complete | Replace column-level `UNIQUE(operation_uuid)` with composite `UNIQUE(operation_uuid, target_object_type, target_uuid)` so multi-target ops record all their target rows |
-| [Network operations facade](PLAN-network-facade.md) | Master plan | Planning | Split `Network` into a queue-enqueuing facade and a single-mutator worker so local daemons can no longer bypass `net-worker`'s serialisation |
+| [Network operations facade](PLAN-network-facade.md) | Master plan | Complete | Split `Network` into a queue-enqueuing facade and a single-mutator worker so local daemons can no longer bypass `net-worker`'s serialisation |
+| [Queue performance and coalescing](PLAN-queue-performance.md) | Steps 1-6 | In Progress | Unified batched dequeue, coalescible-task metadata, worker- and enqueue-side dedup of redundant cluster operations. Step 7 (measure with CI data, decide on fairness) outstanding. |
+| [Recurring cluster operations](PLAN-recurring-operations.md) | Master plan | Stub | Cron-like framework for recurring cluster operations; absorbs `scheduled_tasks.py` and `daemons/network/maintain.py`; adds user-facing recurring tasks (e.g. snapshot every 24 hours) |
 | [Health checks](PLAN-health-checks.md) | Phase 0: Research and decisions | Not started | Resolve per-daemon vs per-node endpoints, HTTP vs gRPC, readiness dependency model, drain grace, auth, mTLS interaction |
 | [Health checks](PLAN-health-checks.md) | Phase 1: sf-api endpoints and drain | Not started | `/livez`, `/readyz`, `/healthz` on sf-api with SIGTERM-driven drain semantics |
 | [Health checks](PLAN-health-checks.md) | Phase 2: gRPC health protocol | Not started | `grpc.health.v1.Health` on sf-database and sf-eventlog with leader / standby readiness semantics |
@@ -123,6 +125,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 
 ### Status Definitions
 
+- **Stub**: Framing recorded for future detailed planning; not yet ready to execute
 - **Not started**: Plan exists, work not yet begun
 - **Planning**: Design complete, implementation not yet started
 - **In Progress**: Currently being implemented

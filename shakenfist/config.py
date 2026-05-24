@@ -106,10 +106,16 @@ class SFConfig(BaseSettings):
 
     # API Options
     API_ASYNC_WAIT: int = Field(
-        15,
+        60,
         description=(
-            'How long we wait for an async operation to complete  before '
-            'returning to the user.'
+            'Default deadline for ``BaseClusterOperation.raise_for_error()``: '
+            'how long an internal caller (or REST handler) will block waiting '
+            'for an enqueued cluster operation to reach a terminal state. The '
+            '15 s value used through phases 1-9 of the network-facade refactor '
+            'was too aggressive for the cascading wait-on-op patterns -- under '
+            'cluster load a ``net_op`` that took 16 s to dispatch tripped '
+            'a 15 s waiter even though the op itself was healthy. Long-running '
+            'startup paths still override this explicitly.'
         )
     )
     AUTH_SECRET_SEED: str = Field(
@@ -197,6 +203,33 @@ class SFConfig(BaseSettings):
     IP_DELETION_HALO_DURATION: int = Field(
         300,
         description='How long an IP is unusable for after being released.'
+    )
+    MAINTAIN_QUEUE_DEPTH_THRESHOLD: int = Field(
+        50,
+        description=(
+            'Maintain pass is skipped if the combined depth of the network '
+            'queue family exceeds this threshold. Prevents piling '
+            'reconciliation requests on top of an already backed-up queue.'
+        )
+    )
+    MAINTAIN_RECONCILE_COOLDOWN_SECONDS: int = Field(
+        60,
+        description=(
+            'If the most recent terminal reconciliation op for a network '
+            'ended in ERROR within this many seconds, maintain skips '
+            'enqueueing another reconciliation for that network. Lets a '
+            'previous failure breathe before retrying.'
+        )
+    )
+    MAINTAIN_RECONCILE_CIRCUIT_K: int = Field(
+        5,
+        description=(
+            'If the last K terminal reconciliations for a network all '
+            'ended in ERROR, maintain quiesces that network with an '
+            'operator-visible event. The next maintain pass naturally '
+            're-checks once a fresh reconciliation succeeds, which closes '
+            'the circuit.'
+        )
     )
 
     # Database Options

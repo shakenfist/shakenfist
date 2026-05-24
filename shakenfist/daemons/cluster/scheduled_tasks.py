@@ -115,13 +115,18 @@ def _process_per_blob_queue(execution_limit=10):
                     last_verified_by_node[h.node] = h.last_verified_at
 
         # Find nodes that already have pending blob operations for this
-        # blob, so we don't schedule duplicate checksum requests.
+        # blob, so we don't schedule duplicate checksum requests. The
+        # lookup is best-effort: an op can be hard-deleted between when
+        # we read the target row and when we read the op row, so the
+        # caller suppresses the "non-existent object" audit event —
+        # treating the absent op as a non-pending one is the correct
+        # behaviour.
         nodes_with_pending_ops = set()
         pending_ops = mariadb.get_cluster_operation_targets_for_object(
             ObjectType.BLOB, str(b.uuid))
         for target in pending_ops:
             op = get_object_class(target.operation_type).from_db(
-                target.operation_uuid)
+                target.operation_uuid, suppress_failure_audit=True)
             if op and op.is_outstanding():
                 # Resolve node UUID to FQDN for comparison with locations
                 n = Node.from_db(op.node_uuid)

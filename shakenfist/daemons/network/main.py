@@ -55,9 +55,6 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                 for job_name in job_classes:
                     needs_start = False
-                    if (job_name == 'net-worker' and
-                            not config.NODE_IS_NETWORK_NODE):
-                        continue
 
                     if not self.cluster_stable():
                         if time.time() - last_defer_message > 10:

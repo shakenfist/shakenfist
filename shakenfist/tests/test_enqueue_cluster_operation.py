@@ -307,3 +307,126 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             self._metadata(instance_uuid=INSTANCE_UUID))
 
         self.mock_create_target.assert_not_called()
+
+
+class EnqueueClusterOperationFamilyTestCase(base.ShakenFistTestCase):
+    """Tests for the family parameter on enqueue_cluster_operation.
+
+    Verifies that:
+    - Omitting family defaults to 'clusteroperation' (existing behaviour).
+    - Passing family='network' produces {target}-network-{priority}.
+    - The audit-event fan-out and cluster_operation_targets writes are
+      unaffected by the family parameter.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_create_and_enqueue = mock.patch(
+            'shakenfist.mariadb.create_and_enqueue_cluster_operation'
+        ).start()
+        self.mock_create_and_enqueue.return_value = True
+
+        self.mock_create_target = mock.patch(
+            'shakenfist.mariadb.create_cluster_operation_target'
+        ).start()
+
+        self.mock_add_event_multi = mock.patch(
+            'shakenfist.schema.operations.util.eventlog'
+            '.add_event_multi'
+        ).start()
+
+        self.mock_time = mock.patch(
+            'shakenfist.schema.operations.util.time.time',
+            return_value=3000.0,
+        ).start()
+
+        self.addCleanup(mock.patch.stopall)
+
+    def _metadata(self, **overrides):
+        md = {
+            'uuid': OP_UUID,
+            'node_uuid': NODE_UUID,
+            'priority': 'user_waiting',
+            'tasks': ['t'],
+        }
+        md.update(overrides)
+        return md
+
+    def test_default_family_produces_clusteroperation_queue_name(self):
+        """Omitting family preserves today's queue name format."""
+        util.enqueue_cluster_operation(
+            _FakeObjectType('NODE_INST_OP'),
+            self._metadata())
+
+        call_kwargs = self.mock_create_and_enqueue.call_args.kwargs
+        self.assertEqual(
+            call_kwargs['queue_name'],
+            f'{NODE_UUID}-clusteroperation-user_waiting')
+
+    def test_explicit_default_family_matches_omitted(self):
+        """Passing family='clusteroperation' explicitly is identical to omitting it."""
+        util.enqueue_cluster_operation(
+            _FakeObjectType('NODE_INST_OP'),
+            self._metadata(),
+            family='clusteroperation')
+
+        call_kwargs = self.mock_create_and_enqueue.call_args.kwargs
+        self.assertEqual(
+            call_kwargs['queue_name'],
+            f'{NODE_UUID}-clusteroperation-user_waiting')
+
+    def test_network_family_produces_network_queue_name(self):
+        """family='network' produces {target}-network-{priority}."""
+        node_uuid = 'node1111-1111-4111-8111-111111111111'
+        util.enqueue_cluster_operation(
+            _FakeObjectType('NODE_NET_OP'),
+            self._metadata(node_uuid=node_uuid),
+            family='network')
+
+        call_kwargs = self.mock_create_and_enqueue.call_args.kwargs
+        self.assertEqual(
+            call_kwargs['queue_name'],
+            f'{node_uuid}-network-user_waiting')
+
+    def test_network_family_with_explicit_target(self):
+        """family='network' with an explicit target uses the target, not node_uuid."""
+        explicit_target = 'target-node-uuid-1111-111111111111'
+        util.enqueue_cluster_operation(
+            _FakeObjectType('NODE_NET_OP'),
+            self._metadata(),
+            target=explicit_target,
+            family='network')
+
+        call_kwargs = self.mock_create_and_enqueue.call_args.kwargs
+        self.assertEqual(
+            call_kwargs['queue_name'],
+            f'{explicit_target}-network-user_waiting')
+
+    def test_family_does_not_affect_audit_event_fan_out(self):
+        """The family parameter does not change audit event targets."""
+        md = self._metadata(network_uuid=NETWORK_UUID)
+        util.enqueue_cluster_operation(
+            _FakeObjectType('NODE_NET_OP'), md, family='network')
+
+        self.mock_add_event_multi.assert_called_once()
+        targets = self.mock_add_event_multi.call_args[0][1]
+        self.assertIn(('node_net_op', OP_UUID), targets)
+        self.assertIn(('node', NODE_UUID), targets)
+        self.assertIn(('network', NETWORK_UUID), targets)
+
+    def test_family_does_not_affect_cluster_operation_targets_writes(self):
+        """The family parameter does not change cluster_operation_targets writes."""
+        util.enqueue_cluster_operation(
+            _FakeObjectType('NET_OP'),
+            self._metadata(network_uuid=NETWORK_UUID),
+            target='networknode',
+            model_class=_NetOnlyModel,
+            family='network')
+
+        self.mock_create_target.assert_called_once_with(
+            operation_uuid=OP_UUID,
+            operation_type='net_op',
+            target_object_type=ObjectType.NETWORK,
+            target_uuid=NETWORK_UUID,
+            created_at=3000.0,
+        )

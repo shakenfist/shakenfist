@@ -162,8 +162,18 @@ def _add_event_multi_inner(
                     f'Failed to add event for {object_type} with uuid '
                     f'{object_uuid}: {e}')
 
+        # 30 s with ``wait_for_ready=True`` blocks the caller waiting for
+        # the eventlog server to come back when it has gone away, which
+        # is exactly the case during a coordinated shutdown: another
+        # daemon's record_exit() can sit on this call long enough that
+        # systemd's TimeoutStopSec=30 s SIGKILLs the whole daemon before
+        # the gRPC times out. Failing fast (5 s, wait_for_ready=False)
+        # is fine because the outer ``add_event_multi`` falls through
+        # to the DLQ on any RpcError, and the cooldown cache then
+        # short-circuits subsequent events at this same node until the
+        # server is back.
         response = stub.RecordMultiEvent(
-            request, timeout=30, wait_for_ready=True)
+            request, timeout=5, wait_for_ready=False)
         if response.ack:
             return
 

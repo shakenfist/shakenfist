@@ -61,36 +61,66 @@ global___EnqueueRequest = EnqueueRequest
 class DequeueRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    QUEUE_NAME_FIELD_NUMBER: builtins.int
-    queue_name: builtins.str
+    QUEUE_NAMES_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    limit: builtins.int
+    """Maximum number of items to claim in this call. Callers that
+    want one-at-a-time behaviour pass 1; pool workers pass their
+    free-slot count so they fill the pool in one round trip.
+    """
+    @property
+    def queue_names(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Queue names in caller-supplied priority order: index 0 is the
+        highest priority. The server uses this order in ORDER BY
+        FIELD(queue_name, ...) so a single SELECT returns the most
+        important eligible work first.
+        """
+
     def __init__(
         self,
         *,
-        queue_name: builtins.str = ...,
+        queue_names: collections.abc.Iterable[builtins.str] | None = ...,
+        limit: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["queue_name", b"queue_name"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["limit", b"limit", "queue_names", b"queue_names"]) -> None: ...
 
 global___DequeueRequest = DequeueRequest
 
 @typing.final
-class DequeueReply(google.protobuf.message.Message):
+class DequeuedItem(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    FOUND_FIELD_NUMBER: builtins.int
+    QUEUE_NAME_FIELD_NUMBER: builtins.int
     JOB_NAME_FIELD_NUMBER: builtins.int
     WORK_ITEM_FIELD_NUMBER: builtins.int
-    found: builtins.bool
+    queue_name: builtins.str
     job_name: builtins.str
     work_item: builtins.str
     """JSON-encoded data"""
     def __init__(
         self,
         *,
-        found: builtins.bool = ...,
+        queue_name: builtins.str = ...,
         job_name: builtins.str = ...,
         work_item: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["found", b"found", "job_name", b"job_name", "work_item", b"work_item"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["job_name", b"job_name", "queue_name", b"queue_name", "work_item", b"work_item"]) -> None: ...
+
+global___DequeuedItem = DequeuedItem
+
+@typing.final
+class DequeueReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEMS_FIELD_NUMBER: builtins.int
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DequeuedItem]: ...
+    def __init__(
+        self,
+        *,
+        items: collections.abc.Iterable[global___DequeuedItem] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
 
 global___DequeueReply = DequeueReply
 
@@ -253,6 +283,113 @@ class DeleteWorkQueueRowRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["row_id", b"row_id"]) -> None: ...
 
 global___DeleteWorkQueueRowRequest = DeleteWorkQueueRowRequest
+
+@typing.final
+class ClaimCoalescibleSiblingsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_COLUMN_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    TASK_NAMES_FIELD_NUMBER: builtins.int
+    EXCLUDE_OP_UUID_FIELD_NUMBER: builtins.int
+    operation_type: builtins.str
+    """The op_type, target column (e.g. "network_uuid"), target uuid
+    and uuid of the surviving op together identify "other ops on
+    the same target object whose work the survivor is about to do."
+    The server folds anything matching by transitioning its state
+    to ``complete`` -- the worker that eventually picks that row
+    up out of the queue will see the terminal state and skip it
+    cleanly (see workitem.py terminal-state branch).
+    """
+    target_column: builtins.str
+    target_uuid: builtins.str
+    exclude_op_uuid: builtins.str
+    @property
+    def task_names(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Tasks the survivor is about to run that are flagged
+        coalescible. Only sibling ops whose entire task list is exactly
+        one of these names are folded -- multi-task siblings might
+        also carry non-coalescible work and must be left alone.
+        """
+
+    def __init__(
+        self,
+        *,
+        operation_type: builtins.str = ...,
+        target_column: builtins.str = ...,
+        target_uuid: builtins.str = ...,
+        task_names: collections.abc.Iterable[builtins.str] | None = ...,
+        exclude_op_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["exclude_op_uuid", b"exclude_op_uuid", "operation_type", b"operation_type", "target_column", b"target_column", "target_uuid", b"target_uuid", "task_names", b"task_names"]) -> None: ...
+
+global___ClaimCoalescibleSiblingsRequest = ClaimCoalescibleSiblingsRequest
+
+@typing.final
+class ClaimCoalescibleSiblingsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOLDED_OP_UUIDS_FIELD_NUMBER: builtins.int
+    @property
+    def folded_op_uuids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Op uuids whose state was transitioned to ``complete``."""
+
+    def __init__(
+        self,
+        *,
+        folded_op_uuids: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["folded_op_uuids", b"folded_op_uuids"]) -> None: ...
+
+global___ClaimCoalescibleSiblingsReply = ClaimCoalescibleSiblingsReply
+
+@typing.final
+class FindExistingCoalescibleOpRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_COLUMN_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    TASK_NAME_FIELD_NUMBER: builtins.int
+    operation_type: builtins.str
+    """Read-only lookup used by enqueue-side dedup: "is there already
+    a pending op on the same target whose entire task list is just
+    this one coalescible task?" -- if so the caller returns that
+    op's uuid to its caller instead of inserting a duplicate.
+    """
+    target_column: builtins.str
+    target_uuid: builtins.str
+    task_name: builtins.str
+    def __init__(
+        self,
+        *,
+        operation_type: builtins.str = ...,
+        target_column: builtins.str = ...,
+        target_uuid: builtins.str = ...,
+        task_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["operation_type", b"operation_type", "target_column", b"target_column", "target_uuid", b"target_uuid", "task_name", b"task_name"]) -> None: ...
+
+global___FindExistingCoalescibleOpRequest = FindExistingCoalescibleOpRequest
+
+@typing.final
+class FindExistingCoalescibleOpReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    """Empty string when no match was found (proto3 has no string
+    null).
+    """
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["op_uuid", b"op_uuid"]) -> None: ...
+
+global___FindExistingCoalescibleOpReply = FindExistingCoalescibleOpReply
 
 @typing.final
 class ClusterLockRequest(google.protobuf.message.Message):
@@ -5252,6 +5389,68 @@ class HasPendingClusterOperationTargetReply(google.protobuf.message.Message):
 global___HasPendingClusterOperationTargetReply = HasPendingClusterOperationTargetReply
 
 @typing.final
+class GetRecentTerminalOpStatesForTargetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    OP_TYPE_FIELD_NUMBER: builtins.int
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    limit: builtins.int
+    op_type: builtins.str
+    """Empty string means "no op_type filter"."""
+    def __init__(
+        self,
+        *,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+        limit: builtins.int = ...,
+        op_type: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["limit", b"limit", "op_type", b"op_type", "target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___GetRecentTerminalOpStatesForTargetRequest = GetRecentTerminalOpStatesForTargetRequest
+
+@typing.final
+class TerminalOpState(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    STATE_VALUE_FIELD_NUMBER: builtins.int
+    UPDATE_TIME_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    state_value: builtins.str
+    update_time: builtins.float
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+        state_value: builtins.str = ...,
+        update_time: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["op_uuid", b"op_uuid", "state_value", b"state_value", "update_time", b"update_time"]) -> None: ...
+
+global___TerminalOpState = TerminalOpState
+
+@typing.final
+class GetRecentTerminalOpStatesForTargetReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTRIES_FIELD_NUMBER: builtins.int
+    @property
+    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TerminalOpState]: ...
+    def __init__(
+        self,
+        *,
+        entries: collections.abc.Iterable[global___TerminalOpState] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
+
+global___GetRecentTerminalOpStatesForTargetReply = GetRecentTerminalOpStatesForTargetReply
+
+@typing.final
 class DeleteClusterOperationTargetRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5543,6 +5742,42 @@ class GetClusterOperationsByNodeReply(google.protobuf.message.Message):
 global___GetClusterOperationsByNodeReply = GetClusterOperationsByNodeReply
 
 @typing.final
+class ListClusterOperationsForTargetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    TARGET_UUID_FIELD_NUMBER: builtins.int
+    target_object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        target_object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]) -> None: ...
+
+global___ListClusterOperationsForTargetRequest = ListClusterOperationsForTargetRequest
+
+@typing.final
+class ListClusterOperationsForTargetReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEMS_FIELD_NUMBER: builtins.int
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ClusterOperationData]:
+        """Items are ordered newest-first by created_at."""
+
+    def __init__(
+        self,
+        *,
+        items: collections.abc.Iterable[global___ClusterOperationData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
+
+global___ListClusterOperationsForTargetReply = ListClusterOperationsForTargetReply
+
+@typing.final
 class DeleteClusterOperationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5592,3 +5827,78 @@ class CreateAndEnqueueClusterOperationRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "queue_name", b"queue_name", "uuid", b"uuid"]) -> None: ...
 
 global___CreateAndEnqueueClusterOperationRequest = CreateAndEnqueueClusterOperationRequest
+
+@typing.final
+class SetClusterOperationErrorRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    ERROR_REPORT_JSON_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    """Operation UUID as string"""
+    error_report_json: builtins.str
+    """ErrorReport serialised as JSON"""
+    created_at: builtins.float
+    """Unix timestamp the report was written"""
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+        error_report_json: builtins.str = ...,
+        created_at: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "error_report_json", b"error_report_json", "op_uuid", b"op_uuid"]) -> None: ...
+
+global___SetClusterOperationErrorRequest = SetClusterOperationErrorRequest
+
+@typing.final
+class GetClusterOperationErrorRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    """Operation UUID as string"""
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["op_uuid", b"op_uuid"]) -> None: ...
+
+global___GetClusterOperationErrorRequest = GetClusterOperationErrorRequest
+
+@typing.final
+class GetClusterOperationErrorReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: builtins.int
+    ERROR_REPORT_JSON_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    error_report_json: builtins.str
+    """ErrorReport serialised as JSON"""
+    def __init__(
+        self,
+        *,
+        found: builtins.bool = ...,
+        error_report_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error_report_json", b"error_report_json", "found", b"found"]) -> None: ...
+
+global___GetClusterOperationErrorReply = GetClusterOperationErrorReply
+
+@typing.final
+class DeleteClusterOperationErrorRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OP_UUID_FIELD_NUMBER: builtins.int
+    op_uuid: builtins.str
+    """Operation UUID as string"""
+    def __init__(
+        self,
+        *,
+        op_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["op_uuid", b"op_uuid"]) -> None: ...
+
+global___DeleteClusterOperationErrorRequest = DeleteClusterOperationErrorRequest

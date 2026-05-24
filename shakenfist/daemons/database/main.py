@@ -32,6 +32,7 @@ from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_status
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.node import Node
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
@@ -95,24 +96,31 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.DequeueRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.DequeueReply:
-        """Claim the next available job from a queue."""
+        """Claim up to ``request.limit`` jobs across ``request.queue_names``.
+
+        Queue order in the request is the caller's priority order
+        (index 0 = top priority); the MariaDB query honours it via
+        ``FIELD()``. Items are returned in the same order.
+        """
         try:
             self.monitor.counters['dequeue'].inc()
-            result = mariadb._direct_work_queue_dequeue(
-                request.queue_name, config.NODE_NAME)
-            if result is None:
-                return database_pb2.DequeueReply(
-                    found=False, job_name='', work_item='')
-            job_name, workitem = result
+            results = mariadb._direct_work_queue_dequeue_batch(
+                list(request.queue_names),
+                config.NODE_NAME,
+                request.limit)
             return database_pb2.DequeueReply(
-                found=True,
-                job_name=job_name,
-                work_item=util_json.json_dump(workitem)
+                items=[
+                    database_pb2.DequeuedItem(
+                        queue_name=queue_name,
+                        job_name=job_name,
+                        work_item=util_json.json_dump(workitem),
+                    )
+                    for queue_name, job_name, workitem in results
+                ]
             )
         except Exception as e:
             util_exceptions.ignore_exception('database Dequeue failed', e)
-            return database_pb2.DequeueReply(
-                found=False, job_name='', work_item='')
+            return database_pb2.DequeueReply(items=[])
 
     def Resolve(
         self,
@@ -228,6 +236,60 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteWorkQueueRow failed', e)
             return database_pb2.StatusReply(
                 success=False, error=str(e))
+
+    def FindExistingCoalescibleOp(
+        self,
+        request: database_pb2.FindExistingCoalescibleOpRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindExistingCoalescibleOpReply:
+        """Read-only enqueue-side dedup lookup.
+
+        Returns the uuid of an existing pending coalescible op on
+        the same target, or an empty string when there's no match.
+        See ``mariadb._direct_find_existing_coalescible_op``.
+        """
+        try:
+            self.monitor.counters['find_existing_coalescible_op'].inc()
+            uuid = mariadb._direct_find_existing_coalescible_op(
+                request.operation_type,
+                request.target_column,
+                request.target_uuid,
+                request.task_name)
+            return database_pb2.FindExistingCoalescibleOpReply(
+                op_uuid=uuid or '')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindExistingCoalescibleOp failed', e)
+            return database_pb2.FindExistingCoalescibleOpReply(op_uuid='')
+
+    def ClaimCoalescibleSiblings(
+        self,
+        request: database_pb2.ClaimCoalescibleSiblingsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ClaimCoalescibleSiblingsReply:
+        """Fold sibling pending coalescible ops.
+
+        Transitions every matching sibling's ``object_states`` row
+        to ``complete`` in a single statement and returns the
+        affected uuids. See
+        ``mariadb._direct_claim_coalescible_siblings`` for the
+        safety guards.
+        """
+        try:
+            self.monitor.counters['claim_coalescible_siblings'].inc()
+            folded = mariadb._direct_claim_coalescible_siblings(
+                request.operation_type,
+                request.target_column,
+                request.target_uuid,
+                list(request.task_names),
+                request.exclude_op_uuid)
+            return database_pb2.ClaimCoalescibleSiblingsReply(
+                folded_op_uuids=folded)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ClaimCoalescibleSiblings failed', e)
+            return database_pb2.ClaimCoalescibleSiblingsReply(
+                folded_op_uuids=[])
 
     # Lock Operations
 
@@ -4297,6 +4359,45 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.HasPendingClusterOperationTargetReply(
                 pending=True)
 
+    def GetRecentTerminalOpStatesForTarget(
+        self,
+        request: database_pb2.GetRecentTerminalOpStatesForTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetRecentTerminalOpStatesForTargetReply:
+        """Return recent terminal op states for an object."""
+        try:
+            self.monitor.counters[
+                'get_recent_terminal_op_states_for_target'].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                return database_pb2.GetRecentTerminalOpStatesForTargetReply(
+                    entries=[])
+            op_type = request.op_type if request.op_type else None
+            rows = (
+                mariadb
+                ._direct_get_recent_terminal_op_states_for_target(
+                    target_object_type,
+                    request.target_uuid,
+                    request.limit,
+                    op_type))
+            return database_pb2.GetRecentTerminalOpStatesForTargetReply(
+                entries=[
+                    database_pb2.TerminalOpState(
+                        op_uuid=op_uuid,
+                        state_value=state_value,
+                        update_time=update_time)
+                    for op_uuid, state_value, update_time in rows
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetRecentTerminalOpStatesForTarget'
+                ' failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetRecentTerminalOpStatesForTargetReply(
+                entries=[])
+
     def DeleteClusterOperationTarget(
         self,
         request: database_pb2.DeleteClusterOperationTargetRequest,
@@ -4544,6 +4645,38 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetClusterOperationsByNodeReply(
                 items=[])
 
+    def ListClusterOperationsForTarget(
+        self,
+        request: database_pb2.ListClusterOperationsForTargetRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ListClusterOperationsForTargetReply:
+        """List cluster operation headers targeting an object, newest first."""
+        try:
+            self.monitor.counters[
+                'list_cluster_operations_for_target'].inc()
+            target_object_type = ObjectType.from_proto_id(
+                request.target_object_type)
+            if target_object_type is None:
+                return database_pb2.ListClusterOperationsForTargetReply(
+                    items=[])
+            items = (
+                mariadb
+                ._direct_list_cluster_operations_for_target(
+                    target_object_type,
+                    request.target_uuid))
+            return database_pb2.ListClusterOperationsForTargetReply(
+                items=[
+                    self._cluster_operation_to_proto(d)
+                    for d in items
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ListClusterOperationsForTarget failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.ListClusterOperationsForTargetReply(
+                items=[])
+
     def DeleteClusterOperation(
         self,
         request: database_pb2.DeleteClusterOperationRequest,
@@ -4598,6 +4731,72 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateAndEnqueueClusterOperation failed',
                 e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def SetClusterOperationError(
+        self,
+        request: database_pb2.SetClusterOperationErrorRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Persist an ErrorReport for a failed cluster operation."""
+        try:
+            self.monitor.counters['set_cluster_operation_error'].inc()
+            report = ErrorReport.model_validate(
+                json.loads(request.error_report_json))
+            success = mariadb._direct_set_cluster_operation_error(
+                UUID(request.op_uuid),
+                report,
+                request.created_at,
+            )
+            return database_pb2.StatusReply(
+                success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database SetClusterOperationError failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetClusterOperationError(
+        self,
+        request: database_pb2.GetClusterOperationErrorRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterOperationErrorReply:
+        """Read the ErrorReport for a cluster operation."""
+        try:
+            self.monitor.counters['get_cluster_operation_error'].inc()
+            report = mariadb._direct_get_cluster_operation_error(
+                UUID(request.op_uuid))
+            if report is None:
+                return database_pb2.GetClusterOperationErrorReply(
+                    found=False)
+            return database_pb2.GetClusterOperationErrorReply(
+                found=True,
+                error_report_json=json.dumps(
+                    report.model_dump(mode='json')),
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterOperationError failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetClusterOperationErrorReply(
+                found=False)
+
+    def DeleteClusterOperationError(
+        self,
+        request: database_pb2.DeleteClusterOperationErrorRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete the ErrorReport row for a cluster operation."""
+        try:
+            self.monitor.counters['delete_cluster_operation_error'].inc()
+            success = mariadb._direct_delete_cluster_operation_error(
+                UUID(request.op_uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteClusterOperationError failed', e)
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
@@ -4686,6 +4885,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'enqueue', 'dequeue', 'resolve', 'get_queue_length',
             'restart_queue', 'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
+            'claim_coalescible_siblings',
+            'find_existing_coalescible_op',
             'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',
@@ -4800,13 +5001,20 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_cluster_operation_targets_for_object',
             'get_latest_cluster_operation_target',
             'has_pending_cluster_operation_target',
+            'get_recent_terminal_op_states_for_target',
             'delete_cluster_operation_target',
             'delete_cluster_operation_targets_for_object',
             'delete_stale_cluster_operation_targets',
             # MariaDB cluster operation operations
             'create_cluster_operation', 'get_cluster_operation',
-            'get_cluster_operations_by_node', 'delete_cluster_operation',
+            'get_cluster_operations_by_node',
+            'list_cluster_operations_for_target',
+            'delete_cluster_operation',
             'create_and_enqueue_cluster_operation',
+            # MariaDB cluster operation error operations
+            'set_cluster_operation_error',
+            'get_cluster_operation_error',
+            'delete_cluster_operation_error',
             # MariaDB find (filter-pushdown) operations
             'find_artifacts', 'find_instances', 'find_networks',
             'find_network_interfaces',

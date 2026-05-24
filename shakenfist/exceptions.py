@@ -11,6 +11,18 @@ class NoNetworkNode(Exception):
     ...
 
 
+class NotOnNetworkNode(Exception):
+    """A network-node-only ``_apply_*`` method was invoked on a host that
+    is not the elected network node. The cluster-wide effect of these
+    methods (dnsmasq config, NAT/floating-IP rules, network-namespace
+    state) only lives on the network node, so calling them elsewhere
+    silently does nothing -- which used to manifest as DNS lookups
+    missing entries and floating IPs not appearing, with no error.
+    Raising at the call site instead surfaces the bug immediately.
+    """
+    ...
+
+
 # Objects
 class ObjectException(Exception):
     ...
@@ -391,6 +403,25 @@ class HashFailed(Exception):
 
 class ListingInterfaceAddressesFailed(Exception):
     ...
+
+
+class OperationTimeout(Exception):
+    """Raised when a cluster operation does not reach a terminal state
+    within the requested timeout."""
+    ...
+
+
+class NetworkOperationFailed(Exception):
+    """Raised by ``op.raise_for_error()`` when a cluster operation
+    reached ``STATE_ERROR``. Carries the persisted ``ErrorReport`` as
+    an attribute so callers can branch on its stable ``code`` field."""
+
+    def __init__(self, error_report):
+        super().__init__()
+        self.error_report = error_report
+
+    def __str__(self):
+        return f'{self.error_report.code}: {self.error_report.message}'
 
 
 class ProcessExecutionError(Exception):

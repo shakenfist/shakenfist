@@ -1003,9 +1003,15 @@ class InstanceInterfacesEndpoint(api_base.Resource):
         # rows written automatically by enqueue_cluster_operation() mark both
         # the network and the instance as "operation in flight" so the network
         # maintainer's Network.is_okay() check defers its own recreate path.
-        dnsmasq_op_type, dnsmasq_op_uuid = net_create_and_enqueue(
+        #
+        # Phase 6 of `PLAN-network-facade.md` retired the misleadingly-
+        # named `network_update_dnsmasq` composite task; the explicit task
+        # list preserves the broader reconciliation (create on network
+        # node, then ensure mesh) that this caller has always wanted.
+        reconcile_op_type, reconcile_op_uuid = net_create_and_enqueue(
             netdesc['network_uuid'],
-            [net_tasks.network_update_dnsmasq],
+            [net_tasks.network_apply_create_network_node,
+             net_tasks.network_ensure_mesh],
             priority=PRIORITY.user_waiting
         )
 
@@ -1018,7 +1024,8 @@ class InstanceInterfacesEndpoint(api_base.Resource):
             PRIORITY.user_waiting,
             request_id=util_general.get_request_id(),
             depends_on=[
-                dependency(op_type=dnsmasq_op_type, op_uuid=dnsmasq_op_uuid)
+                dependency(op_type=reconcile_op_type,
+                           op_uuid=reconcile_op_uuid)
             ],
             runs_after=[instance_from_db.last_cluster_operation])
         # The NetworkInterface row created above is the source of truth

@@ -1,3 +1,4 @@
+# Copyright 2019 Michael Still and contributors
 from enum import Enum
 from typing import ClassVar, Optional
 from uuid import uuid4
@@ -9,6 +10,7 @@ from pydantic import UUID4
 from pydantic import ValidationError
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import _convert_deps
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -21,7 +23,7 @@ LOG, HANDLER = logs.setup(__name__)
 
 object_type = ObjectType.NET_OP
 initial_version = 1
-current_version = 1
+current_version = 2
 
 
 class model_tasks(Enum):
@@ -30,6 +32,45 @@ class model_tasks(Enum):
     network_update_dnsmasq = 3
     network_remove_dnsmasq = 4
     network_remove_nat = 5
+    network_ensure_mesh = 6
+    network_add_floating_ip = 7
+    network_remove_floating_ip = 8
+    network_apply_update_dnsmasq = 9
+    network_apply_remove_dnsmasq = 10
+    network_apply_create_network_node = 11
+    network_apply_delete_network_node = 12
+
+
+# Tasks for which N pending ops on the same network can be folded
+# into a single execution by the worker (step 4) or skipped at
+# enqueue time (step 5):
+#
+# * ``network_apply_update_dnsmasq`` regenerates the dnsmasq config
+#   from current DB state. Six instance starts on the same network
+#   each enqueue one of these; the final config covers every lease
+#   regardless of how many runs landed.
+# * ``network_ensure_mesh`` diffs the FDB against the current set of
+#   participating hypervisors. Same property: the result only
+#   depends on the current snapshot.
+# * ``network_apply_create_network_node`` is idempotent network-node
+#   setup -- running it twice in a row leaves the same state as
+#   running it once.
+#
+# The remaining tasks are *not* coalescible -- they carry per-op
+# parameters (specific floating IPs, specific mac/ip lease pairs)
+# or are order-sensitive against an opposite task (remove vs
+# update / delete vs create).
+COALESCIBLE_TASKS: frozenset[model_tasks] = frozenset({
+    model_tasks.network_apply_update_dnsmasq,
+    model_tasks.network_ensure_mesh,
+    model_tasks.network_apply_create_network_node,
+})
+
+# Indexed column on the ``cluster_operations`` table used by both the
+# enqueue-side dedup lookup (this module) and the worker-side fold
+# (``BaseClusterOperation.coalescible_target_column``) to identify
+# "same target". For NetOp every op is scoped to exactly one network.
+COALESCIBLE_TARGET_COLUMN: str = 'network_uuid'
 
 
 class model(BaseModel):
@@ -39,6 +80,8 @@ class model(BaseModel):
 
     uuid: UUID4
     network_uuid: UUID4
+    floating_address: Optional[str] = None
+    inner_address: Optional[str] = None
     priority: PRIORITY
     request_id: Optional[str]
     tasks: list[model_tasks]
@@ -56,7 +99,37 @@ class model(BaseModel):
 
 
 def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
-                       depends_on=None, runs_after=None):
+                       depends_on=None, runs_after=None,
+                       target='networknode', family='clusteroperation',
+                       floating_address=None, inner_address=None):
+    # Enqueue-side dedup: if this enqueue is a single coalescible task
+    # on a network that already has an equivalent pending op in the
+    # queue, return that op's uuid instead of inserting a duplicate.
+    # All callers' ``raise_for_error`` waits then block on the same
+    # op and the worker runs it once. ``depends_on`` and
+    # ``runs_after`` are skipped here -- an op with dependencies is
+    # intentionally distinct from a bare reconciliation enqueue, and
+    # collapsing them would erase the ordering constraint the caller
+    # encoded. See ``BaseClusterOperation.execute``'s cross-op fold
+    # (worker-side dedup, step 4) for the safety net that catches the
+    # race where two callers both miss the lookup.
+    if (len(tasks) == 1
+            and tasks[0] in COALESCIBLE_TASKS
+            and depends_on is None
+            and runs_after is None):
+        existing_uuid = mariadb.find_existing_coalescible_op(
+            operation_type=object_type.name.lower(),
+            target_column=COALESCIBLE_TARGET_COLUMN,
+            target_uuid=str(network_uuid),
+            task_name=tasks[0].name)
+        if existing_uuid is not None:
+            LOG.with_fields({
+                'existing_op_uuid': existing_uuid,
+                'network_uuid': network_uuid,
+                'task': tasks[0].name,
+            }).info('Enqueue-side dedup: reusing existing pending op')
+            return object_type, existing_uuid
+
     operation_uuid = str(uuid4())
 
     try:
@@ -64,6 +137,8 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         m = model(
             uuid=operation_uuid,
             network_uuid=network_uuid,
+            floating_address=floating_address,
+            inner_address=inner_address,
             priority=priority,
             request_id=request_id,
             tasks=tasks,
@@ -75,6 +150,8 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         LOG.with_fields({
             'uuid': operation_uuid,
             'network_uuid': network_uuid,
+            'floating_address': floating_address,
+            'inner_address': inner_address,
             'priority': priority,
             'request_id': request_id,
             'tasks': tasks,
@@ -85,6 +162,6 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         raise exc
 
     enqueue_cluster_operation(
-        object_type, m.model_dump(mode='json'), target='networknode',
-        model_class=model)
+        object_type, m.model_dump(mode='json'), target=target,
+        family=family, model_class=model)
     return object_type, operation_uuid

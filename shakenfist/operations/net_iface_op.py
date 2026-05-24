@@ -1,10 +1,16 @@
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import FLOATING_NETWORK_UUID
+from shakenfist.eventlog import add_event_multi
 from shakenfist.schema.operations import net_iface_op as schema
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.util import exceptions as util_exceptions
 
 
@@ -104,6 +110,8 @@ class NetIfaceOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(n, ni)
         except Exception as e:
             util_exceptions.ignore_exception('net_iface_op', e)
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetIfaceOp.STATE_ERROR
 
     def _interface_float(self, n, ni):
@@ -116,4 +124,13 @@ class NetIfaceOp(BaseClusterOperation):
                 'Not floating an interface with no floating address')
             raise NoAllocatedFloatingAddress(self)
 
-        n.add_floating_ip(floating, ni.ipv4, [self, n, ni])
+        # Multi-target audit event preserves the correlation that today's
+        # Network.add_floating_ip(... affected_objects=[self, n, ni]) emits.
+        # The floating-network metadata object is added so the floating-IP
+        # ledger sees the assignment too.
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [self, n, ni, ('network', FLOATING_NETWORK_UUID)],
+            'add floating IP',
+            extra={'floating': floating, 'inner': ni.ipv4})
+        BridgedVXLanNetwork(n)._apply_add_floating_ip(floating, ni.ipv4)
