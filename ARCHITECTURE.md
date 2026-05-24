@@ -187,6 +187,68 @@ Reaper activity is exported on
 `cluster_op_reaper_rejected_total`, scraped from
 `CLUSTER_METRICS_PORT` on the cluster daemon.
 
+#### Batched, Priority-Aware Dequeue
+
+`sf-net` and the `sf-queues` worker pool both call a single
+`mariadb.dequeue_work_items(queue_names, limit)` primitive. The
+caller passes the queue names in priority order (index 0 = top
+priority); MariaDB honours that order via
+`ORDER BY FIELD(queue_name, ...), scheduled_at` so one SELECT
+returns the most important eligible work first across an arbitrary
+number of queues. The previous one-RPC-per-queue polling loop is
+replaced by one RPC per iteration regardless of how many priority
+lanes the worker drains.
+
+Lower-priority rows only spill in when the higher-priority queues
+yield fewer rows than `limit`, so sustained heavy load on
+`user_facing` can still crowd `background` out -- explicit fairness
+(bounded staleness or reserved-slot) is intentionally deferred to a
+follow-up step. Worker crash recovery is unchanged: any claimed-
+but-not-yet-executed rows that the worker doesn't run are picked up
+by the stuck-row reaper described above.
+
+#### Coalescible Operations
+
+Some operation tasks are idempotent reconciliation work whose effect
+depends only on current DB state, not on the count of pending ops
+asking for it. The canonical example is
+`network_apply_update_dnsmasq`: six instance starts on the same
+network each enqueue one, but the resulting dnsmasq config covers
+every lease no matter whether the worker ran it once or six times.
+
+Op classes that have such tasks declare them on the class:
+
+```python
+class NetOp(BaseClusterOperation):
+    coalescible_tasks = schema.COALESCIBLE_TASKS
+    coalescible_target_column = 'network_uuid'
+```
+
+`coalescible_target_column` names the indexed column on
+`cluster_operations` used to group sibling ops. The fold runs at
+two layers, both controlled by this metadata:
+
+* **Enqueue-side dedup**
+  (`mariadb.find_existing_coalescible_op`): `create_and_enqueue`
+  in the schema module checks for an existing pending single-task
+  coalescible op on the same target before inserting a new row. If
+  found, the new caller's `op_uuid` is the existing op's `op_uuid`.
+  All `raise_for_error` waiters then block on the same op and the
+  worker runs it once.
+
+* **Worker-side fold**
+  (`mariadb.claim_coalescible_siblings`): inside
+  `BaseClusterOperation.execute`, the survivor atomically
+  transitions every other pending coalescible op on the same target
+  to `STATE_COMPLETE` in one SQL statement. When the dispatcher
+  surfaces a folded sibling's `work_queue` row, the terminal-state
+  branch drops it cleanly. A `'coalesced sibling ops'` audit event
+  on the survivor records the folded uuids.
+
+The enqueue-side dedup is the cheaper of the two -- the row never
+gets inserted -- but the worker-side fold is the safety net for the
+race where two concurrent callers both lose the lookup.
+
 ### Protocol Buffers and gRPC
 
 The gRPC interface is defined in `protos/*.proto` files. Generated Python code
