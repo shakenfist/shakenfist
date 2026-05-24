@@ -1,0 +1,50 @@
+# Shaken Fist MariaDB tuning. Sits in /etc/mysql/mariadb.conf.d/ where it
+# is loaded after Debian's 50-server.cnf, so values here override
+# distribution defaults without editing the packaged file.
+#
+# All five tunables below address bottlenecks observed in CI:
+# pre-tuning, sf-database's 20-thread gRPC pool starved on slow MariaDB
+# queries and emitted ~6 GOAWAY ping_timeout events per minute under
+# functional-test load. Profiling traced this to the buffer pool
+# spilling to disk (~168 MB mariadbd RSS, 128 MB default pool).
+#
+# Tunables are conservative enough to suit Mikal's home production
+# cluster, a development laptop, and the nested-virt CI hardware
+# without further per-environment tweaks. Operators running on
+# considerably larger or smaller hardware should override these in a
+# higher-numbered drop file in the same directory.
+
+[mysqld]
+
+# 1 GiB buffer pool keeps the working set in memory for our write
+# volume (cluster_operations, object_states, work_queue, eventlog
+# fan-out). Debian's 128 MiB default forces the buffer pool to spill
+# under our typical 20-30 ops/sec write rate, which we observed as
+# per-query latency growing from ~5 ms to ~200-400 ms under burst
+# load.
+innodb_buffer_pool_size = 1G
+
+# 256 MiB redo log absorbs write bursts without forcing a checkpoint
+# stall every few seconds. Debian's default is 96 MiB. Two log files
+# at 256 MiB each gives 512 MiB of redo headroom.
+innodb_log_file_size = 256M
+
+# 500 concurrent connections. Shaken Fist's typical deployment runs
+# sf-database (20 gRPC threads, each with its own SQLAlchemy engine
+# pool) plus a small number of direct callers (sf-cleaner sweeps,
+# sf-cluster maintenance). With Debian's max_connections=151 we have
+# been close to the ceiling at peak; 500 gives unambiguous headroom
+# without significantly affecting RAM footprint (each connection
+# allocates ~256 KiB of per-thread buffers).
+max_connections = 500
+
+# Slow query log: anything >100 ms is captured to a dedicated file
+# for forensic analysis. The threshold is deliberately well below the
+# 200-400 ms tail we observed under load so we can see precursors,
+# not just the worst cases. ``log_slow_verbosity`` includes the query
+# plan so we have enough context to act on a finding without a
+# follow-up reproduction.
+slow_query_log = ON
+long_query_time = 0.1
+slow_query_log_file = /var/log/mysql/mariadb-slow.log
+log_slow_verbosity = query_plan,explain

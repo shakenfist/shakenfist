@@ -39,3 +39,16 @@
     regexp: '^bind-address'
     line: 'bind-address = {{ node_mesh_ip }}'
   notify: Restart MariaDB
+
+- name: Install Shaken Fist MariaDB tuning drop file
+  # Sits in mariadb.conf.d/ where it loads after the packaged
+  # 50-server.cnf (alphabetical order), overriding distribution
+  # defaults without editing the packaged file. See the comment
+  # block in 90-shakenfist-tuning.cnf for the per-tunable rationale.
+  copy:
+    src: 90-shakenfist-tuning.cnf
+    dest: /etc/mysql/mariadb.conf.d/90-shakenfist-tuning.cnf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart MariaDB
