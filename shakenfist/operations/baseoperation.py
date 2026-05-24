@@ -477,7 +477,7 @@ def poll_until_terminal(
     state written by the worker. The terminal state set is
     ``{STATE_COMPLETE, STATE_ABORT, STATE_DELETED, STATE_ERROR}``.
 
-    ``timeout`` defaults to ``config.API_ASYNC_WAIT`` (15 seconds) when
+    ``timeout`` defaults to ``config.API_ASYNC_WAIT`` (60 seconds) when
     ``None`` is passed; callers can override for long-running ops.
     Raises :class:`OperationTimeout` if the deadline elapses without
     observing a terminal state.
