@@ -111,6 +111,7 @@ class ClusterOperationEndpoint(api_base.Resource):
             ('operation_uuid', 'query', 'uuid', 'The UUID of the operation.', True)
         ],
         [(200, 'Information about a single cluster operation.', clusteroperation_get_example),
+         (403, 'Operation belongs to a namespace the caller cannot see.', None),
          (404, 'Operation not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
@@ -120,6 +121,32 @@ class ClusterOperationEndpoint(api_base.Resource):
         op = get_object_class(operation_type).from_db(operation_uuid)
         if not op:
             return sf_api.error(404, 'operation not found')
+
+        # Namespace gate: without this, any authenticated caller who
+        # can guess (or enumerate) an op uuid gets back its
+        # operation_type / state / tasks. The leak is small (no
+        # payload) but it lets a tenant probe cross-namespace
+        # activity and confirm op uuids surfaced in error messages.
+        # Mirrors the gate in ``ClusterOperationChainEndpoint.get``
+        # below; we fail closed (403) for non-admins when the op has
+        # no recorded target, since cluster-scoped ancestors should
+        # not be exposed without proof of ownership.
+        caller_namespace = request_namespace()
+        if caller_namespace != 'system':
+            target = mariadb.get_cluster_operation_target(operation_uuid)
+            if target is None:
+                return sf_api.error(
+                    403,
+                    'cluster operation has no recorded target; '
+                    'namespace cannot be verified')
+            target_namespace = _namespace_for_target(
+                target.target_object_type, target.target_uuid)
+            if (target_namespace is not None and
+                    target_namespace != caller_namespace):
+                return sf_api.error(
+                    403,
+                    'cluster operation belongs to a foreign namespace')
+
         return op.external_view()
 
 
