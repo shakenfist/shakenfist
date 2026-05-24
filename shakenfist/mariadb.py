@@ -321,13 +321,29 @@ def _get_engine() -> sa.Engine:
 
     We use thread-local engines to avoid connection sharing issues across
     threads. Each thread gets its own engine with its own connection pool.
+
+    Notes on the engine configuration:
+
+    * ``pool_recycle=1800`` recycles connections after 30 minutes. The
+      MariaDB server-side ``wait_timeout`` default is 28800 s (8 h),
+      so this is well below the server-side disconnect threshold but
+      short enough that connections idle through an apt upgrade /
+      restart-mariadb pair will not surface as a stale-handle error
+      on next use.
+    * No ``pool_pre_ping=True``. We previously paid a ``SELECT 1``
+      round-trip on every checkout, which under bursty load measured
+      at ~50-100 ms each -- material when the rest of the query is
+      a sub-millisecond indexed lookup. The combination of a tight
+      ``pool_recycle`` (above) plus SQLAlchemy's existing built-in
+      ``OperationalError`` -> invalidate-and-retry behaviour on the
+      first failed query post-disconnect gives us equivalent
+      robustness without the per-query overhead.
     """
     if not hasattr(_local, 'engine') or _local.engine is None:
         url = _get_connection_url()
         _local.engine = sa.create_engine(
             url,
-            pool_pre_ping=True,  # Verify connections before use
-            pool_recycle=3600,   # Recycle connections after 1 hour
+            pool_recycle=1800,   # Recycle connections after 30 minutes
             echo=False           # Set True for SQL debugging
         )
         LOG.debug('Created new MariaDB engine for thread')
