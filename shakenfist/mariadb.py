@@ -19876,6 +19876,14 @@ def enqueue_event_dlq(
     Routes to the database microservice or direct MariaDB depending
     on _use_database_service().
     """
+    # Coerce UUID (and other non-default-JSON) values via the
+    # UUID-aware encoder so both the gRPC path's ``json.dumps`` and
+    # the direct path's SQLAlchemy JSON column can serialise the
+    # payload. The eventlog DLQ inherits raw ``extra`` dicts from
+    # callers that may carry uuid.UUID objects (e.g. the network
+    # description echoed by InstancesEndpoint.post), and the default
+    # JSON encoder refuses them.
+    event_json = json.loads(_json_dumps(event_json))
     if _use_database_service():
         _grpc_enqueue_event_dlq(
             object_type, object_uuid, event_timestamp, event_json)

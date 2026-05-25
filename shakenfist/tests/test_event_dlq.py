@@ -152,3 +152,37 @@ class DirectDeleteEventDlqTestCase(base.ShakenFistTestCase):
 
         result = mariadb._direct_delete_event_dlq([1, 2])
         self.assertEqual(result, 0)
+
+
+class PublicEnqueueEventDlqTestCase(base.ShakenFistTestCase):
+    """Tests for the public enqueue_event_dlq UUID coercion."""
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_enqueue_event_dlq')
+    def test_coerces_uuid_objects_in_event_payload(
+            self, mock_direct, mock_use_service):
+        # The eventlog DLQ path passes ``extra`` dicts through
+        # verbatim, and callers (e.g. InstancesEndpoint.post echoing
+        # the request body) can legitimately include uuid.UUID
+        # objects. Both the gRPC and direct paths down-stream rely
+        # on the default JSON encoder, which refuses UUIDs -- the
+        # public enqueue_event_dlq must normalise them so neither
+        # path explodes.
+        import uuid
+        mock_use_service.return_value = False
+
+        event_uuid = uuid.uuid4()
+        payload = {
+            'message': 'requested networking configuration',
+            'extra': {
+                'networks': [{'network_uuid': event_uuid}],
+            },
+        }
+        mariadb.enqueue_event_dlq(
+            'instance', 'uuid-1', 1234567890.0, payload)
+
+        mock_direct.assert_called_once()
+        _, _, _, sanitised = mock_direct.call_args[0]
+        self.assertEqual(
+            sanitised['extra']['networks'][0]['network_uuid'],
+            str(event_uuid))
