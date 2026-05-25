@@ -331,7 +331,30 @@ class BaseClusterOperation(BaseOperation):
         # as "we don't know, be conservative" and the fold runs.
         skip_due_to_empty_queue = self.dispatcher_batch_size == 1
 
-        if coalescible and target_column and not skip_due_to_empty_queue:
+        # Skip the cross-op fold for per-node queues. The fold query keys
+        # on (op_type, target_uuid, task) -- which collapses to "the
+        # same network" for NetOp -- and would otherwise mark a sibling
+        # op on a *different* node's queue as complete, leaving that
+        # node's apply work undone. This is the bug that broke
+        # ``test_single_virtual_networks_work`` on the network-facade
+        # branch: with ``Network.ensure_mesh`` fanned out to every
+        # participating hypervisor, hypervisor A's worker would
+        # otherwise fold hypervisor B's pending ensure_mesh and B's
+        # FDB would never get updated.
+        #
+        # The cluster-wide ``networknode-*`` queues are safe because a
+        # single elected worker drains them, so any sibling found is
+        # one this same worker will eventually process. The intra-node
+        # case (multiple sources enqueueing the same op onto the same
+        # per-node queue) loses the fold's optimisation but is rare
+        # enough that the duplicate executions don't matter at the
+        # measured single-digit-percent rate.
+        queue_is_cluster_wide = (
+            self.queue_name is not None
+            and self.queue_name.startswith('networknode-'))
+
+        if (coalescible and target_column and not skip_due_to_empty_queue
+                and queue_is_cluster_wide):
             survivor_coalescible_tasks = [
                 t for t in unique_tasks if t in coalescible]
             target_uuid_attr = getattr(self, target_column, None)

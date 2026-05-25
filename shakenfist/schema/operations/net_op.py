@@ -113,8 +113,29 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
     # encoded. See ``BaseClusterOperation.execute``'s cross-op fold
     # (worker-side dedup, step 4) for the safety net that catches the
     # race where two callers both miss the lookup.
+    #
+    # The dedup query keys on (op_type, network_uuid, task) but NOT on
+    # the queue ``target``. That's only safe when the op is destined
+    # for the cluster-wide network-node queue (``target='networknode'``)
+    # -- there's exactly one consumer of that queue, so two enqueues
+    # for the same network are genuinely the same work and folding
+    # them is correct. Per-node-targeted enqueues (``target=<node_uuid>``,
+    # which is how ``Network.ensure_mesh`` reaches each participating
+    # hypervisor) MUST NOT be deduped across nodes: a mesh op for the
+    # same network on hypervisor A does completely different work
+    # (updates A's local FDB) than one on hypervisor B (updates B's).
+    # Folding them by network would route both callers at the
+    # first-arriving op, which then never runs on the other host and
+    # leaves the second host's FDB stale -- exactly the bug that broke
+    # ``test_single_virtual_networks_work`` on the network-facade
+    # branch. The intra-node case (multiple instance starts on the
+    # same hypervisor enqueueing ensure_mesh on the same per-node
+    # queue) still coalesces via the worker-side fold inside
+    # ``BaseClusterOperation.execute``; we only lose the cheaper
+    # enqueue-side optimisation in that case.
     if (len(tasks) == 1
             and tasks[0] in COALESCIBLE_TASKS
+            and target == 'networknode'
             and depends_on is None
             and runs_after is None):
         existing_uuid = mariadb.find_existing_coalescible_op(

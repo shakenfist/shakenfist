@@ -188,11 +188,19 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.mock_claim.return_value = []
         self.addCleanup(self.claim_patcher.stop)
 
-    def _make_net_op(self, task_names):
+    def _make_net_op(self, task_names, queue_name=None):
         op = NetOp(_make_net_op_static_values(task_names))
         # ``dispatch_task`` is wired by the concrete op; patch it so
         # we observe which tasks would actually run.
         op.dispatch_task = mock.MagicMock()
+        # The cross-op fold only runs when the op was dequeued from a
+        # cluster-wide ``networknode-*`` queue. Default the tests to
+        # one of those so the legacy assertions still exercise the
+        # fold; tests that want to exercise the skip path pass an
+        # explicit per-node ``queue_name``.
+        if queue_name is None:
+            queue_name = 'networknode-clusteroperation-user_facing'
+        op.queue_name = queue_name
         return op
 
     def test_within_job_drops_duplicate_coalescible_tasks(self):
@@ -286,3 +294,33 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.execute()
 
         self.mock_claim.assert_called_once()
+
+    def test_no_coalescing_call_when_queue_is_per_node(self):
+        # Per-node queues (``<node_uuid>-network-*`` and
+        # ``<node_uuid>-clusteroperation-*``) MUST NOT fold across
+        # sibling ops, because the fold query keys on
+        # (op_type, target_uuid, task) and a sibling on a different
+        # node's queue is doing different work (e.g. mesh apply on
+        # hypervisor B vs hypervisor A). Folding would mark B's op
+        # complete without ever running it. See the comment in
+        # ``BaseClusterOperation.execute`` for the full story.
+        op = self._make_net_op(
+            ['network_apply_update_dnsmasq'],
+            queue_name=(
+                '11111111-1111-4111-8111-111111111111'
+                '-network-user_facing'))
+        op.execute()
+
+        self.mock_claim.assert_not_called()
+
+    def test_no_coalescing_call_when_queue_name_unset(self):
+        # An op loaded outside the dispatch path (e.g. by a unit test
+        # that doesn't set ``queue_name``) has ``None`` for the queue
+        # and we can't tell whether the fold would be safe. The
+        # conservative choice is to skip it -- the fold is a cost
+        # optimisation, not a correctness requirement.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.queue_name = None
+        op.execute()
+
+        self.mock_claim.assert_not_called()
