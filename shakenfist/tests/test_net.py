@@ -429,6 +429,139 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         self.assertIsNone(result)
         self.mock_ensure_vxlan_mesh.assert_not_called()
 
+    def test_ensure_mesh_fans_out_to_every_participating_node(self):
+        # Set up a network with three network-interfaces backed by
+        # three instances placed across three distinct hypervisors
+        # (one of which is the local node). The fan-out must enqueue
+        # one ensure_mesh op per node, each on that node's per-node
+        # ``network`` queue. This is the bug fix for the asymmetric
+        # mesh that broke ``test_single_virtual_networks_work``:
+        # ensure_mesh used to only enqueue on the caller's node, so
+        # other hypervisors never re-meshed.
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'meshnet', network_uuid,
+            provide_dhcp=True, provide_nat=False)
+        n = network.Network.from_db(network_uuid)
+
+        # Build three fake interfaces, each pointing at a different
+        # instance, and three fake instances each placed on a
+        # different node (the local node plus two remotes). We mock
+        # the property and the lookups rather than driving the
+        # MockEtcd state machine through full instance / placement
+        # flows -- the fan-out logic itself is what's under test.
+        remote_a_uuid = '99999999-9999-4999-8999-aaaaaaaaaaaa'
+        remote_b_uuid = '88888888-8888-4888-8888-bbbbbbbbbbbb'
+
+        def _fake_ni(instance_uuid):
+            ni = mock.MagicMock()
+            ni.instance_uuid = instance_uuid
+            return ni
+
+        ifaces = [
+            _fake_ni('inst-local'),
+            _fake_ni('inst-remote-a'),
+            _fake_ni('inst-remote-b'),
+            # Duplicate instance_uuid in the iface list must not
+            # produce a duplicate enqueue.
+            _fake_ni('inst-remote-a'),
+        ]
+
+        def _fake_instance(inst_uuid):
+            placement_by_uuid = {
+                'inst-local': {'node': 'node-local.fqdn'},
+                'inst-remote-a': {'node': 'node-a.fqdn'},
+                'inst-remote-b': {'node': 'node-b.fqdn'},
+            }
+            inst = mock.MagicMock()
+            inst.placement = placement_by_uuid[inst_uuid]
+            return inst
+
+        def _fake_node(fqdn):
+            uuids_by_fqdn = {
+                'node-local.fqdn': self.NODE_UUID,
+                'node-a.fqdn': remote_a_uuid,
+                'node-b.fqdn': remote_b_uuid,
+            }
+            node = mock.MagicMock()
+            node.uuid = uuids_by_fqdn[fqdn]
+            return node
+
+        original = (
+            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+        spy = mock.MagicMock(side_effect=original)
+
+        with mock.patch.object(
+                network.Network, 'networkinterfaces',
+                new_callable=mock.PropertyMock,
+                return_value=ifaces), \
+             mock.patch(
+                'shakenfist.instance.Instance.from_db',
+                side_effect=_fake_instance), \
+             mock.patch(
+                'shakenfist.network.network.Node.from_db',
+                side_effect=_fake_node), \
+             mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.ensure_mesh()
+
+        # One enqueue per distinct participating hypervisor.
+        queue_names = [c.kwargs['queue_name'] for c in spy.call_args_list]
+        self.assertEqual(3, len(queue_names))
+        self.assertIn(
+            f'{self.NODE_UUID}-network-user_facing', queue_names)
+        self.assertIn(
+            f'{remote_a_uuid}-network-user_facing', queue_names)
+        self.assertIn(
+            f'{remote_b_uuid}-network-user_facing', queue_names)
+
+        # The returned op corresponds to the local-node enqueue so
+        # the caller's raise_for_error() still polls a meaningful
+        # state -- the local worker is the most likely participant
+        # that the caller has direct knowledge of.
+        self.assertIsInstance(op, NetOp)
+        local_call = next(
+            c for c in spy.call_args_list
+            if c.kwargs['queue_name'].startswith(self.NODE_UUID))
+        self.assertEqual(
+            local_call.kwargs['metadata']['uuid'], str(op.uuid))
+
+        # No host mutation from this code path.
+        self.mock_ensure_vxlan_mesh.assert_not_called()
+
+    def test_ensure_mesh_falls_back_to_local_when_no_participants(self):
+        # An empty network with no interfaces has no participants to
+        # fan out to. The fallback rule is: still enqueue on the
+        # local node so the caller has something to block on with
+        # raise_for_error(). This keeps the existing
+        # "ensure_mesh during network bootstrap" callers working.
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'emptynet', network_uuid,
+            provide_dhcp=True, provide_nat=False)
+        n = network.Network.from_db(network_uuid)
+
+        original = (
+            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+        spy = mock.MagicMock(side_effect=original)
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.ensure_mesh()
+
+        spy.assert_called_once()
+        self.assertEqual(
+            f'{self.NODE_UUID}-network-user_facing',
+            spy.call_args.kwargs['queue_name'])
+        self.assertIsInstance(op, NetOp)
+
 
 class NetworkFloatingIPEnqueueTestCase(NetworkTestCase):
     """Tests for the phase 3e flip of the five floating-IP / route

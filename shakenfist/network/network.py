@@ -39,6 +39,7 @@ from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.managed_executables import dnsmasq
+from shakenfist.node import Node
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import general as util_general
@@ -788,26 +789,100 @@ class Network(dbowo):
 
     @_not_on_floating_network
     def ensure_mesh(self):
-        """Enqueue a network_ensure_mesh NetOp for this network on this node.
+        """Fan an ensure-mesh NetOp out to every participating hypervisor.
 
-        Returns the enqueued NetOp instance loaded from the database.
-        Callers needing the previous synchronous-with-exception semantics
-        call ``op.raise_for_error()`` to block until the operation reaches
-        a terminal state and to re-raise on error as
-        ``NetworkOperationFailed``.
+        Every hypervisor with an interface on this network has to maintain
+        its own VXLAN FDB entries for the mesh -- the apply method
+        excludes ``self`` from the entries it writes, so a one-node run
+        leaves every *other* node's FDB stale. Enqueueing only on the
+        caller's node was the original behaviour and is the root cause
+        of the asymmetric mesh that broke
+        ``test_single_virtual_networks_work``: when an instance starts
+        on hypervisor A, only A re-meshes, and hypervisor B (which
+        already had an instance on the network) never learns the new
+        FDB entry for A.
 
-        The actual host-mutating work is performed by
-        ``BridgedVXLanNetwork._apply_ensure_mesh`` inside the net-worker
-        dispatcher; nothing in this method mutates host state any more.
+        The fan-out enumerates the set of nodes hosting any of this
+        network's interfaces (mirroring the peer-enumeration logic in
+        ``BridgedVXLanNetwork._apply_ensure_mesh``) and enqueues one
+        ensure_mesh op on each node's per-node ``network`` queue. The
+        enqueue-side dedup in ``net_op.create_and_enqueue`` is keyed on
+        ``target='networknode'`` only, so per-node enqueues are *not*
+        collapsed across nodes -- each node's worker sees its own op
+        and updates its own FDB. Worker-side coalescing on the per-node
+        queue is similarly gated off (see the ``queue_is_cluster_wide``
+        check in ``BaseClusterOperation.execute``).
+
+        Returns the local-node op when this caller's node is itself a
+        participant, so the caller's existing
+        ``raise_for_error()``/``poll_until_terminal()`` semantics keep
+        working. If the caller's node is not a participant (e.g. an
+        API-only node), returns the first remote op enqueued so the
+        caller still has *something* to block on.
         """
-        op_type, op_uuid = net_create_and_enqueue(
-            network_uuid=str(self.uuid),
-            tasks=[net_tasks.network_ensure_mesh],
-            priority=PRIORITY.user_facing,
-            target=config.NODE_UUID,
-            family='network',
-        )
-        return get_object_class(op_type).from_db(op_uuid)
+        # Enumerate participating hypervisors. The FQDN -> node UUID
+        # translation goes through the node table; instances store
+        # placement by FQDN. Late-import ``instance`` to avoid the
+        # network <-> instance circular import at module load.
+        from shakenfist import instance  # noqa: PLC0415
+
+        seen_instances: set[str] = set()
+        node_fqdns: list[str] = []
+        for ni in self.networkinterfaces:
+            if ni.instance_uuid in seen_instances:
+                continue
+            seen_instances.add(ni.instance_uuid)
+            inst = instance.Instance.from_db(ni.instance_uuid)
+            if not inst:
+                continue
+            placement = inst.placement
+            if not placement or not placement.get('node'):
+                continue
+            fqdn = placement['node']
+            if fqdn not in node_fqdns:
+                node_fqdns.append(fqdn)
+
+        # Map FQDN -> node UUID. We need the UUID because the per-node
+        # queue name is composed from it (``<node_uuid>-network-...``).
+        # Skip nodes the database doesn't know about (shouldn't happen
+        # in practice, but a stale placement on a deleted node would
+        # land here otherwise).
+        node_uuids: list[str] = []
+        local_node_uuid = config.NODE_UUID
+        for fqdn in node_fqdns:
+            n = Node.from_db(fqdn)
+            if n is None:
+                continue
+            node_uuids.append(str(n.uuid))
+
+        # If no participating hypervisors were found, still enqueue on
+        # the local node. This keeps the bootstrap case sane: an empty
+        # network with no interfaces yet should still let a caller
+        # observe an ensure_mesh op going to terminal state via
+        # raise_for_error().
+        if not node_uuids:
+            node_uuids = [local_node_uuid]
+
+        local_op_type = None
+        local_op_uuid = None
+        first_op_type = None
+        first_op_uuid = None
+        for node_uuid in node_uuids:
+            op_type, op_uuid = net_create_and_enqueue(
+                network_uuid=str(self.uuid),
+                tasks=[net_tasks.network_ensure_mesh],
+                priority=PRIORITY.user_facing,
+                target=node_uuid,
+                family='network',
+            )
+            if first_op_uuid is None:
+                first_op_type, first_op_uuid = op_type, op_uuid
+            if node_uuid == local_node_uuid:
+                local_op_type, local_op_uuid = op_type, op_uuid
+
+        if local_op_uuid is not None:
+            return get_object_class(local_op_type).from_db(local_op_uuid)
+        return get_object_class(first_op_type).from_db(first_op_uuid)
 
     def add_floating_ip(self, floating_address, inner_address, affected_objects):
         """Enqueue a network_add_floating_ip NetOp for this network.
