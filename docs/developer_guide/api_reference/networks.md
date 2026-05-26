@@ -24,8 +24,8 @@ also implemented on the network node.
 ???+ tip "REST API calls"
 
     * [POST /networks](https://openapi.shakenfist.com/#/networks/post_networks): Create a network.
-    * [DELETE /networks](https://openapi.shakenfist.com/#/networks/delete_networks): Delete all networks in a given namespace.
-    * [DELETE /networks/networks/{network_ref}](https://openapi.shakenfist.com/#/networks/delete_networks__network_ref_): Delete a specific network.
+    * [DELETE /networks](https://openapi.shakenfist.com/#/networks/delete_networks): Delete all networks in a given namespace (returns HTTP 202 with a list of `{network_uuid, op_type, op_uuid}` entries, one per network queued for deletion).
+    * [DELETE /networks/networks/{network_ref}](https://openapi.shakenfist.com/#/networks/delete_networks__network_ref_): Delete a specific network (returns HTTP 202 with an op-handle body `{op_type, op_uuid}`).
     * [GET /networks](https://openapi.shakenfist.com/#/networks/get_networks): List the networks visible to the currently authenticated namespace.
     * [GET /networks/{network_ref}](https://openapi.shakenfist.com/#/networks/get_networks__network_ref_): Get details of a single network
 
@@ -60,38 +60,40 @@ also implemented on the network node.
     ```python
     import json
     from shakenfist_client import apiclient
-    import time
 
     sf_client = apiclient.Client()
     n = sf_client.allocate_network('10.0.0.0/24', True, True, 'example')
 
-    n = sf_client.delete_network(n['uuid'])
-    while n['state'] != 'deleted':
-        print('Waiting...')
-        time.sleep(1)
-        n = sf_client.get_network(n['uuid'])
-
-    print(json.dumps(n, indent=4, sort_keys=True))
+    op = sf_client.delete_network(n['uuid'])
+    print(json.dumps(op, indent=4, sort_keys=True))
     ```
+
+    `delete_network` returns once the cluster operation has reached a
+    terminal state — no manual polling loop is needed. The returned value
+    is the cluster operation's final view:
 
     ```bash
     $ python3 example.py
-    Waiting...
     {
-        "floating_gateway": null,
-        "metadata": {},
-        "name": "example",
+        "depends_on": null,
+        "error_report": null,
         "namespace": "system",
-        "netblock": "10.0.0.0/24",
-        "provide_dhcp": true,
-        "provide_nat": true,
-        "provide_dns": false,
-        "state": "deleted",
+        "object_type": "clusteroperation",
+        "operation_type": "net_op",
+        "state": "complete",
+        "tasks": [
+            "DeleteNetworkTask"
+        ],
         "uuid": "d56ae6e4-2592-43cd-b614-2dc7ca04970a",
-        "version": 4,
-        "vxid": 15408371
+        "version": 1
     }
     ```
+
+    Pass `wait=False` to return the raw op handle (`{op_type, op_uuid}`)
+    immediately without polling, which is useful for fire-and-forget
+    patterns or when you want to manage polling yourself. See
+    [cluster operations](/developer_guide/api_reference/clusteroperations)
+    for the full polling contract and terminal state set.
 
 ??? example "Python API client: get a single network"
     ```python

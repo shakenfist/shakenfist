@@ -187,6 +187,68 @@ Reaper activity is exported on
 `cluster_op_reaper_rejected_total`, scraped from
 `CLUSTER_METRICS_PORT` on the cluster daemon.
 
+#### Batched, Priority-Aware Dequeue
+
+`sf-net` and the `sf-queues` worker pool both call a single
+`mariadb.dequeue_work_items(queue_names, limit)` primitive. The
+caller passes the queue names in priority order (index 0 = top
+priority); MariaDB honours that order via
+`ORDER BY FIELD(queue_name, ...), scheduled_at` so one SELECT
+returns the most important eligible work first across an arbitrary
+number of queues. The previous one-RPC-per-queue polling loop is
+replaced by one RPC per iteration regardless of how many priority
+lanes the worker drains.
+
+Lower-priority rows only spill in when the higher-priority queues
+yield fewer rows than `limit`, so sustained heavy load on
+`user_facing` can still crowd `background` out -- explicit fairness
+(bounded staleness or reserved-slot) is intentionally deferred to a
+follow-up step. Worker crash recovery is unchanged: any claimed-
+but-not-yet-executed rows that the worker doesn't run are picked up
+by the stuck-row reaper described above.
+
+#### Coalescible Operations
+
+Some operation tasks are idempotent reconciliation work whose effect
+depends only on current DB state, not on the count of pending ops
+asking for it. The canonical example is
+`network_apply_update_dnsmasq`: six instance starts on the same
+network each enqueue one, but the resulting dnsmasq config covers
+every lease no matter whether the worker ran it once or six times.
+
+Op classes that have such tasks declare them on the class:
+
+```python
+class NetOp(BaseClusterOperation):
+    coalescible_tasks = schema.COALESCIBLE_TASKS
+    coalescible_target_column = 'network_uuid'
+```
+
+`coalescible_target_column` names the indexed column on
+`cluster_operations` used to group sibling ops. The fold runs at
+two layers, both controlled by this metadata:
+
+* **Enqueue-side dedup**
+  (`mariadb.find_existing_coalescible_op`): `create_and_enqueue`
+  in the schema module checks for an existing pending single-task
+  coalescible op on the same target before inserting a new row. If
+  found, the new caller's `op_uuid` is the existing op's `op_uuid`.
+  All `raise_for_error` waiters then block on the same op and the
+  worker runs it once.
+
+* **Worker-side fold**
+  (`mariadb.claim_coalescible_siblings`): inside
+  `BaseClusterOperation.execute`, the survivor atomically
+  transitions every other pending coalescible op on the same target
+  to `STATE_COMPLETE` in one SQL statement. When the dispatcher
+  surfaces a folded sibling's `work_queue` row, the terminal-state
+  branch drops it cleanly. A `'coalesced sibling ops'` audit event
+  on the survivor records the folded uuids.
+
+The enqueue-side dedup is the cheaper of the two -- the row never
+gets inserted -- but the worker-side fold is the safety net for the
+race where two concurrent callers both lose the lookup.
+
 ### Protocol Buffers and gRPC
 
 The gRPC interface is defined in `protos/*.proto` files. Generated Python code
@@ -224,6 +286,237 @@ To add a new enum value:
 1. Add the member to the Python enum with the next available `proto_id`
 2. Run `tox -e genprotos` to regenerate the protobuf definitions
 3. Never change or reuse existing `proto_id` values
+
+### Network Operation Error Handling
+
+#### ErrorReport — structured failure at the queue boundary
+
+`ErrorReport` (`shakenfist/operations/error_report.py`) is the on-the-wire
+representation of a failed cluster operation. When an `_apply_*` method raises
+inside the dispatcher, `dispatch_task` catches the exception, calls
+`ErrorReport.from_exception(e)`, persists the result via
+`mariadb.set_cluster_operation_error`, and then transitions the op to
+`STATE_ERROR`. The report is stored in its own `cluster_operation_errors` table
+(one row per op UUID) and is never written to the `object_states` or
+`cluster_operations` tables.
+
+The crucial architectural property is that **errors are data, never rehydrated
+Python exception classes**. This converges with gRPC's status-code model (and
+JSON-RPC's error object model) and is an explicit rejection of the
+`oslo.messaging` rehydration pattern, which made exception types load-bearing
+across process boundaries. The stable `code` field (e.g.
+`'network.ensure_mesh.failed'`) is the contract; `message`, `details`,
+`origin_class`, and `traceback` are diagnostic and not part of the contract.
+
+The registry `_EXCEPTION_CODE_REGISTRY` in `error_report.py` is the single
+canonical place for the exception-to-code mapping. Extending support for a new
+typed exception is a one-line change: add a row to the dict.
+
+#### BridgedVXLanNetwork — worker-only mutation surface
+
+`BridgedVXLanNetwork` (`shakenfist/network/bridged_vxlan_network.py`) is the
+worker-side counterpart of `Network`. `Network` is the public facade that
+external callers interact with; it enqueues operations rather than mutating
+host state directly. `BridgedVXLanNetwork` wraps a `Network` instance and
+exposes `_apply_*` methods that actually mutate per-hypervisor state (VXLAN
+FDB table, dnsmasq, etc.).
+
+The constructor is called **only** inside the workitem dispatcher (via the
+`NetOp` task handlers in `net_op.py`). This makes re-entrancy through the
+queue structurally impossible: the only way to bypass the queue and run a
+mutation inline is to construct a `BridgedVXLanNetwork`, and that is gated to
+the dispatcher. External callers always hold `Network`; in-worker callers
+always hold `BridgedVXLanNetwork`.
+
+All 15 host-mutating `Network` methods now enqueue rather than mutate
+directly: `ensure_mesh`, `add_floating_ip`, `remove_floating_ip`,
+`route_address`, `unroute_address`, `remove_nat`, `update_dnsmasq`,
+`remove_dnsmasq`, `remove_dhcp_lease`, `update_dns_entry`,
+`remove_dns_entry`, `create_on_hypervisor`, `delete_on_hypervisor`,
+`create_on_network_node`, `delete_on_network_node`. Note that
+`Network.enable_nat` no longer exists as a public method; it is now the
+private internal helper `BridgedVXLanNetwork._apply_enable_nat`, called
+only from within `_apply_create_on_network_node`.
+
+The retired NetOp handler bodies (`_network_deploy` task 1,
+`_network_destroy` task 2, `_network_update_dnsmasq` task 3) have been
+removed. Their task-enum values are retained in
+`shakenfist/schema/operations/net_op.py` for on-disk record compatibility;
+any in-flight op referencing these tasks now raises `InvalidStateForTask`,
+which the dispatcher's outer exception handler converts to `STATE_ERROR`
+via `ErrorReport`. Active op-type dispatchers are: `net_op`, `net_ip_op`,
+`net_iface_op`, `net_iface_ip_op`, `net_macaddr_ip_op`, plus
+`node_net_op` and `node_inst_op` / `node_inst_netdesc_op`. All route
+through `BridgedVXLanNetwork` and persist `ErrorReport` on their outer
+exception branch.
+
+The worker-only mutation surface is also why cross-daemon serialisation
+can be queue-based rather than lock-based. The 13 per-network
+`NodeLock(global_scope=False)` wrappers that existed inside
+`BridgedVXLanNetwork._apply_*` methods originated in stability-branch
+commit `bd9e1869`, which added them as a short-term fix to serialise
+concurrent host-mutating callers from four daemons (`sf-net`, `sf-queues`,
+`sf-api`, and `instance.py`). With all 15 `Network` methods now enqueuing
+exclusively through `BridgedVXLanNetwork`, the net-worker dispatcher loop
+in `shakenfist/daemons/network/workitem.py` is the only caller of every
+`_apply_*` method, and that loop is single-threaded by construction — so
+those locks became provably redundant and were removed (commit `277b0572`).
+Cross-daemon serialisation is now provided by the queue itself: only one
+daemon (`sf-net`) dequeues and executes work for any given network, making
+concurrent invocation across daemons structurally impossible. The
+single-threaded-dispatcher argument is specific to
+`NodeLock(global_scope=False)`; it does not extend to `ClusterLock`s,
+which serialise across the cluster and remain in use elsewhere.
+
+#### op.error_report / op.raise_for_error — consumer-side API
+
+`BaseClusterOperation` exposes two methods for callers that need to observe an
+op's outcome:
+
+- `op.error_report` — property that reads the `ErrorReport` from MariaDB on
+  every access (no caching). Returns `None` for COMPLETE/ABORT ops.
+- `op.raise_for_error(timeout=None)` — blocks until the op reaches a terminal
+  state (using the `poll_until_terminal` helper underneath), then raises
+  `NetworkOperationFailed(error_report=...)` if the state is `STATE_ERROR`, or
+  returns silently on any other terminal state. The timeout defaults to
+  `config.API_ASYNC_WAIT` (15 seconds); callers can override for long-running
+  ops. Raises `OperationTimeout` if the deadline elapses.
+
+`poll_until_terminal` is the generic free function underneath. It polls
+`cls.from_db(op.uuid)` at a 0.1 s cadence until the state is in
+`{STATE_COMPLETE, STATE_ABORT, STATE_DELETED, STATE_ERROR}`.
+
+#### Per-method migration pattern
+
+Each `Network` method is implemented as "enqueue a `NetOp` and return the
+op handle" rather than mutating host state inline. External callers preserve
+synchronous-with-exception semantics by wrapping the call:
+
+```python
+op = n.ensure_mesh()
+op.raise_for_error()
+```
+
+In-worker callers in `net_op.py` use `BridgedVXLanNetwork(n)._apply_*`
+directly to avoid enqueueing from inside the dispatcher (which would deadlock
+the net-worker). `depends_on` chains may replace some of the per-call
+`raise_for_error` waits where proper async pipelines are needed. All 15
+host-mutating `Network` methods are now enqueue-only; the per-network
+`NodeLock` guards that formerly serialised concurrent callers are no longer
+needed and have been removed — the single-worker queue is the sole
+serialisation point (see the `BridgedVXLanNetwork` subsection above).
+
+
+#### In-worker sibling call pattern
+
+When a `Network` method needs to invoke another host-mutating operation from
+inside an already-executing worker context — for example, `create_on_network_node`
+calling `update_dnsmasq` as part of `_network_deploy`, or `delete_on_network_node`
+calling `remove_dnsmasq` — re-enqueueing through the normal `Network.X()` facade
+would deadlock: the worker is already holding the queue slot and cannot dequeue
+its own dependency. The correct pattern is to construct a `BridgedVXLanNetwork`
+wrapper and call the `_apply_*` method directly:
+
+```python
+BridgedVXLanNetwork(self)._apply_update_dnsmasq(context)
+```
+
+This keeps host mutation inside `BridgedVXLanNetwork` (the worker-only surface),
+avoids a queue round-trip, and eliminates the deadlock-by-timeout that existed in
+Phase 3 where `create_on_network_node` enqueued `update_dnsmasq` and then waited
+for it to complete — but the network-node queue has only one worker, so the
+dependency could never be dequeued while the parent op was still executing. The
+Phase 3 latent bug was fixed when this pattern was adopted in Phase 4.
+
+#### Dual-event emission pattern
+
+Each migrated `Network` method emits two audit events:
+
+1. **Requesting event** — emitted synchronously inside `Network.X()` on the
+   caller's thread, before the op is enqueued. Uses `affected_objects=` so that
+   the event is recorded against all relevant objects (e.g. both the network and
+   the floating network for floating-IP ops).
+2. **Dispatch-time event** — emitted by the dispatcher once the op actually
+   executes. The dispatcher has access to only the objects it has in scope: the
+   `Network` itself plus `('network', FLOATING_NETWORK_UUID)` for floating-IP
+   ops; the `NetworkInterface` for `net_iface_op` / `net_iface_ip_op` ops.
+
+This split is intentional: the requesting event gives operators an immediate
+audit trail that the call was received, while the dispatch-time event records
+when the work actually ran and on which worker node.
+
+### Network Operation Queue Families
+
+Network operations are dispatched through two distinct queue families, both
+in the same priority taxonomy (`user_waiting`, `user_facing`,
+`user_facing_high_io`, `background`, `background_high_io`):
+
+| Family | Queue name pattern | Drained by | Used for |
+|--------|--------------------|------------|----------|
+| Per-node network | `{node_uuid}-network-{priority}` | net-worker on that node only | `create_on_hypervisor`, `ensure_mesh` — operations that mutate per-hypervisor state |
+| Network-node | `networknode-clusteroperation-{priority}` | net-worker on the elected network node only | `create_on_network_node`, `add_floating_ip`, `route_address` — operations that only the elected network node owns |
+
+The `enqueue_cluster_operation()` helper selects the family via its
+`family='network'` keyword argument. Passing `family='network'` produces
+`{node_uuid}-network-{priority}` queue names; the default
+`family='clusteroperation'` produces the existing node/cluster-operation queues.
+
+**Single-worker-per-queue safety property.** The net-worker's in-memory
+exponential back-off map (see the developer guide) is correct only because each
+queue it drains is serviced by exactly one worker. Per-node queues are drained
+by the net-worker on that specific node; cluster-wide `networknode-*` queues are
+drained only by the elected network node's net-worker. Introducing a second
+worker on the same queue would break the back-off schedule — see the prominent
+comment at the map's declaration in
+`shakenfist/daemons/network/workitem.py` for the authoritative statement of
+valid mitigation strategies.
+
+### REST API surface
+
+**202+poll contract for delete endpoints.** `DELETE /networks/<uuid>` and
+`DELETE /networks` return HTTP 202 (Accepted). The response body carries
+the cluster-operation handle so clients can poll for completion:
+
+- Single delete: `{'op_type': 'net_op', 'op_uuid': '<uuid>'}`.
+- Bulk delete: a list of `{'network_uuid': '...', 'op_type': 'net_op',
+  'op_uuid': '...'}` entries, one per network.
+
+**Cluster-operation discovery endpoints.** Two endpoints under
+`/clusteroperations/` allow callers to inspect op history:
+
+- `GET /clusteroperations/<op_uuid>/chain` — walks the `depends_on` graph
+  from `<op_uuid>` and returns the full transitive ancestor closure as a
+  list of op-summary dicts. Namespace-scoped: admin callers see everything;
+  non-admin callers receive HTTP 403 if any chain member belongs to a
+  foreign namespace. The op uuid is sufficient (no `<op_type>` segment)
+  because op uuids are globally unique.
+- `GET /clusteroperations?target_object_type=<type>&target_uuid=<uuid>` —
+  returns all ops that targeted the given object. Namespace filtering is
+  applied at the SQL layer (via a JOIN on `cluster_operation_targets`
+  against namespace-carrying static-values tables) so large result sets
+  are never materialised in Python.
+
+**`redirect_to_network_node` status.** The `@redirect_to_network_node`
+decorator (which proxies HTTP requests from the receiving API server to the
+network node's gunicorn) has been removed from three of its four historical
+call sites: `InterfaceEndpoint.get` (synchronous DB read — no proxy needed),
+and the two network delete endpoints (now 202+poll, dispatched via the
+queue). The decorator remains on `NetworkPingEndpoint.get` because the ping
+handler executes `ip netns exec <network_uuid> ping` directly and the
+network namespace exists only on the elected network node. Migrating the
+ping endpoint to be queue-based requires new op-output infrastructure
+(today the queue carries only error reports, not command output) and is
+deferred to future work. The decorator definition in
+`shakenfist/external_api/base.py` is retained for this one remaining use.
+
+**Client-python.** `delete_network` and `delete_all_networks` in
+`apiclient.py` (sibling `client-python` repo) handle the 202 response
+transparently by default: they detect 202, extract the op UUID, and poll
+`GET /clusteroperations/<op_type>/<op_uuid>` until the op reaches a
+terminal state, raising `ClusterOperationFailed` on error. Advanced callers
+can opt out of polling with `wait=False` to receive the op handle directly.
+Two client methods `get_cluster_operation_chain` and
+`list_cluster_operations_for_target` expose the discovery endpoints.
 
 ### Networking
 

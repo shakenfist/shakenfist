@@ -60,6 +60,16 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
+    ClaimCoalescibleSiblings: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ClaimCoalescibleSiblingsRequest,
+        database_pb2.ClaimCoalescibleSiblingsReply,
+    ]
+
+    FindExistingCoalescibleOp: grpc.UnaryUnaryMultiCallable[
+        database_pb2.FindExistingCoalescibleOpRequest,
+        database_pb2.FindExistingCoalescibleOpReply,
+    ]
+
     AcquireLock: grpc.UnaryUnaryMultiCallable[
         database_pb2.ClusterLockRequest,
         database_pb2.ClusterLockReply,
@@ -923,6 +933,11 @@ class DatabaseServiceStub:
         database_pb2.HasPendingClusterOperationTargetReply,
     ]
 
+    GetRecentTerminalOpStatesForTarget: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetRecentTerminalOpStatesForTargetRequest,
+        database_pb2.GetRecentTerminalOpStatesForTargetReply,
+    ]
+
     DeleteClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteClusterOperationTargetRequest,
         database_pb2.StatusReply,
@@ -982,6 +997,11 @@ class DatabaseServiceStub:
         database_pb2.GetClusterOperationsByNodeReply,
     ]
 
+    ListClusterOperationsForTarget: grpc.UnaryUnaryMultiCallable[
+        database_pb2.ListClusterOperationsForTargetRequest,
+        database_pb2.ListClusterOperationsForTargetReply,
+    ]
+
     DeleteClusterOperation: grpc.UnaryUnaryMultiCallable[
         database_pb2.DeleteClusterOperationRequest,
         database_pb2.StatusReply,
@@ -996,6 +1016,26 @@ class DatabaseServiceStub:
     transaction. Audit events are emitted separately by the caller via
     the eventlog service after this RPC succeeds.
     """
+
+    SetClusterOperationError: grpc.UnaryUnaryMultiCallable[
+        database_pb2.SetClusterOperationErrorRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operation Errors (MariaDB)
+    Persists the structured ErrorReport when an _apply_* method raises
+    inside the dispatcher. Upsert semantics: a retry that fails again
+    overwrites the prior report.
+    """
+
+    GetClusterOperationError: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationErrorRequest,
+        database_pb2.GetClusterOperationErrorReply,
+    ]
+
+    DeleteClusterOperationError: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationErrorRequest,
+        database_pb2.StatusReply,
+    ]
 
 class DatabaseServiceAsyncStub:
     Enqueue: grpc.aio.UnaryUnaryMultiCallable[
@@ -1037,6 +1077,16 @@ class DatabaseServiceAsyncStub:
     DeleteWorkQueueRow: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteWorkQueueRowRequest,
         database_pb2.StatusReply,
+    ]
+
+    ClaimCoalescibleSiblings: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ClaimCoalescibleSiblingsRequest,
+        database_pb2.ClaimCoalescibleSiblingsReply,
+    ]
+
+    FindExistingCoalescibleOp: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.FindExistingCoalescibleOpRequest,
+        database_pb2.FindExistingCoalescibleOpReply,
     ]
 
     AcquireLock: grpc.aio.UnaryUnaryMultiCallable[
@@ -1902,6 +1952,11 @@ class DatabaseServiceAsyncStub:
         database_pb2.HasPendingClusterOperationTargetReply,
     ]
 
+    GetRecentTerminalOpStatesForTarget: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetRecentTerminalOpStatesForTargetRequest,
+        database_pb2.GetRecentTerminalOpStatesForTargetReply,
+    ]
+
     DeleteClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteClusterOperationTargetRequest,
         database_pb2.StatusReply,
@@ -1961,6 +2016,11 @@ class DatabaseServiceAsyncStub:
         database_pb2.GetClusterOperationsByNodeReply,
     ]
 
+    ListClusterOperationsForTarget: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.ListClusterOperationsForTargetRequest,
+        database_pb2.ListClusterOperationsForTargetReply,
+    ]
+
     DeleteClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.DeleteClusterOperationRequest,
         database_pb2.StatusReply,
@@ -1975,6 +2035,26 @@ class DatabaseServiceAsyncStub:
     transaction. Audit events are emitted separately by the caller via
     the eventlog service after this RPC succeeds.
     """
+
+    SetClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.SetClusterOperationErrorRequest,
+        database_pb2.StatusReply,
+    ]
+    """Cluster Operation Errors (MariaDB)
+    Persists the structured ErrorReport when an _apply_* method raises
+    inside the dispatcher. Upsert semantics: a retry that fails again
+    overwrites the prior report.
+    """
+
+    GetClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetClusterOperationErrorRequest,
+        database_pb2.GetClusterOperationErrorReply,
+    ]
+
+    DeleteClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteClusterOperationErrorRequest,
+        database_pb2.StatusReply,
+    ]
 
 class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -2033,6 +2113,20 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.DeleteWorkQueueRowRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+
+    @abc.abstractmethod
+    def ClaimCoalescibleSiblings(
+        self,
+        request: database_pb2.ClaimCoalescibleSiblingsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.ClaimCoalescibleSiblingsReply, collections.abc.Awaitable[database_pb2.ClaimCoalescibleSiblingsReply]]: ...
+
+    @abc.abstractmethod
+    def FindExistingCoalescibleOp(
+        self,
+        request: database_pb2.FindExistingCoalescibleOpRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.FindExistingCoalescibleOpReply, collections.abc.Awaitable[database_pb2.FindExistingCoalescibleOpReply]]: ...
 
     @abc.abstractmethod
     def AcquireLock(
@@ -3210,6 +3304,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.HasPendingClusterOperationTargetReply, collections.abc.Awaitable[database_pb2.HasPendingClusterOperationTargetReply]]: ...
 
     @abc.abstractmethod
+    def GetRecentTerminalOpStatesForTarget(
+        self,
+        request: database_pb2.GetRecentTerminalOpStatesForTargetRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetRecentTerminalOpStatesForTargetReply, collections.abc.Awaitable[database_pb2.GetRecentTerminalOpStatesForTargetReply]]: ...
+
+    @abc.abstractmethod
     def DeleteClusterOperationTarget(
         self,
         request: database_pb2.DeleteClusterOperationTargetRequest,
@@ -3289,6 +3390,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.GetClusterOperationsByNodeReply, collections.abc.Awaitable[database_pb2.GetClusterOperationsByNodeReply]]: ...
 
     @abc.abstractmethod
+    def ListClusterOperationsForTarget(
+        self,
+        request: database_pb2.ListClusterOperationsForTargetRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.ListClusterOperationsForTargetReply, collections.abc.Awaitable[database_pb2.ListClusterOperationsForTargetReply]]: ...
+
+    @abc.abstractmethod
     def DeleteClusterOperation(
         self,
         request: database_pb2.DeleteClusterOperationRequest,
@@ -3306,5 +3414,31 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         transaction. Audit events are emitted separately by the caller via
         the eventlog service after this RPC succeeds.
         """
+
+    @abc.abstractmethod
+    def SetClusterOperationError(
+        self,
+        request: database_pb2.SetClusterOperationErrorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Cluster Operation Errors (MariaDB)
+        Persists the structured ErrorReport when an _apply_* method raises
+        inside the dispatcher. Upsert semantics: a retry that fails again
+        overwrites the prior report.
+        """
+
+    @abc.abstractmethod
+    def GetClusterOperationError(
+        self,
+        request: database_pb2.GetClusterOperationErrorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetClusterOperationErrorReply, collections.abc.Awaitable[database_pb2.GetClusterOperationErrorReply]]: ...
+
+    @abc.abstractmethod
+    def DeleteClusterOperationError(
+        self,
+        request: database_pb2.DeleteClusterOperationErrorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

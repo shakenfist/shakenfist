@@ -892,12 +892,12 @@ class MockEtcd():
         self.test_obj.addCleanup(
             self.mariadb_enqueue_work_item.stop)
 
-        self.mariadb_dequeue_work_item = mock.patch(
-            'shakenfist.mariadb.dequeue_work_item',
-            side_effect=self._mariadb_dequeue_work_item)
-        self.mariadb_dequeue_work_item.start()
+        self.mariadb_dequeue_work_items = mock.patch(
+            'shakenfist.mariadb.dequeue_work_items',
+            side_effect=self._mariadb_dequeue_work_items)
+        self.mariadb_dequeue_work_items.start()
         self.test_obj.addCleanup(
-            self.mariadb_dequeue_work_item.stop)
+            self.mariadb_dequeue_work_items.stop)
 
         self.mariadb_resolve_work_item = mock.patch(
             'shakenfist.mariadb.resolve_work_item',
@@ -940,6 +940,20 @@ class MockEtcd():
         self.mariadb_delete_work_queue_row.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_work_queue_row.stop)
+
+        self.mariadb_claim_coalescible_siblings = mock.patch(
+            'shakenfist.mariadb.claim_coalescible_siblings',
+            side_effect=self._mariadb_claim_coalescible_siblings)
+        self.mariadb_claim_coalescible_siblings.start()
+        self.test_obj.addCleanup(
+            self.mariadb_claim_coalescible_siblings.stop)
+
+        self.mariadb_find_existing_coalescible_op = mock.patch(
+            'shakenfist.mariadb.find_existing_coalescible_op',
+            side_effect=self._mariadb_find_existing_coalescible_op)
+        self.mariadb_find_existing_coalescible_op.start()
+        self.test_obj.addCleanup(
+            self.mariadb_find_existing_coalescible_op.stop)
 
         # Mock cluster lock operations (used by locks.ClusterLock)
         self.db_acquire_lock = mock.patch(
@@ -2571,35 +2585,47 @@ class MockEtcd():
             f'MockMariaDB.enqueue_work_item({queue_name}, '
             f'{work_item}, delay={delay}): id={row["id"]}')
 
-    def _mariadb_dequeue_work_item(self, queue_name):
-        """Mock implementation of mariadb.dequeue_work_item().
+    def _mariadb_dequeue_work_items(self, queue_names, limit=10):
+        """Mock implementation of mariadb.dequeue_work_items().
 
-        Returns (job_name, payload) for the earliest eligible row
-        in queue_name or None. 'Eligible' means claimed_at is None
-        and scheduled_at <= now. Iterates in insertion order, which
-        matches the SQL ORDER BY scheduled_at ASC for ties created
-        at the same logical moment.
+        Returns up to ``limit`` ``(queue_name, job_name, payload)``
+        tuples for the highest-priority eligible rows. Priority is
+        the caller-supplied order of ``queue_names``: index 0 is
+        top priority, matching the SQL ORDER BY
+        FIELD(queue_name, ...). Within a single queue_name, ties are
+        broken by ``scheduled_at`` ASC (insertion order in practice).
+        'Eligible' means ``claimed_at`` is None and ``scheduled_at``
+        <= now.
         """
         now = time.time()
+        priority = {q: i for i, q in enumerate(queue_names)}
         eligible = [
             r for r in self.work_queue_store
-            if r['queue_name'] == queue_name
+            if r['queue_name'] in priority
             and r['claimed_at'] is None
             and r['scheduled_at'] <= now
         ]
         if not eligible:
             self._trace(
-                f'MockMariaDB.dequeue_work_item({queue_name}): empty')
-            return None
-        eligible.sort(key=lambda r: r['scheduled_at'])
-        row = eligible[0]
-        row['claimed_at'] = now
-        row['claimed_by'] = 'mock'
-        row['attempts'] = row.get('attempts', 0) + 1
+                f'MockMariaDB.dequeue_work_items('
+                f'{queue_names}, limit={limit}): empty')
+            return []
+        eligible.sort(key=lambda r: (
+            priority[r['queue_name']], r['scheduled_at']))
+        claimed = eligible[:limit]
+        result = []
+        for row in claimed:
+            row['claimed_at'] = now
+            row['claimed_by'] = 'mock'
+            row['attempts'] = row.get('attempts', 0) + 1
+            result.append(
+                (row['queue_name'], str(row['id']),
+                 dict(row['payload'] or {})))
         self._trace(
-            f'MockMariaDB.dequeue_work_item({queue_name}): '
-            f'id={row["id"]}')
-        return str(row['id']), dict(row['payload'] or {})
+            f'MockMariaDB.dequeue_work_items('
+            f'{queue_names}, limit={limit}): '
+            f'returned {len(result)} items')
+        return result
 
     def _mariadb_resolve_work_item(self, queue_name, job_name):
         """Mock implementation of mariadb.resolve_work_item()."""
@@ -2706,6 +2732,100 @@ class MockEtcd():
             f'MockMariaDB.delete_work_queue_row({row_id}): '
             f'{"removed" if removed else "not found"}')
         return removed
+
+    def _mariadb_find_existing_coalescible_op(
+            self, operation_type, target_column, target_uuid, task_name):
+        """Mock implementation of mariadb.find_existing_coalescible_op().
+
+        Mirrors the SQL guards in
+        ``mariadb._direct_find_existing_coalescible_op``: returns
+        the uuid of the oldest single-task pending op on the same
+        target whose task equals ``task_name``, or ``None``. The
+        oldest-first order matches the SQL
+        ``ORDER BY created_at ASC LIMIT 1``.
+        """
+        if target_column not in {
+                'network_uuid', 'instance_uuid', 'node_uuid'}:
+            return None
+        candidates: list[tuple[float, str]] = []
+        for op_uuid, op_row in self.cluster_operations_store.items():
+            if op_row.get('operation_type') != operation_type:
+                continue
+            if str(op_row.get(target_column) or '') != str(target_uuid):
+                continue
+            # The mock stores metadata fields flat on the row (see
+            # ``_mariadb_create_and_enqueue_cluster_operation``),
+            # while the real cluster_operations table has a
+            # ``metadata_json`` blob. Read from whichever shape is
+            # populated so the mock matches both today's flat layout
+            # and any future migration.
+            metadata = op_row.get('metadata_json') or op_row
+            tasks = metadata.get('tasks') or []
+            if len(tasks) != 1 or tasks[0] != task_name:
+                continue
+            state_key = f'{operation_type}/{op_uuid}'
+            state_row = self.mariadb_states.get(state_key)
+            if not state_row or state_row.get('state_value') != 'queued':
+                continue
+            candidates.append(
+                (op_row.get('created_at', 0.0), op_uuid))
+        if not candidates:
+            self._trace(
+                f'MockMariaDB.find_existing_coalescible_op('
+                f'{operation_type}, {target_column}={target_uuid}, '
+                f'{task_name}): no match')
+            return None
+        candidates.sort()
+        chosen_uuid = candidates[0][1]
+        self._trace(
+            f'MockMariaDB.find_existing_coalescible_op('
+            f'{operation_type}, {target_column}={target_uuid}, '
+            f'{task_name}): reusing {chosen_uuid}')
+        return chosen_uuid
+
+    def _mariadb_claim_coalescible_siblings(
+            self, operation_type, target_column, target_uuid,
+            task_names, exclude_op_uuid):
+        """Mock implementation of mariadb.claim_coalescible_siblings().
+
+        Mirrors the SQL safety guards in
+        ``mariadb._direct_claim_coalescible_siblings``: only single-
+        task ops in state ``queued`` matching one of ``task_names``
+        on the same target are folded; the excluded op is never
+        affected. Transitions the matched ops to ``complete`` in
+        ``mariadb_states`` and returns their uuids.
+        """
+        if not task_names or target_column not in {
+                'network_uuid', 'instance_uuid', 'node_uuid'}:
+            return []
+
+        folded: list[str] = []
+        for op_uuid, op_row in list(self.cluster_operations_store.items()):
+            if op_uuid == exclude_op_uuid:
+                continue
+            if op_row.get('operation_type') != operation_type:
+                continue
+            if str(op_row.get(target_column) or '') != str(target_uuid):
+                continue
+            # See ``_mariadb_find_existing_coalescible_op`` for the
+            # rationale behind the metadata_json-vs-flat fallback.
+            metadata = op_row.get('metadata_json') or op_row
+            tasks = metadata.get('tasks') or []
+            if len(tasks) != 1 or tasks[0] not in task_names:
+                continue
+            state_key = f'{operation_type}/{op_uuid}'
+            state_row = self.mariadb_states.get(state_key)
+            if not state_row or state_row.get('state_value') != 'queued':
+                continue
+            state_row['state_value'] = 'complete'
+            state_row['update_time'] = time.time()
+            state_row['message'] = 'coalesced into sibling op'
+            folded.append(op_uuid)
+        self._trace(
+            f'MockMariaDB.claim_coalescible_siblings('
+            f'{operation_type}, {target_column}={target_uuid}): '
+            f'folded {len(folded)} ops')
+        return folded
 
     def _mariadb_enqueue_event_dlq(
             self, object_type, object_uuid, event_timestamp, event_json):

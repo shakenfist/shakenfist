@@ -14,6 +14,8 @@ service DatabaseService {
   rpc ListStuckWorkQueueRows (ListStuckWorkQueueRowsRequest) returns (ListStuckWorkQueueRowsReply) {}
   rpc ClearWorkQueueClaim (ClearWorkQueueClaimRequest) returns (StatusReply) {}
   rpc DeleteWorkQueueRow (DeleteWorkQueueRowRequest) returns (StatusReply) {}
+  rpc ClaimCoalescibleSiblings (ClaimCoalescibleSiblingsRequest) returns (ClaimCoalescibleSiblingsReply) {}
+  rpc FindExistingCoalescibleOp (FindExistingCoalescibleOpRequest) returns (FindExistingCoalescibleOpReply) {}
 
   // Lock Operations
   rpc AcquireLock (ClusterLockRequest) returns (ClusterLockReply) {}
@@ -264,6 +266,7 @@ service DatabaseService {
   rpc GetClusterOperationTargetsForObject (GetClusterOperationTargetsForObjectRequest) returns (GetClusterOperationTargetsForObjectReply) {}
   rpc GetLatestClusterOperationTarget (GetLatestClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
   rpc HasPendingClusterOperationTarget (HasPendingClusterOperationTargetRequest) returns (HasPendingClusterOperationTargetReply) {}
+  rpc GetRecentTerminalOpStatesForTarget (GetRecentTerminalOpStatesForTargetRequest) returns (GetRecentTerminalOpStatesForTargetReply) {}
   rpc DeleteClusterOperationTarget (DeleteClusterOperationTargetRequest) returns (StatusReply) {}
   rpc DeleteClusterOperationTargetsForObject (DeleteClusterOperationTargetsForObjectRequest) returns (StatusReply) {}
   rpc DeleteStaleClusterOperationTargets (DeleteStaleClusterOperationTargetsRequest) returns (DeleteCountReply) {}
@@ -283,6 +286,7 @@ service DatabaseService {
   rpc CreateClusterOperation (CreateClusterOperationRequest) returns (StatusReply) {}
   rpc GetClusterOperation (GetClusterOperationRequest) returns (GetClusterOperationReply) {}
   rpc GetClusterOperationsByNode (GetClusterOperationsByNodeRequest) returns (GetClusterOperationsByNodeReply) {}
+  rpc ListClusterOperationsForTarget (ListClusterOperationsForTargetRequest) returns (ListClusterOperationsForTargetReply) {}
   rpc DeleteClusterOperation (DeleteClusterOperationRequest) returns (StatusReply) {}
 
   // Atomic create + enqueue for cluster operations (MariaDB).
@@ -290,6 +294,14 @@ service DatabaseService {
   // transaction. Audit events are emitted separately by the caller via
   // the eventlog service after this RPC succeeds.
   rpc CreateAndEnqueueClusterOperation (CreateAndEnqueueClusterOperationRequest) returns (StatusReply) {}
+
+  // Cluster Operation Errors (MariaDB)
+  // Persists the structured ErrorReport when an _apply_* method raises
+  // inside the dispatcher. Upsert semantics: a retry that fails again
+  // overwrites the prior report.
+  rpc SetClusterOperationError (SetClusterOperationErrorRequest) returns (StatusReply) {}
+  rpc GetClusterOperationError (GetClusterOperationErrorRequest) returns (GetClusterOperationErrorReply) {}
+  rpc DeleteClusterOperationError (DeleteClusterOperationErrorRequest) returns (StatusReply) {}
 }
 
 // Generic status reply
@@ -307,13 +319,25 @@ message EnqueueRequest {
 }
 
 message DequeueRequest {
+  // Queue names in caller-supplied priority order: index 0 is the
+  // highest priority. The server uses this order in ORDER BY
+  // FIELD(queue_name, ...) so a single SELECT returns the most
+  // important eligible work first.
+  repeated string queue_names = 1;
+  // Maximum number of items to claim in this call. Callers that
+  // want one-at-a-time behaviour pass 1; pool workers pass their
+  // free-slot count so they fill the pool in one round trip.
+  int32 limit = 2;
+}
+
+message DequeuedItem {
   string queue_name = 1;
+  string job_name = 2;
+  string work_item = 3;  // JSON-encoded data
 }
 
 message DequeueReply {
-  bool found = 1;
-  string job_name = 2;
-  string work_item = 3;  // JSON-encoded data
+  repeated DequeuedItem items = 1;
 }
 
 message ResolveRequest {
@@ -358,6 +382,47 @@ message ClearWorkQueueClaimRequest {
 
 message DeleteWorkQueueRowRequest {
   int64 row_id = 1;
+}
+
+message ClaimCoalescibleSiblingsRequest {
+  // The op_type, target column (e.g. "network_uuid"), target uuid
+  // and uuid of the surviving op together identify "other ops on
+  // the same target object whose work the survivor is about to do."
+  // The server folds anything matching by transitioning its state
+  // to ``complete`` -- the worker that eventually picks that row
+  // up out of the queue will see the terminal state and skip it
+  // cleanly (see workitem.py terminal-state branch).
+  string operation_type = 1;
+  string target_column = 2;
+  string target_uuid = 3;
+  // Tasks the survivor is about to run that are flagged
+  // coalescible. Only sibling ops whose entire task list is exactly
+  // one of these names are folded -- multi-task siblings might
+  // also carry non-coalescible work and must be left alone.
+  repeated string task_names = 4;
+  string exclude_op_uuid = 5;
+}
+
+message ClaimCoalescibleSiblingsReply {
+  // Op uuids whose state was transitioned to ``complete``.
+  repeated string folded_op_uuids = 1;
+}
+
+message FindExistingCoalescibleOpRequest {
+  // Read-only lookup used by enqueue-side dedup: "is there already
+  // a pending op on the same target whose entire task list is just
+  // this one coalescible task?" -- if so the caller returns that
+  // op's uuid to its caller instead of inserting a duplicate.
+  string operation_type = 1;
+  string target_column = 2;
+  string target_uuid = 3;
+  string task_name = 4;
+}
+
+message FindExistingCoalescibleOpReply {
+  // Empty string when no match was found (proto3 has no string
+  // null).
+  string op_uuid = 1;
 }
 
 // Lock Operations
@@ -1746,6 +1811,24 @@ message HasPendingClusterOperationTargetReply {
   bool pending = 1;
 }
 
+message GetRecentTerminalOpStatesForTargetRequest {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
+  int32 limit = 3;
+  // Empty string means "no op_type filter".
+  string op_type = 4;
+}
+
+message TerminalOpState {
+  string op_uuid = 1;
+  string state_value = 2;
+  double update_time = 3;
+}
+
+message GetRecentTerminalOpStatesForTargetReply {
+  repeated TerminalOpState entries = 1;
+}
+
 message DeleteClusterOperationTargetRequest {
   string operation_uuid = 1;
 }
@@ -1825,6 +1908,16 @@ message GetClusterOperationsByNodeReply {
   repeated ClusterOperationData items = 1;
 }
 
+message ListClusterOperationsForTargetRequest {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
+}
+
+message ListClusterOperationsForTargetReply {
+  // Items are ordered newest-first by created_at.
+  repeated ClusterOperationData items = 1;
+}
+
 message DeleteClusterOperationRequest {
   string uuid = 1;
 }
@@ -1836,4 +1929,29 @@ message CreateAndEnqueueClusterOperationRequest {
   string queue_name = 4;     // Target work queue name
   double delay = 5;          // Seconds to defer before the job is eligible
   string metadata_json = 6;  // Full operation metadata dict as JSON
+}
+
+message SetClusterOperationErrorRequest {
+  string op_uuid = 1;             // Operation UUID as string
+  string error_report_json = 2;   // ErrorReport serialised as JSON
+  double created_at = 3;          // Unix timestamp the report was written
+}
+
+message GetClusterOperationErrorRequest {
+  string op_uuid = 1;             // Operation UUID as string
+}
+
+message GetClusterOperationErrorReply {
+  bool found = 1;
+  string error_report_json = 2;   // ErrorReport serialised as JSON
+  // ``created_at`` is intentionally not exposed on the wire: no
+  // caller of ``mariadb.get_cluster_operation_error`` consumes it,
+  // and the table column stays for forensic queries by operators
+  // hitting MariaDB directly. If a programmatic caller later wants
+  // the timestamp, add it back here and thread it through
+  // ``_direct_get_cluster_operation_error``.
+}
+
+message DeleteClusterOperationErrorRequest {
+  string op_uuid = 1;             // Operation UUID as string
 }

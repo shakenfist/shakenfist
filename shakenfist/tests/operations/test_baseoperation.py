@@ -3,12 +3,15 @@ from unittest import mock
 
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import CannotDeferUnqueued
+from shakenfist.operations.net_op import NetOp
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations import artifact_fetch_op as fetch_schema
+from shakenfist.schema.operations import net_op as net_op_schema
 from shakenfist.tests import base
 
 
 OP_UUID = '11111111-1111-4111-8111-111111111111'
+NETWORK_UUID = '22222222-2222-4222-8222-222222222222'
 
 
 class _StubOp(BaseClusterOperation):
@@ -30,6 +33,19 @@ def _make_static_values():
         'runs_after': None,
         'tasks': ['image_fetch'],
         'version': 1,
+    }
+
+
+def _make_net_op_static_values(tasks):
+    return {
+        'uuid': OP_UUID,
+        'network_uuid': NETWORK_UUID,
+        'priority': 'user_facing_high_io',
+        'request_id': None,
+        'depends_on': None,
+        'runs_after': None,
+        'tasks': tasks,
+        'version': net_op_schema.current_version,
     }
 
 
@@ -127,3 +143,184 @@ class DeferWithBackoffTestCase(base.ShakenFistTestCase):
         # ops loaded outside the queue dispatch path.
         op = self._make_op()
         self.assertEqual(0, op.current_defer_count)
+
+
+class CoalescingExecuteTestCase(base.ShakenFistTestCase):
+    """Tests for the within-job and cross-op coalescing branches in
+    ``BaseClusterOperation.execute``.
+
+    The two passes are wired in ``execute()`` itself rather than the
+    dispatcher, so a unit test against a real NetOp class is enough --
+    no need to stand up either of the daemon workers.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        # State writes hit MariaDB; the test only cares about the
+        # behavioural surface (tasks dispatched, events emitted,
+        # claim_coalescible_siblings called with the right shape).
+        self.state_patcher = mock.patch.object(
+            BaseClusterOperation, '_state_update')
+        self.state_patcher.start()
+        self.addCleanup(self.state_patcher.stop)
+        self.state_value_patcher = mock.patch.object(
+            BaseClusterOperation, 'state',
+            new_callable=mock.PropertyMock)
+        mock_state = self.state_value_patcher.start()
+        # The post-dispatch loop in execute() short-circuits if
+        # state.value is in {ABORT, DELETED, ERROR, QUEUED}. We want
+        # the loop to run every task, so return EXECUTING -- the
+        # value execute() itself set before iterating.
+        mock_state.return_value = mock.MagicMock(
+            value=BaseClusterOperation.STATE_EXECUTING)
+        self.addCleanup(self.state_value_patcher.stop)
+
+        self.add_event_patcher = mock.patch.object(
+            BaseClusterOperation, 'add_event')
+        self.mock_add_event = self.add_event_patcher.start()
+        self.addCleanup(self.add_event_patcher.stop)
+
+        self.claim_patcher = mock.patch(
+            'shakenfist.operations.baseoperation.mariadb.'
+            'claim_coalescible_siblings')
+        self.mock_claim = self.claim_patcher.start()
+        self.mock_claim.return_value = []
+        self.addCleanup(self.claim_patcher.stop)
+
+    def _make_net_op(self, task_names, queue_name=None):
+        op = NetOp(_make_net_op_static_values(task_names))
+        # ``dispatch_task`` is wired by the concrete op; patch it so
+        # we observe which tasks would actually run.
+        op.dispatch_task = mock.MagicMock()
+        # The cross-op fold only runs when the op was dequeued from a
+        # cluster-wide ``networknode-*`` queue. Default the tests to
+        # one of those so the legacy assertions still exercise the
+        # fold; tests that want to exercise the skip path pass an
+        # explicit per-node ``queue_name``.
+        if queue_name is None:
+            queue_name = 'networknode-clusteroperation-user_facing'
+        op.queue_name = queue_name
+        return op
+
+    def test_within_job_drops_duplicate_coalescible_tasks(self):
+        # update_dnsmasq is coalescible, so [update, update, update]
+        # collapses to one dispatch.
+        op = self._make_net_op([
+            'network_apply_update_dnsmasq',
+            'network_apply_update_dnsmasq',
+            'network_apply_update_dnsmasq',
+        ])
+        op.execute()
+
+        self.assertEqual(1, op.dispatch_task.call_count)
+        # Two "dropped duplicate" events for the two skipped tasks.
+        drop_events = [
+            c for c in self.mock_add_event.call_args_list
+            if c.args[1].startswith('within-job: dropped duplicate')]
+        self.assertEqual(2, len(drop_events))
+
+    def test_within_job_does_not_drop_non_coalescible_duplicates(self):
+        # network_remove_dnsmasq is *not* coalescible -- a repeat would
+        # be intentional, so the loop runs it twice.
+        op = self._make_net_op([
+            'network_remove_dnsmasq',
+            'network_remove_dnsmasq',
+        ])
+        op.execute()
+
+        self.assertEqual(2, op.dispatch_task.call_count)
+
+    def test_cross_op_coalescing_calls_mariadb_with_target(self):
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.execute()
+
+        self.mock_claim.assert_called_once()
+        kwargs = self.mock_claim.call_args.kwargs
+        self.assertEqual(ObjectType.NET_OP, kwargs['operation_type'])
+        self.assertEqual('network_uuid', kwargs['target_column'])
+        self.assertEqual(NETWORK_UUID, kwargs['target_uuid'])
+        self.assertEqual(
+            ['network_apply_update_dnsmasq'], kwargs['task_names'])
+        self.assertEqual(OP_UUID, kwargs['exclude_op_uuid'])
+
+    def test_cross_op_coalescing_records_sibling_uuids(self):
+        sibling = '33333333-3333-4333-8333-333333333333'
+        self.mock_claim.return_value = [sibling]
+
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.execute()
+
+        coalesced_events = [
+            c for c in self.mock_add_event.call_args_list
+            if c.args[1] == 'coalesced sibling ops']
+        self.assertEqual(1, len(coalesced_events))
+        extra = coalesced_events[0].kwargs['extra']
+        self.assertEqual(1, extra['sibling_count'])
+        self.assertEqual([sibling], extra['sibling_uuids'])
+
+    def test_no_coalescing_call_when_task_not_coalescible(self):
+        # network_remove_dnsmasq isn't in COALESCIBLE_TASKS, so the
+        # mariadb call must not happen at all.
+        op = self._make_net_op(['network_remove_dnsmasq'])
+        op.execute()
+
+        self.mock_claim.assert_not_called()
+
+    def test_no_coalescing_call_when_dispatcher_batch_was_one(self):
+        # Dispatcher hint says we were the only item in the batch, so
+        # no sibling can possibly be ready. Skip the SQL round-trip.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.dispatcher_batch_size = 1
+        op.execute()
+
+        self.mock_claim.assert_not_called()
+
+    def test_coalescing_runs_when_dispatcher_batch_was_multiple(self):
+        # Dispatcher hint says >1 ready items, so contention is
+        # possible -- the fold runs.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.dispatcher_batch_size = 5
+        op.execute()
+
+        self.mock_claim.assert_called_once()
+
+    def test_coalescing_runs_when_dispatcher_batch_unknown(self):
+        # ``None`` means the op was loaded outside the queue path
+        # (e.g. a unit test or REST endpoint); be conservative and
+        # run the fold.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.dispatcher_batch_size = None
+        op.execute()
+
+        self.mock_claim.assert_called_once()
+
+    def test_no_coalescing_call_when_queue_is_per_node(self):
+        # Per-node queues (``<node_uuid>-network-*`` and
+        # ``<node_uuid>-clusteroperation-*``) MUST NOT fold across
+        # sibling ops, because the fold query keys on
+        # (op_type, target_uuid, task) and a sibling on a different
+        # node's queue is doing different work (e.g. mesh apply on
+        # hypervisor B vs hypervisor A). Folding would mark B's op
+        # complete without ever running it. See the comment in
+        # ``BaseClusterOperation.execute`` for the full story.
+        op = self._make_net_op(
+            ['network_apply_update_dnsmasq'],
+            queue_name=(
+                '11111111-1111-4111-8111-111111111111'
+                '-network-user_facing'))
+        op.execute()
+
+        self.mock_claim.assert_not_called()
+
+    def test_no_coalescing_call_when_queue_name_unset(self):
+        # An op loaded outside the dispatch path (e.g. by a unit test
+        # that doesn't set ``queue_name``) has ``None`` for the queue
+        # and we can't tell whether the fold would be safe. The
+        # conservative choice is to skip it -- the fold is a cost
+        # optimisation, not a correctness requirement.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.queue_name = None
+        op.execute()
+
+        self.mock_claim.assert_not_called()

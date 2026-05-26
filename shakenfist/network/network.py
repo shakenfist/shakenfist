@@ -1,5 +1,4 @@
 # Copyright 2020 Michael Still
-import os
 import random
 from typing import Optional
 from uuid import UUID
@@ -8,7 +7,6 @@ from uuid import uuid4
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.constants import FLOATING_NETWORK_UUID
-from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import mariadb
 from shakenfist.network import interface
@@ -22,11 +20,13 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import get_object_class
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.net_op \
     import create_and_enqueue as net_create_and_enqueue
 from shakenfist.schema.operations.net_op \
     import model_tasks as net_tasks
+from shakenfist.schema.operations import net_ip_op as net_ip_op_schema
 from shakenfist.schema.operations.net_macaddr_ip_op \
     import create_and_enqueue as nmi_create_and_enqueue
 from shakenfist.schema.operations.net_macaddr_ip_op \
@@ -38,16 +38,12 @@ from shakenfist.schema.operations.node_net_op \
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist.exceptions import CannotAssignFloatingGateway
-from shakenfist.exceptions import CongestedNetwork
-from shakenfist.exceptions import DeadNetwork
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
-from shakenfist.node import Nodes
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
-from shakenfist.util import concurrency as util_concurrency
 
 
 LOG, _ = logs.setup(__name__)
@@ -305,10 +301,15 @@ class Network(dbowo):
         n = Network.from_db(network_uuid)
         n.state = Network.STATE_INITIAL
 
-        # Networks should immediately appear on the network node
+        # Networks should immediately appear on the network node. Phase 6
+        # of `PLAN-network-facade.md` retired the `network_deploy` composite
+        # task; the explicit task list preserves the original semantic
+        # (create on the network node, then ensure the mesh FDB) without
+        # going through the obsolete handler.
         net_create_and_enqueue(
             n.uuid,
-            [net_tasks.network_deploy],
+            [net_tasks.network_apply_create_network_node,
+             net_tasks.network_ensure_mesh],
             PRIORITY.user_waiting,
             runs_after=[n.last_cluster_operation],
             request_id=util_general.get_request_id())
@@ -422,9 +423,23 @@ class Network(dbowo):
         NetworkInterface lifecycle; all that remains for the
         owning Network is the DHCP-lease housekeeping that used
         to live alongside the list mutation.
+
+        Callers of this method live outside the net-worker
+        dispatcher: ``NetworkInterface.delete`` is invoked from
+        ``node_inst_op._instance_delete`` (the node-queue worker,
+        a different queue from the networknode queue that
+        ``remove_dhcp_lease`` enqueues onto), and from the
+        ``stray_nics`` reaper and cluster-maintainer long-running
+        threads. None of those contexts share a queue with the
+        enqueued ``net_macaddr_ip_op``, so blocking on the op via
+        ``raise_for_error()`` is safe (no self-enqueue deadlock)
+        and preserves the previous synchronous-with-exception
+        semantics.
         """
         if ni.ipv4:
-            self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
+            op = self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
+            if op is not None:
+                op.raise_for_error()
 
     def _update_floating_gateway(self, gateway):
         attrs = self._ensure_attributes()
@@ -559,199 +574,76 @@ class Network(dbowo):
 
     @_not_on_floating_network
     def create_on_hypervisor(self):
-        subst = self.subst_dict()
-        self.add_event(
-            EVENT_TYPE_AUDIT, 'creating network on hypervisor',
-            extra={'vx_bridge': subst['vx_bridge'],
-                   'vx_interface': subst['vx_interface'],
-                   'mesh_nic': self.mesh_nic})
-        with self.get_lock(op='create_on_hypervisor', global_scope=False):
-            if self.is_dead():
-                raise DeadNetwork('network=%s' % self)
-            util_concurrency.create_vxlan_interface(self.vxid, self.mesh_nic)
-        self.add_event(
-            EVENT_TYPE_AUDIT, 'created network on hypervisor',
-            extra={'vx_bridge': subst['vx_bridge'],
-                   'vx_interface': subst['vx_interface']})
+        """Enqueue a network_apply_create_hypervisor node_net_op for this network.
+
+        Returns the enqueued NodeNetOp loaded from the database. Callers
+        wanting the previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_create_on_hypervisor`` and now runs in
+        the net-worker dispatcher on this node.
+        """
+        op_type, op_uuid = nn_create_and_enqueue(
+            str(config.NODE_UUID),
+            self.uuid,
+            [nn_tasks.network_apply_create_hypervisor],
+            PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     @_not_on_floating_network
     def create_on_network_node(self):
+        """Enqueue a network_apply_create_network_node NetOp for this network.
+
+        Returns the enqueued NetOp loaded from the database. Callers
+        wanting the previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_create_on_network_node`` and now runs
+        in the net-worker dispatcher on the elected network node.
+        """
         if self.state.value == dbo.STATE_DELETED:
             self.add_event(
-                EVENT_TYPE_AUDIT, 'refusing to create deleted network on network node')
-            return
-        self.add_event(EVENT_TYPE_AUDIT, 'creating network on network node')
-
-        with self.get_lock(op='create_on_network_node', global_scope=False):
-            if self.is_dead():
-                raise DeadNetwork('network=%s' % self)
-
-            util_concurrency.create_vxlan_interface(self.vxid, self.mesh_nic)
-            util_concurrency.create_network_namespace(self.uuid)
-
-            subst = self.subst_dict()
-
-            if not util_network.check_for_interface(subst['vx_veth_outer']):
-                util_network.create_interface(
-                    subst['vx_veth_outer'], 'veth',
-                    'peer name %(vx_veth_inner)s' % subst)
-                util_concurrency.execute(
-                    'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
-
-                # Refer to bug 952 for more details here, but it turns out
-                # that adding an interface to a bridge overwrites the MTU of
-                # the bridge in an undesirable way. So we lookup the existing
-                # MTU and then re-specify it here.
-                subst['vx_bridge_mtu'] = util_network.get_interface_mtu(
-                    subst['vx_bridge'])
-                util_concurrency.execute(
-                    'ip link set %(vx_veth_outer)s master %(vx_bridge)s '
-                    'mtu %(vx_bridge_mtu)s' % subst)
-
-                util_concurrency.execute(
-                    'ip link set %(vx_veth_outer)s up' % subst)
-                util_concurrency.execute(
-                    'ip link set %(vx_veth_inner)s up' % subst,
-                    netns=self.uuid)
-                util_network.add_address_to_interface(
-                    self.uuid, subst['router'], subst['netmask'],
-                    subst['vx_veth_inner'])
-
-            if not util_network.check_for_interface(subst['egress_veth_outer']):
-                util_network.create_interface(
-                    subst['egress_veth_outer'], 'veth',
-                    'peer name %(egress_veth_inner)s' % subst)
-
-                # Refer to bug 952 for more details here, but it turns out
-                # that adding an interface to a bridge overwrites the MTU of
-                # the bridge in an undesirable way. So we lookup the existing
-                # MTU and then re-specify it here.
-                subst['egress_bridge_mtu'] = util_network.get_interface_mtu(
-                    subst['egress_bridge'])
-                util_concurrency.execute(
-                    'ip link set %(egress_veth_outer)s master %(egress_bridge)s '
-                    'mtu %(egress_bridge_mtu)s' % subst)
-
-                util_concurrency.execute(
-                    'ip link set %(egress_veth_outer)s up' % subst)
-                util_concurrency.execute(
-                    'ip link set %(egress_veth_inner)s netns %(netns)s' % subst)
-
-            if self.provide_nat:
-                # We don't always need this lock, but acquiring it here means
-                # we don't need to construct two identical ipmanagers one after
-                # the other.
-                try:
-                    if not self.floating_gateway:
-                        self.assign_floating_gateway()
-
-                    fn = floating_network()
-                    subst.update({
-                        'floating_router': fn.ipam.get_address_at_index(1),
-                        'floating_gateway': self.floating_gateway,
-                        'floating_netmask': fn.netmask
-                    })
-                except CongestedNetwork:
-                    self.state = self.STATE_ERROR
-                    self.error = 'Unable to allocate floating gateway IP'
-                    return
-
-                addresses = list(util_network.get_interface_addresses(
-                    subst['egress_veth_inner'], netns=subst['netns']))
-                self.log.with_fields({
-                    'addresses': addresses,
-                    'current_address': subst['floating_gateway']}).debug(
-                        'Egress veth has these addresses')
-                if not subst['floating_gateway'] in list(addresses):
-                    util_network.add_address_to_interface(
-                        self.uuid, subst['floating_gateway'], subst['floating_netmask'],
-                        subst['egress_veth_inner'])
-
-                needs_default_route = True
-                default_routes = util_network.get_default_routes(self.uuid)
-                if default_routes == [subst['floating_router']]:
-                    needs_default_route = False
-                elif default_routes:
-                    for default_route in default_routes:
-                        if default_route == subst['floating_router']:
-                            needs_default_route = False
-                        else:
-                            util_network.delete_default_route(
-                                self.uuid, default_route)
-
-                if needs_default_route:
-                    util_network.add_default_route(
-                        self.uuid, subst['floating_router'])
-
-                self.enable_nat()
-
-        self.update_dnsmasq()
-
-        # A final check to ensure we haven't raced with a delete
-        if self.is_dead():
-            raise DeadNetwork('network=%s' % self)
-        self.state = self.STATE_CREATED
+                EVENT_TYPE_AUDIT,
+                'refusing to create deleted network on network node')
+            return None
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_create_network_node],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def delete_on_hypervisor(self):
-        with self.get_lock(op='Network delete', global_scope=False):
-            subst = self.subst_dict()
-            self.add_event(
-                EVENT_TYPE_AUDIT, 'deleting network on hypervisor',
-                extra={'vx_bridge': subst['vx_bridge'],
-                       'vx_interface': subst['vx_interface']})
+        """Enqueue a network_destroy node_net_op for this network on this node.
 
-            bridge_present = util_network.check_for_interface(subst['vx_bridge'])
-            if bridge_present:
-                util_concurrency.execute(
-                    'ip link delete %(vx_bridge)s' % subst)
+        Returns the enqueued NodeNetOp loaded from the database. Callers
+        wanting the previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_delete_on_hypervisor`` and now runs in
+        the net-worker dispatcher on this node.
+        """
+        op_type, op_uuid = nn_create_and_enqueue(
+            str(config.NODE_UUID),
+            self.uuid,
+            [nn_tasks.network_destroy],
+            PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
-            interface_present = util_network.check_for_interface(
-                subst['vx_interface'])
-            if interface_present:
-                util_concurrency.execute(
-                    'ip link delete %(vx_interface)s' % subst)
-
-            self.add_event(
-                EVENT_TYPE_AUDIT, 'deleted network on hypervisor',
-                extra={'vx_bridge': subst['vx_bridge'],
-                       'vx_interface': subst['vx_interface'],
-                       'bridge_was_present': bridge_present,
-                       'interface_was_present': interface_present})
-
-    # This method should only ever be called when you already know you're on
-    # the network node. Specifically it is called by a queue task that the
-    # network node listens for.
     def delete_on_network_node(self):
-        with self.get_lock(op='Network delete', global_scope=False):
-            subst = self.subst_dict()
+        """Enqueue a network_apply_delete_network_node NetOp for this network.
 
-            if util_network.check_for_interface(subst['vx_veth_outer']):
-                util_concurrency.execute(
-                    'ip link delete %(vx_veth_outer)s' % subst)
-
-            if util_network.check_for_interface(subst['egress_veth_outer']):
-                util_concurrency.execute(
-                    'ip link delete %(egress_veth_outer)s' % subst)
-
-            if os.path.exists('/var/run/netns/%s' % str(self.uuid)):
-                util_concurrency.execute('ip netns del %s' % str(self.uuid))
-
-            self.ipam.state = self.ipam.STATE_DELETED
-            self.state = self.STATE_DELETED
-
-        # Ensure that all hypervisors remove this network. This is really
-        # just catching strays, apart from on the network node where we
-        # absolutely need to do this thing.
-        for n in Nodes([], prefilter='active'):
-            nn_create_and_enqueue(
-                str(n.uuid),
-                self.uuid,
-                [nn_tasks.network_destroy],
-                PRIORITY.user_facing,
-                request_id=util_general.get_request_id())
-
-        self.remove_dnsmasq()
-        self.remove_nat()
+        Returns the enqueued NetOp loaded from the database. Callers
+        wanting the previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_delete_on_network_node`` and now runs
+        in the net-worker dispatcher on the elected network node.
+        """
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_delete_network_node],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def hard_delete(self):
         mariadb.delete_network_attributes(UUID(str(self.uuid)))
@@ -772,71 +664,88 @@ class Network(dbowo):
         return is_running
 
     def remove_dhcp_lease(self, ipv4, macaddr):
-        if not self.provide_dhcp and not self.provide_dns:
-            return
+        """Enqueue a remove_dhcp_lease NetMacaddrIPOp for this network.
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DnsMasq', global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.remove_lease(ipv4, macaddr)
-        else:
-            nmi_create_and_enqueue(
-                self.uuid, macaddr, ipv4, [nmi_tasks.remove_dhcp_lease],
-                PRIORITY.user_facing)
+        Returns the enqueued NetMacaddrIPOp loaded from the database, or
+        ``None`` if this network does not run dnsmasq. Callers wanting
+        the previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_remove_dhcp_lease``.
+        """
+        if not self.provide_dhcp and not self.provide_dns:
+            return None
+
+        op_type, op_uuid = nmi_create_and_enqueue(
+            self.uuid, macaddr, ipv4, [nmi_tasks.remove_dhcp_lease],
+            PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def update_dnsmasq(self):
-        if not self.provide_dhcp and not self.provide_dns:
-            return
+        """Enqueue a network_apply_update_dnsmasq NetOp for this network.
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network update DnsMasq', global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.restart()
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_update_dnsmasq],
-                priority=PRIORITY.user_facing_high_io
-            )
+        Returns the enqueued NetOp loaded from the database, or ``None``
+        if this network does not run dnsmasq. Callers wanting the
+        previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_update_dnsmasq``.
+        """
+        if not self.provide_dhcp and not self.provide_dns:
+            return None
+
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def remove_dnsmasq(self):
+        """Enqueue a network_apply_remove_dnsmasq NetOp for this network.
+
+        Returns the enqueued NetOp loaded from the database, or ``None``
+        if this network does not run dnsmasq. Callers wanting the
+        previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_remove_dnsmasq``.
+        """
         if not self.provide_dhcp and not self.provide_dns:
-            return
+            return None
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network remove DnsMasq', global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.terminate()
-                d.state = dnsmasq.DnsMasq.STATE_DELETED
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_remove_dnsmasq],
-                priority=PRIORITY.user_facing
-            )
-
-    def enable_nat(self):
-        if not config.NODE_IS_NETWORK_NODE:
-            return
-        util_concurrency.enable_nat(
-            self.uuid, self.network_address, self.netmask, self.vxid)
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_remove_dnsmasq],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def remove_nat(self):
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(op='Network remove NAT', global_scope=False):
-                if self.floating_gateway:
-                    self.unassign_floating_gateway()
+        """Enqueue a network_remove_nat NetOp for this network.
 
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_remove_nat],
-                priority=PRIORITY.user_facing
-            )
+        Returns the enqueued NetOp loaded from the database. Callers
+        wanting the previous synchronous-with-exception semantics call
+        ``op.raise_for_error()``. The host-mutating work has moved to
+        ``BridgedVXLanNetwork._apply_remove_nat`` and now runs in the
+        net-worker dispatcher on the elected network node.
+        """
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_remove_nat],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def update_dns_entry(self, name, value):
+        """Update a DNS entry and enqueue a dnsmasq restart.
+
+        The attribute mutation (``attrs.hosteddns[name] = value``) is
+        DB-only state and stays synchronous. The dnsmasq restart is
+        enqueued as a ``network_apply_update_dnsmasq`` NetOp. Returns
+        the enqueued NetOp loaded from the database, or ``None`` if
+        this network does not provide DNS.
+        """
         if not self.provide_dns:
-            return
+            return None
 
         attrs = self._ensure_attributes()
         attrs.hosteddns[name] = value
@@ -844,22 +753,25 @@ class Network(dbowo):
         self.add_event(EVENT_TYPE_MUTATE, 'update dns entry',
                        extra={'name': name, 'value': value})
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(
-                    op='Network update DnsMasq',
-                    global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.restart()
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_update_dnsmasq],
-                priority=PRIORITY.user_facing_high_io
-            )
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     def remove_dns_entry(self, name):
+        """Remove a DNS entry and enqueue a dnsmasq restart.
+
+        The attribute mutation (the ``del attrs.hosteddns[name]``) is
+        DB-only state and stays synchronous. The dnsmasq restart is
+        enqueued as a ``network_apply_update_dnsmasq`` NetOp regardless
+        of whether the name was present (matching the pre-flip
+        behaviour). Returns the enqueued NetOp loaded from the
+        database, or ``None`` if this network does not provide DNS.
+        """
         if not self.provide_dns:
-            return
+            return None
 
         attrs = self._ensure_attributes()
         if name in attrs.hosteddns:
@@ -868,121 +780,217 @@ class Network(dbowo):
             self.add_event(EVENT_TYPE_MUTATE, 'remove dns entry',
                            extra={'name': name})
 
-        if config.NODE_IS_NETWORK_NODE:
-            with self.get_lock(
-                    op='Network update DnsMasq',
-                    global_scope=False):
-                d = self._get_dnsmasq_object()
-                d.restart()
-        else:
-            net_create_and_enqueue(
-                self.uuid,
-                [net_tasks.network_update_dnsmasq],
-                priority=PRIORITY.user_facing_high_io
-            )
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
     @_not_on_floating_network
     def ensure_mesh(self):
-        with self.get_lock(op='Network ensure mesh', global_scope=False):
-            # Determine which IPs should be on this mesh and where
-            instances = []
-            for ni in self.networkinterfaces:
-                if ni.instance_uuid not in instances:
-                    instances.append(ni.instance_uuid)
+        """Fan an ensure-mesh NetOp out to every participating hypervisor.
 
-            node_fqdns = []
-            for inst_uuid in instances:
-                inst = instance.Instance.from_db(inst_uuid)
-                if not inst:
-                    continue
-                placement = inst.placement
-                if not placement:
-                    continue
-                if not placement.get('node'):
-                    continue
+        Every hypervisor with an interface on this network has to maintain
+        its own VXLAN FDB entries for the mesh -- the apply method
+        excludes ``self`` from the entries it writes, so a one-node run
+        leaves every *other* node's FDB stale. Enqueueing only on the
+        caller's node was the original behaviour and is the root cause
+        of the asymmetric mesh that broke
+        ``test_single_virtual_networks_work``: when an instance starts
+        on hypervisor A, only A re-meshes, and hypervisor B (which
+        already had an instance on the network) never learns the new
+        FDB entry for A.
 
-                if not placement.get('node') in node_fqdns:
-                    node_fqdns.append(placement.get('node'))
+        The fan-out enumerates the set of nodes hosting any of this
+        network's interfaces (mirroring the peer-enumeration logic in
+        ``BridgedVXLanNetwork._apply_ensure_mesh``) and enqueues one
+        ensure_mesh op on each node's per-node ``network`` queue. The
+        enqueue-side dedup in ``net_op.create_and_enqueue`` is keyed on
+        ``target='networknode'`` only, so per-node enqueues are *not*
+        collapsed across nodes -- each node's worker sees its own op
+        and updates its own FDB. Worker-side coalescing on the per-node
+        queue is similarly gated off (see the ``queue_is_cluster_wide``
+        check in ``BaseClusterOperation.execute``).
 
-            # NOTE(mikal): why not use DNS here? Well, DNS might be outside
-            # the control of the deployer if we're running in a public cloud
-            # as an overlay cloud... Also, we don't include ourselves in the
-            # mesh as that would cause duplicate packets to reflect back to us.
-            # (see bug #859).
-            node_ips = set()
-            if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
-                # Always add Network node if it is not this node
-                node_ips.add(config.NETWORK_NODE_IP)
+        Returns the local-node op when this caller's node is itself a
+        participant, so the caller's existing
+        ``raise_for_error()``/``poll_until_terminal()`` semantics keep
+        working. If the caller's node is not a participant (e.g. an
+        API-only node), returns the first remote op enqueued so the
+        caller still has *something* to block on.
+        """
+        # Enumerate participating hypervisors. The FQDN -> node UUID
+        # translation goes through the node table; instances store
+        # placement by FQDN. Late-import ``instance`` to avoid the
+        # network <-> instance circular import at module load.
+        from shakenfist import instance  # noqa: PLC0415
 
-            for fqdn in node_fqdns:
-                n = Node.from_db(fqdn)
-                if n and n.ip != config.NODE_MESH_IP:
-                    node_ips.add(n.ip)
+        seen_instances: set[str] = set()
+        node_fqdns: list[str] = []
+        for ni in self.networkinterfaces:
+            if ni.instance_uuid in seen_instances:
+                continue
+            seen_instances.add(ni.instance_uuid)
+            inst = instance.Instance.from_db(ni.instance_uuid)
+            if not inst:
+                continue
+            placement = inst.placement
+            if not placement or not placement.get('node'):
+                continue
+            fqdn = placement['node']
+            if fqdn not in node_fqdns:
+                node_fqdns.append(fqdn)
 
-            added, removed = util_concurrency.ensure_vxlan_mesh(
-                self.uuid, self.vxid, node_ips)
-            if removed:
-                self.add_event(EVENT_TYPE_MUTATE, 'remove mesh elements',
-                               extra={'removed': removed})
-            if added:
-                self.add_event(EVENT_TYPE_MUTATE, 'add mesh elements',
-                               extra={'added': added})
+        # Map FQDN -> node UUID. We need the UUID because the per-node
+        # queue name is composed from it (``<node_uuid>-network-...``).
+        # Skip nodes the database doesn't know about (shouldn't happen
+        # in practice, but a stale placement on a deleted node would
+        # land here otherwise).
+        node_uuids: list[str] = []
+        local_node_uuid = config.NODE_UUID
+        for fqdn in node_fqdns:
+            n = Node.from_db(fqdn)
+            if n is None:
+                continue
+            node_uuids.append(str(n.uuid))
 
-    # NOTE(mikal): this call only works on the network node, the API
-    # server redirects there.
+        # If no participating hypervisors were found, still enqueue on
+        # the local node. This keeps the bootstrap case sane: an empty
+        # network with no interfaces yet should still let a caller
+        # observe an ensure_mesh op going to terminal state via
+        # raise_for_error().
+        if not node_uuids:
+            node_uuids = [local_node_uuid]
+
+        local_op_type = None
+        local_op_uuid = None
+        first_op_type = None
+        first_op_uuid = None
+        for node_uuid in node_uuids:
+            op_type, op_uuid = net_create_and_enqueue(
+                network_uuid=str(self.uuid),
+                tasks=[net_tasks.network_ensure_mesh],
+                priority=PRIORITY.user_facing,
+                target=node_uuid,
+                family='network',
+            )
+            if first_op_uuid is None:
+                first_op_type, first_op_uuid = op_type, op_uuid
+            if node_uuid == local_node_uuid:
+                local_op_type, local_op_uuid = op_type, op_uuid
+
+        if local_op_uuid is not None:
+            return get_object_class(local_op_type).from_db(local_op_uuid)
+        return get_object_class(first_op_type).from_db(first_op_uuid)
+
     def add_floating_ip(self, floating_address, inner_address, affected_objects):
+        """Enqueue a network_add_floating_ip NetOp for this network.
+
+        Emits a synchronous "requesting add floating IP" audit event on
+        the caller-supplied ``affected_objects`` to preserve today's
+        multi-target correlation for the *requesting* event, then
+        enqueues a NetOp. The host-mutating work lives in
+        ``BridgedVXLanNetwork._apply_add_floating_ip`` and runs in the
+        net-worker dispatcher. Returns the loaded NetOp; callers may
+        call ``op.raise_for_error()`` for sync-with-exception semantics.
+        """
         affected_objects.append(self)
         affected_objects.append(('network', FLOATING_NETWORK_UUID))
         add_event_multi(
-            EVENT_TYPE_AUDIT, affected_objects, 'adding floating ip',
+            EVENT_TYPE_AUDIT, affected_objects,
+            'requesting add floating IP',
             extra={
                 'floating': floating_address,
                 'inner': inner_address
             })
-        with self.get_lock(op='Network add floating IP', global_scope=False):
-            util_concurrency.add_floating_ip(
-                str(self.uuid), floating_address, inner_address)
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_add_floating_ip],
+            priority=PRIORITY.user_facing,
+            floating_address=floating_address,
+            inner_address=inner_address,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
-    # NOTE(mikal): this call only works on the network node, the API
-    # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address, affected_objects):
+        """Enqueue a network_remove_floating_ip NetOp for this network.
+
+        Emits a synchronous "requesting remove floating IP" audit event
+        on the caller-supplied ``affected_objects`` to preserve today's
+        multi-target correlation for the *requesting* event, then
+        enqueues a NetOp. The host-mutating work lives in
+        ``BridgedVXLanNetwork._apply_remove_floating_ip``. Returns the
+        loaded NetOp; callers may call ``op.raise_for_error()``.
+        """
         affected_objects.append(self)
         affected_objects.append(('network', FLOATING_NETWORK_UUID))
         add_event_multi(
-            EVENT_TYPE_AUDIT, affected_objects, 'remove floating ip',
+            EVENT_TYPE_AUDIT, affected_objects,
+            'requesting remove floating IP',
             extra={
                 'floating': floating_address,
                 'inner': inner_address
             })
-        with self.get_lock(op='Network remove floating IP', global_scope=False):
-            util_concurrency.remove_floating_ip(
-                str(self.uuid), floating_address)
+        op_type, op_uuid = net_create_and_enqueue(
+            network_uuid=str(self.uuid),
+            tasks=[net_tasks.network_remove_floating_ip],
+            priority=PRIORITY.user_facing,
+            floating_address=floating_address,
+            inner_address=inner_address,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
-    # NOTE(mikal): this call only works on the network node, the API
-    # server redirects there.
     def route_address(self, floating_address):
-        self.add_event(
-            EVENT_TYPE_AUDIT, 'routing floating ip to network',
-            extra={'floating': floating_address})
-        subst = self.subst_dict()
-        subst['floating_address'] = floating_address
-        with self.get_lock(op='Network route address', global_scope=False):
-            util_concurrency.execute(
-                'ip route add %(floating_address)s/32 dev %(vx_bridge)s'
-                % subst)
+        """Enqueue a route_address NetIPOp for this network.
 
-    # NOTE(mikal): this call only works on the network node, the API
-    # server redirects there.
-    def unroute_address(self, floating_address):
+        Emits a synchronous "requesting route floating ip" audit
+        event on this Network, then enqueues a NetIPOp. The host-
+        mutating work lives in ``BridgedVXLanNetwork._apply_route_address``
+        and emits its own "routing floating ip to network" event at
+        apply time. Returns the loaded NetIPOp; callers may call
+        ``op.raise_for_error()``.
+
+        The "requesting ..." naming mirrors the floating-IP
+        ``add_floating_ip`` / ``remove_floating_ip`` pair above:
+        the enqueue-side event proves the request was accepted, the
+        apply-side event proves the work landed. Using the same
+        message string on both sides would emit a duplicate audit
+        line and lose that distinction.
+        """
         self.add_event(
-            EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
+            EVENT_TYPE_AUDIT, 'requesting route floating ip',
             extra={'floating': floating_address})
-        subst = self.subst_dict()
-        subst['floating_address'] = floating_address
-        with self.get_lock(op='Network unroute address', global_scope=False):
-            util_concurrency.execute(
-                'ip route del %(floating_address)s/32 dev %(vx_bridge)s'
-                % subst)
+        op_type, op_uuid = net_ip_op_schema.create_and_enqueue(
+            network_uuid=str(self.uuid),
+            ip=floating_address,
+            tasks=[net_ip_op_schema.model_tasks.route_address],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
+
+    def unroute_address(self, floating_address):
+        """Enqueue an unroute_address NetIPOp for this network.
+
+        Emits a synchronous "requesting unroute floating ip" audit
+        event on this Network, then enqueues a NetIPOp. The host-
+        mutating work lives in
+        ``BridgedVXLanNetwork._apply_unroute_address`` and emits its
+        own "unrouting floating ip to network" event at apply time.
+        Returns the loaded NetIPOp; callers may call
+        ``op.raise_for_error()``. See ``route_address`` for the
+        naming rationale.
+        """
+        self.add_event(
+            EVENT_TYPE_AUDIT, 'requesting unroute floating ip',
+            extra={'floating': floating_address})
+        op_type, op_uuid = net_ip_op_schema.create_and_enqueue(
+            network_uuid=str(self.uuid),
+            ip=floating_address,
+            tasks=[net_ip_op_schema.model_tasks.unroute_address],
+            priority=PRIORITY.user_facing,
+        )
+        return get_object_class(op_type).from_db(op_uuid)
 
 
 class Networks(dbo_iter):

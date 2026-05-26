@@ -1,9 +1,12 @@
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
 from shakenfist.schema.operations import net_macaddr_ip_op as schema
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.util import exceptions as util_exceptions
 
 
@@ -90,6 +93,8 @@ class NetMacaddrIPOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(n)
         except Exception as e:
             util_exceptions.ignore_exception('net_macaddr_ip_op', e)
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetMacaddrIPOp.STATE_ERROR
 
     def _remove_dhcp_lease(self, n):
@@ -105,4 +110,5 @@ class NetMacaddrIPOp(BaseClusterOperation):
             self.log.info('Network is dead; skipping DHCP lease removal')
             return
 
-        n.remove_dhcp_lease(self.ip, self.mac_address)
+        BridgedVXLanNetwork(n)._apply_remove_dhcp_lease(
+            self.ip, self.mac_address)

@@ -162,6 +162,25 @@ Concretely:
   `ip netns`** calls move to `pyroute2.IPRoute()` (or the
   higher-level `NDB`) — typed APIs returning structured
   results instead of stdout to be parsed.
+- **VXLAN bridge FDB management (`bridge fdb show / del /
+  append`)** is the single largest contributor to exec
+  churn in SF today and the highest-leverage target of this
+  plan. Each ensure_mesh call shells out one `bridge fdb
+  show` plus one `bridge fdb del` or `append` *per delta*
+  (see `_ensure_mesh` in `shakenfist/daemons/privexec/main.py:292`).
+  After the ensure_mesh fan-out landed on the network-
+  facade branch — one op per participating hypervisor, not
+  one cluster-wide — an instance start on an N-node mesh
+  produces O(N²) forks across the cluster for FDB work
+  alone, on top of the gRPC round-trip each one already
+  carries. Bridge FDB lives in the rtnetlink `neigh` family
+  (`RTM_NEWNEIGH` / `RTM_DELNEIGH` with `NDA_DST` for the
+  VXLAN destination and `NTF_SELF` to scope to the bridge-
+  port FDB), so the move is squarely inside the pyroute2
+  surface; the encoding is one of the fiddlier
+  `RTM_NEWNEIGH` shapes and is called out as a subtask of
+  phase 1 rather than rolled in with the plain `ip neigh`
+  work.
 - **`brctl`** calls (currently used in
   `privexec/util.py:219-229` to disable STP, set forward
   delay, and zero the ageing timer on each VXLAN bridge)
@@ -204,6 +223,27 @@ correctness and atomicity gains (transactional nft
 rulesets, structured error reporting, no shell-escaping
 hazards, no stdout-parsing) are at least as valuable as
 the performance gains.
+
+The **process-churn motivation** is concrete and worth
+calling out separately from the correctness motivation.
+SF's network mutation path today is dominated by short-
+lived helper processes: `_ensure_mesh` alone forks one
+`bridge fdb show` plus one `bridge fdb del/append` per
+FDB delta, and ensure_mesh runs on every instance start
+on every participating hypervisor. Profiling on the
+network-facade branch traces a single instance start to
+double-digit forks of bridge/ip/iptables binaries on the
+hypervisor, each one paying the fork+exec+library-load
+tax (~5-15 ms on a warm host, more under memory
+pressure) and routing through `sf-privexec`'s gRPC
+channel on top. The netlink replacement collapses each
+"one syscall per delta" exec storm into a single
+netlink-batch syscall and removes the privexec hop where
+the worker is already in-process. The cluster_ci
+"6 instances on 3 hypervisors" scenario should see a
+visible drop in per-start wall time as a result; that
+metric is worth capturing pre/post as part of phase 1's
+acceptance criteria.
 
 ## Alternatives considered
 
@@ -370,11 +410,21 @@ Notes on sequencing:
 
 - **Phase 0 is decisions.** No code. Output is appended to
   this master plan and the phase table is re-cut.
-- **Phase 1 is the easiest canary.** `ip link / addr /
-  route / neigh` map almost one-for-one to pyroute2 calls,
-  the existing semantics survive intact, and the wins
-  (typed errors, no stdout parsing, no process fork) show
-  up immediately.
+- **Phase 1 is the easiest canary and contains the single
+  highest-leverage piece of work in the plan.** `ip link /
+  addr / route / neigh` map almost one-for-one to pyroute2
+  calls, the existing semantics survive intact, and the
+  wins (typed errors, no stdout parsing, no process fork)
+  show up immediately. **VXLAN bridge FDB management is
+  carved out as a dedicated subtask within this phase** —
+  same rtnetlink family as `ip neigh` and so naturally
+  grouped, but the dominant per-instance-start fork source
+  in production traces and the largest single reduction in
+  process churn that this plan delivers. The phase plan
+  should treat the FDB subtask as its own commit and its
+  own review pass, and capture before/after fork counts
+  for an N-node ensure_mesh on a controlled test cluster
+  as evidence the optimisation is real.
 - **Phase 2 (bridge attributes)** is small but its own
   step because the rtnetlink encoding for `IFLA_BR_*` is
   the first non-trivial netlink-message-construction work

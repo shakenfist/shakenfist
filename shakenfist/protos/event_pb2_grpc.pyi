@@ -29,6 +29,17 @@ class EventServiceStub:
         event_pb2.EventReply,
     ]
 
+    RecordMultiEventBatch: grpc.UnaryUnaryMultiCallable[
+        event_pb2.EventMultiBatchRequest,
+        event_pb2.EventReply,
+    ]
+    """Batched form: ack=true means *every* event in the batch was
+    persisted. Partial failure is reported as ack=false and the
+    client must replay the whole batch. The local eventlog spool
+    drainer is the only expected caller; it sizes the batch
+    small enough (~100) that whole-batch replay is cheap.
+    """
+
 class EventServiceAsyncStub:
     RecordEvent: grpc.aio.UnaryUnaryMultiCallable[
         event_pb2.EventRequest,
@@ -39,6 +50,17 @@ class EventServiceAsyncStub:
         event_pb2.EventMultiRequest,
         event_pb2.EventReply,
     ]
+
+    RecordMultiEventBatch: grpc.aio.UnaryUnaryMultiCallable[
+        event_pb2.EventMultiBatchRequest,
+        event_pb2.EventReply,
+    ]
+    """Batched form: ack=true means *every* event in the batch was
+    persisted. Partial failure is reported as ack=false and the
+    client must replay the whole batch. The local eventlog spool
+    drainer is the only expected caller; it sizes the batch
+    small enough (~100) that whole-batch replay is cheap.
+    """
 
 class EventServiceServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -54,5 +76,18 @@ class EventServiceServicer(metaclass=abc.ABCMeta):
         request: event_pb2.EventMultiRequest,
         context: _ServicerContext,
     ) -> typing.Union[event_pb2.EventReply, collections.abc.Awaitable[event_pb2.EventReply]]: ...
+
+    @abc.abstractmethod
+    def RecordMultiEventBatch(
+        self,
+        request: event_pb2.EventMultiBatchRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[event_pb2.EventReply, collections.abc.Awaitable[event_pb2.EventReply]]:
+        """Batched form: ack=true means *every* event in the batch was
+        persisted. Partial failure is reported as ack=false and the
+        client must replay the whole batch. The local eventlog spool
+        drainer is the only expected caller; it sizes the batch
+        small enough (~100) that whole-batch replay is cheap.
+        """
 
 def add_EventServiceServicer_to_server(servicer: EventServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

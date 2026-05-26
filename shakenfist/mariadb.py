@@ -29,6 +29,7 @@ from uuid import uuid4
 
 import grpc
 import sqlalchemy as sa
+from sqlalchemy import event as sa_event
 from sqlalchemy.dialects.mysql import INET4
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
@@ -36,6 +37,7 @@ from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
@@ -132,6 +134,7 @@ _cluster_operation_targets_table: Optional[sa.Table] = None
 _node_metrics_table: Optional[sa.Table] = None
 _node_daemon_states_table: Optional[sa.Table] = None
 _cluster_operations_table: Optional[sa.Table] = None
+_cluster_operation_errors_table: Optional[sa.Table] = None
 _work_queue_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
@@ -181,6 +184,7 @@ NODE_METRICS_VERSION = 2
 # JSON column.
 NODE_DAEMON_STATES_VERSION = 2
 CLUSTER_OPERATIONS_VERSION = 2
+CLUSTER_OPERATION_ERRORS_VERSION = 1
 WORK_QUEUE_VERSION = 2
 # v3: leased locks. Adds expires_at, makes acquire steal-if-expired,
 # and introduces a refresh path so live holders can extend their lease.
@@ -313,20 +317,116 @@ def _get_connection_url() -> str:
     )
 
 
+# Queries that take longer than this (in seconds) are logged at WARN.
+# Chosen to surface the tail without filling syslog under healthy load:
+# a sub-millisecond indexed lookup that drifts to 100 ms is already a
+# leading indicator of buffer-pool pressure or sf-database contention,
+# but a small number of legitimately heavy queries (the maintainer's
+# ``find_*`` scans, schema migrations) are slower than that and not
+# interesting. 100 ms is the same threshold as the MariaDB-side
+# slow_query_log (``long_query_time = 0.1`` in
+# ``roles/mariadb/files/90-shakenfist-tuning.cnf``) so the two logs
+# can be correlated by time.
+SLOW_QUERY_THRESHOLD_SECONDS = 0.1
+
+
+def _log_slow_query(
+        _conn: Any,
+        _cursor: Any,
+        statement: str,
+        parameters: Any,
+        context: Any,
+        _executemany: bool) -> None:
+    """Log queries that exceed ``SLOW_QUERY_THRESHOLD_SECONDS`` to syslog.
+
+    SQLAlchemy event listener attached to every engine created by
+    ``_get_engine``. We stash a start timestamp on the
+    ``ExecutionContext`` in the ``before_cursor_execute`` listener
+    (``_record_query_start_time`` below) and compute the duration here.
+
+    Logging at WARN sends the line to per-node syslog, which the CI
+    bundle already captures. This complements the MariaDB-side
+    slow_query_log -- the MariaDB log measures pure server-side query
+    time, this listener measures client-perceived latency (round-trip
+    + serialisation + server). Both at 100 ms threshold so they line
+    up by timestamp.
+
+    The statement is truncated to 400 chars so a giant ``IN (...)``
+    clause does not flood syslog. Parameters are not logged: they may
+    contain blob hashes or UUIDs that have lookup value in eventlog
+    only.
+    """
+    start = getattr(context, '_sf_query_start', None)
+    if start is None:
+        return
+    duration = time.time() - start
+    if duration < SLOW_QUERY_THRESHOLD_SECONDS:
+        return
+    LOG.with_fields({
+        'duration_seconds': duration,
+        'statement': statement[:400],
+    }).warning('Slow MariaDB query')
+
+
+def _record_query_start_time(
+        _conn: Any,
+        _cursor: Any,
+        _statement: str,
+        _parameters: Any,
+        context: Any,
+        _executemany: bool) -> None:
+    """Stash a start timestamp for ``_log_slow_query`` to read.
+
+    SQLAlchemy's ``ExecutionContext`` survives across the
+    before/after cursor events for a single statement, so it is the
+    correct place to keep the per-query timing state without a
+    thread-local.
+    """
+    context._sf_query_start = time.time()
+
+
 def _get_engine() -> sa.Engine:
     """Get or create a thread-local SQLAlchemy engine.
 
     We use thread-local engines to avoid connection sharing issues across
     threads. Each thread gets its own engine with its own connection pool.
+
+    Notes on the engine configuration:
+
+    * ``pool_recycle=1800`` recycles connections after 30 minutes. The
+      MariaDB server-side ``wait_timeout`` default is 28800 s (8 h),
+      so this is well below the server-side disconnect threshold but
+      short enough that connections idle through an apt upgrade /
+      restart-mariadb pair will not surface as a stale-handle error
+      on next use.
+    * No ``pool_pre_ping=True``. We previously paid a ``SELECT 1``
+      round-trip on every checkout, which under bursty load measured
+      at ~50-100 ms each -- material when the rest of the query is
+      a sub-millisecond indexed lookup. The combination of a tight
+      ``pool_recycle`` (above) plus SQLAlchemy's existing built-in
+      ``OperationalError`` -> invalidate-and-retry behaviour on the
+      first failed query post-disconnect gives us equivalent
+      robustness without the per-query overhead.
+    * Slow-query listeners (``_record_query_start_time`` /
+      ``_log_slow_query``) are attached to every engine on creation,
+      so any query exceeding ``SLOW_QUERY_THRESHOLD_SECONDS`` (100 ms)
+      lands in syslog at WARN. Equivalent to MariaDB's
+      ``slow_query_log`` but client-side, available without editing
+      the clingwrap collection target.
     """
     if not hasattr(_local, 'engine') or _local.engine is None:
         url = _get_connection_url()
         _local.engine = sa.create_engine(
             url,
-            pool_pre_ping=True,  # Verify connections before use
-            pool_recycle=3600,   # Recycle connections after 1 hour
+            pool_recycle=1800,   # Recycle connections after 30 minutes
             echo=False           # Set True for SQL debugging
         )
+        sa_event.listen(
+            _local.engine, 'before_cursor_execute',
+            _record_query_start_time)
+        sa_event.listen(
+            _local.engine, 'after_cursor_execute',
+            _log_slow_query)
         LOG.debug('Created new MariaDB engine for thread')
     engine: sa.Engine = _local.engine
     return engine
@@ -853,6 +953,63 @@ def _ensure_cluster_operations_schema(engine: sa.Engine) -> dict[str, Any]:
         'start_version': start_ver,
         'end_version': current_ver,
         'target_version': CLUSTER_OPERATIONS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_cluster_operation_errors_table() -> sa.Table:
+    """Get or create the cluster_operation_errors table definition.
+
+    This table stores the structured failure record (``ErrorReport``)
+    for a cluster operation. There is at most one row per operation;
+    the row is written when the dispatcher catches an exception
+    escaping an ``_apply_*`` method and converts it via
+    ``ErrorReport.from_exception``.
+
+    ``cluster_operations`` rows are insert-only (the table doc on
+    ``_get_cluster_operations_table`` makes this contract explicit),
+    so the error report cannot live as a column there. Persisting it
+    separately also keeps the contract narrow: this table only exists
+    to surface failure data to the REST layer and to operators.
+
+    The ``op_uuid`` column is a natural foreign key to
+    ``cluster_operations.uuid`` but no SA-level FK constraint is
+    declared, matching the existing pattern across the other
+    cluster-operation tables (e.g. ``cluster_operation_targets``
+    does not declare an FK either).
+    """
+    global _cluster_operation_errors_table
+    if _cluster_operation_errors_table is None:
+        metadata = _get_metadata()
+        _cluster_operation_errors_table = sa.Table(
+            'cluster_operation_errors',
+            metadata,
+            sa.Column('op_uuid', sa.Uuid(), primary_key=True),
+            sa.Column('error_report', sa.JSON(), nullable=False),
+            sa.Column('created_at', sa.Double(), nullable=False),
+        )
+    return _cluster_operation_errors_table
+
+
+def _ensure_cluster_operation_errors_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the cluster_operation_errors table schema is up to date."""
+    table_name = 'cluster_operation_errors'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_cluster_operation_errors_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': CLUSTER_OPERATION_ERRORS_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -1915,6 +2072,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_node_metrics_schema(engine))
     results.append(_ensure_node_daemon_states_schema(engine))
     results.append(_ensure_cluster_operations_schema(engine))
+    results.append(_ensure_cluster_operation_errors_schema(engine))
     results.append(_ensure_work_queue_schema(engine))
     results.append(_ensure_cluster_locks_schema(engine))
     results.append(_ensure_cluster_config_schema(engine))
@@ -5595,6 +5753,69 @@ def _direct_has_pending_cluster_operation_target(
         return True
 
 
+# Terminal states for cluster operations -- mirror the set used by the
+# operation state machine (shakenfist/operations/baseoperation.py). An op
+# in any of these states is no longer executing and is safe to consider
+# for cooldown / circuit-breaker queries.
+_TERMINAL_OPERATION_STATES = ('complete', 'abort', 'deleted', 'error')
+
+
+def _direct_get_recent_terminal_op_states_for_target(
+    target_object_type: ObjectType,
+    target_uuid: str,
+    limit: int,
+    op_type: Optional[str] = None
+) -> list[tuple[str, str, float]]:
+    """Return up to ``limit`` most recent terminal op states for an object.
+
+    Joins ``cluster_operation_targets`` against ``object_states`` and
+    filters to terminal cluster operation states (complete, abort,
+    deleted, error). Results are ordered newest first by
+    ``object_states.update_time``. If ``op_type`` is provided, results
+    are additionally narrowed to that operation type (e.g. ``'net_op'``).
+
+    Returns a list of ``(op_uuid, state_value, update_time)`` tuples.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operation_targets_table()
+    states_table = _get_object_states_table()
+
+    conditions = [
+        table.c.target_object_type == target_object_type,
+        table.c.target_uuid == target_uuid,
+        states_table.c.state_value.in_(_TERMINAL_OPERATION_STATES),
+    ]
+    if op_type is not None:
+        conditions.append(table.c.operation_type == op_type)
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(
+                table.c.operation_uuid,
+                states_table.c.state_value,
+                states_table.c.update_time,
+            ).select_from(
+                table.join(
+                    states_table,
+                    table.c.operation_uuid == states_table.c.object_uuid
+                )
+            ).where(
+                sa.and_(*conditions)
+            ).order_by(
+                states_table.c.update_time.desc()
+            ).limit(limit)
+            results = conn.execute(stmt).fetchall()
+            return [
+                (r.operation_uuid, r.state_value, float(r.update_time))
+                for r in results
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for get_recent_terminal_op_states '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return []
+
+
 def _direct_delete_cluster_operation_target(
     operation_uuid: str
 ) -> bool:
@@ -5826,6 +6047,36 @@ def _grpc_has_pending_cluster_operation_target(
         return True
 
 
+def _grpc_get_recent_terminal_op_states_for_target(
+    target_object_type: ObjectType,
+    target_uuid: str,
+    limit: int,
+    op_type: Optional[str] = None
+) -> list[tuple[str, str, float]]:
+    """gRPC variant of get_recent_terminal_op_states_for_target."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetRecentTerminalOpStatesForTargetRequest(
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid,
+            limit=limit,
+            op_type=op_type if op_type is not None else '',
+        )
+        reply = _grpc_call(
+            stub.GetRecentTerminalOpStatesForTarget, request)
+        return [
+            (entry.op_uuid, entry.state_value, float(entry.update_time))
+            for entry in reply.entries
+        ]
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetRecentTerminalOpStatesForTarget failed for '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return []
+
+
 def _grpc_delete_cluster_operation_target(
     operation_uuid: str
 ) -> bool:
@@ -5975,6 +6226,35 @@ def has_pending_cluster_operation_target(
             target_object_type, target_uuid)
     return _direct_has_pending_cluster_operation_target(
         target_object_type, target_uuid)
+
+
+def get_recent_terminal_op_states_for_target(
+    target_object_type: ObjectType,
+    target_uuid: str,
+    limit: int,
+    op_type: Optional[str] = None
+) -> list[tuple[str, str, float]]:
+    """Return up to ``limit`` most recent terminal op states for an object.
+
+    Joins ``cluster_operation_targets`` against ``object_states`` and
+    filters to terminal cluster operation states (complete, abort,
+    deleted, error). Results are ordered newest first by
+    ``object_states.update_time``. If ``op_type`` is provided, results
+    are additionally narrowed to that operation type (e.g. ``'net_op'``).
+
+    This is a generic helper -- it targets any object type. The
+    maintain pass uses ``target_object_type='network'`` and
+    ``op_type='net_op'`` to power its cooldown and circuit-breaker
+    queries.
+
+    Returns a list of ``(op_uuid, state_value, update_time)`` tuples,
+    newest first. Returns an empty list on database error.
+    """
+    if _use_database_service():
+        return _grpc_get_recent_terminal_op_states_for_target(
+            target_object_type, target_uuid, limit, op_type)
+    return _direct_get_recent_terminal_op_states_for_target(
+        target_object_type, target_uuid, limit, op_type)
 
 
 def delete_cluster_operation_target(
@@ -17251,6 +17531,44 @@ def _direct_get_cluster_operations_by_node(
         return []
 
 
+def _direct_list_cluster_operations_for_target(
+        target_object_type: ObjectType,
+        target_uuid: str) -> list[dict[str, Any]]:
+    """List cluster operation headers targeting an object, newest first.
+
+    Joins ``cluster_operation_targets`` against ``cluster_operations`` to
+    return the full op metadata for every operation that has touched the
+    given target, ordered by ``cluster_operations.created_at DESC``.
+    Namespace scoping is the caller's responsibility (handled in the REST
+    layer by validating access to the target object before issuing the
+    query).
+    """
+    engine = _get_engine()
+    targets_table = _get_cluster_operation_targets_table()
+    ops_table = _get_cluster_operations_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(ops_table).select_from(
+                targets_table.join(
+                    ops_table,
+                    targets_table.c.operation_uuid == ops_table.c.uuid
+                )
+            ).where(
+                sa.and_(
+                    targets_table.c.target_object_type == target_object_type,
+                    targets_table.c.target_uuid == target_uuid
+                )
+            ).order_by(ops_table.c.created_at.desc())
+            result = conn.execute(stmt).fetchall()
+            return [_cluster_operation_row_to_dict(row) for row in result]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB query failed for list_cluster_operations_for_target '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return []
+
+
 def _direct_delete_cluster_operation(uuid: UUID) -> bool:
     """Delete a cluster operation header from MariaDB."""
     engine = _get_engine()
@@ -17373,6 +17691,88 @@ def _direct_create_and_enqueue_cluster_operation(
         return False
 
 
+def _direct_set_cluster_operation_error(
+        op_uuid: UUID, error_report: ErrorReport,
+        created_at: float) -> bool:
+    """Persist (or replace) the ErrorReport for a cluster operation.
+
+    Uses ``INSERT ... ON DUPLICATE KEY UPDATE`` so a retry that
+    fails again overwrites the prior row without the caller needing
+    to check-then-write. The dispatcher only writes once per terminal
+    failure today, but the upsert keeps the contract easy to reason
+    about.
+
+    The ErrorReport is JSON-serialised via Pydantic's
+    ``model_dump(mode='json')`` so the dict has only JSON-native
+    primitives (no datetimes/UUIDs sneaking through).
+    """
+    engine = _get_engine()
+    table = _get_cluster_operation_errors_table()
+    payload = error_report.model_dump(mode='json')
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.dialects.mysql.insert(table).values(
+                op_uuid=op_uuid,
+                error_report=payload,
+                created_at=created_at,
+            )
+            stmt = stmt.on_duplicate_key_update(
+                error_report=stmt.inserted.error_report,
+                created_at=stmt.inserted.created_at,
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB write failed for cluster_operation_error '
+            f'{op_uuid}: {e}')
+        return False
+
+
+def _direct_get_cluster_operation_error(
+        op_uuid: UUID) -> Optional[ErrorReport]:
+    """Read the ErrorReport for a cluster operation, or None if absent."""
+    engine = _get_engine()
+    table = _get_cluster_operation_errors_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.op_uuid == op_uuid)
+            result = conn.execute(stmt).fetchone()
+            if result is None:
+                return None
+            return ErrorReport.model_validate(result.error_report)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB read failed for cluster_operation_error '
+            f'{op_uuid}: {e}')
+        return None
+
+
+def _direct_delete_cluster_operation_error(op_uuid: UUID) -> bool:
+    """Delete the cluster_operation_errors row for an op.
+
+    Idempotent: returns True whether or not a row existed, so callers
+    can use it from ``hard_delete`` without checking first.
+    """
+    engine = _get_engine()
+    table = _get_cluster_operation_errors_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.op_uuid == op_uuid)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for cluster_operation_error '
+            f'{op_uuid}: {e}')
+        return False
+
+
 # =============================================================================
 # Cluster Operations gRPC Client Functions
 # =============================================================================
@@ -17440,6 +17840,35 @@ def _grpc_get_cluster_operations_by_node(
         return []
 
 
+def _grpc_list_cluster_operations_for_target(
+        target_object_type: ObjectType,
+        target_uuid: str) -> list[dict[str, Any]]:
+    """List cluster operation headers targeting an object via gRPC.
+
+    Items are returned newest-first by ``created_at``.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ListClusterOperationsForTargetRequest(
+            target_object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                target_object_type.proto_id),
+            target_uuid=target_uuid,
+        )
+        reply = _grpc_call(
+            stub.ListClusterOperationsForTarget, request)
+        return [
+            json.loads(item.metadata_json)
+            if item.metadata_json else {}
+            for item in reply.items
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ListClusterOperationsForTarget failed for '
+            f'{target_object_type}/{target_uuid}: {e}')
+        return []
+
+
 def _grpc_delete_cluster_operation(uuid: UUID) -> bool:
     """Delete a cluster operation header via the database microservice."""
     try:
@@ -17485,6 +17914,61 @@ def _grpc_create_and_enqueue_cluster_operation(
         return False
 
 
+def _grpc_set_cluster_operation_error(
+        op_uuid: UUID, error_report: ErrorReport,
+        created_at: float) -> bool:
+    """Persist the ErrorReport for an operation via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.SetClusterOperationErrorRequest(
+            op_uuid=str(op_uuid),
+            error_report_json=_json_dumps(
+                error_report.model_dump(mode='json')),
+            created_at=created_at,
+        )
+        reply = _grpc_call(stub.SetClusterOperationError, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC SetClusterOperationError failed for '
+            f'{op_uuid}: {e}')
+        return False
+
+
+def _grpc_get_cluster_operation_error(
+        op_uuid: UUID) -> Optional[ErrorReport]:
+    """Read the ErrorReport for an operation via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetClusterOperationErrorRequest(
+            op_uuid=str(op_uuid))
+        reply = _grpc_call(stub.GetClusterOperationError, request)
+        if not reply.found:
+            return None
+        return ErrorReport.model_validate(
+            json.loads(reply.error_report_json))
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC GetClusterOperationError failed for '
+            f'{op_uuid}: {e}')
+        return None
+
+
+def _grpc_delete_cluster_operation_error(op_uuid: UUID) -> bool:
+    """Delete an ErrorReport row via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteClusterOperationErrorRequest(
+            op_uuid=str(op_uuid))
+        reply = _grpc_call(stub.DeleteClusterOperationError, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteClusterOperationError failed for '
+            f'{op_uuid}: {e}')
+        return False
+
+
 # =============================================================================
 # Work Queue gRPC Client Functions
 # =============================================================================
@@ -17510,24 +17994,31 @@ def _grpc_work_queue_enqueue(
             f'gRPC Enqueue failed for {queue_name}: {e}')
 
 
-def _grpc_work_queue_dequeue(
-        queue_name: str) -> Optional[tuple[str, dict[str, Any]]]:
-    """Claim the next available job via the database microservice.
+def _grpc_work_queue_dequeue_batch(
+        queue_names: list[str],
+        limit: int) -> list[tuple[str, str, dict[str, Any]]]:
+    """Claim up to ``limit`` available jobs via the database microservice.
 
-    The database daemon uses its own NODE_NAME as worker_id; the
-    gRPC contract does not carry a caller-supplied worker_id.
+    The database daemon uses its own NODE_NAME as worker_id; the gRPC
+    contract does not carry a caller-supplied worker_id. Returns a
+    list of ``(queue_name, job_name, payload)`` tuples in the
+    server-supplied priority order (top-priority first).
     """
+    if not queue_names or limit <= 0:
+        return []
     try:
         stub = _get_database_stub()
-        request = database_pb2.DequeueRequest(queue_name=queue_name)
+        request = database_pb2.DequeueRequest(
+            queue_names=queue_names, limit=limit)
         reply = _grpc_call(stub.Dequeue, request)
-        if not reply.found:
-            return None
-        return reply.job_name, json.loads(reply.work_item)
+        return [
+            (item.queue_name, item.job_name, json.loads(item.work_item))
+            for item in reply.items
+        ]
     except grpc.RpcError as e:
         LOG.warning(
-            f'gRPC Dequeue failed for {queue_name}: {e}')
-        return None
+            f'gRPC Dequeue failed across {len(queue_names)} queues: {e}')
+        return []
 
 
 def _grpc_work_queue_resolve(
@@ -17637,6 +18128,68 @@ def _grpc_work_queue_delete_row(row_id: int) -> bool:
         return False
 
 
+def _grpc_find_existing_coalescible_op(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_name: str) -> Optional[str]:
+    """Read-only enqueue-side dedup lookup via the database microservice.
+
+    See ``_direct_find_existing_coalescible_op`` for semantics. A
+    return of ``None`` either means no match or an RPC failure;
+    enqueue callers fall back to inserting a new op in both cases
+    (the dispatcher folds the duplicate at execute time).
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.FindExistingCoalescibleOpRequest(
+            operation_type=operation_type,
+            target_column=target_column,
+            target_uuid=target_uuid,
+            task_name=task_name)
+        reply = _grpc_call(stub.FindExistingCoalescibleOp, request)
+        if not reply.op_uuid:
+            return None
+        return str(reply.op_uuid)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC FindExistingCoalescibleOp failed for '
+            f'{operation_type}/{target_column}={target_uuid}/{task_name}: '
+            f'{e}')
+        return None
+
+
+def _grpc_claim_coalescible_siblings(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_names: list[str],
+        exclude_op_uuid: str) -> list[str]:
+    """Fold sibling pending coalescible ops via the database microservice.
+
+    Returns the list of uuids that were folded (state transitioned
+    to ``complete``). See
+    ``_direct_claim_coalescible_siblings`` for the safety guards.
+    """
+    if not task_names:
+        return []
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ClaimCoalescibleSiblingsRequest(
+            operation_type=operation_type,
+            target_column=target_column,
+            target_uuid=target_uuid,
+            task_names=task_names,
+            exclude_op_uuid=exclude_op_uuid)
+        reply = _grpc_call(stub.ClaimCoalescibleSiblings, request)
+        return list(reply.folded_op_uuids)
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ClaimCoalescibleSiblings failed for '
+            f'{operation_type}/{target_column}={target_uuid}: {e}')
+        return []
+
+
 # =============================================================================
 # Cluster Operations Public API Functions
 # =============================================================================
@@ -17707,6 +18260,34 @@ def get_cluster_operations_by_node(
     return _direct_get_cluster_operations_by_node(u)
 
 
+def list_cluster_operations_for_target(
+        target_object_type: ObjectType,
+        target_uuid: str) -> list[dict[str, Any]]:
+    """List cluster operation headers targeting an object, newest-first.
+
+    Joins ``cluster_operation_targets`` against ``cluster_operations``
+    to return the full op metadata for every operation that has touched
+    the given target. Ordered by ``cluster_operations.created_at DESC``.
+
+    Namespace scoping is the caller's responsibility. The REST handler
+    that consumes this helper validates the caller's access to the
+    target object before issuing the query (Approach (b) from the
+    Phase 7 plan), so this function does no namespace filtering itself.
+
+    Args:
+        target_object_type: The ObjectType of the target object.
+        target_uuid: UUID of the target object.
+
+    Returns:
+        List of operation dicts ordered newest-first by ``created_at``.
+    """
+    if _use_database_service():
+        return _grpc_list_cluster_operations_for_target(
+            target_object_type, target_uuid)
+    return _direct_list_cluster_operations_for_target(
+        target_object_type, target_uuid)
+
+
 def delete_cluster_operation(uuid: 'str | UUID') -> bool:
     """Delete a cluster operation header.
 
@@ -17773,14 +18354,89 @@ def create_and_enqueue_cluster_operation(
         queue_name, delay)
 
 
+def set_cluster_operation_error(
+        op_uuid: 'str | UUID',
+        error_report: ErrorReport,
+        created_at: Optional[float] = None) -> bool:
+    """Persist the ErrorReport for a failed cluster operation.
+
+    Routes through the database microservice when the caller is not
+    the database daemon. Upserts the row keyed on op_uuid so a retry
+    that fails again overwrites the prior report cleanly.
+
+    Args:
+        op_uuid: The operation's UUID (str or UUID).
+        error_report: The structured failure record.
+        created_at: Unix timestamp the report was written. Defaults
+            to ``time.time()`` when omitted.
+
+    Returns:
+        True on success, False on MariaDB error.
+    """
+    u = _ensure_uuid(op_uuid)
+    ts = created_at if created_at is not None else time.time()
+    if _use_database_service():
+        return _grpc_set_cluster_operation_error(u, error_report, ts)
+    return _direct_set_cluster_operation_error(u, error_report, ts)
+
+
+def get_cluster_operation_error(
+        op_uuid: 'str | UUID') -> Optional[ErrorReport]:
+    """Read the ErrorReport for a cluster operation.
+
+    Args:
+        op_uuid: The operation's UUID (str or UUID).
+
+    Returns:
+        The persisted ``ErrorReport`` or ``None`` if no report exists.
+    """
+    u = _ensure_uuid(op_uuid)
+    if _use_database_service():
+        return _grpc_get_cluster_operation_error(u)
+    return _direct_get_cluster_operation_error(u)
+
+
+def delete_cluster_operation_error(op_uuid: 'str | UUID') -> bool:
+    """Delete the ErrorReport row for a cluster operation.
+
+    Idempotent. Called from ``BaseClusterOperation.hard_delete`` when
+    the cluster cleaner reaps a terminal-state op so the
+    ``cluster_operation_errors`` table does not grow unbounded.
+
+    Args:
+        op_uuid: The operation's UUID (str or UUID).
+
+    Returns:
+        True on success (whether or not a row existed), False on
+        MariaDB error.
+    """
+    u = _ensure_uuid(op_uuid)
+    if _use_database_service():
+        return _grpc_delete_cluster_operation_error(u)
+    return _direct_delete_cluster_operation_error(u)
+
+
 # =============================================================================
 # Work Queue Direct Access Functions
 # Replaces the /sf/queue/... and /sf/processing/... etcd prefixes with a
 # single row-locked table. Claim state lives on the row itself. Public
-# callers use the enqueue_work_item/dequeue_work_item/resolve_work_item/
+# callers use the enqueue_work_item/dequeue_work_items/resolve_work_item/
 # get_work_queue_length/restart_work_queue wrappers at the bottom of this
 # module.
 # =============================================================================
+
+# Server-side ceiling on a single dequeue batch. The two production
+# callers ask for far less today (``BATCH_SIZE = 10`` in sf-net,
+# ``max(3, cpus/2)`` in the sf-queues pool), so this cap exists purely
+# to bound the worst-case orphan window if any caller -- direct or via
+# gRPC -- ever asks for an unreasonably large limit. Each claimed-but-
+# not-yet-executed row stays invisible to other workers until the
+# stuck-row reaper finds it (CLUSTER_OP_STUCK_THRESHOLD seconds), so
+# the ceiling caps how much work can be stranded on a single worker
+# crash. 256 is well above every legitimate caller and well below
+# anything that would meaningfully exhaust the queue.
+MAX_DEQUEUE_BATCH = 256
+
 
 def _direct_work_queue_enqueue(
         queue_name: str, payload: dict[str, Any],
@@ -17816,43 +18472,64 @@ def _direct_work_queue_enqueue(
             f'work_queue insert failed for {queue_name}') from e
 
 
-def _direct_work_queue_dequeue(
-        queue_name: str,
-        worker_id: str) -> Optional[tuple[str, dict[str, Any]]]:
-    """Claim the next eligible job on a queue.
+def _direct_work_queue_dequeue_batch(
+        queue_names: list[str],
+        worker_id: str,
+        limit: int) -> list[tuple[str, str, dict[str, Any]]]:
+    """Claim up to ``limit`` eligible jobs across ``queue_names``.
 
-    Uses SELECT ... FOR UPDATE SKIP LOCKED so two simultaneous
-    callers either get distinct rows or at least one gets None.
-    Increments attempts on the claim.
+    Returns a list of ``(queue_name, job_name, payload_dict)`` tuples,
+    possibly empty. Rows are ordered by the caller-supplied position
+    of ``queue_name`` in ``queue_names`` (index 0 = top priority) and
+    then by ``scheduled_at``, so a single SELECT returns the most
+    important eligible work first. Uses ``FOR UPDATE SKIP LOCKED`` so
+    parallel workers can't double-claim a row. ``attempts`` is
+    incremented on the claim. ``job_name`` is the stringified
+    autoincrement id, opaque to callers; pass it back -- with the
+    matching ``queue_name`` -- to ``resolve_work_item``.
 
-    Returns (jobname, payload_dict) on success, None if the queue
-    is empty or every eligible row is locked by another worker.
-    The returned jobname is the stringified autoincrement id;
-    callers treat it as opaque and pass it back to resolve().
+    The ``FIELD(queue_name, ...)`` order clause materialises the
+    caller's priority order at the SQL layer. Lower priorities are
+    only returned when the higher-priority queues yield fewer rows
+    than ``limit``; sustained high-priority load can still starve
+    them. Fairness (bounded staleness etc.) is left to the caller's
+    queue_names composition for now.
     """
+    if not queue_names or limit <= 0:
+        return []
+    # Defence-in-depth clamp: see MAX_DEQUEUE_BATCH above. Production
+    # callers never reach this, but the gRPC handler is the trust
+    # boundary and an unbounded ``limit`` would otherwise let any
+    # caller stage an arbitrarily large in-flight batch.
+    if limit > MAX_DEQUEUE_BATCH:
+        limit = MAX_DEQUEUE_BATCH
+
     engine = _get_engine()
     table = _get_work_queue_table()
 
     try:
         with engine.connect() as conn:
             select_stmt = (
-                sa.select(table.c.id, table.c.payload)
-                .where(table.c.queue_name == queue_name)
+                sa.select(table.c.id, table.c.queue_name, table.c.payload)
+                .where(table.c.queue_name.in_(queue_names))
                 .where(table.c.claimed_at.is_(None))
                 .where(
                     table.c.scheduled_at
                     <= sa.func.unix_timestamp(sa.func.now(6)))
-                .order_by(table.c.scheduled_at.asc())
-                .limit(1)
+                .order_by(
+                    sa.func.field(table.c.queue_name, *queue_names),
+                    table.c.scheduled_at.asc())
+                .limit(limit)
                 .with_for_update(skip_locked=True)
             )
-            row = conn.execute(select_stmt).fetchone()
-            if row is None:
-                return None
+            rows = conn.execute(select_stmt).fetchall()
+            if not rows:
+                return []
 
+            row_ids = [r.id for r in rows]
             update_stmt = (
                 sa.update(table)
-                .where(table.c.id == row.id)
+                .where(table.c.id.in_(row_ids))
                 .values(
                     claimed_at=sa.func.unix_timestamp(
                         sa.func.now(6)),
@@ -17862,12 +18539,15 @@ def _direct_work_queue_dequeue(
             )
             conn.execute(update_stmt)
             conn.commit()
-            return str(row.id), dict(row.payload or {})
+            return [
+                (r.queue_name, str(r.id), dict(r.payload or {}))
+                for r in rows
+            ]
     except OperationalError as e:
         LOG.warning(
-            f'MariaDB dequeue failed for work_queue '
-            f'{queue_name}: {e}')
-        return None
+            f'MariaDB dequeue failed for work_queue across '
+            f'{len(queue_names)} queues: {e}')
+        return []
 
 
 def _direct_work_queue_resolve(
@@ -18079,6 +18759,214 @@ def _direct_work_queue_delete_row(row_id: int) -> bool:
             f'MariaDB delete_row failed for work_queue '
             f'row {row_id}: {e}')
         return False
+
+
+def _direct_find_existing_coalescible_op(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_name: str) -> Optional[str]:
+    """Read-only enqueue-side dedup lookup.
+
+    Returns the uuid of the oldest pending cluster operation that:
+
+    * has ``operation_type``
+    * is targeted at ``target_uuid`` via the indexed
+      ``{target_column}`` (one of ``network_uuid``,
+      ``instance_uuid``, ``node_uuid``)
+    * has a single-task list whose entry equals ``task_name``
+    * is currently in state ``queued`` (not yet picked up)
+
+    Returns ``None`` when there's no match. Callers use this to skip
+    a new ``create_and_enqueue`` insert when an equivalent op is
+    already in the queue: both eventual ``raise_for_error`` waiters
+    block on the same op, the worker runs it once.
+
+    There is a benign race: two concurrent callers can both look up
+    and not find anything, and both create new rows. The
+    dispatcher's ``claim_coalescible_siblings`` (step 4) catches the
+    duplicate on the way out -- at most one extra row gets inserted
+    per race window, never an unbounded fan-out.
+    """
+    if target_column not in {
+            'network_uuid', 'instance_uuid', 'node_uuid'}:
+        return None
+
+    # cluster_operations' *_uuid columns are SQLAlchemy Uuid columns,
+    # whose bind processor calls value.hex -- the filter value therefore
+    # has to be a uuid.UUID object, but callers pass it as a plain string
+    # (e.g. create_and_enqueue passes str(network_uuid)). Coerce here
+    # (matching the insert path's _maybe_uuid usage and the sibling
+    # _direct_claim_coalescible_siblings) before it reaches the WHERE
+    # clause. A malformed uuid means there is nothing meaningful to
+    # coalesce against, so skip the lookup rather than letting a
+    # StatementError kill the worker thread.
+    try:
+        target_uuid_val = _maybe_uuid(target_uuid)
+    except (ValueError, AttributeError, TypeError) as e:
+        LOG.warning(
+            f'find_existing_coalescible_op skipped, malformed uuid '
+            f'({target_column}={target_uuid!r}): {e}')
+        return None
+
+    engine = _get_engine()
+    cluster_ops_table = _get_cluster_operations_table()
+    states_table = _get_object_states_table()
+    target_col = getattr(cluster_ops_table.c, target_column)
+
+    try:
+        with engine.connect() as conn:
+            stmt = (
+                sa.select(cluster_ops_table.c.uuid)
+                .select_from(
+                    cluster_ops_table.join(
+                        states_table,
+                        sa.and_(
+                            states_table.c.object_uuid == sa.cast(
+                                cluster_ops_table.c.uuid, sa.String(36)),
+                            states_table.c.object_type
+                            == cluster_ops_table.c.operation_type,
+                        )))
+                .where(cluster_ops_table.c.operation_type == operation_type)
+                .where(target_col == target_uuid_val)
+                .where(states_table.c.state_value == 'queued')
+                .where(
+                    sa.func.json_length(
+                        cluster_ops_table.c.metadata_json,
+                        '$.tasks') == 1)
+                .where(
+                    sa.func.json_unquote(
+                        sa.func.json_extract(
+                            cluster_ops_table.c.metadata_json,
+                            '$.tasks[0]')) == task_name)
+                .order_by(cluster_ops_table.c.created_at.asc())
+                .limit(1)
+            )
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return str(row.uuid)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find_existing_coalescible_op failed for '
+            f'{operation_type}/{target_column}={target_uuid}/{task_name}: '
+            f'{e}')
+        return None
+
+
+def _direct_claim_coalescible_siblings(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_names: list[str],
+        exclude_op_uuid: str) -> list[str]:
+    """Atomically transition sibling pending coalescible ops to COMPLETE.
+
+    Used by the dispatcher (``BaseClusterOperation.execute``) before
+    running a coalescible task: any other ops in the queue targeting
+    the same object with the same single-task work get their state
+    flipped to ``complete`` here, so when their work_queue row is
+    eventually picked up the dispatcher's terminal-state branch
+    (``shakenfist/daemons/network/workitem.py``) drops them cleanly.
+
+    Returns the list of uuids that were folded so the caller can
+    audit-log a "coalesced N siblings" event on the survivor.
+
+    Safety guards baked into the SQL:
+
+    * ``co.uuid != exclude_op_uuid`` -- never fold the survivor.
+    * ``os.state_value = 'queued'`` -- skip anything already being
+      executed by another worker, or already terminal. Combined with
+      ``FOR UPDATE`` on the SELECT, this serialises against the
+      dispatcher's own ``state = STATE_EXECUTING`` write.
+    * ``JSON_LENGTH(metadata_json, '$.tasks') = 1`` -- only fold
+      ops whose entire task list is one task. A multi-task sibling
+      might also carry non-coalescible work that we mustn't drop.
+    * Task name must be in the caller-supplied ``task_names``, which
+      callers pre-filter to ``op_class.coalescible_tasks``.
+
+    ``target_column`` is restricted to a small whitelist
+    (``network_uuid``, ``instance_uuid``, ``node_uuid``) so it can
+    be interpolated into the ORDER BY safely; SQLAlchemy's
+    ``getattr(table.c, ...)`` does the column lookup and refuses
+    unknown columns with ``AttributeError``.
+    """
+    if not task_names or target_column not in {
+            'network_uuid', 'instance_uuid', 'node_uuid'}:
+        return []
+
+    # cluster_operations.uuid and its *_uuid columns are SQLAlchemy Uuid
+    # columns, whose bind processor calls value.hex -- the filter values
+    # therefore have to be uuid.UUID objects, but callers pass them as
+    # plain strings. Coerce here (matching the insert path's _maybe_uuid
+    # usage) before they reach the WHERE clause. A malformed uuid means
+    # there is nothing meaningful to coalesce against, so skip the fold
+    # rather than letting a StatementError kill the worker thread.
+    try:
+        target_uuid_val = _maybe_uuid(target_uuid)
+        exclude_op_uuid_val = _maybe_uuid(exclude_op_uuid)
+    except (ValueError, AttributeError, TypeError) as e:
+        LOG.warning(
+            f'claim_coalescible_siblings skipped, malformed uuid '
+            f'({target_column}={target_uuid!r}, '
+            f'exclude_op_uuid={exclude_op_uuid!r}): {e}')
+        return []
+
+    engine = _get_engine()
+    cluster_ops_table = _get_cluster_operations_table()
+    states_table = _get_object_states_table()
+    target_col = getattr(cluster_ops_table.c, target_column)
+
+    try:
+        with engine.connect() as conn:
+            select_stmt = (
+                sa.select(cluster_ops_table.c.uuid)
+                .select_from(
+                    cluster_ops_table.join(
+                        states_table,
+                        sa.and_(
+                            states_table.c.object_uuid == sa.cast(
+                                cluster_ops_table.c.uuid, sa.String(36)),
+                            states_table.c.object_type
+                            == cluster_ops_table.c.operation_type,
+                        )))
+                .where(cluster_ops_table.c.operation_type == operation_type)
+                .where(target_col == target_uuid_val)
+                .where(cluster_ops_table.c.uuid != exclude_op_uuid_val)
+                .where(states_table.c.state_value == 'queued')
+                .where(
+                    sa.func.json_length(
+                        cluster_ops_table.c.metadata_json,
+                        '$.tasks') == 1)
+                .where(
+                    sa.func.json_unquote(
+                        sa.func.json_extract(
+                            cluster_ops_table.c.metadata_json,
+                            '$.tasks[0]')).in_(task_names))
+                .with_for_update()
+            )
+            rows = conn.execute(select_stmt).fetchall()
+            if not rows:
+                return []
+
+            folded_uuids = [str(r.uuid) for r in rows]
+            update_stmt = (
+                sa.update(states_table)
+                .where(states_table.c.object_type == operation_type)
+                .where(states_table.c.object_uuid.in_(folded_uuids))
+                .values(
+                    state_value='complete',
+                    update_time=sa.func.unix_timestamp(sa.func.now(6)),
+                    message='coalesced into sibling op')
+            )
+            conn.execute(update_stmt)
+            conn.commit()
+            return folded_uuids
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB claim_coalescible_siblings failed for '
+            f'{operation_type}/{target_column}={target_uuid}: {e}')
+        return []
 
 
 # =============================================================================
@@ -18988,6 +19876,14 @@ def enqueue_event_dlq(
     Routes to the database microservice or direct MariaDB depending
     on _use_database_service().
     """
+    # Coerce UUID (and other non-default-JSON) values via the
+    # UUID-aware encoder so both the gRPC path's ``json.dumps`` and
+    # the direct path's SQLAlchemy JSON column can serialise the
+    # payload. The eventlog DLQ inherits raw ``extra`` dicts from
+    # callers that may carry uuid.UUID objects (e.g. the network
+    # description echoed by InstancesEndpoint.post), and the default
+    # JSON encoder refuses them.
+    event_json = json.loads(_json_dumps(event_json))
     if _use_database_service():
         _grpc_enqueue_event_dlq(
             object_type, object_uuid, event_timestamp, event_json)
@@ -19046,20 +19942,31 @@ def enqueue_work_item(
     _direct_work_queue_enqueue(queue_name, work_item, delay)
 
 
-def dequeue_work_item(
-        queue_name: str,
-) -> Optional[tuple[str, dict[str, Any]]]:
-    """Claim the next eligible job on a queue.
+def dequeue_work_items(
+        queue_names: list[str],
+        limit: int = 10,
+) -> list[tuple[str, str, dict[str, Any]]]:
+    """Claim up to ``limit`` eligible jobs across ``queue_names``.
 
-    Returns (job_name, payload) on success or None if the queue is
-    empty / every eligible row is locked. The direct path uses
-    config.NODE_NAME as worker_id; the gRPC path relies on the
-    database daemon's NODE_NAME (the proto does not carry a
-    caller-supplied worker_id).
+    Returns a list of ``(queue_name, job_name, payload)`` tuples,
+    possibly empty. Items are returned in caller-supplied priority
+    order: the first queue_name in the list is highest priority. The
+    direct path uses ``config.NODE_NAME`` as worker_id; the gRPC
+    path relies on the database daemon's NODE_NAME (the proto does
+    not carry a caller-supplied worker_id).
+
+    This single query replaces the previous per-queue dequeue loop;
+    a sf-net or sf-queues worker that used to issue 10 sequential
+    gRPC calls per idle iteration now issues one. The trade-off is
+    that a worker which doesn't immediately execute every returned
+    item holds the others claimed until it does -- crashes between
+    receive and execute are recovered by the stuck-row reaper
+    (``list_stuck_work_queue_rows``).
     """
     if _use_database_service():
-        return _grpc_work_queue_dequeue(queue_name)
-    return _direct_work_queue_dequeue(queue_name, config.NODE_NAME)
+        return _grpc_work_queue_dequeue_batch(queue_names, limit)
+    return _direct_work_queue_dequeue_batch(
+        queue_names, config.NODE_NAME, limit)
 
 
 def resolve_work_item(queue_name: str, job_name: str) -> None:
@@ -19126,3 +20033,53 @@ def delete_work_queue_row(row_id: int) -> bool:
     if _use_database_service():
         return _grpc_work_queue_delete_row(row_id)
     return _direct_work_queue_delete_row(row_id)
+
+
+def find_existing_coalescible_op(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_name: str) -> Optional[str]:
+    """Look up an existing pending coalescible op on the same target.
+
+    Returns its uuid if found, otherwise ``None``. Used by
+    ``create_and_enqueue`` for ops whose entire task list is a
+    single coalescible task: if a sibling is already in the queue,
+    skip the insert and return the existing op's uuid so all
+    waiters block on the same op.
+    """
+    if _use_database_service():
+        return _grpc_find_existing_coalescible_op(
+            operation_type, target_column, target_uuid, task_name)
+    return _direct_find_existing_coalescible_op(
+        operation_type, target_column, target_uuid, task_name)
+
+
+def claim_coalescible_siblings(
+        operation_type: str,
+        target_column: str,
+        target_uuid: str,
+        task_names: list[str],
+        exclude_op_uuid: str) -> list[str]:
+    """Atomically fold sibling pending coalescible ops.
+
+    Used by ``BaseClusterOperation.execute`` before running a
+    coalescible task. The server transitions every matching
+    sibling's ``object_states`` row to ``complete`` in one
+    statement, then returns the affected uuids. See
+    ``_direct_claim_coalescible_siblings`` for the safety guards
+    (matched only single-task siblings in state ``queued``, never
+    folds the survivor).
+
+    Callers pre-filter ``task_names`` to the op class's
+    ``coalescible_tasks`` set and pre-supply
+    ``coalescible_target_column`` so this helper stays generic
+    across op types.
+    """
+    if _use_database_service():
+        return _grpc_claim_coalescible_siblings(
+            operation_type, target_column, target_uuid,
+            task_names, exclude_op_uuid)
+    return _direct_claim_coalescible_siblings(
+        operation_type, target_column, target_uuid,
+        task_names, exclude_op_uuid)

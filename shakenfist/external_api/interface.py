@@ -59,7 +59,6 @@ class InterfaceEndpoint(api_base.Resource):
          (404, 'Interface not found.', None)],
         requires_admin=True))
     @api_base.verify_token
-    @api_base.redirect_to_network_node
     @api_base.log_token_use
     def get(self, interface_uuid=None):
         ni, _, err = api_util.safe_get_network_interface(interface_uuid)

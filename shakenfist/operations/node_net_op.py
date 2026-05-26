@@ -1,9 +1,12 @@
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
 from shakenfist.schema.operations import node_net_op as schema
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.util import exceptions as util_exceptions
 
 
@@ -82,7 +85,12 @@ class NodeNetOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(n)
         except Exception as e:
             util_exceptions.ignore_exception('node_net_op', e)
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NodeNetOp.STATE_ERROR
 
     def _network_destroy(self, n):
-        n.delete_on_hypervisor()
+        BridgedVXLanNetwork(n)._apply_delete_on_hypervisor()
+
+    def _network_apply_create_hypervisor(self, n):
+        BridgedVXLanNetwork(n)._apply_create_on_hypervisor()

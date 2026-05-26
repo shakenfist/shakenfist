@@ -194,6 +194,30 @@ log "=== Terminate cluster maintenance node, stop another node ==="
 maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
 other_victim=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer != true) | .name' | head -1)
 
+# Refuse to halt the host this script is running on -- the script
+# dies when its host halts, leaving the CI runner's outer SSH waiting
+# on a connection that will never close (no keepalive) until the
+# 60-minute job budget burns out. Election is first-acquire-wins on a
+# cluster lock so the same node holds the role for the lifetime of a
+# fresh cluster, but a `sudo systemctl restart sf-cluster` releases
+# the lock and lets another candidate acquire it. The lease is 60 s,
+# so we sleep 90 s -- comfortably past expiry plus a couple of
+# refresh cycles -- and then re-read the role.
+script_host=$(hostname)
+if [ "${maintainer}" == "${script_host}" ]; then
+    log "Maintainer ${maintainer} == script host ${script_host}; forcing re-election"
+    sudo systemctl restart sf-cluster
+    log "Pausing for cluster lock to expire and be re-acquired..."
+    sleep 90
+    maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
+    other_victim=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer != true) | .name' | head -1)
+    log "New maintainer: ${maintainer}"
+    if [ "${maintainer}" == "${script_host}" ]; then
+        log "Re-election still elected the script host; aborting before self-destruct"
+        exit 1
+    fi
+fi
+
 log "Will hard stop the cluster maintainer, ${maintainer}"
 
 # Capture node UUIDs while sf-client can still resolve the names; we need

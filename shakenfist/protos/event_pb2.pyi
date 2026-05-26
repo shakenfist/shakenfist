@@ -112,6 +112,29 @@ class EventMultiRequest(google.protobuf.message.Message):
 global___EventMultiRequest = EventMultiRequest
 
 @typing.final
+class EventMultiBatchRequest(google.protobuf.message.Message):
+    """Batched submission of multiple ``EventMultiRequest`` items in a
+    single RPC. The eventlog daemon persists the whole batch in one
+    transaction; either all succeed or none do. Used by the local
+    eventlog spool drainer to amortise the per-event RPC cost; sized
+    at ~100 events per batch by the caller.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___EventMultiRequest]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[global___EventMultiRequest] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___EventMultiBatchRequest = EventMultiBatchRequest
+
+@typing.final
 class EventReply(google.protobuf.message.Message):
     """An ack from the eventlog daemon"""
 

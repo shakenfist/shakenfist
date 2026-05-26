@@ -2019,8 +2019,10 @@ class Instance(dbowo):
         return blob_uuid
 
     def hot_plug_interface(self, n, ni):
-        n.create_on_hypervisor()
-        n.ensure_mesh()
+        create_op = n.create_on_hypervisor()
+        create_op.raise_for_error()
+        mesh_op = n.ensure_mesh()
+        mesh_op.raise_for_error()
 
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)

@@ -44,6 +44,11 @@ class EventServiceStub(object):
                 request_serializer=event__pb2.EventMultiRequest.SerializeToString,
                 response_deserializer=event__pb2.EventReply.FromString,
                 _registered_method=True)
+        self.RecordMultiEventBatch = channel.unary_unary(
+                '/shakenfist.protos.EventService/RecordMultiEventBatch',
+                request_serializer=event__pb2.EventMultiBatchRequest.SerializeToString,
+                response_deserializer=event__pb2.EventReply.FromString,
+                _registered_method=True)
 
 
 class EventServiceServicer(object):
@@ -61,6 +66,17 @@ class EventServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RecordMultiEventBatch(self, request, context):
+        """Batched form: ack=true means *every* event in the batch was
+        persisted. Partial failure is reported as ack=false and the
+        client must replay the whole batch. The local eventlog spool
+        drainer is the only expected caller; it sizes the batch
+        small enough (~100) that whole-batch replay is cheap.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_EventServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -72,6 +88,11 @@ def add_EventServiceServicer_to_server(servicer, server):
             'RecordMultiEvent': grpc.unary_unary_rpc_method_handler(
                     servicer.RecordMultiEvent,
                     request_deserializer=event__pb2.EventMultiRequest.FromString,
+                    response_serializer=event__pb2.EventReply.SerializeToString,
+            ),
+            'RecordMultiEventBatch': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordMultiEventBatch,
+                    request_deserializer=event__pb2.EventMultiBatchRequest.FromString,
                     response_serializer=event__pb2.EventReply.SerializeToString,
             ),
     }
@@ -128,6 +149,33 @@ class EventService(object):
             target,
             '/shakenfist.protos.EventService/RecordMultiEvent',
             event__pb2.EventMultiRequest.SerializeToString,
+            event__pb2.EventReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RecordMultiEventBatch(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.EventService/RecordMultiEventBatch',
+            event__pb2.EventMultiBatchRequest.SerializeToString,
             event__pb2.EventReply.FromString,
             options,
             channel_credentials,

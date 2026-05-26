@@ -5,6 +5,20 @@ Neutron -- its more like the old OpenStack Compute nova-network implementation
 if you're looking for a mental model. Let's work through some examples to explain
 what it is doing.
 
+!!! note "Asynchronous network deletion (REST API)"
+    `DELETE /networks/{network_ref}` and `DELETE /networks` now return
+    HTTP 202 (Accepted) with a cluster-operation handle in the body
+    rather than performing the work synchronously. Operators scripting
+    directly against the REST API (rather than via the Python client)
+    must poll the returned op uuid at
+    `GET /clusteroperations/{op_type}/{op_uuid}` until the op reaches a
+    terminal state (`complete`, `abort`, `deleted`, or `error`). The
+    Python client (`shakenfist_client`) handles this transparently —
+    `delete_network()` polls by default and raises
+    `ClusterOperationFailed` on a terminal-error state. See the
+    [clusteroperations API reference](/developer_guide/api_reference/clusteroperations)
+    for the full polling contract.
+
 ## Single node install, no networks or instances
 
 ```bash
@@ -365,3 +379,66 @@ Such a route might look like this:
 ```
 ip route add 192.168.15.29/32 dev br-vxlan-e2300f
 ```
+## Dispatcher diagnostic events
+
+Operators reading the event log for a cluster operation will see two
+events emitted directly by the queue dispatcher (in addition to the
+operation-specific audit and mutate events emitted by the operation
+itself):
+
+* **`execution duration`** (`EVENT_TYPE_USAGE`). Emitted when the
+  dispatcher finishes running an op. Carries four fields in `extra`:
+    * `seconds` — wall-clock time spent inside `op.execute()`
+      (state writes, coalescing fold, the `_apply_*` work, the
+      terminal state write).
+    * `wait_seconds` — time between when the op was first inserted
+      into `cluster_operations` and when the dispatcher claimed it.
+      Large values (>10 s) mean the queue was backed up; very
+      large values point at either worker saturation or a stuck
+      op blocking the worker.
+    * `defer_count` — how many times this op was re-enqueued via
+      `defer()` / `defer_with_backoff()` before finally running. A
+      first-time pickup is `0`; non-zero values indicate dependency
+      waits or transient retries.
+    * `queue_name` — the queue the op was claimed from. Useful for
+      attributing wait time to a specific priority lane (e.g.
+      `networknode-clusteroperation-user_facing_high_io`).
+
+  The combined event replaces an earlier split into separate
+  `'started executing'` and `'execution duration'` events. The
+  combined form halves the eventlog gRPC cost on the dispatcher's
+  critical path -- profiling identified that cost as the largest
+  per-op overhead added during the queue-performance work. Ops
+  loaded outside the dispatch path (unit tests, REST endpoints)
+  still emit `'execution duration'` with `seconds` only; the
+  wait fields are populated only when the dispatcher set the
+  hints.
+
+* **`coalesced sibling ops`** (`EVENT_TYPE_STATUS`). Emitted on a
+  surviving op when one or more *other* pending ops on the same
+  target with the same single coalescible task were folded into
+  this one's execution. Carries three fields in `extra`:
+    * `sibling_count` — how many siblings were folded.
+    * `sibling_uuids` — their op uuids. Looking up any of those
+      will show their state as `complete` with the message
+      `coalesced into sibling op`.
+    * `tasks` — which coalescible task(s) drove the fold.
+
+  A burst of these on `network_apply_update_dnsmasq` is the
+  expected outcome of multiple parallel instance starts on the
+  same network and is healthy. A *complete absence* of these
+  during a CI run that's known to be enqueueing duplicate work
+  would point at a bug in either the enqueue-side dedup
+  (`mariadb.find_existing_coalescible_op`) or the worker-side fold
+  (`mariadb.claim_coalescible_siblings`).
+
+  Note that the worker-side fold also skips itself when the
+  dispatcher just observed an empty queue
+  (`dispatcher_batch_size == 1`). A new sibling arriving after our
+  dequeue will be folded on the next dispatcher cycle, not this
+  one, so a moderate gap between sibling-arriving and
+  `coalesced sibling ops` firing is expected.
+
+The `execution duration` event is retained for
+`MAX_USAGE_EVENT_AGE` (default 30 days); the `coalesced sibling
+ops` event for `MAX_STATUS_EVENT_AGE` (default 7 days).

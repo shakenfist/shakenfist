@@ -24,6 +24,7 @@ from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_background_node_queues
 from shakenfist.operations.baseoperation import get_all_network_queues
+from shakenfist.operations.baseoperation import get_node_network_queues
 from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
@@ -278,23 +279,48 @@ class Monitor(daemon.Daemon):
                 'node_background_queue_deferred': node_background_queue_deferred
             })
 
+            # Per-node network queues ({node_uuid}-network-*) are drained by
+            # this node's net-worker regardless of whether this node is the
+            # elected network node, so emit their metrics on every node.
+            node_network_waiting = 0
+            node_network_processing = 0
+            node_network_deferred = 0
+
+            for queue in get_node_network_queues(config.NODE_UUID):
+                processing, queued, deferred = _log_and_update_metrics_for_queue(
+                    queue, 'Per-node network')
+
+                node_network_waiting += queued
+                node_network_processing += processing
+                node_network_deferred += deferred
+
+            retval.update({
+                'node_network_queue_processing': node_network_processing,
+                'node_network_queue_waiting': node_network_waiting,
+                'node_network_queue_deferred': node_network_deferred
+            })
+
             if config.NODE_IS_NETWORK_NODE:
-                network_waiting = 0
-                network_processing = 0
-                network_deferred = 0
+                # Cluster-wide networknode-* queues are only drained by the
+                # elected network node's net-worker, so only emit those metrics
+                # here.  Summing them with the per-node metrics would create a
+                # misleading combined total on non-network nodes.
+                networknode_waiting = 0
+                networknode_processing = 0
+                networknode_deferred = 0
 
                 for queue in get_all_network_queues():
                     processing, queued, deferred = _log_and_update_metrics_for_queue(
                         queue, 'Network node')
 
-                    network_waiting += queued
-                    network_processing += processing
-                    network_deferred += deferred
+                    networknode_waiting += queued
+                    networknode_processing += processing
+                    networknode_deferred += deferred
 
                 retval.update({
-                    'network_queue_processing': network_processing,
-                    'network_queue_waiting': network_waiting,
-                    'network_queue_deferred': network_deferred
+                    'networknode_queue_processing': networknode_processing,
+                    'networknode_queue_waiting': networknode_waiting,
+                    'networknode_queue_deferred': networknode_deferred
                 })
 
             if config.NODE_IS_EVENTLOG_NODE:

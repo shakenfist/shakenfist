@@ -10,6 +10,7 @@ from shakenfist.schema.operations import node_inst_op as schema
 from shakenfist.instance import Instance
 from shakenfist.instance import Instances
 from shakenfist.instance import this_node_filter
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -234,6 +235,12 @@ class NodeInstOp(BaseClusterOperation):
                 if n.state.value == Network.STATE_DELETE_WAIT:
                     continue
 
+                # dnsmasq config files live on the network node only,
+                # so invoking the worker's ``_apply_update_dnsmasq``
+                # method directly from this hypervisor mutates nothing
+                # useful. Enqueue a net_op instead so the network
+                # node's dispatcher picks up the stale lease prune
+                # after the instance is gone.
                 n.update_dnsmasq()
 
                 if (not config.NODE_IS_NETWORK_NODE and
@@ -245,4 +252,4 @@ class NodeInstOp(BaseClusterOperation):
                         'host_networks': host_networks,
                     }).debug('Last instance on host using this network, '
                              'deleting on hypervisor')
-                    n.delete_on_hypervisor()
+                    BridgedVXLanNetwork(n)._apply_delete_on_hypervisor()

@@ -72,6 +72,28 @@ itself cannot record its own startup event through gRPC) and
 gRPC unavailability, not because MariaDB is unsuitable for
 the storage.
 
+The **local spool** lands during the network-facade branch
+ahead of the rest of this plan. Profiling identified the
+per-event synchronous gRPC as the largest remaining
+contributor to dispatch-time wrapper overhead (~200 ms each
+under bursty load, multiple events per cluster operation). The
+spool moves caller-side cost down to a sub-millisecond local
+sqlite insert, with a background drainer thread batching
+events into a new `RecordMultiEventBatch` RPC. The spool is
+per-daemon (`/srv/shakenfist/spool/eventlog/<daemon>-<pid>.db`)
+and survives process crashes; an orphan-spool sweep on daemon
+startup drains files left behind by previously-dead PIDs. The
+caller-facing `eventlog.add_event*` API is unchanged.
+
+With the local spool in place the bootstrapping case that
+originally motivated the DLQ is solved cleanly: events
+generated during sf-database's own startup land in the spool
+and drain as soon as the channel is up. The
+`config.EVENTLOG_SUPPRESS_GRPC` / `set_force_event_dlq`
+paths and the `event_dlq` table are still wired today as a
+belt-and-braces fallback, but phase 0 should confirm they can
+be removed alongside the rest of the eventlog plumbing.
+
 The sqlite storage model is **denormalised at write time**:
 an event touching N objects writes N rows total — one per
 object — each carrying the full `message`, `extra`, and a
@@ -100,7 +122,13 @@ keep:
 The proposal is to delete `sf-eventlog` entirely. The
 in-process abstraction at calling sites is preserved; its
 implementation changes from "send gRPC to sf-eventlog" to
-"insert into MariaDB via the existing `mariadb` client."
+"flush local spool batch via gRPC to sf-database, which writes
+to MariaDB." Note that the local-spool indirection landed in
+the network-facade branch ahead of this plan, so by the time
+this plan executes the change is "swap the drainer's gRPC
+target from sf-eventlog to sf-database" rather than a full
+rewrite of the caller path.
+
 Pruning moves into the cluster daemon's existing periodic-
 maintenance loop, alongside other regular cluster
 housekeeping. The REST API read path stops opening sqlite
@@ -126,9 +154,11 @@ Concretely, after this plan lands:
   object_type, object_uuid, composite PK on those three, with
   an index on `(object_type, object_uuid, event_uuid)` to
   support the per-object stream read).
-- `eventlog.add_event*` writes one row to `events` plus N
-  rows to `event_objects` in a single transaction, going
-  through `sf-database` like every other write.
+- The local sqlite spool drainer (already shipped in the
+  network-facade branch) flushes batched events through
+  `sf-database` into the new MariaDB tables. The
+  caller-facing `eventlog.add_event*` API does not change;
+  only the drainer's gRPC target changes.
 - The REST API event-list endpoints
   (`external_api/{instance,artifact,network,node,blob}.py`)
   use a JOIN-and-LIMIT query directly against the new tables.
@@ -147,12 +177,20 @@ Concretely, after this plan lands:
   `EVENTLOG_API_PORT`, `EVENTLOG_METRICS_PORT`,
   `EVENTLOG_SUPPRESS_GRPC`) are removed.
 - The MariaDB event DLQ table (`event_dlq`) and its
-  drain code are removed unless phase 0 identifies a
-  remaining failure mode they're needed for.
+  drain code are removed. With the local spool in place
+  there is no longer a need for a cluster-side DLQ -- the
+  bootstrap chicken-and-egg the DLQ originally solved
+  (events generated during sf-database / sf-eventlog
+  startup) is handled cleanly by the spool: events sit on
+  local disk until enough of the cluster is up for the
+  drainer to deliver them. Phase 0 confirms this and
+  removes the DLQ code unless it surfaces another failure
+  mode the spool doesn't cover.
 
-The principle is: **the existing `sf-database` channel is
-already the right write path; the rest is removing
-indirection.**
+The principle is: **the local spool is the durability
+boundary on the caller side; the existing `sf-database`
+channel is the right write path on the cluster side; the
+rest is removing indirection.**
 
 ## Open questions
 
@@ -174,11 +212,14 @@ questions include at least:
    ratios are not blob-like).
 2. **Does the event DLQ still need to exist?** Today it
    solves two problems: gRPC unavailability and the
-   eventlog-daemon-startup chicken-and-egg. Direct MariaDB
-   writes via `sf-database` remove the first; the second
-   disappears because there's no daemon to bootstrap. Phase 0
-   confirms there's no remaining failure mode that needs a
-   DLQ, or identifies what it is.
+   eventlog-daemon-startup chicken-and-egg. Both are now
+   absorbed by the local spool that landed in the
+   network-facade branch -- events sit on local disk until
+   the drainer can deliver them, with no caller-visible
+   failure. Phase 0's job here shrinks to "confirm there is
+   no remaining failure mode the spool doesn't cover, then
+   delete the DLQ table and its drain code." Default outcome:
+   removal.
 3. **Prune cadence and the cluster daemon's existing
    maintenance loop.** The old daemon ran prune every loop
    iteration. The cluster daemon has its own cadence for
@@ -209,10 +250,15 @@ questions include at least:
    resources daemon, mutate events from queue workers) hit
    sf-eventlog directly. Routing them through `sf-database`
    changes the load profile on a daemon that already
-   handles much higher write rates for object state. Phase 0
-   confirms it's a non-issue or sketches a write-batching
-   strategy if not. If OTel lands first, use it to baseline
-   the load; otherwise a one-off benchmark in phase 0.
+   handles much higher write rates for object state. The
+   local spool's batched ``RecordMultiEventBatch``-style
+   RPC means sf-database will see one round-trip per drainer
+   batch (typically 50-100 events) rather than one per
+   event, so the per-event amortisation is favourable. Phase 0
+   confirms it's a non-issue or sketches a per-table
+   partitioning / write-sharding strategy if not. If OTel
+   lands first, use it to baseline the load; otherwise a
+   one-off benchmark in phase 0.
 7. **Calling-site abstraction signature.** Today
    `add_event(event_type, object_type, object_uuid, message,
    ...)` and `add_event_multi(event_type, objects, message,
@@ -252,13 +298,20 @@ questions include at least:
     couldn't read `event_uuid` instead, and either drops it
     from the calling-site signature or maps it to
     `event_uuid` for compatibility.
-12. **Event-write failure handling.** Today a failed gRPC
-    falls through to DLQ and a failed DLQ-write logs and
-    drops. Direct MariaDB writes have a different failure
-    profile — sf-database unavailable means the writing
-    daemon is probably about to die anyway. Phase 0
-    confirms the failure-handling story and what (if any)
-    in-process retry or last-ditch log line is appropriate.
+12. **Event-write failure handling.** With the local spool
+    in place a failed RPC no longer reaches the caller --
+    the drainer retries with backoff and events sit in the
+    spool until delivered. Phase 0 confirms what the
+    drainer should do when the spool grows beyond its
+    high-water mark (the network-facade branch picked
+    "drop with a counter," matching today's posture when
+    sf-eventlog is unreachable for >cooldown; the
+    alternative is block-with-timeout, which reintroduces
+    backpressure into callers). The
+    block-vs-drop tradeoff is operator-visible -- drop loses
+    forensic detail on the saturated event stream; block
+    risks knock-on slowdowns -- so phase 0 documents the
+    choice rather than just inheriting it.
 
 ## Execution
 
@@ -266,13 +319,14 @@ Provisional, to be re-cut after phase 0.
 
 | Phase | Plan | Status |
 |-------|------|--------|
+| -1. Local sqlite spool + batched-RPC drainer (caller side) | _(delivered in the network-facade branch ahead of this plan)_ | Complete |
 | 0. Research and decisions document | PLAN-eventlog-direct-mariadb-phase-00-decisions.md | Not started |
 | 1. `events` and `event_objects` schema and migration tooling | PLAN-eventlog-direct-mariadb-phase-01-schema.md | Not started |
-| 2. Direct-write path in `eventlog.add_event*` | PLAN-eventlog-direct-mariadb-phase-02-write.md | Not started |
+| 2. Swap the drainer's RPC target from sf-eventlog to sf-database | PLAN-eventlog-direct-mariadb-phase-02-write.md | Not started |
 | 3. Move prune sweep into the cluster daemon | PLAN-eventlog-direct-mariadb-phase-03-prune.md | Not started |
 | 4. REST API direct-read path | PLAN-eventlog-direct-mariadb-phase-04-read.md | Not started |
 | 5. Historic sqlite data migration | PLAN-eventlog-direct-mariadb-phase-05-historic.md | Not started |
-| 6. Delete `sf-eventlog` daemon, gRPC protos, systemd unit, config | PLAN-eventlog-direct-mariadb-phase-06-remove.md | Not started |
+| 6. Delete `sf-eventlog` daemon, gRPC protos, systemd unit, config, and the MariaDB ``event_dlq`` | PLAN-eventlog-direct-mariadb-phase-06-remove.md | Not started |
 | 7. Documentation | PLAN-eventlog-direct-mariadb-phase-07-docs.md | Not started |
 
 ## Dependencies on other plans

@@ -1,12 +1,17 @@
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import mariadb
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import FLOATING_NETWORK_UUID
+from shakenfist.eventlog import add_event_multi
 from shakenfist.schema.operations import net_op as schema
 from shakenfist.exceptions import CreateVXLANInterfaceFailed
-from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import EnsureMeshFailed
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
+from shakenfist.operations.error_report import ErrorReport
 from shakenfist.util import exceptions as util_exceptions
 
 
@@ -41,11 +46,24 @@ class NetOp(BaseClusterOperation):
     initial_version = schema.initial_version
     current_version = schema.current_version
 
+    # See ``BaseClusterOperation.coalescible_tasks`` and the
+    # ``COALESCIBLE_TASKS`` block in
+    # ``shakenfist/schema/operations/net_op.py`` for the rationale
+    # behind which tasks fold. The target column is ``network_uuid``
+    # -- every NetOp targets exactly one network, and the
+    # ``cluster_operations`` table already has an indexed
+    # ``network_uuid`` column for the sibling-finding query the
+    # dispatcher / enqueue path will issue.
+    coalescible_tasks = schema.COALESCIBLE_TASKS
+    coalescible_target_column = 'network_uuid'
+
     def __init__(self, static_values):
         self.upgrade(static_values)
         super().__init__(static_values, schema)
 
         self.__network_uuid = static_values['network_uuid']
+        self.__floating_address = static_values.get('floating_address')
+        self.__inner_address = static_values.get('inner_address')
 
         self.log = LOG.with_fields({
             'operation_type': self.object_type,
@@ -59,11 +77,21 @@ class NetOp(BaseClusterOperation):
     def network_uuid(self):
         return self.__network_uuid
 
+    @property
+    def floating_address(self):
+        return self.__floating_address
+
+    @property
+    def inner_address(self):
+        return self.__inner_address
+
     # API
     def external_view(self):
         retval = super().external_view()
         retval.update({
-            'network_uuid': self.network_uuid
+            'network_uuid': self.network_uuid,
+            'floating_address': self.floating_address,
+            'inner_address': self.inner_address,
         })
         return retval
 
@@ -81,48 +109,116 @@ class NetOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(n)
 
-        except CreateVXLANInterfaceFailed:
+        except CreateVXLANInterfaceFailed as e:
             self.log.warning(
                 'Failed to create VXLAN interface, will retry')
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetOp.STATE_ERROR
 
         except EnsureMeshFailed as e:
             if n.state.value in n.ACTIVE_STATES:
-                # This should not happen with an active network
+                # This should not happen with an active network; log but
+                # still record the error report before entering STATE_ERROR.
                 util_exceptions.ignore_exception('net_op', e)
 
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetOp.STATE_ERROR
 
         except Exception as e:
             util_exceptions.ignore_exception('net_op', e)
+            mariadb.set_cluster_operation_error(
+                str(self.uuid), ErrorReport.from_exception(e))
             self.state = NetOp.STATE_ERROR
 
     def _network_deploy(self, n):
-        if n.is_dead():
-            raise InvalidStateForTask(self)
-
-        n.create_on_network_node()
-        n.ensure_mesh()
+        # This task is no longer enqueued by any production code path as of
+        # phase 6 of `PLAN-network-facade.md`. Any in-flight op at deploy
+        # time gracefully transitions to STATE_ERROR via the dispatcher's
+        # outer Exception handler, which persists an ErrorReport. The
+        # task-enum value stays in the schema for on-disk record
+        # compatibility.
+        raise InvalidStateForTask(self)
 
     def _network_destroy(self, n):
-        nis = n.networkinterfaces
-        if nis:
-            self.defer(waiting_on=nis)
-            return
-
-        try:
-            n.delete_on_network_node()
-        except DeadNetwork as e:
-            self.log.with_fields({
-                'exception': e
-            }).warning('Attempted destroy on a dead network')
+        # Phase 6: superseded by network_apply_delete_network_node (task
+        # 12). See _network_deploy above for the rationale.
+        raise InvalidStateForTask(self)
 
     def _network_update_dnsmasq(self, n):
-        n.create_on_network_node()
-        n.ensure_mesh()
+        # Phase 6: this misleadingly-named composite task was superseded
+        # by the explicit [network_apply_create_network_node,
+        # network_ensure_mesh] task list. See _network_deploy above for
+        # the rationale.
+        raise InvalidStateForTask(self)
+
+    def _network_apply_create_network_node(self, n):
+        BridgedVXLanNetwork(n)._apply_create_on_network_node()
+
+    # Defer schedule for delete ops waiting on network interfaces to drain.
+    # Roughly nine minutes total before we give up and error the op out --
+    # generous enough to absorb concurrent instance deletes even when the
+    # cluster is under load, but bounded so a wedged delete eventually
+    # surfaces a failure to the caller rather than spinning forever.
+    _DELETE_DRAIN_DELAYS = (15, 30, 60, 60, 60, 60, 60, 60, 60, 60)
+
+    def _network_apply_delete_network_node(self, n):
+        # If interfaces are still attached the network is mid-drain
+        # (delete_all_networks(clean_wait=True) is the common case --
+        # the API enqueues this op while the matching instance deletes
+        # are still in flight). Defer rather than tear the network down
+        # underneath those interfaces; defer_with_backoff re-enqueues
+        # the op and returns control to the worker.
+        if n.networkinterfaces:
+            if not self.defer_with_backoff(
+                    delays=self._DELETE_DRAIN_DELAYS,
+                    reason='waiting for network interfaces to drain'):
+                # Retry budget exhausted -- the worker's outer Exception
+                # handler will persist an ErrorReport and set STATE_ERROR.
+                raise InvalidStateForTask(self)
+            return
+        BridgedVXLanNetwork(n)._apply_delete_on_network_node()
 
     def _network_remove_dnsmasq(self, n):
-        n.remove_dnsmasq()
+        BridgedVXLanNetwork(n)._apply_remove_dnsmasq()
+
+    def _network_apply_update_dnsmasq(self, n):
+        BridgedVXLanNetwork(n)._apply_update_dnsmasq()
+
+    def _network_apply_remove_dnsmasq(self, n):
+        BridgedVXLanNetwork(n)._apply_remove_dnsmasq()
 
     def _network_remove_nat(self, n):
-        n.remove_nat()
+        BridgedVXLanNetwork(n)._apply_remove_nat()
+
+    def _network_ensure_mesh(self, n):
+        BridgedVXLanNetwork(n)._apply_ensure_mesh()
+
+    def _network_add_floating_ip(self, n):
+        # Multi-target audit event preserves today's correlation between
+        # the wrapped network and the floating-network metadata object. The
+        # caller-side affected_objects (interface, instance) are emitted by
+        # net_iface_op._interface_float on the dispatch path it owns.
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [n, ('network', FLOATING_NETWORK_UUID)],
+            'add floating IP',
+            extra={
+                'floating': self.floating_address,
+                'inner': self.inner_address,
+            })
+        BridgedVXLanNetwork(n)._apply_add_floating_ip(
+            self.floating_address, self.inner_address)
+
+    def _network_remove_floating_ip(self, n):
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [n, ('network', FLOATING_NETWORK_UUID)],
+            'remove floating IP',
+            extra={
+                'floating': self.floating_address,
+                'inner': self.inner_address,
+            })
+        BridgedVXLanNetwork(n)._apply_remove_floating_ip(
+            self.floating_address, self.inner_address)

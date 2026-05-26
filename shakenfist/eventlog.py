@@ -18,6 +18,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import constants
+from shakenfist import eventlog_spool
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import config
@@ -162,8 +163,18 @@ def _add_event_multi_inner(
                     f'Failed to add event for {object_type} with uuid '
                     f'{object_uuid}: {e}')
 
+        # 30 s with ``wait_for_ready=True`` blocks the caller waiting for
+        # the eventlog server to come back when it has gone away, which
+        # is exactly the case during a coordinated shutdown: another
+        # daemon's record_exit() can sit on this call long enough that
+        # systemd's TimeoutStopSec=30 s SIGKILLs the whole daemon before
+        # the gRPC times out. Failing fast (5 s, wait_for_ready=False)
+        # is fine because the outer ``add_event_multi`` falls through
+        # to the DLQ on any RpcError, and the cooldown cache then
+        # short-circuits subsequent events at this same node until the
+        # server is back.
         response = stub.RecordMultiEvent(
-            request, timeout=30, wait_for_ready=True)
+            request, timeout=5, wait_for_ready=False)
         if response.ack:
             return
 
@@ -272,6 +283,38 @@ def add_event_multi(
             log.error('Added event')
         else:
             log.info('Added event')
+
+    # Fast path: enqueue into the local per-daemon spool. The
+    # background drainer thread (``shakenfist.eventlog_drainer``)
+    # picks the event up, batches it with peers, and ships the
+    # batch via ``RecordMultiEventBatch``. The spool's
+    # ``enqueue()`` returns in microseconds (single sqlite
+    # insert), so the caller doesn't pay the per-event RPC cost
+    # anymore -- which was the largest remaining contributor to
+    # cluster-operation wrapper time in CI profiling.
+    #
+    # The spool returns False in two cases: (a) uninitialised
+    # (this process never called ``eventlog_drainer.start()`` --
+    # typical for sf-ctl, unit tests, or anything that imports
+    # this module without the daemon scaffolding) or (b) over
+    # its high-water mark. Either way we fall through to the
+    # legacy direct-gRPC + DLQ path so the event still lands.
+    if (not get_force_event_dlq()
+            and not config.EVENTLOG_SUPPRESS_GRPC):
+        payload = {
+            'event_type': event_type,
+            'fqdn': config.NODE_NAME,
+            'duration': duration,
+            'message': message,
+            'extra': util_json.json_dump(extra),
+            'timestamp': timestamp,
+            'objects': [
+                {'object_type': str(ot), 'object_uuid': str(ou)}
+                for ot, ou in simpler_objects
+            ],
+        }
+        if eventlog_spool.enqueue(payload):
+            return
 
     # *** Note that the APIs are different here!
     # If force_event_dlq is set, skip gRPC and go directly to the dead letter
