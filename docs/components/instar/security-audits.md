@@ -456,10 +456,11 @@ improvements:
 ### Scope
 
 Coverage-guided fuzzing of all `no_std` parser crates using
-`cargo-fuzz` (libFuzzer). 13 fuzz targets exercise format detection,
+`cargo-fuzz` (libFuzzer). 17 fuzz targets exercise format detection,
 header parsing, L1/L2 cluster lookup, refcount table traversal,
-decompression, grain directory lookup, BAT traversal, and VHDX
-metadata parsing.
+decompression, grain directory lookup, BAT traversal, VHDX
+metadata parsing, the measure calculator, the create emitters, and
+the resize planners.
 
 ### Technique
 

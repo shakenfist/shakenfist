@@ -127,6 +127,48 @@ against `qemu-img convert`:
 - Skips images with cluster_size > 64KB (unsupported)
 - Skips images whose virtual_size exceeds available temp space
 
+### Resize Tests (`test_resize.py`)
+
+Tests for the `instar resize` operation, structured around six
+surfaces totalling 114 tests:
+
+**Schema-drift tripwire
+(`TestResizeBaselineMatrix.test_resize_cases_match_baselines`):**
+- Walks `instar-testdata/expected-outputs/resize-info-json/<target>/<version>/`
+  and asserts the on-disk case set matches the in-test `RESIZE_CASES`
+  mirror. Catches drift between this mirror and the testdata
+  generator.
+
+**Cross-version baseline matrix (`TestResizeBaselineMatrix`):**
+- Per-`(target, case)` factory diffs `instar create → instar resize`
+  output against the phase-10 `qemu-img info` JSON baseline.
+- ~22 active cases for qcow2 + raw; ~20 skipped (vmdk/vhd/vhdx where
+  qemu rejects, `-no-shrink` rejection cases that surface 6 covers,
+  and `KNOWN_RESIZE_DIVERGENCES` carry-forwards).
+
+**Live cross-validation (`TestResizeCrossValidation`):**
+- 7 curated qcow2 + raw cases comparing instar end-to-end against
+  the system `qemu-img` via `instar info` on both outputs.
+
+**Round-trip check (`TestResizeRoundTripCheck`):**
+- `instar create → resize → check` for ~30 non-raw cases.
+- Catches resize-emitter regressions that produce files qemu-img
+  info accepts but `instar check` flags.
+
+**Internal consistency for vmdk/vpc/vhdx (`TestResizeConsistency`):**
+- 14 cases for the formats qemu can't resize, verified via
+  `instar info` virtual-size match + `instar check`.
+
+**Targeted error paths (`TestResizeErrorPaths`):**
+- 9 fixed tests pinning the host CLI rejection contracts:
+  shrink-without-flag for raw + qcow2, subtractive-size without
+  --shrink, invalid size strings, --preallocation=metadata on
+  raw, --preallocation=falloc + --shrink, --object,
+  --image-opts.
+
+Wall clock: ~32 s serial / ~10 s with `make test-container`'s
+`--concurrency 4`.
+
 ### Adversarial Image Tests (`test_adversarial.py`)
 
 Tests verifying that instar safely handles malicious and malformed images
