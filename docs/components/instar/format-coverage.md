@@ -110,6 +110,37 @@ The `instar convert` operation supports writing output in the following formats:
 
 ---
 
+## Resize Format Support
+
+The `instar resize` operation mutates an existing image's virtual
+size in place. Per-format support:
+
+| Format | Grow | Shrink | Preallocation modes for grow | qemu-img parity |
+|--------|------|--------|------------------------------|------------------|
+| raw    | Yes  | Yes    | off, falloc, full            | Byte-equivalent across qemu-img 6.0.0–10.2.0 |
+| qcow2  | Yes  | Yes (`--shrink`) | off, falloc, full (metadata planner gap) | Byte-equivalent (modulo `KNOWN_RESIZE_DIVERGENCES`) |
+| vmdk (monolithicSparse) | Yes | reject | off | **instar-only** — qemu rejects |
+| vmdk (other subformats) | reject | reject | n/a | n/a |
+| vpc (VHD dynamic) | Yes | reject | off | **instar-only** — qemu rejects |
+| vpc (VHD fixed)   | Yes | reject | off | **instar-only** — qemu rejects |
+| vhdx (dynamic)    | Yes | reject | off | **instar-only** — qemu rejects |
+
+For the formats marked **instar-only**, `qemu-img resize` rejects
+on every shipped version (`6.0.0` through `10.2.0`) with `Image
+format driver does not support resize`. Coverage for those formats
+is via the internal consistency suite
+(`tests/test_resize.py:TestResizeConsistency`) rather than a
+cross-tool diff. See [docs/resize.md](/components/instar/resize/) and the
+"resize subcommand quirks" section of [docs/quirks.md](/components/instar/quirks/).
+
+For sparse-format grow with `--preallocation=falloc|full`, instar
+preallocates only the newly-appended file region, not the entire
+data region of the new virtual size. Documented in
+[docs/quirks.md](/components/instar/quirks/) as a deliberate divergence from
+qemu-img.
+
+---
+
 ## Safety Check Comparison
 
 ### QCOW2 Safety Checks

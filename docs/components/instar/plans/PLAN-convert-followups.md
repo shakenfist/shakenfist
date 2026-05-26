@@ -72,7 +72,7 @@ effort:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. `qemu-img` subcommand parity (~~create~~ / map / ~~measure~~ / resize / snapshot / rebase / commit) | PLAN-convert-followups-phase-01-subcommands.md (not yet written) | Not started (`measure` complete — see [PLAN-measure.md](/components/instar/plans/PLAN-measure/); `create` complete — see [PLAN-create.md](/components/instar/plans/PLAN-create/)) |
+| 1. `qemu-img` subcommand parity (~~create~~ / map / ~~measure~~ / ~~resize~~ / snapshot / rebase / commit) | PLAN-convert-followups-phase-01-subcommands.md (not yet written) | Not started (`measure` complete — see [PLAN-measure.md](/components/instar/plans/PLAN-measure/); `create` complete — see [PLAN-create.md](/components/instar/plans/PLAN-create/); `resize` complete — see [PLAN-resize.md](/components/instar/plans/PLAN-resize/)) |
 | 2. `check --repair` wiring | PLAN-convert-followups-phase-02-check-repair.md (not yet written) | Not started |
 
 Subcommands in phase 1 should be split into one phase plan each
@@ -90,8 +90,7 @@ For phase 1 detail planning, the original scope notes from
   reports contiguous extents with start / length / depth / zero
   / data / offset.
 - ~~**measure**~~ — Shipped. See [PLAN-measure.md](/components/instar/plans/PLAN-measure/).
-- **resize** — Change virtual size. Raw via host truncate;
-  QCOW2 / VMDK / VHD / VHDX via guest L1/BAT extension.
+- ~~**resize**~~ — Shipped. See [PLAN-resize.md](/components/instar/plans/PLAN-resize/).
 - **snapshot** — List, apply, create, delete internal QCOW2
   snapshots.
 - **rebase** — Change backing file references. Unsafe

@@ -993,6 +993,157 @@ file whose internal validator rejects on `instar check`
 `tests/test_create.py::KNOWN_CHECK_FAILURES`; `refcount_bits=1`
 and `=8` fit the encoding and pass.
 
+## resize subcommand quirks
+
+### Raw `resize` runs entirely host-side
+
+`instar resize -f raw` opens the file `O_RDWR`, calls
+`ftruncate(new_virtual_size)`, and optionally applies
+`posix_fallocate` (`--preallocation falloc`) or zero-fills via
+`fallocate(FALLOC_FL_ZERO_RANGE)` with a `pwrite` fallback
+(`--preallocation full`) over the newly-added byte range.
+No KVM guest is launched — raw has no metadata to mutate.
+Every other target format runs `resize.bin` in the sandbox.
+Same shortcut and rationale as `create`.
+
+### qemu-img cannot resize vmdk / vpc / vhdx on any shipped version
+
+`qemu-img resize -f vpc|vmdk|vhdx ...` rejects with
+`qemu-img: Image format driver does not support resize` on
+every qemu-img version from 6.0.0 through 10.2.0 (the matrix
+phase 10 exercises). instar resizes all three. The phase 10
+baselines record qemu's rejection verbatim, both as
+documentation of the cross-tool gap and as a tripwire for the
+day qemu adds support. Phase 11's `TestResizeConsistency`
+covers vmdk/vhd/vhdx via an `instar create → resize → info →
+check` round-trip rather than a cross-tool diff. If
+`vmdkinfo` / `vhdiinfo` (libyal) ever gain resize support,
+the differential surface gets a third axis.
+
+### Preallocation covers only the appended file region
+
+For `--preallocation=falloc|full` on grow, instar preallocates
+only `[file_size_before, file_size_after)` — the bytes the
+planner physically appended past the pre-resize EOF.
+`qemu-img resize` preallocates the entire data region of the
+new virtual size (i.e. every cluster / block the resized
+image's metadata can address). Both behaviours satisfy the
+"reserve disk blocks" intent, but they're not identical: a
+qemu-resized 1 GiB qcow2 with `--preallocation=full` writes
+~1 GiB of zeros to disk; an instar-resized one writes only
+the new L1 region. This is a deliberate divergence — closing
+it requires per-format walk-and-populate logic comparable to
+a `dd if=/dev/zero` over the data region. Documented in
+[docs/plans/PLAN-resize-phase-09-preallocation.md](/components/instar/
+plans/PLAN-resize-phase-09-preallocation/) and queued under
+PLAN-resize.md's Future-work section.
+
+### `--preallocation=falloc|full` + `--shrink` is rejected
+
+instar rejects the combination outright with
+`resize: --preallocation=<mode> is meaningless when shrinking`.
+qemu silently accepts the combination and discards the
+preallocation flag (the shrink still happens; the prealloc is
+a no-op). The deliberate divergence makes the user's
+intent explicit when they pass conflicting flags. Phase 11's
+`TestResizeErrorPaths` pins the rejection message.
+
+### `--preallocation=metadata` on raw is rejected
+
+instar rejects with `resize: --preallocation=metadata is not
+supported for raw`. qemu accepts the flag and silently
+no-ops (raw has no metadata to populate, so the operation
+degrades to a plain `ftruncate`). Same rationale as the
+shrink-+-prealloc rejection: explicit-reject for clarity.
+
+### qcow2 `--preallocation=metadata` is rejected by the planner
+
+The qcow2 grow planner returns
+`ResizeError::PreallocationUnsupported` for `metadata` mode
+(`resize: guest reported error 8: preallocation mode not
+supported by this format`). qemu supports it. The planner gap
+was deferred from phase 2c; the integration matrix carries it
+in `KNOWN_RESIZE_DIVERGENCES` and the differential fuzz
+picker filters the case so it doesn't show up as a finding.
+Closing the gap requires the same `Qcow2Layout` extension
+work that ships in create's metadata mode, adapted for the
+grow path. Future work.
+
+### VHD CHS-rounded `virtual_size` carries forward through resize
+
+The create-time CHS-rounding divergence (qemu rounds
+virtual_size up to the next CHS-aligned multiple; instar
+emits exact bytes — see `create subcommand quirks` above)
+persists across resize. The resize planner preserves whatever
+the create writer chose, so an `instar create -f vpc` →
+`instar resize -f vpc` round-trip stays internally
+consistent; an `instar resize` against a qemu-created VHD
+preserves the qemu CHS-rounded size in the output. Phase 11's
+`TestResizeConsistency` for vhd uses a `>= expected_final_size`
+assertion (rather than equality) to accommodate any future
+CHS-rounding alignment in the resize writer.
+
+### `Image resized.` output matches qemu byte-for-byte
+
+`instar resize` emits the literal string `Image resized.`
+(followed by a newline) on success in human mode — identical
+to qemu-img's output. `-q` suppresses it. `--output=json`
+swaps in a structured envelope (filename, format, action,
+old/new virtual size, new file size) and ignores `-q`.
+
+### qcow2 overlays with a backing file are rejected up-front
+
+`instar resize` of a qcow2 image whose header carries a
+`backing_file_offset` / `backing_file_size` rejects with
+`resize: qcow2 images with a backing file are not yet
+supported (resize would orphan the backing reference);
+resize the base image directly or flatten via
+`instar convert` first`. The qcow2 resize planners do not
+yet thread the existing backing reference through the
+header-rewrite path, so without this guard the rewritten
+header would have `backing_file_offset = 0` and the overlay
+would lose its parent. The rejection mirrors VHDX's
+`has_parent` guard. Lifting it is queued under PLAN-resize.md
+Future work — see the "Planner gaps" section.
+
+### Same file is exposed as input device 0 and output device 1
+
+The resize guest binary reads via `read_output_sector` (new
+in phase 7) and writes via `write_output_sector`, both
+dispatching to the output device at MMIO slot 1. The core
+init unconditionally probes input device 0; the host
+satisfies the probe with a 1-sector tempfile stub that the
+resize op never reads, then attaches the real read-write
+output backing at slot 1. Mirrors the same pattern
+`run_create_nonraw` uses for the same reason. The first
+phase-11 integration run surfaced this contract: an earlier
+revision attached the output at slot 0, which broke the
+guest's `init stage=probe device=output address=0x10001000`
+walk. Caught and fixed before phase 11 landed.
+
+### qcow2 grow has no image-size ceiling; qcow2 shrink does
+
+After followup-01, qcow2 *grow* is bounded only by what the
+filesystem can hold — the guest's targeted pre-pass stages a
+small bounded set of refcount blocks (≤ 16) regardless of
+image size. Tested end-to-end through 1 TiB → 2 TiB in 163 ms.
+
+qcow2 *shrink* still uses the older "stage every non-zero
+refcount block" pre-pass and so retains a per-cluster-size
+ceiling: 4 MiB of `EXISTING_STATE` divided by `cluster_size`
+gives the maximum number of refcount blocks stage-able, each
+covering `cluster_size² / 2` bytes of file. At the default
+64 KiB cluster the ceiling is ~128 GiB; at 4 KiB it's ~8 GiB;
+at 1 MiB it's ~512 TiB (no practical limit). Lifting it
+requires a two-phase shrink pre-pass that walks the L2 tables
+first to identify which clusters are discarded, then stages
+only the refcount blocks containing those clusters; queued
+under PLAN-resize.md Future-work as a separate followup.
+
+Raw / vmdk / vpc / vhdx grow and shrink have no analogous
+metadata-staging step and are bounded only by filesystem
+capacity.
+
 ## Future Additions
 
 Additional quirks will be documented here as they are discovered during
