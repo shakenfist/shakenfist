@@ -335,12 +335,11 @@ else
     question_start
     echo "The node you are running this script on is called the 'primary node'."
     echo "The primary node is largely an operations console. It deploys the other"
-    echo "nodes, receives all nodes' logs via syslog, runs prometheus, and a"
-    echo "grafana dashboard. Most importantly, the primary node is where we will"
-    echo "configure the load balancer for API traffic. Therefore, its public address"
-    echo "needs to be the one which is in the API URL. Don't worry about the URL"
-    echo "for now, but please be aware that this node requires both ingress and"
-    echo "egress network connectivity."
+    echo "nodes, receives all nodes' logs via syslog, and runs prometheus. Most"
+    echo "importantly, the primary node is where we will configure the load balancer"
+    echo "for API traffic. Therefore, its public address needs to be the one which"
+    echo "is in the API URL. Don't worry about the URL for now, but please be aware"
+    echo "that this node requires both ingress and egress network connectivity."
     echo
     echo "The primary node can also be just a hypervisor node as well, depending"
     echo "on your needs."

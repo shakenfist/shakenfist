@@ -1,6 +1,5 @@
-# grafana
+# prometheus
 deploy_name: "sf"
-system_key: "unknown"
 
 # cluster_config
 database_node_ip: "127.0.0.1"
