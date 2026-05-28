@@ -51,16 +51,19 @@ The Shaken Fist deployer today installs and operates a stack
 of supporting infrastructure on top of the SF daemons
 themselves: rsyslog for log aggregation onto a primary node,
 Apache as a reverse proxy / load balancer for the REST API,
-and MariaDB as the cluster datastore. (Grafana and the
-primary-node Prometheus server used to be in this list too;
-both have already been removed as warmup work for this plan.
-The sample Grafana dashboard lives at
-`examples/grafana-dashboard.json` for operators who want to
-import it into their own Grafana, and SF daemons continue to
-expose their Prometheus metrics endpoints for operator-run
-Prometheus to scrape.) All of these run inside the SF
-deployer's purview and are configured by the ansible roles
-in `shakenfist/deploy/ansible/`.
+and MariaDB as the cluster datastore. (Grafana, the
+primary-node Prometheus server, and `prometheus-node-exporter`
+on every node used to be in this list too; all three have
+been removed as warmup work for this plan. The sample
+Grafana dashboard lives at `examples/grafana-dashboard.json`
+for operators who want to import it into their own Grafana.
+SF daemons continue to expose their own Prometheus metrics
+endpoints (13001 / 13002 / 13006), but node-level metrics
+are now an operator concern — they choose node_exporter,
+telegraf, or whatever else their monitoring stack uses.) All
+of these run inside the SF deployer's purview and are
+configured by the ansible roles in
+`shakenfist/deploy/ansible/`.
 
 The `primary_node` role in particular is the visible focal
 point: it hosts the rsyslog sink, the Apache reverse proxy,
