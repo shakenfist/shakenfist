@@ -203,7 +203,18 @@ other_victim=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cl
 # the lock and lets another candidate acquire it. The lease is 60 s,
 # so we sleep 90 s -- comfortably past expiry plus a couple of
 # refresh cycles -- and then re-read the role.
-script_host=$(hostname)
+#
+# Use SHAKENFIST_NODE_NAME (set by /etc/sf/sfrc, which the workflow
+# sources before invoking this script) rather than `hostname`: the
+# kernel hostname is whatever cloud-init wrote at provision time and
+# does not have to match the SF-level node name registered via
+# `--node-name`. The two diverged in the smoke CI environment, the
+# guard silently never fired, and the script halted its own host.
+script_host="${SHAKENFIST_NODE_NAME}"
+if [ -z "${script_host}" ]; then
+    log "SHAKENFIST_NODE_NAME not set -- /etc/sf/sfrc was not sourced. Aborting."
+    exit 1
+fi
 if [ "${maintainer}" == "${script_host}" ]; then
     log "Maintainer ${maintainer} == script host ${script_host}; forcing re-election"
     sudo systemctl restart sf-cluster
