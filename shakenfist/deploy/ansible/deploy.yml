@@ -277,8 +277,4 @@
       vars:
         role_action: "apache2"
     - role: primary
-      vars:
-        role_action: "prometheus"
-        deploy_name: "{{ deploy_name }}"
-    - role: primary
       role_action: "postinstall"

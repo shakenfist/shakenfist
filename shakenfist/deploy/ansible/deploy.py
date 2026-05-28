@@ -44,7 +44,6 @@ def generate_hosts_file(topology, ssh_user, ssh_key_filename):
         'hypervisors': [],
         'etcd_master': [],
         'storage': [],
-        'sf_prometheus_exporters': [],
     }
 
     topology_data = json.loads(topology)
@@ -56,18 +55,14 @@ def generate_hosts_file(topology, ssh_user, ssh_key_filename):
             groups['primary_node'].append(name)
         if node.get('network_node', False):
             groups['network_node'].append(name)
-            groups['sf_prometheus_exporters'].append(name)
         if node.get('eventlog_node', False):
             groups['eventlog_node'].append(name)
-            groups['sf_prometheus_exporters'].append(name)
         if node.get('hypervisor', False):
             groups['hypervisors'].append(name)
-            groups['sf_prometheus_exporters'].append(name)
         if node.get('etcd_master', False):
             groups['etcd_master'].append(name)
         if node.get('storage', False):
             groups['storage'].append(name)
-            groups['sf_prometheus_exporters'].append(name)
 
     # Build node lookup for host vars
     node_lookup = {n['name']: n for n in topology_data}
@@ -90,8 +85,7 @@ def generate_hosts_file(topology, ssh_user, ssh_key_filename):
 
     # Write each group with host variables
     for group_name in ['primary_node', 'network_node', 'eventlog_node',
-                       'hypervisors', 'etcd_master', 'storage',
-                       'sf_prometheus_exporters']:
+                       'hypervisors', 'etcd_master', 'storage']:
         lines.append(f'[{group_name}]')
         seen = set()  # Avoid duplicate entries within same group
         for name in groups[group_name]:

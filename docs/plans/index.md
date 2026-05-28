@@ -51,7 +51,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Health checks](PLAN-health-checks.md) | Phase 2: gRPC health protocol | Not started | `grpc.health.v1.Health` on sf-database and sf-eventlog with leader / standby readiness semantics |
 | [Health checks](PLAN-health-checks.md) | Phase 3: Remaining daemons | Not started | Extend the pattern to every other SF daemon |
 | [Health checks](PLAN-health-checks.md) | Phase 4: Operator documentation | Not started | LB-config examples and the rolling-upgrade-with-drain procedure |
-| [Remove the primary node](PLAN-remove-primary.md) | Phase 1: Remove monitoring | Not started | Drop Prometheus and rsyslog aggregation from the deployer (Grafana already removed as warmup) |
+| [Remove the primary node](PLAN-remove-primary.md) | Phase 1: Remove monitoring | Not started | Drop rsyslog aggregation from the deployer (Grafana and the primary-node Prometheus server already removed as warmup) |
 | [Remove the primary node](PLAN-remove-primary.md) | Phase 2: Bootstrap CLI | Not started | Idempotent `sf-ctl bootstrap-cluster` + `bootstrap_operations` table |
 | [Remove the primary node](PLAN-remove-primary.md) | Phase 3: Remove LB | Not started | Drop the Apache reverse proxy from the deployer |
 | [Remove the primary node](PLAN-remove-primary.md) | Phase 4: BYO MariaDB | Not started | Demote the local MariaDB role to opt-in dev convenience |
