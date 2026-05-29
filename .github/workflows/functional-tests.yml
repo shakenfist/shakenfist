@@ -484,16 +484,26 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
 
-          script="sudo mkdir /srv/shakenfist/exceptions;"
-          script="${script} sudo find /srv/shakenfist/exceptions -type f -ls;"
-          tools/run_remote ${primary} "${script}"
+          # SF writes exception JSON to /srv/shakenfist/exceptions on
+          # the node where the exception fired. Fan out via ansible
+          # from the primary so exceptions raised on hypervisors are
+          # not missed.
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.pr.base_image_user }}@${primary} \
+              "sudo ansible -i /etc/sf/inventory.yaml all -b -m shell \
+                  -a 'mkdir -p /srv/shakenfist/exceptions; find /srv/shakenfist/exceptions -type f -ls' \
+                  2>/dev/null" || true
           echo
 
-          # Check if any exception files exist and set output
+          # Sum per-node counts. ansible --one-line output looks like
+          # "host | STATUS | rc=0 >> <count>" per node.
           EXCEPTION_COUNT=$(ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.pr.base_image_user }}@${primary} \
-              "sudo find /srv/shakenfist/exceptions -type f 2>/dev/null | wc -l")
-          echo "Exception files found: ${EXCEPTION_COUNT}"
+              "sudo ansible -i /etc/sf/inventory.yaml all -b -m shell --one-line \
+                  -a 'find /srv/shakenfist/exceptions -type f 2>/dev/null | wc -l' \
+                  2>/dev/null" \
+              | awk -F'>>' 'NF>1 {gsub(/[^0-9]/,"",$NF); s+=$NF} END {print s+0}')
+          echo "Exception files found (cluster-wide): ${EXCEPTION_COUNT}"
           if [ "${EXCEPTION_COUNT}" -gt 0 ]; then
             echo "exceptions_found=true" >> $GITHUB_OUTPUT
           else
@@ -513,7 +523,9 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+          tools/run_remote ${primary} 'sudo grep -nHE -A 50 "Traceback \(most recent call last\)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -600 || true'
+          echo
+          tools/run_remote ${primary} 'sudo grep -nHE "Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
 
       - name: Dump systemd state and journals
         if: always() && steps.check_logs.outcome == 'failure'
@@ -1017,16 +1029,26 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
 
-          script="sudo mkdir /srv/shakenfist/exceptions;"
-          script="${script} sudo find /srv/shakenfist/exceptions -type f -ls;"
-          tools/run_remote ${primary} "${script}"
+          # SF writes exception JSON to /srv/shakenfist/exceptions on
+          # the node where the exception fired. Fan out via ansible
+          # from the primary so exceptions raised on hypervisors are
+          # not missed.
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.merge.base_image_user }}@${primary} \
+              "sudo ansible -i /etc/sf/inventory.yaml all -b -m shell \
+                  -a 'mkdir -p /srv/shakenfist/exceptions; find /srv/shakenfist/exceptions -type f -ls' \
+                  2>/dev/null" || true
           echo
 
-          # Check if any exception files exist and set output
+          # Sum per-node counts. ansible --one-line output looks like
+          # "host | STATUS | rc=0 >> <count>" per node.
           EXCEPTION_COUNT=$(ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               ${{ matrix.merge.base_image_user }}@${primary} \
-              "sudo find /srv/shakenfist/exceptions -type f 2>/dev/null | wc -l")
-          echo "Exception files found: ${EXCEPTION_COUNT}"
+              "sudo ansible -i /etc/sf/inventory.yaml all -b -m shell --one-line \
+                  -a 'find /srv/shakenfist/exceptions -type f 2>/dev/null | wc -l' \
+                  2>/dev/null" \
+              | awk -F'>>' 'NF>1 {gsub(/[^0-9]/,"",$NF); s+=$NF} END {print s+0}')
+          echo "Exception files found (cluster-wide): ${EXCEPTION_COUNT}"
           if [ "${EXCEPTION_COUNT}" -gt 0 ]; then
             echo "exceptions_found=true" >> $GITHUB_OUTPUT
           else
@@ -1046,7 +1068,9 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+          tools/run_remote ${primary} 'sudo grep -nHE -A 50 "Traceback \(most recent call last\)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -600 || true'
+          echo
+          tools/run_remote ${primary} 'sudo grep -nHE "Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
 
       - name: Dump systemd state and journals
         if: always() && steps.check_logs.outcome == 'failure'
