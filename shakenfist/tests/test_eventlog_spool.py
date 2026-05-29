@@ -7,6 +7,8 @@ are the things that have to work right -- everything else in
 """
 import os
 import tempfile
+import threading
+import time
 from unittest import mock
 
 from shakenfist import eventlog_spool
@@ -109,6 +111,51 @@ class SpoolHighWaterMarkTestCase(
                 eventlog_spool.enqueue({'i': 2}))
             self.assertFalse(
                 eventlog_spool.enqueue({'i': 3}))
+
+    def test_concurrent_enqueue_and_dequeue(self):
+        # Regression for sf-database 'NoneType is not subscriptable'
+        # and 'bad parameter or other API misuse' errors observed
+        # when multiple gRPC worker threads enqueue while the
+        # drainer thread reads from the same sqlite connection.
+        # Without the per-connection lock, cursor state races and
+        # this test surfaces either error within a few seconds.
+        s = eventlog_spool.initialise('test-daemon')
+        stop = threading.Event()
+        errors = []
+
+        def writer(start_n):
+            n = start_n
+            while not stop.is_set():
+                try:
+                    s.enqueue({'i': n})
+                    n += 1
+                except Exception as e:
+                    errors.append(('writer', e))
+                    return
+
+        def reader():
+            while not stop.is_set():
+                try:
+                    batch = s.dequeue_batch(limit=50)
+                    if batch:
+                        s.delete_ids(row_id for row_id, _ in batch)
+                except Exception as e:
+                    errors.append(('reader', e))
+                    return
+
+        writers = [
+            threading.Thread(target=writer, args=(w * 10_000,))
+            for w in range(4)
+        ]
+        readers = [threading.Thread(target=reader) for _ in range(2)]
+        for t in writers + readers:
+            t.start()
+        time.sleep(1.0)
+        stop.set()
+        for t in writers + readers:
+            t.join(timeout=5)
+
+        self.assertEqual([], errors)
 
 
 class SpoolOrphanRecoveryTestCase(

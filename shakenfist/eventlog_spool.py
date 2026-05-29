@@ -108,23 +108,31 @@ class Spool:
     """A single sqlite-backed event spool.
 
     Thread-safe across concurrent ``enqueue()`` callers and the
-    single drainer reader: WAL mode lets one writer + many
-    readers run without blocking, and the drainer's read +
-    delete pair runs inside a single ``BEGIN IMMEDIATE``
-    transaction so it never observes events that arrived
-    mid-batch.
+    single drainer reader. Python's ``sqlite3.Connection`` is
+    not internally thread-safe even with
+    ``check_same_thread=False`` -- two threads issuing
+    ``execute()`` against the same connection race on the
+    underlying cursor state and surface as
+    ``sqlite3.ProgrammingError: bad parameter or other API
+    misuse`` or as ``fetchone()`` returning ``None`` mid-result
+    (``'NoneType' object is not subscriptable``). We serialise
+    every connection use behind ``self._lock``. WAL mode and
+    NORMAL sync still apply -- they govern on-disk durability
+    and reader/writer concurrency at the *database* level; the
+    lock only governs in-process *connection* access.
     """
 
     SCHEMA_VERSION = 1
 
     def __init__(self, path: str):
         self.path = path
+        self._lock = threading.Lock()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         # ``check_same_thread=False`` because the drainer
-        # thread reads while caller threads write. The locking
-        # we need is sqlite's own (WAL mode + immediate
-        # transactions), so we don't need Python-side mutex on
-        # the connection.
+        # thread reads while caller threads write. We add a
+        # Python-side ``self._lock`` ourselves around every
+        # connection use -- see the class docstring for why
+        # WAL mode alone is not sufficient.
         self._conn = sqlite3.connect(
             path, check_same_thread=False, isolation_level=None,
             timeout=30.0)
@@ -152,7 +160,8 @@ class Spool:
 
     def close(self) -> None:
         with contextlib.suppress(Exception):
-            self._conn.close()
+            with self._lock:
+                self._conn.close()
 
     def enqueue(self, payload: dict[str, Any]) -> bool:
         """Append an event to the spool.
@@ -163,12 +172,13 @@ class Spool:
         denied -- raise, since they indicate broken local
         state that has to surface.
         """
-        if self._count() >= SPOOL_HIGH_WATER_MARK:
-            return False
         blob = json.dumps(payload, default=str).encode('utf-8')
-        self._conn.execute(
-            'INSERT INTO events (payload, created_at) VALUES (?, ?)',
-            (blob, time.time()))
+        with self._lock:
+            if self._count_locked() >= SPOOL_HIGH_WATER_MARK:
+                return False
+            self._conn.execute(
+                'INSERT INTO events (payload, created_at) VALUES (?, ?)',
+                (blob, time.time()))
         return True
 
     def dequeue_batch(
@@ -180,9 +190,10 @@ class Spool:
         no-ack the rows stay; the next dequeue picks them up
         again.
         """
-        rows = self._conn.execute(
-            'SELECT id, payload FROM events ORDER BY id ASC LIMIT ?',
-            (limit,)).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                'SELECT id, payload FROM events ORDER BY id ASC LIMIT ?',
+                (limit,)).fetchall()
         return [(row[0], json.loads(row[1])) for row in rows]
 
     def delete_ids(self, ids: Iterable[int]) -> int:
@@ -191,13 +202,19 @@ class Spool:
         if not ids:
             return 0
         placeholders = ','.join('?' for _ in ids)
-        cur = self._conn.execute(
-            f'DELETE FROM events WHERE id IN ({placeholders})', ids)
-        return cur.rowcount
+        with self._lock:
+            cur = self._conn.execute(
+                f'DELETE FROM events WHERE id IN ({placeholders})', ids)
+            return cur.rowcount
 
-    def _count(self) -> int:
+    def _count_locked(self) -> int:
+        """Row count assuming the caller already holds ``self._lock``."""
         cur = self._conn.execute('SELECT COUNT(*) FROM events')
         return int(cur.fetchone()[0])
+
+    def _count(self) -> int:
+        with self._lock:
+            return self._count_locked()
 
     def count(self) -> int:
         """Public count for tests and metrics."""
@@ -216,15 +233,16 @@ class Spool:
             batch = other.dequeue_batch(limit=500)
             if not batch:
                 break
-            for _id, payload in batch:
-                # Mint a fresh row -- the source's auto-id is
-                # not stable across spools.
-                blob = json.dumps(payload, default=str).encode(
-                    'utf-8')
-                self._conn.execute(
-                    'INSERT INTO events (payload, created_at) '
-                    'VALUES (?, ?)',
-                    (blob, time.time()))
+            with self._lock:
+                for _id, payload in batch:
+                    # Mint a fresh row -- the source's auto-id is
+                    # not stable across spools.
+                    blob = json.dumps(payload, default=str).encode(
+                        'utf-8')
+                    self._conn.execute(
+                        'INSERT INTO events (payload, created_at) '
+                        'VALUES (?, ?)',
+                        (blob, time.time()))
             other.delete_ids(row_id for row_id, _ in batch)
             moved += len(batch)
         return moved
