@@ -1,4 +1,5 @@
 import json
+import time
 
 from testtools import content
 
@@ -24,7 +25,20 @@ class TestEvents(base.BaseNamespacedTestCase):
     #     self.assertNotEqual(0, len(self.test_client.get_artifact_events(a['uuid'])))
 
     def test_network_events(self):
-        events = self.test_client.get_network_events(self.net_one['uuid'])
+        # Events are eventually consistent: emitting daemons (sf-api
+        # gunicorn workers, sf-net, sf-queues) enqueue into a local
+        # spool that the per-process drainer ships to sf-eventlog in
+        # ~100 ms batches. "Network is created" (which is what
+        # _await_networks_ready returns on) does not imply "all
+        # events for the network are queryable yet". Poll for a few
+        # seconds so the assertion does not race the drainer.
+        events = []
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            events = self.test_client.get_network_events(self.net_one['uuid'])
+            if events:
+                break
+            time.sleep(1)
         self.addDetail('events', content.text_content(json.dumps(
             events, indent=4, sort_keys=True)))
         self.assertNotEqual(0, len(events))
