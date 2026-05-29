@@ -116,8 +116,21 @@ def resolve_node_uuid():
         LOG.warning('Failed to resolve node UUID in API worker')
 
 
+# The Root endpoint at '/' is hit on every health probe from
+# sf-queues (see daemons/daemon.py:health_check_api). Each probe
+# would otherwise produce two audit events per worker per cluster
+# every few seconds, which under load saturates the eventlog
+# server and channels every event through the event_dlq MariaDB
+# path -- see GH actions run 26612233454 for the full cascade.
+def _is_health_probe():
+    return flask.request.path == '/'
+
+
 @app.before_request
 def log_request_info():
+    if _is_health_probe():
+        return
+
     if not flask.request.content_length:
         body = ''
     elif flask.request.content_length > 1024:
@@ -138,6 +151,9 @@ def log_request_info():
 
 @app.after_request
 def log_response_info(response):
+    if _is_health_probe():
+        return response
+
     if response.is_streamed:
         body = '...body not logged as it is streamed...'
     elif response.direct_passthrough:
