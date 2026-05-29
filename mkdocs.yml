@@ -137,13 +137,18 @@ nav:
                 - "Convert follow-ups: deferred work after PLAN-convert.md": components/instar/plans/PLAN-convert-followups.md
                 - "Coverage-guided fuzzing of parser crates (Phase 6)": components/instar/plans/PLAN-coverage-fuzzing.md
                 - "Instar and qemu-img security audit": components/instar/plans/PLAN-audit.md
+                - "Phase 1 — `plan_vmdk` capacity panic (category A1)": components/instar/plans/PLAN-fuzzing-bugs-phase-01-create-emitters.md
                 - "Phase 10: differential fuzzer extension for `instar create`": components/instar/plans/PLAN-create-phase-10-fuzz-differential.md
                 - "Phase 10: documentation, CHANGELOG polish, follow-ups": components/instar/plans/PLAN-measure-phase-10-docs.md
                 - "Phase 11: documentation, CHANGELOG polish, follow-ups": components/instar/plans/PLAN-create-phase-11-docs.md
                 - "Phase 1: per-format size calculators (`crates/measure/`)": components/instar/plans/PLAN-measure-phase-01-calculators.md
+                - "Phase 2 — qcow2 `scan_allocation` invariant break (category A2)": components/instar/plans/PLAN-fuzzing-bugs-phase-02-measure-scan.md
                 - "Phase 2: source-allocation scanners on the parser crates": components/instar/plans/PLAN-measure-phase-02-allocation-scanners.md
+                - "Phase 3 — measure calculator overflow (category A3)": components/instar/plans/PLAN-fuzzing-bugs-phase-03-measure-calc.md
                 - "Phase 3: guest `measure` operation + protobuf result + call-table boundary": components/instar/plans/PLAN-measure-phase-03-guest-op.md
+                - "Phase 4 — measure fixed-VHD source detection (category B1)": components/instar/plans/PLAN-fuzzing-bugs-phase-04-measure-fixed-vhd.md
                 - "Phase 4: host VMM subcommand and output formatting": components/instar/plans/PLAN-measure-phase-04-host-cli.md
+                - "Phase 5 — differential-fuzz timeout classification (category B2)": components/instar/plans/PLAN-fuzzing-bugs-phase-05-diff-fuzz-timeouts.md
                 - "Phase 5: `-o key=value,...` qemu-img-style option parsing": components/instar/plans/PLAN-measure-phase-05-target-options.md
                 - "Phase 6: cross-version `qemu-img measure` baselines": components/instar/plans/PLAN-measure-phase-06-baselines.md
                 - "Phase 7: cross-version `qemu-img create` baselines": components/instar/plans/PLAN-create-phase-07-baselines.md
@@ -175,6 +180,7 @@ nav:
                 - "Plan: First Public Release of Instar": components/instar/plans/PLAN-release.md
                 - "Plan: Multi-distro install + qemu-img differential CI": components/instar/plans/PLAN-distro-matrix-ci.md
                 - "Release v0.2.0": components/instar/plans/PLAN-release-v0.2.md
+                - "Triage and fix the standing fuzzing-bug backlog": components/instar/plans/PLAN-fuzzing-bugs.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md

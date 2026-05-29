@@ -314,6 +314,29 @@ for memory efficiency.
 4. **Reserved bits:** Must be zero; reject images with non-zero reserved bits
 5. **Maximum L1 size:** 32 MB (qemu limit)
 
+## Out-of-bounds L2 Entries
+
+L1 coverage (`entries_per_l2 * cluster_size` per L1 entry) is rarely an
+exact divisor of `virtual_size`, so on-disk L2 entries can describe
+clusters whose guest LBA lies at or beyond `virtual_size`. Such entries
+are legal on disk — the parser accepts them — but they describe storage
+with no guest-visible meaning.
+
+instar's allocation scan (`walk_l2_standard`,
+`count_allocated_in_l2_extended`) skips these entries so the following
+invariants always hold:
+
+- `allocated_bytes <= virtual_size`.
+- The last cluster, when it straddles `virtual_size`, contributes only
+  its in-bounds portion (`virtual_size - cluster_start`).
+- `target_units_with_data <= virtual_size.div_ceil(target_unit_size)`
+  (the bug-#286 invariant).
+
+This matches the observable allocation numbers `qemu-img measure`
+produces for the same image; differential fuzzing has not surfaced a
+divergence. If a future divergence appears the behaviour becomes a
+candidate for `docs/quirks.md`.
+
 ## Backing File Chain Resolution
 
 When a cluster is unallocated:
