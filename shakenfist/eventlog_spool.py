@@ -23,6 +23,7 @@ executes the drainer will swap its gRPC target from sf-eventlog
 to sf-database, but the spool shape itself doesn't change.
 """
 import contextlib
+import fcntl
 import json
 import os
 import pathlib
@@ -280,6 +281,34 @@ def initialise(daemon_name: str) -> Spool:
                 continue
             if _pid_is_alive(orphan_pid):
                 continue
+
+            # Take an exclusive flock on the orphan file before
+            # we touch it. Multiple sibling workers racing to
+            # recover the same orphan (e.g., five gunicorn
+            # workers starting together) would otherwise each
+            # read the same rows via ``dequeue_batch`` before
+            # any of them got to ``delete_ids`` and produce
+            # N-way duplicate events downstream. Whoever wins
+            # the lock owns the migration; the rest skip.
+            #
+            # ``fcntl.flock`` is BSD-style and does not collide
+            # with sqlite's POSIX byte-range locks on the same
+            # file, so the ``Spool(orphan_path)`` open below
+            # still works inside the held lock. The kernel
+            # releases the lock when the process exits, so a
+            # crashed recoverer does not strand the orphan.
+            try:
+                lock_fd = os.open(orphan_path, os.O_RDONLY)
+            except FileNotFoundError:
+                # Another worker recovered and unlinked it
+                # between our directory scan and now.
+                continue
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                os.close(lock_fd)
+                continue
+
             try:
                 orphan = Spool(orphan_path)
                 moved = spool.migrate_in(orphan)
@@ -305,6 +334,9 @@ def initialise(daemon_name: str) -> Spool:
                 }).warning(
                     'Failed to rescue orphan eventlog spool; '
                     'leaving it in place for the next attempt')
+            finally:
+                with contextlib.suppress(OSError):
+                    os.close(lock_fd)
 
         _spool = spool
         return _spool

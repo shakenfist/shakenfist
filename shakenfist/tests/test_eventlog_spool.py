@@ -5,6 +5,7 @@ Crash recovery, orphan rescue, and high-water-mark behaviour
 are the things that have to work right -- everything else in
 ``shakenfist.eventlog_spool`` is straightforward sqlite I/O.
 """
+import fcntl
 import os
 import tempfile
 import threading
@@ -203,6 +204,36 @@ class SpoolOrphanRecoveryTestCase(
             s = eventlog_spool.initialise('current-daemon')
             self.assertEqual(0, s.count())
             self.assertTrue(os.path.exists(orphan_path))
+
+    def test_orphan_flock_held_elsewhere_is_skipped(self):
+        # Regression for the 5x event duplication seen in the
+        # Debian 12 cluster smoke (test_network_events delete
+        # events arriving in chunks 5 times each with distinct
+        # correlation_ids). Multiple gunicorn workers racing on
+        # the same orphan spool produced one downstream event
+        # per recoverer; the flock guard means only one wins.
+        dead_pid = 99999999
+        self.assertFalse(os.path.isdir(f'/proc/{dead_pid}'))
+        orphan_path = self._make_orphan(
+            'previous-daemon', dead_pid, [{'i': 1}, {'i': 2}])
+
+        # Simulate a concurrent recoverer by holding an
+        # exclusive flock on the orphan from a separate FD.
+        # flock(2) treats multiple opens of the same file as
+        # independent within one process, so this exercises the
+        # exact contention path the cross-process race produces.
+        holder_fd = os.open(orphan_path, os.O_RDONLY)
+        fcntl.flock(holder_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            s = eventlog_spool.initialise('current-daemon')
+            # Orphan was skipped; rows did NOT migrate into us
+            # and the file is still on disk for the lock holder
+            # to finish recovering.
+            self.assertEqual(0, s.count())
+            self.assertTrue(os.path.exists(orphan_path))
+        finally:
+            fcntl.flock(holder_fd, fcntl.LOCK_UN)
+            os.close(holder_fd)
 
     def test_orphan_recovery_handles_unparseable_filename(self):
         # A stray file in SPOOL_ROOT that doesn't follow the

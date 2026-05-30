@@ -412,8 +412,20 @@ def main():
     # the default 2-strike limit (e.g., during reconnect bursts), producing
     # GOAWAY too_many_pings. Our clients are trusted internal daemons, so
     # disabling the kill switch is the recommended pattern.
+    # 32 server threads, not 10. With every daemon process now
+    # running its own eventlog drainer (the spool fan-out from
+    # 2bb62455 + the gunicorn-worker fan-out from c27ae482),
+    # the steady-state set of concurrent ``RecordMultiEventBatch``
+    # callers is ~30 across a 6-node cluster (1 per daemon per
+    # node + 5 gunicorn workers per node). At max_workers=10
+    # the surplus batches queue past the drainer's 10 s RPC
+    # timeout, every drainer backs off exponentially to
+    # BACKOFF_MAX=30 s, events sit in their spools that long,
+    # and read-after-write tests time out. 32 gives enough
+    # headroom that batches do not queue under steady-state
+    # cluster load.
     server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=10),
+        futures.ThreadPoolExecutor(max_workers=32),
         options=[
             ('grpc.http2.min_recv_ping_interval_without_data_ms', 5000),
             ('grpc.keepalive_permit_without_calls', 1),
