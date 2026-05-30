@@ -147,3 +147,6 @@ shakenfist/_version.py
 
 # Claude planning files (root only, not synced docs)
 /PLAN-*.md
+
+# Claude Code per-session state
+/.claude/scheduled_tasks.lock

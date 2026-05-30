@@ -49,16 +49,25 @@ explaining what changed and why.
 
 The Shaken Fist deployer today installs and operates a stack
 of supporting infrastructure on top of the SF daemons
-themselves: Grafana for dashboards, Prometheus for metrics,
-rsyslog for log aggregation onto a primary node, Apache as a
-reverse proxy / load balancer for the REST API, and MariaDB
-as the cluster datastore. All of these run inside the SF
-deployer's purview and are configured by the ansible roles
-in `shakenfist/deploy/ansible/`.
+themselves: rsyslog for log aggregation onto a primary node,
+Apache as a reverse proxy / load balancer for the REST API,
+and MariaDB as the cluster datastore. (Grafana, the
+primary-node Prometheus server, and `prometheus-node-exporter`
+on every node used to be in this list too; all three have
+been removed as warmup work for this plan. The sample
+Grafana dashboard lives at `examples/grafana-dashboard.json`
+for operators who want to import it into their own Grafana.
+SF daemons continue to expose their own Prometheus metrics
+endpoints (13001 / 13002 / 13006), but node-level metrics
+are now an operator concern — they choose node_exporter,
+telegraf, or whatever else their monitoring stack uses.) All
+of these run inside the SF deployer's purview and are
+configured by the ansible roles in
+`shakenfist/deploy/ansible/`.
 
 The `primary_node` role in particular is the visible focal
-point: it hosts the rsyslog sink, Prometheus, Grafana, the
-Apache reverse proxy, and the ad-hoc ansible inventory. It
+point: it hosts the rsyslog sink, the Apache reverse proxy,
+and the ad-hoc ansible inventory. It
 also nominally hosts the cluster-bootstrap orchestration,
 though every `sf-ctl` call in `cluster_config.yml` is
 `delegate_to: groups['etcd_master'][0]`, so the primary node
@@ -85,9 +94,10 @@ Shaken Fist stops being a platform deployer and becomes an
 **opinionated application that runs against operator-provided
 infrastructure**. Concretely:
 
-- The deployer ceases to install Grafana, Loki/rsyslog
-  aggregation, Prometheus, an API load balancer, or the
-  MariaDB server.
+- The deployer ceases to install Loki/rsyslog aggregation,
+  an API load balancer, or the MariaDB server. (Grafana and
+  the primary-node Prometheus server are already gone — see
+  the situation section.)
 - The deployer is repackaged as an ansible-galaxy role that
   configures one SF node — installing packages, writing
   config, managing systemd — parameterised by which daemons
@@ -256,7 +266,7 @@ care.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Remove Grafana, Prometheus, rsyslog from deployer | PLAN-remove-primary-phase-01-remove-monitoring.md | Not started |
+| 1. Remove rsyslog aggregation from deployer | PLAN-remove-primary-phase-01-remove-monitoring.md | Not started |
 | 2. `bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster` | PLAN-remove-primary-phase-02-bootstrap-cli.md | Not started |
 | 3. Remove Apache reverse proxy from deployer | PLAN-remove-primary-phase-03-remove-lb.md | Not started |
 | 4. Make MariaDB BYO; demote local mariadb role to opt-in convenience | PLAN-remove-primary-phase-04-byo-mariadb.md | Not started |
@@ -266,10 +276,12 @@ care.
 
 Phase notes:
 
-- **Phase 1** deletes `roles/primary/tasks/grafana.yml`, the
-  prometheus install steps, the rsyslog forwarder
-  configuration in `roles/base/tasks/syslog`, and associated
-  templates. Documents the metric and log endpoints
+- **Phase 1** deletes the rsyslog forwarder configuration in
+  `roles/base/tasks/syslog` and associated templates. (The
+  primary-node Prometheus server install has already been
+  removed as warmup; rsyslog removal is held back until SF
+  has a Loki-shipper story so operators are not left without
+  a log path.) Documents the metric and log endpoints
   operators must scrape / collect themselves. Also flips
   `shakenfist-utilities` JSON-formatted logging on by
   default (and removes the non-JSON code path on the SF

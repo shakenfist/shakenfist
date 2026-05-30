@@ -153,9 +153,17 @@ def health_check_nodelock():
 
 
 def health_check_api():
+    # 5 s rather than 2 s because the API request crosses a process
+    # boundary into a gunicorn worker that may be in the middle of
+    # another request; under any sustained MariaDB latency the 2 s
+    # budget is unreachable even when sf-api is fundamentally
+    # healthy. sf-queues' caller (_block_until_healthy) already
+    # tolerates a 60 s window of consecutive failures before
+    # declaring degraded, so a longer per-probe budget here just
+    # trades probe latency for fewer false positives.
     try:
         r = requests.get(
-            f'http://{config.NODE_MESH_IP}:13000/', timeout=2)
+            f'http://{config.NODE_MESH_IP}:13000/', timeout=5)
         return r.status_code == 200
     except requests.exceptions.RequestException as e:
         LOG.warning(f'api daemon is unhealthy ({e})!')

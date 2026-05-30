@@ -5,8 +5,11 @@ Crash recovery, orphan rescue, and high-water-mark behaviour
 are the things that have to work right -- everything else in
 ``shakenfist.eventlog_spool`` is straightforward sqlite I/O.
 """
+import fcntl
 import os
 import tempfile
+import threading
+import time
 from unittest import mock
 
 from shakenfist import eventlog_spool
@@ -110,6 +113,51 @@ class SpoolHighWaterMarkTestCase(
             self.assertFalse(
                 eventlog_spool.enqueue({'i': 3}))
 
+    def test_concurrent_enqueue_and_dequeue(self):
+        # Regression for sf-database 'NoneType is not subscriptable'
+        # and 'bad parameter or other API misuse' errors observed
+        # when multiple gRPC worker threads enqueue while the
+        # drainer thread reads from the same sqlite connection.
+        # Without the per-connection lock, cursor state races and
+        # this test surfaces either error within a few seconds.
+        s = eventlog_spool.initialise('test-daemon')
+        stop = threading.Event()
+        errors = []
+
+        def writer(start_n):
+            n = start_n
+            while not stop.is_set():
+                try:
+                    s.enqueue({'i': n})
+                    n += 1
+                except Exception as e:
+                    errors.append(('writer', e))
+                    return
+
+        def reader():
+            while not stop.is_set():
+                try:
+                    batch = s.dequeue_batch(limit=50)
+                    if batch:
+                        s.delete_ids(row_id for row_id, _ in batch)
+                except Exception as e:
+                    errors.append(('reader', e))
+                    return
+
+        writers = [
+            threading.Thread(target=writer, args=(w * 10_000,))
+            for w in range(4)
+        ]
+        readers = [threading.Thread(target=reader) for _ in range(2)]
+        for t in writers + readers:
+            t.start()
+        time.sleep(1.0)
+        stop.set()
+        for t in writers + readers:
+            t.join(timeout=5)
+
+        self.assertEqual([], errors)
+
 
 class SpoolOrphanRecoveryTestCase(
         _SpoolRootMixin, base.ShakenFistTestCase):
@@ -156,6 +204,36 @@ class SpoolOrphanRecoveryTestCase(
             s = eventlog_spool.initialise('current-daemon')
             self.assertEqual(0, s.count())
             self.assertTrue(os.path.exists(orphan_path))
+
+    def test_orphan_flock_held_elsewhere_is_skipped(self):
+        # Regression for the 5x event duplication seen in the
+        # Debian 12 cluster smoke (test_network_events delete
+        # events arriving in chunks 5 times each with distinct
+        # correlation_ids). Multiple gunicorn workers racing on
+        # the same orphan spool produced one downstream event
+        # per recoverer; the flock guard means only one wins.
+        dead_pid = 99999999
+        self.assertFalse(os.path.isdir(f'/proc/{dead_pid}'))
+        orphan_path = self._make_orphan(
+            'previous-daemon', dead_pid, [{'i': 1}, {'i': 2}])
+
+        # Simulate a concurrent recoverer by holding an
+        # exclusive flock on the orphan from a separate FD.
+        # flock(2) treats multiple opens of the same file as
+        # independent within one process, so this exercises the
+        # exact contention path the cross-process race produces.
+        holder_fd = os.open(orphan_path, os.O_RDONLY)
+        fcntl.flock(holder_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            s = eventlog_spool.initialise('current-daemon')
+            # Orphan was skipped; rows did NOT migrate into us
+            # and the file is still on disk for the lock holder
+            # to finish recovering.
+            self.assertEqual(0, s.count())
+            self.assertTrue(os.path.exists(orphan_path))
+        finally:
+            fcntl.flock(holder_fd, fcntl.LOCK_UN)
+            os.close(holder_fd)
 
     def test_orphan_recovery_handles_unparseable_filename(self):
         # A stray file in SPOOL_ROOT that doesn't follow the
