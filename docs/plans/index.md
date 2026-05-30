@@ -88,14 +88,12 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Atomic scheduling via reservations](PLAN-scheduler-reservations.md) | Phase 6: Affinity model rework | Not started | Implement the affinity decision from phase 0 |
 | [Atomic scheduling via reservations](PLAN-scheduler-reservations.md) | Phase 7: Diagnostic-mode rejection logging | Not started | Restore per-rejection detail on failed schedules without paying the cost on every success |
 | [Atomic scheduling via reservations](PLAN-scheduler-reservations.md) | Phase 8: Documentation | Not started | Operator guide for the new model and migration notes |
-| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 0: Research and decisions | Not started | Resolve schema normal form, DLQ removal, historic-migration shape, request_id as first-class column, write-throughput baseline |
-| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 1: Schema and migration tooling | Not started | `events` and `event_objects` tables; idempotent migration tool |
-| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 2: Direct-write path | Not started | `eventlog.add_event*` writes through sf-database, signature unchanged |
-| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 3: Prune in cluster daemon | Not started | Move per-event-type prune sweep into the cluster maintainer |
-| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 4: REST API direct-read | Not started | Event-list endpoints query MariaDB directly; no sqlite locality |
-| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 5: Historic sqlite migration | Not started | Migrate pre-cutover events from per-object sqlite into MariaDB |
-| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 6: Delete the daemon | Not started | Remove `sf-eventlog`, gRPC protos, systemd unit, related config |
-| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 7: Documentation | Not started | Update operator and architecture docs |
+| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | [Phase 1: Schema, accessors, RPC, row-count gauge](PLAN-eventlog-direct-mariadb-phase-01-schema.md) | Not started | `events` / `event_objects` tables, `RecordEventBatch` on sf-database, `database_events_rows` gauge |
+| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 2: Write cut-over and metrics | Not started | Swap drainer's gRPC target to sf-database; promote `event_uuid` / `request_id`; wire spool-depth, drop, insert metrics |
+| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 3: Prune in cluster daemon | Not started | Move per-event-type prune sweep into the cluster maintainer with multi-object semantics |
+| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 4: REST API direct-read | Not started | Event-list endpoints call `GetObjectEvents` on sf-database; no sqlite locality |
+| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 5: Delete the daemon | Not started | Remove `sf-eventlog`, gRPC protos, systemd unit, config, `event_dlq`, and on-disk sqlite chunks |
+| [Remove the eventlog service](PLAN-eventlog-direct-mariadb.md) | Phase 6: Documentation | Not started | Operator guide for new eventlog, history-loss called out in release notes, ARCHITECTURE/README/AGENTS |
 | [Generic allocator](PLAN-generic-allocator.md) | Phase 0: Research and decisions | Not started | Pick allocation strategy, per-pool policy shape, leased-vs-permanent semantics, migration plan |
 | [Generic allocator](PLAN-generic-allocator.md) | Phase 1: Schema and primitive | Not started | `resource_pool_allocations` table and conditional-INSERT allocator |
 | [Generic allocator](PLAN-generic-allocator.md) | Phase 2: Port VXLAN allocator | Not started | First migration; sets the template |
