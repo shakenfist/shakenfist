@@ -862,6 +862,37 @@ class RecordEventBatchRequest(google.protobuf.message.Message):
 global___RecordEventBatchRequest = RecordEventBatchRequest
 
 @typing.final
+class PruneEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PruneEventsRequest = PruneEventsRequest
+
+@typing.final
+class PruneEventsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
+    ROWS_PRUNED_FIELD_NUMBER: builtins.int
+    success: builtins.bool
+    error: builtins.str
+    rows_pruned: builtins.int
+    def __init__(
+        self,
+        *,
+        success: builtins.bool = ...,
+        error: builtins.str = ...,
+        rows_pruned: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error", b"error", "rows_pruned", b"rows_pruned", "success", b"success"]) -> None: ...
+
+global___PruneEventsReply = PruneEventsReply
+
+@typing.final
 class GetObjectStateRequest(google.protobuf.message.Message):
     """Object State Operations (MariaDB)
     These operations manage object state in MariaDB, which is used for

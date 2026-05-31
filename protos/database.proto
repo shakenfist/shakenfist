@@ -39,6 +39,7 @@ service DatabaseService {
   // Direct write path for batches of events; replaces the sf-eventlog
   // gRPC target in phase 2.
   rpc RecordEventBatch (RecordEventBatchRequest) returns (StatusReply) {}
+  rpc PruneEvents (PruneEventsRequest) returns (PruneEventsReply) {}
 
   // Object State Operations (MariaDB)
   rpc GetObjectState (GetObjectStateRequest) returns (GetObjectStateReply) {}
@@ -565,6 +566,15 @@ message EventBatchEntry {
 
 message RecordEventBatchRequest {
   repeated EventBatchEntry events = 1;
+}
+
+message PruneEventsRequest {
+}
+
+message PruneEventsReply {
+  bool success = 1;
+  string error = 2;
+  int64 rows_pruned = 3;
 }
 
 // Object State Operations (MariaDB)

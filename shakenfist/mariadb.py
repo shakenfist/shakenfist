@@ -6805,6 +6805,43 @@ def record_event_batch(events: list[EventRecord]) -> bool:
     return _direct_record_event_batch(events)
 
 
+def _grpc_prune_events() -> int:
+    """Trigger the daily events prune sweep via the database microservice.
+
+    The prune is a once-a-day call that may legitimately take minutes,
+    so we bypass the standard ``_grpc_call`` retry helper (which uses
+    the short ``GRPC_TIMEOUT``) and invoke the stub directly with a
+    generous 5-minute timeout. The cluster maintainer's scheduled
+    task tolerates a no-op return; on RPC failure we log and return
+    zero so the scheduler keeps running.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.PruneEventsRequest()
+        reply = stub.PruneEvents(request, timeout=300.0, wait_for_ready=True)
+        if not reply.success:
+            LOG.warning(f'gRPC PruneEvents failed: {reply.error}')
+            return int(reply.rows_pruned)
+        return int(reply.rows_pruned)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC PruneEvents failed: {e}')
+        return 0
+
+
+def prune_events() -> int:
+    """Run the daily events prune sweep.
+
+    Routes via ``_use_database_service``: on sf-database itself runs
+    the direct path, on every other daemon dispatches via the
+    database gRPC channel. Returns the total number of rows pruned
+    (``event_objects`` rows from stages A and B plus ``events`` rows
+    from stage C).
+    """
+    if _use_database_service():
+        return _grpc_prune_events()
+    return _direct_prune_events()
+
+
 # =============================================================================
 # IPAM Reservation Direct Access Functions
 # These are used by the database daemon for atomic IP address reservation.

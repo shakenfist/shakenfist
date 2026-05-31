@@ -4278,6 +4278,23 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def PruneEvents(
+        self,
+        request: database_pb2.PruneEventsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.PruneEventsReply:
+        """Run the daily events prune sweep."""
+        try:
+            self.monitor.counters['prune_events'].inc()
+            rows = mariadb._direct_prune_events()
+            return database_pb2.PruneEventsReply(
+                success=True, error='', rows_pruned=rows)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database PruneEvents failed', e)
+            return database_pb2.PruneEventsReply(
+                success=False, error=str(e), rows_pruned=0)
+
     def GetClusterOperationTarget(
         self,
         request: database_pb2.GetClusterOperationTargetRequest,
@@ -4937,7 +4954,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_cluster_config', 'set_cluster_config',
             'enqueue_event_dlq', 'drain_event_dlq',
             'delete_event_dlq', 'get_event_dlq_count',
-            'record_event_batch',
+            'record_event_batch', 'prune_events',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state',

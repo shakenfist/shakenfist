@@ -142,6 +142,11 @@ class DatabaseServiceStub:
     gRPC target in phase 2.
     """
 
+    PruneEvents: grpc.UnaryUnaryMultiCallable[
+        database_pb2.PruneEventsRequest,
+        database_pb2.PruneEventsReply,
+    ]
+
     GetObjectState: grpc.UnaryUnaryMultiCallable[
         database_pb2.GetObjectStateRequest,
         database_pb2.GetObjectStateReply,
@@ -1169,6 +1174,11 @@ class DatabaseServiceAsyncStub:
     Direct write path for batches of events; replaces the sf-eventlog
     gRPC target in phase 2.
     """
+
+    PruneEvents: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.PruneEventsRequest,
+        database_pb2.PruneEventsReply,
+    ]
 
     GetObjectState: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetObjectStateRequest,
@@ -2243,6 +2253,13 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         Direct write path for batches of events; replaces the sf-eventlog
         gRPC target in phase 2.
         """
+
+    @abc.abstractmethod
+    def PruneEvents(
+        self,
+        request: database_pb2.PruneEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.PruneEventsReply, collections.abc.Awaitable[database_pb2.PruneEventsReply]]: ...
 
     @abc.abstractmethod
     def GetObjectState(
