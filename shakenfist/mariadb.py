@@ -28,6 +28,7 @@ from uuid import UUID
 from uuid import uuid4
 
 import grpc
+from prometheus_client import Counter
 import sqlalchemy as sa
 from sqlalchemy import event as sa_event
 from sqlalchemy.dialects.mysql import INET4
@@ -81,6 +82,19 @@ from shakenfist.util import callstack as util_callstack
 
 
 LOG, _ = logs.setup(__name__)
+
+
+# Module-scope Prometheus metrics. ``prometheus_client`` uses a single
+# process-wide default registry, so this counter is registered on every
+# daemon that imports ``mariadb``. It only moves on sf-database (the only
+# daemon that actually runs ``_direct_record_event_batch``); on all other
+# daemons the counter stays at zero and is harmlessly visible on their
+# metrics endpoints.
+EVENTS_INSERTED = Counter(
+    'database_events_inserted_total',
+    'Events inserted into the events table.',
+    ['event_type']
+)
 
 # Sentinel node name used during migration when the original node is unknown.
 # This uses a name that cannot conflict with real hostnames.
@@ -6471,6 +6485,7 @@ def _direct_record_event_batch(events: list[EventRecord]) -> bool:
                     request_id=record.request_id,
                 )
                 conn.execute(event_stmt)
+                EVENTS_INSERTED.labels(event_type=record.event_type).inc()
 
                 for object_type, object_uuid in record.objects:
                     obj_stmt = sa.insert(event_objects_table).values(
