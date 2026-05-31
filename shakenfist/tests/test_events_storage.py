@@ -11,8 +11,10 @@
 from unittest import mock
 
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
+from shakenfist.config import config
 from shakenfist.schema.event import EventRecord
 from shakenfist.tests import base
 
@@ -41,8 +43,11 @@ _SAMPLE_RECORD = EventRecord(
 # ---------------------------------------------------------------------------
 
 class _MockResult:
-    def __init__(self, scalar_val=0):
+    """Minimal result stub supporting both scalar() (for SELECT) and rowcount (for DELETE)."""
+
+    def __init__(self, scalar_val=0, rowcount=0):
         self._scalar = scalar_val
+        self.rowcount = rowcount
 
     def scalar(self):
         return self._scalar
@@ -54,13 +59,17 @@ class _MockConnection:
     Supports both context-manager entry (for engine.connect()) and the
     transaction commit path (engine.begin()).  Every execute() call
     appends the statement to self.executed and returns self.result.
+
+    Pass ``result`` for a fixed result on every call.  For multi-call
+    scenarios where different rowcounts are needed on successive
+    iterations, replace ``conn.execute`` with a ``mock.Mock(side_effect=[...])``.
     """
 
     def __init__(self, result=None):
         self.result = result or _MockResult()
         self.executed = []
 
-    def execute(self, stmt):
+    def execute(self, stmt, *args, **kwargs):
         self.executed.append(stmt)
         return self.result
 
@@ -703,3 +712,312 @@ class EventsInsertedCounterTestCase(base.ShakenFistTestCase):
         after = self._counter_value('counter_test_error')
         # The insert never succeeded so the counter must not have moved.
         self.assertAlmostEqual(0.0, after - before, places=9)
+
+
+# ---------------------------------------------------------------------------
+# _direct_prune_events_by_type tests  (Stage A)
+# ---------------------------------------------------------------------------
+
+class DirectPruneEventsByTypeTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_prune_events_by_type() using mock engine/connection.
+
+    The function executes a DELETE in a loop until rowcount < _PRUNE_BATCH_SIZE
+    (10000). We drive the loop by controlling the rowcount returned from each
+    conn.execute() call via mock.Mock(side_effect=[...]).
+    """
+
+    def _events_pruned_value(self, event_type: str) -> float:
+        """Read the current value of EVENTS_PRUNED for a given event_type label."""
+        return mariadb.EVENTS_PRUNED.labels(event_type=event_type)._value.get()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_deletes_only_matching_event_type_rows_returns_count(
+            self, mock_get_engine):
+        """First batch returns rowcount=5 (< 10000), loop exits; total == 5."""
+        conn = _MockConnection()
+        result_small = _MockResult(rowcount=5)
+        conn.execute = mock.Mock(side_effect=[result_small])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_prune_events_by_type('audit', 3600.0)
+
+        self.assertEqual(5, total)
+        self.assertEqual(1, conn.execute.call_count)
+        # The SQL text should be passed as the first argument.
+        called_stmt = conn.execute.call_args[0][0]
+        stmt_text = str(called_stmt)
+        self.assertIn('event_type', stmt_text)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_loops_until_batch_undershoots(self, mock_get_engine):
+        """Two full batches (10000) then a partial (4321) = 24321 total, 3 calls."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _MockResult(rowcount=10000),
+            _MockResult(rowcount=10000),
+            _MockResult(rowcount=4321),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_prune_events_by_type('mutate', 3600.0)
+
+        self.assertEqual(24321, total)
+        self.assertEqual(3, conn.execute.call_count)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_increments_labeled_counter_by_rowcount(self, mock_get_engine):
+        """Counter EVENTS_PRUNED for the given label grows by exactly rowcount."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=42)])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        before = self._events_pruned_value('prune_counter_test')
+        mariadb._direct_prune_events_by_type('prune_counter_test', 3600.0)
+        after = self._events_pruned_value('prune_counter_test')
+
+        self.assertAlmostEqual(42.0, after - before, places=9)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_returns_partial_count(self, mock_get_engine):
+        """First batch returns rowcount=100; second raises OperationalError.
+        Function returns 100 (partial) without re-raising.
+        """
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _MockResult(rowcount=100),
+            OperationalError('stmt', {}, Exception('db error')),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        # rowcount=100 is less than _PRUNE_BATCH_SIZE (10000), so the loop
+        # terminates after the first call without ever reaching the OperationalError.
+        # To exercise the error path we need a full-batch first result.
+        conn2 = _MockConnection()
+        conn2.execute = mock.Mock(side_effect=[
+            _MockResult(rowcount=10000),
+            OperationalError('stmt', {}, Exception('db error')),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn2)
+
+        total = mariadb._direct_prune_events_by_type('status', 3600.0)
+
+        # First batch contributed 10000; second raised, so partial is 10000.
+        self.assertEqual(10000, total)
+
+
+# ---------------------------------------------------------------------------
+# _direct_prune_api_request_events tests  (Stage B)
+# ---------------------------------------------------------------------------
+
+class DirectPruneApiRequestEventsTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_prune_api_request_events()."""
+
+    def _api_request_counter_value(self) -> float:
+        return mariadb.EVENTS_PRUNED.labels(event_type='api-request')._value.get()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_deletes_api_request_object_type_rows(self, mock_get_engine):
+        """SQL statement contains the 'api-request' literal object_type filter."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=7)])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_prune_api_request_events(86400.0)
+
+        self.assertEqual(7, total)
+        self.assertEqual(1, conn.execute.call_count)
+        stmt_text = str(conn.execute.call_args[0][0])
+        self.assertIn('api-request', stmt_text)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_counter_label_is_api_request_synthetic(self, mock_get_engine):
+        """EVENTS_PRUNED{event_type='api-request'} increments by rowcount."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=33)])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        before = self._api_request_counter_value()
+        mariadb._direct_prune_api_request_events(86400.0)
+        after = self._api_request_counter_value()
+
+        self.assertAlmostEqual(33.0, after - before, places=9)
+
+
+# ---------------------------------------------------------------------------
+# _direct_prune_orphan_events tests  (Stage C)
+# ---------------------------------------------------------------------------
+
+class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_prune_orphan_events()."""
+
+    def _orphan_counter_value(self) -> float:
+        return mariadb.ORPHAN_EVENTS_PRUNED._value.get()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_increments_orphan_counter(self, mock_get_engine):
+        """ORPHAN_EVENTS_PRUNED increments by the rowcount of each batch."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=15)])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        before = self._orphan_counter_value()
+        mariadb._direct_prune_orphan_events()
+        after = self._orphan_counter_value()
+
+        self.assertAlmostEqual(15.0, after - before, places=9)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_loops_until_undershoot(self, mock_get_engine):
+        """Two full batches then a partial: loop exits, total is sum of all batches."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _MockResult(rowcount=10000),
+            _MockResult(rowcount=10000),
+            _MockResult(rowcount=999),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_prune_orphan_events()
+
+        self.assertEqual(20999, total)
+        self.assertEqual(3, conn.execute.call_count)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_orphan_sql_uses_left_join_antijoin_shape(self, mock_get_engine):
+        """The DELETE statement uses a LEFT JOIN ... WHERE ... IS NULL anti-join."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=0)])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        mariadb._direct_prune_orphan_events()
+
+        stmt_text = str(conn.execute.call_args[0][0])
+        # Verify the anti-join shape: LEFT JOIN and IS NULL guard.
+        self.assertIn('LEFT JOIN', stmt_text)
+        self.assertIn('IS NULL', stmt_text)
+
+
+# ---------------------------------------------------------------------------
+# _direct_prune_events orchestrator tests
+# ---------------------------------------------------------------------------
+
+class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_prune_events() orchestrator.
+
+    The orchestrator delegates to the three lower-level functions, so we
+    patch those rather than the engine — this keeps the tests focused on
+    orchestration logic (skip-on-minus-one, summation) and avoids having
+    to replicate the full config iteration in mock setup.
+    """
+
+    @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=0)
+    @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=0)
+    @mock.patch('shakenfist.mariadb._direct_prune_events_by_type', return_value=0)
+    def test_skips_event_types_with_max_age_minus_one(
+            self, mock_by_type, mock_api_request, mock_orphan):
+        """Event types whose MAX_*_EVENT_AGE == -1 are skipped; others still run."""
+        # Patch only audit to -1; mutate keeps its default (non-minus-one).
+        with mock.patch.object(config, 'MAX_AUDIT_EVENT_AGE', -1), \
+                mock.patch.object(config, 'MAX_MUTATE_EVENT_AGE', 3600):
+            mariadb._direct_prune_events()
+
+        called_event_types = [
+            call[0][0] for call in mock_by_type.call_args_list
+        ]
+        self.assertNotIn('audit', called_event_types)
+        self.assertIn('mutate', called_event_types)
+
+    @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=30)
+    @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=20)
+    @mock.patch('shakenfist.mariadb._direct_prune_events_by_type', return_value=10)
+    def test_calls_all_three_stages_and_sums(
+            self, mock_by_type, mock_api_request, mock_orphan):
+        """Orchestrator returns sum of all stage totals.
+
+        With seven event_types each returning 10, plus api-request 20,
+        plus orphan 30, the total should be (7 * 10) + 20 + 30 = 120.
+        """
+        total = mariadb._direct_prune_events()
+
+        # Seven per-type calls + one api-request + one orphan.
+        self.assertEqual(7, mock_by_type.call_count)
+        mock_api_request.assert_called_once()
+        mock_orphan.assert_called_once()
+        self.assertEqual(120, total)
+
+    @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=0)
+    @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=0)
+    @mock.patch('shakenfist.mariadb._direct_prune_events_by_type', return_value=0)
+    def test_skips_api_request_when_max_age_minus_one(
+            self, mock_by_type, mock_api_request, mock_orphan):
+        """api-request stage is skipped when MAX_API_REQUEST_EVENT_AGE == -1."""
+        with mock.patch.object(config, 'MAX_API_REQUEST_EVENT_AGE', -1):
+            mariadb._direct_prune_events()
+
+        mock_api_request.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_prune_orphan_events')
+    @mock.patch('shakenfist.mariadb._direct_prune_api_request_events')
+    @mock.patch('shakenfist.mariadb._direct_prune_events_by_type')
+    def test_multi_object_semantic_via_orphan_sweep(
+            self, mock_by_type, mock_api_request, mock_orphan):
+        """Multi-object retention: event row survives until last object ref is gone.
+
+        Scenario: An event has refs from both an instance and an api-request.
+        After stage A drops only the api-request's event_objects row, the
+        event_objects row for the instance still exists, so stage C sees a
+        non-NULL join and does NOT delete the events row.  Only once stage A
+        also drops the instance's event_objects row does stage C find the
+        events row unreferenced and delete it.
+
+        We verify this semantic by checking that _direct_prune_orphan_events
+        is always called (it runs regardless), and that the orchestrator does
+        not short-circuit stage C when prior stages return zero.
+        """
+        mock_by_type.return_value = 0
+        mock_api_request.return_value = 1   # One api-request ref dropped.
+        mock_orphan.return_value = 0        # Instance ref still present; no orphan.
+
+        total_first_cycle = mariadb._direct_prune_events()
+
+        # Orphan sweep ran even though only the api-request stage deleted rows.
+        mock_orphan.assert_called_once()
+        # Event row was not deleted (orphan returned 0).
+        self.assertEqual(1, total_first_cycle)
+
+        # Second prune cycle: instance ref is now also dropped.
+        mock_by_type.return_value = 1
+        mock_api_request.return_value = 0
+        mock_orphan.return_value = 1        # Event row now orphaned; deleted.
+        mock_orphan.reset_mock()
+
+        total_second_cycle = mariadb._direct_prune_events()
+
+        mock_orphan.assert_called_once()
+        # 7 per-type (each = 1) + 0 api-request + 1 orphan = 8
+        self.assertEqual(8, total_second_cycle)
+
+
+# ---------------------------------------------------------------------------
+# Public router test for prune_events
+# ---------------------------------------------------------------------------
+
+class PruneEventsRoutingTestCase(base.ShakenFistTestCase):
+    """prune_events routes to _grpc_* or _direct_* correctly."""
+
+    @mock.patch('shakenfist.mariadb._grpc_prune_events', return_value=42)
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_routes_to_grpc_when_service_mode(self, mock_use_svc, mock_grpc):
+        """_use_database_service() == True -> _grpc_prune_events is called."""
+        result = mariadb.prune_events()
+        self.assertEqual(42, result)
+        mock_grpc.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb._direct_prune_events', return_value=99)
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    def test_routes_to_direct_when_not_service_mode(
+            self, mock_use_svc, mock_direct):
+        """_use_database_service() == False -> _direct_prune_events is called."""
+        result = mariadb.prune_events()
+        self.assertEqual(99, result)
+        mock_direct.assert_called_once()
