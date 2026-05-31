@@ -114,6 +114,39 @@ Error: invalid peer certificate: UnknownIssuer
    the screen — this is a known issue with the cross-frame
    reference handling
 
+### Streaming indicator
+
+The status bar at the bottom of the window has a small
+triangle (▶) glyph immediately to the left of the volume
+controls. Its colour reflects the live state of the SPICE
+display channel's video-stream path (MJPEG / H.264 / VP8 etc.,
+i.e. the `STREAM_CREATE` / `STREAM_DATA` / `STREAM_DESTROY`
+flow — not the per-frame draw_copy path).
+
+| Colour | State | Meaning |
+| --- | --- | --- |
+| Grey | Off | No stream is active and none was destroyed in the last 5 s. The guest is either painting through draw_copy or idle. |
+| Green | Active | One or more streams are open. Hover for the per-stream codec, dimensions, decoded-frame count, and lifetime. |
+| Amber | RecentlyDestroyed | No active stream, but the server tore one down within the last 5 s. Reverts to grey if no new stream replaces it. |
+| Red | Flapping | Three or more streams have been destroyed in the last 30 s with mean lifetime under 3 s. A `Warn` notification also fires once per 60 s while the pattern persists. |
+
+What to put in a bug report when the indicator is amber or red:
+
+1. The session pcap (start ryll with `--capture <dir>` so the
+   wire traffic is on disk before the symptom appears).
+2. A bug report filed from the notification panel while the
+   icon is in the relevant colour — the auto-attached display
+   snapshot includes `streams_recently_destroyed`, which is
+   what the classifier uses.
+3. The guest workload that was running (which application's
+   video region the server was promoting to a stream).
+
+The thresholds (3 destroys, 30 s window, 3 s mean lifetime,
+60 s notification cool-down) are not yet configurable; they
+live in `ryll/src/streaming_state.rs` and are tuned for the
+session-005 flap pattern. Open an issue if a different
+workload trips them too easily or not easily enough.
+
 ## Input Issues
 
 ### Keyboard input not working
@@ -516,6 +549,292 @@ for live debugging without generating a full bug report.
 - Use the channel checkboxes to filter by channel (e.g. hide the
   noisy display channel to focus on inputs).
 - Click **Pause** to freeze the display for inspection.
+
+## Playback channel observability
+
+The playback (audio) channel now exposes detailed diagnostics in bug
+reports to help characterise silent-audio or stuttering symptoms. If
+you file a Connection or Playback-typed bug report (F12), the
+`channel-state.json` will include a `playback` section with counters
+for every stage of the audio pipeline. Use this section to answer
+"where did the audio go?"
+
+**Reading playback diagnostics:**
+
+- **`data_packets_received` > 0**: Server is sending audio DATA packets.
+  If this is zero mid-session, the server stopped sending (check whether
+  audio is muted on the server, or whether the session is in a paused
+  state).
+
+- **`data_packets_decoded` (roughly equal to `data_packets_received`)**:
+  Audio decoder is keeping up. If decoded is significantly less than
+  received, the decoder is failing or too slow; check `data_packets_decode_failed`.
+
+- **`device_callbacks_total` increasing**: CoreAudio (macOS), WASAPI
+  (Windows), or ALSA (Linux) is pulling audio samples from the device.
+  If this is flat mid-session, the device has stopped requesting audio
+  (device-side problem, not ryll).
+
+- **`device_underrun_count` rising**: The audio pipeline ran out of decoded
+  samples when the device asked for them, so silence was fed to the speaker.
+  Non-zero = buffer starvation. Cross-check with `data_packets_decoded`;
+  if decoded is high but underruns are rising, the ring buffer is too small
+  or samples are being dropped upstream.
+
+- **`ring_overflow_count` rising**: Decoded samples were dropped because the
+  ring buffer was full. This suggests the device clock has stopped or is
+  running much slower than the network; the encoder is ahead of the consumer.
+
+- **`current_session: Some(...) vs None`**: When the session is `None`, audio
+  was never started (no SPICE_MSG_PLAYBACK_START received) or was stopped
+  (SPICE_MSG_PLAYBACK_STOP received). When present, it includes the sample
+  rate, channel count, and codec (Opus or raw PCM) the server declared.
+
+**USB and WebDAV analogues:**
+
+For USB redirect issues, the `usbredir` section includes
+`redirected_devices` (list of currently-forwarded devices with vendor/product
+IDs and per-device byte counts) and `device_connect_total` /
+`device_disconnect_total` (connection event counts). For file-share issues,
+the `webdav` section includes `http_requests_received` (HTTP request count)
+and `active_session_count` (currently-open connections).
+
+## Auto-snapshot mode for intermittent issues
+
+When you're hunting for an intermittent issue (audio that drops silent for 30
+seconds, streams that flap between encodings, latency that spikes mid-session),
+it's often too late to hit F12 after the symptom passes. **Auto-snapshot mode**
+is a "flight-data-recorder" that fires a complete bug-report zip every N seconds
+into a rolling subdirectory, capturing whatever was happening at that moment
+regardless of whether you noticed a problem in real time.
+
+### When to enable auto-snapshot mode
+
+- **Intermittent audio issues** — audio works fine for minutes, then goes silent
+  for 30 seconds, then returns. You can correlate playback counters across
+  snapshots before and after the silence to find where the pipeline broke.
+- **Stream flapping** — SPICE streams are constantly created and destroyed,
+  causing display lag. Auto-snapshot captures stream-state transitions across
+  multiple snapshots.
+- **Intermittent latency spikes** — responsiveness drops for 10 seconds then
+  recovers. The snapshots before, during, and after the spike show CPU usage,
+  decode latencies, and buffer states.
+- **Mysterious disconnects** — the session drops unexpectedly and you didn't
+  see an error message. Auto-snapshots up to the disconnect provide the
+  channel state and traffic at the moment before the fault.
+
+### Usage
+
+```bash
+# Fire a snapshot every 30 seconds, keep the last 20 zips (~30 MiB at typical sizes)
+ryll --file connection.vv --auto-snapshot-interval 30
+
+# Custom cap and output directory
+ryll --file connection.vv --auto-snapshot-interval 60 \
+     --auto-snapshot-cap 10 --bug-report-dir /tmp/session-debug
+```
+
+At session start, an `Info` notification confirms auto-snapshot mode is enabled
+with the interval, cap, and target path. The status bar shows
+`Auto-snapshot: N/{cap}` while the mode runs; the counter increments every N
+seconds. No per-snapshot notifications are sent so the panel doesn't spam.
+
+### Finding and reading auto-snapshot files
+
+Snapshots are written to `<bug-report-dir>/auto-snapshots/` with filenames that
+encode the UTC timestamp and session uptime:
+
+```
+ryll-auto-snapshot-2026-05-18T20-37-42Z-T+47.3s.zip
+```
+
+Each zip is a complete bug-report artefact containing:
+- **`channel-state.json`** — all channels merged with full diagnostics (playback
+  counters, stream state, latencies, decoding metrics, etc.)
+- **`traffic.pcap`** — raw SPICE traffic covering all channels for the ~N-second
+  window preceding the snapshot
+- **`metadata.json`** — session context (ryll version, platform, target host)
+- **`runtime-metrics.json`** — CPU, memory, and FD usage at snapshot time
+- **`notifications.json`** — all in-app notifications (channel events, gaps, etc.)
+- **Screenshot** — the display surface at snapshot time (if available)
+
+To diagnose an intermittent issue:
+1. Run the session with auto-snapshot enabled
+2. After reproducing the symptom, review the snapshots around the time it occurred
+3. Compare `channel-state.json` across adjacent snapshots to see what changed
+4. Use `tools/pcap-inspect.py` on the `.pcap` files to see what traffic flowed
+
+The rolling cap is enforced by age (oldest files pruned first), so disk usage
+stays bounded. At the default cap of 20 zips with typical sizes (~1 MiB each),
+you'll use ~20 MiB total.
+
+See the [README section on auto-snapshot mode](/components/ryll/../README/#auto-snapshot-mode)
+for more details on what each field means.
+
+## Display image cache pressure
+
+The SPICE server flags certain decoded image frames with `CACHE_ME` to
+reduce bandwidth on future repeated use. Ryll caches these decoded RGBA
+frames client-side; without a bound, sustained video playback can cause
+the cache to grow unbounded (see session 002g: 30 MiB/s growth during
+full-frame ZlibGlzRgb video, reaching 2.8 GiB in 90 seconds).
+
+The `--image-cache-cap-mib` flag (default 256 MiB) bounds the cache with
+an LRU eviction policy: when the total cached bytes exceed the cap, the
+least-recently-used entries are evicted until the cap is satisfied. This
+is essential for long-running desktop sessions without risk of OOM.
+
+### Interpreting cache statistics in a bug report
+
+When you file a Display bug report (F12), the `channel-state.json`
+includes three cache-related fields under the display channel entry:
+
+- **`image_cache_cap_bytes`** — the configured cap in bytes. This
+  confirms what cap the session ran under without re-reading the CLI
+  invocation. Multiply by 1,048,576 to convert MiB flags (e.g. `256 MiB
+  = 268,435,456 bytes`).
+
+- **`image_cache_evictions_total`** — cumulative count of LRU evictions
+  since the session started. High counts indicate the workload is
+  churning past the cap; compare this across snapshots to see eviction
+  rate. If the eviction count is zero but `image_cache_bytes` is steady
+  around the cap, the cache is at equilibrium (most accesses hit
+  recently-cached entries).
+
+- **`image_cache_evicted_bytes_total`** — cumulative bytes freed by LRU
+  evictions since the session started. Correlate with
+  `image_cache_bytes` to assess cache pressure: if
+  `image_cache_evicted_bytes_total` is much larger than
+  `image_cache_cap_bytes`, the workload is heavily churning past the
+  cap; if `image_cache_evicted_bytes_total` is small and
+  `image_cache_bytes` is steady well below the cap, the workload is
+  not pressuring the cache at all.
+
+### Adjusting the cache cap
+
+**Lower the cap on small-RAM hosts.** Ryll's default is 256 MiB,
+suitable for typical 8–16 GiB desktop machines. On a 2 GiB or 4 GiB
+embedded system, reduce the cap (e.g. `--image-cache-cap-mib 64` or
+`--image-cache-cap-mib 128`) to leave more RAM for other processes.
+Monitor auto-snapshots to confirm `image_cache_bytes` never exceeds the
+cap and evictions are not excessive.
+
+**Raise the cap for heavy CACHE_ME workloads.** If you are running
+sustained video playback (e.g. a full-frame animated desktop) and you
+see high `image_cache_evictions_total` across auto-snapshots with
+`image_cache_bytes` constantly at the cap, the workload is aggressively
+churning. Increase the cap (e.g. `--image-cache-cap-mib 512`) so more
+frames stay hot in cache, reducing the decode load on the next replay.
+This is a trade-off: larger cache = higher RAM cost but potentially
+fewer redecompressions of the same frame.
+
+## Glz dictionary pressure
+
+GLZ ("Generic LZ") is a dictionary-based compression variant SPICE uses
+on `Glz` and `ZlibGlz` image payloads. Decoding a GLZ-compressed frame
+can reference back-window entries from earlier frames the server told
+the client to remember (`IMAGE_FLAGS_CACHE_ME` on the originating
+Glz/ZlibGlz payload). The shared GLZ dictionary holds those decoded
+entries client-side so subsequent back-references resolve.
+
+Until phase 12E the GLZ dictionary was an unbounded
+`Mutex<HashMap<u64, Vec<u8>>>` — entries were appended on every
+`CACHE_ME` payload and removed only on explicit server-driven
+`inval_*` messages. Workloads where the server never sent `inval_*`
+(notably the full-frame ZlibGlzRgb video fallback observed in
+sessions 003a and 004d-g) leaked memory at roughly 30 MiB/s and drove
+the multi-GiB RSS runaway that originally motivated phase 12. This
+also produced one of the more confusing snapshot readings of the
+project: a 5 GiB `image_cache_bytes` value against a 256 MiB cap,
+because the pre-12F snapshot summed the two caches together (see the
+schema-change note below).
+
+The `--glz-dictionary-cap-mib` flag (default 256 MiB; see
+[configuration.md](/components/ryll/configuration/)) bounds the dictionary with the
+same byte-capped LRU as the image cache: when total entry bytes exceed
+the cap, oldest entries are evicted until the cap is satisfied.
+
+### Schema change (phase 12F)
+
+Prior to phase 12F, `image_cache_bytes`, `image_cache_entries`, and
+`image_cache_ids` summed the renderer's `BoundedImageCache` together
+with the SPICE `GlzDictionary` decompression cache. This made bug
+reports ambiguous: a 5 GiB `image_cache_bytes` reading against a
+256 MiB cap (as seen in session 003a) actually came from the GLZ
+dictionary, not the image cache, but nothing in the snapshot
+distinguished the two.
+
+After 12F, the `image_cache_*` fields reflect only the
+`BoundedImageCache` (CACHE_ME-flagged decoded RGBA frames). The GLZ
+dictionary's state is reported separately under the new
+`glz_dictionary_*` fields described below. As a result,
+`image_cache_bytes` in a bug report from a 12F-or-later ryll build
+will be roughly an order of magnitude smaller than the same field
+from a pre-12F bug report under an equivalent workload; if you need
+the pre-12F sum, add `image_cache_bytes + glz_dictionary_bytes`.
+
+### Interpreting GLZ dictionary statistics in a bug report
+
+When you file a Display bug report (F12), the `channel-state.json`
+includes five GLZ-related fields under the display channel entry:
+
+- **`glz_dictionary_bytes`** — current total bytes held by the GLZ
+  dictionary. Should always be at or below `glz_dictionary_cap_bytes`.
+  A reading well below the cap means the workload is not GLZ-heavy
+  (or `inval_*` traffic is keeping the dictionary trimmed); a reading
+  pegged at the cap means the LRU is actively recycling entries.
+
+- **`glz_dictionary_entries`** — current entry count. Read alongside
+  `glz_dictionary_bytes` to estimate average entry size (a 256 MiB
+  reading with ~25 entries implies ~10 MiB per entry, i.e.
+  full-frame RGBA payloads — the symptom of the QXL resolution-cliff
+  fallback path).
+
+- **`glz_dictionary_cap_bytes`** — the configured cap in bytes,
+  mirroring `--glz-dictionary-cap-mib`. Surfaced so a bug report
+  tells you what cap the session ran under without re-reading the
+  CLI invocation. Multiply MiB flags by 1,048,576 (e.g. `256 MiB =
+  268,435,456 bytes`).
+
+- **`glz_dictionary_evictions_total`** — cumulative count of LRU
+  evictions since the session started. High counts indicate the
+  workload is churning past the cap. Zero with `glz_dictionary_bytes`
+  pinned near the cap means the dictionary is at steady-state where
+  server-driven `inval_*` keeps it just at the boundary.
+
+- **`glz_dictionary_evicted_bytes_total`** — cumulative bytes freed
+  by LRU evictions. If this is much larger than `glz_dictionary_cap_bytes`,
+  the workload has churned through many cap-fulls of GLZ entries;
+  if it stays small while `glz_dictionary_bytes` is steady, the
+  dictionary is not under pressure.
+
+### Adjusting the GLZ dictionary cap
+
+**Lower the cap on small-RAM hosts.** As with the image cache, the
+default 256 MiB suits 8–16 GiB desktops. On embedded or low-RAM hosts,
+reduce both caps together (e.g. `--image-cache-cap-mib 64
+--glz-dictionary-cap-mib 64`). Monitor auto-snapshots to confirm
+`glz_dictionary_bytes` never exceeds the cap and that evictions are
+not so aggressive they break GLZ back-references (which would show up
+as decode failures or visual corruption in the rendered surface, not
+as a counter — file a bug report if you see that pattern).
+
+**Raise the cap for sustained GLZ-heavy workloads.** If
+`glz_dictionary_evictions_total` is rising fast across auto-snapshots
+with `glz_dictionary_bytes` constantly at the cap, the server is
+producing more GLZ back-references than the cap can hold hot.
+Raise the cap (e.g. `--glz-dictionary-cap-mib 512`) so more entries
+stay resident. The trade-off is exactly the same shape as the image
+cache: larger dictionary = higher RAM cost but potentially better
+decompression locality.
+
+**Reduce GLZ pressure server-side as well.** Many high-RSS sessions
+trace back to the QXL streaming-heuristic cliff at 1600+ pixel-wide
+guests, where every video frame falls back to a full-frame ZlibGlzRgb
+update. See [`libvirt-spice-recommendations.md`](/components/ryll/libvirt-spice-recommendations/)
+for the server-side recommendations (`auto_lz` instead of `auto_glz`,
+`streaming-video=filter` instead of `all`, `virtio-vga` instead of
+`qxl`) that reduce how often the GLZ path fires in the first place.
 
 ## Getting Help
 
