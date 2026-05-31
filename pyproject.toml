@@ -59,7 +59,7 @@ dependencies = [
     "Flask-JWT-Extended==4.7.4",          # mit
     "flask-request-id-middleware==1.1",   # mit
 
-    "protobuf==5.29.5",                   # bsd
+    "protobuf==5.29.6",                   # bsd
     "grpcio==1.70.0",                     # apache2
     "grpcio-status==1.70.0",              # apache2
     "grpcio-tools==1.70.0",               # apache2
