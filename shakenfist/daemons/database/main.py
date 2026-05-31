@@ -18,6 +18,7 @@ from uuid import UUID
 
 import grpc
 from prometheus_client import Counter
+from prometheus_client import Gauge
 from prometheus_client import start_http_server
 from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs  # noreorder
@@ -38,6 +39,7 @@ from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.event import EventRecord
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
@@ -4233,6 +4235,49 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def RecordEventBatch(
+        self,
+        request: database_pb2.RecordEventBatchRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Record a batch of event log entries in MariaDB."""
+        try:
+            self.monitor.counters['record_event_batch'].inc()
+            records: list[EventRecord] = []
+            for entry in request.events:
+                objects: list[tuple[str, str]] = []
+                for obj in entry.objects:
+                    ot = ObjectType.from_proto_id(obj.object_type)
+                    if ot is None:
+                        return database_pb2.StatusReply(
+                            success=False,
+                            error='Invalid object_type in event '
+                                  f'{entry.event_uuid}')
+                    objects.append((ot.value, obj.object_uuid))
+
+                extra = (
+                    json.loads(entry.extra_json)
+                    if entry.extra_json else None)
+                records.append(EventRecord(
+                    event_uuid=entry.event_uuid,
+                    event_type=entry.event_type,
+                    timestamp=entry.timestamp,
+                    fqdn=entry.fqdn,
+                    duration=(
+                        entry.duration if entry.duration != 0.0 else None),
+                    message=entry.message,
+                    extra=extra,
+                    request_id=entry.request_id if entry.request_id else None,
+                    objects=objects,
+                ))
+            success = mariadb._direct_record_event_batch(records)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database RecordEventBatch failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     def GetClusterOperationTarget(
         self,
         request: database_pb2.GetClusterOperationTargetRequest,
@@ -4892,6 +4937,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_cluster_config', 'set_cluster_config',
             'enqueue_event_dlq', 'drain_event_dlq',
             'delete_event_dlq', 'get_event_dlq_count',
+            'record_event_batch',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state',
@@ -5031,6 +5077,11 @@ class Monitor(daemon.WorkerPoolDaemon):
                 f'Number of {op} operations'
             )
 
+        self.events_rows_gauge = Gauge(
+            'database_events_rows',
+            'Current row count in the events table.'
+        )
+
         start_http_server(config.DATABASE_METRICS_PORT)
 
     def record_start(self) -> None:
@@ -5075,10 +5126,21 @@ class Monitor(daemon.WorkerPoolDaemon):
         send_systemd_status('Terminated')
 
     def _run_inner(self) -> None:
+        refresh_tick = 0
         while daemon.check_abort_path(self.abort_path):
             try:
                 # The database daemon doesn't have background work to do,
-                # it just serves gRPC requests. We check health periodically.
+                # it just serves gRPC requests. We check health periodically
+                # and refresh the events row-count gauge every ~60s (every
+                # 6 ticks of the 10s idle).
+                refresh_tick += 1
+                if refresh_tick % 6 == 0:
+                    try:
+                        self.events_rows_gauge.set(
+                            mariadb._direct_get_events_count())
+                    except Exception as e:
+                        LOG.warning(
+                            f'events row-count gauge refresh failed: {e}')
                 self.idle(10)
             except Exception as e:
                 util_exceptions.ignore_exception('database daemon', e)

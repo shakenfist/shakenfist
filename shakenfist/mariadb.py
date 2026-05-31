@@ -58,6 +58,7 @@ from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.event import EventRecord
 from shakenfist.schema.ipam_data import IPAMData
 from shakenfist.schema.network_attributes import NetworkAttributesData
 from shakenfist.schema.network_data import NetworkData
@@ -6430,6 +6431,140 @@ def delete_stale_cluster_operation_targets(max_age: float) -> int:
         return _grpc_delete_stale_cluster_operation_targets(max_age)
     older_than = time.time() - max_age
     return _direct_delete_stale_cluster_operation_targets(older_than)
+
+
+# =============================================================================
+# Event Storage Functions
+# Batch-write events plus their per-object references into the events
+# and event_objects tables. Both tables are written inside a single
+# transaction so a partial failure leaves no orphan rows.
+# =============================================================================
+
+def _direct_record_event_batch(events: list[EventRecord]) -> bool:
+    """Insert a batch of events directly into MariaDB.
+
+    Writes one row per event into the events table and one row per
+    (object_type, object_uuid) tuple into the event_objects table.
+    The entire batch runs inside a single transaction (engine.begin())
+    so a partial failure rolls everything back, keeping the two tables
+    consistent.
+
+    Duplicate event_uuid primary-key violations are treated as the
+    idempotent re-delivery case and logged at info; any other
+    IntegrityError is logged as a warning and aborts the batch.
+    """
+    engine = _get_engine()
+    events_table = _get_events_table()
+    event_objects_table = _get_event_objects_table()
+
+    try:
+        with engine.begin() as conn:
+            for record in events:
+                event_stmt = sa.insert(events_table).values(
+                    event_uuid=record.event_uuid,
+                    event_type=record.event_type,
+                    timestamp=record.timestamp,
+                    fqdn=record.fqdn,
+                    duration=record.duration,
+                    message=record.message,
+                    extra=record.extra,
+                    request_id=record.request_id,
+                )
+                conn.execute(event_stmt)
+
+                for object_type, object_uuid in record.objects:
+                    obj_stmt = sa.insert(event_objects_table).values(
+                        object_type=object_type,
+                        object_uuid=object_uuid,
+                        event_uuid=record.event_uuid,
+                    )
+                    conn.execute(obj_stmt)
+        return True
+    except IntegrityError as e:
+        # The expected idempotent case is a duplicate event_uuid PK
+        # violation -- the same batch (or one event from it) has been
+        # delivered before. MariaDB names the constraint or column in
+        # the error text; SQLite uses a fixed phrase. Either way we
+        # log and report success so the caller does not retry forever.
+        # Any other integrity violation (NOT NULL, type-check) is a
+        # real bug and must surface as a warning.
+        msg = str(e).lower()
+        if 'event_uuid' in msg or 'unique constraint failed' in msg:
+            LOG.info(f'Duplicate event_uuid in batch (idempotent skip): {e}')
+            return True
+        LOG.warning(f'Non-uniqueness IntegrityError writing events batch: {e}')
+        return False
+    except OperationalError as e:
+        LOG.warning(f'MariaDB write failed for events batch: {e}')
+        return False
+
+
+def _direct_get_events_count() -> int:
+    """Return the current row count of the events table.
+
+    Used by the database daemon to refresh the database_events_rows
+    Prometheus gauge. Returns 0 on database error so a transient
+    failure does not crash the gauge-refresh loop.
+    """
+    engine = _get_engine()
+    events_table = _get_events_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(sa.func.count()).select_from(events_table)
+            return conn.execute(stmt).scalar() or 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB read failed for events count: {e}')
+        return 0
+
+
+def _grpc_record_event_batch(events: list[EventRecord]) -> bool:
+    """Insert a batch of events via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        entries = []
+        for record in events:
+            objects = [
+                database_pb2.EventBatchObject(
+                    object_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        ObjectType(object_type).proto_id),  # type: ignore[call-arg]
+                    object_uuid=object_uuid,
+                )
+                for object_type, object_uuid in record.objects
+            ]
+            entries.append(database_pb2.EventBatchEntry(
+                event_uuid=record.event_uuid,
+                event_type=record.event_type,
+                timestamp=record.timestamp,
+                fqdn=record.fqdn,
+                duration=record.duration if record.duration is not None else 0.0,
+                message=record.message,
+                extra_json=json.dumps(record.extra) if record.extra is not None else '',
+                request_id=record.request_id if record.request_id is not None else '',
+                objects=objects,
+            ))
+        request = database_pb2.RecordEventBatchRequest(events=entries)
+        reply = _grpc_call(stub.RecordEventBatch, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC RecordEventBatch failed: {e}')
+        return False
+
+
+def record_event_batch(events: list[EventRecord]) -> bool:
+    """Write a batch of events to the events and event_objects tables.
+
+    Args:
+        events: List of EventRecord instances to insert.
+
+    Returns:
+        True if the batch was written successfully (or skipped as a
+        duplicate); False on database or RPC error.
+    """
+    if _use_database_service():
+        return _grpc_record_event_batch(events)
+    return _direct_record_event_batch(events)
 
 
 # =============================================================================
