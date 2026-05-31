@@ -489,3 +489,217 @@ class DirectGetEventsCountTestCase(base.ShakenFistTestCase):
 
         count = mariadb._direct_get_events_count()
         self.assertEqual(count, 0)
+
+
+# ---------------------------------------------------------------------------
+# EVENTS_INSERTED counter tests
+# ---------------------------------------------------------------------------
+
+def _make_events_and_objects_tables():
+    """Helper that returns a pair of minimal SQLAlchemy table objects.
+
+    Re-used by the counter tests to avoid building them inline each time.
+    """
+    import sqlalchemy as sa
+    metadata = sa.MetaData()
+    events_table = sa.Table(
+        'events', metadata,
+        sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+        sa.Column('event_type', sa.String(32), nullable=False),
+        sa.Column('timestamp', sa.Double(), nullable=False),
+        sa.Column('fqdn', sa.String(255), nullable=False),
+        sa.Column('duration', sa.Double(), nullable=True),
+        sa.Column('message', sa.Text(), nullable=False),
+        sa.Column('extra', sa.JSON(), nullable=True),
+        sa.Column('request_id', sa.String(64), nullable=True),
+    )
+    event_objects_table = sa.Table(
+        'event_objects', metadata,
+        sa.Column('object_type', sa.String(32), nullable=False),
+        sa.Column('object_uuid', sa.String(36), nullable=False),
+        sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+    )
+    return events_table, event_objects_table
+
+
+class EventsInsertedCounterTestCase(base.ShakenFistTestCase):
+    """``EVENTS_INSERTED`` counter increments once per event in a batch.
+
+    Counter reset strategy: ``EVENTS_INSERTED`` is a module-scope
+    prometheus_client Counter in a single process-wide registry.
+    Previous tests (or the module import itself) may have already
+    incremented label combinations we touch here.  We read the current
+    value *before* each call and assert that it grew by exactly the
+    expected delta, making the test independent of preceding state.
+    """
+
+    def _counter_value(self, event_type: str) -> float:
+        """Read the current value for a specific ``event_type`` label."""
+        return mariadb.EVENTS_INSERTED.labels(
+            event_type=event_type)._value.get()
+
+    @mock.patch('shakenfist.mariadb._get_event_objects_table')
+    @mock.patch('shakenfist.mariadb._get_events_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_single_event_increments_counter_by_one(
+            self, mock_get_engine, mock_get_events_table,
+            mock_get_event_objects_table):
+        """One event in a batch -> counter for its event_type += 1."""
+        events_table, event_objects_table = _make_events_and_objects_tables()
+        mock_get_events_table.return_value = events_table
+        mock_get_event_objects_table.return_value = event_objects_table
+
+        conn = _MockConnection()
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        before = self._counter_value('counter_test_single')
+        record = EventRecord(
+            event_uuid=EVENT_UUID_1,
+            event_type='counter_test_single',
+            timestamp=1_000_000.0,
+            fqdn='test-node',
+            duration=None,
+            message='counter test',
+            extra=None,
+            request_id=None,
+            objects=[('instance', OBJ_UUID_1)],
+        )
+        result = mariadb._direct_record_event_batch([record])
+
+        self.assertTrue(result)
+        after = self._counter_value('counter_test_single')
+        self.assertAlmostEqual(1.0, after - before, places=9)
+
+    @mock.patch('shakenfist.mariadb._get_event_objects_table')
+    @mock.patch('shakenfist.mariadb._get_events_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_three_events_increment_counter_by_three(
+            self, mock_get_engine, mock_get_events_table,
+            mock_get_event_objects_table):
+        """Three events in one batch -> counter += 3 total."""
+        events_table, event_objects_table = _make_events_and_objects_tables()
+        mock_get_events_table.return_value = events_table
+        mock_get_event_objects_table.return_value = event_objects_table
+
+        conn = _MockConnection()
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        before = self._counter_value('counter_test_triple')
+        records = [
+            EventRecord(
+                event_uuid=f'aaaabbbb-0000-4000-8000-{i:012d}',
+                event_type='counter_test_triple',
+                timestamp=float(1_000_000 + i),
+                fqdn='test-node',
+                duration=None,
+                message=f'counter test {i}',
+                extra=None,
+                request_id=None,
+                objects=[('instance', OBJ_UUID_1)],
+            )
+            for i in range(3)
+        ]
+        result = mariadb._direct_record_event_batch(records)
+
+        self.assertTrue(result)
+        after = self._counter_value('counter_test_triple')
+        self.assertAlmostEqual(3.0, after - before, places=9)
+
+    @mock.patch('shakenfist.mariadb._get_event_objects_table')
+    @mock.patch('shakenfist.mariadb._get_events_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_mixed_event_types_increment_separate_label_buckets(
+            self, mock_get_engine, mock_get_events_table,
+            mock_get_event_objects_table):
+        """Events with different event_types increment independent counters."""
+        events_table, event_objects_table = _make_events_and_objects_tables()
+        mock_get_events_table.return_value = events_table
+        mock_get_event_objects_table.return_value = event_objects_table
+
+        conn = _MockConnection()
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        before_a = self._counter_value('counter_test_mixed_a')
+        before_b = self._counter_value('counter_test_mixed_b')
+
+        records = [
+            EventRecord(
+                event_uuid='aaaabbbb-0000-4000-8000-000000000010',
+                event_type='counter_test_mixed_a',
+                timestamp=2_000_000.0,
+                fqdn='test-node',
+                duration=None,
+                message='event a',
+                extra=None,
+                request_id=None,
+                objects=[],
+            ),
+            EventRecord(
+                event_uuid='aaaabbbb-0000-4000-8000-000000000011',
+                event_type='counter_test_mixed_b',
+                timestamp=2_000_001.0,
+                fqdn='test-node',
+                duration=None,
+                message='event b',
+                extra=None,
+                request_id=None,
+                objects=[],
+            ),
+            EventRecord(
+                event_uuid='aaaabbbb-0000-4000-8000-000000000012',
+                event_type='counter_test_mixed_a',
+                timestamp=2_000_002.0,
+                fqdn='test-node',
+                duration=None,
+                message='event a2',
+                extra=None,
+                request_id=None,
+                objects=[],
+            ),
+        ]
+        result = mariadb._direct_record_event_batch(records)
+
+        self.assertTrue(result)
+        after_a = self._counter_value('counter_test_mixed_a')
+        after_b = self._counter_value('counter_test_mixed_b')
+        self.assertAlmostEqual(2.0, after_a - before_a, places=9)
+        self.assertAlmostEqual(1.0, after_b - before_b, places=9)
+
+    @mock.patch('shakenfist.mariadb._get_event_objects_table')
+    @mock.patch('shakenfist.mariadb._get_events_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_counter_not_incremented_on_integrity_error(
+            self, mock_get_engine, mock_get_events_table,
+            mock_get_event_objects_table):
+        """If the insert raises IntegrityError (non-PK), counter stays at zero delta."""
+        events_table, event_objects_table = _make_events_and_objects_tables()
+        mock_get_events_table.return_value = events_table
+        mock_get_event_objects_table.return_value = event_objects_table
+
+        conn = _MockConnection()
+        conn.execute = mock.Mock(
+            side_effect=IntegrityError(
+                'INSERT INTO events', {},
+                Exception("Column 'event_type' cannot be null"),
+            )
+        )
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        before = self._counter_value('counter_test_error')
+        record = EventRecord(
+            event_uuid=EVENT_UUID_2,
+            event_type='counter_test_error',
+            timestamp=3_000_000.0,
+            fqdn='test-node',
+            duration=None,
+            message='should fail',
+            extra=None,
+            request_id=None,
+            objects=[],
+        )
+        result = mariadb._direct_record_event_batch([record])
+
+        self.assertFalse(result)
+        after = self._counter_value('counter_test_error')
+        # The insert never succeeded so the counter must not have moved.
+        self.assertAlmostEqual(0.0, after - before, places=9)

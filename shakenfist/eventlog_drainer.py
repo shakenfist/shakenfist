@@ -1,11 +1,13 @@
 # Copyright 2019 Michael Still and contributors
-"""Background drainer that ships spooled events to sf-eventlog.
+"""Background drainer that ships spooled events to sf-database.
 
 The local eventlog spool (``shakenfist.eventlog_spool``) holds
 events on disk so the caller's ``add_event_multi()`` returns in
 microseconds. This module runs the daemon thread that picks
-batches off the spool and sends them via the batched
-``RecordMultiEventBatch`` RPC to sf-eventlog.
+batches off the spool and writes them via
+``mariadb.record_event_batch`` -- which transparently routes
+through the direct MariaDB path on sf-database itself and via
+the database gRPC channel on every other daemon.
 
 One drainer thread per process. Lifecycle:
 
@@ -18,23 +20,21 @@ One drainer thread per process. Lifecycle:
   and the next process startup (or a sibling daemon's startup)
   rescues it via ``eventlog_spool.initialise`` orphan recovery.
 
-The drainer's RPC target swaps from sf-eventlog to sf-database
-during phase 2 of ``PLAN-eventlog-direct-mariadb``; the spool
-shape and the drain loop don't change.
+On RPC failure the batch is left in the spool and retried on the
+next drain tick; the spool itself is the durability boundary.
 """
 import atexit
+import json
 import threading
 import time
 from typing import Optional
 
-import grpc
 from shakenfist_utilities import logs
+from shakenfist_utilities import random as sf_random
 
 from shakenfist import eventlog_spool
 from shakenfist import mariadb
-from shakenfist.config import config
-from shakenfist.protos import event_pb2
-from shakenfist.protos import event_pb2_grpc
+from shakenfist.schema.event import EventRecord
 
 
 LOG, _ = logs.setup(__name__)
@@ -49,24 +49,17 @@ LOG, _ = logs.setup(__name__)
 DRAIN_POLL_INTERVAL = 0.1
 DRAIN_BATCH_SIZE = 100
 
-# Backoff schedule when sf-eventlog refuses or times out. Resets
+# Backoff schedule when sf-database refuses or times out. Resets
 # to the start on any successful batch.
 BACKOFF_INITIAL = 0.5
 BACKOFF_MAX = 30.0
 BACKOFF_MULTIPLIER = 2.0
 
-# Per-RPC timeout for the batched send. Sized to absorb a slow
-# eventlog daemon under burst load (multiple drainers sending
-# concurrently) without blocking the local drainer for unbounded
-# time. The drainer can re-attempt the same batch on the next
-# tick if the RPC times out.
-RPC_TIMEOUT_SECONDS = 10.0
-
 # Wall time the atexit hook waits for in-flight events to drain
 # before giving up. Configured to be longer than systemd's
 # default ``TimeoutStopSec`` so a clean shutdown almost always
 # delivers everything, while still bounded so a wedged
-# sf-eventlog daemon can't keep this process alive forever.
+# sf-database daemon can't keep this process alive forever.
 SHUTDOWN_DRAIN_TIMEOUT = 20.0
 
 
@@ -74,21 +67,72 @@ _drainer_thread: Optional['_DrainerThread'] = None
 _drainer_lock = threading.Lock()
 
 
+def _build_records(batch: list[tuple[int, dict]]) -> list[EventRecord]:
+    """Translate spool rows into ``EventRecord`` instances.
+
+    Handles the upgrade case where in-flight rows may have been
+    written before the phase 2a payload-shape change:
+
+    * ``event_uuid`` may be missing -- fall back to a fresh UUID
+      (acceptable for the single drain cycle's worth of legacy
+      rows; the events table PK still protects against duplicate
+      inserts if a retry races).
+    * ``request_id`` may live as ``extra['request-id']`` rather
+      than as a top-level key -- read both, prefer the top-level.
+    * ``objects`` may be a list of ``{'object_type': ...,
+      'object_uuid': ...}`` dicts (current shape) or a list of
+      ``(object_type, object_uuid)`` tuples (older shape).
+    """
+    records = []
+    for _row_id, payload in batch:
+        extra_raw = payload.get('extra')
+        extra_dict: Optional[dict] = None
+        if extra_raw:
+            try:
+                extra_dict = json.loads(extra_raw)
+            except (TypeError, ValueError):
+                extra_dict = None
+
+        request_id = payload.get('request_id')
+        if not request_id and extra_dict is not None:
+            request_id = extra_dict.get('request-id') or None
+
+        objects: list[tuple[str, str]] = []
+        for obj in payload.get('objects', []) or []:
+            if isinstance(obj, dict):
+                objects.append(
+                    (str(obj.get('object_type', '')),
+                     str(obj.get('object_uuid', ''))))
+            else:
+                objects.append((str(obj[0]), str(obj[1])))
+
+        records.append(EventRecord(
+            event_uuid=(payload.get('event_uuid')
+                        or sf_random.random_id()),
+            event_type=payload.get('event_type', ''),
+            timestamp=payload.get('timestamp', 0.0),
+            fqdn=payload.get('fqdn', ''),
+            duration=payload.get('duration') or None,
+            message=payload.get('message', ''),
+            extra=extra_dict,
+            request_id=request_id,
+            objects=objects,
+        ))
+    return records
+
+
 class _DrainerThread(threading.Thread):
     """The per-process daemon thread that drains the spool.
 
-    Reads in batches of ``DRAIN_BATCH_SIZE``, sends each batch
-    via ``RecordMultiEventBatch``, deletes spool rows on ack.
-    On any RPC failure (network refused, timeout, server
-    ack=false), holds the batch and backs off; the next attempt
-    re-reads (so a transient server-side glitch doesn't lose
-    the batch).
+    Reads in batches of ``DRAIN_BATCH_SIZE``, writes each batch
+    via ``mariadb.record_event_batch``, deletes spool rows on
+    success. On failure, leaves the rows in the spool and applies
+    exponential backoff; the next drain tick re-reads them.
     """
 
     def __init__(self) -> None:
         super().__init__(daemon=True, name='eventlog-drainer')
         self._stop_event = threading.Event()
-        self._channel: Optional[grpc.Channel] = None
         self._backoff = BACKOFF_INITIAL
 
     def stop(self) -> None:
@@ -140,24 +184,12 @@ class _DrainerThread(threading.Thread):
             drained += n
         return drained
 
-    def _get_channel(self) -> grpc.Channel:
-        if self._channel is None:
-            self._channel = grpc.insecure_channel(
-                f'{config.EVENTLOG_NODE_IP}:'
-                f'{config.EVENTLOG_API_PORT}',
-                options=[
-                    ('grpc.keepalive_timeout_ms', 200),
-                    ('grpc.http2.max_pings_without_data', 0),
-                    ('grpc.keepalive_permit_without_calls', 1),
-                ])
-        return self._channel
-
     def _drain_one_batch(self) -> int:
-        """Send up to DRAIN_BATCH_SIZE events.
+        """Write up to DRAIN_BATCH_SIZE events.
 
-        Returns the number of events successfully sent (and
+        Returns the number of events successfully written (and
         deleted from the spool). Returns 0 if the spool is
-        empty or the RPC failed -- the caller distinguishes
+        empty or the write failed -- the caller distinguishes
         the two via ``spool.count()``.
         """
         spool = eventlog_spool.get_spool()
@@ -168,58 +200,34 @@ class _DrainerThread(threading.Thread):
         if not batch:
             return 0
 
-        request = self._build_batch_request(batch)
         try:
-            stub = event_pb2_grpc.EventServiceStub(
-                self._get_channel())
-            reply = stub.RecordMultiEventBatch(
-                request, timeout=RPC_TIMEOUT_SECONDS,
-                wait_for_ready=False)
-        except grpc.RpcError as e:
-            # Channel-level failure (server unreachable,
-            # timeout). Drop the channel so the next attempt
-            # rebuilds it.
-            self._on_rpc_failure(
-                f'RPC failed: {e.code().name if hasattr(e, "code") else e}')
-            return 0
-
-        if not reply.ack:
-            self._on_rpc_failure(
-                'server returned ack=false for batch')
-            # Fall back to the DLQ for THIS batch so the events
-            # aren't held hostage by a permanently-broken
-            # server. The DLQ is a different path that the
-            # eventlog daemon drains separately; whichever side
-            # recovers first delivers the events.
-            self._fallback_to_dlq(batch)
+            records = _build_records(batch)
+        except Exception as e:
+            # If we can't even build the records (malformed spool
+            # row), there's nothing the database can do for us.
+            # Log and drop the batch -- holding it forever would
+            # block every later event behind the same poison row.
+            LOG.with_fields({
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'batch_size': len(batch),
+            }).error(
+                'Eventlog drainer failed to build records; '
+                'dropping batch')
             spool.delete_ids(row_id for row_id, _ in batch)
             return 0
 
-        # Success. Clear the rows from the spool and reset the
-        # backoff so the next failure starts at INITIAL again.
-        spool.delete_ids(row_id for row_id, _ in batch)
-        self._backoff = BACKOFF_INITIAL
-        return len(batch)
+        if mariadb.record_event_batch(records):
+            # Success. Clear the rows from the spool and reset
+            # the backoff so the next failure starts at INITIAL.
+            spool.delete_ids(row_id for row_id, _ in batch)
+            self._backoff = BACKOFF_INITIAL
+            return len(batch)
 
-    def _build_batch_request(
-            self, batch: list[tuple[int, dict]]
-    ) -> event_pb2.EventMultiBatchRequest:
-        """Translate spool rows into the gRPC batch message."""
-        request = event_pb2.EventMultiBatchRequest()
-        for _row_id, payload in batch:
-            inner = request.events.add()
-            inner.event_type = payload.get('event_type', '')
-            inner.fqdn = payload.get('fqdn', '')
-            inner.message = payload.get('message', '')
-            inner.extra = payload.get('extra', '{}')
-            inner.timestamp = payload.get('timestamp', 0.0)
-            if payload.get('duration') is not None:
-                inner.duration = payload['duration']
-            for obj in payload.get('objects', []):
-                eo = inner.objects.add()
-                eo.object_type = str(obj.get('object_type', ''))
-                eo.object_uuid = str(obj.get('object_uuid', ''))
-        return request
+        # Failure. Leave the batch in the spool for retry on the
+        # next tick and back off.
+        self._on_rpc_failure('record_event_batch returned False')
+        return 0
 
     def _on_rpc_failure(self, reason: str) -> None:
         """Apply exponential backoff and log."""
@@ -235,34 +243,6 @@ class _DrainerThread(threading.Thread):
         # batch. ``_stop_event.wait`` honours stop requests
         # during the sleep so shutdown stays responsive.
         self._stop_event.wait(sleep_for)
-
-    def _fallback_to_dlq(
-            self, batch: list[tuple[int, dict]]) -> None:
-        """Last-ditch: push a failed batch through the existing DLQ.
-
-        Mirrors the per-event DLQ path that today's
-        ``add_event_multi`` falls through to when sf-eventlog
-        is unreachable. The DLQ is a separate path that
-        sf-eventlog's own drainer pulls back out -- between
-        the two paths the events still arrive eventually.
-        """
-        for _row_id, payload in batch:
-            try:
-                mariadb.enqueue_event_dlq(
-                    object_type=(
-                        payload['objects'][0]['object_type']
-                        if payload.get('objects') else ''),
-                    object_uuid=(
-                        payload['objects'][0]['object_uuid']
-                        if payload.get('objects') else ''),
-                    event_timestamp=payload.get('timestamp', 0.0),
-                    event_json=payload.get('extra', '{}'))
-            except Exception as e:
-                LOG.with_fields({
-                    'error': str(e),
-                }).warning(
-                    'Eventlog drainer fallback-to-DLQ failed; '
-                    'event dropped')
 
 
 def start(daemon_name: str) -> None:
