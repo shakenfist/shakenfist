@@ -778,6 +778,90 @@ class GetEventDlqCountReply(google.protobuf.message.Message):
 global___GetEventDlqCountReply = GetEventDlqCountReply
 
 @typing.final
+class EventBatchObject(google.protobuf.message.Message):
+    """Event Storage (MariaDB)
+    Batch write path for events plus their per-object references.
+    `duration = 0` and empty `extra_json`/`request_id` encode "absent"
+    and are mapped to SQL NULL on insert. Named `EventBatchObject` /
+    `EventBatchEntry` (not `EventObject` / `Event`) to avoid the
+    package-level name collision with `EventObject` defined in
+    `event.proto`; the two protos share the `shakenfist.protos`
+    package and event.proto is still alive until phase 5.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    object_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        object_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___EventBatchObject = EventBatchObject
+
+@typing.final
+class EventBatchEntry(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENT_UUID_FIELD_NUMBER: builtins.int
+    EVENT_TYPE_FIELD_NUMBER: builtins.int
+    TIMESTAMP_FIELD_NUMBER: builtins.int
+    FQDN_FIELD_NUMBER: builtins.int
+    DURATION_FIELD_NUMBER: builtins.int
+    MESSAGE_FIELD_NUMBER: builtins.int
+    EXTRA_JSON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    OBJECTS_FIELD_NUMBER: builtins.int
+    event_uuid: builtins.str
+    event_type: builtins.str
+    timestamp: builtins.float
+    fqdn: builtins.str
+    duration: builtins.float
+    message: builtins.str
+    extra_json: builtins.str
+    request_id: builtins.str
+    @property
+    def objects(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___EventBatchObject]: ...
+    def __init__(
+        self,
+        *,
+        event_uuid: builtins.str = ...,
+        event_type: builtins.str = ...,
+        timestamp: builtins.float = ...,
+        fqdn: builtins.str = ...,
+        duration: builtins.float = ...,
+        message: builtins.str = ...,
+        extra_json: builtins.str = ...,
+        request_id: builtins.str = ...,
+        objects: collections.abc.Iterable[global___EventBatchObject] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["duration", b"duration", "event_type", b"event_type", "event_uuid", b"event_uuid", "extra_json", b"extra_json", "fqdn", b"fqdn", "message", b"message", "objects", b"objects", "request_id", b"request_id", "timestamp", b"timestamp"]) -> None: ...
+
+global___EventBatchEntry = EventBatchEntry
+
+@typing.final
+class RecordEventBatchRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___EventBatchEntry]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[global___EventBatchEntry] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___RecordEventBatchRequest = RecordEventBatchRequest
+
+@typing.final
 class GetObjectStateRequest(google.protobuf.message.Message):
     """Object State Operations (MariaDB)
     These operations manage object state in MariaDB, which is used for

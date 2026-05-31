@@ -133,6 +133,15 @@ class DatabaseServiceStub:
         database_pb2.GetEventDlqCountReply,
     ]
 
+    RecordEventBatch: grpc.UnaryUnaryMultiCallable[
+        database_pb2.RecordEventBatchRequest,
+        database_pb2.StatusReply,
+    ]
+    """Event Storage (MariaDB)
+    Direct write path for batches of events; replaces the sf-eventlog
+    gRPC target in phase 2.
+    """
+
     GetObjectState: grpc.UnaryUnaryMultiCallable[
         database_pb2.GetObjectStateRequest,
         database_pb2.GetObjectStateReply,
@@ -1151,6 +1160,15 @@ class DatabaseServiceAsyncStub:
         database_pb2.GetEventDlqCountRequest,
         database_pb2.GetEventDlqCountReply,
     ]
+
+    RecordEventBatch: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.RecordEventBatchRequest,
+        database_pb2.StatusReply,
+    ]
+    """Event Storage (MariaDB)
+    Direct write path for batches of events; replaces the sf-eventlog
+    gRPC target in phase 2.
+    """
 
     GetObjectState: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.GetObjectStateRequest,
@@ -2214,6 +2232,17 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.GetEventDlqCountRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.GetEventDlqCountReply, collections.abc.Awaitable[database_pb2.GetEventDlqCountReply]]: ...
+
+    @abc.abstractmethod
+    def RecordEventBatch(
+        self,
+        request: database_pb2.RecordEventBatchRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+        """Event Storage (MariaDB)
+        Direct write path for batches of events; replaces the sf-eventlog
+        gRPC target in phase 2.
+        """
 
     @abc.abstractmethod
     def GetObjectState(

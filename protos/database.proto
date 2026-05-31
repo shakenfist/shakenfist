@@ -35,6 +35,11 @@ service DatabaseService {
   rpc DeleteEventDlq (DeleteEventDlqRequest) returns (StatusReply) {}
   rpc GetEventDlqCount (GetEventDlqCountRequest) returns (GetEventDlqCountReply) {}
 
+  // Event Storage (MariaDB)
+  // Direct write path for batches of events; replaces the sf-eventlog
+  // gRPC target in phase 2.
+  rpc RecordEventBatch (RecordEventBatchRequest) returns (StatusReply) {}
+
   // Object State Operations (MariaDB)
   rpc GetObjectState (GetObjectStateRequest) returns (GetObjectStateReply) {}
   rpc SetObjectState (SetObjectStateRequest) returns (StatusReply) {}
@@ -530,6 +535,36 @@ message GetEventDlqCountRequest {
 
 message GetEventDlqCountReply {
   int64 count = 1;
+}
+
+// Event Storage (MariaDB)
+// Batch write path for events plus their per-object references.
+// `duration = 0` and empty `extra_json`/`request_id` encode "absent"
+// and are mapped to SQL NULL on insert. Named `EventBatchObject` /
+// `EventBatchEntry` (not `EventObject` / `Event`) to avoid the
+// package-level name collision with `EventObject` defined in
+// `event.proto`; the two protos share the `shakenfist.protos`
+// package and event.proto is still alive until phase 5.
+
+message EventBatchObject {
+  ObjectType object_type = 1;
+  string object_uuid = 2;
+}
+
+message EventBatchEntry {
+  string event_uuid = 1;
+  string event_type = 2;
+  double timestamp = 3;
+  string fqdn = 4;
+  double duration = 5;
+  string message = 6;
+  string extra_json = 7;
+  string request_id = 8;
+  repeated EventBatchObject objects = 9;
+}
+
+message RecordEventBatchRequest {
+  repeated EventBatchEntry events = 1;
 }
 
 // Object State Operations (MariaDB)
