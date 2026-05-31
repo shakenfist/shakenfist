@@ -96,6 +96,20 @@ EVENTS_INSERTED = Counter(
     ['event_type']
 )
 
+EVENTS_PRUNED = Counter(
+    'database_events_pruned_total',
+    'Event-object rows pruned, by event type (and the '
+    'synthetic "api-request" type for the object-type '
+    'override sweep).',
+    ['event_type']
+)
+
+ORPHAN_EVENTS_PRUNED = Counter(
+    'database_orphan_events_pruned_total',
+    'Events rows pruned because no event_objects row '
+    'referenced them.'
+)
+
 # Sentinel node name used during migration when the original node is unknown.
 # This uses a name that cannot conflict with real hostnames.
 MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
@@ -6531,6 +6545,215 @@ def _direct_get_events_count() -> int:
     except OperationalError as e:
         LOG.warning(f'MariaDB read failed for events count: {e}')
         return 0
+
+
+# Batch size for the paged DELETE loops in the prune helpers below.
+# Matches the existing eventlog daemon's per-sweep cap. Small enough to
+# commit in a fraction of a second on a healthy InnoDB even when the
+# rows being deleted are spread across many pages, big enough to keep
+# round-trip overhead negligible for a daily sweep that may delete
+# millions of rows.
+_PRUNE_BATCH_SIZE = 10000
+
+
+def _direct_prune_events_by_type(event_type: str, max_age: float) -> int:
+    """Prune event_objects rows for one event_type older than max_age.
+
+    Stage A of the daily events prune sweep. Joins event_objects to
+    events on event_uuid, filters by event_type and the age cutoff,
+    and deletes the join row in batches of ``_PRUNE_BATCH_SIZE``. Each
+    batch is its own transaction so a long prune does not hold a
+    single transaction open. Returns the total number of event_objects
+    rows deleted across all batches. On OperationalError the partial
+    count accumulated so far is returned.
+
+    Args:
+        event_type: One of 'audit', 'mutate', 'status', 'usage',
+            'resources', 'prune', 'historic'.
+        max_age: Maximum age in seconds. Rows with
+            ``events.timestamp < now - max_age`` are pruned.
+
+    Returns:
+        Total number of event_objects rows deleted.
+    """
+    engine = _get_engine()
+    cutoff = time.time() - max_age
+    total = 0
+
+    stmt = sa.text('''
+        DELETE eo FROM event_objects eo
+        JOIN events e ON eo.event_uuid = e.event_uuid
+        WHERE e.event_type = :event_type AND e.timestamp < :cutoff
+        LIMIT :batch
+    ''')
+
+    try:
+        while True:
+            with engine.connect() as conn:
+                result = conn.execute(stmt, {
+                    'event_type': event_type,
+                    'cutoff': cutoff,
+                    'batch': _PRUNE_BATCH_SIZE,
+                })
+                conn.commit()
+            rowcount = result.rowcount or 0
+            if rowcount > 0:
+                EVENTS_PRUNED.labels(event_type=event_type).inc(rowcount)
+                total += rowcount
+            if rowcount < _PRUNE_BATCH_SIZE:
+                break
+        return total
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB prune_events_by_type failed for {event_type}: {e}')
+        return total
+
+
+def _direct_prune_api_request_events(max_age: float) -> int:
+    """Prune event_objects rows whose object_type is 'api-request'.
+
+    Stage B of the daily events prune sweep. Regardless of the parent
+    event's event_type, an api-request reference ages out at
+    ``MAX_API_REQUEST_EVENT_AGE``. An event tied to both an
+    api-request and another object loses its api-request reference
+    here, but the event row itself only goes away in stage C once its
+    last event_objects row is gone. Counter increments use the
+    synthetic label ``event_type='api-request'`` so operators can
+    distinguish object-type-override prunes from regular per-type
+    prunes in the same metric. Batched and OperationalError-tolerant
+    like stage A.
+
+    Args:
+        max_age: Maximum age in seconds. Rows whose referenced event
+            has ``timestamp < now - max_age`` are pruned.
+
+    Returns:
+        Total number of event_objects rows deleted.
+    """
+    engine = _get_engine()
+    cutoff = time.time() - max_age
+    total = 0
+
+    stmt = sa.text('''
+        DELETE eo FROM event_objects eo
+        JOIN events e ON eo.event_uuid = e.event_uuid
+        WHERE eo.object_type = 'api-request' AND e.timestamp < :cutoff
+        LIMIT :batch
+    ''')
+
+    try:
+        while True:
+            with engine.connect() as conn:
+                result = conn.execute(stmt, {
+                    'cutoff': cutoff,
+                    'batch': _PRUNE_BATCH_SIZE,
+                })
+                conn.commit()
+            rowcount = result.rowcount or 0
+            if rowcount > 0:
+                EVENTS_PRUNED.labels(event_type='api-request').inc(rowcount)
+                total += rowcount
+            if rowcount < _PRUNE_BATCH_SIZE:
+                break
+        return total
+    except OperationalError as e:
+        LOG.warning(f'MariaDB prune_api_request_events failed: {e}')
+        return total
+
+
+def _direct_prune_orphan_events() -> int:
+    """Prune events rows no longer referenced by any event_objects row.
+
+    Stage C of the daily events prune sweep. After stages A and B
+    have removed event_objects rows, any events row whose event_uuid
+    no longer appears in event_objects is now an orphan and may be
+    deleted. Uses a LEFT JOIN anti-join via the events PK and the
+    event_objects ``event_uuid`` secondary index. Batched and
+    OperationalError-tolerant like the other stages.
+
+    Returns:
+        Total number of events rows deleted.
+    """
+    engine = _get_engine()
+    total = 0
+
+    stmt = sa.text('''
+        DELETE e FROM events e
+        LEFT JOIN event_objects eo ON e.event_uuid = eo.event_uuid
+        WHERE eo.event_uuid IS NULL
+        LIMIT :batch
+    ''')
+
+    try:
+        while True:
+            with engine.connect() as conn:
+                result = conn.execute(stmt, {'batch': _PRUNE_BATCH_SIZE})
+                conn.commit()
+            rowcount = result.rowcount or 0
+            if rowcount > 0:
+                ORPHAN_EVENTS_PRUNED.inc(rowcount)
+                total += rowcount
+            if rowcount < _PRUNE_BATCH_SIZE:
+                break
+        return total
+    except OperationalError as e:
+        LOG.warning(f'MariaDB prune_orphan_events failed: {e}')
+        return total
+
+
+# The seven configured event_types whose retention is governed by
+# the MAX_{TYPE}_EVENT_AGE settings. Order is informational only;
+# stage A's batched DELETEs are independent across event_types.
+_PRUNABLE_EVENT_TYPES = (
+    'audit', 'mutate', 'status', 'usage', 'resources', 'prune', 'historic'
+)
+
+
+def _direct_prune_events() -> int:
+    """Orchestrate the three-stage daily events prune sweep.
+
+    Iterates the seven configured event_types and prunes each whose
+    ``MAX_{TYPE}_EVENT_AGE`` is not -1 (a value of -1 disables prune
+    for that type, mirroring the legacy eventlog daemon behaviour).
+    Then runs the api-request object-type override sweep (also
+    skipped if ``MAX_API_REQUEST_EVENT_AGE`` is -1) and finally the
+    orphan events sweep that removes events rows whose last
+    event_objects reference is gone.
+
+    Each stage is independently OperationalError-tolerant: a failure
+    in one stage returns its partial count and the remaining stages
+    still run. The per-stage breakdown is logged at info; the sum is
+    returned for the daily summary line on the cluster maintainer.
+
+    Returns:
+        Total number of rows deleted across all stages
+        (event_objects rows from stages A and B plus events rows
+        from stage C).
+    """
+    total = 0
+    per_stage: dict[str, int] = {}
+
+    for evtype in _PRUNABLE_EVENT_TYPES:
+        max_age = getattr(config, f'MAX_{evtype.upper()}_EVENT_AGE')
+        if max_age == -1:
+            continue
+        deleted = _direct_prune_events_by_type(evtype, float(max_age))
+        per_stage[evtype] = deleted
+        total += deleted
+
+    api_max_age = config.MAX_API_REQUEST_EVENT_AGE
+    if api_max_age != -1:
+        deleted = _direct_prune_api_request_events(float(api_max_age))
+        per_stage['api-request'] = deleted
+        total += deleted
+
+    orphan_deleted = _direct_prune_orphan_events()
+    per_stage['orphan'] = orphan_deleted
+    total += orphan_deleted
+
+    breakdown = ', '.join(f'{k}={v}' for k, v in per_stage.items())
+    LOG.info(f'Events prune sweep deleted {total} rows ({breakdown}).')
+    return total
 
 
 def _grpc_record_event_batch(events: list[EventRecord]) -> bool:
