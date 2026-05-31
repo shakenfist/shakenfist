@@ -254,19 +254,22 @@ def add_event_multi(
     else:
         extra = copy.deepcopy(extra)
 
-    # Add correlation_id for multi-object events to link them during debugging
-    correlation_id = None
-    if len(simpler_objects) > 1:
-        correlation_id = sf_random.random_id()
+    # Always generate an event_uuid: this is the per-event identity that
+    # makes RecordEventBatch retries idempotent against the events table's
+    # primary key. The legacy gRPC and DLQ paths still want a
+    # correlation_id alias, so we keep that name pointing at the same
+    # value for compatibility until phase 5 deletes those paths.
+    event_uuid = sf_random.random_id()
+    correlation_id = event_uuid
 
     # If this event was created in the context of a request from our API, then
-    # we should record the request id that caused this event.
+    # we should record the request id that caused this event. The request id
+    # used to live inside ``extra`` under the ``request-id`` key; it is now a
+    # first-class top-level field on the spool payload.
     try:
         request_id = flask.request.environ.get('FLASK_REQUEST_ID')
     except RuntimeError:
         request_id = None
-    if request_id and 'request-id' not in extra:
-        extra['request-id'] = request_id
 
     log = LOG.with_fields({
         'event_type': event_type,
@@ -302,11 +305,13 @@ def add_event_multi(
     if (not get_force_event_dlq()
             and not config.EVENTLOG_SUPPRESS_GRPC):
         payload = {
+            'event_uuid': event_uuid,
             'event_type': event_type,
             'fqdn': config.NODE_NAME,
             'duration': duration,
             'message': message,
             'extra': util_json.json_dump(extra),
+            'request_id': request_id,
             'timestamp': timestamp,
             'objects': [
                 {'object_type': str(ot), 'object_uuid': str(ou)}
