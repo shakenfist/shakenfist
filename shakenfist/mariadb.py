@@ -136,6 +136,8 @@ _node_daemon_states_table: Optional[sa.Table] = None
 _cluster_operations_table: Optional[sa.Table] = None
 _cluster_operation_errors_table: Optional[sa.Table] = None
 _work_queue_table: Optional[sa.Table] = None
+_events_table: Optional[sa.Table] = None
+_event_objects_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -194,6 +196,8 @@ WORK_QUEUE_VERSION = 2
 CLUSTER_LOCKS_VERSION = 4
 CLUSTER_CONFIG_VERSION = 2
 EVENT_DLQ_VERSION = 2
+EVENTS_VERSION = 1
+EVENT_OBJECTS_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -1327,6 +1331,122 @@ def _ensure_event_dlq_schema(
     }
 
 
+def _get_events_table() -> sa.Table:
+    """Get or create the events table definition.
+
+    This table stores event log entries written directly by sf-database.
+    Each row is a single event with its scalar fields; the per-object
+    relationships live in the companion event_objects table so that one
+    event may target multiple objects (e.g. an interface op touching an
+    instance, network, and interface).
+
+    The extra column is a JSON blob carrying optional structured payload
+    (free-form per-event metadata). request_id is its own indexed column
+    so request-scoped audit queries are a single SQL filter.
+    """
+    global _events_table
+    if _events_table is None:
+        metadata = _get_metadata()
+        _events_table = sa.Table(
+            'events',
+            metadata,
+            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+            sa.Column('event_type', sa.String(32), nullable=False),
+            sa.Column('timestamp', sa.Double(), nullable=False),
+            sa.Column('fqdn', sa.String(255), nullable=False),
+            sa.Column('duration', sa.Double(), nullable=True),
+            sa.Column('message', sa.Text(), nullable=False),
+            sa.Column('extra', sa.JSON(), nullable=True),
+            sa.Column('request_id', sa.String(64), nullable=True),
+            sa.PrimaryKeyConstraint('event_uuid'),
+            sa.Index('idx_events_type_timestamp',
+                     'event_type', 'timestamp'),
+            sa.Index('idx_events_request_id', 'request_id'),
+        )
+    return _events_table
+
+
+def _ensure_events_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the events table schema is up to date."""
+    table_name = 'events'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_events_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': EVENTS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_event_objects_table() -> sa.Table:
+    """Get or create the event_objects table definition.
+
+    This table records the many-to-many relationship between events
+    and the objects they target. The natural key
+    (object_type, object_uuid, event_uuid) is the primary key and
+    supports the per-object read path
+    (WHERE object_type = ? AND object_uuid = ?) by prefix.
+
+    The secondary index on event_uuid supports the prune-side join
+    against events, avoiding a full scan when deleting child rows
+    ahead of orphan parent rows.
+
+    No foreign key constraint is declared between event_uuid here and
+    events.event_uuid; the codebase deliberately avoids FKs on other
+    similar tables (object_states, object_metadata,
+    cluster_operation_targets). Referential integrity is upheld by the
+    insert path writing both tables in one transaction.
+    """
+    global _event_objects_table
+    if _event_objects_table is None:
+        metadata = _get_metadata()
+        _event_objects_table = sa.Table(
+            'event_objects',
+            metadata,
+            sa.Column('object_type', sa.String(32), nullable=False),
+            sa.Column('object_uuid', sa.String(36), nullable=False),
+            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+            sa.PrimaryKeyConstraint(
+                'object_type', 'object_uuid', 'event_uuid'),
+            sa.Index('idx_event_objects_event', 'event_uuid'),
+        )
+    return _event_objects_table
+
+
+def _ensure_event_objects_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the event_objects table schema is up to date."""
+    table_name = 'event_objects'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_event_objects_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': EVENT_OBJECTS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def _get_ipam_reservations_table() -> sa.Table:
     """Get or create the ipam_reservations table definition.
 
@@ -2077,6 +2197,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_cluster_locks_schema(engine))
     results.append(_ensure_cluster_config_schema(engine))
     results.append(_ensure_event_dlq_schema(engine))
+    results.append(_ensure_events_schema(engine))
+    results.append(_ensure_event_objects_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
