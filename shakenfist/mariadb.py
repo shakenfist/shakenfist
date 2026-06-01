@@ -6356,22 +6356,30 @@ def _direct_record_event_batch(events: list[EventRecord]) -> bool:
 
     Writes one row per event into the events table and one row per
     (object_type, object_uuid) tuple into the event_objects table.
-    The entire batch runs inside a single transaction (engine.begin())
-    so a partial failure rolls everything back, keeping the two tables
-    consistent.
+    Uses ``INSERT IGNORE`` on both tables so that a duplicate
+    ``event_uuid`` (the idempotent-retry case after a drainer crash
+    or RPC timeout) is silently skipped per-row, without rolling back
+    sibling events in the same batch. The whole batch still runs
+    inside a single ``engine.begin()`` transaction so a real DB
+    failure (OperationalError) aborts cleanly without leaving the two
+    tables out of sync.
 
-    Duplicate event_uuid primary-key violations are treated as the
-    idempotent re-delivery case and logged at info; any other
-    IntegrityError is logged as a warning and aborts the batch.
+    EVENTS_INSERTED is accumulated locally during the transaction and
+    only applied to the Prometheus counter after the commit succeeds,
+    so a transaction rollback does not leave phantom counter
+    increments visible to operators.
     """
     engine = _get_engine()
     events_table = _get_events_table()
     event_objects_table = _get_event_objects_table()
 
+    inserted_by_type: dict[str, int] = {}
+
     try:
         with engine.begin() as conn:
             for record in events:
-                event_stmt = sa.insert(events_table).values(
+                event_stmt = sa.insert(events_table).prefix_with(
+                    'IGNORE').values(
                     event_uuid=record.event_uuid,
                     event_type=record.event_type,
                     timestamp=record.timestamp,
@@ -6382,33 +6390,24 @@ def _direct_record_event_batch(events: list[EventRecord]) -> bool:
                     request_id=record.request_id,
                 )
                 conn.execute(event_stmt)
-                EVENTS_INSERTED.labels(event_type=record.event_type).inc()
+                inserted_by_type[record.event_type] = (
+                    inserted_by_type.get(record.event_type, 0) + 1)
 
                 for object_type, object_uuid in record.objects:
-                    obj_stmt = sa.insert(event_objects_table).values(
+                    obj_stmt = sa.insert(event_objects_table).prefix_with(
+                        'IGNORE').values(
                         object_type=object_type,
                         object_uuid=object_uuid,
                         event_uuid=record.event_uuid,
                     )
                     conn.execute(obj_stmt)
-        return True
-    except IntegrityError as e:
-        # The expected idempotent case is a duplicate event_uuid PK
-        # violation -- the same batch (or one event from it) has been
-        # delivered before. MariaDB names the constraint or column in
-        # the error text; SQLite uses a fixed phrase. Either way we
-        # log and report success so the caller does not retry forever.
-        # Any other integrity violation (NOT NULL, type-check) is a
-        # real bug and must surface as a warning.
-        msg = str(e).lower()
-        if 'event_uuid' in msg or 'unique constraint failed' in msg:
-            LOG.info(f'Duplicate event_uuid in batch (idempotent skip): {e}')
-            return True
-        LOG.warning(f'Non-uniqueness IntegrityError writing events batch: {e}')
-        return False
     except OperationalError as e:
         LOG.warning(f'MariaDB write failed for events batch: {e}')
         return False
+
+    for event_type, count in inserted_by_type.items():
+        EVENTS_INSERTED.labels(event_type=event_type).inc(count)
+    return True
 
 
 def _direct_get_events_count() -> int:

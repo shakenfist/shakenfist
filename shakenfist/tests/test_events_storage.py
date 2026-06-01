@@ -10,7 +10,6 @@
 
 from unittest import mock
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
@@ -351,94 +350,84 @@ class DirectRecordEventBatchTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_event_objects_table')
     @mock.patch('shakenfist.mariadb._get_events_table')
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_duplicate_event_uuid_is_idempotent(
+    def test_uses_insert_ignore_prefix(
             self, mock_get_engine, mock_get_events_table,
             mock_get_event_objects_table):
-        """Duplicate event_uuid PK violation is treated as success (idempotent)."""
-        import sqlalchemy as sa
-        metadata = sa.MetaData()
-        events_table = sa.Table(
-            'events', metadata,
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-            sa.Column('event_type', sa.String(32), nullable=False),
-            sa.Column('timestamp', sa.Double(), nullable=False),
-            sa.Column('fqdn', sa.String(255), nullable=False),
-            sa.Column('duration', sa.Double(), nullable=True),
-            sa.Column('message', sa.Text(), nullable=False),
-            sa.Column('extra', sa.JSON(), nullable=True),
-            sa.Column('request_id', sa.String(64), nullable=True),
-        )
-        event_objects_table = sa.Table(
-            'event_objects', metadata,
-            sa.Column('object_type', sa.String(32), nullable=False),
-            sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-        )
+        """INSERTs on both tables are prefixed with IGNORE so a duplicate
+        event_uuid is silently skipped per-row rather than rolling the whole
+        transaction back. Compiling each captured statement against the
+        MariaDB dialect renders the literal ``INSERT IGNORE INTO`` form.
+        """
+        from sqlalchemy.dialects import mysql
+        events_table, event_objects_table = _make_events_and_objects_tables()
         mock_get_events_table.return_value = events_table
         mock_get_event_objects_table.return_value = event_objects_table
 
         conn = _MockConnection()
-        # Raise IntegrityError mentioning event_uuid so the handler treats it
-        # as an idempotent duplicate.
-        conn.execute = mock.Mock(
-            side_effect=IntegrityError(
-                'INSERT INTO events', {}, Exception('Duplicate entry for event_uuid')
-            )
-        )
         mock_get_engine.return_value = _MockEngine(conn)
 
-        with mock.patch.object(mariadb.LOG, 'info') as mock_log_info:
-            result = mariadb._direct_record_event_batch([_SAMPLE_RECORD])
+        record = EventRecord(
+            event_uuid=EVENT_UUID_1,
+            event_type='audit',
+            timestamp=1_234_567_890.0,
+            fqdn='test-node.example.com',
+            duration=None,
+            message='ignore-prefix probe',
+            extra=None,
+            request_id=None,
+            objects=[('instance', OBJ_UUID_1)],
+        )
+
+        result = mariadb._direct_record_event_batch([record])
 
         self.assertTrue(result)
-        mock_log_info.assert_called_once()
-        logged_msg = str(mock_log_info.call_args[0][0])
-        self.assertIn('idempotent', logged_msg.lower())
+        self.assertEqual(len(conn.executed), 2)
+        for stmt in conn.executed:
+            rendered = str(stmt.compile(dialect=mysql.dialect()))
+            self.assertIn('INSERT IGNORE INTO', rendered)
 
     @mock.patch('shakenfist.mariadb._get_event_objects_table')
     @mock.patch('shakenfist.mariadb._get_events_table')
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_other_integrity_error_returns_false_and_warns(
+    def test_mixed_batch_with_duplicate_does_not_lose_siblings(
             self, mock_get_engine, mock_get_events_table,
             mock_get_event_objects_table):
-        """A non-duplicate IntegrityError (e.g. NOT NULL) surfaces as False with a warning."""
-        import sqlalchemy as sa
-        metadata = sa.MetaData()
-        events_table = sa.Table(
-            'events', metadata,
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-            sa.Column('event_type', sa.String(32), nullable=False),
-            sa.Column('timestamp', sa.Double(), nullable=False),
-            sa.Column('fqdn', sa.String(255), nullable=False),
-            sa.Column('duration', sa.Double(), nullable=True),
-            sa.Column('message', sa.Text(), nullable=False),
-            sa.Column('extra', sa.JSON(), nullable=True),
-            sa.Column('request_id', sa.String(64), nullable=True),
-        )
-        event_objects_table = sa.Table(
-            'event_objects', metadata,
-            sa.Column('object_type', sa.String(32), nullable=False),
-            sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-        )
+        """A retry-shaped batch where one event_uuid is already in the table
+        does not lose its sibling events. With INSERT IGNORE each INSERT
+        either lands or no-ops; the mock cannot model the server-side row
+        check, but it can prove that every event's INSERT was executed (no
+        rollback truncates the loop) and that all three return success.
+        """
+        events_table, event_objects_table = _make_events_and_objects_tables()
         mock_get_events_table.return_value = events_table
         mock_get_event_objects_table.return_value = event_objects_table
 
         conn = _MockConnection()
-        # The error message does NOT contain 'event_uuid' so the handler
-        # must treat it as a real bug.
-        conn.execute = mock.Mock(
-            side_effect=IntegrityError(
-                'INSERT INTO events', {}, Exception("Column 'event_type' cannot be null")
-            )
-        )
         mock_get_engine.return_value = _MockEngine(conn)
 
-        with mock.patch.object(mariadb.LOG, 'warning') as mock_log_warn:
-            result = mariadb._direct_record_event_batch([_SAMPLE_RECORD])
+        # Three single-object events. The middle one stands in for a
+        # duplicate that would previously have raised IntegrityError and
+        # rolled back the whole batch.
+        records = [
+            EventRecord(
+                event_uuid=u, event_type='audit',
+                timestamp=t, fqdn='test-node', duration=None,
+                message=f'event {i}', extra=None, request_id=None,
+                objects=[('instance', OBJ_UUID_1)],
+            )
+            for i, (u, t) in enumerate([
+                (EVENT_UUID_1, 1_000_000.0),
+                (EVENT_UUID_2, 2_000_000.0),
+                (EVENT_UUID_1, 3_000_000.0),
+            ])
+        ]
 
-        self.assertFalse(result)
-        mock_log_warn.assert_called_once()
+        result = mariadb._direct_record_event_batch(records)
+
+        self.assertTrue(result)
+        # 3 events x (1 events insert + 1 event_objects insert) = 6 calls.
+        # All inserts were executed -- the loop is not short-circuited.
+        self.assertEqual(len(conn.executed), 6)
 
 
 # ---------------------------------------------------------------------------
@@ -694,19 +683,23 @@ class EventsInsertedCounterTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_event_objects_table')
     @mock.patch('shakenfist.mariadb._get_events_table')
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_counter_not_incremented_on_integrity_error(
+    def test_counter_not_incremented_on_operational_error(
             self, mock_get_engine, mock_get_events_table,
             mock_get_event_objects_table):
-        """If the insert raises IntegrityError (non-PK), counter stays at zero delta."""
+        """If the transaction aborts on OperationalError mid-batch the
+        EVENTS_INSERTED counter must not move. The fix for review item #2
+        defers .inc() to after the ``with engine.begin()`` block exits
+        cleanly so a rollback never leaves phantom increments behind.
+        """
         events_table, event_objects_table = _make_events_and_objects_tables()
         mock_get_events_table.return_value = events_table
         mock_get_event_objects_table.return_value = event_objects_table
 
         conn = _MockConnection()
         conn.execute = mock.Mock(
-            side_effect=IntegrityError(
+            side_effect=OperationalError(
                 'INSERT INTO events', {},
-                Exception("Column 'event_type' cannot be null"),
+                Exception('lost connection during write'),
             )
         )
         mock_get_engine.return_value = _MockEngine(conn)
@@ -727,7 +720,7 @@ class EventsInsertedCounterTestCase(base.ShakenFistTestCase):
 
         self.assertFalse(result)
         after = self._counter_value('counter_test_error')
-        # The insert never succeeded so the counter must not have moved.
+        # The insert never committed so the counter must not have moved.
         self.assertAlmostEqual(0.0, after - before, places=9)
 
 
