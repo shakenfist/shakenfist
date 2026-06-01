@@ -18,8 +18,8 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 
 from shakenfist import baseobject
-from shakenfist import eventlog
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FLOATING_NETWORK_UUID
@@ -405,8 +405,12 @@ class NetworkEventsEndpoint(api_base.Resource):
     @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
     def get(self, network_ref=None, event_type=None, limit=100, network_from_db=None):
-        with eventlog.EventLog('network', network_from_db.uuid) as eventdb:
-            return list(eventdb.read_events(limit=limit, event_type=event_type))
+        return [
+            row.model_dump(mode='json')
+            for row in mariadb.get_object_events(
+                'network', network_from_db.uuid,
+                limit=limit, event_type=event_type)
+        ]
 
 
 network_interfaces_example = """{

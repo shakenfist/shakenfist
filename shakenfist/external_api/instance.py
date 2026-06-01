@@ -42,9 +42,9 @@ from shakenfist.schema.operations.node_inst_netdesc_op \
     import create_and_enqueue as nino_create_and_enqueue
 from shakenfist.schema.operations.node_inst_netdesc_op \
     import model_tasks as nino_tasks
-from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import instance
+from shakenfist import mariadb
 from shakenfist.network import network as sfnet
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist import scheduler
@@ -1102,8 +1102,12 @@ class InstanceEventsEndpoint(api_base.Resource):
     @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
     def get(self, instance_ref=None, event_type=None, limit=100, instance_from_db=None):
-        with eventlog.EventLog('instance', instance_from_db.uuid) as eventdb:
-            return list(eventdb.read_events(limit=limit, event_type=event_type))
+        return [
+            row.model_dump(mode='json')
+            for row in mariadb.get_object_events(
+                'instance', instance_from_db.uuid,
+                limit=limit, event_type=event_type)
+        ]
 
 
 class InstanceRebootSoftEndpoint(api_base.Resource):

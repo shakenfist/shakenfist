@@ -26,8 +26,8 @@ from shakenfist.schema.operations.artifact_fetch_op \
     import create_and_enqueue as afo_create_and_enqueue
 from shakenfist.schema.operations.artifact_fetch_op \
     import model_tasks as afo_tasks
-from shakenfist import eventlog
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import Artifacts
 from shakenfist.artifact import namespace_or_shared_filter
@@ -553,8 +553,12 @@ class ArtifactEventsEndpoint(api_base.Resource):
     @api_base.log_token_use
     @api_base.redirect_to_eventlog_node
     def get(self, artifact_ref=None, event_type=None, limit=100, artifact_from_db=None):
-        with eventlog.EventLog('artifact', artifact_from_db.uuid) as eventdb:
-            return list(eventdb.read_events(limit=limit, event_type=event_type))
+        return [
+            row.model_dump(mode='json')
+            for row in mariadb.get_object_events(
+                'artifact', artifact_from_db.uuid,
+                limit=limit, event_type=event_type)
+        ]
 
 
 artifact_versions_example = """[

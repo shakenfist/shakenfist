@@ -10,7 +10,7 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 
 from shakenfist import locks as sf_locks
-from shakenfist import eventlog
+from shakenfist import mariadb
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
 from shakenfist.node import Node
@@ -176,8 +176,12 @@ class NodeEventsEndpoint(api_base.Resource):
         n = Node.from_db(node, suppress_failure_audit=True)
         if not n:
             return sf_api.error(404, 'node not found')
-        with eventlog.EventLog('node', str(n.uuid)) as eventdb:
-            return list(eventdb.read_events(limit=limit, event_type=event_type))
+        return [
+            row.model_dump(mode='json')
+            for row in mariadb.get_object_events(
+                'node', str(n.uuid),
+                limit=limit, event_type=event_type)
+        ]
 
 
 node_process_metrics_example = """[

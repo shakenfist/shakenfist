@@ -42,15 +42,32 @@ _SAMPLE_RECORD = EventRecord(
 # _MockEngine pattern, with begin() added for the transaction path).
 # ---------------------------------------------------------------------------
 
-class _MockResult:
-    """Minimal result stub supporting both scalar() (for SELECT) and rowcount (for DELETE)."""
+class _MockRow:
+    """Minimal row stub with attribute access for column values.
 
-    def __init__(self, scalar_val=0, rowcount=0):
+    Passed as elements of the list returned by ``_MockResult.fetchall()``.
+    Construct with keyword arguments for each column that the caller will
+    access as an attribute.
+    """
+
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+class _MockResult:
+    """Minimal result stub supporting scalar(), fetchall(), and rowcount."""
+
+    def __init__(self, scalar_val=0, rowcount=0, rows=None):
         self._scalar = scalar_val
         self.rowcount = rowcount
+        self._rows = rows if rows is not None else []
 
     def scalar(self):
         return self._scalar
+
+    def fetchall(self):
+        return self._rows
 
 
 class _MockConnection:
@@ -1021,3 +1038,306 @@ class PruneEventsRoutingTestCase(base.ShakenFistTestCase):
         result = mariadb.prune_events()
         self.assertEqual(99, result)
         mock_direct.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 tests — direct get/delete object events helpers
+# ---------------------------------------------------------------------------
+
+_OBJ_UUID_X = 'ccccdddd-2222-4222-8222-222222222201'
+
+# Three sample DB rows returned by conn.execute(...).fetchall() for the
+# get-events path.  Timestamps are intentionally out of order to verify
+# that the function returns whatever the DB gives (ordering is done in SQL).
+_ROWS_3 = [
+    _MockRow(
+        event_uuid='eeeeeeee-0000-4000-8000-000000000001',
+        event_type='audit',
+        timestamp=1_000_003.0,
+        fqdn='node-a.example.com',
+        duration=0.25,
+        message='third event',
+        extra=None,
+        request_id='req-003',
+    ),
+    _MockRow(
+        event_uuid='eeeeeeee-0000-4000-8000-000000000002',
+        event_type='mutate',
+        timestamp=1_000_002.0,
+        fqdn='node-a.example.com',
+        duration=None,
+        message='second event',
+        extra='{"key": "value"}',
+        request_id=None,
+    ),
+    _MockRow(
+        event_uuid='eeeeeeee-0000-4000-8000-000000000003',
+        event_type='audit',
+        timestamp=1_000_001.0,
+        fqdn='node-b.example.com',
+        duration=1.5,
+        message='first event',
+        extra=None,
+        request_id='req-001',
+    ),
+]
+
+
+class DirectGetObjectEventsTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_get_object_events() using mock engine/connection."""
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_returns_event_read_row_list_in_timestamp_desc_order(
+            self, mock_get_engine):
+        """fetchall() returns 3 rows; function returns 3 EventReadRow objects."""
+        conn = _MockConnection(result=_MockResult(rows=_ROWS_3))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        results = mariadb._direct_get_object_events('instance', _OBJ_UUID_X)
+
+        self.assertEqual(3, len(results))
+        # First row maps through unchanged.
+        self.assertEqual('eeeeeeee-0000-4000-8000-000000000001', results[0].event_uuid)
+        self.assertEqual('audit', results[0].event_type)
+        self.assertAlmostEqual(1_000_003.0, results[0].timestamp)
+        self.assertEqual('node-a.example.com', results[0].fqdn)
+        self.assertAlmostEqual(0.25, results[0].duration)
+        self.assertEqual('third event', results[0].message)
+        self.assertIsNone(results[0].extra)
+        self.assertEqual('req-003', results[0].request_id)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_empty_result_returns_empty_list(self, mock_get_engine):
+        """fetchall() returns []; function returns []."""
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        results = mariadb._direct_get_object_events('network', _OBJ_UUID_X)
+
+        self.assertEqual([], results)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_event_type_filter_passed_to_sql(self, mock_get_engine):
+        """event_type='audit' sets event_type_filter='audit' in bound params;
+        event_type=None sets event_type_filter='' (match-all sentinel).
+        """
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_get_engine.return_value = _MockEngine(conn)
+        conn.execute = mock.Mock(return_value=_MockResult(rows=[]))
+
+        # With explicit event_type filter.
+        mariadb._direct_get_object_events('instance', _OBJ_UUID_X, event_type='audit')
+        # Bound params are passed as the second positional argument (a dict).
+        params_with_filter = conn.execute.call_args[0][1]
+        self.assertEqual('audit', params_with_filter['event_type_filter'])
+
+        # Without event_type filter (None -> empty-string sentinel).
+        mariadb._direct_get_object_events('instance', _OBJ_UUID_X, event_type=None)
+        params_without_filter = conn.execute.call_args[0][1]
+        self.assertEqual('', params_without_filter['event_type_filter'])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_limit_clamped_to_default_when_zero(self, mock_get_engine):
+        """limit=0 is replaced with the default 100 before binding."""
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_get_engine.return_value = _MockEngine(conn)
+        conn.execute = mock.Mock(return_value=_MockResult(rows=[]))
+
+        mariadb._direct_get_object_events('instance', _OBJ_UUID_X, limit=0)
+
+        params = conn.execute.call_args[0][1]
+        self.assertEqual(100, params['limit'])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_limit_clamped_to_default_when_negative(self, mock_get_engine):
+        """limit=-1 (legacy REST API 'all rows') is replaced with 100."""
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_get_engine.return_value = _MockEngine(conn)
+        conn.execute = mock.Mock(return_value=_MockResult(rows=[]))
+
+        mariadb._direct_get_object_events('instance', _OBJ_UUID_X, limit=-1)
+
+        params = conn.execute.call_args[0][1]
+        self.assertEqual(100, params['limit'])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_limit_capped_at_1000_when_too_high(self, mock_get_engine):
+        """limit=5000 is capped at 1000."""
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_get_engine.return_value = _MockEngine(conn)
+        conn.execute = mock.Mock(return_value=_MockResult(rows=[]))
+
+        mariadb._direct_get_object_events('instance', _OBJ_UUID_X, limit=5000)
+
+        params = conn.execute.call_args[0][1]
+        self.assertEqual(1000, params['limit'])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_extra_json_string_decoded_to_dict(self, mock_get_engine):
+        """A JSON string in row.extra is decoded to a dict on EventReadRow."""
+        row = _MockRow(
+            event_uuid='eeeeeeee-0000-4000-8000-000000000010',
+            event_type='audit',
+            timestamp=1_000_000.0,
+            fqdn='node-a',
+            duration=None,
+            message='event with extra',
+            extra='{"foo": 1}',
+            request_id=None,
+        )
+        conn = _MockConnection(result=_MockResult(rows=[row]))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        results = mariadb._direct_get_object_events('instance', _OBJ_UUID_X)
+
+        self.assertEqual(1, len(results))
+        self.assertEqual({'foo': 1}, results[0].extra)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_extra_corrupt_json_falls_back_to_none(self, mock_get_engine):
+        """Corrupt JSON in row.extra is silently dropped; EventReadRow.extra is None."""
+        row = _MockRow(
+            event_uuid='eeeeeeee-0000-4000-8000-000000000011',
+            event_type='audit',
+            timestamp=1_000_000.0,
+            fqdn='node-a',
+            duration=None,
+            message='event with bad extra',
+            extra='not json',
+            request_id=None,
+        )
+        conn = _MockConnection(result=_MockResult(rows=[row]))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        results = mariadb._direct_get_object_events('instance', _OBJ_UUID_X)
+
+        self.assertEqual(1, len(results))
+        self.assertIsNone(results[0].extra)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_returns_empty_list(self, mock_get_engine):
+        """OperationalError during execute returns [] without re-raising."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(
+            side_effect=OperationalError('SELECT', {}, Exception('db down')))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        results = mariadb._direct_get_object_events('instance', _OBJ_UUID_X)
+
+        self.assertEqual([], results)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 tests — direct delete object events helper
+# ---------------------------------------------------------------------------
+
+class DirectDeleteObjectEventsTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_delete_object_events() using mock engine/connection."""
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_executes_correct_delete_sql(self, mock_get_engine):
+        """Executed SQL contains DELETE FROM event_objects with correct bound params."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(return_value=_MockResult())
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        mariadb._direct_delete_object_events('instance', _OBJ_UUID_X)
+
+        self.assertEqual(1, conn.execute.call_count)
+        stmt, params = conn.execute.call_args[0]
+        stmt_text = str(stmt)
+        self.assertIn('DELETE FROM event_objects', stmt_text)
+        self.assertEqual('instance', params['object_type'])
+        self.assertEqual(_OBJ_UUID_X, params['object_uuid'])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_is_swallowed(self, mock_get_engine):
+        """OperationalError during DELETE does not propagate; returns None."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(
+            side_effect=OperationalError('DELETE', {}, Exception('db down')))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        result = mariadb._direct_delete_object_events('blob', _OBJ_UUID_X)
+
+        self.assertIsNone(result)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 tests — get_object_events routing
+# ---------------------------------------------------------------------------
+
+class GetObjectEventsRoutingTestCase(base.ShakenFistTestCase):
+    """get_object_events routes to _grpc_* or _direct_* correctly."""
+
+    @mock.patch('shakenfist.mariadb._direct_get_object_events', return_value=[])
+    @mock.patch('shakenfist.mariadb._grpc_get_object_events', return_value=[])
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_routes_to_grpc_when_service_mode(
+            self, mock_use_svc, mock_grpc, mock_direct):
+        """_use_database_service() == True -> _grpc_get_object_events is called."""
+        mariadb.get_object_events('instance', _OBJ_UUID_X)
+        mock_grpc.assert_called_once_with('instance', _OBJ_UUID_X, 100, None)
+        mock_direct.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_get_object_events', return_value=[])
+    @mock.patch('shakenfist.mariadb._grpc_get_object_events', return_value=[])
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    def test_routes_to_direct_when_not_service_mode(
+            self, mock_use_svc, mock_grpc, mock_direct):
+        """_use_database_service() == False -> _direct_get_object_events is called."""
+        mariadb.get_object_events('instance', _OBJ_UUID_X)
+        mock_direct.assert_called_once_with('instance', _OBJ_UUID_X, 100, None)
+        mock_grpc.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 tests — delete_object_events routing
+# ---------------------------------------------------------------------------
+
+class DeleteObjectEventsRoutingTestCase(base.ShakenFistTestCase):
+    """delete_object_events routes to _grpc_* or _direct_* correctly."""
+
+    @mock.patch('shakenfist.mariadb._direct_delete_object_events', return_value=None)
+    @mock.patch('shakenfist.mariadb._grpc_delete_object_events', return_value=None)
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_routes_to_grpc_when_service_mode(
+            self, mock_use_svc, mock_grpc, mock_direct):
+        """_use_database_service() == True -> _grpc_delete_object_events is called."""
+        mariadb.delete_object_events('instance', _OBJ_UUID_X)
+        mock_grpc.assert_called_once_with('instance', _OBJ_UUID_X)
+        mock_direct.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_delete_object_events', return_value=None)
+    @mock.patch('shakenfist.mariadb._grpc_delete_object_events', return_value=None)
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    def test_routes_to_direct_when_not_service_mode(
+            self, mock_use_svc, mock_grpc, mock_direct):
+        """_use_database_service() == False -> _direct_delete_object_events is called."""
+        mariadb.delete_object_events('instance', _OBJ_UUID_X)
+        mock_direct.assert_called_once_with('instance', _OBJ_UUID_X)
+        mock_grpc.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 tests — hard_delete calls delete_object_events
+# ---------------------------------------------------------------------------
+
+class HardDeleteEventsCleanupTestCase(base.ShakenFistTestCase):
+    """hard_delete() must call mariadb.delete_object_events for the object."""
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.delete_object_events', return_value=None)
+    @mock.patch('shakenfist.mariadb.delete_object_metadata', return_value=True)
+    @mock.patch('shakenfist.mariadb.delete_state', return_value=True)
+    def test_hard_delete_calls_delete_object_events(
+            self, mock_del_state, mock_del_meta, mock_del_events, mock_event):
+        """hard_delete() calls delete_object_events(object_type, str(uuid))."""
+        from shakenfist.baseobject import DatabaseBackedObject
+
+        TEST_UUID = '12345678-1234-4321-8234-123456789099'
+        obj = DatabaseBackedObject(TEST_UUID)
+
+        obj.hard_delete()
+
+        mock_del_events.assert_called_once_with(obj.object_type, TEST_UUID)
