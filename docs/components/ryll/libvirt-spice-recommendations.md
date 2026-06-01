@@ -466,3 +466,51 @@ But ryll cannot override a server config that says
 to use a slow encoding, the client just has to decode it. The
 right fix in that case is server-side: update the libvirt XML per
 the recommendations above.
+
+## Shaken Fist enhancement requests
+
+Ryll's primary deployment target is Shaken Fist, but a few of the
+libvirt knobs recommended above are not currently exposed by the
+Shaken Fist API. The gaps below are tracked here so anyone reading
+the recommendations knows where the orchestrator-side ceiling is,
+and what they would have to hand-roll if they wanted to bypass it.
+
+### virgl / `accel3d` is not exposed through `--videospec`
+
+The Shaken Fist videospec accepts `model`, `memory`, and `vdi`
+fields, which the libvirt template
+(`shakenfist/deploy/templates/libvirt.tmpl:199`) substitutes as:
+
+```xml
+<model type='{{video_model}}' vram='{{video_memory}}' heads='1' primary='yes'/>
+```
+
+There is no `<acceleration accel3d='...'/>` child element in the
+template and no field in the API to populate one. That means
+`--videospec model=virtio,...` always builds a guest with
+`accel3d='no'`, and there is no API path to ask for virgl 3D
+forwarding.
+
+Whether this matters depends on the workload. For plain VDI
+(terminal, browser scrolling without WebGL, office apps) virgl
+adds nothing observable. For compositor-heavy desktops, WebGL,
+or any guest-side OpenGL workload it would noticeably improve
+*guest-side* responsiveness — but it would not change anything
+ryll sees on the wire, because SPICE's GL passthrough mode
+(`gl=on`, DMA-BUF) only works for a *local* SPICE client. For a
+remote client like ryll the GL framebuffer is read back to a
+normal framebuffer and shipped as ordinary bitmap blits.
+
+**Workaround today:** create the instance through Shaken Fist as
+normal, then edit the resulting libvirt domain XML by hand to
+add `<acceleration accel3d='yes'/>` and restart the domain. The
+hypervisor needs `virglrenderer` installed and ideally a real
+GPU on the host; software rasterisation works but defeats the
+purpose.
+
+**To close the gap properly** would take an API field on the
+videospec (e.g. `accel3d: bool`), a template change to emit the
+`<acceleration>` element when set, and a hypervisor-side
+prerequisite that operators have `virglrenderer` available. Not
+on any ryll roadmap; filed here as a note for future Shaken Fist
+work.

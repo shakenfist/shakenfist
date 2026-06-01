@@ -87,10 +87,17 @@ decoder backend identification. No additions needed in phase 4.
 ### main
 
 Main already has session identity (`session_id`), multimedia clock state
-(`mm_time`, `mm_time_recv_ts_secs`), and keepalive bookkeeping
-(`keepalive_timeout_fired`, `client_keepalive_send_count`). The four
-new baseline fields (`messages_recv_by_opcode` etc.) will be added in
-phase 4B.
+(`mm_time`, `mm_time_recv_ts_secs`), and keepalive-timeout bookkeeping
+(`keepalive_timeout_fired`). The `client_keepalive_send_count` and
+`last_client_keepalive_send_ts_secs` fields described in earlier
+revisions of this audit were removed in phase 11A — the main-channel
+spurious-PONG keepalive they tracked was a K1 band-aid made redundant
+by the `370d8ce5` fix. (The inputs channel retains the same field
+names — see the "inputs" section above — to track its KEY_MODIFIERS
+idle restatement, kept on the cross-channel-idleness hypothesis;
+see PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md.) The
+four new baseline fields (`messages_recv_by_opcode` etc.) will be
+added in phase 4B.
 
 One nuance: the per-opcode map is less useful on main than on other
 channels because the agent-related opcodes (`VD_AGENT_*`) are nested
