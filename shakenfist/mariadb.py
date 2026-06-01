@@ -59,6 +59,7 @@ from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.event import EventReadRow
 from shakenfist.schema.event import EventRecord
 from shakenfist.schema.ipam_data import IPAMData
 from shakenfist.schema.network_attributes import NetworkAttributesData
@@ -6754,6 +6755,146 @@ def _direct_prune_events() -> int:
     breakdown = ', '.join(f'{k}={v}' for k, v in per_stage.items())
     LOG.info(f'Events prune sweep deleted {total} rows ({breakdown}).')
     return total
+
+
+def _direct_get_object_events(
+        object_type: str, object_uuid: str, limit: int = 100,
+        event_type: Optional[str] = None) -> list[EventReadRow]:
+    """Read events for one (object_type, object_uuid) directly.
+
+    Drives off the event_objects PK prefix (object_type, object_uuid)
+    and joins through events.event_uuid for the per-event scalar
+    columns. Optionally filters on event_type; when the caller passes
+    ``event_type=None`` the bound parameter is the empty string and
+    the SQL ``(:event_type_filter = '' OR ...)`` clause short-circuits
+    so no rows are excluded.
+
+    Limit hardening: ``limit <= 0`` is replaced with the default 100,
+    and ``limit > 1000`` is capped at 1000. The current REST API
+    allows negative limit which the legacy ``EventLog.read_events()``
+    interprets as "all rows"; this caps that foot-gun. Cursor-style
+    pagination is deferred (see Future work in the master plan).
+
+    Args:
+        object_type: One of the constants.OBJECT_NAMES values
+            (e.g. 'instance', 'artifact', 'network').
+        object_uuid: UUID of the object whose events to read.
+        limit: Maximum number of rows to return after hardening.
+        event_type: Optional event-type filter; ``None`` means any.
+
+    Returns:
+        List of ``EventReadRow`` ordered by ``events.timestamp``
+        descending. Empty list on OperationalError or if no events
+        match.
+    """
+    if limit <= 0:
+        limit = 100
+    if limit > 1000:
+        limit = 1000
+
+    engine = _get_engine()
+
+    stmt = sa.text('''
+        SELECT e.event_uuid, e.event_type, e.timestamp, e.fqdn,
+               e.duration, e.message, e.extra, e.request_id
+        FROM event_objects eo
+        JOIN events e ON eo.event_uuid = e.event_uuid
+        WHERE eo.object_type = :object_type
+          AND eo.object_uuid = :object_uuid
+          AND (:event_type_filter = '' OR e.event_type = :event_type_filter)
+        ORDER BY e.timestamp DESC
+        LIMIT :limit
+    ''')
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(stmt, {
+                'object_type': object_type,
+                'object_uuid': object_uuid,
+                'event_type_filter': event_type if event_type is not None else '',
+                'limit': limit,
+            }).fetchall()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_object_events failed for '
+            f'{object_type}/{object_uuid}: {e}')
+        return []
+
+    results: list[EventReadRow] = []
+    for row in rows:
+        # The events.extra column is sa.JSON() but sa.text() does not
+        # carry the column-type binding through to the result, so the
+        # mysqldb driver hands back the raw JSON string from the
+        # server. Parse it here. SQL NULL surfaces as Python None and
+        # is preserved as None on EventReadRow.extra. We accept a
+        # pre-parsed dict too in case a future driver upgrade starts
+        # decoding the JSON automatically.
+        extra_raw = row.extra
+        extra: Optional[dict[str, Any]]
+        if extra_raw is None:
+            extra = None
+        elif isinstance(extra_raw, dict):
+            extra = extra_raw
+        else:
+            try:
+                extra = json.loads(extra_raw)
+            except (ValueError, TypeError):
+                LOG.warning(
+                    f'Failed to decode extra JSON for event '
+                    f'{row.event_uuid}; dropping payload.')
+                extra = None
+
+        results.append(EventReadRow(
+            event_uuid=row.event_uuid,
+            event_type=row.event_type,
+            timestamp=row.timestamp,
+            fqdn=row.fqdn,
+            duration=row.duration,
+            message=row.message,
+            extra=extra,
+            request_id=row.request_id,
+        ))
+    return results
+
+
+def _direct_delete_object_events(
+        object_type: str, object_uuid: str) -> None:
+    """Delete all event_objects rows referencing one object.
+
+    Single DELETE bounded by the event_objects PK prefix
+    (object_type, object_uuid); no batching is needed because one
+    object's event count is small. The events row itself stays alive
+    if any other event_objects row still references it; orphan
+    events rows are reaped by the daily prune sweep
+    (``_direct_prune_orphan_events``).
+
+    No row count is returned; the hard_delete caller does not need
+    it.
+
+    Args:
+        object_type: One of the constants.OBJECT_NAMES values.
+        object_uuid: UUID of the object whose event references to
+            drop.
+    """
+    engine = _get_engine()
+
+    stmt = sa.text('''
+        DELETE FROM event_objects
+        WHERE object_type = :object_type AND object_uuid = :object_uuid
+    ''')
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(stmt, {
+                'object_type': object_type,
+                'object_uuid': object_uuid,
+            })
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete_object_events failed for '
+            f'{object_type}/{object_uuid}: {e}')
+        return
 
 
 def _grpc_record_event_batch(events: list[EventRecord]) -> bool:

@@ -50,3 +50,35 @@ class EventRecord(BaseModel):
     request_id: Optional[str] = None
     # List of (object_type, object_uuid) tuples
     objects: list[tuple[str, str]]
+
+
+class EventReadRow(BaseModel):
+    """One row returned by the per-object events read path.
+
+    Distinct from EventRecord (write side) because the read query has
+    already filtered by one (object_type, object_uuid) and the
+    consumer does not need the per-event objects list.
+
+    Attributes:
+        event_uuid: UUID of the event (primary key in the events
+            table).
+        event_type: The event type/category string.
+        timestamp: Unix timestamp when the event occurred.
+        fqdn: Fully-qualified domain name of the node that produced
+            the event.
+        duration: Optional duration in seconds; None means unset.
+        message: Human-readable event message.
+        extra: Optional structured payload (free-form per-event
+            metadata). None means unset.
+        request_id: Optional request identifier for request-scoped
+            audit queries. None means unset.
+    """
+
+    event_uuid: str
+    event_type: str
+    timestamp: float
+    fqdn: str
+    duration: Optional[float] = None
+    message: str
+    extra: Optional[dict] = None
+    request_id: Optional[str] = None
