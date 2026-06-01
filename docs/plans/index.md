@@ -122,6 +122,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 9: L2 / GARP advertisement | Not started | Alternative for non-routed deployments |
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 10: Migration | Not started | Cutover from singleton network node to smeared carriers |
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 11: Operator documentation | Not started | VIP failover modes and pool sizing |
+| [OIDC authentication](PLAN-oidc-authentication.md) | Master plan | Stub | OIDC as an authentication option for human users; existing namespace keys re-framed as service-account tokens for automation |
 
 ### Status Definitions
 
