@@ -504,90 +504,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
-    # Event DLQ Operations
-
-    def EnqueueEventDlq(
-        self,
-        request: database_pb2.EnqueueEventDlqRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Enqueue an event in the dead-letter queue."""
-        try:
-            self.monitor.counters['enqueue_event_dlq'].inc()
-            event_json = json.loads(request.event_json)
-            mariadb._direct_enqueue_event_dlq(
-                object_type=request.object_type,
-                object_uuid=request.object_uuid,
-                event_timestamp=request.event_timestamp,
-                event_json=event_json,
-            )
-            return database_pb2.StatusReply(
-                success=True, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database EnqueueEventDlq failed', e)
-            return database_pb2.StatusReply(
-                success=False, error=str(e))
-
-    def DrainEventDlq(
-        self,
-        request: database_pb2.DrainEventDlqRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.DrainEventDlqReply:
-        """Return DLQ entries for processing."""
-        try:
-            self.monitor.counters['drain_event_dlq'].inc()
-            rows = mariadb._direct_drain_event_dlq(
-                limit=request.limit)
-            entries = []
-            for row in rows:
-                entries.append(
-                    database_pb2.DrainEventDlqEntry(
-                        id=row['id'],
-                        object_type=row['object_type'],
-                        object_uuid=row['object_uuid'],
-                        event_json=json.dumps(row['event_json']),
-                    ))
-            return database_pb2.DrainEventDlqReply(
-                entries=entries)
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database DrainEventDlq failed', e)
-            return database_pb2.DrainEventDlqReply(entries=[])
-
-    def DeleteEventDlq(
-        self,
-        request: database_pb2.DeleteEventDlqRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Delete processed DLQ entries by id."""
-        try:
-            self.monitor.counters['delete_event_dlq'].inc()
-            mariadb._direct_delete_event_dlq(
-                ids=list(request.ids))
-            return database_pb2.StatusReply(
-                success=True, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database DeleteEventDlq failed', e)
-            return database_pb2.StatusReply(
-                success=False, error=str(e))
-
-    def GetEventDlqCount(
-        self,
-        request: database_pb2.GetEventDlqCountRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.GetEventDlqCountReply:
-        """Return the current number of rows in the event_dlq table."""
-        try:
-            self.monitor.counters['get_event_dlq_count'].inc()
-            count = mariadb._direct_get_event_dlq_count()
-            return database_pb2.GetEventDlqCountReply(count=count)
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database GetEventDlqCount failed', e)
-            return database_pb2.GetEventDlqCountReply(count=0)
-
     # Object State Operations (MariaDB)
     # These operations provide access to MariaDB state storage for all daemons.
     # The database service uses direct MariaDB access; all other daemons call
@@ -5010,8 +4926,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',
-            'enqueue_event_dlq', 'drain_event_dlq',
-            'delete_event_dlq', 'get_event_dlq_count',
             'record_event_batch', 'prune_events',
             'get_object_events', 'delete_object_events',
             # MariaDB state operations
@@ -5161,44 +5075,34 @@ class Monitor(daemon.WorkerPoolDaemon):
         start_http_server(config.DATABASE_METRICS_PORT)
 
     def record_start(self) -> None:
-        # The database daemon records its own startup. It forces events to
-        # the DLQ because the eventlog daemon may not be running yet (avoiding
-        # circular dependencies).
-        eventlog.set_force_event_dlq(True)
-        try:
-            n = Node.from_db(config.NODE_NAME)
-            if n:
-                n.set_daemon_state(
-                    self.daemon_name,
-                    Node.DAEMON_STATE_RUNNING)
-                n.add_event(
-                    EVENT_TYPE_AUDIT,
-                    f'{self.daemon_name} daemon starting')
-        finally:
-            eventlog.set_force_event_dlq(False)
+        # The database daemon records its own startup. Events flow into the
+        # local spool and are picked up by the drainer when it starts.
+        n = Node.from_db(config.NODE_NAME)
+        if n:
+            n.set_daemon_state(
+                self.daemon_name,
+                Node.DAEMON_STATE_RUNNING)
+            n.add_event(
+                EVENT_TYPE_AUDIT,
+                f'{self.daemon_name} daemon starting')
         send_systemd_ready()
 
     def record_exit(self) -> None:
-        # The database daemon records its own shutdown. It forces events to
-        # the DLQ because the eventlog daemon may have already stopped.
-        eventlog.set_force_event_dlq(True)
-        try:
-            n = Node.from_db(config.NODE_NAME)
-            if n:
-                try:
-                    n.set_daemon_state(
-                        self.daemon_name,
-                        Node.DAEMON_STATE_STOPPED)
-                except InvalidStateException as e:
-                    if not str(e).startswith(
-                            'Invalid state change from '
-                            'stopping to degraded'):
-                        raise e
-                n.add_event(
-                    EVENT_TYPE_AUDIT,
-                    f'{self.daemon_name} daemon stopped')
-        finally:
-            eventlog.set_force_event_dlq(False)
+        # The database daemon records its own shutdown.
+        n = Node.from_db(config.NODE_NAME)
+        if n:
+            try:
+                n.set_daemon_state(
+                    self.daemon_name,
+                    Node.DAEMON_STATE_STOPPED)
+            except InvalidStateException as e:
+                if not str(e).startswith(
+                        'Invalid state change from '
+                        'stopping to degraded'):
+                    raise e
+            n.add_event(
+                EVENT_TYPE_AUDIT,
+                f'{self.daemon_name} daemon stopped')
         send_systemd_status('Terminated')
 
     def _run_inner(self) -> None:

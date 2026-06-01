@@ -330,11 +330,6 @@ class SFConfig(BaseSettings):
     )
 
     # Event options
-    EVENTLOG_SUPPRESS_GRPC: bool = Field(
-        False, description=(
-            'Only intended for testing. Always use etcd for event delivery.'
-        )
-    )
     EVENTLOG_NODE_IP: str = Field(
         '',
         description='Mesh IP of the node which stores event logs.',

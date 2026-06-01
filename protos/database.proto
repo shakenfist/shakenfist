@@ -29,12 +29,6 @@ service DatabaseService {
   rpc GetClusterConfig (ClusterConfigRequest) returns (ClusterConfigReply) {}
   rpc SetClusterConfig (SetClusterConfigRequest) returns (StatusReply) {}
 
-  // Event DLQ
-  rpc EnqueueEventDlq (EnqueueEventDlqRequest) returns (StatusReply) {}
-  rpc DrainEventDlq (DrainEventDlqRequest) returns (DrainEventDlqReply) {}
-  rpc DeleteEventDlq (DeleteEventDlqRequest) returns (StatusReply) {}
-  rpc GetEventDlqCount (GetEventDlqCountRequest) returns (GetEventDlqCountReply) {}
-
   // Event Storage (MariaDB)
   // Direct write path for batches of events; replaces the sf-eventlog
   // gRPC target in phase 2.
@@ -507,49 +501,10 @@ message SetClusterConfigRequest {
   string value_json = 2;  // JSON-encoded config value
 }
 
-// Event DLQ
-
-message EnqueueEventDlqRequest {
-  string object_type = 1;
-  string object_uuid = 2;
-  double event_timestamp = 3;
-  string event_json = 4;  // JSON-encoded event dict
-}
-
-message DrainEventDlqRequest {
-  int32 limit = 1;
-}
-
-message DrainEventDlqEntry {
-  int64 id = 1;
-  string object_type = 2;
-  string object_uuid = 3;
-  string event_json = 4;  // JSON-encoded event dict
-}
-
-message DrainEventDlqReply {
-  repeated DrainEventDlqEntry entries = 1;
-}
-
-message DeleteEventDlqRequest {
-  repeated int64 ids = 1;
-}
-
-message GetEventDlqCountRequest {
-}
-
-message GetEventDlqCountReply {
-  int64 count = 1;
-}
-
 // Event Storage (MariaDB)
 // Batch write path for events plus their per-object references.
 // `duration = 0` and empty `extra_json`/`request_id` encode "absent"
-// and are mapped to SQL NULL on insert. Named `EventBatchObject` /
-// `EventBatchEntry` (not `EventObject` / `Event`) to avoid the
-// package-level name collision with `EventObject` defined in
-// `event.proto`; the two protos share the `shakenfist.protos`
-// package and event.proto is still alive until phase 5.
+// and are mapped to SQL NULL on insert.
 
 message EventBatchObject {
   ObjectType object_type = 1;

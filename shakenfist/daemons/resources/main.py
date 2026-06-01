@@ -323,11 +323,6 @@ class Monitor(daemon.Daemon):
                     'networknode_queue_deferred': networknode_deferred
                 })
 
-            if config.NODE_IS_EVENTLOG_NODE:
-                retval.update({
-                    'events_waiting': mariadb.get_event_dlq_count(),
-                })
-
             # What object versions do we support?
             for obj in OBJECT_NAMES_TO_CLASSES:
                 retval['object_version_%s' % obj] = \

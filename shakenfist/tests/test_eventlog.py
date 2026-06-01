@@ -48,7 +48,6 @@ class AddEventMultiSpoolPayloadTestCase(
         config_patcher = mock.patch('shakenfist.eventlog.config')
         self.mock_config = config_patcher.start()
         self.mock_config.NODE_NAME = 'test-node'
-        self.mock_config.EVENTLOG_SUPPRESS_GRPC = False
         self.addCleanup(config_patcher.stop)
 
     def _dequeue_one(self):
