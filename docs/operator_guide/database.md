@@ -23,8 +23,10 @@ etcd is the primary database for Shaken Fist and is used for:
   state.
 - **Distributed locking**: See the [Locks](locks.md) documentation.
 - **Configuration**: Cluster-wide configuration stored at `/sf/config`.
-- **Event log DLQ**: Dead-letter storage for event log entries that could
-  not be delivered to the eventlog gRPC service.
+- **Event storage**: Primary storage for cluster audit, status, mutation,
+  usage, and resource events in the `events` and `event_objects` tables.
+  See [Events](events.md) for the full write-path, retention, and
+  metrics picture.
 
 Cluster operation headers and the per-node work queues were originally
 stored in etcd under `/sf/{op_type}/{uuid}`, `/sf/queue/{queue}/...`
@@ -41,7 +43,6 @@ etcd keys follow a hierarchical structure:
 /sf/                          # Root prefix for all Shaken Fist data
 /sf/object/{type}/{uuid}      # Object definitions
 /sf/attribute/{type}/{uuid}/  # Object attributes (state, placement, etc.)
-/sf/event/{type}/{uuid}/      # Event logs for objects
 /sflocks/                     # Distributed locks
 ```
 
