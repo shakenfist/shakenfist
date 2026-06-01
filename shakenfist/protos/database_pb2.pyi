@@ -893,6 +893,106 @@ class PruneEventsReply(google.protobuf.message.Message):
 global___PruneEventsReply = PruneEventsReply
 
 @typing.final
+class GetObjectEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    EVENT_TYPE_FILTER_FIELD_NUMBER: builtins.int
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    object_uuid: builtins.str
+    limit: builtins.int
+    event_type_filter: builtins.str
+    def __init__(
+        self,
+        *,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        object_uuid: builtins.str = ...,
+        limit: builtins.int = ...,
+        event_type_filter: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["event_type_filter", b"event_type_filter", "limit", b"limit", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___GetObjectEventsRequest = GetObjectEventsRequest
+
+@typing.final
+class EventReadRowProto(google.protobuf.message.Message):
+    """EventReadRowProto carries one row of the GetObjectEvents reply.
+    Named with the ``Proto`` suffix to avoid clashing with the pydantic
+    ``EventReadRow`` model in shakenfist.schema.event (same rename
+    convention as ``EventBatchEntry`` in phase 1b).
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENT_UUID_FIELD_NUMBER: builtins.int
+    EVENT_TYPE_FIELD_NUMBER: builtins.int
+    TIMESTAMP_FIELD_NUMBER: builtins.int
+    FQDN_FIELD_NUMBER: builtins.int
+    DURATION_FIELD_NUMBER: builtins.int
+    MESSAGE_FIELD_NUMBER: builtins.int
+    EXTRA_JSON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    event_uuid: builtins.str
+    event_type: builtins.str
+    timestamp: builtins.float
+    fqdn: builtins.str
+    duration: builtins.float
+    message: builtins.str
+    extra_json: builtins.str
+    request_id: builtins.str
+    def __init__(
+        self,
+        *,
+        event_uuid: builtins.str = ...,
+        event_type: builtins.str = ...,
+        timestamp: builtins.float = ...,
+        fqdn: builtins.str = ...,
+        duration: builtins.float = ...,
+        message: builtins.str = ...,
+        extra_json: builtins.str = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["duration", b"duration", "event_type", b"event_type", "event_uuid", b"event_uuid", "extra_json", b"extra_json", "fqdn", b"fqdn", "message", b"message", "request_id", b"request_id", "timestamp", b"timestamp"]) -> None: ...
+
+global___EventReadRowProto = EventReadRowProto
+
+@typing.final
+class GetObjectEventsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___EventReadRowProto]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[global___EventReadRowProto] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___GetObjectEventsReply = GetObjectEventsReply
+
+@typing.final
+class DeleteObjectEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    object_uuid: builtins.str
+    def __init__(
+        self,
+        *,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        object_uuid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+
+global___DeleteObjectEventsRequest = DeleteObjectEventsRequest
+
+@typing.final
 class GetObjectStateRequest(google.protobuf.message.Message):
     """Object State Operations (MariaDB)
     These operations manage object state in MariaDB, which is used for

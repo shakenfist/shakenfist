@@ -40,6 +40,10 @@ service DatabaseService {
   // gRPC target in phase 2.
   rpc RecordEventBatch (RecordEventBatchRequest) returns (StatusReply) {}
   rpc PruneEvents (PruneEventsRequest) returns (PruneEventsReply) {}
+  // Per-object read and delete paths replacing the legacy sqlite
+  // EventLog backend in phase 4.
+  rpc GetObjectEvents (GetObjectEventsRequest) returns (GetObjectEventsReply) {}
+  rpc DeleteObjectEvents (DeleteObjectEventsRequest) returns (StatusReply) {}
 
   // Object State Operations (MariaDB)
   rpc GetObjectState (GetObjectStateRequest) returns (GetObjectStateReply) {}
@@ -575,6 +579,37 @@ message PruneEventsReply {
   bool success = 1;
   string error = 2;
   int64 rows_pruned = 3;
+}
+
+message GetObjectEventsRequest {
+  ObjectType object_type = 1;
+  string object_uuid = 2;
+  int32 limit = 3;
+  string event_type_filter = 4;
+}
+
+// EventReadRowProto carries one row of the GetObjectEvents reply.
+// Named with the ``Proto`` suffix to avoid clashing with the pydantic
+// ``EventReadRow`` model in shakenfist.schema.event (same rename
+// convention as ``EventBatchEntry`` in phase 1b).
+message EventReadRowProto {
+  string event_uuid = 1;
+  string event_type = 2;
+  double timestamp = 3;
+  string fqdn = 4;
+  double duration = 5;
+  string message = 6;
+  string extra_json = 7;
+  string request_id = 8;
+}
+
+message GetObjectEventsReply {
+  repeated EventReadRowProto events = 1;
+}
+
+message DeleteObjectEventsRequest {
+  ObjectType object_type = 1;
+  string object_uuid = 2;
 }
 
 // Object State Operations (MariaDB)

@@ -147,6 +147,19 @@ class DatabaseServiceStub:
         database_pb2.PruneEventsReply,
     ]
 
+    GetObjectEvents: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetObjectEventsRequest,
+        database_pb2.GetObjectEventsReply,
+    ]
+    """Per-object read and delete paths replacing the legacy sqlite
+    EventLog backend in phase 4.
+    """
+
+    DeleteObjectEvents: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteObjectEventsRequest,
+        database_pb2.StatusReply,
+    ]
+
     GetObjectState: grpc.UnaryUnaryMultiCallable[
         database_pb2.GetObjectStateRequest,
         database_pb2.GetObjectStateReply,
@@ -1178,6 +1191,19 @@ class DatabaseServiceAsyncStub:
     PruneEvents: grpc.aio.UnaryUnaryMultiCallable[
         database_pb2.PruneEventsRequest,
         database_pb2.PruneEventsReply,
+    ]
+
+    GetObjectEvents: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetObjectEventsRequest,
+        database_pb2.GetObjectEventsReply,
+    ]
+    """Per-object read and delete paths replacing the legacy sqlite
+    EventLog backend in phase 4.
+    """
+
+    DeleteObjectEvents: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteObjectEventsRequest,
+        database_pb2.StatusReply,
     ]
 
     GetObjectState: grpc.aio.UnaryUnaryMultiCallable[
@@ -2260,6 +2286,23 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         request: database_pb2.PruneEventsRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.PruneEventsReply, collections.abc.Awaitable[database_pb2.PruneEventsReply]]: ...
+
+    @abc.abstractmethod
+    def GetObjectEvents(
+        self,
+        request: database_pb2.GetObjectEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetObjectEventsReply, collections.abc.Awaitable[database_pb2.GetObjectEventsReply]]:
+        """Per-object read and delete paths replacing the legacy sqlite
+        EventLog backend in phase 4.
+        """
+
+    @abc.abstractmethod
+    def DeleteObjectEvents(
+        self,
+        request: database_pb2.DeleteObjectEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
     @abc.abstractmethod
     def GetObjectState(

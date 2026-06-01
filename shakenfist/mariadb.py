@@ -6983,6 +6983,131 @@ def prune_events() -> int:
     return _direct_prune_events()
 
 
+def _grpc_get_object_events(
+        object_type: str, object_uuid: str, limit: int = 100,
+        event_type: Optional[str] = None) -> list[EventReadRow]:
+    """Fetch per-object events via the database microservice.
+
+    A per-object read should never legitimately take long; if it does
+    something is wrong upstream, so we bypass the standard
+    ``_grpc_call`` retry helper (which uses the short ``GRPC_TIMEOUT``)
+    and invoke the stub directly with a 30 second timeout. This is
+    the same pattern PruneEvents uses for its long-running call, just
+    inverted: PruneEvents needs longer than the default, this needs a
+    generous-but-not-infinite ceiling.
+
+    On RPC failure we log and return an empty list so REST callers
+    surface "no events" rather than crash; the actual error is in the
+    daemon log.
+    """
+    try:
+        stub = _get_database_stub()
+        if limit <= 0:
+            limit = 100
+        request = database_pb2.GetObjectEventsRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                ObjectType(object_type).proto_id),  # type: ignore[call-arg]
+            object_uuid=object_uuid,
+            limit=limit,
+            event_type_filter=event_type if event_type is not None else '',
+        )
+        reply = stub.GetObjectEvents(
+            request, timeout=30.0, wait_for_ready=True)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetObjectEvents failed: {e}')
+        return []
+
+    results: list[EventReadRow] = []
+    for entry in reply.events:
+        extra: Optional[dict[str, Any]]
+        if entry.extra_json:
+            try:
+                extra = json.loads(entry.extra_json)
+            except (ValueError, TypeError):
+                LOG.warning(
+                    f'Failed to decode extra JSON for event '
+                    f'{entry.event_uuid}; dropping payload.')
+                extra = None
+        else:
+            extra = None
+        results.append(EventReadRow(
+            event_uuid=entry.event_uuid,
+            event_type=entry.event_type,
+            timestamp=entry.timestamp,
+            fqdn=entry.fqdn,
+            duration=entry.duration if entry.duration != 0.0 else None,
+            message=entry.message,
+            extra=extra,
+            request_id=entry.request_id if entry.request_id else None,
+        ))
+    return results
+
+
+def _grpc_delete_object_events(
+        object_type: str, object_uuid: str) -> None:
+    """Delete per-object event references via the database microservice.
+
+    Invokes the stub directly with a 30 second timeout (same rationale
+    as ``_grpc_get_object_events``). On RPC failure we log a warning
+    but do not re-raise: hard_delete must not fail because an events
+    cleanup failed. The events row will be reaped by the daily prune
+    if it becomes an orphan.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteObjectEventsRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                ObjectType(object_type).proto_id),  # type: ignore[call-arg]
+            object_uuid=object_uuid,
+        )
+        reply = stub.DeleteObjectEvents(
+            request, timeout=30.0, wait_for_ready=True)
+        if not reply.success:
+            LOG.warning(
+                f'gRPC DeleteObjectEvents failed for '
+                f'{object_type}/{object_uuid}: {reply.error}')
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteObjectEvents failed for '
+            f'{object_type}/{object_uuid}: {e}')
+
+
+def get_object_events(
+        object_type: str, object_uuid: str,
+        limit: int = 100,
+        event_type: Optional[str] = None) -> list[EventReadRow]:
+    """Read events for one (object_type, object_uuid).
+
+    Routes via ``_use_database_service``: on sf-database itself runs
+    the direct SQL path; on every other daemon dispatches via the
+    database gRPC channel. Returns a list of ``EventReadRow`` ordered
+    by timestamp descending, capped per the limit-hardening rules
+    documented on ``_direct_get_object_events``.
+    """
+    if _use_database_service():
+        return _grpc_get_object_events(
+            object_type, object_uuid, limit, event_type)
+    return _direct_get_object_events(
+        object_type, object_uuid, limit, event_type)
+
+
+def delete_object_events(object_type: str, object_uuid: str) -> None:
+    """Delete event_objects rows for one (object_type, object_uuid).
+
+    Routes via ``_use_database_service``. Called from
+    ``baseobject.DatabaseBackedObject.hard_delete`` to clean up an
+    object's event references. The events rows themselves remain
+    alive if other objects still reference them; orphans are reaped
+    by the daily prune.
+    """
+    if _use_database_service():
+        _grpc_delete_object_events(object_type, object_uuid)
+        return
+    _direct_delete_object_events(object_type, object_uuid)
+
+
 # =============================================================================
 # IPAM Reservation Direct Access Functions
 # These are used by the database daemon for atomic IP address reservation.

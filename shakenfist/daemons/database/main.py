@@ -4295,6 +4295,64 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.PruneEventsReply(
                 success=False, error=str(e), rows_pruned=0)
 
+    def GetObjectEvents(
+        self,
+        request: database_pb2.GetObjectEventsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetObjectEventsReply:
+        """Read events for one (object_type, object_uuid) directly."""
+        try:
+            self.monitor.counters['get_object_events'].inc()
+            ot = ObjectType.from_proto_id(request.object_type)
+            if ot is None:
+                # Invalid object_type proto id -- return an empty list.
+                return database_pb2.GetObjectEventsReply(events=[])
+            rows = mariadb._direct_get_object_events(
+                object_type=ot.value,
+                object_uuid=request.object_uuid,
+                limit=request.limit if request.limit else 100,
+                event_type=(request.event_type_filter
+                            if request.event_type_filter else None))
+            proto_rows = []
+            for row in rows:
+                proto_rows.append(database_pb2.EventReadRowProto(
+                    event_uuid=row.event_uuid,
+                    event_type=row.event_type,
+                    timestamp=row.timestamp,
+                    fqdn=row.fqdn,
+                    duration=row.duration if row.duration is not None else 0.0,
+                    message=row.message,
+                    extra_json=(
+                        json.dumps(row.extra) if row.extra is not None else ''),
+                    request_id=row.request_id if row.request_id is not None else '',
+                ))
+            return database_pb2.GetObjectEventsReply(events=proto_rows)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetObjectEvents failed', e)
+            return database_pb2.GetObjectEventsReply(events=[])
+
+    def DeleteObjectEvents(
+        self,
+        request: database_pb2.DeleteObjectEventsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete event_objects rows for one (object_type, object_uuid)."""
+        try:
+            self.monitor.counters['delete_object_events'].inc()
+            ot = ObjectType.from_proto_id(request.object_type)
+            if ot is None:
+                return database_pb2.StatusReply(
+                    success=False, error='Invalid object_type')
+            mariadb._direct_delete_object_events(
+                object_type=ot.value, object_uuid=request.object_uuid)
+            return database_pb2.StatusReply(success=True, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteObjectEvents failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     def GetClusterOperationTarget(
         self,
         request: database_pb2.GetClusterOperationTargetRequest,
@@ -4955,6 +5013,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'enqueue_event_dlq', 'drain_event_dlq',
             'delete_event_dlq', 'get_event_dlq_count',
             'record_event_batch', 'prune_events',
+            'get_object_events', 'delete_object_events',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state',
