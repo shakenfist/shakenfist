@@ -161,7 +161,7 @@ daily orphan sweep removes it.
 
 The events subsystem exposes the following Prometheus metrics.
 All sf-database metrics are scraped from `DATABASE_METRICS_PORT`
-(default 13005). Per-daemon metrics are scraped from each
+(default 13006). Per-daemon metrics are scraped from each
 daemon's own metrics port.
 
 | Metric | Type | Source daemon | Description |
