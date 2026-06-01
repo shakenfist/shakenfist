@@ -18,6 +18,3 @@ sf_config_template_path: "unknown"
 
 # register
 # ...
-
-# create_admin_namespace
-eventlog_node_ip: "127.0.0.1"

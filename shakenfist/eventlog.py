@@ -22,9 +22,6 @@ from shakenfist import eventlog_spool
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import config
-from shakenfist.protos import event_pb2
-from shakenfist.protos import event_pb2_grpc
-from shakenfist.util import callstack as util_callstack
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import json as util_json
 
@@ -122,74 +119,6 @@ def add_event(
         event_type, [(object_type, object_uuid)], message, duration=duration,
         extra=extra, suppress_event_logging=suppress_event_logging,
         log_as_error=log_as_error)
-
-
-def _add_event_multi_inner(
-        event_type: str,
-        log: Any,
-        timestamp: float,
-        simpler_objects: list[tuple[str, Union[str, uuid.UUID]]],
-        message: str,
-        duration: Optional[float] = None,
-        extra: Optional[dict[str, Any]] = None,
-        correlation_id: Optional[str] = None
-) -> None:
-    # Attempt to send with the newer EventMultiRequest
-    # NOTE: correlation_id is not yet supported via gRPC - it will be written
-    # directly to sqlite when the eventlog daemon processes the request.
-    try:
-        channel = get_eventlog_client()
-        stub = event_pb2_grpc.EventServiceStub(channel)
-
-        request = event_pb2.EventMultiRequest(
-            event_type=event_type,
-            timestamp=timestamp,
-            fqdn=config.NODE_NAME,
-            duration=duration,
-            message=message,
-            extra=util_json.json_dump(extra)
-        )
-
-        for object_type, object_uuid in simpler_objects:
-            if not object_uuid:
-                continue
-
-            try:
-                eo = request.objects.add()
-                eo.object_type = str(object_type)
-                eo.object_uuid = str(object_uuid)
-            except TypeError as e:
-                log.warning(
-                    f'Failed to add event for {object_type} with uuid '
-                    f'{object_uuid}: {e}')
-
-        # 30 s with ``wait_for_ready=True`` blocks the caller waiting for
-        # the eventlog server to come back when it has gone away, which
-        # is exactly the case during a coordinated shutdown: another
-        # daemon's record_exit() can sit on this call long enough that
-        # systemd's TimeoutStopSec=30 s SIGKILLs the whole daemon before
-        # the gRPC times out. Failing fast (5 s, wait_for_ready=False)
-        # is fine because the outer ``add_event_multi`` falls through
-        # to the DLQ on any RpcError, and the cooldown cache then
-        # short-circuits subsequent events at this same node until the
-        # server is back.
-        response = stub.RecordMultiEvent(
-            request, timeout=5, wait_for_ready=False)
-        if response.ack:
-            return
-
-    except grpc.RpcError as e:
-        if e.code().name == 'UNAVAILABLE':
-            log.debug('Server unavailable')
-
-        elif e.code().name == 'UNIMPLEMENTED':
-            log.debug('Server does not support multi event with gRPC, '
-                      'trying single events')
-        else:
-            log.info('Unknown server error while sending multi event with gRPC, '
-                     'trying single events: %s' % e)
-
-        raise e
 
 
 def _add_event_dlq_inner(
@@ -321,40 +250,10 @@ def add_event_multi(
         if eventlog_spool.enqueue(payload):
             return
 
-    # *** Note that the APIs are different here!
-    # If force_event_dlq is set, skip gRPC and go directly to the dead letter
-    # queue. This is used during daemon startup to avoid circular dependencies.
-    #
-    # We also check if the eventlog service has been marked as unavailable due
-    # to a recent failure. If so, we skip gRPC and go to DLQ to avoid slow
-    # retries on every event. The cooldown period allows the service time to
-    # recover before we try again.
-    if (not config.EVENTLOG_SUPPRESS_GRPC and not get_force_event_dlq()
-            and _is_eventlog_available()):
-        # If your eventlog server isn't setup, we get cranky. Note that this
-        # happens during unit test discovery for py3 unit tests.
-        if not config.EVENTLOG_NODE_IP:
-            caller = util_callstack.generate_traceback()
-            log.error(
-                'Cannot record event, no configured server! Caller was:\n'
-                f'{caller}')
-            return
-
-        # Try gRPC once. If it fails, mark the service as unavailable and fall
-        # through to the dead letter queue. This avoids slow retries when the
-        # service is down.
-        try:
-            _add_event_multi_inner(
-                event_type, log, timestamp, simpler_objects, message,
-                duration=duration, extra=extra, correlation_id=correlation_id)
-            return
-        except grpc.RpcError as e:
-            log.info('Failed to send event with gRPC, marking eventlog service '
-                     f'unavailable for {EVENTLOG_UNAVAILABLE_COOLDOWN}s and '
-                     f'using dead letter queue: {e}')
-            _mark_eventlog_unavailable()
-
-    # And then the dead letter queue for the remainders
+    # Spool init failed or hit its high-water mark; fall through to the
+    # MariaDB dead-letter queue. The legacy direct-gRPC path to sf-eventlog
+    # is gone in phase 5 -- the DLQ itself, the cooldown cache, and this
+    # whole DLQ fallback are scheduled for deletion in step 5c.
     _add_event_dlq_inner(
         event_type, log, timestamp, simpler_objects, message,
         duration=duration, extra=extra, correlation_id=correlation_id)

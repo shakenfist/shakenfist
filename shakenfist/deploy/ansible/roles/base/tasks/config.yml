@@ -123,18 +123,6 @@
     mode: ugo+r
   notify: Reload systemd
 
-- name: Write systemd unit for eventlog daemon
-  template:
-    src: files/sf.service
-    dest: /etc/systemd/system/sf-eventlog.service
-    owner: root
-    group: root
-    mode: ugo+r
-  vars:
-    item: eventlog
-  when: inventory_hostname in groups.get('eventlog_node', [])
-  notify: Reload systemd
-
 - name: Write systemd unit for database daemon
   template:
     src: files/sf.service

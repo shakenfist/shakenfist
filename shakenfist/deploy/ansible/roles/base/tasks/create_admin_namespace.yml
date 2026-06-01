@@ -5,5 +5,4 @@
         bootstrap-system-key deploy {{ system_key }}
   environment:
     SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
-    SHAKENFIST_EVENTLOG_NODE_IP: "{{ eventlog_node_ip }}"
   run_once: true
