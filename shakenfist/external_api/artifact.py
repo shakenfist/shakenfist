@@ -551,7 +551,6 @@ class ArtifactEventsEndpoint(api_base.Resource):
     @arg_is_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
-    @api_base.redirect_to_eventlog_node
     def get(self, artifact_ref=None, event_type=None, limit=100, artifact_from_db=None):
         return [
             row.model_dump(mode='json')

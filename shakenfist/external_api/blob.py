@@ -279,7 +279,6 @@ class BlobEventsEndpoint(api_base.Resource):
          (404, 'Blob not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
-    @api_base.redirect_to_eventlog_node
     def get(self, blob_uuid=None, event_type=None, limit=100):
         return [
             row.model_dump(mode='json')

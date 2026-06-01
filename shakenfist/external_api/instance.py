@@ -1099,7 +1099,6 @@ class InstanceEventsEndpoint(api_base.Resource):
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
     def get(self, instance_ref=None, event_type=None, limit=100, instance_from_db=None):
         return [

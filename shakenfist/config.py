@@ -140,10 +140,6 @@ class SFConfig(BaseSettings):
     )
 
     # Monitoring Options
-    EVENTLOG_METRICS_PORT: int = Field(
-        13002,
-        description='Where to expose internal metrics from the eventlog daemon.'
-    )
     RESOURCES_METRICS_PORT: int = Field(
         13001,
         description='Where to expose internal metrics from the resources daemon.'
@@ -329,16 +325,6 @@ class SFConfig(BaseSettings):
         )
     )
 
-    # Event options
-    EVENTLOG_NODE_IP: str = Field(
-        '',
-        description='Mesh IP of the node which stores event logs.',
-    )
-    EVENTLOG_API_PORT: int = Field(
-        13003,
-        description='Port for the internal eventlog gRPC API.'
-    )
-
     # Database Service Options
     DATABASE_NODE_IP: str = Field(
         '',
@@ -436,10 +422,6 @@ class SFConfig(BaseSettings):
     NODE_IS_NETWORK_NODE: bool = Field(
         False,
         description='True if this node is the network node.'
-    )
-    NODE_IS_EVENTLOG_NODE: bool = Field(
-        False,
-        description='True if this node is a the eventlog node.'
     )
 
     DISK_BUS: str = Field(

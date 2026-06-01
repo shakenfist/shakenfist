@@ -17,8 +17,8 @@
 [mysqld]
 
 # 1 GiB buffer pool keeps the working set in memory for our write
-# volume (cluster_operations, object_states, work_queue, eventlog
-# fan-out). Debian's 128 MiB default forces the buffer pool to spill
+# volume (cluster_operations, object_states, work_queue, events).
+# Debian's 128 MiB default forces the buffer pool to spill
 # under our typical 20-30 ops/sec write rate, which we observed as
 # per-query latency growing from ~5 ms to ~200-400 ms under burst
 # load.

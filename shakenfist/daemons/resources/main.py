@@ -58,7 +58,7 @@ class Monitor(daemon.Daemon):
                 'is_etcd_master': False,
                 'is_hypervisor': config.NODE_IS_HYPERVISOR,
                 'is_network_node': config.NODE_IS_NETWORK_NODE,
-                'is_eventlog_node': config.NODE_IS_EVENTLOG_NODE,
+                'is_eventlog_node': False,
             }
 
             # CPU info

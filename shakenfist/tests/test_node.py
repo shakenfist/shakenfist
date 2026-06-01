@@ -1034,7 +1034,6 @@ class NodeObserveThisNodeTestCase(base.ShakenFistTestCase):
         mock_config.NODE_MESH_IP = TEST_IP
         mock_config.NODE_IS_HYPERVISOR = True
         mock_config.NODE_IS_NETWORK_NODE = False
-        mock_config.NODE_IS_EVENTLOG_NODE = False
         mock_load_uuid.return_value = TEST_UUID_STR
 
         node_data = NodeData(
@@ -1083,7 +1082,6 @@ class NodeObserveThisNodeTestCase(base.ShakenFistTestCase):
         mock_config.NODE_MESH_IP = TEST_IP
         mock_config.NODE_IS_HYPERVISOR = False
         mock_config.NODE_IS_NETWORK_NODE = False
-        mock_config.NODE_IS_EVENTLOG_NODE = False
         mock_load_uuid.return_value = None
 
         # this_node() returns None (no persisted UUID, FQDN not found)

@@ -170,7 +170,6 @@ class NodeEventsEndpoint(api_base.Resource):
          (404, 'Node not found.', None)]))
     @api_base.verify_token
     @api_base.caller_is_admin
-    @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
     def get(self, node=None, event_type=None, limit=100):
         n = Node.from_db(node, suppress_failure_audit=True)
