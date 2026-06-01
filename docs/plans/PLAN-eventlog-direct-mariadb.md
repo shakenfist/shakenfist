@@ -267,15 +267,18 @@ to re-litigate them.
    sizes we are writing. No content-hash dedup table —
    event payloads do not have blob-like dedup ratios.
 
-2. **DLQ removal.** Removed. The spool is the durability
-   boundary; the bootstrap chicken-and-egg is fully covered
-   (events generated during sf-database startup sit in the
-   spool until the drainer's channel comes up). The
-   `event_dlq` table, accessors, and DATA_MIGRATIONS entry
-   are removed in phase 6. The etcd→DLQ legacy migration
-   (`_migrate_etcd_event_dlq`) is kept for one release for
-   operators upgrading through this version, and is
-   removed in the release after.
+2. **DLQ removal.** Removed in full in phase 5. The spool
+   is the durability boundary; the bootstrap chicken-and-
+   egg is fully covered (events generated during
+   sf-database startup sit in the spool until the
+   drainer's channel comes up). The `event_dlq` table,
+   accessors, DATA_MIGRATIONS entry, and the
+   `_migrate_etcd_event_dlq` legacy etcd-drain migration
+   all go in phase 5. The single operating deployment
+   upgrades all nodes together in a coordinated outage,
+   so the "preserve the migration for one release" hedge
+   that an earlier draft of this decision had is not
+   needed.
 
 3. **Prune cadence.** Daily, run from the cluster daemon's
    periodic-maintenance loop (the `scheduled_tasks` module
@@ -630,10 +633,11 @@ implemented because the following statements will be true:
   maintenance loop, honours the existing eight
   `MAX_{TYPE}_EVENT_AGE` configs, and correctly handles
   multi-object events.
-* The MariaDB `event_dlq` table is removed; the
-  `_migrate_etcd_event_dlq` migration is preserved for
-  one release cycle and filed under Future work for
-  deletion in the next release.
+* The MariaDB `event_dlq` table, all its accessors, the
+  DATA_MIGRATIONS entry, and the
+  `_migrate_etcd_event_dlq` legacy migration are all
+  removed in phase 5. Nothing is preserved for
+  upgrade-compatibility.
 * Historic sqlite event data is **not** migrated; the
   operator-visible loss of pre-cutover history is
   documented in `docs/operator_guide/eventlog.md` and
@@ -686,9 +690,6 @@ implemented because the following statements will be true:
 - **Cursor-style pagination.** Phase 4 keeps the existing
   `limit`-only API for client compatibility. A follow-on
   can add cursor pagination once a client wants it.
-- **Deletion of `_migrate_etcd_event_dlq`.** Kept for one
-  release after phase 6 ships; remove in the release
-  after to retire the last etcd-DLQ codepath.
 
 ### Bugs fixed during this work
 
