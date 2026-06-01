@@ -63,7 +63,7 @@ dependencies = [
     "grpcio==1.70.0",                     # apache2
     "grpcio-status==1.70.0",              # apache2
     "grpcio-tools==1.70.0",               # apache2
-    "googleapis-common-protos==1.70.0",   # apache2
+    "googleapis-common-protos==1.75.0",   # apache2
 
     "requests==2.33.1",                   # apache2
     "requests-toolbelt==1.0.0",           # apache2
