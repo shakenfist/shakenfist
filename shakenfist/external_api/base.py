@@ -21,6 +21,7 @@ from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -601,6 +602,22 @@ def suppress_exceptions_to_client(func):
                                 suppress_traceback=True)
 
     return wrapper
+
+
+def object_events_response(object_type, object_uuid, limit, event_type):
+    """Build the per-object events REST response.
+
+    Shared by the /{instance,artifact,network,node,blob}/<u>/events
+    endpoints: each handler does authn / authz / object lookup, then
+    delegates the read-and-shape step here so the wire-format change
+    only happens in one place.
+    """
+    return [
+        row.model_dump(mode='json')
+        for row in mariadb.get_object_events(
+            object_type, object_uuid,
+            limit=limit, event_type=event_type)
+    ]
 
 
 class Resource(flask_restful.Resource):

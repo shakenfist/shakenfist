@@ -280,12 +280,8 @@ class BlobEventsEndpoint(api_base.Resource):
     @api_base.verify_token
     @api_base.log_token_use
     def get(self, blob_uuid=None, event_type=None, limit=100):
-        return [
-            row.model_dump(mode='json')
-            for row in mariadb.get_object_events(
-                'blob', blob_uuid,
-                limit=limit, event_type=event_type)
-        ]
+        return api_base.object_events_response(
+            'blob', blob_uuid, limit, event_type)
 
 
 class BlobChecksumEndpoint(api_base.Resource):
