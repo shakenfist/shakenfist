@@ -67,8 +67,64 @@ _drainer_thread: Optional['_DrainerThread'] = None
 _drainer_lock = threading.Lock()
 
 
-def _build_records(batch: list[tuple[int, dict]]) -> list[EventRecord]:
+def _build_single_record(payload: dict) -> EventRecord:
+    """Translate one spool payload dict into an ``EventRecord``.
+
+    May raise on a malformed payload; the caller in ``_build_records``
+    isolates the failure to a single spool row.
+    """
+    extra_raw = payload.get('extra')
+    extra_dict: Optional[dict] = None
+    if extra_raw:
+        try:
+            extra_dict = json.loads(extra_raw)
+        except (TypeError, ValueError):
+            extra_dict = None
+
+    request_id = payload.get('request_id')
+    if not request_id and extra_dict is not None:
+        request_id = extra_dict.get('request-id') or None
+
+    objects: list[tuple[str, str]] = []
+    for obj in payload.get('objects', []) or []:
+        if isinstance(obj, dict):
+            objects.append(
+                (str(obj.get('object_type', '')),
+                 str(obj.get('object_uuid', ''))))
+        else:
+            objects.append((str(obj[0]), str(obj[1])))
+
+    return EventRecord(
+        event_uuid=(payload.get('event_uuid')
+                    or sf_random.random_id()),
+        event_type=payload.get('event_type', ''),
+        timestamp=payload.get('timestamp', 0.0),
+        fqdn=payload.get('fqdn', ''),
+        duration=payload.get('duration') or None,
+        message=payload.get('message', ''),
+        extra=extra_dict,
+        request_id=request_id,
+        objects=objects,
+    )
+
+
+def _build_records(
+        batch: list[tuple[int, dict]]
+) -> tuple[list[EventRecord], list[int], list[int]]:
     """Translate spool rows into ``EventRecord`` instances.
+
+    Returns a triple ``(records, good_ids, poison_ids)``:
+
+    * ``records`` is the list of successfully translated EventRecords,
+      aligned with ``good_ids`` -- ``records[i]`` came from spool row
+      ``good_ids[i]``.
+    * ``poison_ids`` is the list of spool ids whose payload failed to
+      translate (KeyError, ValueError parsing extra, pydantic
+      validation failure, etc.). The caller drops these from the spool
+      immediately; holding them forever would block every later event
+      behind the same poison row, but dropping the whole batch on the
+      first bad row would punish the healthy events. Per-row
+      granularity preserves the rest of the batch.
 
     Handles the upgrade case where in-flight rows may have been
     written before the phase 2a payload-shape change:
@@ -83,42 +139,23 @@ def _build_records(batch: list[tuple[int, dict]]) -> list[EventRecord]:
       'object_uuid': ...}`` dicts (current shape) or a list of
       ``(object_type, object_uuid)`` tuples (older shape).
     """
-    records = []
-    for _row_id, payload in batch:
-        extra_raw = payload.get('extra')
-        extra_dict: Optional[dict] = None
-        if extra_raw:
-            try:
-                extra_dict = json.loads(extra_raw)
-            except (TypeError, ValueError):
-                extra_dict = None
-
-        request_id = payload.get('request_id')
-        if not request_id and extra_dict is not None:
-            request_id = extra_dict.get('request-id') or None
-
-        objects: list[tuple[str, str]] = []
-        for obj in payload.get('objects', []) or []:
-            if isinstance(obj, dict):
-                objects.append(
-                    (str(obj.get('object_type', '')),
-                     str(obj.get('object_uuid', ''))))
-            else:
-                objects.append((str(obj[0]), str(obj[1])))
-
-        records.append(EventRecord(
-            event_uuid=(payload.get('event_uuid')
-                        or sf_random.random_id()),
-            event_type=payload.get('event_type', ''),
-            timestamp=payload.get('timestamp', 0.0),
-            fqdn=payload.get('fqdn', ''),
-            duration=payload.get('duration') or None,
-            message=payload.get('message', ''),
-            extra=extra_dict,
-            request_id=request_id,
-            objects=objects,
-        ))
-    return records
+    records: list[EventRecord] = []
+    good_ids: list[int] = []
+    poison_ids: list[int] = []
+    for row_id, payload in batch:
+        try:
+            record = _build_single_record(payload)
+        except Exception as e:
+            LOG.with_fields({
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'spool_row_id': row_id,
+            }).error('Eventlog drainer dropping poison spool row')
+            poison_ids.append(row_id)
+            continue
+        records.append(record)
+        good_ids.append(row_id)
+    return records, good_ids, poison_ids
 
 
 class _DrainerThread(threading.Thread):
@@ -200,29 +237,23 @@ class _DrainerThread(threading.Thread):
         if not batch:
             return 0
 
-        try:
-            records = _build_records(batch)
-        except Exception as e:
-            # If we can't even build the records (malformed spool
-            # row), there's nothing the database can do for us.
-            # Log and drop the batch -- holding it forever would
-            # block every later event behind the same poison row.
-            LOG.with_fields({
-                'error': str(e),
-                'error_type': type(e).__name__,
-                'batch_size': len(batch),
-            }).error(
-                'Eventlog drainer failed to build records; '
-                'dropping batch')
-            spool.delete_ids(row_id for row_id, _ in batch)
+        records, good_ids, poison_ids = _build_records(batch)
+        if poison_ids:
+            # Drop the poison rows from the spool now so a single bad
+            # payload can't wedge the drainer forever. Healthy
+            # siblings in the same batch continue through the normal
+            # RPC path below.
+            spool.delete_ids(poison_ids)
+
+        if not records:
             return 0
 
         if mariadb.record_event_batch(records):
-            # Success. Clear the rows from the spool and reset
+            # Success. Clear the good rows from the spool and reset
             # the backoff so the next failure starts at INITIAL.
-            spool.delete_ids(row_id for row_id, _ in batch)
+            spool.delete_ids(good_ids)
             self._backoff = BACKOFF_INITIAL
-            return len(batch)
+            return len(records)
 
         # Failure. Leave the batch in the spool for retry on the
         # next tick and back off.

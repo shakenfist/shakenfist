@@ -52,7 +52,7 @@ class BuildRecordsTestCase(
             'request_id': 'req-abc',
             'objects': [],
         }
-        records = eventlog_drainer._build_records([(7, payload)])
+        records, _, _ = eventlog_drainer._build_records([(7, payload)])
 
         self.assertEqual(1, len(records))
         rec = records[0]
@@ -77,7 +77,7 @@ class BuildRecordsTestCase(
             'timestamp': 9999.0,
             'objects': [],
         }
-        records = eventlog_drainer._build_records([(3, payload)])
+        records, _, _ = eventlog_drainer._build_records([(3, payload)])
 
         self.assertEqual(1, len(records))
         rec = records[0]
@@ -109,7 +109,7 @@ class BuildRecordsTestCase(
                 {'object_type': 'network', 'object_uuid': 'u2'},
             ],
         }
-        records = eventlog_drainer._build_records([(1, payload)])
+        records, _, _ = eventlog_drainer._build_records([(1, payload)])
 
         rec = records[0]
         self.assertEqual(2, len(rec.objects))
@@ -128,7 +128,7 @@ class BuildRecordsTestCase(
             'request_id': None,
             'objects': [('instance', 'u3'), ('network', 'u4')],
         }
-        records = eventlog_drainer._build_records([(2, payload)])
+        records, _, _ = eventlog_drainer._build_records([(2, payload)])
 
         rec = records[0]
         self.assertEqual(2, len(rec.objects))
@@ -147,7 +147,7 @@ class BuildRecordsTestCase(
             'request_id': None,
             'objects': [],
         }
-        records = eventlog_drainer._build_records([(5, payload)])
+        records, _, _ = eventlog_drainer._build_records([(5, payload)])
         self.assertIsNone(records[0].extra)
 
     def test_extra_json_dict_is_decoded(self):
@@ -162,7 +162,7 @@ class BuildRecordsTestCase(
             'request_id': None,
             'objects': [],
         }
-        records = eventlog_drainer._build_records([(6, payload)])
+        records, _, _ = eventlog_drainer._build_records([(6, payload)])
         self.assertEqual({'key': 'value', 'n': 42}, records[0].extra)
 
     def test_duration_propagated(self):
@@ -178,7 +178,7 @@ class BuildRecordsTestCase(
             'request_id': None,
             'objects': [],
         }
-        records = eventlog_drainer._build_records([(8, payload)])
+        records, _, _ = eventlog_drainer._build_records([(8, payload)])
         self.assertAlmostEqual(3.5, records[0].duration, places=5)
 
     def test_multiple_rows_in_one_call(self):
@@ -195,10 +195,48 @@ class BuildRecordsTestCase(
                 'request_id': None, 'objects': [],
             }),
         ]
-        records = eventlog_drainer._build_records(rows)
+        records, good_ids, poison_ids = eventlog_drainer._build_records(rows)
         self.assertEqual(2, len(records))
+        self.assertEqual([1, 2], good_ids)
+        self.assertEqual([], poison_ids)
         self.assertEqual('first', records[0].message)
         self.assertEqual('second', records[1].message)
+
+    def test_poison_row_partitioned_separately(self):
+        """A bad row goes to poison_ids; siblings are still in records.
+
+        Verifies the per-row tolerance added for review item #5: previously
+        an exception on any row aborted the whole translation; now each
+        row is wrapped in its own try/except so a single poison payload
+        cannot drop healthy peers in the same batch.
+        """
+        rows = [
+            (10, {
+                'event_uuid': 'good-1', 'event_type': 'audit', 'fqdn': 's',
+                'message': 'ok', 'extra': None, 'timestamp': 1.0,
+                'request_id': None, 'objects': [],
+            }),
+            (11, {
+                'event_uuid': 'bad-1', 'event_type': 'audit', 'fqdn': 's',
+                'message': 'malformed', 'extra': None, 'timestamp': 2.0,
+                'request_id': None,
+                # int is not subscriptable -> TypeError on obj[0].
+                'objects': [42],
+            }),
+            (12, {
+                'event_uuid': 'good-2', 'event_type': 'audit', 'fqdn': 's',
+                'message': 'ok', 'extra': None, 'timestamp': 3.0,
+                'request_id': None, 'objects': [],
+            }),
+        ]
+        records, good_ids, poison_ids = eventlog_drainer._build_records(rows)
+
+        self.assertEqual(2, len(records))
+        self.assertEqual([10, 12], good_ids)
+        self.assertEqual([11], poison_ids)
+        self.assertEqual(
+            ['good-1', 'good-2'],
+            [r.event_uuid for r in records])
 
 
 class DrainOneBatchTestCase(
@@ -284,24 +322,70 @@ class DrainOneBatchTestCase(
         self.assertGreater(after_two, after_one)
         self.assertLessEqual(after_two, eventlog_drainer.BACKOFF_MAX)
 
-    def test_poison_row_drops_batch_and_returns_zero(self):
-        """If _build_records raises, the batch is dropped rather than
-        wedging the drainer forever.
+    def test_poison_row_dropped_per_row_siblings_survive(self):
+        """A single bad spool row is dropped on its own; sibling healthy
+        rows still flow through the RPC. Verifies the per-row tolerance
+        added for review item #5: previously the whole batch was dropped
+        on the first bad row, punishing the healthy 99 with the poison 1.
         """
-        self._enqueue(2)
+        # Enqueue one healthy row, then one poison row, then another
+        # healthy row.
+        spool = eventlog_spool.get_spool()
+        spool.enqueue({
+            'event_uuid': 'good-1', 'event_type': 'audit', 'fqdn': 's',
+            'message': 'first', 'extra': None, 'timestamp': 1.0,
+            'request_id': None, 'objects': [],
+        })
+        spool.enqueue({
+            'event_uuid': 'poison-1', 'event_type': 'audit', 'fqdn': 's',
+            'message': 'malformed', 'extra': None, 'timestamp': 2.0,
+            'request_id': None,
+            # The else-branch of the object loop subscripts obj[0] /
+            # obj[1]; an int is not subscriptable and raises TypeError
+            # per row, so this row goes to poison_ids.
+            'objects': [42],
+        })
+        spool.enqueue({
+            'event_uuid': 'good-2', 'event_type': 'audit', 'fqdn': 's',
+            'message': 'third', 'extra': None, 'timestamp': 3.0,
+            'request_id': None, 'objects': [],
+        })
 
         with mock.patch(
-                'shakenfist.eventlog_drainer._build_records',
-                side_effect=ValueError('malformed payload')) as mock_build, \
-                mock.patch(
-                    'shakenfist.eventlog_drainer.mariadb.'
-                    'record_event_batch') as mock_rpc:
+                'shakenfist.eventlog_drainer.mariadb.'
+                'record_event_batch',
+                return_value=True) as mock_rpc:
             drained = self.thread._drain_one_batch()
 
-        mock_build.assert_called_once()
-        mock_rpc.assert_not_called()
+        # The two healthy rows made it through the RPC.
+        self.assertEqual(2, drained)
+        mock_rpc.assert_called_once()
+        rpc_batch = mock_rpc.call_args[0][0]
+        self.assertEqual(2, len(rpc_batch))
+        self.assertEqual(
+            ['good-1', 'good-2'],
+            [r.event_uuid for r in rpc_batch])
+        # The poison row is dropped from the spool too.
+        self.assertEqual(0, eventlog_spool.get_spool().count())
+
+    def test_all_poison_batch_returns_zero_no_rpc(self):
+        """If every row in the batch is poison the RPC is skipped and the
+        spool is cleared. The drainer doesn't wedge on a fully-bad batch.
+        """
+        spool = eventlog_spool.get_spool()
+        spool.enqueue({
+            'event_uuid': 'p1', 'event_type': 'audit', 'fqdn': 's',
+            'message': 'bad', 'extra': None, 'timestamp': 1.0,
+            'request_id': None, 'objects': [42],
+        })
+
+        with mock.patch(
+                'shakenfist.eventlog_drainer.mariadb.'
+                'record_event_batch') as mock_rpc:
+            drained = self.thread._drain_one_batch()
+
         self.assertEqual(0, drained)
-        # Poison rows were removed from spool (drop path).
+        mock_rpc.assert_not_called()
         self.assertEqual(0, eventlog_spool.get_spool().count())
 
     def test_stop_event_exits_cleanly(self):
