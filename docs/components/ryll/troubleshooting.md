@@ -147,6 +147,29 @@ live in `ryll/src/streaming_state.rs` and are tuned for the
 session-005 flap pattern. Open an issue if a different
 workload trips them too easily or not easily enough.
 
+### JPEG decoder backend selection
+
+MJPEG video streams are decoded by a per-platform JPEG decoder
+selected at display-channel startup. The active backend is
+exposed in bug reports as `mjpeg_decoder_backend` in the
+`channel-state.json` display-channel snapshot. Selection priority:
+
+- **macOS**: ImageIO (Apple Silicon's dedicated media block
+  when available)
+- **Windows**: WIC (hardware codec support where available)
+- **Linux**: VA-API (hardware-accelerated JPEG via libva,
+  probed at runtime if installed)
+- **Fallback**: libjpeg-turbo via the vendored `mozjpeg` crate
+- **Last resort**: Pure-Rust `jpeg-decoder` crate
+
+If MJPEG video is decoding slowly or using excessive CPU,
+check the `mjpeg_decoder_backend` field in a bug report (F12,
+Display category). If the backend is `jpeg-decoder` (pure Rust)
+on a platform that normally supports hardware acceleration, it
+indicates the hardware codec was unavailable at startup. On
+Linux, install `libva-dev` and ensure a render node exists at
+`/dev/dri/renderD128` for VA-API support.
+
 ## Input Issues
 
 ### Keyboard input not working
@@ -598,6 +621,49 @@ IDs and per-device byte counts) and `device_connect_total` /
 `device_disconnect_total` (connection event counts). For file-share issues,
 the `webdav` section includes `http_requests_received` (HTTP request count)
 and `active_session_count` (currently-open connections).
+
+## Guest agent diagnostics
+
+The main channel tracks the responsiveness of the guest agent (vdagent) by
+sending periodic liveness probes and measuring the round-trip time of replies.
+Every 30 seconds, ryll re-sends the guest agent a `VD_AGENT_MONITORS_CONFIG`
+message (the display layout); the agent acknowledges with `VD_AGENT_REPLY`.
+The lag between send and reply (in microseconds) measures how quickly the
+agent can respond to requests. If the agent fails to reply for more than
+5 seconds, a Warn notification appears in the status panel. This mechanism
+helps diagnose guest agent freezes without log parsing.
+
+**The probe is dormant until the first `VD_AGENT_MONITORS_CONFIG` send.** That
+first send happens on session bring-up once display geometry is known, or on
+any window resize. In a freshly-connected session with no resize activity (or
+in headless mode where geometry is fixed), `agent_request_count` may stay at
+zero for a while before the probe starts firing — that does not indicate an
+unhealthy agent.
+
+**Agent reply-lag fields in `MainSnapshot` (visible in Connection bug reports):**
+
+| Field | Meaning |
+|-------|---------|
+| `agent_request_count` | Cumulative liveness probes sent (increments every ~30s when connected). |
+| `agent_reply_count` | Cumulative `VD_AGENT_REPLY` messages received. Should equal `agent_request_count` on a healthy agent (off by at most one in flight). |
+| `agent_reply_error_count` | Replies with non-zero error code. Should be zero on a healthy agent. |
+| `last_agent_reply_ts_secs` | Session-relative seconds of the most recent REPLY. |
+| `last_agent_reply_lag_us` | Microseconds between most recent probe send and matched REPLY. Healthy agents reply in well under 100 ms. |
+| `recent_agent_reply_lag_us` | Ring of the last 16 reply-lag measurements (in microseconds) for detecting trends. Use min/max/mean to spot when responsiveness degrades. |
+| `outstanding_agent_request_count` | Number of probes sent without a matched REPLY yet. Zero on healthy agents; persistently > 0 indicates a stuck or unresponsive agent. |
+
+**Interpreting Warn notifications:**
+
+When `outstanding_agent_request_count > 0` continuously for more than 5
+seconds after a probe, a Warn notification fires every 60 seconds (to keep
+the notification panel quiet during sustained stalls). The message reads
+like `"Guest agent is not replying — last send was 5.3s ago, 1 request
+outstanding"` (elapsed time is formatted to one decimal place; `request`
+vs `requests` is pluralised by count). The elapsed time is measured against
+the most recent send, not the oldest outstanding request, so the actual
+silence may be longer than the number reports. This indicates the guest
+agent has stopped responding to configuration requests and may require a
+reboot or diagnosis on the server side.
 
 ## Auto-snapshot mode for intermittent issues
 

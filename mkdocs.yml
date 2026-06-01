@@ -276,6 +276,7 @@ nav:
                 - "Bug-report trigger-time snapshot (2026-04-23)": components/ryll/plans/PLAN-bugreport-trigger-snapshot.md
                 - "Capture mode for protocol and display debugging": components/ryll/plans/PLAN-capture.md
                 - "CI platform-matrix expansion": components/ryll/plans/PLAN-ci-platform-matrix.md
+                - "Completed phase plans": components/ryll/plans/completed/README.md
                 - "Connection properties dialog": components/ryll/plans/PLAN-connection-properties.md
                 - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
                 - "Deferred debt: collating and paying down outstanding work": components/ryll/plans/PLAN-deferred-debt.md
@@ -290,6 +291,7 @@ nav:
                 - "Macbook bug-report fixes (2026-04-23)": components/ryll/plans/PLAN-macbook-bugreport-fixes.md
                 - "macOS runtime metrics for bug reports": components/ryll/plans/PLAN-macos-runtime-metrics.md
                 - "Notifications system": components/ryll/plans/PLAN-notifications.md
+                - "Open questions awaiting data": components/ryll/plans/OPEN-QUESTIONS.md
                 - "Paste-as-keystrokes fallback": components/ryll/plans/PLAN-paste-as-keystrokes.md
                 - "Phase 01: Auto-snapshot ring buffer at disconnect moment": components/ryll/plans/PLAN-session-001-feedback-phase-01-disconnect-snapshot.md
                 - "Phase 01: Idle CPU profile": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile.md
@@ -303,12 +305,12 @@ nav:
                 - "Phase 09: Connection events in the notifications pane (F1)": components/ryll/plans/PLAN-session-001-feedback-phase-09-connection-notifications.md
                 - "Phase 1 — always fit window to guest surface": components/ryll/plans/PLAN-display-window-sizing-phase-01-always-fit.md
                 - "Phase 1 — PR 31 follow-up: regression tests": components/ryll/plans/PLAN-pr31-followup-phase-01-tests.md
-                - "Phase 1 — STREAM_REPORT": components/ryll/plans/PLAN-stream-caps-and-flap-phase-01-stream-report.md
+                - "Phase 1 — STREAM_REPORT": components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report.md
                 - "Phase 1 — trigger-snapshot metadata plumbing": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-01-metadata.md
                 - "Phase 10: Notification → bug-report button (F2)": components/ryll/plans/PLAN-session-001-feedback-phase-10-notification-bug-button.md
                 - "Phase 10: Testing and QEMU setup": components/ryll/plans/PLAN-usb-redir-phase-10-testing.md
                 - "Phase 11 — Remove spurious-PONG keepalive": components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md
-                - "Phase 12 — Bounded image cache": components/ryll/plans/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache.md
+                - "Phase 12 — Bounded image cache": components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache.md
                 - "Phase 13 — Investigate intermittent server-side streaming": components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md
                 - "Phase 14 — Stop status-bar pointer events leaking into the guest": components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak.md
                 - "Phase 15 — Track down `build_tcp_frame: payload too large` warns": components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn.md
@@ -372,7 +374,7 @@ nav:
                 - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
                 - "Phase 3: WebRTC plumbing (`webrtc-rs`)": components/ryll/plans/PLAN-web-frontend-phase-03-webrtc.md
-                - "Phase 4 — Channel diagnostics audit + playback observability": components/ryll/plans/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics.md
+                - "Phase 4 — Channel diagnostics audit + playback observability": components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics.md
                 - "Phase 4 — documentation": components/ryll/plans/PLAN-display-window-sizing-phase-04-docs.md
                 - "Phase 4 — documentation": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs.md
                 - "Phase 4: COPY_BITS": components/ryll/plans/PLAN-display-draw-ops-phase-04-copy-bits.md
@@ -423,6 +425,7 @@ nav:
                 - "Phase 8: Documentation": components/ryll/plans/PLAN-usb-ui-phase-08-docs.md
                 - "Phase 8: Native TLS + operator docs + systemd": components/ryll/plans/PLAN-web-frontend-phase-08-docs.md
                 - "Phase 8: UI integration and CLI flags": components/ryll/plans/PLAN-usb-redir-phase-08-ui.md
+                - "Phase 9 — Vdagent responsiveness probe": components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe.md
                 - "Phase 9: Interrupt transfers": components/ryll/plans/PLAN-usb-redir-phase-09-interrupt.md
                 - "Phase 9: Thread live bug-report handles to the pedantic observer": components/ryll/plans/PLAN-display-draw-ops-phase-09-pedantic-handles.md
                 - "Plan: Port Ryll SPICE Client to Rust": components/ryll/plans/PLAN-initial.md

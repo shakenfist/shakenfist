@@ -51,6 +51,45 @@ Out of scope:
 None. This is straight removal; the only risk is K1 reproducing,
 which 11C's soak rules out.
 
+## Inputs-channel `send_idle_keepalive` (discovered during 11A)
+
+Sub-agent execution of 11A surfaced that
+`shakenfist-spice-renderer/src/channels/inputs.rs` has its own
+`send_idle_keepalive` from commit `f39f2e3b` (session-001 phase
+02). It uses a different mechanism (KEY_MODIFIERS restatement,
+not a spurious PONG with stage 0) and was added under a
+different hypothesis (cross-channel idleness: keep inputs busy
+to also keep main alive).
+
+Decision: **keep it.** Rationale:
+
+- Unlike main's PONG-with-stage-0, the inputs restatement does
+  NOT leak any visible warning to the server log — KEY_MODIFIERS
+  is a legitimate idempotent client→server message.
+- The cross-channel-idleness hypothesis from the original
+  session-001 phase 02 work was never empirically disproven,
+  just deferred. With K1 fixed via the main-channel path, the
+  inputs path is now low-cost defense-in-depth (one byte every
+  10 s when idle).
+- The "fix the root cause, drop the band-aid" principle that
+  drove 11A applies less cleanly here because (a) the inputs
+  keepalive is non-spurious from a protocol standpoint (it's
+  a real idempotent message, not a forged PONG to a non-
+  existent PING), and (b) cost is genuinely negligible.
+
+If a future per-channel-timeout investigation shows the inputs
+keepalive is also redundant, it can be removed at that point
+under its own ticket. No action in this phase.
+
+## 11A: stale doc reference fixed
+
+11A's sub-agent missed `docs/channel-diagnostics-audit.md`'s
+description of main-channel diagnostics, which still listed
+`client_keepalive_send_count` as a current field. Fixed
+post-hoc alongside the inputs-keepalive decision write-up
+above; the audit doc now points readers at this plan for the
+inputs / main split.
+
 ## Success criteria
 
 - `make build && make test && make lint && pre-commit run --all-files` clean.
