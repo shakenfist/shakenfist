@@ -17,7 +17,6 @@ Shaken Fist runs several daemons on each cluster node:
 |--------|---------|------|
 | `sf-api` | REST API server (Flask/Gunicorn) | 13000 |
 | `sf-database` | Database microservice (MariaDB access) | 13005 |
-| `sf-eventlog` | Event logging service | 13009 |
 | `sf-cleaner` | Resource cleanup | - |
 | `sf-cluster` | Cluster maintenance | - |
 | `sf-net` | Network daemon | - |
@@ -62,7 +61,9 @@ Shaken Fist runs several daemons on each cluster node:
                         |  locks,     |
                         |  cluster    |
                         |  config,    |
-                        |  event DLQ) |
+                        |  events,    |
+                        |  event_     |
+                        |  objects)   |
                         +-------------+
 ```
 
@@ -170,9 +171,8 @@ either claim distinct rows or one gets nothing.
 Creating a cluster operation is atomic: the `CreateAndEnqueueCluster`
 gRPC RPC writes the `cluster_operations` row, the `object_states`
 row, and the `work_queue` row in a single MariaDB transaction.
-Audit events are published out-of-band through the normal eventlog
-gRPC service path, which falls back to the MariaDB ``event_dlq``
-table for failure recovery.
+Audit events are written directly into MariaDB via the local
+spool drainer's `mariadb.record_event_batch` call.
 
 The cluster daemon runs
 `reap_stuck_cluster_operation_jobs()` from

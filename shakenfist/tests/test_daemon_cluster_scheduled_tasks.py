@@ -311,3 +311,44 @@ class ProcessPerBlobQueueTestCase(base.ShakenFistTestCase):
         self.assertEqual(dbo.STATE_CREATED, blob._state_value)
         mock_get_targets.assert_not_called()
         mock_create_and_enqueue.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# prune_events scheduled-task wiring tests
+# ---------------------------------------------------------------------------
+
+class ClusterPruneEventsScheduledTaskTestCase(base.ShakenFistTestCase):
+    """Tests for the scheduled_tasks.prune_events() wrapper.
+
+    The wrapper is a thin shim: call mariadb.prune_events(), log the
+    row count at info level, and swallow any exception with a warning log.
+    These tests verify the shim behaves correctly without touching
+    real MariaDB or gRPC.
+    """
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.prune_events',
+                return_value=42)
+    def test_prune_events_calls_mariadb_and_logs_row_count(
+            self, mock_prune):
+        """prune_events() calls mariadb.prune_events and logs the returned count."""
+        with mock.patch.object(st.LOG, 'info') as mock_log_info:
+            st.prune_events()
+
+        mock_prune.assert_called_once()
+        # At least one log call should mention the row count.
+        log_messages = ' '.join(
+            str(call[0][0]) for call in mock_log_info.call_args_list
+        )
+        self.assertIn('42', log_messages)
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.prune_events',
+                side_effect=Exception('db offline'))
+    def test_prune_events_handles_exception(self, mock_prune):
+        """prune_events() catches exceptions and logs a warning without re-raising."""
+        with mock.patch.object(st.LOG, 'warning') as mock_log_warn:
+            # Must not raise.
+            st.prune_events()
+
+        mock_log_warn.assert_called_once()
+        warn_msg = str(mock_log_warn.call_args[0][0])
+        self.assertIn('failed', warn_msg.lower())

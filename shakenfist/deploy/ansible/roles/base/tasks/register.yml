@@ -29,13 +29,6 @@
         --node-mesh-ip "{{ node_mesh_ip }}"
   delegate_to: "{{ groups['etcd_master'][0] }}"
 
-- name: Register the eventlog daemon if it runs on this node
-  shell: |
-    /srv/shakenfist/venv/bin/sf-ctl register-daemon eventlog \
-        --node-name "{{ node_name }}"
-  delegate_to: "{{ groups['etcd_master'][0] }}"
-  when: inventory_hostname in groups.get('eventlog_node', [])
-
 - name: Register the database daemon if it runs on this node
   shell: |
     /srv/shakenfist/venv/bin/sf-ctl register-daemon database \
@@ -75,14 +68,6 @@
     - sentinel-first
     - privexec
     - nodelock
-
-- name: Now the the eventlog daemon
-  service:
-    name: "sf-eventlog"
-    enabled: yes
-    state: restarted
-    daemon_reload: no
-  when: inventory_hostname in groups.get('eventlog_node', [])
 
 # TODO(mikal): this is a bit wrong. Some of these should only come up
 # on nodes which are either a network node, hypervisor, or storage

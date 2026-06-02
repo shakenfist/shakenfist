@@ -18,7 +18,6 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 
 from shakenfist import baseobject
-from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist.network import network
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -402,11 +401,10 @@ class NetworkEventsEndpoint(api_base.Resource):
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
     def get(self, network_ref=None, event_type=None, limit=100, network_from_db=None):
-        with eventlog.EventLog('network', network_from_db.uuid) as eventdb:
-            return list(eventdb.read_events(limit=limit, event_type=event_type))
+        return api_base.object_events_response(
+            'network', network_from_db.uuid, limit, event_type)
 
 
 network_interfaces_example = """{

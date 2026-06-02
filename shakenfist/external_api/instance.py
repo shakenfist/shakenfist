@@ -42,7 +42,6 @@ from shakenfist.schema.operations.node_inst_netdesc_op \
     import create_and_enqueue as nino_create_and_enqueue
 from shakenfist.schema.operations.node_inst_netdesc_op \
     import model_tasks as nino_tasks
-from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.network import network as sfnet
@@ -1099,11 +1098,10 @@ class InstanceEventsEndpoint(api_base.Resource):
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
     def get(self, instance_ref=None, event_type=None, limit=100, instance_from_db=None):
-        with eventlog.EventLog('instance', instance_from_db.uuid) as eventdb:
-            return list(eventdb.read_events(limit=limit, event_type=event_type))
+        return api_base.object_events_response(
+            'instance', instance_from_db.uuid, limit, event_type)
 
 
 class InstanceRebootSoftEndpoint(api_base.Resource):

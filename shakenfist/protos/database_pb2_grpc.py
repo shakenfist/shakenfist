@@ -124,25 +124,25 @@ class DatabaseServiceStub(object):
                 request_serializer=database__pb2.SetClusterConfigRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
-        self.EnqueueEventDlq = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/EnqueueEventDlq',
-                request_serializer=database__pb2.EnqueueEventDlqRequest.SerializeToString,
+        self.RecordEventBatch = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/RecordEventBatch',
+                request_serializer=database__pb2.RecordEventBatchRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
-        self.DrainEventDlq = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/DrainEventDlq',
-                request_serializer=database__pb2.DrainEventDlqRequest.SerializeToString,
-                response_deserializer=database__pb2.DrainEventDlqReply.FromString,
+        self.PruneEvents = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/PruneEvents',
+                request_serializer=database__pb2.PruneEventsRequest.SerializeToString,
+                response_deserializer=database__pb2.PruneEventsReply.FromString,
                 _registered_method=True)
-        self.DeleteEventDlq = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/DeleteEventDlq',
-                request_serializer=database__pb2.DeleteEventDlqRequest.SerializeToString,
+        self.GetObjectEvents = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetObjectEvents',
+                request_serializer=database__pb2.GetObjectEventsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetObjectEventsReply.FromString,
+                _registered_method=True)
+        self.DeleteObjectEvents = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteObjectEvents',
+                request_serializer=database__pb2.DeleteObjectEventsRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
-                _registered_method=True)
-        self.GetEventDlqCount = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/GetEventDlqCount',
-                request_serializer=database__pb2.GetEventDlqCountRequest.SerializeToString,
-                response_deserializer=database__pb2.GetEventDlqCountReply.FromString,
                 _registered_method=True)
         self.GetObjectState = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/GetObjectState',
@@ -1065,26 +1065,30 @@ class DatabaseServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def EnqueueEventDlq(self, request, context):
-        """Event DLQ
+    def RecordEventBatch(self, request, context):
+        """Event Storage (MariaDB)
+        Direct write path for batches of events; replaces the sf-eventlog
+        gRPC target in phase 2.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def DrainEventDlq(self, request, context):
+    def PruneEvents(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def DeleteEventDlq(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+    def GetObjectEvents(self, request, context):
+        """Per-object read and delete paths replacing the legacy sqlite
+        EventLog backend in phase 4.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetEventDlqCount(self, request, context):
+    def DeleteObjectEvents(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2224,25 +2228,25 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.SetClusterConfigRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
-            'EnqueueEventDlq': grpc.unary_unary_rpc_method_handler(
-                    servicer.EnqueueEventDlq,
-                    request_deserializer=database__pb2.EnqueueEventDlqRequest.FromString,
+            'RecordEventBatch': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordEventBatch,
+                    request_deserializer=database__pb2.RecordEventBatchRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
-            'DrainEventDlq': grpc.unary_unary_rpc_method_handler(
-                    servicer.DrainEventDlq,
-                    request_deserializer=database__pb2.DrainEventDlqRequest.FromString,
-                    response_serializer=database__pb2.DrainEventDlqReply.SerializeToString,
+            'PruneEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.PruneEvents,
+                    request_deserializer=database__pb2.PruneEventsRequest.FromString,
+                    response_serializer=database__pb2.PruneEventsReply.SerializeToString,
             ),
-            'DeleteEventDlq': grpc.unary_unary_rpc_method_handler(
-                    servicer.DeleteEventDlq,
-                    request_deserializer=database__pb2.DeleteEventDlqRequest.FromString,
+            'GetObjectEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetObjectEvents,
+                    request_deserializer=database__pb2.GetObjectEventsRequest.FromString,
+                    response_serializer=database__pb2.GetObjectEventsReply.SerializeToString,
+            ),
+            'DeleteObjectEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteObjectEvents,
+                    request_deserializer=database__pb2.DeleteObjectEventsRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
-            ),
-            'GetEventDlqCount': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetEventDlqCount,
-                    request_deserializer=database__pb2.GetEventDlqCountRequest.FromString,
-                    response_serializer=database__pb2.GetEventDlqCountReply.SerializeToString,
             ),
             'GetObjectState': grpc.unary_unary_rpc_method_handler(
                     servicer.GetObjectState,
@@ -3547,7 +3551,7 @@ class DatabaseService(object):
             _registered_method=True)
 
     @staticmethod
-    def EnqueueEventDlq(request,
+    def RecordEventBatch(request,
             target,
             options=(),
             channel_credentials=None,
@@ -3560,8 +3564,8 @@ class DatabaseService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/shakenfist.protos.DatabaseService/EnqueueEventDlq',
-            database__pb2.EnqueueEventDlqRequest.SerializeToString,
+            '/shakenfist.protos.DatabaseService/RecordEventBatch',
+            database__pb2.RecordEventBatchRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,
@@ -3574,7 +3578,7 @@ class DatabaseService(object):
             _registered_method=True)
 
     @staticmethod
-    def DrainEventDlq(request,
+    def PruneEvents(request,
             target,
             options=(),
             channel_credentials=None,
@@ -3587,9 +3591,9 @@ class DatabaseService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/shakenfist.protos.DatabaseService/DrainEventDlq',
-            database__pb2.DrainEventDlqRequest.SerializeToString,
-            database__pb2.DrainEventDlqReply.FromString,
+            '/shakenfist.protos.DatabaseService/PruneEvents',
+            database__pb2.PruneEventsRequest.SerializeToString,
+            database__pb2.PruneEventsReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -3601,7 +3605,7 @@ class DatabaseService(object):
             _registered_method=True)
 
     @staticmethod
-    def DeleteEventDlq(request,
+    def GetObjectEvents(request,
             target,
             options=(),
             channel_credentials=None,
@@ -3614,36 +3618,36 @@ class DatabaseService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/shakenfist.protos.DatabaseService/DeleteEventDlq',
-            database__pb2.DeleteEventDlqRequest.SerializeToString,
+            '/shakenfist.protos.DatabaseService/GetObjectEvents',
+            database__pb2.GetObjectEventsRequest.SerializeToString,
+            database__pb2.GetObjectEventsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteObjectEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteObjectEvents',
+            database__pb2.DeleteObjectEventsRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def GetEventDlqCount(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/GetEventDlqCount',
-            database__pb2.GetEventDlqCountRequest.SerializeToString,
-            database__pb2.GetEventDlqCountReply.FromString,
             options,
             channel_credentials,
             insecure,

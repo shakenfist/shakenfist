@@ -58,7 +58,7 @@ class Monitor(daemon.Daemon):
                 'is_etcd_master': False,
                 'is_hypervisor': config.NODE_IS_HYPERVISOR,
                 'is_network_node': config.NODE_IS_NETWORK_NODE,
-                'is_eventlog_node': config.NODE_IS_EVENTLOG_NODE,
+                'is_eventlog_node': False,
             }
 
             # CPU info
@@ -321,11 +321,6 @@ class Monitor(daemon.Daemon):
                     'networknode_queue_processing': networknode_processing,
                     'networknode_queue_waiting': networknode_waiting,
                     'networknode_queue_deferred': networknode_deferred
-                })
-
-            if config.NODE_IS_EVENTLOG_NODE:
-                retval.update({
-                    'events_waiting': mariadb.get_event_dlq_count(),
                 })
 
             # What object versions do we support?

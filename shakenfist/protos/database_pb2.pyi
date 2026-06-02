@@ -654,128 +654,215 @@ class SetClusterConfigRequest(google.protobuf.message.Message):
 global___SetClusterConfigRequest = SetClusterConfigRequest
 
 @typing.final
-class EnqueueEventDlqRequest(google.protobuf.message.Message):
-    """Event DLQ"""
+class EventBatchObject(google.protobuf.message.Message):
+    """Event Storage (MariaDB)
+    Batch write path for events plus their per-object references.
+    `duration = 0` and empty `extra_json`/`request_id` encode "absent"
+    and are mapped to SQL NULL on insert.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     OBJECT_TYPE_FIELD_NUMBER: builtins.int
     OBJECT_UUID_FIELD_NUMBER: builtins.int
-    EVENT_TIMESTAMP_FIELD_NUMBER: builtins.int
-    EVENT_JSON_FIELD_NUMBER: builtins.int
-    object_type: builtins.str
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
     object_uuid: builtins.str
-    event_timestamp: builtins.float
-    event_json: builtins.str
-    """JSON-encoded event dict"""
     def __init__(
         self,
         *,
-        object_type: builtins.str = ...,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         object_uuid: builtins.str = ...,
-        event_timestamp: builtins.float = ...,
-        event_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["event_json", b"event_json", "event_timestamp", b"event_timestamp", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
 
-global___EnqueueEventDlqRequest = EnqueueEventDlqRequest
+global___EventBatchObject = EventBatchObject
 
 @typing.final
-class DrainEventDlqRequest(google.protobuf.message.Message):
+class EventBatchEntry(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    EVENT_UUID_FIELD_NUMBER: builtins.int
+    EVENT_TYPE_FIELD_NUMBER: builtins.int
+    TIMESTAMP_FIELD_NUMBER: builtins.int
+    FQDN_FIELD_NUMBER: builtins.int
+    DURATION_FIELD_NUMBER: builtins.int
+    MESSAGE_FIELD_NUMBER: builtins.int
+    EXTRA_JSON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    OBJECTS_FIELD_NUMBER: builtins.int
+    event_uuid: builtins.str
+    event_type: builtins.str
+    timestamp: builtins.float
+    fqdn: builtins.str
+    duration: builtins.float
+    message: builtins.str
+    extra_json: builtins.str
+    request_id: builtins.str
+    @property
+    def objects(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___EventBatchObject]: ...
+    def __init__(
+        self,
+        *,
+        event_uuid: builtins.str = ...,
+        event_type: builtins.str = ...,
+        timestamp: builtins.float = ...,
+        fqdn: builtins.str = ...,
+        duration: builtins.float = ...,
+        message: builtins.str = ...,
+        extra_json: builtins.str = ...,
+        request_id: builtins.str = ...,
+        objects: collections.abc.Iterable[global___EventBatchObject] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["duration", b"duration", "event_type", b"event_type", "event_uuid", b"event_uuid", "extra_json", b"extra_json", "fqdn", b"fqdn", "message", b"message", "objects", b"objects", "request_id", b"request_id", "timestamp", b"timestamp"]) -> None: ...
+
+global___EventBatchEntry = EventBatchEntry
+
+@typing.final
+class RecordEventBatchRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___EventBatchEntry]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[global___EventBatchEntry] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___RecordEventBatchRequest = RecordEventBatchRequest
+
+@typing.final
+class PruneEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PruneEventsRequest = PruneEventsRequest
+
+@typing.final
+class PruneEventsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
+    ROWS_PRUNED_FIELD_NUMBER: builtins.int
+    success: builtins.bool
+    error: builtins.str
+    rows_pruned: builtins.int
+    def __init__(
+        self,
+        *,
+        success: builtins.bool = ...,
+        error: builtins.str = ...,
+        rows_pruned: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error", b"error", "rows_pruned", b"rows_pruned", "success", b"success"]) -> None: ...
+
+global___PruneEventsReply = PruneEventsReply
+
+@typing.final
+class GetObjectEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: builtins.int
+    OBJECT_UUID_FIELD_NUMBER: builtins.int
     LIMIT_FIELD_NUMBER: builtins.int
+    EVENT_TYPE_FILTER_FIELD_NUMBER: builtins.int
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
+    object_uuid: builtins.str
     limit: builtins.int
+    event_type_filter: builtins.str
     def __init__(
         self,
         *,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        object_uuid: builtins.str = ...,
         limit: builtins.int = ...,
+        event_type_filter: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["limit", b"limit"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["event_type_filter", b"event_type_filter", "limit", b"limit", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
 
-global___DrainEventDlqRequest = DrainEventDlqRequest
+global___GetObjectEventsRequest = GetObjectEventsRequest
 
 @typing.final
-class DrainEventDlqEntry(google.protobuf.message.Message):
+class EventReadRowProto(google.protobuf.message.Message):
+    """EventReadRowProto carries one row of the GetObjectEvents reply.
+    Named with the ``Proto`` suffix to avoid clashing with the pydantic
+    ``EventReadRow`` model in shakenfist.schema.event (same rename
+    convention as ``EventBatchEntry`` in phase 1b).
+    """
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    ID_FIELD_NUMBER: builtins.int
+    EVENT_UUID_FIELD_NUMBER: builtins.int
+    EVENT_TYPE_FIELD_NUMBER: builtins.int
+    TIMESTAMP_FIELD_NUMBER: builtins.int
+    FQDN_FIELD_NUMBER: builtins.int
+    DURATION_FIELD_NUMBER: builtins.int
+    MESSAGE_FIELD_NUMBER: builtins.int
+    EXTRA_JSON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    event_uuid: builtins.str
+    event_type: builtins.str
+    timestamp: builtins.float
+    fqdn: builtins.str
+    duration: builtins.float
+    message: builtins.str
+    extra_json: builtins.str
+    request_id: builtins.str
+    def __init__(
+        self,
+        *,
+        event_uuid: builtins.str = ...,
+        event_type: builtins.str = ...,
+        timestamp: builtins.float = ...,
+        fqdn: builtins.str = ...,
+        duration: builtins.float = ...,
+        message: builtins.str = ...,
+        extra_json: builtins.str = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["duration", b"duration", "event_type", b"event_type", "event_uuid", b"event_uuid", "extra_json", b"extra_json", "fqdn", b"fqdn", "message", b"message", "request_id", b"request_id", "timestamp", b"timestamp"]) -> None: ...
+
+global___EventReadRowProto = EventReadRowProto
+
+@typing.final
+class GetObjectEventsReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___EventReadRowProto]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[global___EventReadRowProto] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___GetObjectEventsReply = GetObjectEventsReply
+
+@typing.final
+class DeleteObjectEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     OBJECT_TYPE_FIELD_NUMBER: builtins.int
     OBJECT_UUID_FIELD_NUMBER: builtins.int
-    EVENT_JSON_FIELD_NUMBER: builtins.int
-    id: builtins.int
-    object_type: builtins.str
+    object_type: shakenfist_enums_pb2.ObjectType.ValueType
     object_uuid: builtins.str
-    event_json: builtins.str
-    """JSON-encoded event dict"""
     def __init__(
         self,
         *,
-        id: builtins.int = ...,
-        object_type: builtins.str = ...,
+        object_type: shakenfist_enums_pb2.ObjectType.ValueType = ...,
         object_uuid: builtins.str = ...,
-        event_json: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["event_json", b"event_json", "id", b"id", "object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["object_type", b"object_type", "object_uuid", b"object_uuid"]) -> None: ...
 
-global___DrainEventDlqEntry = DrainEventDlqEntry
-
-@typing.final
-class DrainEventDlqReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    ENTRIES_FIELD_NUMBER: builtins.int
-    @property
-    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DrainEventDlqEntry]: ...
-    def __init__(
-        self,
-        *,
-        entries: collections.abc.Iterable[global___DrainEventDlqEntry] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
-
-global___DrainEventDlqReply = DrainEventDlqReply
-
-@typing.final
-class DeleteEventDlqRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    IDS_FIELD_NUMBER: builtins.int
-    @property
-    def ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
-    def __init__(
-        self,
-        *,
-        ids: collections.abc.Iterable[builtins.int] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["ids", b"ids"]) -> None: ...
-
-global___DeleteEventDlqRequest = DeleteEventDlqRequest
-
-@typing.final
-class GetEventDlqCountRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___GetEventDlqCountRequest = GetEventDlqCountRequest
-
-@typing.final
-class GetEventDlqCountReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    COUNT_FIELD_NUMBER: builtins.int
-    count: builtins.int
-    def __init__(
-        self,
-        *,
-        count: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["count", b"count"]) -> None: ...
-
-global___GetEventDlqCountReply = GetEventDlqCountReply
+global___DeleteObjectEventsRequest = DeleteObjectEventsRequest
 
 @typing.final
 class GetObjectStateRequest(google.protobuf.message.Message):

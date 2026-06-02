@@ -34,10 +34,26 @@ from typing import Any
 from typing import Iterable
 from typing import Optional
 
+from prometheus_client import Counter
+from prometheus_client import Gauge
 from shakenfist_utilities import logs
 
 
 LOG, _ = logs.setup(__name__)
+
+
+# Module-scope Prometheus metrics. ``prometheus_client`` uses a
+# single process-wide default registry, so every daemon that
+# imports ``eventlog.py`` (which transitively imports this
+# module) exposes these on its existing metrics endpoint with no
+# per-daemon bootstrap.
+EVENTLOG_SPOOL_DROPPED = Counter(
+    'eventlog_spool_dropped_total',
+    'Events dropped at the spool high-water mark.')
+
+EVENTLOG_SPOOL_DEPTH = Gauge(
+    'eventlog_spool_depth',
+    'Rows currently pending in the local eventlog spool.')
 
 
 # All spool files live under this root so an operator (or a
@@ -62,8 +78,10 @@ SPOOL_HIGH_WATER_MARK = 100_000
 _spool: Optional['Spool'] = None
 _spool_lock = threading.Lock()
 
-# Counters surfaced via logs for the drop path -- the spool
-# does not own a metrics endpoint, the host daemon does.
+# Local mirror of the drop counter so the "log every 100 drops"
+# diagnostic remains independent of the prometheus_client
+# Counter's internal representation. The authoritative count for
+# operators is ``EVENTLOG_SPOOL_DROPPED``.
 _dropped_total = 0
 
 
@@ -367,6 +385,7 @@ def enqueue(payload: dict[str, Any]) -> bool:
         return False
     if spool.enqueue(payload):
         return True
+    EVENTLOG_SPOOL_DROPPED.inc()
     _dropped_total += 1
     # Log every 100th drop at WARN to avoid flooding under
     # sustained drop conditions, but make sure operators see
@@ -380,6 +399,30 @@ def enqueue(payload: dict[str, Any]) -> bool:
         }).warning(
             'Eventlog spool over high-water mark; dropping event')
     return False
+
+
+def _sample_depth() -> int:
+    """Prometheus scrape callback for ``EVENTLOG_SPOOL_DEPTH``.
+
+    Sampled on each ``/metrics`` scrape rather than tracked
+    incrementally so we avoid races between enqueue and dequeue
+    paths and pay the ``SELECT COUNT(*)`` cost at most once per
+    scrape interval (operator-controlled, typically 15-60 s).
+    Returns 0 if the spool is uninitialised or if the underlying
+    sqlite query raises transiently -- a metrics endpoint that
+    breaks on a sampler error is worse than one that briefly
+    reports zero.
+    """
+    spool = get_spool()
+    if spool is None:
+        return 0
+    try:
+        return spool.count()
+    except Exception:
+        return 0
+
+
+EVENTLOG_SPOOL_DEPTH.set_function(_sample_depth)
 
 
 def reset_for_tests() -> None:

@@ -112,25 +112,31 @@ class DatabaseServiceStub:
         database_pb2.StatusReply,
     ]
 
-    EnqueueEventDlq: grpc.UnaryUnaryMultiCallable[
-        database_pb2.EnqueueEventDlqRequest,
+    RecordEventBatch: grpc.UnaryUnaryMultiCallable[
+        database_pb2.RecordEventBatchRequest,
         database_pb2.StatusReply,
     ]
-    """Event DLQ"""
+    """Event Storage (MariaDB)
+    Direct write path for batches of events; replaces the sf-eventlog
+    gRPC target in phase 2.
+    """
 
-    DrainEventDlq: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DrainEventDlqRequest,
-        database_pb2.DrainEventDlqReply,
+    PruneEvents: grpc.UnaryUnaryMultiCallable[
+        database_pb2.PruneEventsRequest,
+        database_pb2.PruneEventsReply,
     ]
 
-    DeleteEventDlq: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteEventDlqRequest,
+    GetObjectEvents: grpc.UnaryUnaryMultiCallable[
+        database_pb2.GetObjectEventsRequest,
+        database_pb2.GetObjectEventsReply,
+    ]
+    """Per-object read and delete paths replacing the legacy sqlite
+    EventLog backend in phase 4.
+    """
+
+    DeleteObjectEvents: grpc.UnaryUnaryMultiCallable[
+        database_pb2.DeleteObjectEventsRequest,
         database_pb2.StatusReply,
-    ]
-
-    GetEventDlqCount: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetEventDlqCountRequest,
-        database_pb2.GetEventDlqCountReply,
     ]
 
     GetObjectState: grpc.UnaryUnaryMultiCallable[
@@ -1131,25 +1137,31 @@ class DatabaseServiceAsyncStub:
         database_pb2.StatusReply,
     ]
 
-    EnqueueEventDlq: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.EnqueueEventDlqRequest,
+    RecordEventBatch: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.RecordEventBatchRequest,
         database_pb2.StatusReply,
     ]
-    """Event DLQ"""
+    """Event Storage (MariaDB)
+    Direct write path for batches of events; replaces the sf-eventlog
+    gRPC target in phase 2.
+    """
 
-    DrainEventDlq: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DrainEventDlqRequest,
-        database_pb2.DrainEventDlqReply,
+    PruneEvents: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.PruneEventsRequest,
+        database_pb2.PruneEventsReply,
     ]
 
-    DeleteEventDlq: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteEventDlqRequest,
+    GetObjectEvents: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.GetObjectEventsRequest,
+        database_pb2.GetObjectEventsReply,
+    ]
+    """Per-object read and delete paths replacing the legacy sqlite
+    EventLog backend in phase 4.
+    """
+
+    DeleteObjectEvents: grpc.aio.UnaryUnaryMultiCallable[
+        database_pb2.DeleteObjectEventsRequest,
         database_pb2.StatusReply,
-    ]
-
-    GetEventDlqCount: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetEventDlqCountRequest,
-        database_pb2.GetEventDlqCountReply,
     ]
 
     GetObjectState: grpc.aio.UnaryUnaryMultiCallable[
@@ -2187,33 +2199,39 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
 
     @abc.abstractmethod
-    def EnqueueEventDlq(
+    def RecordEventBatch(
         self,
-        request: database_pb2.EnqueueEventDlqRequest,
+        request: database_pb2.RecordEventBatchRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
-        """Event DLQ"""
+        """Event Storage (MariaDB)
+        Direct write path for batches of events; replaces the sf-eventlog
+        gRPC target in phase 2.
+        """
 
     @abc.abstractmethod
-    def DrainEventDlq(
+    def PruneEvents(
         self,
-        request: database_pb2.DrainEventDlqRequest,
+        request: database_pb2.PruneEventsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.DrainEventDlqReply, collections.abc.Awaitable[database_pb2.DrainEventDlqReply]]: ...
+    ) -> typing.Union[database_pb2.PruneEventsReply, collections.abc.Awaitable[database_pb2.PruneEventsReply]]: ...
 
     @abc.abstractmethod
-    def DeleteEventDlq(
+    def GetObjectEvents(
         self,
-        request: database_pb2.DeleteEventDlqRequest,
+        request: database_pb2.GetObjectEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[database_pb2.GetObjectEventsReply, collections.abc.Awaitable[database_pb2.GetObjectEventsReply]]:
+        """Per-object read and delete paths replacing the legacy sqlite
+        EventLog backend in phase 4.
+        """
+
+    @abc.abstractmethod
+    def DeleteObjectEvents(
+        self,
+        request: database_pb2.DeleteObjectEventsRequest,
         context: _ServicerContext,
     ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
-
-    @abc.abstractmethod
-    def GetEventDlqCount(
-        self,
-        request: database_pb2.GetEventDlqCountRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetEventDlqCountReply, collections.abc.Awaitable[database_pb2.GetEventDlqCountReply]]: ...
 
     @abc.abstractmethod
     def GetObjectState(

@@ -417,8 +417,9 @@ class BaseClusterOperationHardDeleteTestCase(base.ShakenFistTestCase):
                 '.delete_cluster_operation')
     @mock.patch('shakenfist.baseobject.mariadb.delete_state')
     @mock.patch('shakenfist.baseobject.mariadb.delete_object_metadata')
+    @mock.patch('shakenfist.baseobject.mariadb.delete_object_events')
     def test_hard_delete_removes_error_and_operation_rows(
-            self, mock_delete_metadata, mock_delete_state,
+            self, mock_delete_events, mock_delete_metadata, mock_delete_state,
             mock_delete_op, mock_delete_error, mock_delete_target):
         from shakenfist.operations.baseoperation import BaseClusterOperation
 

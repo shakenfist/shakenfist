@@ -268,6 +268,36 @@ class SpoolDurabilityTestCase(
         s2.close()
 
 
+class SpoolCountTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
+    """``Spool.count()`` returns the number of pending rows."""
+
+    def test_empty_spool_count_is_zero(self):
+        s = eventlog_spool.initialise('test-daemon')
+        self.assertEqual(0, s.count())
+
+    def test_count_increases_with_each_enqueue(self):
+        s = eventlog_spool.initialise('test-daemon')
+        for i in range(5):
+            s.enqueue({'i': i})
+        self.assertEqual(5, s.count())
+
+    def test_count_decreases_after_delete_ids(self):
+        s = eventlog_spool.initialise('test-daemon')
+        for i in range(4):
+            s.enqueue({'i': i})
+        batch = s.dequeue_batch(2)
+        s.delete_ids([row_id for row_id, _ in batch])
+        self.assertEqual(2, s.count())
+
+    def test_count_zero_after_all_deleted(self):
+        s = eventlog_spool.initialise('test-daemon')
+        for i in range(3):
+            s.enqueue({'i': i})
+        batch = s.dequeue_batch(10)
+        s.delete_ids([row_id for row_id, _ in batch])
+        self.assertEqual(0, s.count())
+
+
 class PidParsingTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
     """Edge cases on ``_pid_from_spool_path``."""
 

@@ -31,7 +31,6 @@ from shakenfist.schema.operations.node_blob_op \
     import create_and_enqueue as nbo_create_and_enqueue
 from shakenfist.schema.operations.node_blob_op \
     import model_tasks as nbo_tasks
-from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.instance import instance_usage_for_blob_uuid
 from shakenfist.namespace import get_api_token
@@ -280,10 +279,9 @@ class BlobEventsEndpoint(api_base.Resource):
          (404, 'Blob not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
-    @api_base.redirect_to_eventlog_node
     def get(self, blob_uuid=None, event_type=None, limit=100):
-        with eventlog.EventLog('blob', blob_uuid) as eventdb:
-            return list(eventdb.read_events(limit=limit, event_type=event_type))
+        return api_base.object_events_response(
+            'blob', blob_uuid, limit, event_type)
 
 
 class BlobChecksumEndpoint(api_base.Resource):

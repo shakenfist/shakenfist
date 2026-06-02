@@ -336,6 +336,21 @@ def reap_stuck_cluster_operation_jobs():
             }).info('Reaper re-queued stuck work item')
 
 
+def prune_events() -> None:
+    """Daily prune sweep of the events / event_objects tables.
+
+    Runs on the elected cluster maintainer; the cluster lock makes
+    sure only one node calls this per day. The actual prune work
+    runs inside the sf-database direct path; this function just
+    triggers it and logs the result.
+    """
+    try:
+        rows = mariadb.prune_events()
+        LOG.info(f'Events prune sweep removed {rows} rows.')
+    except Exception as e:
+        LOG.warning(f'Events prune sweep failed: {e}')
+
+
 @util_general.recorded_method
 def per_deleted_object_checks():
     start_time = time.time()

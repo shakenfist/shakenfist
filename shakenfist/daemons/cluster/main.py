@@ -434,6 +434,7 @@ class Monitor(daemon.Daemon):
                 scheduled_tasks.per_instance_checks_and_usage)
             schedule.every(15).minutes.do(
                 scheduled_tasks.per_deleted_object_checks)
+            schedule.every(1).days.do(scheduled_tasks.prune_events)
 
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):

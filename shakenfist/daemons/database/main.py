@@ -18,6 +18,7 @@ from uuid import UUID
 
 import grpc
 from prometheus_client import Counter
+from prometheus_client import Gauge
 from prometheus_client import start_http_server
 from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs  # noreorder
@@ -38,6 +39,7 @@ from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.event import EventRecord
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
@@ -501,90 +503,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database SetClusterConfig failed', e)
             return database_pb2.StatusReply(
                 success=False, error=str(e))
-
-    # Event DLQ Operations
-
-    def EnqueueEventDlq(
-        self,
-        request: database_pb2.EnqueueEventDlqRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Enqueue an event in the dead-letter queue."""
-        try:
-            self.monitor.counters['enqueue_event_dlq'].inc()
-            event_json = json.loads(request.event_json)
-            mariadb._direct_enqueue_event_dlq(
-                object_type=request.object_type,
-                object_uuid=request.object_uuid,
-                event_timestamp=request.event_timestamp,
-                event_json=event_json,
-            )
-            return database_pb2.StatusReply(
-                success=True, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database EnqueueEventDlq failed', e)
-            return database_pb2.StatusReply(
-                success=False, error=str(e))
-
-    def DrainEventDlq(
-        self,
-        request: database_pb2.DrainEventDlqRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.DrainEventDlqReply:
-        """Return DLQ entries for processing."""
-        try:
-            self.monitor.counters['drain_event_dlq'].inc()
-            rows = mariadb._direct_drain_event_dlq(
-                limit=request.limit)
-            entries = []
-            for row in rows:
-                entries.append(
-                    database_pb2.DrainEventDlqEntry(
-                        id=row['id'],
-                        object_type=row['object_type'],
-                        object_uuid=row['object_uuid'],
-                        event_json=json.dumps(row['event_json']),
-                    ))
-            return database_pb2.DrainEventDlqReply(
-                entries=entries)
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database DrainEventDlq failed', e)
-            return database_pb2.DrainEventDlqReply(entries=[])
-
-    def DeleteEventDlq(
-        self,
-        request: database_pb2.DeleteEventDlqRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Delete processed DLQ entries by id."""
-        try:
-            self.monitor.counters['delete_event_dlq'].inc()
-            mariadb._direct_delete_event_dlq(
-                ids=list(request.ids))
-            return database_pb2.StatusReply(
-                success=True, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database DeleteEventDlq failed', e)
-            return database_pb2.StatusReply(
-                success=False, error=str(e))
-
-    def GetEventDlqCount(
-        self,
-        request: database_pb2.GetEventDlqCountRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.GetEventDlqCountReply:
-        """Return the current number of rows in the event_dlq table."""
-        try:
-            self.monitor.counters['get_event_dlq_count'].inc()
-            count = mariadb._direct_get_event_dlq_count()
-            return database_pb2.GetEventDlqCountReply(count=count)
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database GetEventDlqCount failed', e)
-            return database_pb2.GetEventDlqCountReply(count=0)
 
     # Object State Operations (MariaDB)
     # These operations provide access to MariaDB state storage for all daemons.
@@ -4233,6 +4151,124 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def RecordEventBatch(
+        self,
+        request: database_pb2.RecordEventBatchRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Record a batch of event log entries in MariaDB."""
+        try:
+            self.monitor.counters['record_event_batch'].inc()
+            records: list[EventRecord] = []
+            for entry in request.events:
+                objects: list[tuple[str, str]] = []
+                for obj in entry.objects:
+                    ot = ObjectType.from_proto_id(obj.object_type)
+                    if ot is None:
+                        return database_pb2.StatusReply(
+                            success=False,
+                            error='Invalid object_type in event '
+                                  f'{entry.event_uuid}')
+                    objects.append((ot.value, obj.object_uuid))
+
+                extra = (
+                    json.loads(entry.extra_json)
+                    if entry.extra_json else None)
+                records.append(EventRecord(
+                    event_uuid=entry.event_uuid,
+                    event_type=entry.event_type,
+                    timestamp=entry.timestamp,
+                    fqdn=entry.fqdn,
+                    duration=(
+                        entry.duration if entry.duration != 0.0 else None),
+                    message=entry.message,
+                    extra=extra,
+                    request_id=entry.request_id if entry.request_id else None,
+                    objects=objects,
+                ))
+            success = mariadb._direct_record_event_batch(records)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database RecordEventBatch failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def PruneEvents(
+        self,
+        request: database_pb2.PruneEventsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.PruneEventsReply:
+        """Run the daily events prune sweep."""
+        try:
+            self.monitor.counters['prune_events'].inc()
+            rows = mariadb._direct_prune_events()
+            return database_pb2.PruneEventsReply(
+                success=True, error='', rows_pruned=rows)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database PruneEvents failed', e)
+            return database_pb2.PruneEventsReply(
+                success=False, error=str(e), rows_pruned=0)
+
+    def GetObjectEvents(
+        self,
+        request: database_pb2.GetObjectEventsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetObjectEventsReply:
+        """Read events for one (object_type, object_uuid) directly."""
+        try:
+            self.monitor.counters['get_object_events'].inc()
+            ot = ObjectType.from_proto_id(request.object_type)
+            if ot is None:
+                # Invalid object_type proto id -- return an empty list.
+                return database_pb2.GetObjectEventsReply(events=[])
+            rows = mariadb._direct_get_object_events(
+                object_type=ot.value,
+                object_uuid=request.object_uuid,
+                limit=request.limit if request.limit else 100,
+                event_type=(request.event_type_filter
+                            if request.event_type_filter else None))
+            proto_rows = []
+            for row in rows:
+                proto_rows.append(database_pb2.EventReadRowProto(
+                    event_uuid=row.event_uuid,
+                    event_type=row.event_type,
+                    timestamp=row.timestamp,
+                    fqdn=row.fqdn,
+                    duration=row.duration if row.duration is not None else 0.0,
+                    message=row.message,
+                    extra_json=(
+                        json.dumps(row.extra) if row.extra is not None else ''),
+                    request_id=row.request_id if row.request_id is not None else '',
+                ))
+            return database_pb2.GetObjectEventsReply(events=proto_rows)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetObjectEvents failed', e)
+            return database_pb2.GetObjectEventsReply(events=[])
+
+    def DeleteObjectEvents(
+        self,
+        request: database_pb2.DeleteObjectEventsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete event_objects rows for one (object_type, object_uuid)."""
+        try:
+            self.monitor.counters['delete_object_events'].inc()
+            ot = ObjectType.from_proto_id(request.object_type)
+            if ot is None:
+                return database_pb2.StatusReply(
+                    success=False, error='Invalid object_type')
+            mariadb._direct_delete_object_events(
+                object_type=ot.value, object_uuid=request.object_uuid)
+            return database_pb2.StatusReply(success=True, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteObjectEvents failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     def GetClusterOperationTarget(
         self,
         request: database_pb2.GetClusterOperationTargetRequest,
@@ -4890,8 +4926,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',
-            'enqueue_event_dlq', 'drain_event_dlq',
-            'delete_event_dlq', 'get_event_dlq_count',
+            'record_event_batch', 'prune_events',
+            'get_object_events', 'delete_object_events',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state',
@@ -5031,54 +5067,60 @@ class Monitor(daemon.WorkerPoolDaemon):
                 f'Number of {op} operations'
             )
 
+        self.events_rows_gauge = Gauge(
+            'database_events_rows',
+            'Current row count in the events table.'
+        )
+
         start_http_server(config.DATABASE_METRICS_PORT)
 
     def record_start(self) -> None:
-        # The database daemon records its own startup. It forces events to
-        # the DLQ because the eventlog daemon may not be running yet (avoiding
-        # circular dependencies).
-        eventlog.set_force_event_dlq(True)
-        try:
-            n = Node.from_db(config.NODE_NAME)
-            if n:
-                n.set_daemon_state(
-                    self.daemon_name,
-                    Node.DAEMON_STATE_RUNNING)
-                n.add_event(
-                    EVENT_TYPE_AUDIT,
-                    f'{self.daemon_name} daemon starting')
-        finally:
-            eventlog.set_force_event_dlq(False)
+        # The database daemon records its own startup. Events flow into the
+        # local spool and are picked up by the drainer when it starts.
+        n = Node.from_db(config.NODE_NAME)
+        if n:
+            n.set_daemon_state(
+                self.daemon_name,
+                Node.DAEMON_STATE_RUNNING)
+            n.add_event(
+                EVENT_TYPE_AUDIT,
+                f'{self.daemon_name} daemon starting')
         send_systemd_ready()
 
     def record_exit(self) -> None:
-        # The database daemon records its own shutdown. It forces events to
-        # the DLQ because the eventlog daemon may have already stopped.
-        eventlog.set_force_event_dlq(True)
-        try:
-            n = Node.from_db(config.NODE_NAME)
-            if n:
-                try:
-                    n.set_daemon_state(
-                        self.daemon_name,
-                        Node.DAEMON_STATE_STOPPED)
-                except InvalidStateException as e:
-                    if not str(e).startswith(
-                            'Invalid state change from '
-                            'stopping to degraded'):
-                        raise e
-                n.add_event(
-                    EVENT_TYPE_AUDIT,
-                    f'{self.daemon_name} daemon stopped')
-        finally:
-            eventlog.set_force_event_dlq(False)
+        # The database daemon records its own shutdown.
+        n = Node.from_db(config.NODE_NAME)
+        if n:
+            try:
+                n.set_daemon_state(
+                    self.daemon_name,
+                    Node.DAEMON_STATE_STOPPED)
+            except InvalidStateException as e:
+                if not str(e).startswith(
+                        'Invalid state change from '
+                        'stopping to degraded'):
+                    raise e
+            n.add_event(
+                EVENT_TYPE_AUDIT,
+                f'{self.daemon_name} daemon stopped')
         send_systemd_status('Terminated')
 
     def _run_inner(self) -> None:
+        refresh_tick = 0
         while daemon.check_abort_path(self.abort_path):
             try:
                 # The database daemon doesn't have background work to do,
-                # it just serves gRPC requests. We check health periodically.
+                # it just serves gRPC requests. We check health periodically
+                # and refresh the events row-count gauge every ~60s (every
+                # 6 ticks of the 10s idle).
+                refresh_tick += 1
+                if refresh_tick % 6 == 0:
+                    try:
+                        self.events_rows_gauge.set(
+                            mariadb._direct_get_events_count())
+                    except Exception as e:
+                        LOG.warning(
+                            f'events row-count gauge refresh failed: {e}')
                 self.idle(10)
             except Exception as e:
                 util_exceptions.ignore_exception('database daemon', e)

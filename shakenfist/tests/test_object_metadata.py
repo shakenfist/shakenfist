@@ -153,10 +153,11 @@ class HardDeleteMetadataTestCase(base.ShakenFistTestCase):
     """Test hard_delete cleans up object_metadata."""
 
     @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.delete_object_events', return_value=None)
     @mock.patch('shakenfist.mariadb.delete_object_metadata', return_value=True)
     @mock.patch('shakenfist.mariadb.delete_state', return_value=True)
     def test_hard_delete_cleans_up_object_metadata(
-            self, mock_del_state, mock_del_meta, mock_event):
+            self, mock_del_state, mock_del_meta, mock_del_events, mock_event):
         d = DatabaseBackedObject(TEST_UUID)
         d.hard_delete()
 

@@ -29,11 +29,15 @@ service DatabaseService {
   rpc GetClusterConfig (ClusterConfigRequest) returns (ClusterConfigReply) {}
   rpc SetClusterConfig (SetClusterConfigRequest) returns (StatusReply) {}
 
-  // Event DLQ
-  rpc EnqueueEventDlq (EnqueueEventDlqRequest) returns (StatusReply) {}
-  rpc DrainEventDlq (DrainEventDlqRequest) returns (DrainEventDlqReply) {}
-  rpc DeleteEventDlq (DeleteEventDlqRequest) returns (StatusReply) {}
-  rpc GetEventDlqCount (GetEventDlqCountRequest) returns (GetEventDlqCountReply) {}
+  // Event Storage (MariaDB)
+  // Direct write path for batches of events; replaces the sf-eventlog
+  // gRPC target in phase 2.
+  rpc RecordEventBatch (RecordEventBatchRequest) returns (StatusReply) {}
+  rpc PruneEvents (PruneEventsRequest) returns (PruneEventsReply) {}
+  // Per-object read and delete paths replacing the legacy sqlite
+  // EventLog backend in phase 4.
+  rpc GetObjectEvents (GetObjectEventsRequest) returns (GetObjectEventsReply) {}
+  rpc DeleteObjectEvents (DeleteObjectEventsRequest) returns (StatusReply) {}
 
   // Object State Operations (MariaDB)
   rpc GetObjectState (GetObjectStateRequest) returns (GetObjectStateReply) {}
@@ -497,39 +501,70 @@ message SetClusterConfigRequest {
   string value_json = 2;  // JSON-encoded config value
 }
 
-// Event DLQ
+// Event Storage (MariaDB)
+// Batch write path for events plus their per-object references.
+// `duration = 0` and empty `extra_json`/`request_id` encode "absent"
+// and are mapped to SQL NULL on insert.
 
-message EnqueueEventDlqRequest {
-  string object_type = 1;
+message EventBatchObject {
+  ObjectType object_type = 1;
   string object_uuid = 2;
-  double event_timestamp = 3;
-  string event_json = 4;  // JSON-encoded event dict
 }
 
-message DrainEventDlqRequest {
-  int32 limit = 1;
+message EventBatchEntry {
+  string event_uuid = 1;
+  string event_type = 2;
+  double timestamp = 3;
+  string fqdn = 4;
+  double duration = 5;
+  string message = 6;
+  string extra_json = 7;
+  string request_id = 8;
+  repeated EventBatchObject objects = 9;
 }
 
-message DrainEventDlqEntry {
-  int64 id = 1;
-  string object_type = 2;
-  string object_uuid = 3;
-  string event_json = 4;  // JSON-encoded event dict
+message RecordEventBatchRequest {
+  repeated EventBatchEntry events = 1;
 }
 
-message DrainEventDlqReply {
-  repeated DrainEventDlqEntry entries = 1;
+message PruneEventsRequest {
 }
 
-message DeleteEventDlqRequest {
-  repeated int64 ids = 1;
+message PruneEventsReply {
+  bool success = 1;
+  string error = 2;
+  int64 rows_pruned = 3;
 }
 
-message GetEventDlqCountRequest {
+message GetObjectEventsRequest {
+  ObjectType object_type = 1;
+  string object_uuid = 2;
+  int32 limit = 3;
+  string event_type_filter = 4;
 }
 
-message GetEventDlqCountReply {
-  int64 count = 1;
+// EventReadRowProto carries one row of the GetObjectEvents reply.
+// Named with the ``Proto`` suffix to avoid clashing with the pydantic
+// ``EventReadRow`` model in shakenfist.schema.event (same rename
+// convention as ``EventBatchEntry`` in phase 1b).
+message EventReadRowProto {
+  string event_uuid = 1;
+  string event_type = 2;
+  double timestamp = 3;
+  string fqdn = 4;
+  double duration = 5;
+  string message = 6;
+  string extra_json = 7;
+  string request_id = 8;
+}
+
+message GetObjectEventsReply {
+  repeated EventReadRowProto events = 1;
+}
+
+message DeleteObjectEventsRequest {
+  ObjectType object_type = 1;
+  string object_uuid = 2;
 }
 
 // Object State Operations (MariaDB)

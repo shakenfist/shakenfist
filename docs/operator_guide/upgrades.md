@@ -48,8 +48,6 @@ command runs automatically on an etcd_master node to:
 1. Create any missing tables
 2. Apply any pending schema migrations to bring tables up to the current version
 
-This is similar to how the eventlog sqlite databases handle schema upgrades.
-
 ### Manual schema verification
 
 You can manually check or apply schema migrations by running on an etcd_master

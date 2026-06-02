@@ -40,7 +40,6 @@ def generate_hosts_file(topology, ssh_user, ssh_key_filename):
     groups = {
         'primary_node': [],
         'network_node': [],
-        'eventlog_node': [],
         'hypervisors': [],
         'etcd_master': [],
         'storage': [],
@@ -55,8 +54,6 @@ def generate_hosts_file(topology, ssh_user, ssh_key_filename):
             groups['primary_node'].append(name)
         if node.get('network_node', False):
             groups['network_node'].append(name)
-        if node.get('eventlog_node', False):
-            groups['eventlog_node'].append(name)
         if node.get('hypervisor', False):
             groups['hypervisors'].append(name)
         if node.get('etcd_master', False):
@@ -84,7 +81,7 @@ def generate_hosts_file(topology, ssh_user, ssh_key_filename):
         return ' '.join(parts)
 
     # Write each group with host variables
-    for group_name in ['primary_node', 'network_node', 'eventlog_node',
+    for group_name in ['primary_node', 'network_node',
                        'hypervisors', 'etcd_master', 'storage']:
         lines.append(f'[{group_name}]')
         seen = set()  # Avoid duplicate entries within same group
@@ -99,7 +96,6 @@ def generate_hosts_file(topology, ssh_user, ssh_key_filename):
         '[allsf:children]',
         'primary_node',
         'network_node',
-        'eventlog_node',
         'hypervisors',
         'etcd_master',
         'storage',

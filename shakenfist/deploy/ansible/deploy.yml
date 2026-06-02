@@ -64,7 +64,7 @@
 
 ### Preinstall validation
 
-- hosts: hypervisors, network_node, eventlog_node
+- hosts: hypervisors, network_node
   become: yes
   become_method: sudo
   gather_facts: yes
@@ -264,7 +264,6 @@
         role_action: "create_admin_namespace"
         system_key: "{{ admin_password }}"
         node_mesh_ip: "{{ node_mesh_ip }}"
-        eventlog_node_ip: "{{hostvars[groups['eventlog_node'][0]]['node_mesh_ip']}}"
       when: inventory_hostname == groups['etcd_master'][0]
 
 - hosts: primary_node

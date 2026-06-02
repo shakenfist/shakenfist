@@ -28,6 +28,7 @@ from uuid import UUID
 from uuid import uuid4
 
 import grpc
+from prometheus_client import Counter
 import sqlalchemy as sa
 from sqlalchemy import event as sa_event
 from sqlalchemy.dialects.mysql import INET4
@@ -58,6 +59,8 @@ from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.blob_hash import BlobHash
 from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.schema.dnsmasq import DnsMasqData
+from shakenfist.schema.event import EventReadRow
+from shakenfist.schema.event import EventRecord
 from shakenfist.schema.ipam_data import IPAMData
 from shakenfist.schema.network_attributes import NetworkAttributesData
 from shakenfist.schema.network_data import NetworkData
@@ -80,6 +83,33 @@ from shakenfist.util import callstack as util_callstack
 
 
 LOG, _ = logs.setup(__name__)
+
+
+# Module-scope Prometheus metrics. ``prometheus_client`` uses a single
+# process-wide default registry, so this counter is registered on every
+# daemon that imports ``mariadb``. It only moves on sf-database (the only
+# daemon that actually runs ``_direct_record_event_batch``); on all other
+# daemons the counter stays at zero and is harmlessly visible on their
+# metrics endpoints.
+EVENTS_INSERTED = Counter(
+    'database_events_inserted_total',
+    'Events inserted into the events table.',
+    ['event_type']
+)
+
+EVENTS_PRUNED = Counter(
+    'database_events_pruned_total',
+    'Event-object rows pruned, by event type (and the '
+    'synthetic "api-request" type for the object-type '
+    'override sweep).',
+    ['event_type']
+)
+
+ORPHAN_EVENTS_PRUNED = Counter(
+    'database_orphan_events_pruned_total',
+    'Events rows pruned because no event_objects row '
+    'referenced them.'
+)
 
 # Sentinel node name used during migration when the original node is unknown.
 # This uses a name that cannot conflict with real hostnames.
@@ -136,6 +166,8 @@ _node_daemon_states_table: Optional[sa.Table] = None
 _cluster_operations_table: Optional[sa.Table] = None
 _cluster_operation_errors_table: Optional[sa.Table] = None
 _work_queue_table: Optional[sa.Table] = None
+_events_table: Optional[sa.Table] = None
+_event_objects_table: Optional[sa.Table] = None
 
 # Current schema versions for each table. Increment when making schema changes.
 # Version history:
@@ -193,7 +225,8 @@ WORK_QUEUE_VERSION = 2
 # locks; the acquired index never had a reader.
 CLUSTER_LOCKS_VERSION = 4
 CLUSTER_CONFIG_VERSION = 2
-EVENT_DLQ_VERSION = 2
+EVENTS_VERSION = 1
+EVENT_OBJECTS_VERSION = 1
 
 
 def _use_database_service() -> bool:
@@ -1266,50 +1299,47 @@ def _ensure_cluster_config_schema(
     }
 
 
-_event_dlq_table: Optional[sa.Table] = None
+def _get_events_table() -> sa.Table:
+    """Get or create the events table definition.
 
+    This table stores event log entries written directly by sf-database.
+    Each row is a single event with its scalar fields; the per-object
+    relationships live in the companion event_objects table so that one
+    event may target multiple objects (e.g. an interface op touching an
+    instance, network, and interface).
 
-def _get_event_dlq_table() -> sa.Table:
-    """Get or create the event_dlq table definition.
-
-    This table stores event log dead-letter queue entries previously held
-    in etcd at /sf/event/{object_type}/{object_uuid}/{timestamp}. The
-    eventlog daemon drains this table periodically and writes events to
-    per-object SQLite files.
+    The extra column is a JSON blob carrying optional structured payload
+    (free-form per-event metadata). request_id is its own indexed column
+    so request-scoped audit queries are a single SQL filter.
     """
-    global _event_dlq_table
-    if _event_dlq_table is None:
+    global _events_table
+    if _events_table is None:
         metadata = _get_metadata()
-        _event_dlq_table = sa.Table(
-            'event_dlq',
+        _events_table = sa.Table(
+            'events',
             metadata,
-            sa.Column('id', sa.BigInteger(),
-                      primary_key=True, autoincrement=True),
-            sa.Column('object_type', sa.String(32),
-                      nullable=False),
-            sa.Column('object_uuid', sa.String(36),
-                      nullable=False),
-            sa.Column('event_timestamp', sa.Double(),
-                      nullable=False),
-            sa.Column('event_json', sa.JSON(),
-                      nullable=False),
-            sa.Column('enqueued_at', sa.Double(),
-                      nullable=False),
-            sa.Index('idx_event_dlq_object',
-                     'object_type', 'object_uuid'),
-            sa.Index('idx_event_dlq_enqueued',
-                     'enqueued_at'),
+            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+            sa.Column('event_type', sa.String(32), nullable=False),
+            sa.Column('timestamp', sa.Double(), nullable=False),
+            sa.Column('fqdn', sa.String(255), nullable=False),
+            sa.Column('duration', sa.Double(), nullable=True),
+            sa.Column('message', sa.Text(), nullable=False),
+            sa.Column('extra', sa.JSON(), nullable=True),
+            sa.Column('request_id', sa.String(64), nullable=True),
+            sa.PrimaryKeyConstraint('event_uuid'),
+            sa.Index('idx_events_type_timestamp',
+                     'event_type', 'timestamp'),
+            sa.Index('idx_events_request_id', 'request_id'),
         )
-    return _event_dlq_table
+    return _events_table
 
 
-def _ensure_event_dlq_schema(
-        engine: sa.Engine) -> dict[str, Any]:
-    """Ensure the event_dlq table schema is up to date."""
-    table_name = 'event_dlq'
+def _ensure_events_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the events table schema is up to date."""
+    table_name = 'events'
     current_ver = _get_table_version(engine, table_name)
     start_ver = current_ver
-    table = _get_event_dlq_table()
+    table = _get_events_table()
 
     if current_ver <= 0:
         LOG.info(f'Creating {table_name} table (version 1)')
@@ -1322,7 +1352,65 @@ def _ensure_event_dlq_schema(
         'table': table_name,
         'start_version': start_ver,
         'end_version': current_ver,
-        'target_version': EVENT_DLQ_VERSION,
+        'target_version': EVENTS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _get_event_objects_table() -> sa.Table:
+    """Get or create the event_objects table definition.
+
+    This table records the many-to-many relationship between events
+    and the objects they target. The natural key
+    (object_type, object_uuid, event_uuid) is the primary key and
+    supports the per-object read path
+    (WHERE object_type = ? AND object_uuid = ?) by prefix.
+
+    The secondary index on event_uuid supports the prune-side join
+    against events, avoiding a full scan when deleting child rows
+    ahead of orphan parent rows.
+
+    No foreign key constraint is declared between event_uuid here and
+    events.event_uuid; the codebase deliberately avoids FKs on other
+    similar tables (object_states, object_metadata,
+    cluster_operation_targets). Referential integrity is upheld by the
+    insert path writing both tables in one transaction.
+    """
+    global _event_objects_table
+    if _event_objects_table is None:
+        metadata = _get_metadata()
+        _event_objects_table = sa.Table(
+            'event_objects',
+            metadata,
+            sa.Column('object_type', sa.String(32), nullable=False),
+            sa.Column('object_uuid', sa.String(36), nullable=False),
+            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+            sa.PrimaryKeyConstraint(
+                'object_type', 'object_uuid', 'event_uuid'),
+            sa.Index('idx_event_objects_event', 'event_uuid'),
+        )
+    return _event_objects_table
+
+
+def _ensure_event_objects_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the event_objects table schema is up to date."""
+    table_name = 'event_objects'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_event_objects_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(
+            engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': EVENT_OBJECTS_VERSION,
         'migrated': start_ver != current_ver
     }
 
@@ -2076,7 +2164,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_work_queue_schema(engine))
     results.append(_ensure_cluster_locks_schema(engine))
     results.append(_ensure_cluster_config_schema(engine))
-    results.append(_ensure_event_dlq_schema(engine))
+    results.append(_ensure_events_schema(engine))
+    results.append(_ensure_event_objects_schema(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]
@@ -4642,58 +4731,6 @@ def _migrate_etcd_cluster_config(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
-def _migrate_etcd_event_dlq(engine: sa.Engine) -> dict[str, Any]:
-    """Drain residual /sf/event/* etcd keys into the event_dlq table.
-
-    Each etcd key at /sf/event/{objtype}/{objuuid}/{timestamp} holds
-    a JSON dict with the event payload. We insert each into event_dlq
-    and delete the etcd key.
-    """
-    from shakenfist import etcd
-
-    migrated = 0
-    errors = 0
-
-    LOG.info('Migrating event DLQ from etcd...')
-
-    for key, event in etcd.get_prefix_raw('/sf/event/'):
-        if not isinstance(event, dict):
-            LOG.warning(
-                f'Event DLQ migration: malformed payload '
-                f'at {key}; leaving in place')
-            errors += 1
-            continue
-
-        try:
-            parts = key.split('/')
-            # /sf/event/{objtype}/{objuuid}/{ts}
-            objtype = parts[3]
-            objuuid = parts[4]
-            ts = float(parts[5])
-        except (IndexError, ValueError) as e:
-            LOG.warning(
-                f'Event DLQ migration: bad key {key}: {e}')
-            errors += 1
-            continue
-
-        _direct_enqueue_event_dlq(
-            object_type=objtype,
-            object_uuid=objuuid,
-            event_timestamp=ts,
-            event_json=event,
-        )
-        etcd.delete_raw(key)
-        migrated += 1
-
-    LOG.info(
-        f'Event DLQ migration: {migrated} migrated, '
-        f'{errors} errors')
-    return {
-        'migrated_count': migrated,
-        'error_count': errors,
-    }
-
-
 # Populate DATA_MIGRATIONS now that all migration functions are defined.
 # All data migrations happen at version 2 (after table creation at version 1).
 DATA_MIGRATIONS.update({
@@ -4789,9 +4826,6 @@ DATA_MIGRATIONS.update({
     },
     'cluster_config': {
         2: _migrate_etcd_cluster_config,
-    },
-    'event_dlq': {
-        2: _migrate_etcd_event_dlq,
     },
 })
 
@@ -6308,6 +6342,661 @@ def delete_stale_cluster_operation_targets(max_age: float) -> int:
         return _grpc_delete_stale_cluster_operation_targets(max_age)
     older_than = time.time() - max_age
     return _direct_delete_stale_cluster_operation_targets(older_than)
+
+
+# =============================================================================
+# Event Storage Functions
+# Batch-write events plus their per-object references into the events
+# and event_objects tables. Both tables are written inside a single
+# transaction so a partial failure leaves no orphan rows.
+# =============================================================================
+
+def _direct_record_event_batch(events: list[EventRecord]) -> bool:
+    """Insert a batch of events directly into MariaDB.
+
+    Writes one row per event into the events table and one row per
+    (object_type, object_uuid) tuple into the event_objects table.
+    Uses ``INSERT IGNORE`` on both tables so that a duplicate
+    ``event_uuid`` (the idempotent-retry case after a drainer crash
+    or RPC timeout) is silently skipped per-row, without rolling back
+    sibling events in the same batch. The whole batch still runs
+    inside a single ``engine.begin()`` transaction so a real DB
+    failure (OperationalError) aborts cleanly without leaving the two
+    tables out of sync.
+
+    EVENTS_INSERTED is accumulated locally during the transaction and
+    only applied to the Prometheus counter after the commit succeeds,
+    so a transaction rollback does not leave phantom counter
+    increments visible to operators.
+    """
+    engine = _get_engine()
+    events_table = _get_events_table()
+    event_objects_table = _get_event_objects_table()
+
+    inserted_by_type: dict[str, int] = {}
+
+    try:
+        with engine.begin() as conn:
+            for record in events:
+                event_stmt = sa.insert(events_table).prefix_with(
+                    'IGNORE').values(
+                    event_uuid=record.event_uuid,
+                    event_type=record.event_type,
+                    timestamp=record.timestamp,
+                    fqdn=record.fqdn,
+                    duration=record.duration,
+                    message=record.message,
+                    extra=record.extra,
+                    request_id=record.request_id,
+                )
+                conn.execute(event_stmt)
+                inserted_by_type[record.event_type] = (
+                    inserted_by_type.get(record.event_type, 0) + 1)
+
+                for object_type, object_uuid in record.objects:
+                    obj_stmt = sa.insert(event_objects_table).prefix_with(
+                        'IGNORE').values(
+                        object_type=object_type,
+                        object_uuid=object_uuid,
+                        event_uuid=record.event_uuid,
+                    )
+                    conn.execute(obj_stmt)
+    except OperationalError as e:
+        LOG.warning(f'MariaDB write failed for events batch: {e}')
+        return False
+
+    for event_type, count in inserted_by_type.items():
+        EVENTS_INSERTED.labels(event_type=event_type).inc(count)
+    return True
+
+
+def _direct_get_events_count() -> int:
+    """Return the current row count of the events table.
+
+    Used by the database daemon to refresh the database_events_rows
+    Prometheus gauge. Returns 0 on database error so a transient
+    failure does not crash the gauge-refresh loop.
+    """
+    engine = _get_engine()
+    events_table = _get_events_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(sa.func.count()).select_from(events_table)
+            return conn.execute(stmt).scalar() or 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB read failed for events count: {e}')
+        return 0
+
+
+# Batch size for the paged DELETE loops in the prune helpers below.
+# Matches the existing eventlog daemon's per-sweep cap. Small enough to
+# commit in a fraction of a second on a healthy InnoDB even when the
+# rows being deleted are spread across many pages, big enough to keep
+# round-trip overhead negligible for a daily sweep that may delete
+# millions of rows.
+_PRUNE_BATCH_SIZE = 10000
+
+
+def _direct_prune_events_by_type(event_type: str, max_age: float) -> int:
+    """Prune event_objects rows for one event_type older than max_age.
+
+    Stage A of the daily events prune sweep. Joins event_objects to
+    events on event_uuid, filters by event_type and the age cutoff,
+    and deletes the join row in batches of ``_PRUNE_BATCH_SIZE``. Each
+    batch is its own transaction so a long prune does not hold a
+    single transaction open. Returns the total number of event_objects
+    rows deleted across all batches. On OperationalError the partial
+    count accumulated so far is returned.
+
+    Args:
+        event_type: One of 'audit', 'mutate', 'status', 'usage',
+            'resources', 'prune', 'historic'.
+        max_age: Maximum age in seconds. Rows with
+            ``events.timestamp < now - max_age`` are pruned.
+
+    Returns:
+        Total number of event_objects rows deleted.
+    """
+    engine = _get_engine()
+    cutoff = time.time() - max_age
+    total = 0
+
+    stmt = sa.text('''
+        DELETE eo FROM event_objects eo
+        JOIN events e ON eo.event_uuid = e.event_uuid
+        WHERE e.event_type = :event_type AND e.timestamp < :cutoff
+        LIMIT :batch
+    ''')
+
+    try:
+        while True:
+            with engine.connect() as conn:
+                result = conn.execute(stmt, {
+                    'event_type': event_type,
+                    'cutoff': cutoff,
+                    'batch': _PRUNE_BATCH_SIZE,
+                })
+                conn.commit()
+            rowcount = result.rowcount or 0
+            if rowcount > 0:
+                EVENTS_PRUNED.labels(event_type=event_type).inc(rowcount)
+                total += rowcount
+            if rowcount < _PRUNE_BATCH_SIZE:
+                break
+        return total
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB prune_events_by_type failed for {event_type}: {e}')
+        return total
+
+
+def _direct_prune_api_request_events(max_age: float) -> int:
+    """Prune event_objects rows whose object_type is 'api-request'.
+
+    Stage B of the daily events prune sweep. Regardless of the parent
+    event's event_type, an api-request reference ages out at
+    ``MAX_API_REQUEST_EVENT_AGE``. An event tied to both an
+    api-request and another object loses its api-request reference
+    here, but the event row itself only goes away in stage C once its
+    last event_objects row is gone. Counter increments use the
+    synthetic label ``event_type='api-request'`` so operators can
+    distinguish object-type-override prunes from regular per-type
+    prunes in the same metric. Batched and OperationalError-tolerant
+    like stage A.
+
+    Args:
+        max_age: Maximum age in seconds. Rows whose referenced event
+            has ``timestamp < now - max_age`` are pruned.
+
+    Returns:
+        Total number of event_objects rows deleted.
+    """
+    engine = _get_engine()
+    cutoff = time.time() - max_age
+    total = 0
+
+    stmt = sa.text('''
+        DELETE eo FROM event_objects eo
+        JOIN events e ON eo.event_uuid = e.event_uuid
+        WHERE eo.object_type = 'api-request' AND e.timestamp < :cutoff
+        LIMIT :batch
+    ''')
+
+    try:
+        while True:
+            with engine.connect() as conn:
+                result = conn.execute(stmt, {
+                    'cutoff': cutoff,
+                    'batch': _PRUNE_BATCH_SIZE,
+                })
+                conn.commit()
+            rowcount = result.rowcount or 0
+            if rowcount > 0:
+                EVENTS_PRUNED.labels(event_type='api-request').inc(rowcount)
+                total += rowcount
+            if rowcount < _PRUNE_BATCH_SIZE:
+                break
+        return total
+    except OperationalError as e:
+        LOG.warning(f'MariaDB prune_api_request_events failed: {e}')
+        return total
+
+
+def _direct_prune_orphan_events() -> int:
+    """Prune events rows no longer referenced by any event_objects row.
+
+    Stage C of the daily events prune sweep. After stages A and B
+    have removed event_objects rows, any events row whose event_uuid
+    no longer appears in event_objects is now an orphan and may be
+    deleted. Uses a LEFT JOIN anti-join via the events PK and the
+    event_objects ``event_uuid`` secondary index. Batched and
+    OperationalError-tolerant like the other stages.
+
+    Returns:
+        Total number of events rows deleted.
+    """
+    engine = _get_engine()
+    total = 0
+
+    stmt = sa.text('''
+        DELETE e FROM events e
+        LEFT JOIN event_objects eo ON e.event_uuid = eo.event_uuid
+        WHERE eo.event_uuid IS NULL
+        LIMIT :batch
+    ''')
+
+    try:
+        while True:
+            with engine.connect() as conn:
+                result = conn.execute(stmt, {'batch': _PRUNE_BATCH_SIZE})
+                conn.commit()
+            rowcount = result.rowcount or 0
+            if rowcount > 0:
+                ORPHAN_EVENTS_PRUNED.inc(rowcount)
+                total += rowcount
+            if rowcount < _PRUNE_BATCH_SIZE:
+                break
+        return total
+    except OperationalError as e:
+        LOG.warning(f'MariaDB prune_orphan_events failed: {e}')
+        return total
+
+
+# The seven configured event_types whose retention is governed by
+# the MAX_{TYPE}_EVENT_AGE settings. Order is informational only;
+# stage A's batched DELETEs are independent across event_types.
+_PRUNABLE_EVENT_TYPES = (
+    'audit', 'mutate', 'status', 'usage', 'resources', 'prune', 'historic'
+)
+
+
+def _direct_prune_events() -> int:
+    """Orchestrate the three-stage daily events prune sweep.
+
+    Iterates the seven configured event_types and prunes each whose
+    ``MAX_{TYPE}_EVENT_AGE`` is not -1 (a value of -1 disables prune
+    for that type, mirroring the legacy eventlog daemon behaviour).
+    Then runs the api-request object-type override sweep (also
+    skipped if ``MAX_API_REQUEST_EVENT_AGE`` is -1) and finally the
+    orphan events sweep that removes events rows whose last
+    event_objects reference is gone.
+
+    Each stage is independently OperationalError-tolerant: a failure
+    in one stage returns its partial count and the remaining stages
+    still run. The per-stage breakdown is logged at info; the sum is
+    returned for the daily summary line on the cluster maintainer.
+
+    Returns:
+        Total number of rows deleted across all stages
+        (event_objects rows from stages A and B plus events rows
+        from stage C).
+    """
+    total = 0
+    per_stage: dict[str, int] = {}
+
+    for evtype in _PRUNABLE_EVENT_TYPES:
+        max_age = getattr(config, f'MAX_{evtype.upper()}_EVENT_AGE')
+        if max_age == -1:
+            continue
+        deleted = _direct_prune_events_by_type(evtype, float(max_age))
+        per_stage[evtype] = deleted
+        total += deleted
+
+    api_max_age = config.MAX_API_REQUEST_EVENT_AGE
+    if api_max_age != -1:
+        deleted = _direct_prune_api_request_events(float(api_max_age))
+        per_stage['api-request'] = deleted
+        total += deleted
+
+    orphan_deleted = _direct_prune_orphan_events()
+    per_stage['orphan'] = orphan_deleted
+    total += orphan_deleted
+
+    breakdown = ', '.join(f'{k}={v}' for k, v in per_stage.items())
+    LOG.info(f'Events prune sweep deleted {total} rows ({breakdown}).')
+    return total
+
+
+def _direct_get_object_events(
+        object_type: str, object_uuid: str, limit: int = 100,
+        event_type: Optional[str] = None) -> list[EventReadRow]:
+    """Read events for one (object_type, object_uuid) directly.
+
+    Drives off the event_objects PK prefix (object_type, object_uuid)
+    and joins through events.event_uuid for the per-event scalar
+    columns. Optionally filters on event_type; when the caller passes
+    ``event_type=None`` the bound parameter is the empty string and
+    the SQL ``(:event_type_filter = '' OR ...)`` clause short-circuits
+    so no rows are excluded.
+
+    Limit hardening: ``limit <= 0`` is replaced with the default 100,
+    and ``limit > 1000`` is capped at 1000. The current REST API
+    allows negative limit which the legacy ``EventLog.read_events()``
+    interprets as "all rows"; this caps that foot-gun. Cursor-style
+    pagination is deferred (see Future work in the master plan).
+
+    Args:
+        object_type: One of the constants.OBJECT_NAMES values
+            (e.g. 'instance', 'artifact', 'network').
+        object_uuid: UUID of the object whose events to read.
+        limit: Maximum number of rows to return after hardening.
+        event_type: Optional event-type filter; ``None`` means any.
+
+    Returns:
+        List of ``EventReadRow`` ordered by ``events.timestamp``
+        descending. Empty list on OperationalError or if no events
+        match.
+    """
+    if limit <= 0:
+        limit = 100
+    if limit > 1000:
+        limit = 1000
+
+    engine = _get_engine()
+
+    stmt = sa.text('''
+        SELECT e.event_uuid, e.event_type, e.timestamp, e.fqdn,
+               e.duration, e.message, e.extra, e.request_id
+        FROM event_objects eo
+        JOIN events e ON eo.event_uuid = e.event_uuid
+        WHERE eo.object_type = :object_type
+          AND eo.object_uuid = :object_uuid
+          AND (:event_type_filter = '' OR e.event_type = :event_type_filter)
+        ORDER BY e.timestamp DESC
+        LIMIT :limit
+    ''')
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(stmt, {
+                'object_type': object_type,
+                'object_uuid': object_uuid,
+                'event_type_filter': event_type if event_type is not None else '',
+                'limit': limit,
+            }).fetchall()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_object_events failed for '
+            f'{object_type}/{object_uuid}: {e}')
+        return []
+
+    results: list[EventReadRow] = []
+    for row in rows:
+        # The events.extra column is sa.JSON() but sa.text() does not
+        # carry the column-type binding through to the result, so the
+        # mysqldb driver hands back the raw JSON string from the
+        # server. Parse it here. SQL NULL surfaces as Python None and
+        # is preserved as None on EventReadRow.extra. We accept a
+        # pre-parsed dict too in case a future driver upgrade starts
+        # decoding the JSON automatically.
+        extra_raw = row.extra
+        extra: Optional[dict[str, Any]]
+        if extra_raw is None:
+            extra = None
+        elif isinstance(extra_raw, dict):
+            extra = extra_raw
+        else:
+            try:
+                extra = json.loads(extra_raw)
+            except (ValueError, TypeError):
+                LOG.warning(
+                    f'Failed to decode extra JSON for event '
+                    f'{row.event_uuid}; dropping payload.')
+                extra = None
+
+        results.append(EventReadRow(
+            event_uuid=row.event_uuid,
+            event_type=row.event_type,
+            timestamp=row.timestamp,
+            fqdn=row.fqdn,
+            duration=row.duration,
+            message=row.message,
+            extra=extra,
+            request_id=row.request_id,
+        ))
+    return results
+
+
+def _direct_delete_object_events(
+        object_type: str, object_uuid: str) -> None:
+    """Delete all event_objects rows referencing one object.
+
+    Single DELETE bounded by the event_objects PK prefix
+    (object_type, object_uuid); no batching is needed because one
+    object's event count is small. The events row itself stays alive
+    if any other event_objects row still references it; orphan
+    events rows are reaped by the daily prune sweep
+    (``_direct_prune_orphan_events``).
+
+    No row count is returned; the hard_delete caller does not need
+    it.
+
+    Args:
+        object_type: One of the constants.OBJECT_NAMES values.
+        object_uuid: UUID of the object whose event references to
+            drop.
+    """
+    engine = _get_engine()
+
+    stmt = sa.text('''
+        DELETE FROM event_objects
+        WHERE object_type = :object_type AND object_uuid = :object_uuid
+    ''')
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(stmt, {
+                'object_type': object_type,
+                'object_uuid': object_uuid,
+            })
+            conn.commit()
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete_object_events failed for '
+            f'{object_type}/{object_uuid}: {e}')
+        return
+
+
+def _grpc_record_event_batch(events: list[EventRecord]) -> bool:
+    """Insert a batch of events via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        entries = []
+        for record in events:
+            objects = [
+                database_pb2.EventBatchObject(
+                    object_type=cast(
+                        shakenfist_enums_pb2.ObjectType.ValueType,
+                        ObjectType(object_type).proto_id),  # type: ignore[call-arg]
+                    object_uuid=object_uuid,
+                )
+                for object_type, object_uuid in record.objects
+            ]
+            entries.append(database_pb2.EventBatchEntry(
+                event_uuid=record.event_uuid,
+                event_type=record.event_type,
+                timestamp=record.timestamp,
+                fqdn=record.fqdn,
+                duration=record.duration if record.duration is not None else 0.0,
+                message=record.message,
+                extra_json=json.dumps(record.extra) if record.extra is not None else '',
+                request_id=record.request_id if record.request_id is not None else '',
+                objects=objects,
+            ))
+        request = database_pb2.RecordEventBatchRequest(events=entries)
+        reply = _grpc_call(stub.RecordEventBatch, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC RecordEventBatch failed: {e}')
+        return False
+
+
+def record_event_batch(events: list[EventRecord]) -> bool:
+    """Write a batch of events to the events and event_objects tables.
+
+    Args:
+        events: List of EventRecord instances to insert.
+
+    Returns:
+        True if the batch was written successfully (or skipped as a
+        duplicate); False on database or RPC error.
+    """
+    if _use_database_service():
+        return _grpc_record_event_batch(events)
+    return _direct_record_event_batch(events)
+
+
+def _grpc_prune_events() -> int:
+    """Trigger the daily events prune sweep via the database microservice.
+
+    The prune is a once-a-day call that may legitimately take minutes,
+    so we bypass the standard ``_grpc_call`` retry helper (which uses
+    the short ``GRPC_TIMEOUT``) and invoke the stub directly with a
+    generous 5-minute timeout. The cluster maintainer's scheduled
+    task tolerates a no-op return; on RPC failure we log and return
+    zero so the scheduler keeps running.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.PruneEventsRequest()
+        reply = stub.PruneEvents(request, timeout=300.0, wait_for_ready=True)
+        if not reply.success:
+            LOG.warning(f'gRPC PruneEvents failed: {reply.error}')
+            return int(reply.rows_pruned)
+        return int(reply.rows_pruned)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC PruneEvents failed: {e}')
+        return 0
+
+
+def prune_events() -> int:
+    """Run the daily events prune sweep.
+
+    Routes via ``_use_database_service``: on sf-database itself runs
+    the direct path, on every other daemon dispatches via the
+    database gRPC channel. Returns the total number of rows pruned
+    (``event_objects`` rows from stages A and B plus ``events`` rows
+    from stage C).
+    """
+    if _use_database_service():
+        return _grpc_prune_events()
+    return _direct_prune_events()
+
+
+def _grpc_get_object_events(
+        object_type: str, object_uuid: str, limit: int = 100,
+        event_type: Optional[str] = None) -> list[EventReadRow]:
+    """Fetch per-object events via the database microservice.
+
+    A per-object read should never legitimately take long; if it does
+    something is wrong upstream, so we bypass the standard
+    ``_grpc_call`` retry helper (which uses the short ``GRPC_TIMEOUT``)
+    and invoke the stub directly with a 30 second timeout. This is
+    the same pattern PruneEvents uses for its long-running call, just
+    inverted: PruneEvents needs longer than the default, this needs a
+    generous-but-not-infinite ceiling.
+
+    On RPC failure we log and return an empty list so REST callers
+    surface "no events" rather than crash; the actual error is in the
+    daemon log.
+    """
+    try:
+        stub = _get_database_stub()
+        if limit <= 0:
+            limit = 100
+        request = database_pb2.GetObjectEventsRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                ObjectType(object_type).proto_id),  # type: ignore[call-arg]
+            object_uuid=object_uuid,
+            limit=limit,
+            event_type_filter=event_type if event_type is not None else '',
+        )
+        reply = stub.GetObjectEvents(
+            request, timeout=30.0, wait_for_ready=True)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetObjectEvents failed: {e}')
+        return []
+
+    results: list[EventReadRow] = []
+    for entry in reply.events:
+        extra: Optional[dict[str, Any]]
+        if entry.extra_json:
+            try:
+                extra = json.loads(entry.extra_json)
+            except (ValueError, TypeError):
+                LOG.warning(
+                    f'Failed to decode extra JSON for event '
+                    f'{entry.event_uuid}; dropping payload.')
+                extra = None
+        else:
+            extra = None
+        results.append(EventReadRow(
+            event_uuid=entry.event_uuid,
+            event_type=entry.event_type,
+            timestamp=entry.timestamp,
+            fqdn=entry.fqdn,
+            duration=entry.duration if entry.duration != 0.0 else None,
+            message=entry.message,
+            extra=extra,
+            request_id=entry.request_id if entry.request_id else None,
+        ))
+    return results
+
+
+def _grpc_delete_object_events(
+        object_type: str, object_uuid: str) -> None:
+    """Delete per-object event references via the database microservice.
+
+    Invokes the stub directly with a 30 second timeout (same rationale
+    as ``_grpc_get_object_events``). On RPC failure we log a warning
+    but do not re-raise: hard_delete must not fail because an events
+    cleanup failed. The events row will be reaped by the daily prune
+    if it becomes an orphan.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteObjectEventsRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                ObjectType(object_type).proto_id),  # type: ignore[call-arg]
+            object_uuid=object_uuid,
+        )
+        reply = stub.DeleteObjectEvents(
+            request, timeout=30.0, wait_for_ready=True)
+        if not reply.success:
+            LOG.warning(
+                f'gRPC DeleteObjectEvents failed for '
+                f'{object_type}/{object_uuid}: {reply.error}')
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC DeleteObjectEvents failed for '
+            f'{object_type}/{object_uuid}: {e}')
+
+
+def get_object_events(
+        object_type: str, object_uuid: Any,
+        limit: int = 100,
+        event_type: Optional[str] = None) -> list[EventReadRow]:
+    """Read events for one (object_type, object_uuid).
+
+    Routes via ``_use_database_service``: on sf-database itself runs
+    the direct SQL path; on every other daemon dispatches via the
+    database gRPC channel. Returns a list of ``EventReadRow`` ordered
+    by timestamp descending, capped per the limit-hardening rules
+    documented on ``_direct_get_object_events``.
+
+    ``object_uuid`` is coerced to ``str`` so callers can pass either
+    a ``uuid.UUID`` instance (the common case from
+    ``DatabaseBackedObject.uuid``) or a string. The underlying gRPC
+    layer accepts strings only.
+    """
+    object_uuid = str(object_uuid)
+    if _use_database_service():
+        return _grpc_get_object_events(
+            object_type, object_uuid, limit, event_type)
+    return _direct_get_object_events(
+        object_type, object_uuid, limit, event_type)
+
+
+def delete_object_events(object_type: str, object_uuid: Any) -> None:
+    """Delete event_objects rows for one (object_type, object_uuid).
+
+    Routes via ``_use_database_service``. Called from
+    ``baseobject.DatabaseBackedObject.hard_delete`` to clean up an
+    object's event references. The events rows themselves remain
+    alive if other objects still reference them; orphans are reaped
+    by the daily prune.
+
+    ``object_uuid`` is coerced to ``str`` so callers can pass either
+    a ``uuid.UUID`` instance or a string.
+    """
+    object_uuid = str(object_uuid)
+    if _use_database_service():
+        _grpc_delete_object_events(object_type, object_uuid)
+        return
+    _direct_delete_object_events(object_type, object_uuid)
 
 
 # =============================================================================
@@ -19376,189 +20065,6 @@ def _direct_delete_cluster_config(
 
 
 # =============================================================================
-# Event DLQ Direct Access Functions
-# =============================================================================
-
-def _direct_enqueue_event_dlq(
-        object_type: str, object_uuid: str,
-        event_timestamp: float,
-        event_json: dict[str, Any]) -> None:
-    """Insert an event into the dead-letter queue."""
-    engine = _get_engine()
-    table = _get_event_dlq_table()
-    now = time.time()
-
-    try:
-        with engine.connect() as conn:
-            stmt = sa.insert(table).values(
-                object_type=object_type,
-                object_uuid=str(object_uuid),
-                event_timestamp=event_timestamp,
-                event_json=event_json,
-                enqueued_at=now,
-            )
-            conn.execute(stmt)
-            conn.commit()
-    except OperationalError as e:
-        LOG.warning(
-            f'MariaDB enqueue_event_dlq failed for '
-            f'{object_type}/{object_uuid}: {e}')
-
-
-def _direct_drain_event_dlq(
-        limit: int = 10000) -> list[dict[str, Any]]:
-    """Return up to limit DLQ rows ordered by id.
-
-    Returns list of dicts with keys: id, object_type,
-    object_uuid, event_json.
-    """
-    engine = _get_engine()
-    table = _get_event_dlq_table()
-
-    try:
-        with engine.connect() as conn:
-            stmt = (
-                sa.select(
-                    table.c.id,
-                    table.c.object_type,
-                    table.c.object_uuid,
-                    table.c.event_json,
-                )
-                .order_by(table.c.id)
-                .limit(limit)
-            )
-            rows = conn.execute(stmt).fetchall()
-            return [
-                {
-                    'id': row[0],
-                    'object_type': row[1],
-                    'object_uuid': row[2],
-                    'event_json': row[3],
-                }
-                for row in rows
-            ]
-    except OperationalError as e:
-        LOG.warning(
-            f'MariaDB drain_event_dlq failed: {e}')
-        return []
-
-
-def _direct_get_event_dlq_count() -> int:
-    """Return the current number of rows in the event_dlq table."""
-    engine = _get_engine()
-    table = _get_event_dlq_table()
-
-    try:
-        with engine.connect() as conn:
-            stmt = sa.select(sa.func.count()).select_from(table)
-            return int(conn.execute(stmt).scalar_one())
-    except OperationalError as e:
-        LOG.warning(
-            f'MariaDB get_event_dlq_count failed: {e}')
-        return 0
-
-
-def _direct_delete_event_dlq(ids: list[int]) -> int:
-    """Delete DLQ rows by id. Returns count deleted."""
-    if not ids:
-        return 0
-
-    engine = _get_engine()
-    table = _get_event_dlq_table()
-
-    try:
-        with engine.connect() as conn:
-            stmt = sa.delete(table).where(
-                table.c.id.in_(ids))
-            result = conn.execute(stmt)
-            conn.commit()
-            return result.rowcount
-    except OperationalError as e:
-        LOG.warning(
-            f'MariaDB delete_event_dlq failed: {e}')
-        return 0
-
-
-# =============================================================================
-# Event DLQ gRPC Client Functions
-# =============================================================================
-
-def _grpc_enqueue_event_dlq(
-        object_type: str, object_uuid: str,
-        event_timestamp: float,
-        event_json: dict[str, Any]) -> None:
-    """Enqueue an event via the database microservice."""
-    from shakenfist.protos import database_pb2
-
-    stub = _get_database_stub()
-    if not stub:
-        return
-
-    request = database_pb2.EnqueueEventDlqRequest(
-        object_type=object_type,
-        object_uuid=str(object_uuid),
-        event_timestamp=event_timestamp,
-        event_json=json.dumps(event_json),
-    )
-    _grpc_call(stub.EnqueueEventDlq, request)
-
-
-def _grpc_drain_event_dlq(
-        limit: int = 10000) -> list[dict[str, Any]]:
-    """Drain DLQ entries via the database microservice."""
-    from shakenfist.protos import database_pb2
-
-    stub = _get_database_stub()
-    if not stub:
-        return []
-
-    request = database_pb2.DrainEventDlqRequest(limit=limit)
-    response = _grpc_call(stub.DrainEventDlq, request)
-    if response is None:
-        return []
-
-    return [
-        {
-            'id': entry.id,
-            'object_type': entry.object_type,
-            'object_uuid': entry.object_uuid,
-            'event_json': json.loads(entry.event_json),
-        }
-        for entry in response.entries
-    ]
-
-
-def _grpc_get_event_dlq_count() -> int:
-    """Fetch the event_dlq row count via the database microservice."""
-    from shakenfist.protos import database_pb2
-
-    stub = _get_database_stub()
-    if not stub:
-        return 0
-
-    request = database_pb2.GetEventDlqCountRequest()
-    response = _grpc_call(stub.GetEventDlqCount, request)
-    if response is None:
-        return 0
-    return int(response.count)
-
-
-def _grpc_delete_event_dlq(ids: list[int]) -> int:
-    """Delete DLQ entries via the database microservice."""
-    from shakenfist.protos import database_pb2
-
-    stub = _get_database_stub()
-    if not stub:
-        return 0
-
-    request = database_pb2.DeleteEventDlqRequest(ids=ids)
-    response = _grpc_call(stub.DeleteEventDlq, request)
-    if response is None:
-        return 0
-    return len(ids) if response.success else 0
-
-
-# =============================================================================
 # Cluster Lock gRPC Functions
 # =============================================================================
 
@@ -19861,65 +20367,6 @@ def set_cluster_config(key_name: str, value: Any) -> None:
         _grpc_set_cluster_config(key_name, value)
         return
     _direct_set_cluster_config(key_name, value)
-
-
-# =============================================================================
-# Event DLQ Public API Functions
-# =============================================================================
-
-def enqueue_event_dlq(
-        object_type: str, object_uuid: str,
-        event_timestamp: float,
-        event_json: dict[str, Any]) -> None:
-    """Insert an event into the dead-letter queue.
-
-    Routes to the database microservice or direct MariaDB depending
-    on _use_database_service().
-    """
-    # Coerce UUID (and other non-default-JSON) values via the
-    # UUID-aware encoder so both the gRPC path's ``json.dumps`` and
-    # the direct path's SQLAlchemy JSON column can serialise the
-    # payload. The eventlog DLQ inherits raw ``extra`` dicts from
-    # callers that may carry uuid.UUID objects (e.g. the network
-    # description echoed by InstancesEndpoint.post), and the default
-    # JSON encoder refuses them.
-    event_json = json.loads(_json_dumps(event_json))
-    if _use_database_service():
-        _grpc_enqueue_event_dlq(
-            object_type, object_uuid, event_timestamp, event_json)
-        return
-    _direct_enqueue_event_dlq(
-        object_type, object_uuid, event_timestamp, event_json)
-
-
-def drain_event_dlq(limit: int = 10000) -> list[dict[str, Any]]:
-    """Return up to limit DLQ rows for processing.
-
-    Returns list of dicts with keys: id, object_type, object_uuid,
-    event_json. Caller must call delete_event_dlq() after successful
-    processing to preserve at-least-once delivery.
-    """
-    if _use_database_service():
-        return _grpc_drain_event_dlq(limit)
-    return _direct_drain_event_dlq(limit)
-
-
-def delete_event_dlq(ids: list[int]) -> int:
-    """Delete processed DLQ rows by id. Returns count deleted."""
-    if _use_database_service():
-        return _grpc_delete_event_dlq(ids)
-    return _direct_delete_event_dlq(ids)
-
-
-def get_event_dlq_count() -> int:
-    """Return the current number of rows in the event_dlq table.
-
-    This is a cheap SELECT COUNT(*) suitable for metrics; it does not
-    deserialise any event payloads, unlike drain_event_dlq.
-    """
-    if _use_database_service():
-        return _grpc_get_event_dlq_count()
-    return _direct_get_event_dlq_count()
 
 
 # =============================================================================

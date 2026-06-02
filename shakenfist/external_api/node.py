@@ -10,7 +10,6 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 
 from shakenfist import locks as sf_locks
-from shakenfist import eventlog
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
 from shakenfist.node import Node
@@ -170,14 +169,13 @@ class NodeEventsEndpoint(api_base.Resource):
          (404, 'Node not found.', None)]))
     @api_base.verify_token
     @api_base.caller_is_admin
-    @api_base.redirect_to_eventlog_node
     @api_base.log_token_use
     def get(self, node=None, event_type=None, limit=100):
         n = Node.from_db(node, suppress_failure_audit=True)
         if not n:
             return sf_api.error(404, 'node not found')
-        with eventlog.EventLog('node', str(n.uuid)) as eventdb:
-            return list(eventdb.read_events(limit=limit, event_type=event_type))
+        return api_base.object_events_response(
+            'node', str(n.uuid), limit, event_type)
 
 
 node_process_metrics_example = """[

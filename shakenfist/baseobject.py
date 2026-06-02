@@ -665,6 +665,7 @@ class DatabaseBackedObject:
     def hard_delete(self):
         mariadb.delete_state(self.object_type, str(self.uuid))
         mariadb.delete_object_metadata(self.object_type, str(self.uuid))
+        mariadb.delete_object_events(self.object_type, str(self.uuid))
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 

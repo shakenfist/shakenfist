@@ -34,12 +34,6 @@ all:
         {{hostvars[svr]['ansible_fqdn']}}:
 {% endfor %}
 
-    eventlog:
-      hosts:
-{% for svr in groups.eventlog_node %}
-        {{hostvars[svr]['ansible_fqdn']}}:
-{% endfor %}
-
     storage:
       hosts:
 {% for svr in groups.storage %}
