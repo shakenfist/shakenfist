@@ -25,3 +25,4 @@
 - PLAN-network-service-ports.md: Per-network DNAT'd service ports for managed services
 - PLAN-network-carrier-model.md: Lease-based per-network carrier model with VIP advertisement
 - PLAN-oidc-authentication.md: OIDC authentication for Shaken Fist
+- PLAN-qemu-futures.md: Owning more of the QEMU stack — QMP, and one day maybe libvirt's job too
