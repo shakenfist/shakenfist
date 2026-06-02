@@ -494,6 +494,7 @@ nav:
        - "Artifacts": operator_guide/artifacts.md
        - "Authentication": operator_guide/authentication.md
        - "Database": operator_guide/database.md
+       - "Events": operator_guide/events.md
        - "Exception Tracking": operator_guide/exception_tracking.md
        - "Locks": operator_guide/locks.md
        - "Networking": operator_guide/networking/overview.md
