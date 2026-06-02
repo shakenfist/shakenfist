@@ -6956,7 +6956,7 @@ def _grpc_delete_object_events(
 
 
 def get_object_events(
-        object_type: str, object_uuid: str,
+        object_type: str, object_uuid: Any,
         limit: int = 100,
         event_type: Optional[str] = None) -> list[EventReadRow]:
     """Read events for one (object_type, object_uuid).
@@ -6966,7 +6966,13 @@ def get_object_events(
     database gRPC channel. Returns a list of ``EventReadRow`` ordered
     by timestamp descending, capped per the limit-hardening rules
     documented on ``_direct_get_object_events``.
+
+    ``object_uuid`` is coerced to ``str`` so callers can pass either
+    a ``uuid.UUID`` instance (the common case from
+    ``DatabaseBackedObject.uuid``) or a string. The underlying gRPC
+    layer accepts strings only.
     """
+    object_uuid = str(object_uuid)
     if _use_database_service():
         return _grpc_get_object_events(
             object_type, object_uuid, limit, event_type)
@@ -6974,7 +6980,7 @@ def get_object_events(
         object_type, object_uuid, limit, event_type)
 
 
-def delete_object_events(object_type: str, object_uuid: str) -> None:
+def delete_object_events(object_type: str, object_uuid: Any) -> None:
     """Delete event_objects rows for one (object_type, object_uuid).
 
     Routes via ``_use_database_service``. Called from
@@ -6982,7 +6988,11 @@ def delete_object_events(object_type: str, object_uuid: str) -> None:
     object's event references. The events rows themselves remain
     alive if other objects still reference them; orphans are reaped
     by the daily prune.
+
+    ``object_uuid`` is coerced to ``str`` so callers can pass either
+    a ``uuid.UUID`` instance or a string.
     """
+    object_uuid = str(object_uuid)
     if _use_database_service():
         _grpc_delete_object_events(object_type, object_uuid)
         return

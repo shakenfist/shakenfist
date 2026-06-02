@@ -1283,6 +1283,27 @@ class GetObjectEventsRoutingTestCase(base.ShakenFistTestCase):
         mock_direct.assert_called_once_with('instance', _OBJ_UUID_X, 100, None)
         mock_grpc.assert_not_called()
 
+    @mock.patch('shakenfist.mariadb._direct_get_object_events', return_value=[])
+    @mock.patch('shakenfist.mariadb._grpc_get_object_events', return_value=[])
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_uuid_object_is_coerced_to_str(
+            self, mock_use_svc, mock_grpc, mock_direct):
+        """REST endpoints pass ``DatabaseBackedObject.uuid`` (a uuid.UUID
+        instance) straight through; the public function must coerce to
+        str because the gRPC layer's proto string field rejects UUID
+        objects with a TypeError. CI surfaced this as HTTP 400 on
+        /artifacts/<u>/events.
+        """
+        import uuid as _uuid
+        u = _uuid.UUID('b2d0e260-423f-4387-9f5e-179603c254ba')
+        mariadb.get_object_events('artifact', u)
+        mock_grpc.assert_called_once_with(
+            'artifact', str(u), 100, None)
+        # ``str(u)`` round-trips the UUID to its canonical hyphenated form.
+        self.assertEqual(
+            'b2d0e260-423f-4387-9f5e-179603c254ba',
+            mock_grpc.call_args[0][1])
+
 
 # ---------------------------------------------------------------------------
 # Phase 4 tests — delete_object_events routing
@@ -1310,6 +1331,20 @@ class DeleteObjectEventsRoutingTestCase(base.ShakenFistTestCase):
         mariadb.delete_object_events('instance', _OBJ_UUID_X)
         mock_direct.assert_called_once_with('instance', _OBJ_UUID_X)
         mock_grpc.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_delete_object_events', return_value=None)
+    @mock.patch('shakenfist.mariadb._grpc_delete_object_events', return_value=None)
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_uuid_object_is_coerced_to_str(
+            self, mock_use_svc, mock_grpc, mock_direct):
+        """``hard_delete`` already stringifies its caller, but the public
+        API is permissive for symmetry with ``get_object_events``: a
+        ``uuid.UUID`` is coerced before reaching the gRPC layer.
+        """
+        import uuid as _uuid
+        u = _uuid.UUID('b2d0e260-423f-4387-9f5e-179603c254ba')
+        mariadb.delete_object_events('instance', u)
+        mock_grpc.assert_called_once_with('instance', str(u))
 
 
 # ---------------------------------------------------------------------------
