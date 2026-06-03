@@ -24,6 +24,7 @@ from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -5139,11 +5140,22 @@ def main() -> None:
                   'MARIADB_HOST to be set. Aborting.')
         raise SystemExit(1)
 
-    # Ensure the MariaDB schema exists before accepting requests
-    mariadb.ensure_schema()
+    # Verify the MariaDB server is compatible before serving any request.
+    # Schema creation and migrations are operator-driven via
+    # `sf-ctl ensure-mariadb-schema`; sf-database refuses to start if the
+    # schema is not at the version this build expects.
+    engine = mariadb._get_engine()
+    try:
+        mariadb.verify_mariadb_compat(engine)
+    except exceptions.MariaDBIncompatibleError as e:
+        LOG.error(str(e))
+        raise SystemExit(1)
 
-    # Run any pending data migrations (e.g., etcd -> MariaDB)
-    mariadb.ensure_data_migrations()
+    try:
+        mariadb.verify_schema_versions(engine)
+    except exceptions.SchemaVersionMismatchError as e:
+        LOG.error(str(e))
+        raise SystemExit(1)
 
     # Create the gRPC server.  Allow clients to send keepalive pings as
     # often as every 5 seconds — mariadb.py uses a 10-second interval.
