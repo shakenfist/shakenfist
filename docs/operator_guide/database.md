@@ -944,17 +944,3 @@ read from the database with an older version:
 This allows rolling upgrades without requiring all objects to be migrated
 immediately.
 
-### Automatic Data Migrations
-
-Data migrations from etcd to MariaDB run automatically when the database
-daemon starts. The `ensure_data_migrations()` function checks each table's
-version and runs any pending migrations. This includes migrations for object
-states, IPAM reservations, uploads, blobs, nodes, and other object types.
-
-No manual `sf-ctl` commands are needed for data migration -- simply
-upgrading and restarting the database daemon is sufficient. Migrations are
-idempotent and safe to re-run if the daemon restarts during migration.
-
-If any objects fail to migrate, the table version is not bumped and the
-migration will retry on the next daemon restart. This ensures all objects
-are successfully migrated before the version advances.
