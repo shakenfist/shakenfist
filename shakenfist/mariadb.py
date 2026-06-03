@@ -229,6 +229,57 @@ EVENTS_VERSION = 1
 EVENT_OBJECTS_VERSION = 1
 
 
+# Consolidated mapping of every MariaDB table managed by ensure_schema() to
+# the expected version of that table. The named constants above remain the
+# source of truth -- humans bump those when changing a schema. This dict is
+# derived from them so verify_schema_versions() and similar helpers have a
+# single place to look without invoking the _ensure_*_schema() functions.
+#
+# When you add or remove a table here, you must also update:
+#   1. ensure_schema() in this file (the canonical list of tables).
+#   2. EXPECTED_TABLE_NAMES in
+#      shakenfist/tests/test_mariadb_schema_concurrency.py (which guards
+#      against drift between this dict and ensure_schema()).
+EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
+    'object_states': OBJECT_STATES_VERSION,
+    'ipam_reservations': IPAM_RESERVATIONS_VERSION,
+    'uploads': UPLOADS_VERSION,
+    'dnsmasq': DNSMASQ_VERSION,
+    'blobs': BLOBS_VERSION,
+    'object_references': OBJECT_REFERENCES_VERSION,
+    'blob_hashes': BLOB_HASHES_VERSION,
+    'blob_transfers': BLOB_TRANSFERS_VERSION,
+    'blob_attributes': BLOB_ATTRIBUTES_VERSION,
+    'nodes': NODES_VERSION,
+    'node_attributes': NODE_ATTRIBUTES_VERSION,
+    'namespaces': NAMESPACES_VERSION,
+    'namespace_attributes': NAMESPACE_ATTRIBUTES_VERSION,
+    'artifacts': ARTIFACTS_VERSION,
+    'artifact_attributes': ARTIFACT_ATTRIBUTES_VERSION,
+    'artifact_indexes': ARTIFACT_INDEXES_VERSION,
+    'network_interfaces': NETWORK_INTERFACES_VERSION,
+    'network_interface_attributes': NETWORK_INTERFACE_ATTRIBUTES_VERSION,
+    'networks': NETWORKS_VERSION,
+    'network_attributes': NETWORK_ATTRIBUTES_VERSION,
+    'ipams': IPAMS_VERSION,
+    'agent_operations': AGENT_OPERATIONS_VERSION,
+    'agent_operation_attributes': AGENT_OPERATION_ATTRIBUTES_VERSION,
+    'instances': INSTANCES_VERSION,
+    'instance_attributes': INSTANCE_ATTRIBUTES_VERSION,
+    'object_metadata': OBJECT_METADATA_VERSION,
+    'cluster_operation_targets': CLUSTER_OPERATION_TARGETS_VERSION,
+    'node_metrics': NODE_METRICS_VERSION,
+    'node_daemon_states': NODE_DAEMON_STATES_VERSION,
+    'cluster_operations': CLUSTER_OPERATIONS_VERSION,
+    'cluster_operation_errors': CLUSTER_OPERATION_ERRORS_VERSION,
+    'work_queue': WORK_QUEUE_VERSION,
+    'cluster_locks': CLUSTER_LOCKS_VERSION,
+    'cluster_config': CLUSTER_CONFIG_VERSION,
+    'events': EVENTS_VERSION,
+    'event_objects': EVENT_OBJECTS_VERSION,
+}
+
+
 def _use_database_service() -> bool:
     """Check if we should use the database microservice instead of direct access.
 

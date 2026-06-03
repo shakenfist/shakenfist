@@ -142,3 +142,94 @@ class SchemaVersionsTableConcurrencyTestCase(base.ShakenFistTestCase):
         for i, tbl in enumerate(results[1:], start=1):
             self.assertIs(first, tbl,
                           f'Thread 0 and thread {i} got different objects')
+
+
+# The canonical list of tables that ensure_schema() manages. Kept in lockstep
+# with both ensure_schema() in shakenfist/mariadb.py and the keys of
+# EXPECTED_SCHEMA_VERSIONS. If you add or remove a table you must update all
+# three locations -- this test catches the drift.
+EXPECTED_TABLE_NAMES = sorted([
+    'object_states',
+    'ipam_reservations',
+    'uploads',
+    'dnsmasq',
+    'blobs',
+    'object_references',
+    'blob_hashes',
+    'blob_transfers',
+    'blob_attributes',
+    'nodes',
+    'node_attributes',
+    'namespaces',
+    'namespace_attributes',
+    'artifacts',
+    'artifact_attributes',
+    'artifact_indexes',
+    'network_interfaces',
+    'network_interface_attributes',
+    'networks',
+    'network_attributes',
+    'ipams',
+    'agent_operations',
+    'agent_operation_attributes',
+    'instances',
+    'instance_attributes',
+    'object_metadata',
+    'cluster_operation_targets',
+    'node_metrics',
+    'node_daemon_states',
+    'cluster_operations',
+    'cluster_operation_errors',
+    'work_queue',
+    'cluster_locks',
+    'cluster_config',
+    'events',
+    'event_objects',
+])
+
+
+class ExpectedSchemaVersionsTestCase(base.ShakenFistTestCase):
+    """Guard the EXPECTED_SCHEMA_VERSIONS dict against drift.
+
+    The dict in shakenfist/mariadb.py is the single source of truth read by
+    verify_schema_versions() (and similar helpers added later in this phase).
+    It must stay in one-to-one correspondence with the tables that
+    ensure_schema() actually creates/migrates. If you bump or add a table to
+    ensure_schema() without also touching EXPECTED_SCHEMA_VERSIONS (or vice
+    versa), this test fails.
+    """
+
+    def test_keys_match_expected_table_names(self):
+        """Every table in EXPECTED_SCHEMA_VERSIONS appears in the hand-list."""
+        self.assertEqual(
+            sorted(mariadb.EXPECTED_SCHEMA_VERSIONS.keys()),
+            EXPECTED_TABLE_NAMES,
+            'EXPECTED_SCHEMA_VERSIONS keys drifted from EXPECTED_TABLE_NAMES; '
+            'update both this test and ensure_schema() if you added or '
+            'removed a table.')
+
+    def test_all_versions_are_positive_ints(self):
+        """Every version value must be a positive int (>= 1)."""
+        for table_name, version in mariadb.EXPECTED_SCHEMA_VERSIONS.items():
+            self.assertIsInstance(
+                version, int,
+                f'EXPECTED_SCHEMA_VERSIONS[{table_name!r}] = {version!r} '
+                f'is not an int')
+            # bool is a subclass of int -- reject it explicitly so a stray
+            # True/False can't masquerade as a version.
+            self.assertNotIsInstance(
+                version, bool,
+                f'EXPECTED_SCHEMA_VERSIONS[{table_name!r}] = {version!r} '
+                f'is a bool, not a real int')
+            self.assertGreaterEqual(
+                version, 1,
+                f'EXPECTED_SCHEMA_VERSIONS[{table_name!r}] = {version} '
+                f'is not a positive version')
+
+    def test_entry_count_matches_expected_table_count(self):
+        """Sanity: the dict has exactly the expected number of entries."""
+        self.assertEqual(
+            len(mariadb.EXPECTED_SCHEMA_VERSIONS),
+            len(EXPECTED_TABLE_NAMES),
+            'EXPECTED_SCHEMA_VERSIONS entry count drifted from the expected '
+            'list in this test.')
