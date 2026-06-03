@@ -52,18 +52,14 @@ implementation itself. An example `sfrc` looks like this:
 # Command line hinting
 eval "$(_SF_CLIENT_COMPLETE=bash_source sf-client)"
 
-# Use the v3 etcd API
-export ETCDCTL_API=3
-
 # Client auth
 export SHAKENFIST_NAMESPACE="system"
 export SHAKENFIST_KEY="oisoSe7T"
 export SHAKENFIST_API_URL="https://shakenfist/api"
 ```
 
-The first two lines of the file enable tab completion for `sf-client` in a bash
-shell. The middle section defaults `etcd` to use the v3 API and can be ignored
-for now. The last three lines are the important authentication details:
+The first line of the file enables tab completion for `sf-client` in a bash
+shell. The last three lines are the important authentication details:
 
 * the namespace we want to use is called "system".
 * our access key is "oisoSe7T".

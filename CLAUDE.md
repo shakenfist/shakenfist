@@ -158,7 +158,6 @@ shakenfist/
 │   ├── artifact.py          # Disk images and artifacts
 │   ├── blob.py              # Content-addressable blob storage
 │   ├── baseobject.py        # Base framework for all persistable objects
-│   ├── etcd.py              # Minimal etcd shim for drain migrations only
 │   ├── locks.py             # Distributed cluster locks (MariaDB-backed)
 │   ├── eventlog.py          # Event logging (gRPC)
 │   ├── cache.py             # In-memory caching layer
@@ -188,7 +187,7 @@ shakenfist/
 │   ├── operations/          # Task operation definitions
 │   │   ├── baseoperation.py # Base operation class
 │   │   └── *_op.py          # Specific operations
-│   ├── etcd_schema/         # Legacy schema directory (Pydantic models)
+│   ├── schema/              # Pydantic models
 │   ├── util/                # Utility modules
 │   ├── client/              # CLI tools
 │   └── tests/               # Test suite
@@ -242,10 +241,6 @@ Configuration options:
 set, which causes it to use direct MariaDB access for its own startup and
 shutdown recording. All other daemons access MariaDB via the database
 service's gRPC interface.
-
-Note: the `etcd.py` module is retained only to service DATA_MIGRATIONS
-entries which drain leftover etcd keys from older clusters. The module
-will be removed in the next minor version.
 
 ### Systemd Service Ordering
 
@@ -366,7 +361,6 @@ Queue priorities (per-node and global):
 
 ## Key Dependencies
 
-- **etcd3gw** - etcd client (retained for DATA_MIGRATIONS drain only)
 - **grpcio/protobuf** - gRPC communication
 - **Flask/Flask-RESTful/Flasgger** - REST API
 - **Flask-JWT-Extended** - Authentication
@@ -462,9 +456,9 @@ performance. This is required for all deployments - MariaDB must be configured.
 
 ### Migrating Existing Deployments
 
-Data migrations from etcd to MariaDB run automatically when the database
-daemon starts. Simply upgrade and restart the `sf-database` service.
-Migrations are idempotent and safe to re-run.
+Object schema upgrade steps run automatically when the database daemon
+starts. Simply upgrade and restart the `sf-database` service. Migrations
+are idempotent and safe to re-run.
 
 ### State Class
 

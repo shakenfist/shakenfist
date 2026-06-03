@@ -134,8 +134,6 @@ class Node(dbo):
 
     @classmethod
     def _upgrade_step_10_to_11(cls, static_values):
-        # Migration to MariaDB nodes/node_attributes tables is handled by
-        # sf-ctl migrate-data-to-mariadb.
         ...
 
     @classmethod
