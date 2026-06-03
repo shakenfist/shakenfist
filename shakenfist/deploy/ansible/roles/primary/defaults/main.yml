@@ -1,5 +1,6 @@
 # cluster_config
-database_node_ip: "127.0.0.1"
+mariadb_gateway_hosts:
+  - "127.0.0.1"
 auth_secret: "unknown"
 ram_system_reservation: 5
 lowest_mtu: 1500

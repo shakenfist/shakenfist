@@ -289,13 +289,23 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
 
 
 def _use_database_service() -> bool:
-    """Check if we should use the database microservice instead of direct access.
+    """Decide whether to route a MariaDB access through the gRPC tier.
 
-    Returns True if the database service is configured and we should use it.
-    Returns False if we should use direct MariaDB access (database daemon mode).
+    Returns True if the gRPC tier should be used, False if
+    this process has direct MariaDB access available and
+    should prefer it.
 
-    Only the database daemon has MARIADB_HOST configured directly. All other
-    daemons access MariaDB via the database service gRPC interface.
+    MARIADB_HOST being set signals direct access is available
+    (sf-database itself, or sf-ctl ensure-mariadb-schema).
+    Direct access wins when both configs are set, because
+    the only process with direct access does not gain anything
+    by hopping through the tier to reach itself.
+
+    MARIADB_GATEWAY_HOSTS provides one or more sf-database
+    endpoints for processes without direct access. Phase 3 of
+    PLAN-byo-mariadb will reshape the consuming code into a
+    client-side load-balanced channel; today the channel
+    construction simply takes the first entry.
     """
     if config.MARIADB_HOST:
         return False

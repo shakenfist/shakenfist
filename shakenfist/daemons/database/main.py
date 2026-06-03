@@ -5074,9 +5074,9 @@ class Monitor(daemon.WorkerPoolDaemon):
         )
 
         # Bind the Prometheus metrics server on this node's mesh IP rather
-        # than the client-facing DATABASE_NODE_IP. The two are conflated
-        # today but will diverge once sf-database can run as a tier of
-        # several instances; clients still connect via DATABASE_NODE_IP.
+        # than listing it in MARIADB_GATEWAY_HOSTS. The two are the same
+        # address today but will diverge once sf-database can run as a
+        # tier of several instances; clients scrape via their own discovery.
         start_http_server(config.MARIADB_GATEWAY_METRICS_PORT, addr=config.NODE_MESH_IP)
 
     def record_start(self) -> None:
@@ -5197,7 +5197,7 @@ def main() -> None:
         ]
     )
     # Bind the gRPC server on this node's mesh IP. Clients discover where
-    # to connect via DATABASE_NODE_IP; the bind address is intentionally
+    # to connect via MARIADB_GATEWAY_HOSTS; the bind address is intentionally
     # separate so a tier of sf-database instances can each bind locally.
     server.add_insecure_port(
         f'{config.NODE_MESH_IP}:{config.MARIADB_GATEWAY_PORT}')

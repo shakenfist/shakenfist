@@ -26,13 +26,19 @@ def _parse_comma_separated_hosts(value):
 def load_cluster_config() -> None:
     """Load cluster-wide config into environment variables.
 
-    On the database node (MARIADB_HOST set), read directly from
-    MariaDB. This is important during bootstrap, when sf-database's
-    own ExecStartPre=verify-config runs before the daemon is
-    listening and therefore cannot self-loop through gRPC.
+    If MARIADB_HOST is set, this process has direct MariaDB
+    access available and uses it -- this path is used by
+    sf-database itself and by `sf-ctl ensure-mariadb-schema`.
+    Direct access is preferred when available because it
+    avoids a self-loop through the sf-database gRPC tier.
 
-    On every other node, fetch via the database microservice gRPC
-    API. Falls back silently on any failure so that fresh-install
+    Otherwise, if MARIADB_GATEWAY_HOSTS is set, the process
+    reaches the sf-database tier via gRPC. Phase 3 of
+    PLAN-byo-mariadb will reshape this into a client-side
+    load-balanced channel; today we connect to the first
+    endpoint in the list.
+
+    Falls back silently on any failure so that fresh-install
     nodes with no database daemon yet can still start.
 
     Built inline to avoid circular imports (database.py and
