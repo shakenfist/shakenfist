@@ -92,11 +92,8 @@ class HardDeleteWithTargetsTestCase(base.ShakenFistTestCase):
     @mock.patch(
         'shakenfist.mariadb.delete_cluster_operation_targets_for_object',
         return_value=True)
-    @mock.patch('shakenfist.etcd.delete_all')
-    @mock.patch('shakenfist.etcd.delete')
     def test_hard_delete_cleans_up_targets(
-            self, mock_etcd_del, mock_etcd_del_all,
-            mock_del_targets, mock_del_state,
+            self, mock_del_targets, mock_del_state,
             mock_del_meta, mock_del_events, mock_event):
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
         d.hard_delete()
