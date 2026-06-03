@@ -6,6 +6,15 @@ class VersionSpecificationError(Exception):
     ...
 
 
+# MariaDB
+class MariaDBIncompatibleError(Exception):
+    """The connected MariaDB server is incompatible with this SF release."""
+
+
+class SchemaVersionMismatchError(Exception):
+    """The MariaDB schema version does not match what this SF release expects."""
+
+
 # Configuration
 class NoNetworkNode(Exception):
     ...

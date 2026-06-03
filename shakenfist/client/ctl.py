@@ -123,6 +123,7 @@ sf_config.verify_config(skip_auth_seed=True)
 config = sf_config.config
 
 # These imports _must_ occur after the extra config setup has run.
+from shakenfist import exceptions                          # noqa
 from shakenfist import mariadb                             # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
@@ -216,6 +217,12 @@ def ensure_mariadb_schema() -> None:
         raise click.ClickException(
             'This command requires MARIADB_HOST to be configured. '
             'It should only be run on database nodes (etcd_master).')
+
+    engine = mariadb._get_engine()
+    try:
+        mariadb.verify_mariadb_compat(engine)
+    except exceptions.MariaDBIncompatibleError as e:
+        raise click.ClickException(str(e))
 
     results = mariadb.ensure_schema()
 

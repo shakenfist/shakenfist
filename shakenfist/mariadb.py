@@ -38,6 +38,7 @@ from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
+from shakenfist import exceptions
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
@@ -227,6 +228,14 @@ CLUSTER_LOCKS_VERSION = 4
 CLUSTER_CONFIG_VERSION = 2
 EVENTS_VERSION = 1
 EVENT_OBJECTS_VERSION = 1
+
+
+# Minimum supported MariaDB version. See docs/plans/PLAN-byo-mariadb-phase-01-
+# statelessness.md decision 1 for the rationale; in short: comfortably above
+# the 10.2 JSON-features floor SF uses today, matches Ubuntu 22.04 LTS so the
+# floor lines up with a vendor-supported LTS distro, and well below what
+# cluster_ci's debian-12 functional tests (MariaDB 10.11) exercise.
+MIN_MARIADB_VERSION: tuple[int, int, int] = (10, 6, 0)
 
 
 # Consolidated mapping of every MariaDB table managed by ensure_schema() to
@@ -608,6 +617,127 @@ def _ensure_schema_versions_table(engine: sa.Engine) -> None:
     versions_table = _get_schema_versions_table()
     versions_table.metadata.create_all(engine, tables=[versions_table],
                                        checkfirst=True)
+
+
+def _parse_mariadb_version(version_string: str) -> tuple[int, int, int]:
+    """Parse a MariaDB ``VERSION()`` string into a (major, minor, patch) tuple.
+
+    MariaDB returns strings like ``10.11.5-MariaDB-1:10.11.5+maria~ubu2204``
+    on Debian/Ubuntu builds or ``10.6.16-MariaDB`` in older formats. MySQL
+    returns strings like ``8.0.35`` or ``8.0.36-0ubuntu0.22.04.1``. In every
+    case the leading chunk before the first ``-`` is dotted numerics, so
+    splitting on ``-`` then on ``.`` recovers the version triple.
+
+    Raises ``ValueError`` if the string does not contain three integer-valued
+    dot-separated components in its first chunk.
+    """
+    head = version_string.split('-', 1)[0]
+    parts = head.split('.')
+    if len(parts) < 3:
+        raise ValueError(
+            f'Expected at least three dot-separated components, got {head!r}')
+    return (int(parts[0]), int(parts[1]), int(parts[2]))
+
+
+def verify_mariadb_compat(engine: sa.Engine) -> None:
+    """Verify the connected MariaDB server is compatible with this SF release.
+
+    Performs four independent checks and accumulates all failures into a
+    single ``MariaDBIncompatibleError`` so operators see every problem at
+    once rather than chasing them one-by-one:
+
+      (a) Server version is MariaDB and at least ``MIN_MARIADB_VERSION``.
+      (b) Default storage engine is InnoDB.
+      (c) Default character set is utf8mb4.
+      (d) Default collation is a utf8mb4_* collation.
+
+    Raises ``MariaDBIncompatibleError`` listing every detected problem if
+    any check fails. Returns silently on success.
+    """
+    failures: list[str] = []
+
+    with engine.connect() as conn:
+        version_str = str(conn.execute(sa.text('SELECT VERSION()')).scalar() or '')
+        storage_engine = str(
+            conn.execute(sa.text('SELECT @@default_storage_engine')).scalar() or '')
+        charset = str(
+            conn.execute(sa.text('SELECT @@character_set_database')).scalar() or '')
+        collation = str(
+            conn.execute(sa.text('SELECT @@collation_database')).scalar() or '')
+
+    # (a) Server version + MariaDB-not-MySQL.
+    try:
+        observed_version = _parse_mariadb_version(version_str)
+    except ValueError:
+        failures.append(
+            f'Could not parse MariaDB version string: {version_str!r}')
+    else:
+        if observed_version < MIN_MARIADB_VERSION:
+            observed = '.'.join(str(p) for p in observed_version)
+            minimum = '.'.join(str(p) for p in MIN_MARIADB_VERSION)
+            failures.append(
+                f'MariaDB server version {observed} is older than the '
+                f'minimum supported version {minimum}')
+
+    if 'MariaDB' not in version_str:
+        failures.append(
+            f'Connected to non-MariaDB server (VERSION() returned '
+            f'{version_str!r}); only MariaDB is supported')
+
+    # (b) Default storage engine.
+    if storage_engine != 'InnoDB':
+        failures.append(
+            f'Default storage engine is {storage_engine!r}; SF requires InnoDB')
+
+    # (c) Default character set.
+    if charset != 'utf8mb4':
+        failures.append(
+            f'Default character set is {charset!r}; SF requires utf8mb4')
+
+    # (d) Default collation.
+    if not collation.startswith('utf8mb4_'):
+        failures.append(
+            f'Default collation is {collation!r}; SF requires a utf8mb4_* '
+            f'collation')
+
+    if failures:
+        message = 'MariaDB server is incompatible:\n' + '\n'.join(
+            f'  - {f}' for f in failures)
+        raise exceptions.MariaDBIncompatibleError(message)
+
+
+def verify_schema_versions(engine: sa.Engine) -> None:
+    """Verify every managed table is at the expected schema version.
+
+    Reads ``EXPECTED_SCHEMA_VERSIONS`` and compares each entry to the
+    actual version recorded in the ``schema_versions`` table. If the
+    ``schema_versions`` table itself does not exist, raises a clearer
+    error pointing the operator at ``sf-ctl ensure-mariadb-schema``
+    rather than producing N parallel "expected v2, found v-1" lines.
+
+    Raises ``SchemaVersionMismatchError`` listing every mismatched table
+    if any are out of date. Returns silently on success.
+    """
+    if not sa.inspect(engine).has_table('schema_versions'):
+        raise exceptions.SchemaVersionMismatchError(
+            'MariaDB schema has not been initialised; run '
+            '`sf-ctl ensure-mariadb-schema`')
+
+    mismatches: list[tuple[str, int, int]] = []
+    for table_name, expected in EXPECTED_SCHEMA_VERSIONS.items():
+        actual = _get_table_version(engine, table_name)
+        if actual != expected:
+            mismatches.append((table_name, expected, actual))
+
+    if mismatches:
+        lines = [
+            'Schema version mismatches detected. Run '
+            '`sf-ctl ensure-mariadb-schema` to apply pending migrations.'
+        ]
+        for table_name, expected, actual in mismatches:
+            lines.append(
+                f'  - {table_name}: expected v{expected}, found v{actual}')
+        raise exceptions.SchemaVersionMismatchError('\n'.join(lines))
 
 
 def _get_object_states_table() -> sa.Table:
