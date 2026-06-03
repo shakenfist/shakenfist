@@ -5073,7 +5073,11 @@ class Monitor(daemon.WorkerPoolDaemon):
             'Current row count in the events table.'
         )
 
-        start_http_server(config.DATABASE_METRICS_PORT)
+        # Bind the Prometheus metrics server on this node's mesh IP rather
+        # than the client-facing DATABASE_NODE_IP. The two are conflated
+        # today but will diverge once sf-database can run as a tier of
+        # several instances; clients still connect via DATABASE_NODE_IP.
+        start_http_server(config.DATABASE_METRICS_PORT, addr=config.NODE_MESH_IP)
 
     def record_start(self) -> None:
         # The database daemon records its own startup. Events flow into the
@@ -5192,8 +5196,11 @@ def main() -> None:
             ('grpc.http2.max_ping_strikes', 0),
         ]
     )
+    # Bind the gRPC server on this node's mesh IP. Clients discover where
+    # to connect via DATABASE_NODE_IP; the bind address is intentionally
+    # separate so a tier of sf-database instances can each bind locally.
     server.add_insecure_port(
-        f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
+        f'{config.NODE_MESH_IP}:{config.DATABASE_API_PORT}')
 
     # Create the monitor and register the service BEFORE starting the server.
     # This is critical - if we start the server before registering the service,
@@ -5206,7 +5213,7 @@ def main() -> None:
     # Now start the server - it's ready to accept requests
     server.start()
     LOG.info('gRPC server started and listening on '
-             f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
+             f'{config.NODE_MESH_IP}:{config.DATABASE_API_PORT}')
 
     m.run()
     server.stop(1).wait()
