@@ -3,16 +3,24 @@ import json
 import os
 import socket
 import sys
+from typing import Annotated
 from typing import NoReturn
 from typing import Optional
 
 from pydantic import AnyHttpUrl
+from pydantic import BeforeValidator
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 def get_node_name() -> str:
     return socket.getfqdn()
+
+
+def _parse_comma_separated_hosts(value):
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(',') if item.strip()]
+    return value
 
 
 def load_cluster_config() -> None:
@@ -69,18 +77,21 @@ def load_cluster_config() -> None:
             # so bootstrap keeps working.
             return
 
-    db_ip = os.getenv('SHAKENFIST_DATABASE_NODE_IP')
-    if not db_ip:
+    hosts_raw = os.getenv('SHAKENFIST_MARIADB_GATEWAY_HOSTS', '')
+    if not hosts_raw:
+        return
+    hosts = [h.strip() for h in hosts_raw.split(',') if h.strip()]
+    if not hosts:
         return
 
-    db_port = os.getenv('SHAKENFIST_DATABASE_API_PORT', '13005')
+    db_port = os.getenv('SHAKENFIST_MARIADB_GATEWAY_PORT', '13005')
 
     try:
         import grpc
         from shakenfist.protos import database_pb2
         from shakenfist.protos import database_pb2_grpc
 
-        channel = grpc.insecure_channel(f'{db_ip}:{db_port}')
+        channel = grpc.insecure_channel(f'{hosts[0]}:{db_port}')
         stub = database_pb2_grpc.DatabaseServiceStub(channel)
         request = database_pb2.ClusterConfigRequest()
 
@@ -326,17 +337,24 @@ class SFConfig(BaseSettings):
     )
 
     # Database Service Options
-    DATABASE_NODE_IP: str = Field(
-        '',
-        description='Mesh IP of the node running the database service.'
+    MARIADB_GATEWAY_HOSTS: Annotated[
+        list[str], BeforeValidator(_parse_comma_separated_hosts)
+    ] = Field(
+        default_factory=list,
+        description=(
+            'List of sf-database tier endpoints clients connect to. A '
+            'single-instance deployment sets this to a one-element list. '
+            'When supplied via environment variable, comma-separated '
+            'values are parsed into the list.'
+        )
     )
-    DATABASE_API_PORT: int = Field(
+    MARIADB_GATEWAY_PORT: int = Field(
         13005,
-        description='Port for the internal database gRPC API.'
+        description='Port the sf-database gRPC service listens on.'
     )
-    DATABASE_METRICS_PORT: int = Field(
+    MARIADB_GATEWAY_METRICS_PORT: int = Field(
         13006,
-        description='Prometheus metrics port for the database daemon.'
+        description='Prometheus metrics port for the sf-database daemon.'
     )
     USAGE_EVENT_FREQUENCY: int = Field(
         60,

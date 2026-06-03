@@ -44,13 +44,13 @@ def get_database_client():
             c = None
 
     if not c:
-        if not config.DATABASE_NODE_IP:
+        if not config.MARIADB_GATEWAY_HOSTS:
             LOG.error('Cannot communicate with database service, no '
                       'configured server!')
             return None
 
         local.sf_database_client = grpc.insecure_channel(
-            f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}',
+            f'{config.MARIADB_GATEWAY_HOSTS[0]}:{config.MARIADB_GATEWAY_PORT}',
             options=[
                 ('grpc.keepalive_timeout_ms', 200),
                 ('grpc.http2.max_pings_without_data', 0),
@@ -106,7 +106,7 @@ def _retry_database(func):
 
 def is_available():
     """Check if the database service is configured and available."""
-    if not config.DATABASE_NODE_IP:
+    if not config.MARIADB_GATEWAY_HOSTS:
         return False
     return True
 

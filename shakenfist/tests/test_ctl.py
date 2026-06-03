@@ -23,8 +23,8 @@ class MockConfig:
     NODE_NAME = 'test-node'
     NODE_MESH_IP = '10.0.0.1'
     MARIADB_HOST = ''
-    DATABASE_NODE_IP = '192.168.1.1'
-    DATABASE_API_PORT = 13005
+    MARIADB_GATEWAY_HOSTS = ['192.168.1.1']
+    MARIADB_GATEWAY_PORT = 13005
 
 
 def _import_ctl_module():

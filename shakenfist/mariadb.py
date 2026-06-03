@@ -299,7 +299,7 @@ def _use_database_service() -> bool:
     """
     if config.MARIADB_HOST:
         return False
-    if not config.DATABASE_NODE_IP:
+    if not config.MARIADB_GATEWAY_HOSTS:
         return False
     return True
 
@@ -316,7 +316,7 @@ def _get_database_stub() -> Any:
     """
     if not hasattr(_local, 'database_channel') or _local.database_channel is None:
         _local.database_channel = grpc.insecure_channel(
-            f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}',
+            f'{config.MARIADB_GATEWAY_HOSTS[0]}:{config.MARIADB_GATEWAY_PORT}',
             options=[
                 ('grpc.keepalive_time_ms', 10000),
                 ('grpc.keepalive_timeout_ms', 5000),
