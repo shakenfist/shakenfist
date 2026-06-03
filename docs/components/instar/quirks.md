@@ -1144,6 +1144,155 @@ Raw / vmdk / vpc / vhdx grow and shrink have no analogous
 metadata-staging step and are bounded only by filesystem
 capacity.
 
+## rebase subcommand quirks
+
+### Unsafe (`-u`) is byte-equivalent across qemu-img versions
+
+The post-rebase `qemu-img info --output=json` for `instar
+rebase -u` matches `qemu-img rebase -u` byte-for-byte across
+qemu-img 6.0.0 through 10.2.0 after the
+`KNOWN_REBASE_DIVERGENCES` whitelist
+(`tests/helpers/info_json.py`). Cross-version coverage:
+`tests/test_rebase.py:TestRebaseBaselineMatrix`.
+
+### qemu-img cannot rebase vmdk / vhd / vhdx on any shipped version
+
+`qemu-img rebase -f vpc|vmdk|vhdx ...` rejects with
+`qemu-img: Image format driver does not support rebase` on
+every version 6.0.0 through 10.2.0. instar rebase
+unsafe-mode supports vmdk monolithicSparse; the
+post-rebase descriptor records the new
+`parentFileNameHint` via the cross-tool comparison in
+`TestRebaseSuccessPaths`. Cross-version baselines cover
+qcow2 only — there is nothing to record for the
+instar-only targets.
+
+### Safe-mode rebase for vmdk is not yet supported
+
+instar's safe-mode planner refuses vmdk with
+`ERROR_UNSUPPORTED_FORMAT`; qemu-img refuses vmdk rebase
+entirely. Lifting the gap (cluster comparison loop +
+descriptor rewrite atomicity for vmdk grain tables) is
+tracked under PLAN-rebase-commit Future work.
+
+### Long-path relocation is rejected
+
+If the new backing-file path is longer than the overlay's
+existing slot (qcow2 `backing_file_size` field), instar
+refuses with `ERROR_BACKING_PATH_TOO_LONG`. qemu-img
+silently relocates the path string to a fresh cluster and
+updates the header offset. Lifting the gap (planner +
+guest scratch budget for the appended path cluster) is
+tracked under PLAN-rebase-commit Future work; until then,
+keep the new backing path's length ≤ the overlay's
+existing slot.
+
+### Cross-cluster-size rebase is rejected
+
+Safe-mode rebase requires the old and new backings to
+share a cluster size. If they differ, instar refuses with
+`ERROR_NEW_BACKING_INCOMPATIBLE`. qemu-img silently
+succeeds but the resulting overlay has inconsistent
+metadata; the master plan tracks this as a future
+hardening item. Use unsafe-mode rebase (`-u`) when the
+caller knows the new backing's data is bit-identical to
+the old.
+
+### `Image rebased.` / `Image detached.` output matches qemu byte-for-byte
+
+instar emits the same trailing-newline-terminated strings
+as `qemu-img rebase`. `--output=json` adds a structured
+envelope unique to instar (see
+[docs/rebase.md](/components/instar/rebase/)).
+
+## commit subcommand quirks
+
+### Implicit `-b` matches the overlay's recorded parent
+
+`instar commit FILENAME` (no `-b`) reads the overlay's
+recorded backing-file pointer and uses it as the commit
+target. Matches `qemu-img commit`'s implicit-`-b`
+semantics. v1 supports only the overlay's immediate
+parent; if `-b BASE` is supplied and resolves to a
+different file than the recorded parent, instar refuses
+with `commit through an intermediate layer is not yet
+supported`.
+
+### qemu-img cannot commit vhd / vhdx / raw
+
+qemu-img commit accepts qcow2 and vmdk monolithicSparse —
+the only formats with backing-chain support — and
+refuses every other format. instar matches that surface.
+
+### vmdk implicit-`-b` is blocked by a host info gap
+
+The host info operation doesn't currently surface vmdk
+monolithicSparse's `parentFileNameHint` via the
+`backing_file` field, so the host's `-b`-against-
+recorded-parent check refuses every vmdk commit without
+an explicit `-b`. Phase 9's matrix and round-trip vmdk
+cases all pass an explicit `-b base.vmdk`. Tracked
+separately under PLAN-info's vmdk follow-ups; once the
+info-side gap lifts, the implicit form will work too.
+
+### Cluster-size mismatch is refused up-front
+
+If the overlay and backing have different qcow2 cluster
+sizes, the host pre-check refuses with `commit between
+mismatched cluster sizes is not yet supported`. qemu-img
+silently succeeds with limited efficiency. Lifting the
+gap requires cluster-size adapters in the planner's
+per-cluster loop.
+
+### Cross-format commit is refused
+
+qcow2 → qcow2 and vmdk → vmdk only. Cross-format commit
+(e.g. qcow2 overlay onto a vmdk backing) is refused with
+`ERROR_UNSUPPORTED_FORMAT`. Lifting needs planner
+extensions plus a cluster-size translation layer.
+
+### `cluster_size > 64 KiB` overflows the commit scratch budget
+
+The commit guest binary's `OVERLAY_RT_LIMIT` and
+`BACKING_RT_LIMIT` scratch regions are sized at
+`MAX_SECTOR_SIZE` (64 KiB), so a single-cluster refcount
+table for any `cluster_size > 64 KiB` overflows the
+budget and returns `ERROR_SCRATCH_TOO_SMALL`. The
+differential fuzzer picker
+(`scripts/differential-fuzz.py:_commit_option_picker`)
+caps `cluster_size` at 64 KiB to match; lifting the
+guest-side limit is a master-plan TODO.
+
+### `-d` / `-p` / `-r` / `-t` are not implemented
+
+qemu-img commit's `-d` (drop overlay after commit), `-p`
+(progress bar), `-r` (rate limit), and `-t` (cache mode)
+flags are not implemented in instar v1. The user can
+manually `rm` the overlay after a successful commit when
+the equivalent of `-d` is needed. All four are tracked
+under PLAN-rebase-commit Future work.
+
+### `Image committed.` output matches qemu byte-for-byte
+
+instar emits the same trailing-newline-terminated string
+as `qemu-img commit`. `--output=json` adds a structured
+envelope unique to instar (see
+[docs/commit.md](/components/instar/commit/)).
+
+### Same file is exposed as input device 0 and output device 1
+
+Commit's two-device layout has the overlay attached at
+input slot 0 opened RW (so the guest's overlay-clear
+pass can write through `write_input_sector(0, ...)`)
+and the backing attached as the output device opened
+RW. The backing's own ancestor chain occupies input
+slots [1..N) read-only — v1 doesn't consult them, but
+the slots are populated so the future "skip when chain
+provides this data" mode (see
+[PLAN-rebase-commit-phase-08-commit-host.md](/components/instar/
+plans/PLAN-rebase-commit-phase-08-commit-host/)) can
+plug in without an ABI change.
+
 ## Future Additions
 
 Additional quirks will be documented here as they are discovered during

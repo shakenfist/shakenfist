@@ -141,6 +141,66 @@ qemu-img.
 
 ---
 
+## Rebase Format Support
+
+The `instar rebase` operation changes the backing-file
+pointer recorded in an overlay (and, in safe mode, copies
+divergent clusters from the old chain). Per-format support:
+
+| Format | Unsafe (`-u`) | Safe (default) | qemu-img parity |
+|--------|---------------|----------------|------------------|
+| qcow2 v2 / v3 | Yes | Yes | Byte-equivalent across qemu-img 6.0.0–10.2.0 (modulo `KNOWN_REBASE_DIVERGENCES`) |
+| vmdk monolithicSparse | Yes | Reject (planner gap) | **instar-only**: `qemu-img rebase` rejects vmdk on every shipped version |
+| Other formats | Reject | Reject | n/a (both refuse) |
+
+For qcow2, the post-rebase `qemu-img info --output=json`
+matches `qemu-img rebase` byte-for-byte across every
+shipped version. Coverage is via
+`tests/test_rebase.py:TestRebaseBaselineMatrix` (cross-
+version) and `TestRebaseRoundTrip` (live cross-tool diff).
+
+For vmdk — which `qemu-img rebase` rejects entirely with
+`Image format driver does not support rebase` — coverage is
+via instar's smoke tests (`TestRebaseSuccessPaths`)
+asserting the post-rebase descriptor records the new
+`parentFileNameHint`. See [docs/rebase.md](/components/instar/rebase/) and
+the "rebase subcommand quirks" section of
+[docs/quirks.md](/components/instar/quirks/).
+
+---
+
+## Commit Format Support
+
+The `instar commit` operation merges every allocated cluster
+from an overlay into its backing image, then zeroes the
+overlay's metadata. Per-format support:
+
+| Format | Implicit `-b` | Explicit `-b` | qemu-img parity |
+|--------|---------------|---------------|------------------|
+| qcow2 v2 / v3 | Yes | Yes | Byte-equivalent across qemu-img 6.0.0–10.2.0 (modulo `KNOWN_COMMIT_DIVERGENCES`) |
+| vmdk monolithicSparse | Reject (info-side gap) | Yes | Cross-version baselines recorded; implicit-`-b` blocked by info-vmdk-backing-file follow-up |
+| Other formats | Reject | Reject | n/a (both refuse) |
+
+For qcow2, post-commit `qemu-img info --output=json` for
+both the overlay and the backing matches `qemu-img commit`
+byte-for-byte across every shipped version. Coverage is via
+`tests/test_commit.py:TestCommitBaselineMatrix` (cross-
+version, both buckets) and `TestCommitRoundTrip` (live
+cross-tool diff).
+
+For vmdk monolithicSparse, the implicit-`-b` resolution
+path is blocked because the host info operation doesn't
+currently expose vmdk monolithicSparse's
+`parentFileNameHint` via the `backing_file` field. Phase 9's
+matrix and round-trip tests use explicit `-b base.vmdk` to
+sidestep this; once the info-side gap lifts (tracked under
+PLAN-info's vmdk follow-ups), the implicit form will work
+too. See [docs/commit.md](/components/instar/commit/) and the "commit
+subcommand quirks" section of
+[docs/quirks.md](/components/instar/quirks/).
+
+---
+
 ## Safety Check Comparison
 
 ### QCOW2 Safety Checks

@@ -102,8 +102,10 @@ nav:
                 - "Title for the plan": components/development/plans/PLAN-consistency-audits-v2.md
         - Instar:
             - "Introduction": components/instar/index.md
+            - "`instar commit` — merge an overlay's data into its backing": components/instar/commit.md
             - "`instar create` — create a new empty disk image": components/instar/create.md
             - "`instar measure` — predict file size for a target format": components/instar/measure.md
+            - "`instar rebase` — change an overlay's backing-file reference": components/instar/rebase.md
             - "`instar resize` — change a disk image's virtual size": components/instar/resize.md
             - "Announcement": components/instar/openstack-announcement-email.md
             - "Backing Chain Discovery": components/instar/chain-discovery.md
@@ -132,6 +134,7 @@ nav:
             - Plans:
                 - "`instar create` subcommand": components/instar/plans/PLAN-create.md
                 - "`instar measure` subcommand": components/instar/plans/PLAN-measure.md
+                - "`instar rebase` and `instar commit` subcommands": components/instar/plans/PLAN-rebase-commit.md
                 - "`instar resize` subcommand": components/instar/plans/PLAN-resize.md
                 - "Automated fuzzer bug fix workflow": components/instar/plans/PLAN-fuzz-autofix.md
                 - "Convert follow-ups: deferred work after PLAN-convert.md": components/instar/plans/PLAN-convert-followups.md
@@ -163,6 +166,18 @@ nav:
                 - "PLAN-create phase 4: qemu-img-style `-o key=value,...` parser": components/instar/plans/PLAN-create-phase-04-target-options.md
                 - "PLAN-create phase 5: backing-file polish": components/instar/plans/PLAN-create-phase-05-backing-file.md
                 - "PLAN-create phase 6: preallocation modes": components/instar/plans/PLAN-create-phase-06-preallocation.md
+                - "PLAN-rebase-commit phase 01: shared ABI": components/instar/plans/PLAN-rebase-commit-phase-01-abi.md
+                - "PLAN-rebase-commit phase 02: rebase planners": components/instar/plans/PLAN-rebase-commit-phase-02-rebase-planners.md
+                - "PLAN-rebase-commit phase 03: rebase guest binary": components/instar/plans/PLAN-rebase-commit-phase-03-rebase-guest.md
+                - "PLAN-rebase-commit phase 04: rebase host CLI": components/instar/plans/PLAN-rebase-commit-phase-04-rebase-host.md
+                - "PLAN-rebase-commit phase 05: rebase integration tests + baselines": components/instar/plans/PLAN-rebase-commit-phase-05-rebase-tests.md
+                - "PLAN-rebase-commit phase 06: commit planners": components/instar/plans/PLAN-rebase-commit-phase-06-commit-planners.md
+                - "PLAN-rebase-commit phase 07: commit guest binary": components/instar/plans/PLAN-rebase-commit-phase-07-commit-guest.md
+                - "PLAN-rebase-commit phase 08: commit host CLI": components/instar/plans/PLAN-rebase-commit-phase-08-commit-host.md
+                - "PLAN-rebase-commit phase 09: commit integration tests + baselines": components/instar/plans/PLAN-rebase-commit-phase-09-commit-tests.md
+                - "PLAN-rebase-commit phase 10: coverage-guided fuzzing": components/instar/plans/PLAN-rebase-commit-phase-10-fuzz.md
+                - "PLAN-rebase-commit phase 11: differential fuzzing vs qemu-img": components/instar/plans/PLAN-rebase-commit-phase-11-diff-fuzz.md
+                - "PLAN-rebase-commit phase 12: documentation, CHANGELOG, ARCHITECTURE": components/instar/plans/PLAN-rebase-commit-phase-12-docs.md
                 - "PLAN-resize followup 01: targeted refcount-block pre-pass": components/instar/plans/PLAN-resize-followup-01-targeted-prepass.md
                 - "PLAN-resize phase 10: cross-version baselines": components/instar/plans/PLAN-resize-phase-10-baselines.md
                 - "PLAN-resize phase 11: integration tests": components/instar/plans/PLAN-resize-phase-11-integration-tests.md
