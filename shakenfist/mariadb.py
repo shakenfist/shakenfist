@@ -481,14 +481,20 @@ def _get_schema_versions_table() -> sa.Table:
     """
     global _schema_versions_table
     if _schema_versions_table is None:
-        metadata = _get_metadata()
-        _schema_versions_table = sa.Table(
-            'schema_versions',
-            metadata,
-            sa.Column('table_name', sa.String(64), primary_key=True),
-            sa.Column('version', sa.Integer(), nullable=False),
-            sa.Column('updated_at', sa.Double(), nullable=False),
-        )
+        with TABLE_CREATION_LOCK:
+            if _schema_versions_table is not None:
+                return _schema_versions_table
+            metadata = _get_metadata()
+            if 'schema_versions' in metadata.tables:
+                _schema_versions_table = metadata.tables['schema_versions']
+                return _schema_versions_table
+            _schema_versions_table = sa.Table(
+                'schema_versions',
+                metadata,
+                sa.Column('table_name', sa.String(64), primary_key=True),
+                sa.Column('version', sa.Integer(), nullable=False),
+                sa.Column('updated_at', sa.Double(), nullable=False),
+            )
     return _schema_versions_table
 
 
