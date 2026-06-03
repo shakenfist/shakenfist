@@ -457,6 +457,38 @@ happens automatically when the database daemon starts. The migration reads
 all reservations from etcd, writes them to the MariaDB `ipam_reservations`
 table, and removes the original etcd entries.
 
+## MariaDB compatibility requirements
+
+Before `sf-database` starts, and before `sf-ctl ensure-mariadb-schema` applies
+any schema work, the server is checked against these requirements:
+
+- **MariaDB, not MySQL.** The `VERSION()` string must contain `MariaDB`.
+  Shaken Fist uses MariaDB-specific column types (such as `INET4`) that are
+  not available in MySQL.
+- **Version 10.6.0 or later.** This matches the version shipped with
+  Ubuntu 22.04 LTS and is well above the 10.2 JSON-features floor.
+- **Default storage engine: InnoDB.** Shaken Fist relies on row-level
+  locking and transactional semantics provided by InnoDB.
+- **Default character set: utf8mb4.** Required for full Unicode support,
+  including supplementary characters.
+- **Default collation: any `utf8mb4_*` collation.** The exact collation
+  within the `utf8mb4` family is not mandated.
+
+`sf-ctl ensure-mariadb-schema` runs these checks before touching any schema
+objects and refuses to proceed if the server does not meet them, printing a
+multi-line error that lists every failing check. The same checks run at
+`sf-database` startup; the daemon refuses to start on an incompatible server.
+
+After an SF version bump that includes schema changes, you must run
+`sf-ctl ensure-mariadb-schema` **before** starting `sf-database`. If you
+skip this step, the daemon will refuse to start with a schema-version
+mismatch error that names the command to run.
+
+!!! note
+    Phase 7 of the BYO-MariaDB plan will reorganise this operator guide to
+    lead with BYO MariaDB provisioning. Until then, this subsection is the
+    canonical statement of the server requirements.
+
 ## Administrative Commands
 
 The `sf-ctl` command provides several database-related administrative functions.
@@ -465,14 +497,18 @@ These commands are typically used during cluster bootstrap and maintenance.
 ### ensure-mariadb-schema
 
 Ensures the MariaDB schema exists and is up to date. This command must be run
-on an etcd_master node (which has `MARIADB_HOST` configured):
+on a node with direct database access (i.e. `MARIADB_HOST` configured):
 
 ```bash
 sf-ctl ensure-mariadb-schema
 ```
 
-This is automatically run during cluster deployment before any nodes are
-initialized.
+The command first performs a compatibility check against the requirements
+listed in [MariaDB compatibility requirements](#mariadb-compatibility-requirements)
+above, then creates any missing tables and applies pending schema migrations.
+Operators must run this command (or ensure their deployment automation runs
+it) before starting `sf-database` whenever an SF upgrade includes schema
+changes.
 
 ### initialise-node
 
