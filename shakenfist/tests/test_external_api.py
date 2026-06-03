@@ -141,7 +141,6 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         fake_config = SFConfig(
             NODE_NAME='node1',
             NODE_UUID='a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
-            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch('shakenfist.instance.config', fake_config)
         self.mock_config = self.config.start()
@@ -192,7 +191,6 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         fake_config = SFConfig(
             NODE_NAME='node1',
             NODE_UUID='a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
-            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch('shakenfist.instance.config', fake_config)
         self.mock_config = self.config.start()
@@ -508,7 +506,6 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
 
         class FakeConfig(BaseSettings):
             API_ASYNC_WAIT: int = 1
-            ETCD_HOST: str = '127.0.0.1'
 
         fake_config = FakeConfig()
 

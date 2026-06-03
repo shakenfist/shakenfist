@@ -25,7 +25,6 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
             DISK_BUS='virtio',
             ZONE='sfzone',
             NODE_NAME='node01',
-            ETCD_HOST='127.0.0.1'
         )
 
         self.config = mock.patch('shakenfist.instance.config', fake_config)
@@ -81,7 +80,6 @@ class InstanceTestCase(base.ShakenFistTestCase):
             DISK_BUS='virtio',
             ZONE='sfzone',
             NODE_NAME='node01',
-            ETCD_HOST='127.0.0.1'
         )
 
         self.config = mock.patch('shakenfist.instance.config',

@@ -41,7 +41,6 @@ class InterfaceEndpointGetTestCase(base.ShakenFistTestCase):
             NODE_EGRESS_NIC='eth0',
             NODE_MESH_NIC='eth1',
             NODE_IS_NETWORK_NODE=False,
-            ETCD_HOST='127.0.0.1'
         )
         self.config_patch = mock.patch(
             'shakenfist.external_api.base.config', fake_config)

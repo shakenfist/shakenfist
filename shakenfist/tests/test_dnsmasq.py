@@ -28,9 +28,6 @@ class DnsMasqTestCase(testtools.TestCase):
             NODE_NAME: str = 'foo'
             STORAGE_PATH: str = f'{TEST_DIR}/files/'
             ZONE: str = 'shakenfist'
-            ETCD_USER: str = 'sf'
-            ETCD_PASSWORD: str = 'foo'
-            ETCD_SERVER: str = 'localhost'
             NODE_EGRESS_IP: IPvAnyAddress = '127.0.0.1'
             DOWNLOAD_URL_CIRROS: AnyHttpUrl = (
                 'http://download.cirros-cloud.net/%(vernum)s/'
@@ -38,7 +35,6 @@ class DnsMasqTestCase(testtools.TestCase):
             DOWNLOAD_URL_UBUNTU: AnyHttpUrl = (
                 'https://cloud-images.ubuntu.com/%(vername)s/current/'
                 '%(vername)s-server-cloudimg-amd64.img')
-            ETCD_HOST: str = '127.0.0.1'
 
         fake_config = FakeConfig()
         self.config = mock.patch(

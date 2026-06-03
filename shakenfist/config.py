@@ -485,15 +485,6 @@ class SFConfig(BaseSettings):
     LOGLEVEL_SIDECHANNEL: str = 'info'
     LOGLEVEL_QUEUES: str = 'info'
 
-    # etcd (retained only for DATA_MIGRATIONS drain — remove in next release)
-    ETCD_HOST: str = Field(
-        '',
-        description=(
-            'Hostname or IP of the etcd host to query for drain migrations. '
-            'Retained only for one-time migration of legacy clusters.'
-        )
-    )
-
     # MariaDB
     MARIADB_HOST: str = Field(
         '',

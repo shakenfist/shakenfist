@@ -38,7 +38,6 @@ class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
             NODE_EGRESS_NIC='eth0',
             NODE_MESH_NIC='eth1',
             NODE_IS_NETWORK_NODE=True,
-            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch(
             'shakenfist.external_api.base.config', fake_config)
@@ -183,7 +182,6 @@ class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
             NODE_EGRESS_NIC='eth0',
             NODE_MESH_NIC='eth1',
             NODE_IS_NETWORK_NODE=True,
-            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch(
             'shakenfist.external_api.base.config', fake_config)
@@ -289,7 +287,6 @@ class NetworkDeleteAlreadyDeletedTestCase(base.ShakenFistTestCase):
             NODE_EGRESS_NIC='eth0',
             NODE_MESH_NIC='eth1',
             NODE_IS_NETWORK_NODE=True,
-            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch(
             'shakenfist.external_api.base.config', fake_config)
@@ -350,7 +347,6 @@ class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
             NODE_EGRESS_NIC='eth0',
             NODE_MESH_NIC='eth1',
             NODE_IS_NETWORK_NODE=True,
-            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch(
             'shakenfist.external_api.base.config', fake_config)
