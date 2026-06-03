@@ -104,8 +104,8 @@ This architecture:
 
 The `shakenfist.mariadb` module automatically routes requests:
 
-- If `DATABASE_USE_DIRECT_ETCD=True` (database daemon): Direct MariaDB access
-- If `DATABASE_USE_DIRECT_ETCD=False` (all other daemons): gRPC to database service
+- If `MARIADB_HOST` is set (database daemon, schema tool): Direct MariaDB access
+- Otherwise (all other daemons): gRPC to the database service tier via `MARIADB_GATEWAY_HOSTS`
 
 #### SQL Filter Pushdown
 
@@ -488,6 +488,38 @@ mismatch error that names the command to run.
     Phase 7 of the BYO-MariaDB plan will reorganise this operator guide to
     lead with BYO MariaDB provisioning. Until then, this subsection is the
     canonical statement of the server requirements.
+
+## MARIADB_HOST vs MARIADB_GATEWAY_HOSTS
+
+These two config keys are orthogonal and serve different purposes. Understanding
+the distinction helps when troubleshooting or planning a deployment.
+
+**`MARIADB_HOST`** is set only on nodes that have *direct* access to the MariaDB
+server. In practice this means nodes running `sf-database`, and any node where
+an operator runs `sf-ctl ensure-mariadb-schema`. The presence of `MARIADB_HOST`
+tells the `shakenfist.mariadb` module to bypass the gRPC layer and talk to
+MariaDB directly using SQLAlchemy. Ordinary cluster nodes (running `sf-api`,
+`sf-queues`, etc.) do **not** have `MARIADB_HOST` set and should never need it.
+
+**`MARIADB_GATEWAY_HOSTS`** is set on every cluster node. It is the list of
+`sf-database` gRPC endpoints that non-database daemons connect to. For a
+single-instance deployment this list has one entry; phase 3 of PLAN-byo-mariadb
+will add client-side load balancing so that multiple entries are tried in round-
+robin, enabling a tier of `sf-database` instances for higher availability.
+
+A node running `sf-database` has **both** keys set: `MARIADB_HOST` for its own
+direct MariaDB access, and `MARIADB_GATEWAY_HOSTS` so that any client library
+running on the same node can still reach the database tier over gRPC (for
+example, when `sf-api` and `sf-database` are co-located).
+
+In summary:
+
+| Who uses it | Config key | What it does |
+|-------------|------------|--------------|
+| `sf-database`, schema tool | `MARIADB_HOST` | Direct SQLAlchemy → MariaDB |
+| All other daemons | `MARIADB_GATEWAY_HOSTS` | gRPC → `sf-database` tier |
+| `sf-database` itself (gRPC listener) | `MARIADB_GATEWAY_PORT` | Port each `sf-database` binds on (default 13005) |
+| Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` instance (default 13006) |
 
 ## Administrative Commands
 

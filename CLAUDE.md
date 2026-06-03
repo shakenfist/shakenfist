@@ -213,8 +213,9 @@ shakenfist/
 Shaken Fist uses MariaDB as its sole datastore. Object state, queues,
 locks, and cluster config all live in MariaDB.
 
-The database microservice (`sf-database`) runs on the database node and
-provides a gRPC interface for all database operations:
+The database microservice (`sf-database`) provides a gRPC interface for all
+database operations. One or more `sf-database` instances can run as a tier;
+clients reach them through the gateway-hosts list.
 
 ```python
 # MariaDB state access (automatically routed through database service)
@@ -231,11 +232,16 @@ This abstraction layer:
 - Enables clean separation of concerns
 
 Configuration options:
-- `DATABASE_NODE_IP` - IP address of the database service node
-- `DATABASE_API_PORT` - gRPC API port (default: 13005)
-- `DATABASE_METRICS_PORT` - Prometheus metrics port (default: 13006)
-- `MARIADB_HOST` - Set only on the database daemon node; enables direct
-  MariaDB access for the daemon itself
+- `MARIADB_GATEWAY_HOSTS` - List of `sf-database` gRPC endpoints that clients
+  connect to (e.g. `['10.0.0.1']`). A single-instance deployment sets this to a
+  one-element list. Phase 3 of PLAN-byo-mariadb will add client-side load
+  balancing across multiple entries.
+- `MARIADB_GATEWAY_PORT` - gRPC API port on each gateway host (default: 13005)
+- `MARIADB_GATEWAY_METRICS_PORT` - Prometheus metrics port on each gateway host
+  (default: 13006)
+- `MARIADB_HOST` - Set only on nodes that run `sf-database` or where
+  `sf-ctl ensure-mariadb-schema` is executed; enables direct MariaDB access.
+  Do **not** set this on ordinary cluster nodes.
 
 **Database daemon special case**: The database daemon has `MARIADB_HOST`
 set, which causes it to use direct MariaDB access for its own startup and
