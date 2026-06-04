@@ -185,19 +185,6 @@
         role_action: "syslog"
         syslog_target: "{{ hostvars[groups['primary_node'][0]]['node_mesh_ip'] }}"
 
-### MariaDB
-
-- hosts: etcd_master
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-  roles:
-    - role: mariadb
-      vars:
-        role_action: "bootstrap"
-        mariadb_password: "{{ mariadb_password }}"
-
 ### Write config and configure client
 
 - hosts: allsf
