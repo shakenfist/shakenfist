@@ -24,7 +24,9 @@
 # The script is used by CI to install a BYO-style MariaDB on the
 # functional-test VM, and by developers spinning up single-box dev
 # deploys. CI passes a fixed test password; developers pass whatever
-# they choose.
+# they choose. The script writes a bind-all drop-in so MariaDB listens
+# on all interfaces (required for multi-node CI shapes; harmless on
+# single-node).
 
 set -euo pipefail
 
@@ -79,22 +81,30 @@ done
 echo "Applying SF bootstrap snippet..."
 sed "s/__REPLACE_ME__/${DB_PASSWORD}/" "${SQL_PATH}" | mysql -u root
 
+echo "Writing bind-all drop-in for multi-node access..."
+cat > /etc/mysql/mariadb.conf.d/99-bind-all.cnf <<'EOF'
+[mysqld]
+bind-address = 0.0.0.0
+EOF
+
 if [ -n "${TUNING_PATH}" ]; then
     echo "Installing SF tuning drop-in..."
     cp "${TUNING_PATH}" /etc/mysql/mariadb.conf.d/
-    systemctl restart mariadb
-    attempt=0
-    until systemctl is-active --quiet mariadb; do
-        attempt=$((attempt + 1))
-        if [ "${attempt}" -ge 30 ]; then
-            echo "mariadb did not restart cleanly after tuning install" >&2
-            systemctl status mariadb || true
-            exit 1
-        fi
-        sleep 2
-    done
 else
     echo "Skipping tuning install (empty path)"
 fi
+
+echo "Restarting MariaDB to pick up bind-all and tuning..."
+systemctl restart mariadb
+attempt=0
+until systemctl is-active --quiet mariadb; do
+    attempt=$((attempt + 1))
+    if [ "${attempt}" -ge 30 ]; then
+        echo "mariadb did not restart cleanly" >&2
+        systemctl status mariadb || true
+        exit 1
+    fi
+    sleep 2
+done
 
 echo "MariaDB ready."

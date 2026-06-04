@@ -31,7 +31,7 @@ SHAKENFIST_NODE_IS_DATABASE_NODE=True
 {% else %}
 SHAKENFIST_NODE_IS_DATABASE_NODE=False
 {% endif %}
-SHAKENFIST_MARIADB_GATEWAY_HOSTS="{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+SHAKENFIST_MARIADB_GATEWAY_HOSTS="{{ groups['etcd_master'] | map('extract', hostvars, 'node_mesh_ip') | join(',') }}"
 SHAKENFIST_MARIADB_GATEWAY_PORT=13005
 SHAKENFIST_MARIADB_GATEWAY_METRICS_PORT=13006
 
