@@ -55,7 +55,7 @@ Install `actionlint`:
 
 - `sf-ctl` - Control CLI
 - `sf-api` - REST API server
-- `sf-database` - Database microservice daemon (runs on etcd_master)
+- `sf-database` - Database microservice daemon (runs on database-tier nodes)
 - `sf-cleaner`, `sf-cluster`, `sf-net`, `sf-queues`, `sf-resources` - Daemons
 
 ### Generating gRPC Stubs from Proto Files

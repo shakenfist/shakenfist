@@ -1,32 +1,38 @@
 # Database Architecture
 
-Shaken Fist uses a combination of databases for different purposes. This page
-describes the database architecture, how data is organized, and how the schema
-system works.
+Shaken Fist uses MariaDB as its sole active data store. This page describes
+the database architecture, how data is organized, and how the schema system
+works.
 
 ## Overview
 
-Shaken Fist currently uses two database backends:
+Shaken Fist uses MariaDB as its primary database. All object state, IPAM
+reservations, cluster operations, work queues, locks, and cluster
+configuration live in MariaDB. Operator-provided infrastructure is required —
+see [Bring-your-own MariaDB setup](#bring-your-own-mariadb-setup) for the
+provisioning workflow.
 
-- **etcd**: A distributed key-value store used for cluster coordination,
-  configuration, locks, and object storage.
-- **MariaDB**: A relational database being introduced for structured data that
-  benefits from SQL queries and indexing.
+etcd is retained only to drain residual keys left by older cluster versions.
+The `etcd.py` module will be removed once all known deployments have completed
+their drain migrations.
 
 ## etcd
 
-etcd is the primary database for Shaken Fist and is used for:
+etcd is no longer an active data store for Shaken Fist. It is retained only
+to drain residual keys left by clusters that ran older versions before the
+full MariaDB migration. Data migrations run automatically on `sf-database`
+startup and move any leftover etcd data into MariaDB.
 
-- **Object storage**: Shaken Fist objects not yet migrated to MariaDB
-  (instances, networks, etc.) are stored in etcd.
-- **Cluster coordination**: Node discovery, leader election, and distributed
-  state.
-- **Distributed locking**: See the [Locks](locks.md) documentation.
-- **Configuration**: Cluster-wide configuration stored at `/sf/config`.
-- **Event storage**: Primary storage for cluster audit, status, mutation,
-  usage, and resource events in the `events` and `event_objects` tables.
-  See [Events](events.md) for the full write-path, retention, and
-  metrics picture.
+Historically, etcd was used for:
+
+- **Object storage**: All object types have been migrated to MariaDB tables.
+- **Distributed locking**: Locks now live in the `cluster_locks` MariaDB
+  table. See the [Locks](locks.md) documentation.
+- **Configuration**: Cluster-wide configuration is stored in the
+  `cluster_config` MariaDB table.
+- **Event storage**: Events are written to the `events` and `event_objects`
+  MariaDB tables. See [Events](events.md) for the full write-path,
+  retention, and metrics picture.
 
 Cluster operation headers and the per-node work queues were originally
 stored in etcd under `/sf/{op_type}/{uuid}`, `/sf/queue/{queue}/...`
@@ -35,9 +41,10 @@ and `/sf/processing/{queue}/...`. They have been moved to the
 corresponding data migrations run automatically on database daemon
 startup and drain any residual etcd keys into MariaDB.
 
-### Key Structure
+### Historical Key Structure
 
-etcd keys follow a hierarchical structure:
+Older clusters stored data in etcd under these paths. Drain migrations move
+any remaining keys into MariaDB on `sf-database` startup:
 
 ```
 /sf/                          # Root prefix for all Shaken Fist data
@@ -46,9 +53,9 @@ etcd keys follow a hierarchical structure:
 /sflocks/                     # Distributed locks
 ```
 
-### Object Types
+### Object Types (historical etcd paths)
 
-Each object type has a dedicated key prefix:
+All object types have been migrated from etcd to MariaDB:
 
 | Object Type | Key Prefix |
 |-------------|------------|
@@ -56,23 +63,26 @@ Each object type has a dedicated key prefix:
 | Network | MariaDB `networks` table (migrated from etcd) |
 | Network Interface | MariaDB `network_interfaces` table (migrated from etcd) |
 | AgentOperation | MariaDB `agent_operations` table (migrated from etcd) |
-| Blob | `/sf/object/blob/` |
+| Blob | MariaDB `blobs`, `blob_attributes`, `blob_hashes` tables (migrated from etcd) |
 | Artifact | MariaDB `artifacts` table (migrated from etcd) |
 | Node | MariaDB `nodes` table (migrated from etcd) |
 | Namespace | MariaDB `namespaces` table (migrated from etcd) |
 
 ## MariaDB
 
-MariaDB is used for object state storage and IPAM reservation tracking,
-providing:
+MariaDB is the primary data store for Shaken Fist. It holds all object state,
+IPAM reservations, cluster operations, work queues, locks, metrics, and
+cluster configuration, providing:
 
 - Efficient queries by object type and state value
 - Indexed lookups for state-based filtering
-- Better performance than etcd for scanning large numbers of objects
 - Atomic IP address reservation with database-level uniqueness constraints
+- Transactional operation enqueue (cluster operation header + state + queue
+  row written atomically)
 
-MariaDB is deployed on etcd master nodes and uses Galera for multi-master
-replication across the cluster.
+MariaDB is operator-provided infrastructure. See
+[Bring-your-own MariaDB setup](#bring-your-own-mariadb-setup) for the full
+provisioning workflow.
 
 ### MariaDB Required (Not MySQL)
 
@@ -457,6 +467,63 @@ happens automatically when the database daemon starts. The migration reads
 all reservations from etcd, writes them to the MariaDB `ipam_reservations`
 table, and removes the original etcd entries.
 
+## Bring-your-own MariaDB setup
+
+Shaken Fist does not bundle or install MariaDB. The operator provisions the
+database server before running `getsf`.
+
+### Provisioning checklist
+
+1. **Provision a MariaDB server.** Any host reachable from every SF node
+   works — it need not be an SF node itself. The server must meet the
+   [compatibility requirements](#mariadb-compatibility-requirements) below
+   (MariaDB 10.6.0+, InnoDB, utf8mb4).
+
+2. **Apply the bootstrap snippet.** The repository ships
+   `tools/bootstrap-mariadb.sql`, which creates the `shakenfist` database,
+   the `shakenfist` user, and the required grants. Replace
+   `__REPLACE_ME__` with the password you want:
+
+    ```bash
+    sed 's/__REPLACE_ME__/your-password/' tools/bootstrap-mariadb.sql | mysql -u root
+    ```
+
+    The snippet is idempotent and safe to re-run.
+
+3. **(Optional) install the recommended tuning.** `examples/mariadb-tuning.cnf`
+   ships a set of starting-point InnoDB and connection-pool settings tuned for
+   a small-to-medium SF cluster. Copy it and restart MariaDB:
+
+    ```bash
+    sudo cp examples/mariadb-tuning.cnf /etc/mysql/mariadb.conf.d/
+    sudo systemctl restart mariadb
+    ```
+
+    The values are starting points, not prescriptions — adjust them to match
+    your hardware and workload.
+
+4. **Run `getsf`.** The installer will prompt for the MariaDB host, port, user,
+   password, and database name. The defaults match what `bootstrap-mariadb.sql`
+   creates: port `3306`, user `shakenfist`, database `shakenfist`.
+
+5. **Schema initialisation.** After the deploy completes,
+   `sf-ctl ensure-mariadb-schema` runs automatically on a database-tier node
+   and creates all SF tables. You can also run it manually at any time from a
+   node that has `MARIADB_HOST` configured (see
+   [Administrative Commands](#administrative-commands)).
+
+### Single-box example
+
+For a single-machine deployment, the complete workflow is:
+
+```bash
+sudo apt install mariadb-server
+sed 's/__REPLACE_ME__/mypassword/' tools/bootstrap-mariadb.sql | sudo mysql -u root
+sudo cp examples/mariadb-tuning.cnf /etc/mysql/mariadb.conf.d/   # optional
+sudo systemctl restart mariadb
+sudo ./getsf                                                      # answers the new prompts
+```
+
 ## MariaDB compatibility requirements
 
 Before `sf-database` starts, and before `sf-ctl ensure-mariadb-schema` applies
@@ -483,11 +550,6 @@ After an SF version bump that includes schema changes, you must run
 `sf-ctl ensure-mariadb-schema` **before** starting `sf-database`. If you
 skip this step, the daemon will refuse to start with a schema-version
 mismatch error that names the command to run.
-
-!!! note
-    Phase 7 of the BYO-MariaDB plan will reorganise this operator guide to
-    lead with BYO MariaDB provisioning. Until then, this subsection is the
-    canonical statement of the server requirements.
 
 ## MARIADB_HOST vs MARIADB_GATEWAY_HOSTS
 
@@ -562,8 +624,8 @@ configuration:
 sf-ctl initialise-node
 ```
 
-For cluster bootstrap, this command can initialize any node when run from an
-etcd_master with direct database access:
+For cluster bootstrap, this command can initialize any node when run from a
+database-tier node with direct database access:
 
 ```bash
 # Run on the database node to initialize a remote node
@@ -582,8 +644,8 @@ node:
 sf-ctl register-daemon sentinel-first privexec nodelock
 ```
 
-For cluster bootstrap, daemons can be registered on any node when run from an
-etcd_master with direct database access:
+For cluster bootstrap, daemons can be registered on any node when run from a
+database-tier node with direct database access:
 
 ```bash
 # Run on the database node to register daemons on a remote node
@@ -669,8 +731,9 @@ storage:
 - **Storage efficiency**: JSON serialization is less efficient than native types
 - **Index support**: No secondary indexes for efficient lookups by attribute
 
-MariaDB addresses these limitations while maintaining the distributed nature
-of the cluster through Galera replication.
+MariaDB addresses these limitations. High availability is an operator concern;
+the database service tier can front multiple `sf-database` instances to
+provide redundancy.
 
 ### Migration Phases
 
