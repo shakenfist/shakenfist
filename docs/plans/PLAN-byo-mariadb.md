@@ -509,7 +509,7 @@ Phase 07 documents the end state.
 | 3. Multi-endpoint client-side gRPC LB; minimal `grpc.health.v1.Health` server-side support on sf-database; channel factory helper | PLAN-byo-mariadb-phase-03-grpc-tier.md | Complete |
 | 4. `getsf` reworked to prompt for BYO connection details; `roles/mariadb/` deleted; `tools/bootstrap-mariadb.sql` shipped; `deploy.py` stops generating a password; tuning `.cnf` moved to `examples/` | PLAN-byo-mariadb-phase-04-deploy-byo.md | Complete |
 | 5. CI workflow step installs MariaDB and applies the SQL snippet before getsf runs; cluster_ci updated to drive the new path | PLAN-byo-mariadb-phase-05-ci-byo.md | Complete |
-| 6. CI deployment shape with N=2 sf-database instances against the same MariaDB; functional test exercising the LB path; regression coverage | PLAN-byo-mariadb-phase-06-ci-tier.md | Not started |
+| 6. CI deployment shape with N=2 sf-database instances against the same MariaDB; functional test exercising the LB path; regression coverage | PLAN-byo-mariadb-phase-06-ci-tier.md | Complete |
 | 7. Documentation: `docs/operator_guide/database.md` rewritten lead-with-BYO, `ARCHITECTURE.md` / `README.md` / `AGENTS.md` updates, release notes calling out the breaking change | PLAN-byo-mariadb-phase-07-docs.md | Not started |
 
 Sequencing constraints between phases:
