@@ -42,6 +42,7 @@ from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.util.grpc_channel import make_database_channel
 from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
 from shakenfist.schema.agentoperation_data import AgentOperationData
 from shakenfist.schema.instance_attributes import InstanceAttributesData
@@ -325,14 +326,9 @@ def _get_database_stub() -> Any:
     Returns Any because the generated protobuf stubs are untyped.
     """
     if not hasattr(_local, 'database_channel') or _local.database_channel is None:
-        _local.database_channel = grpc.insecure_channel(
-            f'{config.MARIADB_GATEWAY_HOSTS[0]}:{config.MARIADB_GATEWAY_PORT}',
-            options=[
-                ('grpc.keepalive_time_ms', 10000),
-                ('grpc.keepalive_timeout_ms', 5000),
-                ('grpc.http2.max_pings_without_data', 0),
-                ('grpc.keepalive_permit_without_calls', 1),
-            ]
+        _local.database_channel = make_database_channel(
+            config.MARIADB_GATEWAY_HOSTS,
+            config.MARIADB_GATEWAY_PORT,
         )
         _local.database_stub = database_pb2_grpc.DatabaseServiceStub(
             _local.database_channel)

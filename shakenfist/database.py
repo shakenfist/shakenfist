@@ -18,6 +18,7 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.util import json as util_json
+from shakenfist.util.grpc_channel import make_database_channel
 
 
 LOG, _ = logs.setup(__name__)
@@ -49,15 +50,14 @@ def get_database_client():
                       'configured server!')
             return None
 
-        local.sf_database_client = grpc.insecure_channel(
-            f'{config.MARIADB_GATEWAY_HOSTS[0]}:{config.MARIADB_GATEWAY_PORT}',
-            options=[
+        local.sf_database_client = make_database_channel(
+            config.MARIADB_GATEWAY_HOSTS,
+            config.MARIADB_GATEWAY_PORT,
+            extra_options=[
                 ('grpc.keepalive_timeout_ms', 200),
-                ('grpc.http2.max_pings_without_data', 0),
-                ('grpc.keepalive_permit_without_calls', 1),
                 ('grpc.max_send_message_length', 100000000),
                 ('grpc.max_receive_message_length', 100000000),
-            ]
+            ],
         )
         c = local.sf_database_client
     return c

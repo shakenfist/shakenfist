@@ -93,11 +93,11 @@ def load_cluster_config() -> None:
     db_port = os.getenv('SHAKENFIST_MARIADB_GATEWAY_PORT', '13005')
 
     try:
-        import grpc
         from shakenfist.protos import database_pb2
         from shakenfist.protos import database_pb2_grpc
+        from shakenfist.util.grpc_channel import make_database_channel
 
-        channel = grpc.insecure_channel(f'{hosts[0]}:{db_port}')
+        channel = make_database_channel(hosts, int(db_port))
         stub = database_pb2_grpc.DatabaseServiceStub(channel)
         request = database_pb2.ClusterConfigRequest()
 
