@@ -521,6 +521,17 @@ In summary:
 | `sf-database` itself (gRPC listener) | `MARIADB_GATEWAY_PORT` | Port each `sf-database` binds on (default 13005) |
 | Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` instance (default 13006) |
 
+**Load balancing**: When `MARIADB_GATEWAY_HOSTS` is a multi-element list, every
+SF daemon connects to the tier with a gRPC channel that round-robins requests
+across the listed endpoints. Unhealthy endpoints are skipped automatically:
+`sf-database` publishes the standard `grpc.health.v1.Health` protocol against
+the empty-string service name, and clients use that protocol via the gRPC
+channel's own `healthCheckConfig`. There is no external load balancer to
+configure -- the round-robin behaviour and health-aware skipping are inside
+the gRPC client library. Rolling upgrades of the tier work cleanly because
+each `sf-database` flips its health status to `NOT_SERVING` before stopping,
+giving in-flight clients a window to drain to peer instances.
+
 ## Administrative Commands
 
 The `sf-ctl` command provides several database-related administrative functions.
