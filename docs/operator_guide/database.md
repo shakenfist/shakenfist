@@ -565,9 +565,9 @@ MariaDB directly using SQLAlchemy. Ordinary cluster nodes (running `sf-api`,
 
 **`MARIADB_GATEWAY_HOSTS`** is set on every cluster node. It is the list of
 `sf-database` gRPC endpoints that non-database daemons connect to. For a
-single-instance deployment this list has one entry; phase 3 of PLAN-byo-mariadb
-will add client-side load balancing so that multiple entries are tried in round-
-robin, enabling a tier of `sf-database` instances for higher availability.
+single-instance deployment this list has one entry; for higher availability,
+list multiple `sf-database` endpoints and the gRPC client library round-robins
+requests across them.
 
 A node running `sf-database` has **both** keys set: `MARIADB_HOST` for its own
 direct MariaDB access, and `MARIADB_GATEWAY_HOSTS` so that any client library
@@ -582,6 +582,16 @@ In summary:
 | All other daemons | `MARIADB_GATEWAY_HOSTS` | gRPC → `sf-database` tier |
 | `sf-database` itself (gRPC listener) | `MARIADB_GATEWAY_PORT` | Port each `sf-database` binds on (default 13005) |
 | Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` instance (default 13006) |
+
+**Multi-instance deployments**: More than one `sf-database` instance can run
+against the same MariaDB server. List every instance's mesh IP in
+`MARIADB_GATEWAY_HOSTS`, comma-separated — for example,
+`MARIADB_GATEWAY_HOSTS="10.0.0.20,10.0.0.21,10.0.0.22"`. Every `sf-database`
+instance must be able to reach the MariaDB server; in BYO deployments this
+typically means the operator's MariaDB is bound to a routable interface rather
+than `127.0.0.1`. This multi-instance shape is exercised by CI on every
+merge-queue run, so operators can rely on it as a supported production
+configuration.
 
 **Load balancing**: When `MARIADB_GATEWAY_HOSTS` is a multi-element list, every
 SF daemon connects to the tier with a gRPC channel that round-robins requests
