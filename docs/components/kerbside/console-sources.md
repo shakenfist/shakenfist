@@ -100,6 +100,68 @@ for Kolla-Ansible deployment support, and the
 [Nova specification](https://specs.openstack.org/openstack/nova-specs/specs/2025.1/implemented/libvirt-spice-direct-consoles.html)
 for configuration details.
 
+## Static source
+
+The static source driver (`type: static`) reads its VM-to-console
+mapping entirely from an inline `consoles:` list in the sources.yaml
+entry.  No external API calls are made and no control plane is needed.
+
+**Intended use-cases:**
+
+- **CI pipelines** that boot a QEMU guest directly and need kerbside
+  to front it.  The phase 5 direct-qemu CI workflow uses this driver.
+- **Ad-hoc debugging** where you want to point kerbside at a hand-
+  rolled QEMU without spinning up a full Shaken Fist or oVirt
+  deployment.
+
+**Not intended for production use.**  The console list is static —
+kerbside must be restarted to pick up changes, there is no polling,
+and there is no liveness check on the QEMU process behind the ticket.
+
+The following options are used to configure a static console source
+(`type: static`).
+
+| Option | Description |
+|--------|-------------|
+| source | The name of the source (used as an identifier) |
+| type | The type of the source: `static` |
+| consoles | A list of console entry dicts (see fields below) |
+
+Each entry in the `consoles` list requires the following fields:
+
+| Field | Description |
+|-------|-------------|
+| uuid | Unique identifier for this console (must be globally unique) |
+| name | Human-readable display name |
+| hypervisor | Hostname of the hypervisor (used if hypervisor_ip is empty) |
+| hypervisor_ip | IP address of the hypervisor |
+| insecure_port | SPICE port (plaintext) |
+| ticket | SPICE password / authentication ticket |
+
+Optional fields (default to null):
+
+| Field | Description |
+|-------|-------------|
+| secure_port | SPICE TLS port (if QEMU exposes one) |
+| host_subject | TLS host subject for certificate verification |
+
+**Example sources.yaml entry for a static source:**
+
+```yaml
+- source: ci-direct-qemu
+  type: static
+  consoles:
+    - uuid: "6f4e2c1a-0000-0000-0000-000000000001"
+      name: "sextant-ci-vm"
+      hypervisor: "localhost"
+      hypervisor_ip: "127.0.0.1"
+      insecure_port: 5910
+      ticket: "my-spice-password"
+```
+
+A two-console example with inline comments is available at
+`etc/example-static-sources.yaml`.
+
 ## Example sources.yaml
 
 An example configuration follows:

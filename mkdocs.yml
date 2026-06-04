@@ -241,6 +241,10 @@ nav:
             - "SPICE Protocol Overview": components/kerbside/protocol-overview.md
             - "USB Redirection Protocol": components/kerbside/usb-redirection.md
             - "VD Agent Protocol": components/kerbside/vd-agent-protocol.md
+            - Plans:
+                - "Automated SPICE test harness": components/kerbside/plans/PLAN-test-harness.md
+                - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
+                - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md
