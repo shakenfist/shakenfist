@@ -1,18 +1,26 @@
-# Shaken Fist MariaDB tuning. Sits in /etc/mysql/mariadb.conf.d/ where it
-# is loaded after Debian's 50-server.cnf, so values here override
-# distribution defaults without editing the packaged file.
+# Shaken Fist recommended MariaDB tuning (optional).
+#
+# Drop this file into /etc/mysql/mariadb.conf.d/ on your MariaDB
+# server to apply Shaken Fist's recommended tunings. The filename
+# starts with `90-` so it loads after Debian's packaged
+# 50-server.cnf and overrides distribution defaults without
+# editing the packaged file:
+#
+#   sudo cp examples/mariadb-tuning.cnf /etc/mysql/mariadb.conf.d/
+#   sudo systemctl restart mariadb
+#
+# The values below are reasonable starting points for clusters in
+# the size range Shaken Fist tends to be deployed at -- Mikal's
+# home production cluster, a development laptop, and CI hardware.
+# Operators on substantially larger or smaller hardware should
+# override these in a higher-numbered drop file in the same
+# directory.
 #
 # All five tunables below address bottlenecks observed in CI:
 # pre-tuning, sf-database's 20-thread gRPC pool starved on slow MariaDB
 # queries and emitted ~6 GOAWAY ping_timeout events per minute under
 # functional-test load. Profiling traced this to the buffer pool
 # spilling to disk (~168 MB mariadbd RSS, 128 MB default pool).
-#
-# Tunables are conservative enough to suit Mikal's home production
-# cluster, a development laptop, and the nested-virt CI hardware
-# without further per-environment tweaks. Operators running on
-# considerably larger or smaller hardware should override these in a
-# higher-numbered drop file in the same directory.
 
 [mysqld]
 
