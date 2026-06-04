@@ -204,10 +204,9 @@
 # Cluster config must run before register because register starts the
 # sf-database daemon, and sf-database's ExecStartPre=verify-config
 # requires AUTH_SECRET_SEED to already be in the cluster_config table.
-# The cluster_config tasks delegate to etcd_master[0] with
-# SHAKENFIST_MARIADB_HOST=localhost so that set-config writes directly
-# to MariaDB rather than going through the not-yet-running gRPC
-# database service.
+# The cluster_config tasks delegate to etcd_master[0]; direct MariaDB
+# access works because /etc/sf/config on that node has
+# SHAKENFIST_MARIADB_HOST set to the operator-provided host.
 - hosts: primary_node
   become: yes
   become_method: sudo
