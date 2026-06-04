@@ -138,6 +138,24 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} python3 tools/buffer.py
 
+      - name: Install BYO MariaDB on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/tools/bootstrap-mariadb.sql \
+              ${GITHUB_WORKSPACE}/tools/ci-install-mariadb.sh \
+              ${GITHUB_WORKSPACE}/examples/mariadb-tuning.cnf \
+              ${{ matrix.os.base_image_user }}@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} \
+              'sudo bash /tmp/ci-install-mariadb.sh \
+                   /tmp/bootstrap-mariadb.sql \
+                   /tmp/mariadb-tuning.cnf \
+                   citestpw'
+
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
@@ -145,7 +163,13 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} /tmp/getsf-wrapper
+              ${{ matrix.os.base_image_user }}@${primary} \
+              "GETSF_MARIADB_HOST=127.0.0.1 \
+               GETSF_MARIADB_PORT=3306 \
+               GETSF_MARIADB_USER=shakenfist \
+               GETSF_MARIADB_PASSWORD=citestpw \
+               GETSF_MARIADB_DATABASE=shakenfist \
+               /tmp/getsf-wrapper"
 
       - name: Wait for API to start answering
         run: |
