@@ -823,6 +823,15 @@ jobs:
             topology: 'slim-primary',
             concurrency: 5,
             stestr_config: 'guest-ci.conf'
+          },
+          {
+            name: 'Debian 12 tier',
+            job_name: 'debian-12-slim-tier',
+            base_image: 'sf://label/ci-images/debian-12',
+            base_image_user: 'debian',
+            topology: 'slim-tier',
+            concurrency: 5,
+            stestr_config: 'cluster-ci.conf'
           }
         ]
     runs-on: [self-hosted, vm, debian-12]
@@ -914,7 +923,7 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${{ matrix.merge.base_image_user }}@${primary} \
-              "GETSF_MARIADB_HOST=127.0.0.1 \
+              "GETSF_MARIADB_HOST=${{ matrix.merge.topology == 'slim-tier' && '10.0.1.10' || '127.0.0.1' }} \
                GETSF_MARIADB_PORT=3306 \
                GETSF_MARIADB_USER=shakenfist \
                GETSF_MARIADB_PASSWORD=citestpw \
