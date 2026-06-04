@@ -17,6 +17,9 @@ from typing import cast
 from uuid import UUID
 
 import grpc
+from grpc_health.v1 import health
+from grpc_health.v1 import health_pb2
+from grpc_health.v1 import health_pb2_grpc
 from prometheus_client import Counter
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
@@ -5196,6 +5199,17 @@ def main() -> None:
             ('grpc.http2.max_ping_strikes', 0),
         ]
     )
+
+    # Register the gRPC standard health-checking protocol against the
+    # empty-string service name. Empty-string is the convention for
+    # "overall server health" and is what client-side LB checks against
+    # via the healthCheckConfig in shakenfist/util/grpc_channel.py.
+    # The status flips to NOT_SERVING during the shutdown path so
+    # rolling-upgrade clients can drain to peer instances.
+    health_servicer = health.HealthServicer()
+    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+    health_servicer.set('', health_pb2.HealthCheckResponse.SERVING)
+
     # Bind the gRPC server on this node's mesh IP. Clients discover where
     # to connect via MARIADB_GATEWAY_HOSTS; the bind address is intentionally
     # separate so a tier of sf-database instances can each bind locally.
@@ -5216,6 +5230,12 @@ def main() -> None:
              f'{config.NODE_MESH_IP}:{config.MARIADB_GATEWAY_PORT}')
 
     m.run()
+
+    # Flip the health status to NOT_SERVING so LB-aware clients see
+    # the change via the standard gRPC health protocol and drain to
+    # peer instances before sf-database stops accepting requests.
+    health_servicer.set('', health_pb2.HealthCheckResponse.NOT_SERVING)
+
     server.stop(1).wait()
 
     daemon.force_clean_exit()

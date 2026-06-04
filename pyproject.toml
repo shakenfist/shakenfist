@@ -60,6 +60,7 @@ dependencies = [
 
     "protobuf==5.29.6",                   # bsd
     "grpcio==1.70.0",                     # apache2
+    "grpcio-health-checking==1.70.0",     # apache2
     "grpcio-status==1.70.0",              # apache2
     "grpcio-tools==1.70.0",               # apache2
     "googleapis-common-protos==1.75.0",   # apache2
