@@ -11,6 +11,7 @@ from pydantic import AnyHttpUrl
 from pydantic import BeforeValidator
 from pydantic import Field
 from pydantic_settings import BaseSettings
+from pydantic_settings import NoDecode
 
 
 def get_node_name() -> str:
@@ -343,8 +344,13 @@ class SFConfig(BaseSettings):
     )
 
     # Database Service Options
+    # NoDecode prevents pydantic-settings from attempting to JSON-decode
+    # the env value before the BeforeValidator runs. Without it, a bare
+    # comma-separated string like "10.0.0.10" raises JSONDecodeError
+    # ("Extra data") because the source treats list[str] as a complex
+    # type and tries json.loads() first.
     MARIADB_GATEWAY_HOSTS: Annotated[
-        list[str], BeforeValidator(_parse_comma_separated_hosts)
+        list[str], NoDecode, BeforeValidator(_parse_comma_separated_hosts)
     ] = Field(
         default_factory=list,
         description=(
