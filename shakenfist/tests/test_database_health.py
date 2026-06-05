@@ -22,7 +22,12 @@ class HealthServicerEndToEndTestCase(base.ShakenFistTestCase):
         port = server.add_insecure_port('127.0.0.1:0')
         server.start()
         try:
-            channel = grpc.insecure_channel(f'127.0.0.1:{port}')
+            # Disable gRPC's HTTP_PROXY honouring so the localhost
+            # connection is not routed through any ambient proxy
+            # (CI runners typically set http_proxy).
+            channel = grpc.insecure_channel(
+                f'127.0.0.1:{port}',
+                options=[('grpc.enable_http_proxy', 0)])
             stub = health_pb2_grpc.HealthStub(channel)
 
             resp = stub.Check(health_pb2.HealthCheckRequest(service=''))

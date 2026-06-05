@@ -144,9 +144,9 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${GITHUB_WORKSPACE}/tools/bootstrap-mariadb.sql \
-              ${GITHUB_WORKSPACE}/tools/ci-install-mariadb.sh \
-              ${GITHUB_WORKSPACE}/examples/mariadb-tuning.cnf \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/bootstrap-mariadb.sql \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-mariadb.sh \
+              ${GITHUB_WORKSPACE}/shakenfist/examples/mariadb-tuning.cnf \
               ${{ matrix.os.base_image_user }}@${primary}:/tmp/
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \

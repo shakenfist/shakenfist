@@ -31,6 +31,12 @@ _DEFAULT_OPTIONS: list[tuple[str, Any]] = [
     ('grpc.keepalive_timeout_ms', 5000),
     ('grpc.http2.max_pings_without_data', 0),
     ('grpc.keepalive_permit_without_calls', 1),
+    # Disable gRPC's default behaviour of honouring the HTTP_PROXY /
+    # HTTPS_PROXY environment variables. SF nodes that sit behind an
+    # outbound HTTP proxy (CI runners, corporate networks) would
+    # otherwise see localhost / mesh-IP database calls routed through
+    # the proxy and rejected with 503.
+    ('grpc.enable_http_proxy', 0),
     ('grpc.service_config', json.dumps({
         'loadBalancingConfig': [{'round_robin': {}}],
         'healthCheckConfig': {'serviceName': ''},
