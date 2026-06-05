@@ -48,6 +48,7 @@ Features unique to instar that do not exist in qemu-img.
 | [Resize](/components/instar/resize/) | `instar resize` - change a disk image's virtual size |
 | [Rebase](/components/instar/rebase/) | `instar rebase` - change an overlay's backing-file reference |
 | [Commit](/components/instar/commit/) | `instar commit` - merge an overlay's data into its backing |
+| [Map](/components/instar/map/) | `instar map` - emit the allocation map of a disk image |
 
 ## Compatibility
 

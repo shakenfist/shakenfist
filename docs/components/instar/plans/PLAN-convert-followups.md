@@ -72,7 +72,7 @@ effort:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. `qemu-img` subcommand parity (~~create~~ / map / ~~measure~~ / ~~resize~~ / snapshot / ~~rebase~~ / ~~commit~~) | PLAN-convert-followups-phase-01-subcommands.md (not yet written) | Not started (`measure` complete — see [PLAN-measure.md](/components/instar/plans/PLAN-measure/); `create` complete — see [PLAN-create.md](/components/instar/plans/PLAN-create/); `resize` complete — see [PLAN-resize.md](/components/instar/plans/PLAN-resize/); `rebase` and `commit` complete — see [PLAN-rebase-commit.md](/components/instar/plans/PLAN-rebase-commit/)) |
+| 1. `qemu-img` subcommand parity (~~create~~ / ~~map~~ / ~~measure~~ / ~~resize~~ / snapshot / ~~rebase~~ / ~~commit~~) | PLAN-convert-followups-phase-01-subcommands.md (not yet written) | Not started (`measure` complete — see [PLAN-measure.md](/components/instar/plans/PLAN-measure/); `create` complete — see [PLAN-create.md](/components/instar/plans/PLAN-create/); `resize` complete — see [PLAN-resize.md](/components/instar/plans/PLAN-resize/); `rebase` and `commit` complete — see [PLAN-rebase-commit.md](/components/instar/plans/PLAN-rebase-commit/); `map` complete — see [PLAN-map.md](/components/instar/plans/PLAN-map/); `snapshot` remains.) |
 | 2. `check --repair` wiring | PLAN-convert-followups-phase-02-check-repair.md (not yet written) | Not started |
 
 Subcommands in phase 1 should be split into one phase plan each
@@ -86,9 +86,7 @@ For phase 1 detail planning, the original scope notes from
 `PLAN-convert.md`:
 
 - ~~**create**~~ — Shipped. See [PLAN-create.md](/components/instar/plans/PLAN-create/).
-- **map** — Display allocation map. Reuses format parsing,
-  reports contiguous extents with start / length / depth / zero
-  / data / offset.
+- ~~**map**~~ — Shipped. See [PLAN-map.md](/components/instar/plans/PLAN-map/).
 - ~~**measure**~~ — Shipped. See [PLAN-measure.md](/components/instar/plans/PLAN-measure/).
 - ~~**resize**~~ — Shipped. See [PLAN-resize.md](/components/instar/plans/PLAN-resize/).
 - **snapshot** — List, apply, create, delete internal QCOW2

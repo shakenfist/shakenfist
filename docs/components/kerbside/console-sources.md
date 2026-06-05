@@ -162,6 +162,18 @@ Optional fields (default to null):
 A two-console example with inline comments is available at
 `etc/example-static-sources.yaml`.
 
+The static source pairs cleanly with
+[Ryll's control socket](https://github.com/shakenfist/ryll/blob/main/docs/control-socket-protocol.md)
+for end-to-end direct-QEMU testing. A test harness boots a QEMU
+guest, declares it via the static source, points kerbside at that
+source, and then drives the SPICE session through Ryll's
+`--control-socket` interface — sending keystrokes, pasting text,
+and capturing screenshots without a GUI. The control-socket protocol
+is the bridge between the test driver and the SPICE session it
+asserts against. See phase 3 of the test-harness plan for the full
+design:
+`docs/plans/PLAN-test-harness-phase-03-control-socket.md`.
+
 ## Example sources.yaml
 
 An example configuration follows:
