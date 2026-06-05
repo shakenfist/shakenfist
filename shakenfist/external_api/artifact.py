@@ -50,19 +50,39 @@ daemon.set_log_level(LOG, 'api')
 
 def arg_is_artifact_ref(func):
     def wrapper(*args, **kwargs):
-        # Older style call
+        body_namespace = kwargs.get('namespace')
+
+        # Older style call: internal flows that pass artifact_uuid
+        # directly are server-driven, so we skip the body-namespace
+        # authz dance and only apply the strict-scope check below.
         if 'artifact_uuid' in kwargs:
             kwargs['artifact_from_db'] = Artifact.from_db(
                 kwargs['artifact_uuid'])
-
         else:
+            lookup_namespace, err = api_base.resolve_lookup_namespace(
+                body_namespace, 'artifact')
+            if err:
+                return err
             try:
                 kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
-                    kwargs.get('artifact_ref'), request_namespace())
+                    kwargs.get('artifact_ref'), lookup_namespace)
             except exceptions.MultipleObjects as e:
                 return sf_api.error(400, str(e), suppress_traceback=True)
 
         if not kwargs.get('artifact_from_db'):
+            return sf_api.error(404, 'artifact not found')
+
+        # UUID lookups bypass from_db_by_ref's namespace filter; if the
+        # caller explicitly named a namespace, the resolved artifact
+        # must live there or we reject it. This intentionally hides
+        # shared artifacts owned by other namespaces — callers who want
+        # shared visibility must omit `namespace`.
+        a = kwargs['artifact_from_db']
+        if body_namespace and a.namespace != body_namespace:
+            LOG.with_fields({
+                'artifact': a,
+                'requested_namespace': body_namespace,
+            }).info('Artifact not in requested namespace')
             return sf_api.error(404, 'artifact not found')
 
         return func(*args, **kwargs)

@@ -52,6 +52,28 @@ def caller_is_admin(func):
     return wrapper
 
 
+def resolve_lookup_namespace(body_namespace, kind):
+    # Decide which namespace a `*_ref` lookup should be scoped to.
+    #
+    # Why: `from_db_by_ref(name, namespace='system')` is a documented
+    # "search everywhere" mode used for unqualified system lookups. The
+    # decorators historically passed `request_namespace()` straight in,
+    # which meant a system caller asking for a specific namespace via
+    # the request body silently got cross-namespace resolution and
+    # could find a same-named object in an unrelated namespace.
+    #
+    # Returns (lookup_namespace, error_response_or_None). A non-system
+    # caller may not query a namespace other than their own — match
+    # the 404 posture used by the requires_*_ownership decorators
+    # rather than 403 to avoid leaking which namespaces exist.
+    caller_ns = request_namespace()
+    if body_namespace:
+        if caller_ns != 'system' and body_namespace != caller_ns:
+            return None, sf_api.error(404, f'{kind} not found')
+        return body_namespace, None
+    return caller_ns, None
+
+
 # https://swagger.io/specification/v2/ defines the schema for this dictionary
 def swagger_helper(section, description, parameters, responses,
                    requires_admin=False, requires_auth=True):
@@ -208,15 +230,31 @@ def log_token_use(func):
 
 def arg_is_instance_ref(func):
     def wrapper(*args, **kwargs):
+        body_namespace = kwargs.get('namespace')
+        lookup_namespace, err = resolve_lookup_namespace(
+            body_namespace, 'instance')
+        if err:
+            return err
+
         try:
             inst = Instance.from_db_by_ref(
-                kwargs.get('instance_ref'), request_namespace())
+                kwargs.get('instance_ref'), lookup_namespace)
         except exceptions.MultipleObjects as e:
             return sf_api.error(400, str(e), suppress_traceback=True)
 
         if not inst:
             LOG.with_fields({'instance': kwargs.get('instance_ref')}).info(
                 'Instance not found, missing or deleted')
+            return sf_api.error(404, 'instance not found')
+
+        # UUID lookups bypass from_db_by_ref's namespace filter; if the
+        # caller explicitly named a namespace, the resolved object must
+        # live there or we reject it.
+        if body_namespace and inst.namespace != body_namespace:
+            LOG.with_fields({
+                'instance': inst,
+                'requested_namespace': body_namespace,
+            }).info('Instance not in requested namespace')
             return sf_api.error(404, 'instance not found')
 
         kwargs['instance_from_db'] = inst
@@ -318,15 +356,34 @@ def requires_instance_active(func):
 def arg_is_network_ref(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
+        body_namespace = kwargs.get('namespace')
+        lookup_namespace, err = resolve_lookup_namespace(
+            body_namespace, 'network')
+        if err:
+            return err
+
         try:
             n = network.Network.from_db_by_ref(
-                kwargs.get('network_ref'), request_namespace())
+                kwargs.get('network_ref'), lookup_namespace)
         except exceptions.MultipleObjects as e:
             return sf_api.error(400, str(e), suppress_traceback=True)
 
         if not n:
             LOG.with_fields({'network': kwargs.get('network_ref')}).info(
                 'Network not found, missing or deleted')
+            return sf_api.error(404, 'network not found')
+
+        # UUID lookups bypass from_db_by_ref's namespace filter; if the
+        # caller explicitly named a namespace, the resolved object must
+        # live there or we reject it. The floating network has
+        # namespace=None and is therefore never "in" any namespace from
+        # this check's perspective — admins must omit `namespace` to
+        # reach it.
+        if body_namespace and n.namespace != body_namespace:
+            LOG.with_fields({
+                'network': n,
+                'requested_namespace': body_namespace,
+            }).info('Network not in requested namespace')
             return sf_api.error(404, 'network not found')
 
         kwargs['network_from_db'] = n
