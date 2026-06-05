@@ -104,6 +104,7 @@ nav:
             - "Introduction": components/instar/index.md
             - "`instar commit` — merge an overlay's data into its backing": components/instar/commit.md
             - "`instar create` — create a new empty disk image": components/instar/create.md
+            - "`instar map` — emit the allocation map of a disk image": components/instar/map.md
             - "`instar measure` — predict file size for a target format": components/instar/measure.md
             - "`instar rebase` — change an overlay's backing-file reference": components/instar/rebase.md
             - "`instar resize` — change a disk image's virtual size": components/instar/resize.md
@@ -133,6 +134,7 @@ nav:
                 - "virtualpc-vhd Test Image": components/instar/image_notes/virtualpc-vhd.md
             - Plans:
                 - "`instar create` subcommand": components/instar/plans/PLAN-create.md
+                - "`instar map` subcommand": components/instar/plans/PLAN-map.md
                 - "`instar measure` subcommand": components/instar/plans/PLAN-measure.md
                 - "`instar rebase` and `instar commit` subcommands": components/instar/plans/PLAN-rebase-commit.md
                 - "`instar resize` subcommand": components/instar/plans/PLAN-resize.md
@@ -144,22 +146,31 @@ nav:
                 - "Phase 10: differential fuzzer extension for `instar create`": components/instar/plans/PLAN-create-phase-10-fuzz-differential.md
                 - "Phase 10: documentation, CHANGELOG polish, follow-ups": components/instar/plans/PLAN-measure-phase-10-docs.md
                 - "Phase 11: documentation, CHANGELOG polish, follow-ups": components/instar/plans/PLAN-create-phase-11-docs.md
+                - "Phase 1: per-format extent iterators on the parser crates": components/instar/plans/PLAN-map-phase-01-extent-iterators.md
                 - "Phase 1: per-format size calculators (`crates/measure/`)": components/instar/plans/PLAN-measure-phase-01-calculators.md
                 - "Phase 2 — qcow2 `scan_allocation` invariant break (category A2)": components/instar/plans/PLAN-fuzzing-bugs-phase-02-measure-scan.md
+                - "Phase 2: guest `map` operation + protobuf + call-table boundary": components/instar/plans/PLAN-map-phase-02-guest-op.md
                 - "Phase 2: source-allocation scanners on the parser crates": components/instar/plans/PLAN-measure-phase-02-allocation-scanners.md
                 - "Phase 3 — measure calculator overflow (category A3)": components/instar/plans/PLAN-fuzzing-bugs-phase-03-measure-calc.md
                 - "Phase 3: guest `measure` operation + protobuf result + call-table boundary": components/instar/plans/PLAN-measure-phase-03-guest-op.md
+                - "Phase 3: host VMM subcommand + clap surface": components/instar/plans/PLAN-map-phase-03-host-cli.md
                 - "Phase 4 — measure fixed-VHD source detection (category B1)": components/instar/plans/PLAN-fuzzing-bugs-phase-04-measure-fixed-vhd.md
                 - "Phase 4: host VMM subcommand and output formatting": components/instar/plans/PLAN-measure-phase-04-host-cli.md
+                - "Phase 4: output formatting": components/instar/plans/PLAN-map-phase-04-output-formatting.md
                 - "Phase 5 — differential-fuzz timeout classification (category B2)": components/instar/plans/PLAN-fuzzing-bugs-phase-05-diff-fuzz-timeouts.md
                 - "Phase 5: `-o key=value,...` qemu-img-style option parsing": components/instar/plans/PLAN-measure-phase-05-target-options.md
+                - "Phase 5: cross-version baselines": components/instar/plans/PLAN-map-phase-05-baselines.md
                 - "Phase 6: cross-version `qemu-img measure` baselines": components/instar/plans/PLAN-measure-phase-06-baselines.md
+                - "Phase 6: integration tests": components/instar/plans/PLAN-map-phase-06-integration-tests.md
+                - "Phase 7: coverage-guided fuzz harness for map iterators": components/instar/plans/PLAN-map-phase-07-fuzz-coverage.md
                 - "Phase 7: cross-version `qemu-img create` baselines": components/instar/plans/PLAN-create-phase-07-baselines.md
                 - "Phase 7: integration tests against the cross-version baselines": components/instar/plans/PLAN-measure-phase-07-integration-tests.md
                 - "Phase 8: coverage-guided fuzzing for `crates/measure/` and the scanners": components/instar/plans/PLAN-measure-phase-08-fuzz-coverage.md
+                - "Phase 8: differential fuzzing against `qemu-img map`": components/instar/plans/PLAN-map-phase-08-fuzz-differential.md
                 - "Phase 8: integration tests against the cross-version create baselines": components/instar/plans/PLAN-create-phase-08-integration-tests.md
                 - "Phase 9: coverage-guided fuzzing for `crates/create/` emitters": components/instar/plans/PLAN-create-phase-09-fuzz-coverage.md
                 - "Phase 9: differential fuzzer extension for `instar measure`": components/instar/plans/PLAN-measure-phase-09-fuzz-differential.md
+                - "Phase 9: documentation and CHANGELOG": components/instar/plans/PLAN-map-phase-09-docs.md
                 - "PLAN-create phase 1: per-format metadata emitters": components/instar/plans/PLAN-create-phase-01-emitters.md
                 - "PLAN-create phase 2: guest `create` operation binary": components/instar/plans/PLAN-create-phase-02-guest-op.md
                 - "PLAN-create phase 3: host VMM subcommand": components/instar/plans/PLAN-create-phase-03-host-cli.md
@@ -245,6 +256,7 @@ nav:
                 - "Automated SPICE test harness": components/kerbside/plans/PLAN-test-harness.md
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
+                - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md

@@ -872,6 +872,146 @@ Categories:
 See `docs/measure.md` for the user-facing presentation of
 these divergences.
 
+## map subcommand quirks
+
+### `--image-opts` is rejected
+
+`qemu-img map --image-opts driver=qcow2,file.filename=...`
+accepts a descriptor-based source specification. instar does
+not support this form and errors out before launching the
+guest. Use the positional `FILENAME` argument instead.
+
+### Backing-chain `depth` is always 0 in v1
+
+`qemu-img map` walks the backing chain when present and
+emits a non-zero `depth` field in JSON output for extents
+that resolve through a parent image. instar's phase 1 / 2
+walkers report the active layer only and refuse sources
+that carry a backing/parent reference (qcow2
+`backing_file_offset != 0`, vhd `disk_type ==
+DISK_TYPE_DIFFERENCING`, vhdx `has_parent`). Chain
+composition is tracked as a follow-up under
+[PLAN-map.md](/components/instar/plans/PLAN-map/). In v1 the `depth` JSON
+field is always `0`.
+
+### Raw source sparseness is not detected
+
+`qemu-img map` calls `lseek(SEEK_HOLE)` / `lseek(SEEK_DATA)`
+on the underlying file for raw sources and reports the
+sparse vs. dense regions as separate extents
+(`present: true, zero: true, data: false` for the sparse
+runs). instar's no_std raw walker has no syscall surface
+inside the guest and reports one fully-allocated `data:
+true` extent covering the whole virtual size. A host-side
+`SEEK_HOLE` pre-pass that feeds an extent list through
+`MapConfig` is tracked as future work.
+
+### VHD unallocated blocks are reported as `present: false`
+
+`qemu-img map` reports a dynamic VHD's unallocated BAT entries
+(`0xFFFFFFFF`) as `present: true, zero: true, data: false` —
+the same `ZeroAllocated` convention it applies to raw sparse
+runs. instar's vhd walker reports them as `present: false,
+zero: true, data: false` (`Hole`), faithful to the on-disk
+BAT marker. Functionally equivalent for downstream consumers
+that care only about which bytes contain data; visually
+different in the `present` field. Phase 6's
+`KNOWN_MAP_DIVERGENCES` (`hyperv-dynamic-vhd`,
+`virtualpc-vhd`) and phase 8's differential fuzzer
+(`MAP_FIELD_SKIPS` in `scripts/differential-fuzz.py`)
+both skip the `present` field on vpc sources for this
+reason.
+
+### VHDX `PAYLOAD_BLOCK_PARTIALLY_PRESENT` is reported as `data: true`
+
+`qemu-img map` walks the per-sector bitmap for partially-
+present VHDX blocks and emits per-sector extents. instar's
+phase 1 vhdx walker treats `PARTIALLY_PRESENT` as fully
+present (same posture as `scan_allocation`) and reports
+the entire block as one `data: true` extent. The
+per-sector-bitmap walk is tracked as future work.
+
+### VMDK multi-extent sources are refused
+
+`qemu-img map` reads the VMDK descriptor and walks the
+multi-extent layout. instar's `VmdkState::init` only parses
+the VMDK4 binary header, so descriptor-driven (multi-extent
+monolithicFlat / 2GbMaxExtent…) sources fail init. The
+host CLI also refuses them via `peek_is_vmdk_descriptor`
+before launching the guest, pointing the user at `qemu-img
+map` as the workaround.
+
+### qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO` not honoured
+
+In qcow2 v3 (compat=1.1) images that use *standard* L2 tables
+(8-byte entries, not extended L2), the `QCOW_OFLAG_ZERO` bit
+(bit 0) on an L2 entry signals `QCOW2_CLUSTER_ZERO_PLAIN`
+(when `host_offset == 0`) or `QCOW2_CLUSTER_ZERO_ALLOC` (when
+`host_offset != 0`) — both of which qemu-img reports as
+`present: true, zero: true, data: false` (`ZeroAllocated`).
+instar's `classify_qcow2_l2_standard` ignores the bit and
+treats any non-zero L2 entry without `OFLAG_COMPRESSED` as
+`Data`; if `host_offset == 0` it reports `Hole`. This is a
+pre-existing gap in the qcow2 parser (`cluster_lookup` has no
+`OFLAG_ZERO` branch either) inherited by map for consistency.
+Reporting the bit correctly is a single-edit change in
+`classify_qcow2_l2_standard` once we want to land it; tracked
+as future work in PLAN-map.md. Extended-L2 subcluster-bitmap
+`ZeroAllocated` reporting is unaffected — instar walks the
+bitmap and classifies subclusters correctly.
+
+### qcow2 compressed clusters report `compressed: false`
+
+`qemu-img map` emits `compressed: true` for extents that
+back compressed-cluster L2 entries. instar's phase 1 qcow2
+walker classifies compressed clusters as `Data` with the
+compressed-payload file offset, but does not carry the
+compressed bit through the FFI / protobuf path. The phase 4
+renderer emits `compressed: false` for every extent
+unconditionally. Extending `MapExtentRecord` and
+`MapExtentMessage` with a `compressed: bool` field is
+tracked as future work; once landed, the differential
+fuzzer will catch any remaining divergence on
+compressed-cluster sources.
+
+### Trailing newline after JSON `]`
+
+`qemu-img map --output=json` emits a single trailing
+newline after the closing `]`. instar matches this
+byte-for-byte. (An earlier draft of this document
+incorrectly stated "no trailing newline" based on a
+misread of `cat -A` output — `cat -A` places the `$`
+end-of-line marker *before* each newline, including the
+trailing one, which made the trailing newline easy to
+miss in spot-check verification. Phase 6's full baseline
+sweep surfaced the discrepancy and corrected the
+renderer.)
+
+### Partial output on guest failure
+
+The renderer writes the human header (or the JSON `[`)
+before any `MapExtentMessage` arrives. If the guest fails
+to start, or reports an error code mid-stream, the user
+sees a partial table or an unclosed JSON array on stdout
+plus a clear stderr message and a non-zero exit code.
+JSON consumers should always check the process exit code
+before parsing stdout. The trade-off keeps the streaming
+path clean — the alternative (buffer everything host-side
+until the success path is known) defeats the streaming
+memory bound.
+
+### Window filter is byte-level, not cluster-aligned
+
+`qemu-img map --start-offset=N --max-length=M` silently
+clamps `--start-offset` to a cluster boundary on output
+(the extent containing the offset is emitted in full
+starting from the cluster boundary). instar's
+`clip_to_window` operates at the byte level, which can
+produce a leading partial extent that qemu-img would not.
+Functionally equivalent for downstream consumers that
+care about byte ranges; visually different in human
+output.
+
 ## create subcommand quirks
 
 ### Raw `create` runs entirely host-side
