@@ -52,17 +52,25 @@ def arg_is_artifact_ref(func):
     def wrapper(*args, **kwargs):
         body_namespace = kwargs.get('namespace')
 
-        # Older style call: internal flows that pass artifact_uuid
-        # directly are server-driven, so we skip the body-namespace
-        # authz dance and only apply the strict-scope check below.
+        # Resolve and authorise the namespace once, regardless of
+        # whether the caller named the artifact by UUID or by ref.
+        # The UUID branch does not use `lookup_namespace` because
+        # `Artifact.from_db` takes only a UUID, but the early-reject
+        # for tenants passing a foreign namespace must still apply
+        # so the two paths share an identical authz posture.
+        lookup_namespace, err = api_base.resolve_lookup_namespace(
+            body_namespace, 'artifact')
+        if err:
+            return err
+
+        # Older style call: some internal flows pass artifact_uuid
+        # directly. Routes only mount `<artifact_ref>` today, but the
+        # body-key population in generic_wrapper means any body with
+        # `artifact_uuid` would reach this branch.
         if 'artifact_uuid' in kwargs:
             kwargs['artifact_from_db'] = Artifact.from_db(
                 kwargs['artifact_uuid'])
         else:
-            lookup_namespace, err = api_base.resolve_lookup_namespace(
-                body_namespace, 'artifact')
-            if err:
-                return err
             try:
                 kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
                     kwargs.get('artifact_ref'), lookup_namespace)

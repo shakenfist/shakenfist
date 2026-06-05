@@ -196,3 +196,32 @@ class ArgIsRefNamespaceScopingTestCase(base.ShakenFistTestCase):
                 f'got {response!r}')
             lookup.assert_called_once_with(_REF, 'ns1')
             self.assertNotIn(case.obj_kwarg, captured)
+
+    # ------------------------------------------------------------------
+    # Artifact-specific: the `artifact_uuid` branch goes through
+    # Artifact.from_db rather than from_db_by_ref, but must still honour
+    # the namespace authz check so a tenant cannot bypass scoping by
+    # providing artifact_uuid in the request body.
+    # ------------------------------------------------------------------
+
+    def test_artifact_uuid_branch_tenant_foreign_namespace_rejected(self):
+        captured = {}
+
+        @api_artifact.arg_is_artifact_ref
+        def endpoint(**kwargs):
+            captured.update(kwargs)
+            return 'ok'
+
+        with mock.patch(_REQUEST_NS_TARGET, return_value='ns1'), \
+                mock.patch('shakenfist.external_api.artifact.Artifact'
+                           '.from_db') as from_db, \
+                mock.patch('shakenfist.external_api.artifact.Artifact'
+                           '.from_db_by_ref') as from_db_by_ref:
+            response = endpoint(artifact_uuid='some-uuid', namespace='ns2')
+
+        self.assertEqual(
+            404, response.status_code,
+            f'foreign-namespace tenant should be 404, got {response!r}')
+        from_db.assert_not_called()
+        from_db_by_ref.assert_not_called()
+        self.assertNotIn('artifact_from_db', captured)

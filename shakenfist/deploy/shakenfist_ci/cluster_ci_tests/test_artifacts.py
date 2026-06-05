@@ -508,3 +508,62 @@ class TestArtifactLookupByName(base.BaseNamespacedTestCase):
                 self.system_client.delete_namespace(ns_b_name)
             except apiclient.ResourceNotFoundException:
                 pass
+
+    def test_artifact_system_creds_namespace_scoped(self):
+        """System creds + explicit `namespace=` scope strictly (artifacts).
+
+        Companion to the instance/network versions in test_object_names.
+        Regression test for the bug where a system caller passing
+        ``namespace=A`` could receive a same-named artifact from
+        namespace B. The fix lives in `arg_is_artifact_ref`.
+
+        The Python client `get_artifact` helper does not accept
+        ``namespace=`` (the artifact endpoint historically had no
+        scoped form), so this test drives the body parameter via
+        ``_request_url`` directly.
+        """
+        artifact_name = 'shared-name'
+
+        ns_b_name = self.namespace + '-b'
+        ns_b_key = self._uniquifier()
+        client_b = self._make_namespace(ns_b_name, ns_b_key)
+
+        try:
+            art_a = self._upload_tiny_artifact(
+                self.test_client, artifact_name)
+            art_b = self._upload_tiny_artifact(client_b, artifact_name)
+            self.assertNotEqual(art_a['uuid'], art_b['uuid'])
+
+            # System creds, explicit namespace=A → must be A's UUID.
+            scoped_a = self.system_client._request_url(
+                'GET', '/artifacts/' + artifact_name,
+                data={'namespace': self.namespace}).json()
+            self.addDetail(
+                'scoped_a', content.text_content(
+                    json.dumps(scoped_a, indent=4, sort_keys=True)))
+            self.assertEqual(
+                art_a['uuid'], scoped_a['uuid'],
+                'System client with namespace=A should resolve A, not B')
+
+            # System creds, explicit namespace=B → must be B's UUID.
+            scoped_b = self.system_client._request_url(
+                'GET', '/artifacts/' + artifact_name,
+                data={'namespace': ns_b_name}).json()
+            self.addDetail(
+                'scoped_b', content.text_content(
+                    json.dumps(scoped_b, indent=4, sort_keys=True)))
+            self.assertEqual(
+                art_b['uuid'], scoped_b['uuid'],
+                'System client with namespace=B should resolve B, not A')
+
+            # Tenant A attempting to query namespace B by name must fail.
+            self.assertRaises(
+                apiclient.ResourceNotFoundException,
+                self.test_client._request_url,
+                'GET', '/artifacts/' + artifact_name,
+                data={'namespace': ns_b_name})
+        finally:
+            try:
+                self.system_client.delete_namespace(ns_b_name)
+            except apiclient.ResourceNotFoundException:
+                pass
