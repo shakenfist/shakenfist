@@ -861,10 +861,12 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_object_states_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {OBJECT_STATES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -875,7 +877,7 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = OBJECT_STATES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1108,10 +1110,14 @@ def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_node_metrics_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NODE_METRICS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
-        current_ver = 1
+        current_ver = NODE_METRICS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1167,10 +1173,14 @@ def _ensure_cluster_operations_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_cluster_operations_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {CLUSTER_OPERATIONS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
-        current_ver = 1
+        current_ver = CLUSTER_OPERATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1286,10 +1296,14 @@ def _ensure_work_queue_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_work_queue_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {WORK_QUEUE_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
-        current_ver = 1
+        current_ver = WORK_QUEUE_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1476,11 +1490,15 @@ def _ensure_cluster_config_schema(
     start_ver = current_ver
     table = _get_cluster_config_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {CLUSTER_CONFIG_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True)
-        current_ver = 1
+        current_ver = CLUSTER_CONFIG_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1667,10 +1685,12 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_ipam_reservations_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {IPAM_RESERVATIONS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1681,7 +1701,7 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = IPAM_RESERVATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1728,10 +1748,12 @@ def _ensure_uploads_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_uploads_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {UPLOADS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1742,7 +1764,7 @@ def _ensure_uploads_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = UPLOADS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1789,10 +1811,12 @@ def _ensure_dnsmasq_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_dnsmasq_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {DNSMASQ_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1803,7 +1827,7 @@ def _ensure_dnsmasq_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = DNSMASQ_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1850,10 +1874,12 @@ def _ensure_blobs_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_blobs_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {BLOBS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1864,7 +1890,7 @@ def _ensure_blobs_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = BLOBS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1914,10 +1940,12 @@ def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_object_references_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {OBJECT_REFERENCES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1928,7 +1956,7 @@ def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = OBJECT_REFERENCES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1975,10 +2003,12 @@ def _ensure_blob_hashes_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_blob_hashes_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {BLOB_HASHES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1989,7 +2019,7 @@ def _ensure_blob_hashes_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = BLOB_HASHES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -2035,10 +2065,12 @@ def _ensure_blob_transfers_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_blob_transfers_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Cleanup migration will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {BLOB_TRANSFERS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -2049,7 +2081,7 @@ def _ensure_blob_transfers_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = BLOB_TRANSFERS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -2244,8 +2276,12 @@ def _ensure_artifact_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_artifact_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {ARTIFACT_ATTRIBUTES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -2255,7 +2291,7 @@ def _ensure_artifact_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = ARTIFACT_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -2274,8 +2310,12 @@ def _ensure_artifact_indexes_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_artifact_indexes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {ARTIFACT_INDEXES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -2285,7 +2325,7 @@ def _ensure_artifact_indexes_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = ARTIFACT_INDEXES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -8602,8 +8642,12 @@ def _ensure_nodes_schema(
     start_ver = current_ver
     table = _get_nodes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NODES_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True
         )
@@ -8618,7 +8662,7 @@ def _ensure_nodes_schema(
                         f'skipped: {e}'
                     )
 
-        current_ver = 1
+        current_ver = NODES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -8639,8 +8683,12 @@ def _ensure_node_attributes_schema(
     start_ver = current_ver
     table = _get_node_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NODE_ATTRIBUTES_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True
         )
@@ -8655,7 +8703,7 @@ def _ensure_node_attributes_schema(
                         f'skipped: {e}'
                     )
 
-        current_ver = 1
+        current_ver = NODE_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -9931,8 +9979,12 @@ def _ensure_namespaces_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_namespaces_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NAMESPACES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -9942,7 +9994,7 @@ def _ensure_namespaces_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = NAMESPACES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -9961,8 +10013,12 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_namespace_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NAMESPACE_ATTRIBUTES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -9972,7 +10028,7 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = NAMESPACE_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -11539,8 +11595,12 @@ def _ensure_network_interface_attributes_schema(
     start_ver = current_ver
     table = _get_network_interface_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NETWORK_INTERFACE_ATTRIBUTES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -11550,7 +11610,7 @@ def _ensure_network_interface_attributes_schema(
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = NETWORK_INTERFACE_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -12496,8 +12556,12 @@ def _ensure_ipams_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_ipams_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {IPAMS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -12507,7 +12571,7 @@ def _ensure_ipams_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = IPAMS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -13622,8 +13686,12 @@ def _ensure_agent_operations_schema(
     start_ver = current_ver
     table = _get_agent_operations_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {AGENT_OPERATIONS_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True)
 
@@ -13635,7 +13703,7 @@ def _ensure_agent_operations_schema(
                     LOG.debug(
                         f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = AGENT_OPERATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -13655,8 +13723,12 @@ def _ensure_agent_operation_attributes_schema(
     start_ver = current_ver
     table = _get_agent_operation_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {AGENT_OPERATION_ATTRIBUTES_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True)
 
@@ -13668,7 +13740,7 @@ def _ensure_agent_operation_attributes_schema(
                     LOG.debug(
                         f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = AGENT_OPERATION_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
