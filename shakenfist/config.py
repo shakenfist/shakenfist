@@ -17,7 +17,7 @@ def get_node_name() -> str:
     return socket.getfqdn()
 
 
-def _parse_comma_separated_hosts(value):
+def _parse_comma_separated_hosts(value: object) -> object:
     if isinstance(value, str):
         return [item.strip() for item in value.split(',') if item.strip()]
     return value

@@ -241,6 +241,7 @@ named "_service_key". From v0.7 service keys have a name of the form
 
 ## Key Storage
 
-Shaken Fist stores the access keys in `etcd`. The keys are stored as the base64
-encoding of the key post salting and hashing. The python `bcrypt` library is used
-to perform salting, hashing, and key verification.
+Shaken Fist stores the access keys in MariaDB (in the `namespace_attributes`
+table). The keys are stored as the base64 encoding of the key post salting and
+hashing. The python `bcrypt` library is used to perform salting, hashing, and
+key verification.

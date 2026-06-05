@@ -174,7 +174,6 @@ shakenfist/
 │   │   ├── cleaner/         # Resource cleanup
 │   │   ├── cluster/         # Cluster maintenance
 │   │   ├── database/        # Database microservice (MariaDB gRPC wrapper)
-│   │   ├── eventlog/        # Event logging service
 │   │   ├── network/         # Network daemon
 │   │   ├── queues/          # Job queue processing
 │   │   ├── resources/       # Resource tracking

@@ -588,7 +588,7 @@ if [ -z "${GETSF_MARIADB_PASSWORD}" ]; then
     read GETSF_MARIADB_PASSWORD
     record_answer GETSF_MARIADB_PASSWORD "${GETSF_MARIADB_PASSWORD}"
 else
-    echo "(a password) >> ${GETSF_MARIADB_PASSWORD}"
+    echo "(a password) >> [redacted, sourced from environment]"
 fi
 question_end
 if [ -z "${GETSF_MARIADB_PASSWORD}" ]; then

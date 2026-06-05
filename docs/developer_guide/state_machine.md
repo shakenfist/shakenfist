@@ -9,7 +9,7 @@ raise an exception if an unexpected transition occurs. The state model for a
 given object is defined in the `state_targets` map in the object class for those
 keen on reading code.
 
-Objects marked as `deleted` are removed from etcd after sitting deleted for
+Objects marked as `deleted` are removed from MariaDB after sitting deleted for
 some period of time. This is called a "hard deletion" and the period of time is
 configured with the CLEANER_DELAY configuration option. Once an object is hard
 deleted it will no longer appear in any API request, as it no longer exists in
