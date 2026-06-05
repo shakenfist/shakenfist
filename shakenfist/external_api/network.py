@@ -168,11 +168,6 @@ class NetworkEndpoint(api_base.Resource):
         if network_ref == str(FLOATING_NETWORK_UUID):
             return sf_api.error(403, 'you cannot delete the floating network')
 
-        # If a namespace is specified, ensure the network is in it
-        if namespace:
-            if network_from_db.namespace != namespace:
-                return sf_api.error(404, 'network not in namespace')
-
         # An already-deleted network has nothing left to enqueue, but the
         # Phase 7 client contract is "DELETE returns 202+op-handle and
         # the client polls"; returning a bare ``return`` here produced a

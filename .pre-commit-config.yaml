@@ -57,6 +57,21 @@ repos:
         pass_filenames: false
         types: [python]
 
+  # Namespace-scoping guardrail for from_db_by_ref calls in external_api/
+  - repo: local
+    hooks:
+      - id: check-from-db-by-ref-namespace
+        name: Check from_db_by_ref namespace scoping
+        description: >-
+          Reject from_db_by_ref(..., request_namespace()) in external_api/;
+          callers must resolve the namespace via api_base.resolve_lookup_namespace
+          first so the request body's `namespace` field is honoured for
+          system tokens.
+        entry: tools/check-from-db-by-ref-namespace.sh
+        language: system
+        files: ^shakenfist/external_api/.*\.py$
+        pass_filenames: false
+
   # Type checking with mypy (incremental rollout via tox)
   # Requires: pip install tox mypy
   - repo: local

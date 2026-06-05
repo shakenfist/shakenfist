@@ -251,11 +251,6 @@ class InstanceEndpoint(api_base.Resource):
         if instance_from_db.state.value == dbo.STATE_DELETED:
             return sf_api.error(404, 'instance not found')
 
-        # If a namespace is specified, ensure the instance is in it
-        if namespace:
-            if instance_from_db.namespace != namespace:
-                return sf_api.error(404, 'instance not in namespace')
-
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'delete request from REST API')
         instance_from_db.enqueue_delete()
@@ -298,10 +293,12 @@ def _netdesc_safety_checks(netdesc, namespace):
             400, 'network specification is missing network_uuid')
 
     # Allow network to be specified by name or UUID (and error early
-    # if not found)
+    # if not found). Scope to the *instance's* namespace, not the
+    # caller's — a system admin creating an instance in tenant 'ns1'
+    # must resolve 'ns1's network, not whatever same-named network
+    # happens to be visible cluster-wide.
     try:
-        n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'],
-                                         request_namespace())
+        n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'], namespace)
     except exceptions.MultipleObjects as e:
         return sf_api.error(400, str(e), suppress_traceback=True)
 

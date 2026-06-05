@@ -175,6 +175,74 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
                 # asynchronously deleted.
                 pass
 
+    def test_instance_system_creds_namespace_scoped(self):
+        """System creds + explicit `namespace=` scope strictly.
+
+        Regression test for the bug where a system caller passing
+        ``namespace=A`` could receive a same-named instance from
+        namespace B because the server collapsed system creds to
+        "search every namespace" before applying the body's namespace
+        filter. The fix is in `arg_is_instance_ref`.
+        """
+        inst_name = 'shared-name'
+        minimal_disk = [{'size': 1, 'type': 'disk'}]
+
+        ns_b_name = self.namespace + '-b'
+        ns_b_key = self._uniquifier()
+        client_b = self._make_namespace(ns_b_name, ns_b_key)
+
+        inst_a = None
+        inst_b = None
+        try:
+            inst_a = self.test_client.create_instance(
+                inst_name, 1, 128, None, minimal_disk, None, None,
+                namespace=self.namespace)
+            inst_b = client_b.create_instance(
+                inst_name, 1, 128, None, minimal_disk, None, None,
+                namespace=ns_b_name)
+            self.assertNotEqual(inst_a['uuid'], inst_b['uuid'])
+
+            # System creds, explicit namespace=A → must be A's UUID.
+            scoped_a = self.system_client.get_instance(
+                inst_name, namespace=self.namespace)
+            self.addDetail(
+                'scoped_a',
+                content.text_content(json.dumps(scoped_a, indent=4, sort_keys=True)))
+            self.assertEqual(
+                inst_a['uuid'], scoped_a['uuid'],
+                'System client with namespace=A should resolve A, not B')
+
+            # System creds, explicit namespace=B → must be B's UUID.
+            scoped_b = self.system_client.get_instance(
+                inst_name, namespace=ns_b_name)
+            self.addDetail(
+                'scoped_b',
+                content.text_content(json.dumps(scoped_b, indent=4, sort_keys=True)))
+            self.assertEqual(
+                inst_b['uuid'], scoped_b['uuid'],
+                'System client with namespace=B should resolve B, not A')
+
+            # Tenant A attempting to query namespace B by name must fail.
+            self.assertRaises(
+                apiclient.ResourceNotFoundException,
+                self.test_client.get_instance, inst_name,
+                namespace=ns_b_name)
+        finally:
+            for client, inst in [
+                    (self.test_client, inst_a),
+                    (client_b, inst_b)]:
+                if inst is None:
+                    continue
+                try:
+                    client.delete_instance(inst['uuid'])
+                except apiclient.ResourceNotFoundException:
+                    pass
+            try:
+                self.system_client.delete_namespace(ns_b_name)
+            except (apiclient.ResourceNotFoundException,
+                    apiclient.RequestMalformedException):
+                pass
+
     def test_network_same_name_different_namespace(self):
         """Two namespaces each own a network called 'shared-net'.
 
@@ -259,4 +327,58 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
                     apiclient.RequestMalformedException):
                 # RequestMalformedException if networks are still being
                 # asynchronously deleted.
+                pass
+
+    def test_network_system_creds_namespace_scoped(self):
+        """System creds + explicit `namespace=` scope strictly (networks).
+
+        Companion to test_instance_system_creds_namespace_scoped — same
+        regression, network decorator.
+        """
+        net_name = 'shared-net'
+
+        ns_b_name = self.namespace + '-b'
+        ns_b_key = self._uniquifier()
+        client_b = self._make_namespace(ns_b_name, ns_b_key)
+
+        net_a = None
+        net_b = None
+        try:
+            net_a = self.test_client.allocate_network(
+                '10.110.0.0/24', True, True, net_name)
+            net_b = client_b.allocate_network(
+                '10.111.0.0/24', True, True, net_name)
+            self.assertNotEqual(net_a['uuid'], net_b['uuid'])
+
+            scoped_a = self.system_client.get_network(
+                net_name, namespace=self.namespace)
+            self.assertEqual(
+                net_a['uuid'], scoped_a['uuid'],
+                'System client with namespace=A should resolve A, not B')
+
+            scoped_b = self.system_client.get_network(
+                net_name, namespace=ns_b_name)
+            self.assertEqual(
+                net_b['uuid'], scoped_b['uuid'],
+                'System client with namespace=B should resolve B, not A')
+
+            self.assertRaises(
+                apiclient.ResourceNotFoundException,
+                self.test_client.get_network, net_name,
+                namespace=ns_b_name)
+        finally:
+            for client, net in [
+                    (self.test_client, net_a),
+                    (client_b, net_b)]:
+                if net is None:
+                    continue
+                try:
+                    client.delete_network(net['uuid'])
+                except (apiclient.ResourceNotFoundException,
+                        apiclient.ResourceStateConflictException):
+                    pass
+            try:
+                self.system_client.delete_namespace(ns_b_name)
+            except (apiclient.ResourceNotFoundException,
+                    apiclient.RequestMalformedException):
                 pass
