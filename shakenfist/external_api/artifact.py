@@ -50,7 +50,7 @@ daemon.set_log_level(LOG, 'api')
 
 def arg_is_artifact_ref(func):
     def wrapper(*args, **kwargs):
-        body_namespace = kwargs.get('namespace')
+        body_namespace = kwargs.pop('namespace', None)
 
         # Resolve and authorise the namespace once, regardless of
         # whether the caller named the artifact by UUID or by ref.

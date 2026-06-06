@@ -230,7 +230,7 @@ def log_token_use(func):
 
 def arg_is_instance_ref(func):
     def wrapper(*args, **kwargs):
-        body_namespace = kwargs.get('namespace')
+        body_namespace = kwargs.pop('namespace', None)
         lookup_namespace, err = resolve_lookup_namespace(
             body_namespace, 'instance')
         if err:
@@ -356,7 +356,7 @@ def requires_instance_active(func):
 def arg_is_network_ref(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
-        body_namespace = kwargs.get('namespace')
+        body_namespace = kwargs.pop('namespace', None)
         lookup_namespace, err = resolve_lookup_namespace(
             body_namespace, 'network')
         if err:
