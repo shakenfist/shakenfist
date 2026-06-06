@@ -406,8 +406,8 @@ nav:
                 - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
                 - "Phase 3: WebRTC plumbing (`webrtc-rs`)": components/ryll/plans/PLAN-web-frontend-phase-03-webrtc.md
                 - "Phase 4 — Channel diagnostics audit + playback observability": components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics.md
-                - "Phase 4 — documentation": components/ryll/plans/PLAN-display-window-sizing-phase-04-docs.md
                 - "Phase 4 — documentation": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs.md
+                - "Phase 4 — documentation": components/ryll/plans/PLAN-display-window-sizing-phase-04-docs.md
                 - "Phase 4: COPY_BITS": components/ryll/plans/PLAN-display-draw-ops-phase-04-copy-bits.md
                 - "Phase 4: Device enumeration display": components/ryll/plans/PLAN-usb-ui-phase-04-enumerate.md
                 - "Phase 4: Documentation and cross-repo updates": components/ryll/plans/PLAN-paste-as-keystrokes-phase-04-docs.md
