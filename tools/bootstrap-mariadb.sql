@@ -19,9 +19,18 @@
 -- After applying this snippet, run `sf-ctl ensure-mariadb-schema`
 -- to create the SF tables and apply any pending schema migrations.
 
+-- We intentionally do not pin a COLLATE here: the database inherits
+-- the server's default collation for utf8mb4. Pinning a non-default
+-- collation makes JOINs that compare a table column (which carries
+-- the column's collation) against CAST() output (which carries the
+-- server's default collation) raise "Illegal mix of collations"
+-- (MariaDB error 1267) -- which is exactly what bit the
+-- coalescible-op join in cluster CI. Shaken Fist's comparisons are
+-- over UUIDs, integers, and ASCII keys, where utf8mb4_general_ci
+-- and utf8mb4_unicode_ci are interchangeable, so letting the server
+-- pick avoids the mismatch.
 CREATE DATABASE IF NOT EXISTS `shakenfist`
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
+    CHARACTER SET utf8mb4;
 
 CREATE USER IF NOT EXISTS 'shakenfist'@'%'
     IDENTIFIED BY '__REPLACE_ME__';
