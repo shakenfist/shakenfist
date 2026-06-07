@@ -857,7 +857,7 @@ fi
 
 local_client_package="/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
 if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
-    local_server_package=shakenfist-client
+    local_client_package=shakenfist-client
 fi
 
 # The shakenfist-agent package used to be installed into the server venv
