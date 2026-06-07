@@ -149,7 +149,6 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
 
     update_if_specified('server_package', 'shakenfist')
     update_if_specified('client_package', 'shakenfist-client')
-    update_if_specified('agent_package', 'shakenfist-agent')
     update_if_specified('pip_extra', '')
     update_if_specified('topology', None)
 

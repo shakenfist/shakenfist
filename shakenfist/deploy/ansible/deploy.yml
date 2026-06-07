@@ -98,7 +98,6 @@
       vars:
         role_action: "bootstrap"
         server_package: "{{ server_package }}"
-        agent_package: "{{ agent_package }}"
         client_package: "{{ client_package }}"
         pip_extra: "{{ pip_extra }}"
 
