@@ -369,7 +369,15 @@ def _grpc_call(method: Any, request: Any) -> Any:
         grpc.StatusCode.UNAVAILABLE,
         grpc.StatusCode.DEADLINE_EXCEEDED,
     }
-    method_name = getattr(method, '__name__', None)
+    # grpcio's ``_UnaryUnaryMultiCallable`` (returned by ``stub.X``) uses
+    # ``__slots__`` and exposes no ``__name__``; the wire method name lives
+    # in ``self._method`` as bytes shaped like
+    # ``b'/shakenfist.protos.DatabaseService/GetNodeByFqdn'``. Take the part
+    # after the last ``/`` -- that matches the attribute name set on the
+    # stub in the generated ``_pb2_grpc`` module, so ``getattr(stub, name)``
+    # resolves cleanly on the retry path.
+    raw_method = getattr(method, '_method', b'') or b''
+    method_name = raw_method.decode().rsplit('/', 1)[-1] or None
 
     last_error: BaseException = grpc.RpcError()
     for attempt in range(GRPC_RETRIES):
