@@ -1,0 +1,926 @@
+# Control Socket Protocol — Version 1.0
+
+This document specifies the wire protocol spoken between Ryll's headless
+mode and any external driver that connects to its Unix-domain control
+socket. It is the load-bearing contract for all of phase 3 of the
+kerbside automated-SPICE-test-harness plan. Downstream work — the
+phase 4 latency loadtest port, the phase 6 `digest_updated` event
+layer, and the phase 7 Sextant scenario tempest test — all implement
+against this document. Read the whole document before writing a client
+or implementing a verb.
+
+Protocol version: **1.0**
+
+---
+
+## Contents
+
+1. [Scope and non-goals](#scope-and-non-goals)
+2. [Transport](#transport)
+3. [Framing](#framing)
+4. [Message envelopes](#message-envelopes)
+5. [Hello handshake](#hello-handshake)
+6. [Concurrency](#concurrency)
+7. [Verb reference](#verb-reference)
+8. [Event reference](#event-reference)
+9. [Subscription semantics](#subscription-semantics)
+10. [Backpressure](#backpressure)
+11. [Error model](#error-model)
+12. [Versioning](#versioning)
+13. [End-to-end worked example](#end-to-end-worked-example)
+
+---
+
+## Scope and non-goals
+
+### What this protocol covers
+
+- Driving a headless Ryll session from an external process over a
+  Unix-domain socket.
+- Querying session state (SPICE connection status, surfaces, agent
+  availability).
+- Sending keyboard input as individual scancodes or as paste-as-
+  keystrokes text.
+- Capturing a screenshot of any live surface.
+- Subscribing to an asynchronous stream of events: SPICE latency
+  samples, agent connect/disconnect transitions, paste completion
+  notifications, and queue-overflow notifications.
+- Negotiating the protocol version at connection time so clients and
+  servers can evolve independently within a major version.
+
+### What this protocol does NOT cover (phase 3 non-goals)
+
+- **Digest events.** The `digest_updated` event is reserved for phase
+  6. It will be added as a new event name in a minor version bump
+  (v1.1) without changing any existing envelope or verb. Clients that
+  ask to subscribe to `digest_updated` in v1.0 will receive an empty
+  `subscribed` list for that name; this is intentional.
+- **Mouse and USB-redirection verbs.** The latency loadtest and first
+  Sextant scenarios do not need them. They will be added as new minor-
+  version verbs when a test that requires them arrives.
+- **Authentication or encryption on the socket.** Unix-socket file
+  permissions are the security boundary for v1. Cross-host control is
+  not a goal; if it ever becomes one, that is a separate design.
+- **Multi-client concurrency.** Version 1 accepts exactly one client at
+  a time. A second connection attempt while a client is connected
+  receives a `busy` error and is closed immediately.
+- **Control socket in GUI or web mode.** The socket is only valid in
+  `--headless` mode. Combining `--control-socket` with the GUI or
+  `--web` flag is a CLI error.
+- **Replacing the `--cadence`, `--paste-text`, or `--latency-file`
+  flags.** Those flags keep working unchanged. The control socket is a
+  new, orthogonal interface.
+
+---
+
+## Transport
+
+The control socket is a **Unix-domain stream socket** (type
+`SOCK_STREAM`). Its path is supplied by the caller via Ryll's
+`--control-socket <path>` flag. This flag is only valid when
+`--headless` is also present; Ryll will reject the combination with
+any other operating mode.
+
+On startup, Ryll:
+
+1. Unlinks any existing file at the path (so a stale socket from a
+   previous run does not block startup).
+2. Creates a new socket file and calls `bind()`.
+3. Sets the file mode to **0600** (owner read/write only) before
+   calling `listen()`. File permissions are the sole access-control
+   mechanism; protect the path accordingly.
+4. Begins accepting connections.
+
+When the SPICE session ends (normally or on error), Ryll closes the
+listening socket and unlinks the socket file.
+
+The socket is a streaming transport, not a datagram transport. Because
+NDJSON framing (see below) is self-delimiting, the client and server
+never need to know how many bytes to read in advance; they read until
+they see a newline.
+
+---
+
+## Framing
+
+All messages are framed as **line-delimited JSON** (NDJSON). Every
+message is exactly one JSON value encoded as a single line terminated
+by a `\n` (ASCII 0x0A) byte. No length prefix, no binary envelope, no
+trailing null byte. Each line is a self-contained, parseable JSON
+object.
+
+- Encoding: UTF-8.
+- Line terminator: `\n`. The sender appends `\n` after every
+  serialised object. The receiver splits the byte stream on `\n`
+  boundaries and feeds each non-empty line to a JSON parser.
+- A single connection is full-duplex: the client writes request lines;
+  the server writes response lines and event lines. Writes from each
+  side are independent; neither side buffers until it hears from the
+  other.
+- The server never sends a partial line. If the server has nothing to
+  say, it is silent. A reader that reads a complete `\n`-terminated
+  line always has a complete JSON object.
+- JSON values that span multiple lines are not supported. Do not pretty-
+  print messages on the wire.
+
+---
+
+## Message envelopes
+
+There are three envelope shapes. Every message on the wire is one of
+these three.
+
+### Request (client to server)
+
+```json
+{"id": 1, "method": "send_key", "params": {"scancode": 28, "state": "press"}}
+```
+
+Fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | integer or string | yes | Caller-chosen correlation token. The server echoes it in the matching response. Must be unique among in-flight requests on this connection. |
+| `method` | string | yes | The verb name. See the verb reference section. |
+| `params` | object | yes | Verb-specific parameters. May be `{}` for verbs that take no arguments. Never omit the key. |
+
+The `id` field may be any JSON integer or JSON string. Integers are
+recommended for simplicity. The server treats it as an opaque token;
+it never performs arithmetic on it.
+
+### Response (server to client)
+
+Success:
+
+```json
+{"id": 1, "ok": true, "result": {}}
+```
+
+Failure:
+
+```json
+{"id": 1, "ok": false, "error": {"code": "bad_state", "message": "unrecognised state value \"sideways\""}}
+```
+
+Fields:
+
+| Field | Type | Present when | Description |
+|-------|------|--------------|-------------|
+| `id` | integer or string | always | The `id` copied from the matching request. |
+| `ok` | boolean | always | `true` on success, `false` on error. |
+| `result` | object | `ok` is `true` | Verb-specific result payload. May be `{}`. |
+| `error` | object | `ok` is `false` | Error descriptor. Contains `code` (stable string) and `message` (human-readable string). |
+
+### Event (server to client, unsolicited)
+
+```json
+{"event": "latency", "data": {"sample_ms": 12.4, "wallclock_us": 1717000000123456}}
+```
+
+Fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | string | The event name. See the event reference section. |
+| `data` | object | Event-specific payload. |
+
+Events have no `id` field and never correspond to a request. They are
+delivered whenever the subscribed condition occurs. A client that has
+not called `subscribe` receives no events; see the subscription
+semantics section.
+
+---
+
+## Hello handshake
+
+Every fresh connection must begin with a `hello` request before any
+other request. This rule exists so both sides can negotiate the
+protocol version before doing anything that depends on a particular
+verb signature.
+
+### Ordering rule
+
+The server tracks whether the current client has completed a successful
+`hello` exchange. If the server receives any request other than
+`hello` before a successful `hello` response has been sent, it
+responds immediately with:
+
+```json
+{"id": <the_request_id>, "ok": false, "error": {"code": "no_hello_yet", "message": "first request must be hello"}}
+```
+
+Importantly, **the connection stays open** after this error. The client
+may then send a `hello` request and continue normally. This is
+intentional: a buggy client that accidentally sends one request out of
+order should be able to recover without reconnecting.
+
+### Hello request
+
+```json
+{"id": 1, "method": "hello", "params": {"client_name": "my-loadtest", "protocol_version": "1.0"}}
+```
+
+Parameters:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `client_name` | string | A human-readable identifier for the client. Used in server logs; not validated. |
+| `protocol_version` | string | The major.minor protocol version the client is requesting. Must be a dotted two-part string, e.g. `"1.0"`. |
+
+### Hello response — success
+
+```json
+{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.0", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped"]}}
+```
+
+Result fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `server_name` | string | Always `"ryll"` in this implementation. |
+| `protocol_version` | string | The version the server will speak. In v1 this is always `"1.0"`. |
+| `supported_methods` | array of string | The complete set of verb names the server recognises. Clients should use this list rather than hard-coding expectations, especially when connecting to a newer server. |
+| `supported_events` | array of string | The complete set of event names the server can emit. |
+
+### Hello response — version mismatch
+
+If the client's `protocol_version` has a different **major** component
+from the server's supported major version, the server responds with an
+error and then **closes the connection**:
+
+```json
+{"id": 1, "ok": false, "error": {"code": "protocol_version_mismatch", "message": "server speaks major version 1; client requested major version 2"}}
+```
+
+The server writes the error line and then closes the socket. The client
+will see EOF immediately after reading that line.
+
+**Minor version mismatches are accepted in both directions.** A v1.3
+client connecting to a v1.0 server, or vice versa, is fine: the server
+responds with `"protocol_version": "1.0"` and both sides behave
+according to the features they each know about. The client should check
+`supported_methods` and `supported_events` at runtime rather than
+assuming every verb in this document is available on every server.
+
+---
+
+## Concurrency
+
+Version 1 supports **one client at a time**.
+
+The server maintains a flag that tracks whether a client is currently
+connected. A second `accept()` while a client is connected results in
+the server writing a single error line on the new connection and then
+closing it:
+
+```json
+{"ok": false, "error": {"code": "busy", "message": "another client is connected"}}
+```
+
+Note that this synthetic response does not have an `id` field, because
+no request was received. A client reading this line can detect the
+`busy` condition by checking `ok` and `error.code`. After writing
+this line the server closes the new connection. The existing client is
+unaffected.
+
+Clients that need to retry should implement a simple back-off loop.
+A reasonable strategy is to poll every 250 ms with a short timeout.
+
+---
+
+## Verb reference
+
+Every verb subsection describes the params object, the result object on
+success, the error codes specific to that verb, and a worked NDJSON
+example. The common error codes (`no_hello_yet`, `unknown_method`,
+`bad_params`, `internal_error`) are not repeated per-verb; see the
+error model section for their definitions.
+
+### `hello`
+
+Documented in full in the hello handshake section. Repeated here for
+completeness as a verb-reference entry.
+
+Params:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `client_name` | string | Human-readable client identifier. |
+| `protocol_version` | string | Dotted `major.minor` string the client is requesting. |
+
+Result on success:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `server_name` | string | `"ryll"`. |
+| `protocol_version` | string | The version the server will speak. |
+| `supported_methods` | array of string | Verb names this server supports. |
+| `supported_events` | array of string | Event names this server can emit. |
+
+Verb-specific error codes:
+
+| Code | When |
+|------|------|
+| `protocol_version_mismatch` | Major version in `protocol_version` does not match the server's major version. Connection is closed after the error. |
+
+Worked example:
+
+```
+→ {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.0"}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.0", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped"]}}
+```
+
+---
+
+### `status`
+
+Query the current state of the headless SPICE session.
+
+Params: `{}` (none required)
+
+Result on success:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spice_connected` | boolean | Whether the SPICE main channel is currently established. |
+| `agent_connected` | boolean | Whether a SPICE vdagent is currently running in the guest. Some operations (paste) require the agent. |
+| `surfaces` | array of surface objects | The set of display surfaces currently known to Ryll. May be empty while the session is still initialising. |
+
+Each surface object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `channel_id` | u8 | The display channel number this surface belongs to. |
+| `surface_id` | u32 | The surface identifier within that channel. Surface 0 is the primary surface. |
+| `width` | u32 | Width in pixels. |
+| `height` | u32 | Height in pixels. |
+
+Verb-specific error codes: none beyond the common set.
+
+Worked example:
+
+```
+→ {"id": 2, "method": "status", "params": {}}
+← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
+```
+
+---
+
+### `send_key`
+
+Send a single keyboard scancode event to the guest.
+
+Params:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `scancode` | u16 | The AT-set 1 scancode to send. Extended scancodes (0xE0 prefix) should be supplied as the full 16-bit value with the prefix byte in the high byte, e.g. `0xE04B` for left arrow. |
+| `state` | string | One of `"down"`, `"up"`, or `"press"`. `"press"` sends a down event immediately followed by an up event in a single operation. |
+
+Result on success: `{}`
+
+Verb-specific error codes:
+
+| Code | When |
+|------|------|
+| `bad_state` | The `state` field contains a value other than `"down"`, `"up"`, or `"press"`. |
+
+Worked example (Enter key press):
+
+```
+→ {"id": 3, "method": "send_key", "params": {"scancode": 28, "state": "press"}}
+← {"id": 3, "ok": true, "result": {}}
+```
+
+Worked example (extended key, left arrow, explicit down then up):
+
+```
+→ {"id": 4, "method": "send_key", "params": {"scancode": 57419, "state": "down"}}
+← {"id": 4, "ok": true, "result": {}}
+→ {"id": 5, "method": "send_key", "params": {"scancode": 57419, "state": "up"}}
+← {"id": 5, "ok": true, "result": {}}
+```
+
+Note: 57419 decimal is 0xE04B, the scancode for the left arrow key.
+
+---
+
+### `paste`
+
+Paste a string of text into the guest by translating it into US-QWERTY
+key events and queuing them for delivery.
+
+This verb is **asynchronous**. The response is returned as soon as the
+paste task has been queued, not when it has finished typing all the
+characters. Completion (or failure) is communicated as a
+`paste_completed` or `paste_failed` event delivered to any client that
+has subscribed to those events. The `request_id` field in those events
+matches the `id` of the `paste` request, so the caller can correlate
+the outcome.
+
+This design mirrors how `--paste-text` works internally: the paste
+produces a series of synthetic `KeyDown`/`KeyUp` events spaced by
+`char_delay_ms`, and those events are generated by a background task
+that runs concurrently with the SPICE session loop. Blocking the
+`paste` response until the last character is typed would stall the
+control socket for potentially several seconds, which is worse than
+async reporting.
+
+If the client disconnects while a paste is in progress, Ryll cancels
+the outstanding paste task and stops generating synthetic key events.
+This is tracked per request ID via a cancellation token held in the
+session's in-flight action registry.
+
+Params:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | string | The text to type. Must be representable in US-QWERTY layout (ASCII printable characters). Characters that cannot be represented will cause a `paste_failed` event. |
+| `char_delay_ms` | u32 or null | Milliseconds to wait between each character. Defaults to Ryll's built-in paste delay (currently 10 ms) if omitted or null. Useful for guests with slow keystroke handling. |
+
+Result on success: `{}` (returned immediately on queue, not on completion)
+
+Verb-specific error codes:
+
+| Code | When |
+|------|------|
+| `agent_not_connected` | The SPICE vdagent is not currently connected. The paste infrastructure depends on the agent for clipboard operations. Wait for an `agent_connected` event with `connected: true` before retrying. |
+
+Worked example:
+
+```
+→ {"id": 6, "method": "paste", "params": {"text": "hunter2", "char_delay_ms": 20}}
+← {"id": 6, "ok": true, "result": {}}
+```
+
+After some time, assuming the client is subscribed to `paste_completed`:
+
+```
+← {"event": "paste_completed", "data": {"request_id": 6, "chars_sent": 7}}
+```
+
+Or on failure (e.g. an unrepresentable character mid-string):
+
+```
+← {"event": "paste_failed", "data": {"request_id": 6, "reason": "character U+2022 is not representable in US-QWERTY"}}
+```
+
+---
+
+### `screenshot`
+
+Capture a PNG or raw RGBA image of a display surface and return it
+inline in the response, base64-encoded.
+
+This is a synchronous verb: the server locks the surface mirror,
+snapshots the pixel buffer, encodes the image, and responds before
+accepting another request. The response therefore may be large and slow
+to arrive.
+
+**Size and latency warning.** At 1024 x 768:
+
+- A raw RGBA snapshot is 1024 x 768 x 4 = 3,145,728 bytes (~3 MB).
+- A PNG encode of typical desktop content takes approximately 5-10 ms
+  and produces roughly 300-900 KB.
+- Base64 inflates the payload by 33 %. A 600 KB PNG becomes roughly
+  800 KB as a JSON string.
+
+Callers that need low-latency screenshots (e.g. a digest assertion
+loop) should use `"format": "rgba"` to skip the PNG encode. Callers
+that need human-readable images (e.g. test-failure artefacts) should
+use `"format": "png"` (the default).
+
+Headless mode does not instantiate a `SurfaceMirror` by default. The
+mirror is created on first use of `screenshot` and kept alive until the
+session ends. The first screenshot call may therefore take slightly
+longer than subsequent ones as the mirror catches up on buffered
+surface events.
+
+Params:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `surface_id` | u32 or null | The surface to capture. Defaults to surface 0 (the primary surface) if omitted or null. |
+| `format` | string or null | `"png"` (default) or `"rgba"`. |
+
+Result on success:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `width` | u32 | Width of the captured surface in pixels. |
+| `height` | u32 | Height of the captured surface in pixels. |
+| `format` | string | The format actually used: `"png"` or `"rgba"`. Echoed back so the client does not need to remember its own request. |
+| `data_base64` | string | The image data, base64-encoded (standard alphabet, no line breaks). For `"png"`, this is a complete PNG file. For `"rgba"`, this is a raw byte array in row-major order, 4 bytes per pixel (R, G, B, A), top-left origin. |
+
+Verb-specific error codes:
+
+| Code | When |
+|------|------|
+| `no_such_surface` | No surface with the requested `surface_id` exists in the current session. Check `status` for the available surface list. |
+| `unsupported_format` | The `format` field contains a value other than `"png"` or `"rgba"`. |
+
+Worked example:
+
+```
+→ {"id": 7, "method": "screenshot", "params": {"surface_id": 0, "format": "png"}}
+← {"id": 7, "ok": true, "result": {"width": 1024, "height": 768, "format": "png", "data_base64": "iVBORw0KGgo..."}}
+```
+
+The `data_base64` value above is truncated; a real PNG will be
+hundreds of kilobytes when base64-encoded.
+
+---
+
+### `subscribe`
+
+Register interest in one or more named events. After a successful
+`subscribe` call, the server will begin delivering matching events to
+this client as they occur.
+
+Event delivery is asynchronous. Events may arrive at any time after the
+`subscribe` response, interleaved with responses to other requests.
+There is no guarantee of ordering between events and responses on the
+wire, except that the server writes each line atomically.
+
+**Unknown event names are silently ignored** and will not appear in the
+`subscribed` result. This is intentional forward-compatibility
+behaviour: a client compiled against a newer version of this document
+may ask for `digest_updated` (a phase 6 event) while talking to a v1.0
+server that does not know the name. Rather than failing the call, the
+server silently drops unrecognised names from the result. The client
+can check `subscribed` to discover which names were actually accepted,
+and fall back gracefully if a name it needs is not present.
+
+Params:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `events` | array of string | The event names to subscribe to. Unknown names are silently ignored. |
+
+Result on success:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `subscribed` | array of string | The subset of requested event names that the server actually agreed to deliver. Names in `events` that the server does not recognise will not appear here. |
+
+Verb-specific error codes: none beyond the common set.
+
+Worked example:
+
+```
+→ {"id": 8, "method": "subscribe", "params": {"events": ["latency", "digest_updated"]}}
+← {"id": 8, "ok": true, "result": {"subscribed": ["latency"]}}
+```
+
+In this example `digest_updated` was silently dropped (not yet
+implemented in v1.0).
+
+---
+
+### `unsubscribe`
+
+Cancel delivery of one or more named events. After a successful
+`unsubscribe`, matching events will no longer be delivered to this
+client.
+
+Unsubscribing from an event name that the client is not currently
+subscribed to is a **no-op** and is not an error. Similarly,
+unsubscribing from an unknown event name is a no-op. The `unsubscribed`
+result will reflect only the names that were actually removed from the
+active subscription set.
+
+Params:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `events` | array of string | The event names to unsubscribe from. |
+
+Result on success:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `unsubscribed` | array of string | The subset of requested event names that were removed from the active subscription. Names not currently subscribed are absent from this list. |
+
+Verb-specific error codes: none beyond the common set.
+
+Worked example:
+
+```
+→ {"id": 9, "method": "unsubscribe", "params": {"events": ["latency"]}}
+← {"id": 9, "ok": true, "result": {"unsubscribed": ["latency"]}}
+```
+
+---
+
+## Event reference
+
+Events are unsolicited lines written by the server. They have no `id`
+and do not correspond to a request. The client receives only events it
+has subscribed to. All events share the same envelope shape:
+`{"event": "<name>", "data": {...}}`.
+
+### `latency`
+
+Emitted on every PING/PONG return path through the SPICE main channel.
+The latency is the round-trip time from when Ryll sent the PING to when
+it received the PONG, measured in milliseconds. This is the same metric
+the `--latency-file` flag writes to disk in headless mode.
+
+High-frequency callers (the phase 4 loadtest) should subscribe to this
+event and accumulate samples client-side rather than polling with
+`status` calls.
+
+Data fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sample_ms` | f64 | Round-trip latency in milliseconds. Always non-negative. Sub-millisecond values are possible on loopback connections. |
+| `wallclock_us` | u64 | Unix timestamp in microseconds at the moment Ryll received the PONG. Useful for aligning latency samples with external wall-clock logs. |
+
+Worked example:
+
+```
+← {"event": "latency", "data": {"sample_ms": 0.83, "wallclock_us": 1717000000456789}}
+```
+
+---
+
+### `agent_connected`
+
+Emitted when the SPICE vdagent connection state transitions. This event
+fires on **transitions only** — once when the agent connects and once
+when it disconnects. It does not fire periodically as a heartbeat. The
+initial state after `hello` can be queried via `status`.
+
+Callers that depend on agent-required verbs (`paste`) should subscribe
+to this event and watch for `"connected": true` before issuing the
+first paste request.
+
+Data fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `connected` | boolean | `true` when the agent has just connected; `false` when it has just disconnected. |
+
+Worked example (agent connects):
+
+```
+← {"event": "agent_connected", "data": {"connected": true}}
+```
+
+Worked example (agent disconnects, e.g. guest shutdown):
+
+```
+← {"event": "agent_connected", "data": {"connected": false}}
+```
+
+---
+
+### `paste_completed`
+
+Emitted when a paste operation finishes successfully. The `request_id`
+field matches the `id` of the `paste` request that initiated the
+operation, allowing the caller to correlate the completion with its
+original request.
+
+Data fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `request_id` | integer or string | The `id` from the originating `paste` request. Type matches what the client sent. |
+| `chars_sent` | u32 | The number of characters successfully typed into the guest. |
+
+Worked example:
+
+```
+← {"event": "paste_completed", "data": {"request_id": 6, "chars_sent": 7}}
+```
+
+---
+
+### `paste_failed`
+
+Emitted when a paste operation fails before completing. This includes
+cases such as an unrepresentable character in the text, an agent
+disconnect mid-paste, or a client disconnect that caused the paste to
+be cancelled.
+
+Data fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `request_id` | integer or string | The `id` from the originating `paste` request. |
+| `reason` | string | A human-readable description of why the paste failed. Not a stable code; do not parse this string programmatically. |
+
+Worked example:
+
+```
+← {"event": "paste_failed", "data": {"request_id": 6, "reason": "agent disconnected during paste"}}
+```
+
+---
+
+### `dropped`
+
+Emitted once per drop episode to inform the client that events were
+lost due to backpressure. See the backpressure section for the full
+semantics. The cumulative count covers all events dropped since the
+previous `dropped` event (or since the start of the session if this is
+the first one).
+
+Data fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `count` | u32 | Number of events that were discarded since the last `dropped` event. |
+
+Worked example:
+
+```
+← {"event": "dropped", "data": {"count": 14}}
+```
+
+---
+
+## Subscription semantics
+
+The default state for a new connection is **no subscriptions**. The
+server never pushes events to a client that has not called `subscribe`.
+
+Rules:
+
+- A `subscribe` call adds the named events to the client's active
+  subscription set. Subscribing to an event that is already subscribed
+  is a no-op.
+- An `unsubscribe` call removes the named events from the active
+  subscription set. Unsubscribing from an event that is not currently
+  subscribed is a no-op.
+- Unknown event names in either call are silently ignored. This enables
+  forward compatibility: a client compiled against a future version of
+  this document can ask for events that the current server does not
+  know without breaking the call.
+- When the client disconnects, its subscription state is discarded.
+  There is no persistent subscription across reconnections.
+
+The subscription state is per-client and per-connection. Because v1
+supports only one concurrent client, there is only ever one active
+subscription set.
+
+---
+
+## Backpressure
+
+The server maintains a **bounded per-client event queue** with a
+capacity of 256 items. Events are placed in this queue by the SPICE
+event producers (channel handlers running on the tokio runtime) and
+drained by the socket writer task.
+
+If the client is reading slowly and the queue fills up, the server
+drops the **oldest** queued events to make room for newer ones. Dropped
+events are counted. When the queue next drains to empty, or after a
+short bounded delay if the queue remains under pressure but the count
+is non-zero, the server emits a single `dropped` event with the
+cumulative drop count since the last `dropped` event.
+
+The server **never blocks** the SPICE channel producers waiting for the
+client to read. The consequence is explicit: a slow client gets dropped
+events, not backpressure that degrades the SPICE session. This is the
+correct trade-off for a test-harness control socket where the SPICE
+session must remain responsive to the guest at all times.
+
+Clients that want to receive all events reliably should drain the socket
+promptly. If the client's consumer loop is slower than the event rate, it
+should either:
+
+- Unsubscribe from high-rate events (e.g. `latency`) that it does not
+  need.
+- Increase the rate at which it drains the socket (e.g. use a
+  background thread or async task for reading).
+- Accept that drops will occur and handle `dropped` events as a
+  diagnostic signal rather than an error.
+
+The `dropped` event itself is never itself dropped — if it cannot fit
+in the queue, the existing `dropped` count is incremented in-place
+rather than adding a second `dropped` entry.
+
+---
+
+## Error model
+
+All error responses share the same structure:
+
+```json
+{"id": <id>, "ok": false, "error": {"code": "<stable_code>", "message": "<human_readable>"}}
+```
+
+The `code` field is a stable, machine-readable string. Do not parse
+`message` programmatically; it may change between minor versions.
+
+The following error codes are defined in v1.0:
+
+| Code | Semantics |
+|------|-----------|
+| `no_hello_yet` | A request other than `hello` was received before the hello handshake completed. The connection stays open. |
+| `protocol_version_mismatch` | The major version in the `hello` params does not match the server's major version. The server closes the connection after writing this error. |
+| `busy` | A second client attempted to connect while one is already connected. Written as the first and only line on the new connection, which is then closed. Note: no `id` field on this response. |
+| `unknown_method` | The `method` field names a verb the server does not know. |
+| `bad_params` | The `params` object is missing a required field, has a field of the wrong type, or is not a JSON object at all. |
+| `bad_state` | The `state` field in a `send_key` request is not `"down"`, `"up"`, or `"press"`. |
+| `agent_not_connected` | A `paste` was requested but the SPICE vdagent is not currently connected. |
+| `no_such_surface` | A `screenshot` was requested for a `surface_id` that does not exist in the current session. |
+| `unsupported_format` | A `screenshot` was requested with a `format` value other than `"png"` or `"rgba"`. |
+| `not_implemented` | The method is recognised but not yet implemented. Used during incremental rollout (steps 3b–3g) before each verb is fully wired. Should not appear in a complete v1.0 implementation. |
+| `internal_error` | An unexpected condition occurred server-side. The `message` field will contain details. Report these as bugs. |
+
+Additional error codes may be added in future **minor** version bumps.
+Clients should treat any unrecognised `code` value as a generic error
+(print the `message` and fail the operation) rather than treating it as
+`internal_error`. This ensures forward compatibility when a client
+compiled against v1.0 connects to a v1.2 server that has added new
+domain-specific codes.
+
+---
+
+## Versioning
+
+The protocol version is a dotted `major.minor` string. The current
+version is **1.0**.
+
+Rules:
+
+- A **major** version bump (e.g. 1.x → 2.0) indicates a breaking
+  change: a message envelope shape has changed, a verb has been
+  removed, or a field has been renamed or re-typed. Clients and servers
+  with different major versions are not compatible. The server rejects a
+  `hello` with a mismatched major version with `protocol_version_mismatch`
+  and closes the connection.
+- A **minor** version bump (e.g. 1.0 → 1.1) indicates an additive,
+  backward-compatible change: a new verb was added, a new event was
+  added, a new optional parameter was added to an existing verb, or a
+  new error code was introduced. Clients and servers with the same major
+  but different minor versions SHOULD interoperate. The server accepts
+  any `hello` whose `protocol_version` has a matching major, regardless
+  of the minor component.
+
+Forward-compatibility obligations:
+
+- **Clients** must gracefully ignore unknown event names they receive
+  (they should never have arrived, but defensively discarding them is
+  safer than panicking). Clients must also ignore unknown fields in
+  response `result` objects; future minor versions may add fields.
+- **Servers** must route unknown `method` values to the `unknown_method`
+  error rather than panicking. Servers must also silently ignore unknown
+  event names in `subscribe`/`unsubscribe` params.
+
+Version 1.0 is the first published version. No prior published version
+exists.
+
+---
+
+## End-to-end worked example
+
+The following transcript shows a complete client session: connect,
+hello, status, subscribe, a latency event arriving, a key press, a
+paste with async completion, and then disconnect. Arrow direction
+indicates the sender: `→` is client-to-server, `←` is server-to-client.
+
+```
+→ {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.0", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped"]}}
+→ {"id": 2, "method": "status", "params": {}}
+← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
+→ {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
+← {"id": 3, "ok": true, "result": {"subscribed": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
+← {"event": "latency", "data": {"sample_ms": 1.2, "wallclock_us": 1717000000000100}}
+→ {"id": 4, "method": "send_key", "params": {"scancode": 28, "state": "press"}}
+← {"id": 4, "ok": true, "result": {}}
+← {"event": "latency", "data": {"sample_ms": 1.1, "wallclock_us": 1717000002000200}}
+→ {"id": 5, "method": "paste", "params": {"text": "hello", "char_delay_ms": 10}}
+← {"id": 5, "ok": true, "result": {}}
+← {"event": "latency", "data": {"sample_ms": 1.3, "wallclock_us": 1717000002100300}}
+← {"event": "paste_completed", "data": {"request_id": 5, "chars_sent": 5}}
+```
+
+After the `paste_completed` event the client closes the connection
+(TCP FIN). Ryll detects the EOF on the socket, cleans up the per-client
+state (cancellation tokens, subscription set, queue), and resumes
+listening for the next client.
+
+Key observations from this transcript:
+
+- The `hello` handshake always comes first and its response lists the
+  full verb and event catalogue.
+- `status` gives a snapshot of the session state at that instant. The
+  surfaces list shows one surface, which is all that most single-monitor
+  guests present.
+- After `subscribe`, events arrive interleaved with responses. The two
+  `latency` events arrived between request 4 and request 5, and again
+  between request 5's response and the `paste_completed` event. The
+  client must be prepared to receive events at any time while subscribed.
+- The `paste` response (`id: 5`) arrived before the
+  `paste_completed` event. This is guaranteed: the response is written
+  when the task is queued; the event is written when the task finishes.
+  The `request_id` in `paste_completed` ties the outcome back to the
+  original `paste` request.
+- The connection can be torn down by either side simply closing the
+  socket. No explicit disconnect verb is required.
