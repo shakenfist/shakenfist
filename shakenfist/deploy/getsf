@@ -860,17 +860,18 @@ if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
     local_server_package=shakenfist-client
 fi
 
-local_agent_package="/tmp/"$(basename ${GETSF_AGENT_PACKAGE})
-if [ ${GETSF_AGENT_PACKAGE} == "shakenfist-agent" ]; then
-    local_server_package=shakenfist-agent
-fi
+# The shakenfist-agent package used to be installed into the server venv
+# because the pre-gRPC guest-protocol definitions lived there. The agent
+# is now standalone (vsock + gRPC) and the server does not import it, so
+# we install only the server and client packages here. The agent wheel
+# is still copied to /tmp on every node for operators who want to push
+# it into guests, but it is no longer a dependency of the server venv.
 
 echo
 status "Install Shaken Fist server from \${local_server_package}."
 status "Install Shaken Fist client from \${local_client_package}."
-status "Install Shaken Fist agent from \${local_agent_package}."
 echo
-uv pip install --reinstall ${PIP_EXTRA} \${local_server_package} \${local_client_package} \${local_agent_package}
+uv pip install --reinstall ${PIP_EXTRA} \${local_server_package} \${local_client_package}
 
 deactivate
 PERNODEEOF
