@@ -3,2715 +3,1267 @@
 isort:skip_file
 """
 
-import abc
-import collections.abc
-from shakenfist.protos import database_pb2
-import grpc
-import grpc.aio
-import typing
+from collections import abc as _abc
+from grpc import aio as _aio
+import abc as _abc_1
+import database_pb2 as _database_pb2
+import grpc as _grpc
+import sys
+import typing as _typing
 
-_T = typing.TypeVar("_T")
+if sys.version_info >= (3, 11):
+    from typing import Self as _Self
+else:
+    from typing_extensions import Self as _Self
 
-class _MaybeAsyncIterator(collections.abc.AsyncIterator[_T], collections.abc.Iterator[_T], metaclass=abc.ABCMeta): ...
+_T = _typing.TypeVar("_T")
 
-class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore[misc, type-arg]
+class _MaybeAsyncIterator(_abc.AsyncIterator[_T], _abc.Iterator[_T], metaclass=_abc_1.ABCMeta): ...
+
+class _ServicerContext(_grpc.ServicerContext, _aio.ServicerContext):  # type: ignore[misc, type-arg]
     ...
 
+GRPC_GENERATED_VERSION: str
+GRPC_VERSION: str
+
 class DatabaseServiceStub:
-    def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
-    Enqueue: grpc.UnaryUnaryMultiCallable[
-        database_pb2.EnqueueRequest,
-        database_pb2.StatusReply,
-    ]
+    @_typing.overload
+    def __new__(cls, channel: _grpc.Channel) -> _Self: ...
+    @_typing.overload
+    def __new__(cls, channel: _aio.Channel) -> DatabaseServiceAsyncStub: ...
+    Enqueue: _grpc.UnaryUnaryMultiCallable[_database_pb2.EnqueueRequest, _database_pb2.StatusReply]
     """Queue Operations"""
-
-    Dequeue: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DequeueRequest,
-        database_pb2.DequeueReply,
-    ]
-
-    Resolve: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ResolveRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetQueueLength: grpc.UnaryUnaryMultiCallable[
-        database_pb2.QueueLengthRequest,
-        database_pb2.QueueLengthReply,
-    ]
-
-    RestartQueue: grpc.UnaryUnaryMultiCallable[
-        database_pb2.RestartQueueRequest,
-        database_pb2.StatusReply,
-    ]
-
-    ListStuckWorkQueueRows: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ListStuckWorkQueueRowsRequest,
-        database_pb2.ListStuckWorkQueueRowsReply,
-    ]
-
-    ClearWorkQueueClaim: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ClearWorkQueueClaimRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteWorkQueueRow: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteWorkQueueRowRequest,
-        database_pb2.StatusReply,
-    ]
-
-    ClaimCoalescibleSiblings: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ClaimCoalescibleSiblingsRequest,
-        database_pb2.ClaimCoalescibleSiblingsReply,
-    ]
-
-    FindExistingCoalescibleOp: grpc.UnaryUnaryMultiCallable[
-        database_pb2.FindExistingCoalescibleOpRequest,
-        database_pb2.FindExistingCoalescibleOpReply,
-    ]
-
-    AcquireLock: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ClusterLockRequest,
-        database_pb2.ClusterLockReply,
-    ]
+    Dequeue: _grpc.UnaryUnaryMultiCallable[_database_pb2.DequeueRequest, _database_pb2.DequeueReply]
+    Resolve: _grpc.UnaryUnaryMultiCallable[_database_pb2.ResolveRequest, _database_pb2.StatusReply]
+    GetQueueLength: _grpc.UnaryUnaryMultiCallable[_database_pb2.QueueLengthRequest, _database_pb2.QueueLengthReply]
+    RestartQueue: _grpc.UnaryUnaryMultiCallable[_database_pb2.RestartQueueRequest, _database_pb2.StatusReply]
+    ListStuckWorkQueueRows: _grpc.UnaryUnaryMultiCallable[_database_pb2.ListStuckWorkQueueRowsRequest, _database_pb2.ListStuckWorkQueueRowsReply]
+    ClearWorkQueueClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClearWorkQueueClaimRequest, _database_pb2.StatusReply]
+    DeleteWorkQueueRow: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]
+    ClaimCoalescibleSiblings: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsRequest, _database_pb2.ClaimCoalescibleSiblingsReply]
+    FindExistingCoalescibleOp: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpRequest, _database_pb2.FindExistingCoalescibleOpReply]
+    AcquireLock: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterLockRequest, _database_pb2.ClusterLockReply]
     """Lock Operations"""
-
-    ReleaseLock: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ClusterReleaseLockRequest,
-        database_pb2.StatusReply,
-    ]
-
-    RefreshLock: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ClusterRefreshLockRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetLockHolder: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ClusterGetLockHolderRequest,
-        database_pb2.ClusterLockHolderReply,
-    ]
-
-    ClearStaleLocks: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ClusterClearStaleLocksRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetExistingLocks: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ClusterGetExistingLocksRequest,
-        database_pb2.ClusterGetExistingLocksReply,
-    ]
-
-    GetClusterConfig: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ClusterConfigRequest,
-        database_pb2.ClusterConfigReply,
-    ]
+    ReleaseLock: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterReleaseLockRequest, _database_pb2.StatusReply]
+    RefreshLock: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterRefreshLockRequest, _database_pb2.StatusReply]
+    GetLockHolder: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterGetLockHolderRequest, _database_pb2.ClusterLockHolderReply]
+    ClearStaleLocks: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterClearStaleLocksRequest, _database_pb2.StatusReply]
+    GetExistingLocks: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterGetExistingLocksRequest, _database_pb2.ClusterGetExistingLocksReply]
+    GetClusterConfig: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterConfigRequest, _database_pb2.ClusterConfigReply]
     """Cluster Config"""
-
-    SetClusterConfig: grpc.UnaryUnaryMultiCallable[
-        database_pb2.SetClusterConfigRequest,
-        database_pb2.StatusReply,
-    ]
-
-    RecordEventBatch: grpc.UnaryUnaryMultiCallable[
-        database_pb2.RecordEventBatchRequest,
-        database_pb2.StatusReply,
-    ]
+    SetClusterConfig: _grpc.UnaryUnaryMultiCallable[_database_pb2.SetClusterConfigRequest, _database_pb2.StatusReply]
+    RecordEventBatch: _grpc.UnaryUnaryMultiCallable[_database_pb2.RecordEventBatchRequest, _database_pb2.StatusReply]
     """Event Storage (MariaDB)
     Direct write path for batches of events; replaces the sf-eventlog
     gRPC target in phase 2.
     """
-
-    PruneEvents: grpc.UnaryUnaryMultiCallable[
-        database_pb2.PruneEventsRequest,
-        database_pb2.PruneEventsReply,
-    ]
-
-    GetObjectEvents: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetObjectEventsRequest,
-        database_pb2.GetObjectEventsReply,
-    ]
+    PruneEvents: _grpc.UnaryUnaryMultiCallable[_database_pb2.PruneEventsRequest, _database_pb2.PruneEventsReply]
+    GetObjectEvents: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetObjectEventsRequest, _database_pb2.GetObjectEventsReply]
     """Per-object read and delete paths replacing the legacy sqlite
     EventLog backend in phase 4.
     """
-
-    DeleteObjectEvents: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteObjectEventsRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetObjectState: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetObjectStateRequest,
-        database_pb2.GetObjectStateReply,
-    ]
+    DeleteObjectEvents: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectEventsRequest, _database_pb2.StatusReply]
+    GetObjectState: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetObjectStateRequest, _database_pb2.GetObjectStateReply]
     """Object State Operations (MariaDB)"""
-
-    SetObjectState: grpc.UnaryUnaryMultiCallable[
-        database_pb2.SetObjectStateRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteObjectState: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteObjectStateRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetObjectsByState: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetObjectsByStateRequest,
-        database_pb2.GetObjectsByStateReply,
-    ]
-
-    ReserveAddress: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ReserveAddressRequest,
-        database_pb2.StatusReply,
-    ]
+    SetObjectState: _grpc.UnaryUnaryMultiCallable[_database_pb2.SetObjectStateRequest, _database_pb2.StatusReply]
+    DeleteObjectState: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectStateRequest, _database_pb2.StatusReply]
+    GetObjectsByState: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetObjectsByStateRequest, _database_pb2.GetObjectsByStateReply]
+    ReserveAddress: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReserveAddressRequest, _database_pb2.StatusReply]
     """IPAM Reservation Operations (MariaDB)"""
-
-    ReleaseAddress: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ReleaseAddressRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetReservation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetReservationRequest,
-        database_pb2.GetReservationReply,
-    ]
-
-    GetReservationsForIPAM: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetReservationsForIPAMRequest,
-        database_pb2.GetReservationsForIPAMReply,
-    ]
-
-    DeleteReservation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteReservationRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteReservationsForIPAM: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteReservationsForIPAMRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    ReleaseHaloedAddresses: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ReleaseHaloedAddressesRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    GetAddressesInUse: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAddressesInUseRequest,
-        database_pb2.GetAddressesInUseReply,
-    ]
-
-    CreateUpload: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateUploadRequest,
-        database_pb2.StatusReply,
-    ]
+    ReleaseAddress: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReleaseAddressRequest, _database_pb2.StatusReply]
+    GetReservation: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetReservationRequest, _database_pb2.GetReservationReply]
+    GetReservationsForIPAM: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetReservationsForIPAMRequest, _database_pb2.GetReservationsForIPAMReply]
+    DeleteReservation: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteReservationRequest, _database_pb2.StatusReply]
+    DeleteReservationsForIPAM: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteReservationsForIPAMRequest, _database_pb2.DeleteCountReply]
+    ReleaseHaloedAddresses: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReleaseHaloedAddressesRequest, _database_pb2.DeleteCountReply]
+    GetAddressesInUse: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAddressesInUseRequest, _database_pb2.GetAddressesInUseReply]
+    CreateUpload: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateUploadRequest, _database_pb2.StatusReply]
     """Upload Operations (MariaDB)"""
-
-    GetUpload: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetUploadRequest,
-        database_pb2.GetUploadReply,
-    ]
-
-    GetUploads: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetUploadsRequest,
-        database_pb2.GetUploadsReply,
-    ]
-
-    DeleteUpload: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteUploadRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateUpload: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateUploadRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateBlob: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateBlobRequest,
-        database_pb2.StatusReply,
-    ]
+    GetUpload: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetUploadRequest, _database_pb2.GetUploadReply]
+    GetUploads: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetUploadsRequest, _database_pb2.GetUploadsReply]
+    DeleteUpload: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteUploadRequest, _database_pb2.StatusReply]
+    UpdateUpload: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateUploadRequest, _database_pb2.StatusReply]
+    CreateBlob: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateBlobRequest, _database_pb2.StatusReply]
     """Blob Operations (MariaDB)"""
-
-    GetBlob: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobRequest,
-        database_pb2.GetBlobReply,
-    ]
-
-    GetAllBlobUuids: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllBlobUuidsRequest,
-        database_pb2.GetAllBlobUuidsReply,
-    ]
-
-    DeleteBlob: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateBlob: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateBlobRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateDnsMasq: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateDnsMasqRequest,
-        database_pb2.StatusReply,
-    ]
+    GetBlob: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetBlobRequest, _database_pb2.GetBlobReply]
+    GetAllBlobUuids: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllBlobUuidsRequest, _database_pb2.GetAllBlobUuidsReply]
+    DeleteBlob: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobRequest, _database_pb2.StatusReply]
+    UpdateBlob: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateBlobRequest, _database_pb2.StatusReply]
+    CreateDnsMasq: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateDnsMasqRequest, _database_pb2.StatusReply]
     """DnsMasq Operations (MariaDB)"""
-
-    GetDnsMasq: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetDnsMasqRequest,
-        database_pb2.GetDnsMasqReply,
-    ]
-
-    GetDnsMasqs: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetDnsMasqsRequest,
-        database_pb2.GetDnsMasqsReply,
-    ]
-
-    DeleteDnsMasq: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteDnsMasqRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateDnsMasq: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateDnsMasqRequest,
-        database_pb2.StatusReply,
-    ]
-
-    RecordRelationship: grpc.UnaryUnaryMultiCallable[
-        database_pb2.RecordRelationshipRequest,
-        database_pb2.StatusReply,
-    ]
+    GetDnsMasq: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetDnsMasqRequest, _database_pb2.GetDnsMasqReply]
+    GetDnsMasqs: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetDnsMasqsRequest, _database_pb2.GetDnsMasqsReply]
+    DeleteDnsMasq: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteDnsMasqRequest, _database_pb2.StatusReply]
+    UpdateDnsMasq: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateDnsMasqRequest, _database_pb2.StatusReply]
+    RecordRelationship: _grpc.UnaryUnaryMultiCallable[_database_pb2.RecordRelationshipRequest, _database_pb2.StatusReply]
     """Object Reference Operations (MariaDB)"""
-
-    RemoveRelationship: grpc.UnaryUnaryMultiCallable[
-        database_pb2.RemoveRelationshipRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetReferencesTo: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetReferencesToRequest,
-        database_pb2.GetReferencesReply,
-    ]
-
-    GetReferencesFrom: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetReferencesFromRequest,
-        database_pb2.GetReferencesReply,
-    ]
-
-    CountReferencesTo: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CountReferencesToRequest,
-        database_pb2.CountReply,
-    ]
-
-    RemoveAllReferencesFrom: grpc.UnaryUnaryMultiCallable[
-        database_pb2.RemoveAllReferencesFromRequest,
-        database_pb2.CountReply,
-    ]
-
-    UpdateLastActive: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateLastActiveRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetStaleReferences: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetStaleReferencesRequest,
-        database_pb2.GetReferencesReply,
-    ]
-
-    UpsertBlobHash: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpsertBlobHashRequest,
-        database_pb2.StatusReply,
-    ]
+    RemoveRelationship: _grpc.UnaryUnaryMultiCallable[_database_pb2.RemoveRelationshipRequest, _database_pb2.StatusReply]
+    GetReferencesTo: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetReferencesToRequest, _database_pb2.GetReferencesReply]
+    GetReferencesFrom: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetReferencesFromRequest, _database_pb2.GetReferencesReply]
+    CountReferencesTo: _grpc.UnaryUnaryMultiCallable[_database_pb2.CountReferencesToRequest, _database_pb2.CountReply]
+    RemoveAllReferencesFrom: _grpc.UnaryUnaryMultiCallable[_database_pb2.RemoveAllReferencesFromRequest, _database_pb2.CountReply]
+    UpdateLastActive: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateLastActiveRequest, _database_pb2.StatusReply]
+    GetStaleReferences: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetStaleReferencesRequest, _database_pb2.GetReferencesReply]
+    UpsertBlobHash: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpsertBlobHashRequest, _database_pb2.StatusReply]
     """Blob Hash Operations (MariaDB)"""
-
-    GetBlobHashes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobHashesRequest,
-        database_pb2.GetBlobHashesReply,
-    ]
-
-    FindBlobByHash: grpc.UnaryUnaryMultiCallable[
-        database_pb2.FindBlobByHashRequest,
-        database_pb2.FindBlobByHashReply,
-    ]
-
-    GetStaleBlobHashes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetStaleBlobHashesRequest,
-        database_pb2.GetBlobHashesReply,
-    ]
-
-    DeleteBlobHashes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobHashesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateBlobTransfer: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateBlobTransferRequest,
-        database_pb2.StatusReply,
-    ]
+    GetBlobHashes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetBlobHashesRequest, _database_pb2.GetBlobHashesReply]
+    FindBlobByHash: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindBlobByHashRequest, _database_pb2.FindBlobByHashReply]
+    GetStaleBlobHashes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetStaleBlobHashesRequest, _database_pb2.GetBlobHashesReply]
+    DeleteBlobHashes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobHashesRequest, _database_pb2.StatusReply]
+    CreateBlobTransfer: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateBlobTransferRequest, _database_pb2.StatusReply]
     """Blob Transfer Operations (MariaDB)"""
-
-    GetBlobTransfer: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobTransferRequest,
-        database_pb2.GetBlobTransferReply,
-    ]
-
-    GetBlobTransfersForNode: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobTransfersForNodeRequest,
-        database_pb2.GetBlobTransfersReply,
-    ]
-
-    GetBlobTransfersForBlob: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobTransfersForBlobRequest,
-        database_pb2.GetBlobTransfersReply,
-    ]
-
-    UpdateBlobTransfer: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateBlobTransferRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteBlobTransfer: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobTransferRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteBlobTransfersForBlob: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobTransfersForBlobRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    DeleteStaleTransfers: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteStaleTransfersRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    CreateBlobAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateBlobAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetBlobTransfer: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetBlobTransferRequest, _database_pb2.GetBlobTransferReply]
+    GetBlobTransfersForNode: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetBlobTransfersForNodeRequest, _database_pb2.GetBlobTransfersReply]
+    GetBlobTransfersForBlob: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetBlobTransfersForBlobRequest, _database_pb2.GetBlobTransfersReply]
+    UpdateBlobTransfer: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateBlobTransferRequest, _database_pb2.StatusReply]
+    DeleteBlobTransfer: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobTransferRequest, _database_pb2.StatusReply]
+    DeleteBlobTransfersForBlob: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobTransfersForBlobRequest, _database_pb2.DeleteCountReply]
+    DeleteStaleTransfers: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteStaleTransfersRequest, _database_pb2.DeleteCountReply]
+    CreateBlobAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateBlobAttributesRequest, _database_pb2.StatusReply]
     """Blob Attributes Operations (MariaDB)
     These store mutable blob attributes, separate from BlobData (static values).
     """
-
-    GetBlobAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobAttributesRequest,
-        database_pb2.GetBlobAttributesReply,
-    ]
-
-    UpdateBlobAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateBlobAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateBlobLastUsed: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateBlobLastUsedRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteBlobAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetExpiredBlobUuids: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetExpiredBlobUuidsRequest,
-        database_pb2.GetExpiredBlobUuidsReply,
-    ]
-
-    GetStaleTranscodedBlobUuids: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetStaleTranscodedBlobUuidsRequest,
-        database_pb2.GetStaleTranscodedBlobUuidsReply,
-    ]
-
-    CreateNode: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateNodeRequest,
-        database_pb2.StatusReply,
-    ]
+    GetBlobAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetBlobAttributesRequest, _database_pb2.GetBlobAttributesReply]
+    UpdateBlobAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateBlobAttributesRequest, _database_pb2.StatusReply]
+    UpdateBlobLastUsed: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateBlobLastUsedRequest, _database_pb2.StatusReply]
+    DeleteBlobAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobAttributesRequest, _database_pb2.StatusReply]
+    GetExpiredBlobUuids: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetExpiredBlobUuidsRequest, _database_pb2.GetExpiredBlobUuidsReply]
+    GetStaleTranscodedBlobUuids: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetStaleTranscodedBlobUuidsRequest, _database_pb2.GetStaleTranscodedBlobUuidsReply]
+    CreateNode: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNodeRequest, _database_pb2.StatusReply]
     """Node Operations (MariaDB)
     These manage node static values (uuid, fqdn, ip) in MariaDB.
     Nodes now use real UUID4 identifiers; FQDN is a separate indexed column.
     """
-
-    GetNode: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeRequest,
-        database_pb2.GetNodeReply,
-    ]
-
-    GetNodeByFqdn: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeByFqdnRequest,
-        database_pb2.GetNodeReply,
-    ]
-
-    GetAllNodeUuids: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNodeUuidsRequest,
-        database_pb2.GetAllNodeUuidsReply,
-    ]
-
-    DeleteNode: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNodeRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateNode: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNodeRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNodeAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateNodeAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNode: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNodeRequest, _database_pb2.GetNodeReply]
+    GetNodeByFqdn: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNodeByFqdnRequest, _database_pb2.GetNodeReply]
+    GetAllNodeUuids: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllNodeUuidsRequest, _database_pb2.GetAllNodeUuidsReply]
+    DeleteNode: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNodeRequest, _database_pb2.StatusReply]
+    UpdateNode: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNodeRequest, _database_pb2.StatusReply]
+    CreateNodeAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNodeAttributesRequest, _database_pb2.StatusReply]
     """Node Attributes Operations (MariaDB)
     These store mutable node attributes, separate from NodeData (static values).
     """
-
-    GetNodeAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeAttributesRequest,
-        database_pb2.GetNodeAttributesReply,
-    ]
-
-    UpdateNodeAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNodeAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteNodeAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNodeAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    SetNodeDaemonState: grpc.UnaryUnaryMultiCallable[
-        database_pb2.SetNodeDaemonStateRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNodeAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNodeAttributesRequest, _database_pb2.GetNodeAttributesReply]
+    UpdateNodeAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNodeAttributesRequest, _database_pb2.StatusReply]
+    DeleteNodeAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNodeAttributesRequest, _database_pb2.StatusReply]
+    SetNodeDaemonState: _grpc.UnaryUnaryMultiCallable[_database_pb2.SetNodeDaemonStateRequest, _database_pb2.StatusReply]
     """Node Daemon State Operations (MariaDB)
     Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
     that previously lived inside node_attributes; that dict required a
     coarse per-node lock for every transition and serialised every
     daemon's startup/shutdown through a single 10s lock.
     """
-
-    GetNodeDaemonState: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeDaemonStateRequest,
-        database_pb2.GetNodeDaemonStateReply,
-    ]
-
-    GetAllNodeDaemonStates: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNodeDaemonStatesRequest,
-        database_pb2.GetAllNodeDaemonStatesReply,
-    ]
-
-    DeleteNodeDaemonState: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNodeDaemonStateRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNamespace: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateNamespaceRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNodeDaemonState: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNodeDaemonStateRequest, _database_pb2.GetNodeDaemonStateReply]
+    GetAllNodeDaemonStates: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllNodeDaemonStatesRequest, _database_pb2.GetAllNodeDaemonStatesReply]
+    DeleteNodeDaemonState: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNodeDaemonStateRequest, _database_pb2.StatusReply]
+    CreateNamespace: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceRequest, _database_pb2.StatusReply]
     """Namespace Operations (MariaDB)
     These manage namespace static values (name, version) in MariaDB.
     Namespaces use their name as primary key (not a UUID).
     """
-
-    GetNamespace: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNamespaceRequest,
-        database_pb2.GetNamespaceReply,
-    ]
-
-    GetAllNamespaceNames: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNamespaceNamesRequest,
-        database_pb2.GetAllNamespaceNamesReply,
-    ]
-
-    DeleteNamespace: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNamespaceRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNamespaceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateNamespaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNamespace: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceRequest, _database_pb2.GetNamespaceReply]
+    GetAllNamespaceNames: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllNamespaceNamesRequest, _database_pb2.GetAllNamespaceNamesReply]
+    DeleteNamespace: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceRequest, _database_pb2.StatusReply]
+    CreateNamespaceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceAttributesRequest, _database_pb2.StatusReply]
     """Namespace Attributes Operations (MariaDB)
     These store mutable namespace attributes (keys, trust).
     """
-
-    GetNamespaceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNamespaceAttributesRequest,
-        database_pb2.GetNamespaceAttributesReply,
-    ]
-
-    UpdateNamespaceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNamespaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteNamespaceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNamespaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateArtifact: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateArtifactRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNamespaceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceAttributesRequest, _database_pb2.GetNamespaceAttributesReply]
+    UpdateNamespaceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceAttributesRequest, _database_pb2.StatusReply]
+    DeleteNamespaceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceAttributesRequest, _database_pb2.StatusReply]
+    CreateArtifact: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateArtifactRequest, _database_pb2.StatusReply]
     """Artifact Operations (MariaDB)
     These manage artifact static values (uuid, type, source_url, name, namespace)
     in MariaDB. Artifacts represent versioned disk images.
     """
-
-    GetArtifact: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetArtifactRequest,
-        database_pb2.GetArtifactReply,
-    ]
-
-    GetAllArtifacts: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllArtifactsRequest,
-        database_pb2.GetAllArtifactsReply,
-    ]
-
-    FindArtifacts: grpc.UnaryUnaryMultiCallable[
-        database_pb2.FindArtifactsRequest,
-        database_pb2.FindArtifactsReply,
-    ]
-
-    UpdateArtifact: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateArtifactRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteArtifact: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteArtifactRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateArtifactAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateArtifactAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetArtifact: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetArtifactRequest, _database_pb2.GetArtifactReply]
+    GetAllArtifacts: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllArtifactsRequest, _database_pb2.GetAllArtifactsReply]
+    FindArtifacts: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindArtifactsRequest, _database_pb2.FindArtifactsReply]
+    UpdateArtifact: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateArtifactRequest, _database_pb2.StatusReply]
+    DeleteArtifact: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteArtifactRequest, _database_pb2.StatusReply]
+    CreateArtifactAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateArtifactAttributesRequest, _database_pb2.StatusReply]
     """Artifact Attributes Operations (MariaDB)
     These store mutable artifact attributes (max_versions, shared, highest_index).
     """
-
-    GetArtifactAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetArtifactAttributesRequest,
-        database_pb2.GetArtifactAttributesReply,
-    ]
-
-    UpdateArtifactAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateArtifactAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteArtifactAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteArtifactAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateArtifactIndex: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateArtifactIndexRequest,
-        database_pb2.StatusReply,
-    ]
+    GetArtifactAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetArtifactAttributesRequest, _database_pb2.GetArtifactAttributesReply]
+    UpdateArtifactAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateArtifactAttributesRequest, _database_pb2.StatusReply]
+    DeleteArtifactAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteArtifactAttributesRequest, _database_pb2.StatusReply]
+    CreateArtifactIndex: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateArtifactIndexRequest, _database_pb2.StatusReply]
     """Artifact Index Operations (MariaDB)
     These manage artifact version indexes, mapping index numbers to blob UUIDs.
     """
-
-    GetArtifactIndex: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetArtifactIndexRequest,
-        database_pb2.GetArtifactIndexReply,
-    ]
-
-    GetAllArtifactIndexes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllArtifactIndexesRequest,
-        database_pb2.GetAllArtifactIndexesReply,
-    ]
-
-    DeleteArtifactIndex: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteArtifactIndexRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteAllArtifactIndexes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteAllArtifactIndexesRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    CreateNetworkInterface: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateNetworkInterfaceRequest,
-        database_pb2.StatusReply,
-    ]
+    GetArtifactIndex: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetArtifactIndexRequest, _database_pb2.GetArtifactIndexReply]
+    GetAllArtifactIndexes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllArtifactIndexesRequest, _database_pb2.GetAllArtifactIndexesReply]
+    DeleteArtifactIndex: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteArtifactIndexRequest, _database_pb2.StatusReply]
+    DeleteAllArtifactIndexes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteAllArtifactIndexesRequest, _database_pb2.DeleteCountReply]
+    CreateNetworkInterface: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkInterfaceRequest, _database_pb2.StatusReply]
     """NetworkInterface Operations (MariaDB)
     These manage NetworkInterface static values in MariaDB.
     """
-
-    GetNetworkInterface: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkInterfaceRequest,
-        database_pb2.GetNetworkInterfaceReply,
-    ]
-
-    GetNetworkInterfacesByInstance: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkInterfacesByInstanceRequest,
-        database_pb2.GetNetworkInterfacesReply,
-    ]
-
-    GetNetworkInterfacesByNetwork: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkInterfacesByNetworkRequest,
-        database_pb2.GetNetworkInterfacesReply,
-    ]
-
-    GetAllNetworkInterfaces: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNetworkInterfacesRequest,
-        database_pb2.GetNetworkInterfacesReply,
-    ]
-
-    FindNetworkInterfaces: grpc.UnaryUnaryMultiCallable[
-        database_pb2.FindNetworkInterfacesRequest,
-        database_pb2.FindNetworkInterfacesReply,
-    ]
-
-    DeleteNetworkInterface: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNetworkInterfaceRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateNetworkInterface: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNetworkInterfaceRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNetworkInterfaceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateNetworkInterfaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNetworkInterface: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkInterfaceRequest, _database_pb2.GetNetworkInterfaceReply]
+    GetNetworkInterfacesByInstance: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkInterfacesByInstanceRequest, _database_pb2.GetNetworkInterfacesReply]
+    GetNetworkInterfacesByNetwork: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkInterfacesByNetworkRequest, _database_pb2.GetNetworkInterfacesReply]
+    GetAllNetworkInterfaces: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllNetworkInterfacesRequest, _database_pb2.GetNetworkInterfacesReply]
+    FindNetworkInterfaces: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindNetworkInterfacesRequest, _database_pb2.FindNetworkInterfacesReply]
+    DeleteNetworkInterface: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkInterfaceRequest, _database_pb2.StatusReply]
+    UpdateNetworkInterface: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkInterfaceRequest, _database_pb2.StatusReply]
+    CreateNetworkInterfaceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkInterfaceAttributesRequest, _database_pb2.StatusReply]
     """NetworkInterface Attributes Operations (MariaDB)
     These store mutable NetworkInterface attributes (floating address).
     """
-
-    GetNetworkInterfaceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkInterfaceAttributesRequest,
-        database_pb2.GetNetworkInterfaceAttributesReply,
-    ]
-
-    UpdateNetworkInterfaceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNetworkInterfaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteNetworkInterfaceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNetworkInterfaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateIPAM: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateIPAMRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNetworkInterfaceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkInterfaceAttributesRequest, _database_pb2.GetNetworkInterfaceAttributesReply]
+    UpdateNetworkInterfaceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkInterfaceAttributesRequest, _database_pb2.StatusReply]
+    DeleteNetworkInterfaceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkInterfaceAttributesRequest, _database_pb2.StatusReply]
+    CreateIPAM: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateIPAMRequest, _database_pb2.StatusReply]
     """IPAM Operations (MariaDB)
     These manage IPAM static values (uuid, namespace, network_uuid, ipblock)
     in MariaDB. IPAMs track IP address allocation within a network.
     """
-
-    GetIPAM: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetIPAMRequest,
-        database_pb2.GetIPAMReply,
-    ]
-
-    DeleteIPAM: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteIPAMRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateIPAM: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateIPAMRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNetwork: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateNetworkRequest,
-        database_pb2.StatusReply,
-    ]
+    GetIPAM: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetIPAMRequest, _database_pb2.GetIPAMReply]
+    DeleteIPAM: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteIPAMRequest, _database_pb2.StatusReply]
+    UpdateIPAM: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateIPAMRequest, _database_pb2.StatusReply]
+    CreateNetwork: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkRequest, _database_pb2.StatusReply]
     """Network Operations (MariaDB)
     These manage Network static values in MariaDB. Networks are virtual L2
     networks with optional DHCP, NAT, and DNS services connected via VXLAN.
     """
-
-    GetNetwork: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkRequest,
-        database_pb2.GetNetworkReply,
-    ]
-
-    GetAllNetworks: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNetworksRequest,
-        database_pb2.GetAllNetworksReply,
-    ]
-
-    FindNetworks: grpc.UnaryUnaryMultiCallable[
-        database_pb2.FindNetworksRequest,
-        database_pb2.FindNetworksReply,
-    ]
-
-    DeleteNetwork: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNetworkRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNetworkAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateNetworkAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNetwork: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkRequest, _database_pb2.GetNetworkReply]
+    GetAllNetworks: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllNetworksRequest, _database_pb2.GetAllNetworksReply]
+    FindNetworks: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindNetworksRequest, _database_pb2.FindNetworksReply]
+    DeleteNetwork: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkRequest, _database_pb2.StatusReply]
+    CreateNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkAttributesRequest, _database_pb2.StatusReply]
     """Network Attributes Operations (MariaDB)
     These store mutable Network attributes (floating gateway, NI list, DNS).
     """
-
-    GetNetworkAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkAttributesRequest,
-        database_pb2.GetNetworkAttributesReply,
-    ]
-
-    UpdateNetworkAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNetworkAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteNetworkAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNetworkAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateAgentOperation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateAgentOperationRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkAttributesRequest, _database_pb2.GetNetworkAttributesReply]
+    UpdateNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkAttributesRequest, _database_pb2.StatusReply]
+    DeleteNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkAttributesRequest, _database_pb2.StatusReply]
+    CreateAgentOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationRequest, _database_pb2.StatusReply]
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values in MariaDB. AgentOperations
     represent in-guest agent tasks (execute, get-file, put-blob, chmod).
     """
-
-    GetAgentOperation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAgentOperationRequest,
-        database_pb2.GetAgentOperationReply,
-    ]
-
-    DeleteAgentOperation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteAgentOperationRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateAgentOperationAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateAgentOperationAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetAgentOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAgentOperationRequest, _database_pb2.GetAgentOperationReply]
+    DeleteAgentOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteAgentOperationRequest, _database_pb2.StatusReply]
+    CreateAgentOperationAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationAttributesRequest, _database_pb2.StatusReply]
     """AgentOperation Attributes Operations (MariaDB)
     These store mutable AgentOperation attributes (results).
     """
-
-    GetAgentOperationAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAgentOperationAttributesRequest,
-        database_pb2.GetAgentOperationAttributesReply,
-    ]
-
-    UpdateAgentOperationAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateAgentOperationAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteAgentOperationAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteAgentOperationAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateInstance: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateInstanceRequest,
-        database_pb2.StatusReply,
-    ]
+    GetAgentOperationAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAgentOperationAttributesRequest, _database_pb2.GetAgentOperationAttributesReply]
+    UpdateAgentOperationAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateAgentOperationAttributesRequest, _database_pb2.StatusReply]
+    DeleteAgentOperationAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteAgentOperationAttributesRequest, _database_pb2.StatusReply]
+    CreateInstance: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateInstanceRequest, _database_pb2.StatusReply]
     """Instance Operations (MariaDB)
     These manage Instance static values in MariaDB. Instances represent
     virtual machines with CPU, memory, disk, and network configuration.
     """
-
-    GetInstance: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetInstanceRequest,
-        database_pb2.GetInstanceReply,
-    ]
-
-    GetAllInstances: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllInstancesRequest,
-        database_pb2.GetAllInstancesReply,
-    ]
-
-    FindInstances: grpc.UnaryUnaryMultiCallable[
-        database_pb2.FindInstancesRequest,
-        database_pb2.FindInstancesReply,
-    ]
-
-    GetAllInstanceUuids: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllInstanceUuidsRequest,
-        database_pb2.GetAllInstanceUuidsReply,
-    ]
-
-    DeleteInstance: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteInstanceRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateInstanceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateInstanceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetInstance: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetInstanceRequest, _database_pb2.GetInstanceReply]
+    GetAllInstances: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllInstancesRequest, _database_pb2.GetAllInstancesReply]
+    FindInstances: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindInstancesRequest, _database_pb2.FindInstancesReply]
+    GetAllInstanceUuids: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllInstanceUuidsRequest, _database_pb2.GetAllInstanceUuidsReply]
+    DeleteInstance: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteInstanceRequest, _database_pb2.StatusReply]
+    CreateInstanceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateInstanceAttributesRequest, _database_pb2.StatusReply]
     """Instance Attributes Operations (MariaDB)
     These store mutable Instance attributes (placement, power state, ports,
     block devices, interfaces, agent state, etc.).
     """
-
-    GetInstanceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetInstanceAttributesRequest,
-        database_pb2.GetInstanceAttributesReply,
-    ]
-
-    UpdateInstanceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpdateInstanceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteInstanceAttributes: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteInstanceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetConsumedPortsForNode: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetConsumedPortsForNodeRequest,
-        database_pb2.GetConsumedPortsForNodeReply,
-    ]
-
-    IsVsockCidInUse: grpc.UnaryUnaryMultiCallable[
-        database_pb2.IsVsockCidInUseRequest,
-        database_pb2.IsVsockCidInUseReply,
-    ]
-
-    GetObjectMetadata: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetObjectMetadataRequest,
-        database_pb2.GetObjectMetadataReply,
-    ]
+    GetInstanceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetInstanceAttributesRequest, _database_pb2.GetInstanceAttributesReply]
+    UpdateInstanceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateInstanceAttributesRequest, _database_pb2.StatusReply]
+    DeleteInstanceAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteInstanceAttributesRequest, _database_pb2.StatusReply]
+    GetConsumedPortsForNode: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetConsumedPortsForNodeRequest, _database_pb2.GetConsumedPortsForNodeReply]
+    IsVsockCidInUse: _grpc.UnaryUnaryMultiCallable[_database_pb2.IsVsockCidInUseRequest, _database_pb2.IsVsockCidInUseReply]
+    GetObjectMetadata: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetObjectMetadataRequest, _database_pb2.GetObjectMetadataReply]
     """Object Metadata Operations (MariaDB)
     These store user-defined metadata for all object types in a single shared
     table (like object_states).
     """
-
-    SetMetadata: grpc.UnaryUnaryMultiCallable[
-        database_pb2.SetMetadataRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteObjectMetadata: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteObjectMetadataRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateClusterOperationTargetRequest,
-        database_pb2.StatusReply,
-    ]
+    SetMetadata: _grpc.UnaryUnaryMultiCallable[_database_pb2.SetMetadataRequest, _database_pb2.StatusReply]
+    DeleteObjectMetadata: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectMetadataRequest, _database_pb2.StatusReply]
+    CreateClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateClusterOperationTargetRequest, _database_pb2.StatusReply]
     """Cluster Operation Target Operations (MariaDB)
     Track which operations target which objects, with sequence ordering.
     """
-
-    GetClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationTargetRequest,
-        database_pb2.GetClusterOperationTargetReply,
-    ]
-
-    GetClusterOperationTargetsForObject: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationTargetsForObjectRequest,
-        database_pb2.GetClusterOperationTargetsForObjectReply,
-    ]
-
-    GetLatestClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetLatestClusterOperationTargetRequest,
-        database_pb2.GetClusterOperationTargetReply,
-    ]
-
-    HasPendingClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
-        database_pb2.HasPendingClusterOperationTargetRequest,
-        database_pb2.HasPendingClusterOperationTargetReply,
-    ]
-
-    GetRecentTerminalOpStatesForTarget: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetRecentTerminalOpStatesForTargetRequest,
-        database_pb2.GetRecentTerminalOpStatesForTargetReply,
-    ]
-
-    DeleteClusterOperationTarget: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteClusterOperationTargetRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteClusterOperationTargetsForObject: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteClusterOperationTargetsForObjectRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteStaleClusterOperationTargets: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteStaleClusterOperationTargetsRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    UpsertNodeMetrics: grpc.UnaryUnaryMultiCallable[
-        database_pb2.UpsertNodeMetricsRequest,
-        database_pb2.StatusReply,
-    ]
+    GetClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]
+    GetClusterOperationTargetsForObject: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetsForObjectRequest, _database_pb2.GetClusterOperationTargetsForObjectReply]
+    GetLatestClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetLatestClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]
+    HasPendingClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.HasPendingClusterOperationTargetRequest, _database_pb2.HasPendingClusterOperationTargetReply]
+    GetRecentTerminalOpStatesForTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetRecentTerminalOpStatesForTargetRequest, _database_pb2.GetRecentTerminalOpStatesForTargetReply]
+    DeleteClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationTargetRequest, _database_pb2.StatusReply]
+    DeleteClusterOperationTargetsForObject: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationTargetsForObjectRequest, _database_pb2.StatusReply]
+    DeleteStaleClusterOperationTargets: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteStaleClusterOperationTargetsRequest, _database_pb2.DeleteCountReply]
+    UpsertNodeMetrics: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpsertNodeMetricsRequest, _database_pb2.StatusReply]
     """Node Metrics Operations (MariaDB)
     Ephemeral per-node resource metrics, upserted every 60s by the resources
     daemon. The metrics payload is a JSON string (~50+ fields, schemaless).
     """
-
-    GetNodeMetrics: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeMetricsRequest,
-        database_pb2.GetNodeMetricsReply,
-    ]
-
-    GetAllNodeMetrics: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNodeMetricsRequest,
-        database_pb2.GetAllNodeMetricsReply,
-    ]
-
-    DeleteNodeMetrics: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNodeMetricsRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateClusterOperation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateClusterOperationRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNodeMetrics: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNodeMetricsRequest, _database_pb2.GetNodeMetricsReply]
+    GetAllNodeMetrics: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllNodeMetricsRequest, _database_pb2.GetAllNodeMetricsReply]
+    DeleteNodeMetrics: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNodeMetricsRequest, _database_pb2.StatusReply]
+    CreateClusterOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateClusterOperationRequest, _database_pb2.StatusReply]
     """Cluster Operations (MariaDB)
     Operation headers, keyed by operation uuid. State lives separately in
     object_states; per-target tracking lives in cluster_operation_targets.
     Insert-only: rows are never mutated after creation.
     """
-
-    GetClusterOperation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationRequest,
-        database_pb2.GetClusterOperationReply,
-    ]
-
-    GetClusterOperationsByNode: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationsByNodeRequest,
-        database_pb2.GetClusterOperationsByNodeReply,
-    ]
-
-    ListClusterOperationsForTarget: grpc.UnaryUnaryMultiCallable[
-        database_pb2.ListClusterOperationsForTargetRequest,
-        database_pb2.ListClusterOperationsForTargetReply,
-    ]
-
-    DeleteClusterOperation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteClusterOperationRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateAndEnqueueClusterOperation: grpc.UnaryUnaryMultiCallable[
-        database_pb2.CreateAndEnqueueClusterOperationRequest,
-        database_pb2.StatusReply,
-    ]
+    GetClusterOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationRequest, _database_pb2.GetClusterOperationReply]
+    GetClusterOperationsByNode: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationsByNodeRequest, _database_pb2.GetClusterOperationsByNodeReply]
+    ListClusterOperationsForTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.ListClusterOperationsForTargetRequest, _database_pb2.ListClusterOperationsForTargetReply]
+    DeleteClusterOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationRequest, _database_pb2.StatusReply]
+    CreateAndEnqueueClusterOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateAndEnqueueClusterOperationRequest, _database_pb2.StatusReply]
     """Atomic create + enqueue for cluster operations (MariaDB).
     Writes cluster_operations, object_states and work_queue in a single
     transaction. Audit events are emitted separately by the caller via
     the eventlog service after this RPC succeeds.
     """
-
-    SetClusterOperationError: grpc.UnaryUnaryMultiCallable[
-        database_pb2.SetClusterOperationErrorRequest,
-        database_pb2.StatusReply,
-    ]
+    SetClusterOperationError: _grpc.UnaryUnaryMultiCallable[_database_pb2.SetClusterOperationErrorRequest, _database_pb2.StatusReply]
     """Cluster Operation Errors (MariaDB)
     Persists the structured ErrorReport when an _apply_* method raises
     inside the dispatcher. Upsert semantics: a retry that fails again
     overwrites the prior report.
     """
+    GetClusterOperationError: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationErrorRequest, _database_pb2.GetClusterOperationErrorReply]
+    DeleteClusterOperationError: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationErrorRequest, _database_pb2.StatusReply]
 
-    GetClusterOperationError: grpc.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationErrorRequest,
-        database_pb2.GetClusterOperationErrorReply,
-    ]
-
-    DeleteClusterOperationError: grpc.UnaryUnaryMultiCallable[
-        database_pb2.DeleteClusterOperationErrorRequest,
-        database_pb2.StatusReply,
-    ]
-
-class DatabaseServiceAsyncStub:
-    Enqueue: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.EnqueueRequest,
-        database_pb2.StatusReply,
-    ]
+@_typing.type_check_only
+class DatabaseServiceAsyncStub(DatabaseServiceStub):
+    def __init__(self, channel: _aio.Channel) -> None: ...
+    Enqueue: _aio.UnaryUnaryMultiCallable[_database_pb2.EnqueueRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Queue Operations"""
-
-    Dequeue: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DequeueRequest,
-        database_pb2.DequeueReply,
-    ]
-
-    Resolve: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ResolveRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetQueueLength: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.QueueLengthRequest,
-        database_pb2.QueueLengthReply,
-    ]
-
-    RestartQueue: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.RestartQueueRequest,
-        database_pb2.StatusReply,
-    ]
-
-    ListStuckWorkQueueRows: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ListStuckWorkQueueRowsRequest,
-        database_pb2.ListStuckWorkQueueRowsReply,
-    ]
-
-    ClearWorkQueueClaim: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ClearWorkQueueClaimRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteWorkQueueRow: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteWorkQueueRowRequest,
-        database_pb2.StatusReply,
-    ]
-
-    ClaimCoalescibleSiblings: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ClaimCoalescibleSiblingsRequest,
-        database_pb2.ClaimCoalescibleSiblingsReply,
-    ]
-
-    FindExistingCoalescibleOp: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.FindExistingCoalescibleOpRequest,
-        database_pb2.FindExistingCoalescibleOpReply,
-    ]
-
-    AcquireLock: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ClusterLockRequest,
-        database_pb2.ClusterLockReply,
-    ]
+    Dequeue: _aio.UnaryUnaryMultiCallable[_database_pb2.DequeueRequest, _database_pb2.DequeueReply]  # type: ignore[assignment]
+    Resolve: _aio.UnaryUnaryMultiCallable[_database_pb2.ResolveRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetQueueLength: _aio.UnaryUnaryMultiCallable[_database_pb2.QueueLengthRequest, _database_pb2.QueueLengthReply]  # type: ignore[assignment]
+    RestartQueue: _aio.UnaryUnaryMultiCallable[_database_pb2.RestartQueueRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    ListStuckWorkQueueRows: _aio.UnaryUnaryMultiCallable[_database_pb2.ListStuckWorkQueueRowsRequest, _database_pb2.ListStuckWorkQueueRowsReply]  # type: ignore[assignment]
+    ClearWorkQueueClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.ClearWorkQueueClaimRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteWorkQueueRow: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    ClaimCoalescibleSiblings: _aio.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsRequest, _database_pb2.ClaimCoalescibleSiblingsReply]  # type: ignore[assignment]
+    FindExistingCoalescibleOp: _aio.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpRequest, _database_pb2.FindExistingCoalescibleOpReply]  # type: ignore[assignment]
+    AcquireLock: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterLockRequest, _database_pb2.ClusterLockReply]  # type: ignore[assignment]
     """Lock Operations"""
-
-    ReleaseLock: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ClusterReleaseLockRequest,
-        database_pb2.StatusReply,
-    ]
-
-    RefreshLock: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ClusterRefreshLockRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetLockHolder: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ClusterGetLockHolderRequest,
-        database_pb2.ClusterLockHolderReply,
-    ]
-
-    ClearStaleLocks: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ClusterClearStaleLocksRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetExistingLocks: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ClusterGetExistingLocksRequest,
-        database_pb2.ClusterGetExistingLocksReply,
-    ]
-
-    GetClusterConfig: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ClusterConfigRequest,
-        database_pb2.ClusterConfigReply,
-    ]
+    ReleaseLock: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterReleaseLockRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    RefreshLock: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterRefreshLockRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetLockHolder: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterGetLockHolderRequest, _database_pb2.ClusterLockHolderReply]  # type: ignore[assignment]
+    ClearStaleLocks: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterClearStaleLocksRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetExistingLocks: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterGetExistingLocksRequest, _database_pb2.ClusterGetExistingLocksReply]  # type: ignore[assignment]
+    GetClusterConfig: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterConfigRequest, _database_pb2.ClusterConfigReply]  # type: ignore[assignment]
     """Cluster Config"""
-
-    SetClusterConfig: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.SetClusterConfigRequest,
-        database_pb2.StatusReply,
-    ]
-
-    RecordEventBatch: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.RecordEventBatchRequest,
-        database_pb2.StatusReply,
-    ]
+    SetClusterConfig: _aio.UnaryUnaryMultiCallable[_database_pb2.SetClusterConfigRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    RecordEventBatch: _aio.UnaryUnaryMultiCallable[_database_pb2.RecordEventBatchRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Event Storage (MariaDB)
     Direct write path for batches of events; replaces the sf-eventlog
     gRPC target in phase 2.
     """
-
-    PruneEvents: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.PruneEventsRequest,
-        database_pb2.PruneEventsReply,
-    ]
-
-    GetObjectEvents: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetObjectEventsRequest,
-        database_pb2.GetObjectEventsReply,
-    ]
+    PruneEvents: _aio.UnaryUnaryMultiCallable[_database_pb2.PruneEventsRequest, _database_pb2.PruneEventsReply]  # type: ignore[assignment]
+    GetObjectEvents: _aio.UnaryUnaryMultiCallable[_database_pb2.GetObjectEventsRequest, _database_pb2.GetObjectEventsReply]  # type: ignore[assignment]
     """Per-object read and delete paths replacing the legacy sqlite
     EventLog backend in phase 4.
     """
-
-    DeleteObjectEvents: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteObjectEventsRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetObjectState: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetObjectStateRequest,
-        database_pb2.GetObjectStateReply,
-    ]
+    DeleteObjectEvents: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectEventsRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetObjectState: _aio.UnaryUnaryMultiCallable[_database_pb2.GetObjectStateRequest, _database_pb2.GetObjectStateReply]  # type: ignore[assignment]
     """Object State Operations (MariaDB)"""
-
-    SetObjectState: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.SetObjectStateRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteObjectState: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteObjectStateRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetObjectsByState: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetObjectsByStateRequest,
-        database_pb2.GetObjectsByStateReply,
-    ]
-
-    ReserveAddress: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ReserveAddressRequest,
-        database_pb2.StatusReply,
-    ]
+    SetObjectState: _aio.UnaryUnaryMultiCallable[_database_pb2.SetObjectStateRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteObjectState: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectStateRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetObjectsByState: _aio.UnaryUnaryMultiCallable[_database_pb2.GetObjectsByStateRequest, _database_pb2.GetObjectsByStateReply]  # type: ignore[assignment]
+    ReserveAddress: _aio.UnaryUnaryMultiCallable[_database_pb2.ReserveAddressRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """IPAM Reservation Operations (MariaDB)"""
-
-    ReleaseAddress: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ReleaseAddressRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetReservation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetReservationRequest,
-        database_pb2.GetReservationReply,
-    ]
-
-    GetReservationsForIPAM: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetReservationsForIPAMRequest,
-        database_pb2.GetReservationsForIPAMReply,
-    ]
-
-    DeleteReservation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteReservationRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteReservationsForIPAM: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteReservationsForIPAMRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    ReleaseHaloedAddresses: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ReleaseHaloedAddressesRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    GetAddressesInUse: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAddressesInUseRequest,
-        database_pb2.GetAddressesInUseReply,
-    ]
-
-    CreateUpload: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateUploadRequest,
-        database_pb2.StatusReply,
-    ]
+    ReleaseAddress: _aio.UnaryUnaryMultiCallable[_database_pb2.ReleaseAddressRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetReservation: _aio.UnaryUnaryMultiCallable[_database_pb2.GetReservationRequest, _database_pb2.GetReservationReply]  # type: ignore[assignment]
+    GetReservationsForIPAM: _aio.UnaryUnaryMultiCallable[_database_pb2.GetReservationsForIPAMRequest, _database_pb2.GetReservationsForIPAMReply]  # type: ignore[assignment]
+    DeleteReservation: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteReservationRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteReservationsForIPAM: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteReservationsForIPAMRequest, _database_pb2.DeleteCountReply]  # type: ignore[assignment]
+    ReleaseHaloedAddresses: _aio.UnaryUnaryMultiCallable[_database_pb2.ReleaseHaloedAddressesRequest, _database_pb2.DeleteCountReply]  # type: ignore[assignment]
+    GetAddressesInUse: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAddressesInUseRequest, _database_pb2.GetAddressesInUseReply]  # type: ignore[assignment]
+    CreateUpload: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateUploadRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Upload Operations (MariaDB)"""
-
-    GetUpload: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetUploadRequest,
-        database_pb2.GetUploadReply,
-    ]
-
-    GetUploads: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetUploadsRequest,
-        database_pb2.GetUploadsReply,
-    ]
-
-    DeleteUpload: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteUploadRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateUpload: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateUploadRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateBlob: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateBlobRequest,
-        database_pb2.StatusReply,
-    ]
+    GetUpload: _aio.UnaryUnaryMultiCallable[_database_pb2.GetUploadRequest, _database_pb2.GetUploadReply]  # type: ignore[assignment]
+    GetUploads: _aio.UnaryUnaryMultiCallable[_database_pb2.GetUploadsRequest, _database_pb2.GetUploadsReply]  # type: ignore[assignment]
+    DeleteUpload: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteUploadRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    UpdateUpload: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateUploadRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateBlob: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateBlobRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Blob Operations (MariaDB)"""
-
-    GetBlob: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobRequest,
-        database_pb2.GetBlobReply,
-    ]
-
-    GetAllBlobUuids: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllBlobUuidsRequest,
-        database_pb2.GetAllBlobUuidsReply,
-    ]
-
-    DeleteBlob: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateBlob: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateBlobRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateDnsMasq: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateDnsMasqRequest,
-        database_pb2.StatusReply,
-    ]
+    GetBlob: _aio.UnaryUnaryMultiCallable[_database_pb2.GetBlobRequest, _database_pb2.GetBlobReply]  # type: ignore[assignment]
+    GetAllBlobUuids: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllBlobUuidsRequest, _database_pb2.GetAllBlobUuidsReply]  # type: ignore[assignment]
+    DeleteBlob: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    UpdateBlob: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateBlobRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateDnsMasq: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateDnsMasqRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """DnsMasq Operations (MariaDB)"""
-
-    GetDnsMasq: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetDnsMasqRequest,
-        database_pb2.GetDnsMasqReply,
-    ]
-
-    GetDnsMasqs: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetDnsMasqsRequest,
-        database_pb2.GetDnsMasqsReply,
-    ]
-
-    DeleteDnsMasq: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteDnsMasqRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateDnsMasq: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateDnsMasqRequest,
-        database_pb2.StatusReply,
-    ]
-
-    RecordRelationship: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.RecordRelationshipRequest,
-        database_pb2.StatusReply,
-    ]
+    GetDnsMasq: _aio.UnaryUnaryMultiCallable[_database_pb2.GetDnsMasqRequest, _database_pb2.GetDnsMasqReply]  # type: ignore[assignment]
+    GetDnsMasqs: _aio.UnaryUnaryMultiCallable[_database_pb2.GetDnsMasqsRequest, _database_pb2.GetDnsMasqsReply]  # type: ignore[assignment]
+    DeleteDnsMasq: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteDnsMasqRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    UpdateDnsMasq: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateDnsMasqRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    RecordRelationship: _aio.UnaryUnaryMultiCallable[_database_pb2.RecordRelationshipRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Object Reference Operations (MariaDB)"""
-
-    RemoveRelationship: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.RemoveRelationshipRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetReferencesTo: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetReferencesToRequest,
-        database_pb2.GetReferencesReply,
-    ]
-
-    GetReferencesFrom: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetReferencesFromRequest,
-        database_pb2.GetReferencesReply,
-    ]
-
-    CountReferencesTo: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CountReferencesToRequest,
-        database_pb2.CountReply,
-    ]
-
-    RemoveAllReferencesFrom: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.RemoveAllReferencesFromRequest,
-        database_pb2.CountReply,
-    ]
-
-    UpdateLastActive: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateLastActiveRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetStaleReferences: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetStaleReferencesRequest,
-        database_pb2.GetReferencesReply,
-    ]
-
-    UpsertBlobHash: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpsertBlobHashRequest,
-        database_pb2.StatusReply,
-    ]
+    RemoveRelationship: _aio.UnaryUnaryMultiCallable[_database_pb2.RemoveRelationshipRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetReferencesTo: _aio.UnaryUnaryMultiCallable[_database_pb2.GetReferencesToRequest, _database_pb2.GetReferencesReply]  # type: ignore[assignment]
+    GetReferencesFrom: _aio.UnaryUnaryMultiCallable[_database_pb2.GetReferencesFromRequest, _database_pb2.GetReferencesReply]  # type: ignore[assignment]
+    CountReferencesTo: _aio.UnaryUnaryMultiCallable[_database_pb2.CountReferencesToRequest, _database_pb2.CountReply]  # type: ignore[assignment]
+    RemoveAllReferencesFrom: _aio.UnaryUnaryMultiCallable[_database_pb2.RemoveAllReferencesFromRequest, _database_pb2.CountReply]  # type: ignore[assignment]
+    UpdateLastActive: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateLastActiveRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetStaleReferences: _aio.UnaryUnaryMultiCallable[_database_pb2.GetStaleReferencesRequest, _database_pb2.GetReferencesReply]  # type: ignore[assignment]
+    UpsertBlobHash: _aio.UnaryUnaryMultiCallable[_database_pb2.UpsertBlobHashRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Blob Hash Operations (MariaDB)"""
-
-    GetBlobHashes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobHashesRequest,
-        database_pb2.GetBlobHashesReply,
-    ]
-
-    FindBlobByHash: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.FindBlobByHashRequest,
-        database_pb2.FindBlobByHashReply,
-    ]
-
-    GetStaleBlobHashes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetStaleBlobHashesRequest,
-        database_pb2.GetBlobHashesReply,
-    ]
-
-    DeleteBlobHashes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobHashesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateBlobTransfer: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateBlobTransferRequest,
-        database_pb2.StatusReply,
-    ]
+    GetBlobHashes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetBlobHashesRequest, _database_pb2.GetBlobHashesReply]  # type: ignore[assignment]
+    FindBlobByHash: _aio.UnaryUnaryMultiCallable[_database_pb2.FindBlobByHashRequest, _database_pb2.FindBlobByHashReply]  # type: ignore[assignment]
+    GetStaleBlobHashes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetStaleBlobHashesRequest, _database_pb2.GetBlobHashesReply]  # type: ignore[assignment]
+    DeleteBlobHashes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobHashesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateBlobTransfer: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateBlobTransferRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Blob Transfer Operations (MariaDB)"""
-
-    GetBlobTransfer: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobTransferRequest,
-        database_pb2.GetBlobTransferReply,
-    ]
-
-    GetBlobTransfersForNode: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobTransfersForNodeRequest,
-        database_pb2.GetBlobTransfersReply,
-    ]
-
-    GetBlobTransfersForBlob: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobTransfersForBlobRequest,
-        database_pb2.GetBlobTransfersReply,
-    ]
-
-    UpdateBlobTransfer: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateBlobTransferRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteBlobTransfer: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobTransferRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteBlobTransfersForBlob: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobTransfersForBlobRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    DeleteStaleTransfers: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteStaleTransfersRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    CreateBlobAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateBlobAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetBlobTransfer: _aio.UnaryUnaryMultiCallable[_database_pb2.GetBlobTransferRequest, _database_pb2.GetBlobTransferReply]  # type: ignore[assignment]
+    GetBlobTransfersForNode: _aio.UnaryUnaryMultiCallable[_database_pb2.GetBlobTransfersForNodeRequest, _database_pb2.GetBlobTransfersReply]  # type: ignore[assignment]
+    GetBlobTransfersForBlob: _aio.UnaryUnaryMultiCallable[_database_pb2.GetBlobTransfersForBlobRequest, _database_pb2.GetBlobTransfersReply]  # type: ignore[assignment]
+    UpdateBlobTransfer: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateBlobTransferRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteBlobTransfer: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobTransferRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteBlobTransfersForBlob: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobTransfersForBlobRequest, _database_pb2.DeleteCountReply]  # type: ignore[assignment]
+    DeleteStaleTransfers: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteStaleTransfersRequest, _database_pb2.DeleteCountReply]  # type: ignore[assignment]
+    CreateBlobAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateBlobAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Blob Attributes Operations (MariaDB)
     These store mutable blob attributes, separate from BlobData (static values).
     """
-
-    GetBlobAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetBlobAttributesRequest,
-        database_pb2.GetBlobAttributesReply,
-    ]
-
-    UpdateBlobAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateBlobAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateBlobLastUsed: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateBlobLastUsedRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteBlobAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteBlobAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetExpiredBlobUuids: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetExpiredBlobUuidsRequest,
-        database_pb2.GetExpiredBlobUuidsReply,
-    ]
-
-    GetStaleTranscodedBlobUuids: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetStaleTranscodedBlobUuidsRequest,
-        database_pb2.GetStaleTranscodedBlobUuidsReply,
-    ]
-
-    CreateNode: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateNodeRequest,
-        database_pb2.StatusReply,
-    ]
+    GetBlobAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetBlobAttributesRequest, _database_pb2.GetBlobAttributesReply]  # type: ignore[assignment]
+    UpdateBlobAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateBlobAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    UpdateBlobLastUsed: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateBlobLastUsedRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteBlobAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetExpiredBlobUuids: _aio.UnaryUnaryMultiCallable[_database_pb2.GetExpiredBlobUuidsRequest, _database_pb2.GetExpiredBlobUuidsReply]  # type: ignore[assignment]
+    GetStaleTranscodedBlobUuids: _aio.UnaryUnaryMultiCallable[_database_pb2.GetStaleTranscodedBlobUuidsRequest, _database_pb2.GetStaleTranscodedBlobUuidsReply]  # type: ignore[assignment]
+    CreateNode: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNodeRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Node Operations (MariaDB)
     These manage node static values (uuid, fqdn, ip) in MariaDB.
     Nodes now use real UUID4 identifiers; FQDN is a separate indexed column.
     """
-
-    GetNode: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeRequest,
-        database_pb2.GetNodeReply,
-    ]
-
-    GetNodeByFqdn: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeByFqdnRequest,
-        database_pb2.GetNodeReply,
-    ]
-
-    GetAllNodeUuids: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNodeUuidsRequest,
-        database_pb2.GetAllNodeUuidsReply,
-    ]
-
-    DeleteNode: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNodeRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateNode: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNodeRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateNodeAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNode: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNodeRequest, _database_pb2.GetNodeReply]  # type: ignore[assignment]
+    GetNodeByFqdn: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNodeByFqdnRequest, _database_pb2.GetNodeReply]  # type: ignore[assignment]
+    GetAllNodeUuids: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllNodeUuidsRequest, _database_pb2.GetAllNodeUuidsReply]  # type: ignore[assignment]
+    DeleteNode: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNodeRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    UpdateNode: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNodeRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateNodeAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNodeAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Node Attributes Operations (MariaDB)
     These store mutable node attributes, separate from NodeData (static values).
     """
-
-    GetNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeAttributesRequest,
-        database_pb2.GetNodeAttributesReply,
-    ]
-
-    UpdateNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNodeAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteNodeAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNodeAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    SetNodeDaemonState: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.SetNodeDaemonStateRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNodeAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNodeAttributesRequest, _database_pb2.GetNodeAttributesReply]  # type: ignore[assignment]
+    UpdateNodeAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNodeAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteNodeAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNodeAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    SetNodeDaemonState: _aio.UnaryUnaryMultiCallable[_database_pb2.SetNodeDaemonStateRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Node Daemon State Operations (MariaDB)
     Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
     that previously lived inside node_attributes; that dict required a
     coarse per-node lock for every transition and serialised every
     daemon's startup/shutdown through a single 10s lock.
     """
-
-    GetNodeDaemonState: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeDaemonStateRequest,
-        database_pb2.GetNodeDaemonStateReply,
-    ]
-
-    GetAllNodeDaemonStates: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNodeDaemonStatesRequest,
-        database_pb2.GetAllNodeDaemonStatesReply,
-    ]
-
-    DeleteNodeDaemonState: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNodeDaemonStateRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNamespace: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateNamespaceRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNodeDaemonState: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNodeDaemonStateRequest, _database_pb2.GetNodeDaemonStateReply]  # type: ignore[assignment]
+    GetAllNodeDaemonStates: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllNodeDaemonStatesRequest, _database_pb2.GetAllNodeDaemonStatesReply]  # type: ignore[assignment]
+    DeleteNodeDaemonState: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNodeDaemonStateRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateNamespace: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Namespace Operations (MariaDB)
     These manage namespace static values (name, version) in MariaDB.
     Namespaces use their name as primary key (not a UUID).
     """
-
-    GetNamespace: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNamespaceRequest,
-        database_pb2.GetNamespaceReply,
-    ]
-
-    GetAllNamespaceNames: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNamespaceNamesRequest,
-        database_pb2.GetAllNamespaceNamesReply,
-    ]
-
-    DeleteNamespace: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNamespaceRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNamespaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateNamespaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNamespace: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceRequest, _database_pb2.GetNamespaceReply]  # type: ignore[assignment]
+    GetAllNamespaceNames: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllNamespaceNamesRequest, _database_pb2.GetAllNamespaceNamesReply]  # type: ignore[assignment]
+    DeleteNamespace: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateNamespaceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Namespace Attributes Operations (MariaDB)
     These store mutable namespace attributes (keys, trust).
     """
-
-    GetNamespaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNamespaceAttributesRequest,
-        database_pb2.GetNamespaceAttributesReply,
-    ]
-
-    UpdateNamespaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNamespaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteNamespaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNamespaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateArtifact: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateArtifactRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNamespaceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceAttributesRequest, _database_pb2.GetNamespaceAttributesReply]  # type: ignore[assignment]
+    UpdateNamespaceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteNamespaceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateArtifact: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateArtifactRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Artifact Operations (MariaDB)
     These manage artifact static values (uuid, type, source_url, name, namespace)
     in MariaDB. Artifacts represent versioned disk images.
     """
-
-    GetArtifact: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetArtifactRequest,
-        database_pb2.GetArtifactReply,
-    ]
-
-    GetAllArtifacts: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllArtifactsRequest,
-        database_pb2.GetAllArtifactsReply,
-    ]
-
-    FindArtifacts: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.FindArtifactsRequest,
-        database_pb2.FindArtifactsReply,
-    ]
-
-    UpdateArtifact: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateArtifactRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteArtifact: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteArtifactRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateArtifactAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateArtifactAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetArtifact: _aio.UnaryUnaryMultiCallable[_database_pb2.GetArtifactRequest, _database_pb2.GetArtifactReply]  # type: ignore[assignment]
+    GetAllArtifacts: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllArtifactsRequest, _database_pb2.GetAllArtifactsReply]  # type: ignore[assignment]
+    FindArtifacts: _aio.UnaryUnaryMultiCallable[_database_pb2.FindArtifactsRequest, _database_pb2.FindArtifactsReply]  # type: ignore[assignment]
+    UpdateArtifact: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateArtifactRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteArtifact: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteArtifactRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateArtifactAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateArtifactAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Artifact Attributes Operations (MariaDB)
     These store mutable artifact attributes (max_versions, shared, highest_index).
     """
-
-    GetArtifactAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetArtifactAttributesRequest,
-        database_pb2.GetArtifactAttributesReply,
-    ]
-
-    UpdateArtifactAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateArtifactAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteArtifactAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteArtifactAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateArtifactIndex: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateArtifactIndexRequest,
-        database_pb2.StatusReply,
-    ]
+    GetArtifactAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetArtifactAttributesRequest, _database_pb2.GetArtifactAttributesReply]  # type: ignore[assignment]
+    UpdateArtifactAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateArtifactAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteArtifactAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteArtifactAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateArtifactIndex: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateArtifactIndexRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Artifact Index Operations (MariaDB)
     These manage artifact version indexes, mapping index numbers to blob UUIDs.
     """
-
-    GetArtifactIndex: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetArtifactIndexRequest,
-        database_pb2.GetArtifactIndexReply,
-    ]
-
-    GetAllArtifactIndexes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllArtifactIndexesRequest,
-        database_pb2.GetAllArtifactIndexesReply,
-    ]
-
-    DeleteArtifactIndex: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteArtifactIndexRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteAllArtifactIndexes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteAllArtifactIndexesRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    CreateNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateNetworkInterfaceRequest,
-        database_pb2.StatusReply,
-    ]
+    GetArtifactIndex: _aio.UnaryUnaryMultiCallable[_database_pb2.GetArtifactIndexRequest, _database_pb2.GetArtifactIndexReply]  # type: ignore[assignment]
+    GetAllArtifactIndexes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllArtifactIndexesRequest, _database_pb2.GetAllArtifactIndexesReply]  # type: ignore[assignment]
+    DeleteArtifactIndex: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteArtifactIndexRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteAllArtifactIndexes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteAllArtifactIndexesRequest, _database_pb2.DeleteCountReply]  # type: ignore[assignment]
+    CreateNetworkInterface: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkInterfaceRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """NetworkInterface Operations (MariaDB)
     These manage NetworkInterface static values in MariaDB.
     """
-
-    GetNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkInterfaceRequest,
-        database_pb2.GetNetworkInterfaceReply,
-    ]
-
-    GetNetworkInterfacesByInstance: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkInterfacesByInstanceRequest,
-        database_pb2.GetNetworkInterfacesReply,
-    ]
-
-    GetNetworkInterfacesByNetwork: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkInterfacesByNetworkRequest,
-        database_pb2.GetNetworkInterfacesReply,
-    ]
-
-    GetAllNetworkInterfaces: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNetworkInterfacesRequest,
-        database_pb2.GetNetworkInterfacesReply,
-    ]
-
-    FindNetworkInterfaces: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.FindNetworkInterfacesRequest,
-        database_pb2.FindNetworkInterfacesReply,
-    ]
-
-    DeleteNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNetworkInterfaceRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateNetworkInterface: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNetworkInterfaceRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNetworkInterfaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateNetworkInterfaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNetworkInterface: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkInterfaceRequest, _database_pb2.GetNetworkInterfaceReply]  # type: ignore[assignment]
+    GetNetworkInterfacesByInstance: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkInterfacesByInstanceRequest, _database_pb2.GetNetworkInterfacesReply]  # type: ignore[assignment]
+    GetNetworkInterfacesByNetwork: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkInterfacesByNetworkRequest, _database_pb2.GetNetworkInterfacesReply]  # type: ignore[assignment]
+    GetAllNetworkInterfaces: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllNetworkInterfacesRequest, _database_pb2.GetNetworkInterfacesReply]  # type: ignore[assignment]
+    FindNetworkInterfaces: _aio.UnaryUnaryMultiCallable[_database_pb2.FindNetworkInterfacesRequest, _database_pb2.FindNetworkInterfacesReply]  # type: ignore[assignment]
+    DeleteNetworkInterface: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkInterfaceRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    UpdateNetworkInterface: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkInterfaceRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateNetworkInterfaceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkInterfaceAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """NetworkInterface Attributes Operations (MariaDB)
     These store mutable NetworkInterface attributes (floating address).
     """
-
-    GetNetworkInterfaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkInterfaceAttributesRequest,
-        database_pb2.GetNetworkInterfaceAttributesReply,
-    ]
-
-    UpdateNetworkInterfaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNetworkInterfaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteNetworkInterfaceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNetworkInterfaceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateIPAM: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateIPAMRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNetworkInterfaceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkInterfaceAttributesRequest, _database_pb2.GetNetworkInterfaceAttributesReply]  # type: ignore[assignment]
+    UpdateNetworkInterfaceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkInterfaceAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteNetworkInterfaceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkInterfaceAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateIPAM: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateIPAMRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """IPAM Operations (MariaDB)
     These manage IPAM static values (uuid, namespace, network_uuid, ipblock)
     in MariaDB. IPAMs track IP address allocation within a network.
     """
-
-    GetIPAM: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetIPAMRequest,
-        database_pb2.GetIPAMReply,
-    ]
-
-    DeleteIPAM: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteIPAMRequest,
-        database_pb2.StatusReply,
-    ]
-
-    UpdateIPAM: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateIPAMRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNetwork: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateNetworkRequest,
-        database_pb2.StatusReply,
-    ]
+    GetIPAM: _aio.UnaryUnaryMultiCallable[_database_pb2.GetIPAMRequest, _database_pb2.GetIPAMReply]  # type: ignore[assignment]
+    DeleteIPAM: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteIPAMRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    UpdateIPAM: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateIPAMRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateNetwork: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Network Operations (MariaDB)
     These manage Network static values in MariaDB. Networks are virtual L2
     networks with optional DHCP, NAT, and DNS services connected via VXLAN.
     """
-
-    GetNetwork: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkRequest,
-        database_pb2.GetNetworkReply,
-    ]
-
-    GetAllNetworks: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNetworksRequest,
-        database_pb2.GetAllNetworksReply,
-    ]
-
-    FindNetworks: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.FindNetworksRequest,
-        database_pb2.FindNetworksReply,
-    ]
-
-    DeleteNetwork: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNetworkRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateNetworkAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateNetworkAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNetwork: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkRequest, _database_pb2.GetNetworkReply]  # type: ignore[assignment]
+    GetAllNetworks: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllNetworksRequest, _database_pb2.GetAllNetworksReply]  # type: ignore[assignment]
+    FindNetworks: _aio.UnaryUnaryMultiCallable[_database_pb2.FindNetworksRequest, _database_pb2.FindNetworksReply]  # type: ignore[assignment]
+    DeleteNetwork: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNetworkAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Network Attributes Operations (MariaDB)
     These store mutable Network attributes (floating gateway, NI list, DNS).
     """
-
-    GetNetworkAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNetworkAttributesRequest,
-        database_pb2.GetNetworkAttributesReply,
-    ]
-
-    UpdateNetworkAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateNetworkAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteNetworkAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNetworkAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateAgentOperation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateAgentOperationRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkAttributesRequest, _database_pb2.GetNetworkAttributesReply]  # type: ignore[assignment]
+    UpdateNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateAgentOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values in MariaDB. AgentOperations
     represent in-guest agent tasks (execute, get-file, put-blob, chmod).
     """
-
-    GetAgentOperation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAgentOperationRequest,
-        database_pb2.GetAgentOperationReply,
-    ]
-
-    DeleteAgentOperation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteAgentOperationRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateAgentOperationAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateAgentOperationAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetAgentOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAgentOperationRequest, _database_pb2.GetAgentOperationReply]  # type: ignore[assignment]
+    DeleteAgentOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteAgentOperationRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateAgentOperationAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """AgentOperation Attributes Operations (MariaDB)
     These store mutable AgentOperation attributes (results).
     """
-
-    GetAgentOperationAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAgentOperationAttributesRequest,
-        database_pb2.GetAgentOperationAttributesReply,
-    ]
-
-    UpdateAgentOperationAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateAgentOperationAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteAgentOperationAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteAgentOperationAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateInstance: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateInstanceRequest,
-        database_pb2.StatusReply,
-    ]
+    GetAgentOperationAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAgentOperationAttributesRequest, _database_pb2.GetAgentOperationAttributesReply]  # type: ignore[assignment]
+    UpdateAgentOperationAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateAgentOperationAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteAgentOperationAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteAgentOperationAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateInstance: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateInstanceRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Instance Operations (MariaDB)
     These manage Instance static values in MariaDB. Instances represent
     virtual machines with CPU, memory, disk, and network configuration.
     """
-
-    GetInstance: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetInstanceRequest,
-        database_pb2.GetInstanceReply,
-    ]
-
-    GetAllInstances: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllInstancesRequest,
-        database_pb2.GetAllInstancesReply,
-    ]
-
-    FindInstances: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.FindInstancesRequest,
-        database_pb2.FindInstancesReply,
-    ]
-
-    GetAllInstanceUuids: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllInstanceUuidsRequest,
-        database_pb2.GetAllInstanceUuidsReply,
-    ]
-
-    DeleteInstance: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteInstanceRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateInstanceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
+    GetInstance: _aio.UnaryUnaryMultiCallable[_database_pb2.GetInstanceRequest, _database_pb2.GetInstanceReply]  # type: ignore[assignment]
+    GetAllInstances: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllInstancesRequest, _database_pb2.GetAllInstancesReply]  # type: ignore[assignment]
+    FindInstances: _aio.UnaryUnaryMultiCallable[_database_pb2.FindInstancesRequest, _database_pb2.FindInstancesReply]  # type: ignore[assignment]
+    GetAllInstanceUuids: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllInstanceUuidsRequest, _database_pb2.GetAllInstanceUuidsReply]  # type: ignore[assignment]
+    DeleteInstance: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteInstanceRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateInstanceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateInstanceAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Instance Attributes Operations (MariaDB)
     These store mutable Instance attributes (placement, power state, ports,
     block devices, interfaces, agent state, etc.).
     """
-
-    GetInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetInstanceAttributesRequest,
-        database_pb2.GetInstanceAttributesReply,
-    ]
-
-    UpdateInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpdateInstanceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteInstanceAttributes: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteInstanceAttributesRequest,
-        database_pb2.StatusReply,
-    ]
-
-    GetConsumedPortsForNode: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetConsumedPortsForNodeRequest,
-        database_pb2.GetConsumedPortsForNodeReply,
-    ]
-
-    IsVsockCidInUse: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.IsVsockCidInUseRequest,
-        database_pb2.IsVsockCidInUseReply,
-    ]
-
-    GetObjectMetadata: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetObjectMetadataRequest,
-        database_pb2.GetObjectMetadataReply,
-    ]
+    GetInstanceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetInstanceAttributesRequest, _database_pb2.GetInstanceAttributesReply]  # type: ignore[assignment]
+    UpdateInstanceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateInstanceAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteInstanceAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteInstanceAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetConsumedPortsForNode: _aio.UnaryUnaryMultiCallable[_database_pb2.GetConsumedPortsForNodeRequest, _database_pb2.GetConsumedPortsForNodeReply]  # type: ignore[assignment]
+    IsVsockCidInUse: _aio.UnaryUnaryMultiCallable[_database_pb2.IsVsockCidInUseRequest, _database_pb2.IsVsockCidInUseReply]  # type: ignore[assignment]
+    GetObjectMetadata: _aio.UnaryUnaryMultiCallable[_database_pb2.GetObjectMetadataRequest, _database_pb2.GetObjectMetadataReply]  # type: ignore[assignment]
     """Object Metadata Operations (MariaDB)
     These store user-defined metadata for all object types in a single shared
     table (like object_states).
     """
-
-    SetMetadata: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.SetMetadataRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteObjectMetadata: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteObjectMetadataRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateClusterOperationTargetRequest,
-        database_pb2.StatusReply,
-    ]
+    SetMetadata: _aio.UnaryUnaryMultiCallable[_database_pb2.SetMetadataRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteObjectMetadata: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectMetadataRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateClusterOperationTargetRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Cluster Operation Target Operations (MariaDB)
     Track which operations target which objects, with sequence ordering.
     """
-
-    GetClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationTargetRequest,
-        database_pb2.GetClusterOperationTargetReply,
-    ]
-
-    GetClusterOperationTargetsForObject: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationTargetsForObjectRequest,
-        database_pb2.GetClusterOperationTargetsForObjectReply,
-    ]
-
-    GetLatestClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetLatestClusterOperationTargetRequest,
-        database_pb2.GetClusterOperationTargetReply,
-    ]
-
-    HasPendingClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.HasPendingClusterOperationTargetRequest,
-        database_pb2.HasPendingClusterOperationTargetReply,
-    ]
-
-    GetRecentTerminalOpStatesForTarget: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetRecentTerminalOpStatesForTargetRequest,
-        database_pb2.GetRecentTerminalOpStatesForTargetReply,
-    ]
-
-    DeleteClusterOperationTarget: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteClusterOperationTargetRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteClusterOperationTargetsForObject: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteClusterOperationTargetsForObjectRequest,
-        database_pb2.StatusReply,
-    ]
-
-    DeleteStaleClusterOperationTargets: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteStaleClusterOperationTargetsRequest,
-        database_pb2.DeleteCountReply,
-    ]
-
-    UpsertNodeMetrics: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.UpsertNodeMetricsRequest,
-        database_pb2.StatusReply,
-    ]
+    GetClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]  # type: ignore[assignment]
+    GetClusterOperationTargetsForObject: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetsForObjectRequest, _database_pb2.GetClusterOperationTargetsForObjectReply]  # type: ignore[assignment]
+    GetLatestClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.GetLatestClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]  # type: ignore[assignment]
+    HasPendingClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.HasPendingClusterOperationTargetRequest, _database_pb2.HasPendingClusterOperationTargetReply]  # type: ignore[assignment]
+    GetRecentTerminalOpStatesForTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.GetRecentTerminalOpStatesForTargetRequest, _database_pb2.GetRecentTerminalOpStatesForTargetReply]  # type: ignore[assignment]
+    DeleteClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationTargetRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteClusterOperationTargetsForObject: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationTargetsForObjectRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteStaleClusterOperationTargets: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteStaleClusterOperationTargetsRequest, _database_pb2.DeleteCountReply]  # type: ignore[assignment]
+    UpsertNodeMetrics: _aio.UnaryUnaryMultiCallable[_database_pb2.UpsertNodeMetricsRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Node Metrics Operations (MariaDB)
     Ephemeral per-node resource metrics, upserted every 60s by the resources
     daemon. The metrics payload is a JSON string (~50+ fields, schemaless).
     """
-
-    GetNodeMetrics: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetNodeMetricsRequest,
-        database_pb2.GetNodeMetricsReply,
-    ]
-
-    GetAllNodeMetrics: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetAllNodeMetricsRequest,
-        database_pb2.GetAllNodeMetricsReply,
-    ]
-
-    DeleteNodeMetrics: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteNodeMetricsRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateClusterOperationRequest,
-        database_pb2.StatusReply,
-    ]
+    GetNodeMetrics: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNodeMetricsRequest, _database_pb2.GetNodeMetricsReply]  # type: ignore[assignment]
+    GetAllNodeMetrics: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllNodeMetricsRequest, _database_pb2.GetAllNodeMetricsReply]  # type: ignore[assignment]
+    DeleteNodeMetrics: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNodeMetricsRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateClusterOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateClusterOperationRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Cluster Operations (MariaDB)
     Operation headers, keyed by operation uuid. State lives separately in
     object_states; per-target tracking lives in cluster_operation_targets.
     Insert-only: rows are never mutated after creation.
     """
-
-    GetClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationRequest,
-        database_pb2.GetClusterOperationReply,
-    ]
-
-    GetClusterOperationsByNode: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationsByNodeRequest,
-        database_pb2.GetClusterOperationsByNodeReply,
-    ]
-
-    ListClusterOperationsForTarget: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.ListClusterOperationsForTargetRequest,
-        database_pb2.ListClusterOperationsForTargetReply,
-    ]
-
-    DeleteClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteClusterOperationRequest,
-        database_pb2.StatusReply,
-    ]
-
-    CreateAndEnqueueClusterOperation: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.CreateAndEnqueueClusterOperationRequest,
-        database_pb2.StatusReply,
-    ]
+    GetClusterOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationRequest, _database_pb2.GetClusterOperationReply]  # type: ignore[assignment]
+    GetClusterOperationsByNode: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationsByNodeRequest, _database_pb2.GetClusterOperationsByNodeReply]  # type: ignore[assignment]
+    ListClusterOperationsForTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.ListClusterOperationsForTargetRequest, _database_pb2.ListClusterOperationsForTargetReply]  # type: ignore[assignment]
+    DeleteClusterOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateAndEnqueueClusterOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateAndEnqueueClusterOperationRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Atomic create + enqueue for cluster operations (MariaDB).
     Writes cluster_operations, object_states and work_queue in a single
     transaction. Audit events are emitted separately by the caller via
     the eventlog service after this RPC succeeds.
     """
-
-    SetClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.SetClusterOperationErrorRequest,
-        database_pb2.StatusReply,
-    ]
+    SetClusterOperationError: _aio.UnaryUnaryMultiCallable[_database_pb2.SetClusterOperationErrorRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Cluster Operation Errors (MariaDB)
     Persists the structured ErrorReport when an _apply_* method raises
     inside the dispatcher. Upsert semantics: a retry that fails again
     overwrites the prior report.
     """
+    GetClusterOperationError: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationErrorRequest, _database_pb2.GetClusterOperationErrorReply]  # type: ignore[assignment]
+    DeleteClusterOperationError: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterOperationErrorRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
 
-    GetClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.GetClusterOperationErrorRequest,
-        database_pb2.GetClusterOperationErrorReply,
-    ]
-
-    DeleteClusterOperationError: grpc.aio.UnaryUnaryMultiCallable[
-        database_pb2.DeleteClusterOperationErrorRequest,
-        database_pb2.StatusReply,
-    ]
-
-class DatabaseServiceServicer(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
+    @_abc_1.abstractmethod
     def Enqueue(
         self,
-        request: database_pb2.EnqueueRequest,
+        request: _database_pb2.EnqueueRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Queue Operations"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def Dequeue(
         self,
-        request: database_pb2.DequeueRequest,
+        request: _database_pb2.DequeueRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.DequeueReply, collections.abc.Awaitable[database_pb2.DequeueReply]]: ...
+    ) -> _typing.Union[_database_pb2.DequeueReply, _abc.Awaitable[_database_pb2.DequeueReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def Resolve(
         self,
-        request: database_pb2.ResolveRequest,
+        request: _database_pb2.ResolveRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetQueueLength(
         self,
-        request: database_pb2.QueueLengthRequest,
+        request: _database_pb2.QueueLengthRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.QueueLengthReply, collections.abc.Awaitable[database_pb2.QueueLengthReply]]: ...
+    ) -> _typing.Union[_database_pb2.QueueLengthReply, _abc.Awaitable[_database_pb2.QueueLengthReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def RestartQueue(
         self,
-        request: database_pb2.RestartQueueRequest,
+        request: _database_pb2.RestartQueueRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def ListStuckWorkQueueRows(
         self,
-        request: database_pb2.ListStuckWorkQueueRowsRequest,
+        request: _database_pb2.ListStuckWorkQueueRowsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.ListStuckWorkQueueRowsReply, collections.abc.Awaitable[database_pb2.ListStuckWorkQueueRowsReply]]: ...
+    ) -> _typing.Union[_database_pb2.ListStuckWorkQueueRowsReply, _abc.Awaitable[_database_pb2.ListStuckWorkQueueRowsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def ClearWorkQueueClaim(
         self,
-        request: database_pb2.ClearWorkQueueClaimRequest,
+        request: _database_pb2.ClearWorkQueueClaimRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteWorkQueueRow(
         self,
-        request: database_pb2.DeleteWorkQueueRowRequest,
+        request: _database_pb2.DeleteWorkQueueRowRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def ClaimCoalescibleSiblings(
         self,
-        request: database_pb2.ClaimCoalescibleSiblingsRequest,
+        request: _database_pb2.ClaimCoalescibleSiblingsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.ClaimCoalescibleSiblingsReply, collections.abc.Awaitable[database_pb2.ClaimCoalescibleSiblingsReply]]: ...
+    ) -> _typing.Union[_database_pb2.ClaimCoalescibleSiblingsReply, _abc.Awaitable[_database_pb2.ClaimCoalescibleSiblingsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def FindExistingCoalescibleOp(
         self,
-        request: database_pb2.FindExistingCoalescibleOpRequest,
+        request: _database_pb2.FindExistingCoalescibleOpRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.FindExistingCoalescibleOpReply, collections.abc.Awaitable[database_pb2.FindExistingCoalescibleOpReply]]: ...
+    ) -> _typing.Union[_database_pb2.FindExistingCoalescibleOpReply, _abc.Awaitable[_database_pb2.FindExistingCoalescibleOpReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def AcquireLock(
         self,
-        request: database_pb2.ClusterLockRequest,
+        request: _database_pb2.ClusterLockRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.ClusterLockReply, collections.abc.Awaitable[database_pb2.ClusterLockReply]]:
+    ) -> _typing.Union[_database_pb2.ClusterLockReply, _abc.Awaitable[_database_pb2.ClusterLockReply]]:
         """Lock Operations"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def ReleaseLock(
         self,
-        request: database_pb2.ClusterReleaseLockRequest,
+        request: _database_pb2.ClusterReleaseLockRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def RefreshLock(
         self,
-        request: database_pb2.ClusterRefreshLockRequest,
+        request: _database_pb2.ClusterRefreshLockRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetLockHolder(
         self,
-        request: database_pb2.ClusterGetLockHolderRequest,
+        request: _database_pb2.ClusterGetLockHolderRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.ClusterLockHolderReply, collections.abc.Awaitable[database_pb2.ClusterLockHolderReply]]: ...
+    ) -> _typing.Union[_database_pb2.ClusterLockHolderReply, _abc.Awaitable[_database_pb2.ClusterLockHolderReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def ClearStaleLocks(
         self,
-        request: database_pb2.ClusterClearStaleLocksRequest,
+        request: _database_pb2.ClusterClearStaleLocksRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetExistingLocks(
         self,
-        request: database_pb2.ClusterGetExistingLocksRequest,
+        request: _database_pb2.ClusterGetExistingLocksRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.ClusterGetExistingLocksReply, collections.abc.Awaitable[database_pb2.ClusterGetExistingLocksReply]]: ...
+    ) -> _typing.Union[_database_pb2.ClusterGetExistingLocksReply, _abc.Awaitable[_database_pb2.ClusterGetExistingLocksReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetClusterConfig(
         self,
-        request: database_pb2.ClusterConfigRequest,
+        request: _database_pb2.ClusterConfigRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.ClusterConfigReply, collections.abc.Awaitable[database_pb2.ClusterConfigReply]]:
+    ) -> _typing.Union[_database_pb2.ClusterConfigReply, _abc.Awaitable[_database_pb2.ClusterConfigReply]]:
         """Cluster Config"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def SetClusterConfig(
         self,
-        request: database_pb2.SetClusterConfigRequest,
+        request: _database_pb2.SetClusterConfigRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def RecordEventBatch(
         self,
-        request: database_pb2.RecordEventBatchRequest,
+        request: _database_pb2.RecordEventBatchRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Event Storage (MariaDB)
         Direct write path for batches of events; replaces the sf-eventlog
         gRPC target in phase 2.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def PruneEvents(
         self,
-        request: database_pb2.PruneEventsRequest,
+        request: _database_pb2.PruneEventsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.PruneEventsReply, collections.abc.Awaitable[database_pb2.PruneEventsReply]]: ...
+    ) -> _typing.Union[_database_pb2.PruneEventsReply, _abc.Awaitable[_database_pb2.PruneEventsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetObjectEvents(
         self,
-        request: database_pb2.GetObjectEventsRequest,
+        request: _database_pb2.GetObjectEventsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetObjectEventsReply, collections.abc.Awaitable[database_pb2.GetObjectEventsReply]]:
+    ) -> _typing.Union[_database_pb2.GetObjectEventsReply, _abc.Awaitable[_database_pb2.GetObjectEventsReply]]:
         """Per-object read and delete paths replacing the legacy sqlite
         EventLog backend in phase 4.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteObjectEvents(
         self,
-        request: database_pb2.DeleteObjectEventsRequest,
+        request: _database_pb2.DeleteObjectEventsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetObjectState(
         self,
-        request: database_pb2.GetObjectStateRequest,
+        request: _database_pb2.GetObjectStateRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetObjectStateReply, collections.abc.Awaitable[database_pb2.GetObjectStateReply]]:
+    ) -> _typing.Union[_database_pb2.GetObjectStateReply, _abc.Awaitable[_database_pb2.GetObjectStateReply]]:
         """Object State Operations (MariaDB)"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def SetObjectState(
         self,
-        request: database_pb2.SetObjectStateRequest,
+        request: _database_pb2.SetObjectStateRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteObjectState(
         self,
-        request: database_pb2.DeleteObjectStateRequest,
+        request: _database_pb2.DeleteObjectStateRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetObjectsByState(
         self,
-        request: database_pb2.GetObjectsByStateRequest,
+        request: _database_pb2.GetObjectsByStateRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetObjectsByStateReply, collections.abc.Awaitable[database_pb2.GetObjectsByStateReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetObjectsByStateReply, _abc.Awaitable[_database_pb2.GetObjectsByStateReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def ReserveAddress(
         self,
-        request: database_pb2.ReserveAddressRequest,
+        request: _database_pb2.ReserveAddressRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """IPAM Reservation Operations (MariaDB)"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def ReleaseAddress(
         self,
-        request: database_pb2.ReleaseAddressRequest,
+        request: _database_pb2.ReleaseAddressRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetReservation(
         self,
-        request: database_pb2.GetReservationRequest,
+        request: _database_pb2.GetReservationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetReservationReply, collections.abc.Awaitable[database_pb2.GetReservationReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetReservationReply, _abc.Awaitable[_database_pb2.GetReservationReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetReservationsForIPAM(
         self,
-        request: database_pb2.GetReservationsForIPAMRequest,
+        request: _database_pb2.GetReservationsForIPAMRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetReservationsForIPAMReply, collections.abc.Awaitable[database_pb2.GetReservationsForIPAMReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetReservationsForIPAMReply, _abc.Awaitable[_database_pb2.GetReservationsForIPAMReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteReservation(
         self,
-        request: database_pb2.DeleteReservationRequest,
+        request: _database_pb2.DeleteReservationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteReservationsForIPAM(
         self,
-        request: database_pb2.DeleteReservationsForIPAMRequest,
+        request: _database_pb2.DeleteReservationsForIPAMRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
+    ) -> _typing.Union[_database_pb2.DeleteCountReply, _abc.Awaitable[_database_pb2.DeleteCountReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def ReleaseHaloedAddresses(
         self,
-        request: database_pb2.ReleaseHaloedAddressesRequest,
+        request: _database_pb2.ReleaseHaloedAddressesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
+    ) -> _typing.Union[_database_pb2.DeleteCountReply, _abc.Awaitable[_database_pb2.DeleteCountReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAddressesInUse(
         self,
-        request: database_pb2.GetAddressesInUseRequest,
+        request: _database_pb2.GetAddressesInUseRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAddressesInUseReply, collections.abc.Awaitable[database_pb2.GetAddressesInUseReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAddressesInUseReply, _abc.Awaitable[_database_pb2.GetAddressesInUseReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateUpload(
         self,
-        request: database_pb2.CreateUploadRequest,
+        request: _database_pb2.CreateUploadRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Upload Operations (MariaDB)"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetUpload(
         self,
-        request: database_pb2.GetUploadRequest,
+        request: _database_pb2.GetUploadRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetUploadReply, collections.abc.Awaitable[database_pb2.GetUploadReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetUploadReply, _abc.Awaitable[_database_pb2.GetUploadReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetUploads(
         self,
-        request: database_pb2.GetUploadsRequest,
+        request: _database_pb2.GetUploadsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetUploadsReply, collections.abc.Awaitable[database_pb2.GetUploadsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetUploadsReply, _abc.Awaitable[_database_pb2.GetUploadsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteUpload(
         self,
-        request: database_pb2.DeleteUploadRequest,
+        request: _database_pb2.DeleteUploadRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateUpload(
         self,
-        request: database_pb2.UpdateUploadRequest,
+        request: _database_pb2.UpdateUploadRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateBlob(
         self,
-        request: database_pb2.CreateBlobRequest,
+        request: _database_pb2.CreateBlobRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Blob Operations (MariaDB)"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetBlob(
         self,
-        request: database_pb2.GetBlobRequest,
+        request: _database_pb2.GetBlobRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetBlobReply, collections.abc.Awaitable[database_pb2.GetBlobReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetBlobReply, _abc.Awaitable[_database_pb2.GetBlobReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllBlobUuids(
         self,
-        request: database_pb2.GetAllBlobUuidsRequest,
+        request: _database_pb2.GetAllBlobUuidsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllBlobUuidsReply, collections.abc.Awaitable[database_pb2.GetAllBlobUuidsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllBlobUuidsReply, _abc.Awaitable[_database_pb2.GetAllBlobUuidsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteBlob(
         self,
-        request: database_pb2.DeleteBlobRequest,
+        request: _database_pb2.DeleteBlobRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateBlob(
         self,
-        request: database_pb2.UpdateBlobRequest,
+        request: _database_pb2.UpdateBlobRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateDnsMasq(
         self,
-        request: database_pb2.CreateDnsMasqRequest,
+        request: _database_pb2.CreateDnsMasqRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """DnsMasq Operations (MariaDB)"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetDnsMasq(
         self,
-        request: database_pb2.GetDnsMasqRequest,
+        request: _database_pb2.GetDnsMasqRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetDnsMasqReply, collections.abc.Awaitable[database_pb2.GetDnsMasqReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetDnsMasqReply, _abc.Awaitable[_database_pb2.GetDnsMasqReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetDnsMasqs(
         self,
-        request: database_pb2.GetDnsMasqsRequest,
+        request: _database_pb2.GetDnsMasqsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetDnsMasqsReply, collections.abc.Awaitable[database_pb2.GetDnsMasqsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetDnsMasqsReply, _abc.Awaitable[_database_pb2.GetDnsMasqsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteDnsMasq(
         self,
-        request: database_pb2.DeleteDnsMasqRequest,
+        request: _database_pb2.DeleteDnsMasqRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateDnsMasq(
         self,
-        request: database_pb2.UpdateDnsMasqRequest,
+        request: _database_pb2.UpdateDnsMasqRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def RecordRelationship(
         self,
-        request: database_pb2.RecordRelationshipRequest,
+        request: _database_pb2.RecordRelationshipRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Object Reference Operations (MariaDB)"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def RemoveRelationship(
         self,
-        request: database_pb2.RemoveRelationshipRequest,
+        request: _database_pb2.RemoveRelationshipRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetReferencesTo(
         self,
-        request: database_pb2.GetReferencesToRequest,
+        request: _database_pb2.GetReferencesToRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetReferencesReply, collections.abc.Awaitable[database_pb2.GetReferencesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetReferencesReply, _abc.Awaitable[_database_pb2.GetReferencesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetReferencesFrom(
         self,
-        request: database_pb2.GetReferencesFromRequest,
+        request: _database_pb2.GetReferencesFromRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetReferencesReply, collections.abc.Awaitable[database_pb2.GetReferencesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetReferencesReply, _abc.Awaitable[_database_pb2.GetReferencesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CountReferencesTo(
         self,
-        request: database_pb2.CountReferencesToRequest,
+        request: _database_pb2.CountReferencesToRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.CountReply, collections.abc.Awaitable[database_pb2.CountReply]]: ...
+    ) -> _typing.Union[_database_pb2.CountReply, _abc.Awaitable[_database_pb2.CountReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def RemoveAllReferencesFrom(
         self,
-        request: database_pb2.RemoveAllReferencesFromRequest,
+        request: _database_pb2.RemoveAllReferencesFromRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.CountReply, collections.abc.Awaitable[database_pb2.CountReply]]: ...
+    ) -> _typing.Union[_database_pb2.CountReply, _abc.Awaitable[_database_pb2.CountReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateLastActive(
         self,
-        request: database_pb2.UpdateLastActiveRequest,
+        request: _database_pb2.UpdateLastActiveRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetStaleReferences(
         self,
-        request: database_pb2.GetStaleReferencesRequest,
+        request: _database_pb2.GetStaleReferencesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetReferencesReply, collections.abc.Awaitable[database_pb2.GetReferencesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetReferencesReply, _abc.Awaitable[_database_pb2.GetReferencesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpsertBlobHash(
         self,
-        request: database_pb2.UpsertBlobHashRequest,
+        request: _database_pb2.UpsertBlobHashRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Blob Hash Operations (MariaDB)"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetBlobHashes(
         self,
-        request: database_pb2.GetBlobHashesRequest,
+        request: _database_pb2.GetBlobHashesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetBlobHashesReply, collections.abc.Awaitable[database_pb2.GetBlobHashesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetBlobHashesReply, _abc.Awaitable[_database_pb2.GetBlobHashesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def FindBlobByHash(
         self,
-        request: database_pb2.FindBlobByHashRequest,
+        request: _database_pb2.FindBlobByHashRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.FindBlobByHashReply, collections.abc.Awaitable[database_pb2.FindBlobByHashReply]]: ...
+    ) -> _typing.Union[_database_pb2.FindBlobByHashReply, _abc.Awaitable[_database_pb2.FindBlobByHashReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetStaleBlobHashes(
         self,
-        request: database_pb2.GetStaleBlobHashesRequest,
+        request: _database_pb2.GetStaleBlobHashesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetBlobHashesReply, collections.abc.Awaitable[database_pb2.GetBlobHashesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetBlobHashesReply, _abc.Awaitable[_database_pb2.GetBlobHashesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteBlobHashes(
         self,
-        request: database_pb2.DeleteBlobHashesRequest,
+        request: _database_pb2.DeleteBlobHashesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateBlobTransfer(
         self,
-        request: database_pb2.CreateBlobTransferRequest,
+        request: _database_pb2.CreateBlobTransferRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Blob Transfer Operations (MariaDB)"""
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetBlobTransfer(
         self,
-        request: database_pb2.GetBlobTransferRequest,
+        request: _database_pb2.GetBlobTransferRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetBlobTransferReply, collections.abc.Awaitable[database_pb2.GetBlobTransferReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetBlobTransferReply, _abc.Awaitable[_database_pb2.GetBlobTransferReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetBlobTransfersForNode(
         self,
-        request: database_pb2.GetBlobTransfersForNodeRequest,
+        request: _database_pb2.GetBlobTransfersForNodeRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetBlobTransfersReply, collections.abc.Awaitable[database_pb2.GetBlobTransfersReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetBlobTransfersReply, _abc.Awaitable[_database_pb2.GetBlobTransfersReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetBlobTransfersForBlob(
         self,
-        request: database_pb2.GetBlobTransfersForBlobRequest,
+        request: _database_pb2.GetBlobTransfersForBlobRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetBlobTransfersReply, collections.abc.Awaitable[database_pb2.GetBlobTransfersReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetBlobTransfersReply, _abc.Awaitable[_database_pb2.GetBlobTransfersReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateBlobTransfer(
         self,
-        request: database_pb2.UpdateBlobTransferRequest,
+        request: _database_pb2.UpdateBlobTransferRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteBlobTransfer(
         self,
-        request: database_pb2.DeleteBlobTransferRequest,
+        request: _database_pb2.DeleteBlobTransferRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteBlobTransfersForBlob(
         self,
-        request: database_pb2.DeleteBlobTransfersForBlobRequest,
+        request: _database_pb2.DeleteBlobTransfersForBlobRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
+    ) -> _typing.Union[_database_pb2.DeleteCountReply, _abc.Awaitable[_database_pb2.DeleteCountReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteStaleTransfers(
         self,
-        request: database_pb2.DeleteStaleTransfersRequest,
+        request: _database_pb2.DeleteStaleTransfersRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
+    ) -> _typing.Union[_database_pb2.DeleteCountReply, _abc.Awaitable[_database_pb2.DeleteCountReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateBlobAttributes(
         self,
-        request: database_pb2.CreateBlobAttributesRequest,
+        request: _database_pb2.CreateBlobAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Blob Attributes Operations (MariaDB)
         These store mutable blob attributes, separate from BlobData (static values).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetBlobAttributes(
         self,
-        request: database_pb2.GetBlobAttributesRequest,
+        request: _database_pb2.GetBlobAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetBlobAttributesReply, collections.abc.Awaitable[database_pb2.GetBlobAttributesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetBlobAttributesReply, _abc.Awaitable[_database_pb2.GetBlobAttributesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateBlobAttributes(
         self,
-        request: database_pb2.UpdateBlobAttributesRequest,
+        request: _database_pb2.UpdateBlobAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateBlobLastUsed(
         self,
-        request: database_pb2.UpdateBlobLastUsedRequest,
+        request: _database_pb2.UpdateBlobLastUsedRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteBlobAttributes(
         self,
-        request: database_pb2.DeleteBlobAttributesRequest,
+        request: _database_pb2.DeleteBlobAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetExpiredBlobUuids(
         self,
-        request: database_pb2.GetExpiredBlobUuidsRequest,
+        request: _database_pb2.GetExpiredBlobUuidsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetExpiredBlobUuidsReply, collections.abc.Awaitable[database_pb2.GetExpiredBlobUuidsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetExpiredBlobUuidsReply, _abc.Awaitable[_database_pb2.GetExpiredBlobUuidsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetStaleTranscodedBlobUuids(
         self,
-        request: database_pb2.GetStaleTranscodedBlobUuidsRequest,
+        request: _database_pb2.GetStaleTranscodedBlobUuidsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetStaleTranscodedBlobUuidsReply, collections.abc.Awaitable[database_pb2.GetStaleTranscodedBlobUuidsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetStaleTranscodedBlobUuidsReply, _abc.Awaitable[_database_pb2.GetStaleTranscodedBlobUuidsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateNode(
         self,
-        request: database_pb2.CreateNodeRequest,
+        request: _database_pb2.CreateNodeRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Node Operations (MariaDB)
         These manage node static values (uuid, fqdn, ip) in MariaDB.
         Nodes now use real UUID4 identifiers; FQDN is a separate indexed column.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNode(
         self,
-        request: database_pb2.GetNodeRequest,
+        request: _database_pb2.GetNodeRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNodeReply, collections.abc.Awaitable[database_pb2.GetNodeReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNodeReply, _abc.Awaitable[_database_pb2.GetNodeReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNodeByFqdn(
         self,
-        request: database_pb2.GetNodeByFqdnRequest,
+        request: _database_pb2.GetNodeByFqdnRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNodeReply, collections.abc.Awaitable[database_pb2.GetNodeReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNodeReply, _abc.Awaitable[_database_pb2.GetNodeReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllNodeUuids(
         self,
-        request: database_pb2.GetAllNodeUuidsRequest,
+        request: _database_pb2.GetAllNodeUuidsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllNodeUuidsReply, collections.abc.Awaitable[database_pb2.GetAllNodeUuidsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllNodeUuidsReply, _abc.Awaitable[_database_pb2.GetAllNodeUuidsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNode(
         self,
-        request: database_pb2.DeleteNodeRequest,
+        request: _database_pb2.DeleteNodeRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateNode(
         self,
-        request: database_pb2.UpdateNodeRequest,
+        request: _database_pb2.UpdateNodeRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateNodeAttributes(
         self,
-        request: database_pb2.CreateNodeAttributesRequest,
+        request: _database_pb2.CreateNodeAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Node Attributes Operations (MariaDB)
         These store mutable node attributes, separate from NodeData (static values).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNodeAttributes(
         self,
-        request: database_pb2.GetNodeAttributesRequest,
+        request: _database_pb2.GetNodeAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNodeAttributesReply, collections.abc.Awaitable[database_pb2.GetNodeAttributesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNodeAttributesReply, _abc.Awaitable[_database_pb2.GetNodeAttributesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateNodeAttributes(
         self,
-        request: database_pb2.UpdateNodeAttributesRequest,
+        request: _database_pb2.UpdateNodeAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNodeAttributes(
         self,
-        request: database_pb2.DeleteNodeAttributesRequest,
+        request: _database_pb2.DeleteNodeAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def SetNodeDaemonState(
         self,
-        request: database_pb2.SetNodeDaemonStateRequest,
+        request: _database_pb2.SetNodeDaemonStateRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Node Daemon State Operations (MariaDB)
         Per-(node, daemon) state rows. Replaces the daemon_states JSON dict
         that previously lived inside node_attributes; that dict required a
@@ -2719,744 +1271,744 @@ class DatabaseServiceServicer(metaclass=abc.ABCMeta):
         daemon's startup/shutdown through a single 10s lock.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNodeDaemonState(
         self,
-        request: database_pb2.GetNodeDaemonStateRequest,
+        request: _database_pb2.GetNodeDaemonStateRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNodeDaemonStateReply, collections.abc.Awaitable[database_pb2.GetNodeDaemonStateReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNodeDaemonStateReply, _abc.Awaitable[_database_pb2.GetNodeDaemonStateReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllNodeDaemonStates(
         self,
-        request: database_pb2.GetAllNodeDaemonStatesRequest,
+        request: _database_pb2.GetAllNodeDaemonStatesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllNodeDaemonStatesReply, collections.abc.Awaitable[database_pb2.GetAllNodeDaemonStatesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllNodeDaemonStatesReply, _abc.Awaitable[_database_pb2.GetAllNodeDaemonStatesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNodeDaemonState(
         self,
-        request: database_pb2.DeleteNodeDaemonStateRequest,
+        request: _database_pb2.DeleteNodeDaemonStateRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateNamespace(
         self,
-        request: database_pb2.CreateNamespaceRequest,
+        request: _database_pb2.CreateNamespaceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Namespace Operations (MariaDB)
         These manage namespace static values (name, version) in MariaDB.
         Namespaces use their name as primary key (not a UUID).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNamespace(
         self,
-        request: database_pb2.GetNamespaceRequest,
+        request: _database_pb2.GetNamespaceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNamespaceReply, collections.abc.Awaitable[database_pb2.GetNamespaceReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNamespaceReply, _abc.Awaitable[_database_pb2.GetNamespaceReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllNamespaceNames(
         self,
-        request: database_pb2.GetAllNamespaceNamesRequest,
+        request: _database_pb2.GetAllNamespaceNamesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllNamespaceNamesReply, collections.abc.Awaitable[database_pb2.GetAllNamespaceNamesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllNamespaceNamesReply, _abc.Awaitable[_database_pb2.GetAllNamespaceNamesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNamespace(
         self,
-        request: database_pb2.DeleteNamespaceRequest,
+        request: _database_pb2.DeleteNamespaceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateNamespaceAttributes(
         self,
-        request: database_pb2.CreateNamespaceAttributesRequest,
+        request: _database_pb2.CreateNamespaceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Namespace Attributes Operations (MariaDB)
         These store mutable namespace attributes (keys, trust).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNamespaceAttributes(
         self,
-        request: database_pb2.GetNamespaceAttributesRequest,
+        request: _database_pb2.GetNamespaceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNamespaceAttributesReply, collections.abc.Awaitable[database_pb2.GetNamespaceAttributesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNamespaceAttributesReply, _abc.Awaitable[_database_pb2.GetNamespaceAttributesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateNamespaceAttributes(
         self,
-        request: database_pb2.UpdateNamespaceAttributesRequest,
+        request: _database_pb2.UpdateNamespaceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNamespaceAttributes(
         self,
-        request: database_pb2.DeleteNamespaceAttributesRequest,
+        request: _database_pb2.DeleteNamespaceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateArtifact(
         self,
-        request: database_pb2.CreateArtifactRequest,
+        request: _database_pb2.CreateArtifactRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Artifact Operations (MariaDB)
         These manage artifact static values (uuid, type, source_url, name, namespace)
         in MariaDB. Artifacts represent versioned disk images.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetArtifact(
         self,
-        request: database_pb2.GetArtifactRequest,
+        request: _database_pb2.GetArtifactRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetArtifactReply, collections.abc.Awaitable[database_pb2.GetArtifactReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetArtifactReply, _abc.Awaitable[_database_pb2.GetArtifactReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllArtifacts(
         self,
-        request: database_pb2.GetAllArtifactsRequest,
+        request: _database_pb2.GetAllArtifactsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllArtifactsReply, collections.abc.Awaitable[database_pb2.GetAllArtifactsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllArtifactsReply, _abc.Awaitable[_database_pb2.GetAllArtifactsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def FindArtifacts(
         self,
-        request: database_pb2.FindArtifactsRequest,
+        request: _database_pb2.FindArtifactsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.FindArtifactsReply, collections.abc.Awaitable[database_pb2.FindArtifactsReply]]: ...
+    ) -> _typing.Union[_database_pb2.FindArtifactsReply, _abc.Awaitable[_database_pb2.FindArtifactsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateArtifact(
         self,
-        request: database_pb2.UpdateArtifactRequest,
+        request: _database_pb2.UpdateArtifactRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteArtifact(
         self,
-        request: database_pb2.DeleteArtifactRequest,
+        request: _database_pb2.DeleteArtifactRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateArtifactAttributes(
         self,
-        request: database_pb2.CreateArtifactAttributesRequest,
+        request: _database_pb2.CreateArtifactAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Artifact Attributes Operations (MariaDB)
         These store mutable artifact attributes (max_versions, shared, highest_index).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetArtifactAttributes(
         self,
-        request: database_pb2.GetArtifactAttributesRequest,
+        request: _database_pb2.GetArtifactAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetArtifactAttributesReply, collections.abc.Awaitable[database_pb2.GetArtifactAttributesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetArtifactAttributesReply, _abc.Awaitable[_database_pb2.GetArtifactAttributesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateArtifactAttributes(
         self,
-        request: database_pb2.UpdateArtifactAttributesRequest,
+        request: _database_pb2.UpdateArtifactAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteArtifactAttributes(
         self,
-        request: database_pb2.DeleteArtifactAttributesRequest,
+        request: _database_pb2.DeleteArtifactAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateArtifactIndex(
         self,
-        request: database_pb2.CreateArtifactIndexRequest,
+        request: _database_pb2.CreateArtifactIndexRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Artifact Index Operations (MariaDB)
         These manage artifact version indexes, mapping index numbers to blob UUIDs.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetArtifactIndex(
         self,
-        request: database_pb2.GetArtifactIndexRequest,
+        request: _database_pb2.GetArtifactIndexRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetArtifactIndexReply, collections.abc.Awaitable[database_pb2.GetArtifactIndexReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetArtifactIndexReply, _abc.Awaitable[_database_pb2.GetArtifactIndexReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllArtifactIndexes(
         self,
-        request: database_pb2.GetAllArtifactIndexesRequest,
+        request: _database_pb2.GetAllArtifactIndexesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllArtifactIndexesReply, collections.abc.Awaitable[database_pb2.GetAllArtifactIndexesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllArtifactIndexesReply, _abc.Awaitable[_database_pb2.GetAllArtifactIndexesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteArtifactIndex(
         self,
-        request: database_pb2.DeleteArtifactIndexRequest,
+        request: _database_pb2.DeleteArtifactIndexRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteAllArtifactIndexes(
         self,
-        request: database_pb2.DeleteAllArtifactIndexesRequest,
+        request: _database_pb2.DeleteAllArtifactIndexesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
+    ) -> _typing.Union[_database_pb2.DeleteCountReply, _abc.Awaitable[_database_pb2.DeleteCountReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateNetworkInterface(
         self,
-        request: database_pb2.CreateNetworkInterfaceRequest,
+        request: _database_pb2.CreateNetworkInterfaceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """NetworkInterface Operations (MariaDB)
         These manage NetworkInterface static values in MariaDB.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNetworkInterface(
         self,
-        request: database_pb2.GetNetworkInterfaceRequest,
+        request: _database_pb2.GetNetworkInterfaceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNetworkInterfaceReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfaceReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNetworkInterfaceReply, _abc.Awaitable[_database_pb2.GetNetworkInterfaceReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNetworkInterfacesByInstance(
         self,
-        request: database_pb2.GetNetworkInterfacesByInstanceRequest,
+        request: _database_pb2.GetNetworkInterfacesByInstanceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfacesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNetworkInterfacesReply, _abc.Awaitable[_database_pb2.GetNetworkInterfacesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNetworkInterfacesByNetwork(
         self,
-        request: database_pb2.GetNetworkInterfacesByNetworkRequest,
+        request: _database_pb2.GetNetworkInterfacesByNetworkRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfacesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNetworkInterfacesReply, _abc.Awaitable[_database_pb2.GetNetworkInterfacesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllNetworkInterfaces(
         self,
-        request: database_pb2.GetAllNetworkInterfacesRequest,
+        request: _database_pb2.GetAllNetworkInterfacesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfacesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNetworkInterfacesReply, _abc.Awaitable[_database_pb2.GetNetworkInterfacesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def FindNetworkInterfaces(
         self,
-        request: database_pb2.FindNetworkInterfacesRequest,
+        request: _database_pb2.FindNetworkInterfacesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.FindNetworkInterfacesReply, collections.abc.Awaitable[database_pb2.FindNetworkInterfacesReply]]: ...
+    ) -> _typing.Union[_database_pb2.FindNetworkInterfacesReply, _abc.Awaitable[_database_pb2.FindNetworkInterfacesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNetworkInterface(
         self,
-        request: database_pb2.DeleteNetworkInterfaceRequest,
+        request: _database_pb2.DeleteNetworkInterfaceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateNetworkInterface(
         self,
-        request: database_pb2.UpdateNetworkInterfaceRequest,
+        request: _database_pb2.UpdateNetworkInterfaceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateNetworkInterfaceAttributes(
         self,
-        request: database_pb2.CreateNetworkInterfaceAttributesRequest,
+        request: _database_pb2.CreateNetworkInterfaceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """NetworkInterface Attributes Operations (MariaDB)
         These store mutable NetworkInterface attributes (floating address).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNetworkInterfaceAttributes(
         self,
-        request: database_pb2.GetNetworkInterfaceAttributesRequest,
+        request: _database_pb2.GetNetworkInterfaceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNetworkInterfaceAttributesReply, collections.abc.Awaitable[database_pb2.GetNetworkInterfaceAttributesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNetworkInterfaceAttributesReply, _abc.Awaitable[_database_pb2.GetNetworkInterfaceAttributesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateNetworkInterfaceAttributes(
         self,
-        request: database_pb2.UpdateNetworkInterfaceAttributesRequest,
+        request: _database_pb2.UpdateNetworkInterfaceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNetworkInterfaceAttributes(
         self,
-        request: database_pb2.DeleteNetworkInterfaceAttributesRequest,
+        request: _database_pb2.DeleteNetworkInterfaceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateIPAM(
         self,
-        request: database_pb2.CreateIPAMRequest,
+        request: _database_pb2.CreateIPAMRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """IPAM Operations (MariaDB)
         These manage IPAM static values (uuid, namespace, network_uuid, ipblock)
         in MariaDB. IPAMs track IP address allocation within a network.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetIPAM(
         self,
-        request: database_pb2.GetIPAMRequest,
+        request: _database_pb2.GetIPAMRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetIPAMReply, collections.abc.Awaitable[database_pb2.GetIPAMReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetIPAMReply, _abc.Awaitable[_database_pb2.GetIPAMReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteIPAM(
         self,
-        request: database_pb2.DeleteIPAMRequest,
+        request: _database_pb2.DeleteIPAMRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateIPAM(
         self,
-        request: database_pb2.UpdateIPAMRequest,
+        request: _database_pb2.UpdateIPAMRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateNetwork(
         self,
-        request: database_pb2.CreateNetworkRequest,
+        request: _database_pb2.CreateNetworkRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Network Operations (MariaDB)
         These manage Network static values in MariaDB. Networks are virtual L2
         networks with optional DHCP, NAT, and DNS services connected via VXLAN.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNetwork(
         self,
-        request: database_pb2.GetNetworkRequest,
+        request: _database_pb2.GetNetworkRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNetworkReply, collections.abc.Awaitable[database_pb2.GetNetworkReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNetworkReply, _abc.Awaitable[_database_pb2.GetNetworkReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllNetworks(
         self,
-        request: database_pb2.GetAllNetworksRequest,
+        request: _database_pb2.GetAllNetworksRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllNetworksReply, collections.abc.Awaitable[database_pb2.GetAllNetworksReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllNetworksReply, _abc.Awaitable[_database_pb2.GetAllNetworksReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def FindNetworks(
         self,
-        request: database_pb2.FindNetworksRequest,
+        request: _database_pb2.FindNetworksRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.FindNetworksReply, collections.abc.Awaitable[database_pb2.FindNetworksReply]]: ...
+    ) -> _typing.Union[_database_pb2.FindNetworksReply, _abc.Awaitable[_database_pb2.FindNetworksReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNetwork(
         self,
-        request: database_pb2.DeleteNetworkRequest,
+        request: _database_pb2.DeleteNetworkRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateNetworkAttributes(
         self,
-        request: database_pb2.CreateNetworkAttributesRequest,
+        request: _database_pb2.CreateNetworkAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Network Attributes Operations (MariaDB)
         These store mutable Network attributes (floating gateway, NI list, DNS).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNetworkAttributes(
         self,
-        request: database_pb2.GetNetworkAttributesRequest,
+        request: _database_pb2.GetNetworkAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNetworkAttributesReply, collections.abc.Awaitable[database_pb2.GetNetworkAttributesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNetworkAttributesReply, _abc.Awaitable[_database_pb2.GetNetworkAttributesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateNetworkAttributes(
         self,
-        request: database_pb2.UpdateNetworkAttributesRequest,
+        request: _database_pb2.UpdateNetworkAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNetworkAttributes(
         self,
-        request: database_pb2.DeleteNetworkAttributesRequest,
+        request: _database_pb2.DeleteNetworkAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateAgentOperation(
         self,
-        request: database_pb2.CreateAgentOperationRequest,
+        request: _database_pb2.CreateAgentOperationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """AgentOperation Operations (MariaDB)
         These manage AgentOperation static values in MariaDB. AgentOperations
         represent in-guest agent tasks (execute, get-file, put-blob, chmod).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAgentOperation(
         self,
-        request: database_pb2.GetAgentOperationRequest,
+        request: _database_pb2.GetAgentOperationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAgentOperationReply, collections.abc.Awaitable[database_pb2.GetAgentOperationReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAgentOperationReply, _abc.Awaitable[_database_pb2.GetAgentOperationReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteAgentOperation(
         self,
-        request: database_pb2.DeleteAgentOperationRequest,
+        request: _database_pb2.DeleteAgentOperationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateAgentOperationAttributes(
         self,
-        request: database_pb2.CreateAgentOperationAttributesRequest,
+        request: _database_pb2.CreateAgentOperationAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """AgentOperation Attributes Operations (MariaDB)
         These store mutable AgentOperation attributes (results).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAgentOperationAttributes(
         self,
-        request: database_pb2.GetAgentOperationAttributesRequest,
+        request: _database_pb2.GetAgentOperationAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAgentOperationAttributesReply, collections.abc.Awaitable[database_pb2.GetAgentOperationAttributesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAgentOperationAttributesReply, _abc.Awaitable[_database_pb2.GetAgentOperationAttributesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateAgentOperationAttributes(
         self,
-        request: database_pb2.UpdateAgentOperationAttributesRequest,
+        request: _database_pb2.UpdateAgentOperationAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteAgentOperationAttributes(
         self,
-        request: database_pb2.DeleteAgentOperationAttributesRequest,
+        request: _database_pb2.DeleteAgentOperationAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateInstance(
         self,
-        request: database_pb2.CreateInstanceRequest,
+        request: _database_pb2.CreateInstanceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Instance Operations (MariaDB)
         These manage Instance static values in MariaDB. Instances represent
         virtual machines with CPU, memory, disk, and network configuration.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetInstance(
         self,
-        request: database_pb2.GetInstanceRequest,
+        request: _database_pb2.GetInstanceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetInstanceReply, collections.abc.Awaitable[database_pb2.GetInstanceReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetInstanceReply, _abc.Awaitable[_database_pb2.GetInstanceReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllInstances(
         self,
-        request: database_pb2.GetAllInstancesRequest,
+        request: _database_pb2.GetAllInstancesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllInstancesReply, collections.abc.Awaitable[database_pb2.GetAllInstancesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllInstancesReply, _abc.Awaitable[_database_pb2.GetAllInstancesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def FindInstances(
         self,
-        request: database_pb2.FindInstancesRequest,
+        request: _database_pb2.FindInstancesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.FindInstancesReply, collections.abc.Awaitable[database_pb2.FindInstancesReply]]: ...
+    ) -> _typing.Union[_database_pb2.FindInstancesReply, _abc.Awaitable[_database_pb2.FindInstancesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllInstanceUuids(
         self,
-        request: database_pb2.GetAllInstanceUuidsRequest,
+        request: _database_pb2.GetAllInstanceUuidsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllInstanceUuidsReply, collections.abc.Awaitable[database_pb2.GetAllInstanceUuidsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllInstanceUuidsReply, _abc.Awaitable[_database_pb2.GetAllInstanceUuidsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteInstance(
         self,
-        request: database_pb2.DeleteInstanceRequest,
+        request: _database_pb2.DeleteInstanceRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateInstanceAttributes(
         self,
-        request: database_pb2.CreateInstanceAttributesRequest,
+        request: _database_pb2.CreateInstanceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Instance Attributes Operations (MariaDB)
         These store mutable Instance attributes (placement, power state, ports,
         block devices, interfaces, agent state, etc.).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetInstanceAttributes(
         self,
-        request: database_pb2.GetInstanceAttributesRequest,
+        request: _database_pb2.GetInstanceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetInstanceAttributesReply, collections.abc.Awaitable[database_pb2.GetInstanceAttributesReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetInstanceAttributesReply, _abc.Awaitable[_database_pb2.GetInstanceAttributesReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpdateInstanceAttributes(
         self,
-        request: database_pb2.UpdateInstanceAttributesRequest,
+        request: _database_pb2.UpdateInstanceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteInstanceAttributes(
         self,
-        request: database_pb2.DeleteInstanceAttributesRequest,
+        request: _database_pb2.DeleteInstanceAttributesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetConsumedPortsForNode(
         self,
-        request: database_pb2.GetConsumedPortsForNodeRequest,
+        request: _database_pb2.GetConsumedPortsForNodeRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetConsumedPortsForNodeReply, collections.abc.Awaitable[database_pb2.GetConsumedPortsForNodeReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetConsumedPortsForNodeReply, _abc.Awaitable[_database_pb2.GetConsumedPortsForNodeReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def IsVsockCidInUse(
         self,
-        request: database_pb2.IsVsockCidInUseRequest,
+        request: _database_pb2.IsVsockCidInUseRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.IsVsockCidInUseReply, collections.abc.Awaitable[database_pb2.IsVsockCidInUseReply]]: ...
+    ) -> _typing.Union[_database_pb2.IsVsockCidInUseReply, _abc.Awaitable[_database_pb2.IsVsockCidInUseReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetObjectMetadata(
         self,
-        request: database_pb2.GetObjectMetadataRequest,
+        request: _database_pb2.GetObjectMetadataRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetObjectMetadataReply, collections.abc.Awaitable[database_pb2.GetObjectMetadataReply]]:
+    ) -> _typing.Union[_database_pb2.GetObjectMetadataReply, _abc.Awaitable[_database_pb2.GetObjectMetadataReply]]:
         """Object Metadata Operations (MariaDB)
         These store user-defined metadata for all object types in a single shared
         table (like object_states).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def SetMetadata(
         self,
-        request: database_pb2.SetMetadataRequest,
+        request: _database_pb2.SetMetadataRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteObjectMetadata(
         self,
-        request: database_pb2.DeleteObjectMetadataRequest,
+        request: _database_pb2.DeleteObjectMetadataRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateClusterOperationTarget(
         self,
-        request: database_pb2.CreateClusterOperationTargetRequest,
+        request: _database_pb2.CreateClusterOperationTargetRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Cluster Operation Target Operations (MariaDB)
         Track which operations target which objects, with sequence ordering.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetClusterOperationTarget(
         self,
-        request: database_pb2.GetClusterOperationTargetRequest,
+        request: _database_pb2.GetClusterOperationTargetRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetClusterOperationTargetReply, collections.abc.Awaitable[database_pb2.GetClusterOperationTargetReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetClusterOperationTargetReply, _abc.Awaitable[_database_pb2.GetClusterOperationTargetReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetClusterOperationTargetsForObject(
         self,
-        request: database_pb2.GetClusterOperationTargetsForObjectRequest,
+        request: _database_pb2.GetClusterOperationTargetsForObjectRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetClusterOperationTargetsForObjectReply, collections.abc.Awaitable[database_pb2.GetClusterOperationTargetsForObjectReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetClusterOperationTargetsForObjectReply, _abc.Awaitable[_database_pb2.GetClusterOperationTargetsForObjectReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetLatestClusterOperationTarget(
         self,
-        request: database_pb2.GetLatestClusterOperationTargetRequest,
+        request: _database_pb2.GetLatestClusterOperationTargetRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetClusterOperationTargetReply, collections.abc.Awaitable[database_pb2.GetClusterOperationTargetReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetClusterOperationTargetReply, _abc.Awaitable[_database_pb2.GetClusterOperationTargetReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def HasPendingClusterOperationTarget(
         self,
-        request: database_pb2.HasPendingClusterOperationTargetRequest,
+        request: _database_pb2.HasPendingClusterOperationTargetRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.HasPendingClusterOperationTargetReply, collections.abc.Awaitable[database_pb2.HasPendingClusterOperationTargetReply]]: ...
+    ) -> _typing.Union[_database_pb2.HasPendingClusterOperationTargetReply, _abc.Awaitable[_database_pb2.HasPendingClusterOperationTargetReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetRecentTerminalOpStatesForTarget(
         self,
-        request: database_pb2.GetRecentTerminalOpStatesForTargetRequest,
+        request: _database_pb2.GetRecentTerminalOpStatesForTargetRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetRecentTerminalOpStatesForTargetReply, collections.abc.Awaitable[database_pb2.GetRecentTerminalOpStatesForTargetReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetRecentTerminalOpStatesForTargetReply, _abc.Awaitable[_database_pb2.GetRecentTerminalOpStatesForTargetReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteClusterOperationTarget(
         self,
-        request: database_pb2.DeleteClusterOperationTargetRequest,
+        request: _database_pb2.DeleteClusterOperationTargetRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteClusterOperationTargetsForObject(
         self,
-        request: database_pb2.DeleteClusterOperationTargetsForObjectRequest,
+        request: _database_pb2.DeleteClusterOperationTargetsForObjectRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteStaleClusterOperationTargets(
         self,
-        request: database_pb2.DeleteStaleClusterOperationTargetsRequest,
+        request: _database_pb2.DeleteStaleClusterOperationTargetsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.DeleteCountReply, collections.abc.Awaitable[database_pb2.DeleteCountReply]]: ...
+    ) -> _typing.Union[_database_pb2.DeleteCountReply, _abc.Awaitable[_database_pb2.DeleteCountReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def UpsertNodeMetrics(
         self,
-        request: database_pb2.UpsertNodeMetricsRequest,
+        request: _database_pb2.UpsertNodeMetricsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Node Metrics Operations (MariaDB)
         Ephemeral per-node resource metrics, upserted every 60s by the resources
         daemon. The metrics payload is a JSON string (~50+ fields, schemaless).
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetNodeMetrics(
         self,
-        request: database_pb2.GetNodeMetricsRequest,
+        request: _database_pb2.GetNodeMetricsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetNodeMetricsReply, collections.abc.Awaitable[database_pb2.GetNodeMetricsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetNodeMetricsReply, _abc.Awaitable[_database_pb2.GetNodeMetricsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetAllNodeMetrics(
         self,
-        request: database_pb2.GetAllNodeMetricsRequest,
+        request: _database_pb2.GetAllNodeMetricsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetAllNodeMetricsReply, collections.abc.Awaitable[database_pb2.GetAllNodeMetricsReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetAllNodeMetricsReply, _abc.Awaitable[_database_pb2.GetAllNodeMetricsReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteNodeMetrics(
         self,
-        request: database_pb2.DeleteNodeMetricsRequest,
+        request: _database_pb2.DeleteNodeMetricsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateClusterOperation(
         self,
-        request: database_pb2.CreateClusterOperationRequest,
+        request: _database_pb2.CreateClusterOperationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Cluster Operations (MariaDB)
         Operation headers, keyed by operation uuid. State lives separately in
         object_states; per-target tracking lives in cluster_operation_targets.
         Insert-only: rows are never mutated after creation.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetClusterOperation(
         self,
-        request: database_pb2.GetClusterOperationRequest,
+        request: _database_pb2.GetClusterOperationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetClusterOperationReply, collections.abc.Awaitable[database_pb2.GetClusterOperationReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetClusterOperationReply, _abc.Awaitable[_database_pb2.GetClusterOperationReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetClusterOperationsByNode(
         self,
-        request: database_pb2.GetClusterOperationsByNodeRequest,
+        request: _database_pb2.GetClusterOperationsByNodeRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetClusterOperationsByNodeReply, collections.abc.Awaitable[database_pb2.GetClusterOperationsByNodeReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetClusterOperationsByNodeReply, _abc.Awaitable[_database_pb2.GetClusterOperationsByNodeReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def ListClusterOperationsForTarget(
         self,
-        request: database_pb2.ListClusterOperationsForTargetRequest,
+        request: _database_pb2.ListClusterOperationsForTargetRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.ListClusterOperationsForTargetReply, collections.abc.Awaitable[database_pb2.ListClusterOperationsForTargetReply]]: ...
+    ) -> _typing.Union[_database_pb2.ListClusterOperationsForTargetReply, _abc.Awaitable[_database_pb2.ListClusterOperationsForTargetReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteClusterOperation(
         self,
-        request: database_pb2.DeleteClusterOperationRequest,
+        request: _database_pb2.DeleteClusterOperationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def CreateAndEnqueueClusterOperation(
         self,
-        request: database_pb2.CreateAndEnqueueClusterOperationRequest,
+        request: _database_pb2.CreateAndEnqueueClusterOperationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Atomic create + enqueue for cluster operations (MariaDB).
         Writes cluster_operations, object_states and work_queue in a single
         transaction. Audit events are emitted separately by the caller via
         the eventlog service after this RPC succeeds.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def SetClusterOperationError(
         self,
-        request: database_pb2.SetClusterOperationErrorRequest,
+        request: _database_pb2.SetClusterOperationErrorRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]:
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Cluster Operation Errors (MariaDB)
         Persists the structured ErrorReport when an _apply_* method raises
         inside the dispatcher. Upsert semantics: a retry that fails again
         overwrites the prior report.
         """
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def GetClusterOperationError(
         self,
-        request: database_pb2.GetClusterOperationErrorRequest,
+        request: _database_pb2.GetClusterOperationErrorRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.GetClusterOperationErrorReply, collections.abc.Awaitable[database_pb2.GetClusterOperationErrorReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetClusterOperationErrorReply, _abc.Awaitable[_database_pb2.GetClusterOperationErrorReply]]: ...
 
-    @abc.abstractmethod
+    @_abc_1.abstractmethod
     def DeleteClusterOperationError(
         self,
-        request: database_pb2.DeleteClusterOperationErrorRequest,
+        request: _database_pb2.DeleteClusterOperationErrorRequest,
         context: _ServicerContext,
-    ) -> typing.Union[database_pb2.StatusReply, collections.abc.Awaitable[database_pb2.StatusReply]]: ...
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
-def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...
+def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...

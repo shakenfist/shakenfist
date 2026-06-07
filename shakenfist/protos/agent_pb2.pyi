@@ -3,602 +3,710 @@
 isort:skip_file
 """
 
-import builtins
-import collections.abc
-from shakenfist.protos import common_pb2
-import google.protobuf.descriptor
-import google.protobuf.internal.containers
-import google.protobuf.internal.enum_type_wrapper
-import google.protobuf.message
+from collections import abc as _abc
+from google.protobuf import descriptor as _descriptor
+from google.protobuf import message as _message
+from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
+import builtins as _builtins
+from shakenfist.protos import common_pb2 as _common_pb2
 import sys
-import typing
+import typing as _typing
 
-if sys.version_info >= (3, 10):
-    import typing as typing_extensions
+if sys.version_info >= (3, 11):
+    from typing import TypeAlias as _TypeAlias, Never as _Never
 else:
-    import typing_extensions
+    from typing_extensions import TypeAlias as _TypeAlias, Never as _Never
 
-DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
+DESCRIPTOR: _descriptor.FileDescriptor
 
-@typing.final
-class HypervisorWelcome(google.protobuf.message.Message):
+@_typing.final
+class HypervisorWelcome(_message.Message):
     """Agent state information sent to clients"""
 
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    DESCRIPTOR: _descriptor.Descriptor
 
-    VERSION_FIELD_NUMBER: builtins.int
-    version: builtins.str
+    VERSION_FIELD_NUMBER: _builtins.int
+    version: _builtins.str
     def __init__(
         self,
         *,
-        version: builtins.str = ...,
+        version: _builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["version", b"version"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["version", b"version"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___HypervisorWelcome = HypervisorWelcome
+Global___HypervisorWelcome: _TypeAlias = HypervisorWelcome  # noqa: Y015
 
-@typing.final
-class AgentWelcome(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class AgentWelcome(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    VERSION_FIELD_NUMBER: builtins.int
-    BOOT_TIME_FIELD_NUMBER: builtins.int
-    version: builtins.str
-    boot_time: builtins.float
+    VERSION_FIELD_NUMBER: _builtins.int
+    BOOT_TIME_FIELD_NUMBER: _builtins.int
+    version: _builtins.str
+    boot_time: _builtins.float
     def __init__(
         self,
         *,
-        version: builtins.str = ...,
-        boot_time: builtins.float = ...,
+        version: _builtins.str = ...,
+        boot_time: _builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["boot_time", b"boot_time", "version", b"version"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["boot_time", b"boot_time", "version", b"version"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___AgentWelcome = AgentWelcome
+Global___AgentWelcome: _TypeAlias = AgentWelcome  # noqa: Y015
 
-@typing.final
-class HypervisorDeparture(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class HypervisorDeparture(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
     def __init__(
         self,
     ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___HypervisorDeparture = HypervisorDeparture
+Global___HypervisorDeparture: _TypeAlias = HypervisorDeparture  # noqa: Y015
 
-@typing.final
-class PingRequest(google.protobuf.message.Message):
+@_typing.final
+class PingRequest(_message.Message):
     """Things clients can ask the agent to do"""
 
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    DESCRIPTOR: _descriptor.Descriptor
 
     def __init__(
         self,
     ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___PingRequest = PingRequest
+Global___PingRequest: _TypeAlias = PingRequest  # noqa: Y015
 
-@typing.final
-class PingReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___PingReply = PingReply
-
-@typing.final
-class IsSystemRunningRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class PingReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
     def __init__(
         self,
     ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___IsSystemRunningRequest = IsSystemRunningRequest
+Global___PingReply: _TypeAlias = PingReply  # noqa: Y015
 
-@typing.final
-class IsSystemRunningReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class IsSystemRunningRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    RESULT_FIELD_NUMBER: builtins.int
-    MESSAGE_FIELD_NUMBER: builtins.int
-    BOOT_TIME_FIELD_NUMBER: builtins.int
-    result: builtins.bool
-    message: builtins.str
-    boot_time: builtins.float
     def __init__(
         self,
-        *,
-        result: builtins.bool = ...,
-        message: builtins.str = ...,
-        boot_time: builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["boot_time", b"boot_time", "message", b"message", "result", b"result"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___IsSystemRunningReply = IsSystemRunningReply
+Global___IsSystemRunningRequest: _TypeAlias = IsSystemRunningRequest  # noqa: Y015
 
-@typing.final
-class Fact(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class IsSystemRunningReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    NAME_FIELD_NUMBER: builtins.int
-    VALUE_FIELD_NUMBER: builtins.int
-    name: builtins.str
-    value: builtins.str
+    RESULT_FIELD_NUMBER: _builtins.int
+    MESSAGE_FIELD_NUMBER: _builtins.int
+    BOOT_TIME_FIELD_NUMBER: _builtins.int
+    result: _builtins.bool
+    message: _builtins.str
+    boot_time: _builtins.float
     def __init__(
         self,
         *,
-        name: builtins.str = ...,
-        value: builtins.str = ...,
+        result: _builtins.bool = ...,
+        message: _builtins.str = ...,
+        boot_time: _builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["name", b"name", "value", b"value"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["boot_time", b"boot_time", "message", b"message", "result", b"result"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___Fact = Fact
+Global___IsSystemRunningReply: _TypeAlias = IsSystemRunningReply  # noqa: Y015
 
-@typing.final
-class MountPoint(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class Fact(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    DEVICE_FIELD_NUMBER: builtins.int
-    MOUNT_POINT_FIELD_NUMBER: builtins.int
-    VFS_TYPE_FIELD_NUMBER: builtins.int
-    device: builtins.str
-    mount_point: builtins.str
-    vfs_type: builtins.str
+    NAME_FIELD_NUMBER: _builtins.int
+    VALUE_FIELD_NUMBER: _builtins.int
+    name: _builtins.str
+    value: _builtins.str
     def __init__(
         self,
         *,
-        device: builtins.str = ...,
-        mount_point: builtins.str = ...,
-        vfs_type: builtins.str = ...,
+        name: _builtins.str = ...,
+        value: _builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["device", b"device", "mount_point", b"mount_point", "vfs_type", b"vfs_type"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "value", b"value"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___MountPoint = MountPoint
+Global___Fact: _TypeAlias = Fact  # noqa: Y015
 
-@typing.final
-class GatherFactsRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class MountPoint(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___GatherFactsRequest = GatherFactsRequest
-
-@typing.final
-class GatherFactsReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    DISTRO_FACTS_FIELD_NUMBER: builtins.int
-    MOUNT_POINTS_FIELD_NUMBER: builtins.int
-    SSH_HOST_KEYS_FIELD_NUMBER: builtins.int
-    @property
-    def distro_facts(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Fact]: ...
-    @property
-    def mount_points(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___MountPoint]: ...
-    @property
-    def ssh_host_keys(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Fact]: ...
+    DEVICE_FIELD_NUMBER: _builtins.int
+    MOUNT_POINT_FIELD_NUMBER: _builtins.int
+    VFS_TYPE_FIELD_NUMBER: _builtins.int
+    device: _builtins.str
+    mount_point: _builtins.str
+    vfs_type: _builtins.str
     def __init__(
         self,
         *,
-        distro_facts: collections.abc.Iterable[global___Fact] | None = ...,
-        mount_points: collections.abc.Iterable[global___MountPoint] | None = ...,
-        ssh_host_keys: collections.abc.Iterable[global___Fact] | None = ...,
+        device: _builtins.str = ...,
+        mount_point: _builtins.str = ...,
+        vfs_type: _builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["distro_facts", b"distro_facts", "mount_points", b"mount_points", "ssh_host_keys", b"ssh_host_keys"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["device", b"device", "mount_point", b"mount_point", "vfs_type", b"vfs_type"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___GatherFactsReply = GatherFactsReply
+Global___MountPoint: _TypeAlias = MountPoint  # noqa: Y015
 
-@typing.final
-class FileChunk(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class GatherFactsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GatherFactsRequest: _TypeAlias = GatherFactsRequest  # noqa: Y015
+
+@_typing.final
+class GatherFactsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DISTRO_FACTS_FIELD_NUMBER: _builtins.int
+    MOUNT_POINTS_FIELD_NUMBER: _builtins.int
+    SSH_HOST_KEYS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def distro_facts(self) -> _containers.RepeatedCompositeFieldContainer[Global___Fact]: ...
+    @_builtins.property
+    def mount_points(self) -> _containers.RepeatedCompositeFieldContainer[Global___MountPoint]: ...
+    @_builtins.property
+    def ssh_host_keys(self) -> _containers.RepeatedCompositeFieldContainer[Global___Fact]: ...
+    def __init__(
+        self,
+        *,
+        distro_facts: _abc.Iterable[Global___Fact] | None = ...,
+        mount_points: _abc.Iterable[Global___MountPoint] | None = ...,
+        ssh_host_keys: _abc.Iterable[Global___Fact] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["distro_facts", b"distro_facts", "mount_points", b"mount_points", "ssh_host_keys", b"ssh_host_keys"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GatherFactsReply: _TypeAlias = GatherFactsReply  # noqa: Y015
+
+@_typing.final
+class FileChunk(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
     class _Encoding:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
+        ValueType = _typing.NewType("ValueType", _builtins.int)
+        V: _TypeAlias = ValueType  # noqa: Y015
 
-    class _EncodingEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FileChunk._Encoding.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    class _EncodingEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[FileChunk._Encoding.ValueType], _builtins.type):
+        DESCRIPTOR: _descriptor.EnumDescriptor
         BASE64: FileChunk._Encoding.ValueType  # 0
 
     class Encoding(_Encoding, metaclass=_EncodingEnumTypeWrapper): ...
     BASE64: FileChunk.Encoding.ValueType  # 0
 
-    OFFSET_FIELD_NUMBER: builtins.int
-    ENCODING_FIELD_NUMBER: builtins.int
-    PAYLOAD_FIELD_NUMBER: builtins.int
-    offset: builtins.int
-    encoding: global___FileChunk.Encoding.ValueType
-    payload: builtins.str
+    OFFSET_FIELD_NUMBER: _builtins.int
+    ENCODING_FIELD_NUMBER: _builtins.int
+    PAYLOAD_FIELD_NUMBER: _builtins.int
+    offset: _builtins.int
+    encoding: Global___FileChunk.Encoding.ValueType
+    payload: _builtins.str
     def __init__(
         self,
         *,
-        offset: builtins.int = ...,
-        encoding: global___FileChunk.Encoding.ValueType = ...,
-        payload: builtins.str = ...,
+        offset: _builtins.int = ...,
+        encoding: Global___FileChunk.Encoding.ValueType = ...,
+        payload: _builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["encoding", b"encoding", "offset", b"offset", "payload", b"payload"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["encoding", b"encoding", "offset", b"offset", "payload", b"payload"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___FileChunk = FileChunk
+Global___FileChunk: _TypeAlias = FileChunk  # noqa: Y015
 
-@typing.final
-class PutFileRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class PutFileRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    PATH_FIELD_NUMBER: builtins.int
-    MODE_FIELD_NUMBER: builtins.int
-    LENGTH_FIELD_NUMBER: builtins.int
-    FIRST_CHUNK_FIELD_NUMBER: builtins.int
-    path: builtins.str
-    mode: builtins.int
-    length: builtins.int
-    @property
-    def first_chunk(self) -> global___FileChunk: ...
+    PATH_FIELD_NUMBER: _builtins.int
+    MODE_FIELD_NUMBER: _builtins.int
+    LENGTH_FIELD_NUMBER: _builtins.int
+    FIRST_CHUNK_FIELD_NUMBER: _builtins.int
+    path: _builtins.str
+    mode: _builtins.int
+    length: _builtins.int
+    @_builtins.property
+    def first_chunk(self) -> Global___FileChunk: ...
     def __init__(
         self,
         *,
-        path: builtins.str = ...,
-        mode: builtins.int = ...,
-        length: builtins.int = ...,
-        first_chunk: global___FileChunk | None = ...,
+        path: _builtins.str = ...,
+        mode: _builtins.int = ...,
+        length: _builtins.int = ...,
+        first_chunk: Global___FileChunk | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["first_chunk", b"first_chunk"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["first_chunk", b"first_chunk", "length", b"length", "mode", b"mode", "path", b"path"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["first_chunk", b"first_chunk"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["first_chunk", b"first_chunk", "length", b"length", "mode", b"mode", "path", b"path"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___PutFileRequest = PutFileRequest
+Global___PutFileRequest: _TypeAlias = PutFileRequest  # noqa: Y015
 
-@typing.final
-class FileChunkReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class FileChunkReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    PATH_FIELD_NUMBER: builtins.int
-    OFFSET_FIELD_NUMBER: builtins.int
-    path: builtins.str
-    offset: builtins.int
+    PATH_FIELD_NUMBER: _builtins.int
+    OFFSET_FIELD_NUMBER: _builtins.int
+    path: _builtins.str
+    offset: _builtins.int
     def __init__(
         self,
         *,
-        path: builtins.str = ...,
-        offset: builtins.int = ...,
+        path: _builtins.str = ...,
+        offset: _builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["offset", b"offset", "path", b"path"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["offset", b"offset", "path", b"path"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___FileChunkReply = FileChunkReply
+Global___FileChunkReply: _TypeAlias = FileChunkReply  # noqa: Y015
 
-@typing.final
-class ChmodRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class ChmodRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    PATH_FIELD_NUMBER: builtins.int
-    MODE_FIELD_NUMBER: builtins.int
-    path: builtins.str
-    mode: builtins.int
+    PATH_FIELD_NUMBER: _builtins.int
+    MODE_FIELD_NUMBER: _builtins.int
+    path: _builtins.str
+    mode: _builtins.int
     def __init__(
         self,
         *,
-        path: builtins.str = ...,
-        mode: builtins.int = ...,
+        path: _builtins.str = ...,
+        mode: _builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["mode", b"mode", "path", b"path"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["mode", b"mode", "path", b"path"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___ChmodRequest = ChmodRequest
+Global___ChmodRequest: _TypeAlias = ChmodRequest  # noqa: Y015
 
-@typing.final
-class ChmodReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class ChmodReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    PATH_FIELD_NUMBER: builtins.int
-    path: builtins.str
+    PATH_FIELD_NUMBER: _builtins.int
+    path: _builtins.str
     def __init__(
         self,
         *,
-        path: builtins.str = ...,
+        path: _builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["path", b"path"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["path", b"path"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___ChmodReply = ChmodReply
+Global___ChmodReply: _TypeAlias = ChmodReply  # noqa: Y015
 
-@typing.final
-class ChownRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class ChownRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    PATH_FIELD_NUMBER: builtins.int
-    USER_FIELD_NUMBER: builtins.int
-    GROUP_FIELD_NUMBER: builtins.int
-    path: builtins.str
-    user: builtins.str
-    group: builtins.str
+    PATH_FIELD_NUMBER: _builtins.int
+    USER_FIELD_NUMBER: _builtins.int
+    GROUP_FIELD_NUMBER: _builtins.int
+    path: _builtins.str
+    user: _builtins.str
+    group: _builtins.str
     def __init__(
         self,
         *,
-        path: builtins.str = ...,
-        user: builtins.str | None = ...,
-        group: builtins.str | None = ...,
+        path: _builtins.str = ...,
+        user: _builtins.str | None = ...,
+        group: _builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_group", b"_group", "_user", b"_user", "group", b"group", "user", b"user"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_group", b"_group", "_user", b"_user", "group", b"group", "path", b"path", "user", b"user"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_group", b"_group"]) -> typing.Literal["group"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_user", b"_user"]) -> typing.Literal["user"] | None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_group", b"_group", "_user", b"_user", "group", b"group", "user", b"user"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_group", b"_group", "_user", b"_user", "group", b"group", "path", b"path", "user", b"user"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    _WhichOneofReturnType__group: _TypeAlias = _typing.Literal["group"]  # noqa: Y015
+    _WhichOneofArgType__group: _TypeAlias = _typing.Literal["_group", b"_group"]  # noqa: Y015
+    _WhichOneofReturnType__user: _TypeAlias = _typing.Literal["user"]  # noqa: Y015
+    _WhichOneofArgType__user: _TypeAlias = _typing.Literal["_user", b"_user"]  # noqa: Y015
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__group) -> _WhichOneofReturnType__group | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__user) -> _WhichOneofReturnType__user | None: ...
 
-global___ChownRequest = ChownRequest
+Global___ChownRequest: _TypeAlias = ChownRequest  # noqa: Y015
 
-@typing.final
-class ChownReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class ChownReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    PATH_FIELD_NUMBER: builtins.int
-    path: builtins.str
+    PATH_FIELD_NUMBER: _builtins.int
+    path: _builtins.str
     def __init__(
         self,
         *,
-        path: builtins.str = ...,
+        path: _builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["path", b"path"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["path", b"path"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___ChownReply = ChownReply
+Global___ChownReply: _TypeAlias = ChownReply  # noqa: Y015
 
-@typing.final
-class GetFileRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class GetFileRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    PATH_FIELD_NUMBER: builtins.int
-    path: builtins.str
+    PATH_FIELD_NUMBER: _builtins.int
+    path: _builtins.str
     def __init__(
         self,
         *,
-        path: builtins.str = ...,
+        path: _builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["path", b"path"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["path", b"path"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___GetFileRequest = GetFileRequest
+Global___GetFileRequest: _TypeAlias = GetFileRequest  # noqa: Y015
 
-@typing.final
-class StatResult(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class StatResult(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    PATH_FIELD_NUMBER: builtins.int
-    MODE_FIELD_NUMBER: builtins.int
-    SIZE_FIELD_NUMBER: builtins.int
-    UID_FIELD_NUMBER: builtins.int
-    GID_FIELD_NUMBER: builtins.int
-    ATIME_FIELD_NUMBER: builtins.int
-    MTIME_FIELD_NUMBER: builtins.int
-    CTIME_FIELD_NUMBER: builtins.int
-    path: builtins.str
-    mode: builtins.int
-    size: builtins.int
-    uid: builtins.int
-    gid: builtins.int
-    atime: builtins.float
-    mtime: builtins.float
-    ctime: builtins.float
+    PATH_FIELD_NUMBER: _builtins.int
+    MODE_FIELD_NUMBER: _builtins.int
+    SIZE_FIELD_NUMBER: _builtins.int
+    UID_FIELD_NUMBER: _builtins.int
+    GID_FIELD_NUMBER: _builtins.int
+    ATIME_FIELD_NUMBER: _builtins.int
+    MTIME_FIELD_NUMBER: _builtins.int
+    CTIME_FIELD_NUMBER: _builtins.int
+    path: _builtins.str
+    mode: _builtins.int
+    size: _builtins.int
+    uid: _builtins.int
+    gid: _builtins.int
+    atime: _builtins.float
+    mtime: _builtins.float
+    ctime: _builtins.float
     def __init__(
         self,
         *,
-        path: builtins.str = ...,
-        mode: builtins.int = ...,
-        size: builtins.int = ...,
-        uid: builtins.int = ...,
-        gid: builtins.int = ...,
-        atime: builtins.float = ...,
-        mtime: builtins.float = ...,
-        ctime: builtins.float = ...,
+        path: _builtins.str = ...,
+        mode: _builtins.int = ...,
+        size: _builtins.int = ...,
+        uid: _builtins.int = ...,
+        gid: _builtins.int = ...,
+        atime: _builtins.float = ...,
+        mtime: _builtins.float = ...,
+        ctime: _builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["atime", b"atime", "ctime", b"ctime", "gid", b"gid", "mode", b"mode", "mtime", b"mtime", "path", b"path", "size", b"size", "uid", b"uid"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["atime", b"atime", "ctime", b"ctime", "gid", b"gid", "mode", b"mode", "mtime", b"mtime", "path", b"path", "size", b"size", "uid", b"uid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___StatResult = StatResult
+Global___StatResult: _TypeAlias = StatResult  # noqa: Y015
 
-@typing.final
-class CommandError(google.protobuf.message.Message):
+@_typing.final
+class CommandError(_message.Message):
     """Protocol level errors"""
 
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    DESCRIPTOR: _descriptor.Descriptor
 
-    ERROR_FIELD_NUMBER: builtins.int
-    LAST_ENVELOPE_FIELD_NUMBER: builtins.int
-    error: builtins.str
-    @property
-    def last_envelope(self) -> global___HypervisorToAgent: ...
+    ERROR_FIELD_NUMBER: _builtins.int
+    LAST_ENVELOPE_FIELD_NUMBER: _builtins.int
+    error: _builtins.str
+    @_builtins.property
+    def last_envelope(self) -> Global___HypervisorToAgent: ...
     def __init__(
         self,
         *,
-        error: builtins.str = ...,
-        last_envelope: global___HypervisorToAgent | None = ...,
+        error: _builtins.str = ...,
+        last_envelope: Global___HypervisorToAgent | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["last_envelope", b"last_envelope"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["error", b"error", "last_envelope", b"last_envelope"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["last_envelope", b"last_envelope"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "last_envelope", b"last_envelope"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___CommandError = CommandError
+Global___CommandError: _TypeAlias = CommandError  # noqa: Y015
 
-@typing.final
-class UnknownCommand(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class UnknownCommand(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    LAST_ENVELOPE_FIELD_NUMBER: builtins.int
-    @property
-    def last_envelope(self) -> global___HypervisorToAgent: ...
+    LAST_ENVELOPE_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def last_envelope(self) -> Global___HypervisorToAgent: ...
     def __init__(
         self,
         *,
-        last_envelope: global___HypervisorToAgent | None = ...,
+        last_envelope: Global___HypervisorToAgent | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["last_envelope", b"last_envelope"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["last_envelope", b"last_envelope"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["last_envelope", b"last_envelope"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["last_envelope", b"last_envelope"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___UnknownCommand = UnknownCommand
+Global___UnknownCommand: _TypeAlias = UnknownCommand  # noqa: Y015
 
-@typing.final
-class HypervisorToAgentCommand(google.protobuf.message.Message):
+@_typing.final
+class HypervisorToAgentCommand(_message.Message):
     """Envelopes"""
 
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    DESCRIPTOR: _descriptor.Descriptor
 
-    COMMAND_ID_FIELD_NUMBER: builtins.int
-    HYPERVISOR_WELCOME_FIELD_NUMBER: builtins.int
-    HYPERVISOR_DEPARTURE_FIELD_NUMBER: builtins.int
-    COMMAND_ERROR_FIELD_NUMBER: builtins.int
-    UNKNOWN_COMMAND_FIELD_NUMBER: builtins.int
-    PING_REQUEST_FIELD_NUMBER: builtins.int
-    EXECUTE_REQUEST_FIELD_NUMBER: builtins.int
-    IS_SYSTEM_RUNNING_REQUEST_FIELD_NUMBER: builtins.int
-    GATHER_FACTS_REQUEST_FIELD_NUMBER: builtins.int
-    PUT_FILE_REQUEST_FIELD_NUMBER: builtins.int
-    FILE_CHUNK_FIELD_NUMBER: builtins.int
-    CHMOD_REQUEST_FIELD_NUMBER: builtins.int
-    CHOWN_REQUEST_FIELD_NUMBER: builtins.int
-    GET_FILE_REQUEST_FIELD_NUMBER: builtins.int
-    FILE_CHUNK_REPLY_FIELD_NUMBER: builtins.int
-    command_id: builtins.str
-    @property
-    def hypervisor_welcome(self) -> global___HypervisorWelcome: ...
-    @property
-    def hypervisor_departure(self) -> global___HypervisorDeparture: ...
-    @property
-    def command_error(self) -> global___CommandError: ...
-    @property
-    def unknown_command(self) -> global___UnknownCommand: ...
-    @property
-    def ping_request(self) -> global___PingRequest: ...
-    @property
-    def execute_request(self) -> common_pb2.ExecuteRequest: ...
-    @property
-    def is_system_running_request(self) -> global___IsSystemRunningRequest: ...
-    @property
-    def gather_facts_request(self) -> global___GatherFactsRequest: ...
-    @property
-    def put_file_request(self) -> global___PutFileRequest: ...
-    @property
-    def file_chunk(self) -> global___FileChunk: ...
-    @property
-    def chmod_request(self) -> global___ChmodRequest: ...
-    @property
-    def chown_request(self) -> global___ChownRequest: ...
-    @property
-    def get_file_request(self) -> global___GetFileRequest: ...
-    @property
-    def file_chunk_reply(self) -> global___FileChunkReply: ...
+    COMMAND_ID_FIELD_NUMBER: _builtins.int
+    HYPERVISOR_WELCOME_FIELD_NUMBER: _builtins.int
+    HYPERVISOR_DEPARTURE_FIELD_NUMBER: _builtins.int
+    COMMAND_ERROR_FIELD_NUMBER: _builtins.int
+    UNKNOWN_COMMAND_FIELD_NUMBER: _builtins.int
+    PING_REQUEST_FIELD_NUMBER: _builtins.int
+    EXECUTE_REQUEST_FIELD_NUMBER: _builtins.int
+    IS_SYSTEM_RUNNING_REQUEST_FIELD_NUMBER: _builtins.int
+    GATHER_FACTS_REQUEST_FIELD_NUMBER: _builtins.int
+    PUT_FILE_REQUEST_FIELD_NUMBER: _builtins.int
+    FILE_CHUNK_FIELD_NUMBER: _builtins.int
+    CHMOD_REQUEST_FIELD_NUMBER: _builtins.int
+    CHOWN_REQUEST_FIELD_NUMBER: _builtins.int
+    GET_FILE_REQUEST_FIELD_NUMBER: _builtins.int
+    FILE_CHUNK_REPLY_FIELD_NUMBER: _builtins.int
+    command_id: _builtins.str
+    @_builtins.property
+    def hypervisor_welcome(self) -> Global___HypervisorWelcome: ...
+    @_builtins.property
+    def hypervisor_departure(self) -> Global___HypervisorDeparture: ...
+    @_builtins.property
+    def command_error(self) -> Global___CommandError: ...
+    @_builtins.property
+    def unknown_command(self) -> Global___UnknownCommand: ...
+    @_builtins.property
+    def ping_request(self) -> Global___PingRequest: ...
+    @_builtins.property
+    def execute_request(self) -> _common_pb2.ExecuteRequest: ...
+    @_builtins.property
+    def is_system_running_request(self) -> Global___IsSystemRunningRequest: ...
+    @_builtins.property
+    def gather_facts_request(self) -> Global___GatherFactsRequest: ...
+    @_builtins.property
+    def put_file_request(self) -> Global___PutFileRequest: ...
+    @_builtins.property
+    def file_chunk(self) -> Global___FileChunk: ...
+    @_builtins.property
+    def chmod_request(self) -> Global___ChmodRequest: ...
+    @_builtins.property
+    def chown_request(self) -> Global___ChownRequest: ...
+    @_builtins.property
+    def get_file_request(self) -> Global___GetFileRequest: ...
+    @_builtins.property
+    def file_chunk_reply(self) -> Global___FileChunkReply: ...
     def __init__(
         self,
         *,
-        command_id: builtins.str = ...,
-        hypervisor_welcome: global___HypervisorWelcome | None = ...,
-        hypervisor_departure: global___HypervisorDeparture | None = ...,
-        command_error: global___CommandError | None = ...,
-        unknown_command: global___UnknownCommand | None = ...,
-        ping_request: global___PingRequest | None = ...,
-        execute_request: common_pb2.ExecuteRequest | None = ...,
-        is_system_running_request: global___IsSystemRunningRequest | None = ...,
-        gather_facts_request: global___GatherFactsRequest | None = ...,
-        put_file_request: global___PutFileRequest | None = ...,
-        file_chunk: global___FileChunk | None = ...,
-        chmod_request: global___ChmodRequest | None = ...,
-        chown_request: global___ChownRequest | None = ...,
-        get_file_request: global___GetFileRequest | None = ...,
-        file_chunk_reply: global___FileChunkReply | None = ...,
+        command_id: _builtins.str = ...,
+        hypervisor_welcome: Global___HypervisorWelcome | None = ...,
+        hypervisor_departure: Global___HypervisorDeparture | None = ...,
+        command_error: Global___CommandError | None = ...,
+        unknown_command: Global___UnknownCommand | None = ...,
+        ping_request: Global___PingRequest | None = ...,
+        execute_request: _common_pb2.ExecuteRequest | None = ...,
+        is_system_running_request: Global___IsSystemRunningRequest | None = ...,
+        gather_facts_request: Global___GatherFactsRequest | None = ...,
+        put_file_request: Global___PutFileRequest | None = ...,
+        file_chunk: Global___FileChunk | None = ...,
+        chmod_request: Global___ChmodRequest | None = ...,
+        chown_request: Global___ChownRequest | None = ...,
+        get_file_request: Global___GetFileRequest | None = ...,
+        file_chunk_reply: Global___FileChunkReply | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["chmod_request", b"chmod_request", "chown_request", b"chown_request", "command_error", b"command_error", "execute_request", b"execute_request", "file_chunk", b"file_chunk", "file_chunk_reply", b"file_chunk_reply", "gather_facts_request", b"gather_facts_request", "get_file_request", b"get_file_request", "hypervisor_departure", b"hypervisor_departure", "hypervisor_welcome", b"hypervisor_welcome", "is_system_running_request", b"is_system_running_request", "ping_request", b"ping_request", "put_file_request", b"put_file_request", "request", b"request", "unknown_command", b"unknown_command"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["chmod_request", b"chmod_request", "chown_request", b"chown_request", "command_error", b"command_error", "command_id", b"command_id", "execute_request", b"execute_request", "file_chunk", b"file_chunk", "file_chunk_reply", b"file_chunk_reply", "gather_facts_request", b"gather_facts_request", "get_file_request", b"get_file_request", "hypervisor_departure", b"hypervisor_departure", "hypervisor_welcome", b"hypervisor_welcome", "is_system_running_request", b"is_system_running_request", "ping_request", b"ping_request", "put_file_request", b"put_file_request", "request", b"request", "unknown_command", b"unknown_command"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["request", b"request"]) -> typing.Literal["hypervisor_welcome", "hypervisor_departure", "command_error", "unknown_command", "ping_request", "execute_request", "is_system_running_request", "gather_facts_request", "put_file_request", "file_chunk", "chmod_request", "chown_request", "get_file_request", "file_chunk_reply"] | None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["chmod_request", b"chmod_request", "chown_request", b"chown_request", "command_error", b"command_error", "execute_request", b"execute_request", "file_chunk", b"file_chunk", "file_chunk_reply", b"file_chunk_reply", "gather_facts_request", b"gather_facts_request", "get_file_request", b"get_file_request", "hypervisor_departure", b"hypervisor_departure", "hypervisor_welcome", b"hypervisor_welcome", "is_system_running_request", b"is_system_running_request", "ping_request", b"ping_request", "put_file_request", b"put_file_request", "request", b"request", "unknown_command", b"unknown_command"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["chmod_request", b"chmod_request", "chown_request", b"chown_request", "command_error", b"command_error", "command_id", b"command_id", "execute_request", b"execute_request", "file_chunk", b"file_chunk", "file_chunk_reply", b"file_chunk_reply", "gather_facts_request", b"gather_facts_request", "get_file_request", b"get_file_request", "hypervisor_departure", b"hypervisor_departure", "hypervisor_welcome", b"hypervisor_welcome", "is_system_running_request", b"is_system_running_request", "ping_request", b"ping_request", "put_file_request", b"put_file_request", "request", b"request", "unknown_command", b"unknown_command"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    _WhichOneofReturnType_request: _TypeAlias = _typing.Literal["hypervisor_welcome", "hypervisor_departure", "command_error", "unknown_command", "ping_request", "execute_request", "is_system_running_request", "gather_facts_request", "put_file_request", "file_chunk", "chmod_request", "chown_request", "get_file_request", "file_chunk_reply"]  # noqa: Y015
+    _WhichOneofArgType_request: _TypeAlias = _typing.Literal["request", b"request"]  # noqa: Y015
+    def WhichOneof(self, oneof_group: _WhichOneofArgType_request) -> _WhichOneofReturnType_request | None: ...
 
-global___HypervisorToAgentCommand = HypervisorToAgentCommand
+Global___HypervisorToAgentCommand: _TypeAlias = HypervisorToAgentCommand  # noqa: Y015
 
-@typing.final
-class HypervisorToAgent(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class HypervisorToAgent(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    COMMANDS_FIELD_NUMBER: builtins.int
-    @property
-    def commands(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___HypervisorToAgentCommand]: ...
+    COMMANDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def commands(self) -> _containers.RepeatedCompositeFieldContainer[Global___HypervisorToAgentCommand]: ...
     def __init__(
         self,
         *,
-        commands: collections.abc.Iterable[global___HypervisorToAgentCommand] | None = ...,
+        commands: _abc.Iterable[Global___HypervisorToAgentCommand] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["commands", b"commands"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["commands", b"commands"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___HypervisorToAgent = HypervisorToAgent
+Global___HypervisorToAgent: _TypeAlias = HypervisorToAgent  # noqa: Y015
 
-@typing.final
-class AgentToHypervisorCommand(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class AgentToHypervisorCommand(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    COMMAND_ID_FIELD_NUMBER: builtins.int
-    AGENT_WELCOME_FIELD_NUMBER: builtins.int
-    COMMAND_ERROR_FIELD_NUMBER: builtins.int
-    UNKNOWN_COMMAND_FIELD_NUMBER: builtins.int
-    PING_REPLY_FIELD_NUMBER: builtins.int
-    EXECUTE_REPLY_FIELD_NUMBER: builtins.int
-    IS_SYSTEM_RUNNING_REPLY_FIELD_NUMBER: builtins.int
-    GATHER_FACTS_REPLY_FIELD_NUMBER: builtins.int
-    FILE_CHUNK_REPLY_FIELD_NUMBER: builtins.int
-    CHMOD_REPLY_FIELD_NUMBER: builtins.int
-    CHOWN_REPLY_FIELD_NUMBER: builtins.int
-    FILE_CHUNK_FIELD_NUMBER: builtins.int
-    STAT_RESULT_FIELD_NUMBER: builtins.int
-    command_id: builtins.str
-    @property
-    def agent_welcome(self) -> global___AgentWelcome: ...
-    @property
-    def command_error(self) -> global___CommandError: ...
-    @property
-    def unknown_command(self) -> global___UnknownCommand: ...
-    @property
-    def ping_reply(self) -> global___PingReply: ...
-    @property
-    def execute_reply(self) -> common_pb2.ExecuteReply: ...
-    @property
-    def is_system_running_reply(self) -> global___IsSystemRunningReply: ...
-    @property
-    def gather_facts_reply(self) -> global___GatherFactsReply: ...
-    @property
-    def file_chunk_reply(self) -> global___FileChunkReply: ...
-    @property
-    def chmod_reply(self) -> global___ChmodReply: ...
-    @property
-    def chown_reply(self) -> global___ChownReply: ...
-    @property
-    def file_chunk(self) -> global___FileChunk: ...
-    @property
-    def stat_result(self) -> global___StatResult: ...
+    COMMAND_ID_FIELD_NUMBER: _builtins.int
+    AGENT_WELCOME_FIELD_NUMBER: _builtins.int
+    COMMAND_ERROR_FIELD_NUMBER: _builtins.int
+    UNKNOWN_COMMAND_FIELD_NUMBER: _builtins.int
+    PING_REPLY_FIELD_NUMBER: _builtins.int
+    EXECUTE_REPLY_FIELD_NUMBER: _builtins.int
+    IS_SYSTEM_RUNNING_REPLY_FIELD_NUMBER: _builtins.int
+    GATHER_FACTS_REPLY_FIELD_NUMBER: _builtins.int
+    FILE_CHUNK_REPLY_FIELD_NUMBER: _builtins.int
+    CHMOD_REPLY_FIELD_NUMBER: _builtins.int
+    CHOWN_REPLY_FIELD_NUMBER: _builtins.int
+    FILE_CHUNK_FIELD_NUMBER: _builtins.int
+    STAT_RESULT_FIELD_NUMBER: _builtins.int
+    command_id: _builtins.str
+    @_builtins.property
+    def agent_welcome(self) -> Global___AgentWelcome: ...
+    @_builtins.property
+    def command_error(self) -> Global___CommandError: ...
+    @_builtins.property
+    def unknown_command(self) -> Global___UnknownCommand: ...
+    @_builtins.property
+    def ping_reply(self) -> Global___PingReply: ...
+    @_builtins.property
+    def execute_reply(self) -> _common_pb2.ExecuteReply: ...
+    @_builtins.property
+    def is_system_running_reply(self) -> Global___IsSystemRunningReply: ...
+    @_builtins.property
+    def gather_facts_reply(self) -> Global___GatherFactsReply: ...
+    @_builtins.property
+    def file_chunk_reply(self) -> Global___FileChunkReply: ...
+    @_builtins.property
+    def chmod_reply(self) -> Global___ChmodReply: ...
+    @_builtins.property
+    def chown_reply(self) -> Global___ChownReply: ...
+    @_builtins.property
+    def file_chunk(self) -> Global___FileChunk: ...
+    @_builtins.property
+    def stat_result(self) -> Global___StatResult: ...
     def __init__(
         self,
         *,
-        command_id: builtins.str = ...,
-        agent_welcome: global___AgentWelcome | None = ...,
-        command_error: global___CommandError | None = ...,
-        unknown_command: global___UnknownCommand | None = ...,
-        ping_reply: global___PingReply | None = ...,
-        execute_reply: common_pb2.ExecuteReply | None = ...,
-        is_system_running_reply: global___IsSystemRunningReply | None = ...,
-        gather_facts_reply: global___GatherFactsReply | None = ...,
-        file_chunk_reply: global___FileChunkReply | None = ...,
-        chmod_reply: global___ChmodReply | None = ...,
-        chown_reply: global___ChownReply | None = ...,
-        file_chunk: global___FileChunk | None = ...,
-        stat_result: global___StatResult | None = ...,
+        command_id: _builtins.str = ...,
+        agent_welcome: Global___AgentWelcome | None = ...,
+        command_error: Global___CommandError | None = ...,
+        unknown_command: Global___UnknownCommand | None = ...,
+        ping_reply: Global___PingReply | None = ...,
+        execute_reply: _common_pb2.ExecuteReply | None = ...,
+        is_system_running_reply: Global___IsSystemRunningReply | None = ...,
+        gather_facts_reply: Global___GatherFactsReply | None = ...,
+        file_chunk_reply: Global___FileChunkReply | None = ...,
+        chmod_reply: Global___ChmodReply | None = ...,
+        chown_reply: Global___ChownReply | None = ...,
+        file_chunk: Global___FileChunk | None = ...,
+        stat_result: Global___StatResult | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["agent_welcome", b"agent_welcome", "chmod_reply", b"chmod_reply", "chown_reply", b"chown_reply", "command_error", b"command_error", "execute_reply", b"execute_reply", "file_chunk", b"file_chunk", "file_chunk_reply", b"file_chunk_reply", "gather_facts_reply", b"gather_facts_reply", "is_system_running_reply", b"is_system_running_reply", "ping_reply", b"ping_reply", "reply", b"reply", "stat_result", b"stat_result", "unknown_command", b"unknown_command"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["agent_welcome", b"agent_welcome", "chmod_reply", b"chmod_reply", "chown_reply", b"chown_reply", "command_error", b"command_error", "command_id", b"command_id", "execute_reply", b"execute_reply", "file_chunk", b"file_chunk", "file_chunk_reply", b"file_chunk_reply", "gather_facts_reply", b"gather_facts_reply", "is_system_running_reply", b"is_system_running_reply", "ping_reply", b"ping_reply", "reply", b"reply", "stat_result", b"stat_result", "unknown_command", b"unknown_command"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["reply", b"reply"]) -> typing.Literal["agent_welcome", "command_error", "unknown_command", "ping_reply", "execute_reply", "is_system_running_reply", "gather_facts_reply", "file_chunk_reply", "chmod_reply", "chown_reply", "file_chunk", "stat_result"] | None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["agent_welcome", b"agent_welcome", "chmod_reply", b"chmod_reply", "chown_reply", b"chown_reply", "command_error", b"command_error", "execute_reply", b"execute_reply", "file_chunk", b"file_chunk", "file_chunk_reply", b"file_chunk_reply", "gather_facts_reply", b"gather_facts_reply", "is_system_running_reply", b"is_system_running_reply", "ping_reply", b"ping_reply", "reply", b"reply", "stat_result", b"stat_result", "unknown_command", b"unknown_command"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["agent_welcome", b"agent_welcome", "chmod_reply", b"chmod_reply", "chown_reply", b"chown_reply", "command_error", b"command_error", "command_id", b"command_id", "execute_reply", b"execute_reply", "file_chunk", b"file_chunk", "file_chunk_reply", b"file_chunk_reply", "gather_facts_reply", b"gather_facts_reply", "is_system_running_reply", b"is_system_running_reply", "ping_reply", b"ping_reply", "reply", b"reply", "stat_result", b"stat_result", "unknown_command", b"unknown_command"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    _WhichOneofReturnType_reply: _TypeAlias = _typing.Literal["agent_welcome", "command_error", "unknown_command", "ping_reply", "execute_reply", "is_system_running_reply", "gather_facts_reply", "file_chunk_reply", "chmod_reply", "chown_reply", "file_chunk", "stat_result"]  # noqa: Y015
+    _WhichOneofArgType_reply: _TypeAlias = _typing.Literal["reply", b"reply"]  # noqa: Y015
+    def WhichOneof(self, oneof_group: _WhichOneofArgType_reply) -> _WhichOneofReturnType_reply | None: ...
 
-global___AgentToHypervisorCommand = AgentToHypervisorCommand
+Global___AgentToHypervisorCommand: _TypeAlias = AgentToHypervisorCommand  # noqa: Y015
 
-@typing.final
-class AgentToHypervisor(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class AgentToHypervisor(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    COMMANDS_FIELD_NUMBER: builtins.int
-    @property
-    def commands(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___AgentToHypervisorCommand]: ...
+    COMMANDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def commands(self) -> _containers.RepeatedCompositeFieldContainer[Global___AgentToHypervisorCommand]: ...
     def __init__(
         self,
         *,
-        commands: collections.abc.Iterable[global___AgentToHypervisorCommand] | None = ...,
+        commands: _abc.Iterable[Global___AgentToHypervisorCommand] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["commands", b"commands"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["commands", b"commands"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___AgentToHypervisor = AgentToHypervisor
+Global___AgentToHypervisor: _TypeAlias = AgentToHypervisor  # noqa: Y015

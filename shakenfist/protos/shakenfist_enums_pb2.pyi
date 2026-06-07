@@ -14,25 +14,25 @@ Source of truth: schema/object_types.py
                  schema/relationship_types.py
 """
 
-import builtins
-import google.protobuf.descriptor
-import google.protobuf.internal.enum_type_wrapper
+from google.protobuf import descriptor as _descriptor
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
+import builtins as _builtins
 import sys
-import typing
+import typing as _typing
 
 if sys.version_info >= (3, 10):
-    import typing as typing_extensions
+    from typing import TypeAlias as _TypeAlias
 else:
-    import typing_extensions
+    from typing_extensions import TypeAlias as _TypeAlias
 
-DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
+DESCRIPTOR: _descriptor.FileDescriptor
 
 class _ObjectType:
-    ValueType = typing.NewType("ValueType", builtins.int)
-    V: typing_extensions.TypeAlias = ValueType
+    ValueType = _typing.NewType("ValueType", _builtins.int)
+    V: _TypeAlias = ValueType  # noqa: Y015
 
-class _ObjectTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ObjectType.ValueType], builtins.type):
-    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+class _ObjectTypeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_ObjectType.ValueType], _builtins.type):
+    DESCRIPTOR: _descriptor.EnumDescriptor
     OBJECT_TYPE_UNSPECIFIED: _ObjectType.ValueType  # 0
     OBJECT_TYPE_AGENTOPERATION: _ObjectType.ValueType  # 1
     """"agentoperation" """
@@ -153,14 +153,14 @@ OBJECT_TYPE_UNKNOWN: ObjectType.ValueType  # 27
 """"unknown" """
 OBJECT_TYPE_UNKNOWN_MANAGED_EXECUTABLE: ObjectType.ValueType  # 28
 """"unknown_managed_executable" """
-global___ObjectType = ObjectType
+Global___ObjectType: _TypeAlias = ObjectType  # noqa: Y015
 
 class _ReservationType:
-    ValueType = typing.NewType("ValueType", builtins.int)
-    V: typing_extensions.TypeAlias = ValueType
+    ValueType = _typing.NewType("ValueType", _builtins.int)
+    V: _TypeAlias = ValueType  # noqa: Y015
 
-class _ReservationTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ReservationType.ValueType], builtins.type):
-    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+class _ReservationTypeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_ReservationType.ValueType], _builtins.type):
+    DESCRIPTOR: _descriptor.EnumDescriptor
     RESERVATION_TYPE_UNSPECIFIED: _ReservationType.ValueType  # 0
     RESERVATION_TYPE_NETWORK: _ReservationType.ValueType  # 1
     """"network" """
@@ -201,14 +201,14 @@ RESERVATION_TYPE_DELETION_HALO: ReservationType.ValueType  # 7
 """"deletion-halo" """
 RESERVATION_TYPE_UNKNOWN: ReservationType.ValueType  # 8
 """"unknown" """
-global___ReservationType = ReservationType
+Global___ReservationType: _TypeAlias = ReservationType  # noqa: Y015
 
 class _RelationshipType:
-    ValueType = typing.NewType("ValueType", builtins.int)
-    V: typing_extensions.TypeAlias = ValueType
+    ValueType = _typing.NewType("ValueType", _builtins.int)
+    V: _TypeAlias = ValueType  # noqa: Y015
 
-class _RelationshipTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RelationshipType.ValueType], builtins.type):
-    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+class _RelationshipTypeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_RelationshipType.ValueType], _builtins.type):
+    DESCRIPTOR: _descriptor.EnumDescriptor
     RELATIONSHIP_TYPE_UNSPECIFIED: _RelationshipType.ValueType  # 0
     RELATIONSHIP_TYPE_DISK: _RelationshipType.ValueType  # 1
     """"disk" """
@@ -245,4 +245,4 @@ RELATIONSHIP_TYPE_AGENT_OUTPUT: RelationshipType.ValueType  # 6
 """"agent_output" """
 RELATIONSHIP_TYPE_BLOB_LOCATION: RelationshipType.ValueType  # 7
 """"blob_location" """
-global___RelationshipType = RelationshipType
+Global___RelationshipType: _TypeAlias = RelationshipType  # noqa: Y015

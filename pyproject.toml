@@ -58,11 +58,11 @@ dependencies = [
     "Flask-JWT-Extended==4.7.4",          # mit
     "flask-request-id-middleware==1.1",   # mit
 
-    "protobuf==5.29.6",                   # bsd
-    "grpcio==1.70.0",                     # apache2
-    "grpcio-health-checking==1.70.0",     # apache2
-    "grpcio-status==1.70.0",              # apache2
-    "grpcio-tools==1.70.0",               # apache2
+    "protobuf==6.33.6",                   # bsd
+    "grpcio==1.81.0",                     # apache2
+    "grpcio-health-checking==1.81.0",     # apache2
+    "grpcio-status==1.81.0",              # apache2
+    "grpcio-tools==1.81.0",               # apache2
     "googleapis-common-protos==1.75.0",   # apache2
 
     "requests==2.33.1",                   # apache2
@@ -197,9 +197,9 @@ test = [
     "mkdocs-material==9.7.6",   # mit
     "testscenarios==0.5.0",     # bsd
     "mypy==1.14.1",             # mit
-    "mypy-protobuf==3.6.0",     # apache2
+    "mypy-protobuf==5.1.0",     # apache2
     "grpc-stubs==1.53.0.6",     # mit
-    "types-protobuf==5.29.1.20250403",    # apache2
+    "types-protobuf==6.32.1.20260221",    # apache2
     "types-PyYAML==6.0.12.20260518",      # apache2
     "types-requests==2.33.0.20260513",    # apache2
 ]
