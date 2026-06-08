@@ -236,6 +236,7 @@ nav:
             - "Building and Testing on macOS": components/ryll/development-macos.md
             - "Channel diagnostics audit": components/ryll/channel-diagnostics-audit.md
             - "Configuration": components/ryll/configuration.md
+            - "Control Socket Protocol — Version 1.0": components/ryll/control-socket-protocol.md
             - "Installation": components/ryll/installation.md
             - "K1: tokio waker silently lost on main channel after T+465 s": components/ryll/TOKIO-WEDGING.md
             - "Libvirt / QEMU Settings for Best SPICE Performance with Ryll": components/ryll/libvirt-spice-recommendations.md
