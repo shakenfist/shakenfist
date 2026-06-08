@@ -10,3 +10,19 @@
 - api-query-batching-roadmap.md: API query batching roadmap
 - PLAN-sql-pushdown-filtering.md: SQL-pushdown filtering
 - PLAN-replace-last-cluster-operation.md: Replace last_cluster_operation with cluster_operation_targets gating
+- PLAN-network-facade.md: Network operations facade and queue-only mutation
+- PLAN-queue-performance.md: Queue performance and coalescing
+- PLAN-recurring-operations.md: Recurring cluster operations framework
+- PLAN-remove-etcd.md: Retire etcd from the Shaken Fist codebase
+- PLAN-health-checks.md: Health checks, readiness, and graceful drain for SF daemons
+- PLAN-remove-primary.md: Remove the primary node and adopt a BYO-infrastructure deployer
+- PLAN-embrace-tls.md: Embrace TLS across Shaken Fist
+- PLAN-sticky-transfers.md: Sticky session affinity for SF blob transfers
+- PLAN-replace-exec-with-netlink.md: Replace exec'd network commands with native netlink operations
+- PLAN-scheduler-reservations.md: Atomic scheduling via a reservations table
+- PLAN-eventlog-direct-mariadb.md: Remove the eventlog service and write events directly to MariaDB
+- PLAN-generic-allocator.md: Unify finite-resource allocation onto one primitive
+- PLAN-network-service-ports.md: Per-network DNAT'd service ports for managed services
+- PLAN-network-carrier-model.md: Lease-based per-network carrier model with VIP advertisement
+- PLAN-oidc-authentication.md: OIDC authentication for Shaken Fist
+- PLAN-qemu-futures.md: Owning more of the QEMU stack — QMP, and one day maybe libvirt's job too

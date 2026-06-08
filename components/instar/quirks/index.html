@@ -1410,6 +1410,174 @@
   
   
     <li class="md-nav__item">
+      <a href="../commit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar commit` — merge an overlay's data into its backing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../create/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar create` — create a new empty disk image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar map` — emit the allocation map of a disk image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../measure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar measure` — predict file size for a target format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rebase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar rebase` — change an overlay's backing-file reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar resize` — change a disk image's virtual size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../openstack-announcement-email/" class="md-nav__link">
         
   
@@ -2565,6 +2733,691 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#measure-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        measure subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="measure subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-image-opts-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --image-opts is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-o-help-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -o help is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bitmaps-field-emission-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bitmaps field emission rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convert-vs-measure-size-bounds-for-vmdk-vpc-vhdx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convert-vs-measure size bounds for vmdk / vpc / vhdx
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-scanner-divergences-from-qemu-img" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known scanner divergences from qemu-img
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        map subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="map subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-image-opts-is-rejected_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --image-opts is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backing-chain-depth-is-always-0-in-v1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backing-chain depth is always 0 in v1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#raw-source-sparseness-is-not-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw source sparseness is not detected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhd-unallocated-blocks-are-reported-as-present-false" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD unallocated blocks are reported as present: false
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhdx-payload_block_partially_present-is-reported-as-data-true" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHDX PAYLOAD_BLOCK_PARTIALLY_PRESENT is reported as data: true
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmdk-multi-extent-sources-are-refused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMDK multi-extent sources are refused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-v3-standard-l2-qcow_oflag_zero-not-honoured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 v3 standard-L2 QCOW_OFLAG_ZERO not honoured
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-compressed-clusters-report-compressed-false" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 compressed clusters report compressed: false
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trailing-newline-after-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trailing newline after JSON ]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partial-output-on-guest-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial output on guest failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#window-filter-is-byte-level-not-cluster-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Window filter is byte-level, not cluster-aligned
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="create subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#raw-create-runs-entirely-host-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw create runs entirely host-side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backing-file-path-is-written-verbatim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backing-file path is written verbatim
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backing-file-format-inference-requires-f-or-u" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backing-file format inference requires -F or -u
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preallocation-accept-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preallocation accept set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhd-virtual_size-diverges-from-qemu-img-by-chs-rounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD virtual_size diverges from qemu-img by CHS rounding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-refcount_bits-is-hardcoded-to-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 refcount_bits is hardcoded to 16
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-compat010-is-silently-upgraded-to-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 compat=0.10 is silently upgraded to 1.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-compression_typezstd-is-accept-ignored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 compression_type=zstd is accept-ignored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhdx-default-block_size-differs-from-qemu-img" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vhdx default block_size differs from qemu-img
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhd-fixed-subformat-carries-footer-only-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD fixed subformat carries footer-only metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-check-failure-qcow2-refcount_bits64" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known check failure: qcow2 refcount_bits=64
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resize-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resize subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="resize subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#raw-resize-runs-entirely-host-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw resize runs entirely host-side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qemu-img-cannot-resize-vmdk-vpc-vhdx-on-any-shipped-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qemu-img cannot resize vmdk / vpc / vhdx on any shipped version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preallocation-covers-only-the-appended-file-region" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preallocation covers only the appended file region
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-preallocationfallocfull-shrink-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --preallocation=falloc|full + --shrink is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-preallocationmetadata-on-raw-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --preallocation=metadata on raw is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-preallocationmetadata-is-rejected-by-the-planner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 --preallocation=metadata is rejected by the planner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhd-chs-rounded-virtual_size-carries-forward-through-resize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD CHS-rounded virtual_size carries forward through resize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-resized-output-matches-qemu-byte-for-byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image resized. output matches qemu byte-for-byte
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-overlays-with-a-backing-file-are-rejected-up-front" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 overlays with a backing file are rejected up-front
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#same-file-is-exposed-as-input-device-0-and-output-device-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Same file is exposed as input device 0 and output device 1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-grow-has-no-image-size-ceiling-qcow2-shrink-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 grow has no image-size ceiling; qcow2 shrink does
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rebase-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rebase subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="rebase subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unsafe-u-is-byte-equivalent-across-qemu-img-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unsafe (-u) is byte-equivalent across qemu-img versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qemu-img-cannot-rebase-vmdk-vhd-vhdx-on-any-shipped-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qemu-img cannot rebase vmdk / vhd / vhdx on any shipped version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe-mode-rebase-for-vmdk-is-not-yet-supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe-mode rebase for vmdk is not yet supported
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#long-path-relocation-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-path relocation is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-cluster-size-rebase-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-cluster-size rebase is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-rebased-image-detached-output-matches-qemu-byte-for-byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image rebased. / Image detached. output matches qemu byte-for-byte
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commit-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        commit subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="commit subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implicit-b-matches-the-overlays-recorded-parent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implicit -b matches the overlay's recorded parent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qemu-img-cannot-commit-vhd-vhdx-raw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qemu-img cannot commit vhd / vhdx / raw
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmdk-implicit-b-is-blocked-by-a-host-info-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vmdk implicit--b is blocked by a host info gap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-size-mismatch-is-refused-up-front" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster-size mismatch is refused up-front
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-format-commit-is-refused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-format commit is refused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster_size-64-kib-overflows-the-commit-scratch-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cluster_size &gt; 64 KiB overflows the commit scratch budget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-d-p-r-t-are-not-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -d / -p / -r / -t are not implemented
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-committed-output-matches-qemu-byte-for-byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image committed. output matches qemu byte-for-byte
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#same-file-is-exposed-as-input-device-0-and-output-device-1_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Same file is exposed as input device 0 and output device 1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-additions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2711,10 +3564,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_16" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_22" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_16" id="__nav_3_6_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_22" id="__nav_3_6_22_label" tabindex="0">
             
   
   
@@ -2732,8 +3585,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_16">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_22_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_22">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2742,6 +3595,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../commentary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instar Commentary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -2822,10 +3703,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_23" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_17" id="__nav_3_6_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_23" id="__nav_3_6_23_label" tabindex="0">
             
   
   
@@ -2843,8 +3724,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_17">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_23_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_23">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2905,10 +3786,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_18" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_18" id="__nav_3_6_18_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_24" id="__nav_3_6_24_label" tabindex="0">
             
   
   
@@ -2926,8 +3807,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_18_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_18">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3072,10 +3953,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_19" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_19" id="__nav_3_6_19_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_25" id="__nav_3_6_25_label" tabindex="0">
             
   
   
@@ -3093,8 +3974,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_19_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_19">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3111,126 +3992,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-fuzz-autofix/" class="md-nav__link">
+      <a href="../plans/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Automated fuzzer bug fix workflow
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-convert-followups/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Convert follow-ups: deferred work after PLAN-convert.md
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-coverage-fuzzing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Coverage-guided fuzzing of parser crates (Phase 6)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-audit/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Instar and qemu-img security audit
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-release/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plan: First Public Release of Instar
+    Plans index
   
 
     
@@ -3258,7 +4027,7 @@
   <span class="md-ellipsis">
     
   
-    Plan: Multi-distro install + qemu-img differential CI
+    Distro matrix CI
   
 
     
@@ -3300,6 +4069,314 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First public release of instar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-coverage-fuzzing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage-guided fuzzing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-fuzz-autofix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fuzz autofix workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-convert-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convert follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-measure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar measure subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-create/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar create subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-resize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar resize subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rebase-commit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar rebase and commit subcommands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar map subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-fuzzing-bugs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fuzzing bug backlog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3323,10 +4400,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_20" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_26" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_20" id="__nav_3_6_20_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_26" id="__nav_3_6_26_label" tabindex="0">
             
   
   
@@ -3344,8 +4421,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_20_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_20">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_26_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_26">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3798,10 +4875,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_21" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_27" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_21" id="__nav_3_6_21_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_27" id="__nav_3_6_27_label" tabindex="0">
             
   
   
@@ -3819,8 +4896,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_21_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_21">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_27_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_27">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4049,10 +5126,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_22" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_28" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_22" id="__nav_3_6_22_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_28" id="__nav_3_6_28_label" tabindex="0">
             
   
   
@@ -4070,8 +5147,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_22_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_22">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_28_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_28">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4132,10 +5209,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_23" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_29" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_23" id="__nav_3_6_23_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_29" id="__nav_3_6_29_label" tabindex="0">
             
   
   
@@ -4153,8 +5230,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_23_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_23">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_29_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_29">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4703,6 +5780,201 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7_14" id="__nav_3_7_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated SPICE test harness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Shared visual-digest crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Static source driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Control socket on Ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5028,6 +6300,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../occystrap/plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM planning documents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -5743,6 +7043,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ryll/channel-diagnostics-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channel diagnostics audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ryll/configuration/" class="md-nav__link">
         
   
@@ -5779,6 +7107,90 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/TOKIO-WEDGING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    K1: tokio waker silently lost on main channel after T+465 s
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/libvirt-spice-recommendations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Libvirt / QEMU Settings for Best SPICE Performance with Ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/macos-metrics-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS runtime-metrics verification runbook
   
 
     
@@ -5919,10 +7331,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_14" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_10" id="__nav_3_9_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_14" id="__nav_3_9_14_label" tabindex="0">
             
   
   
@@ -5940,8 +7352,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -5958,3290 +7370,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-android-apk/" class="md-nav__link">
+      <a href="../../ryll/plans/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Android APK Port of Ryll
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Bug reporting mode for ryll
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Bug-report trigger-time snapshot (2026-04-23)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-capture/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Capture mode for protocol and display debugging
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-connection-properties/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Connection properties dialog
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Cross-Platform Packaging for Ryll
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt: collating and paying down outstanding work
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Display draw-op coverage
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Display Iteration Follow-ups
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Extract reusable crates from ryll
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu for status-bar actions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Idle CPU reduction and real latency measurement
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Interactive USB device management UI
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-macbook-bugreport-fixes/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Macbook bug-report fixes (2026-04-23)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-notifications/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Paste-as-keystrokes fallback
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 01: Idle CPU profile
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-window-sizing-phase-01-always-fit/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1 — always fit window to guest surface
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr31-followup-phase-01-tests/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1 — PR 31 follow-up: regression tests
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bugreport-trigger-snapshot-phase-01-metadata/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1 — trigger-snapshot metadata plumbing
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-10-testing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 10: Testing and QEMU setup
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-capture-phase-01-infra/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Capture infrastructure
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction-phase-01-workspace/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Convert ryll to a Cargo workspace
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt-phase-01-display/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Display correctness
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui-phase-01-bus-fix/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Fix enumerate_physical bus field
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-hamburger-menu-phase-01-migrate/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Migrate action buttons to hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-notifications-phase-01-store/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Notification store and ring buffer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-cursor-rendering-phase-01-parse/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Parse SpiceCursor image data
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-paste-as-keystrokes-phase-01-translator/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Paste-as-keystrokes translator
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging-phase-01-portability/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Platform Portability
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops-phase-01-plumbing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Plumbing
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend-phase-01-extract/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Renderer extraction (`shakenfist-spice-renderer`)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports-phase-01-ring-buffer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Ring buffer infrastructure
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-screenshot-and-latency-hud-phase-01-screenshot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: Screenshot hotkey and save dialog
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-01-vmc-channel/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: SpiceVMC channel transport
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webdav-phase-01-port-channel/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 1: SpiceVMC port channel transport for WebDAV
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-window-sizing-phase-02-toggle/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 — hamburger toggle and CLI flag
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr31-followup-phase-02-docs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 — PR 31 follow-up: docs sweep
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bugreport-trigger-snapshot-phase-02-snapshot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 — trigger-time surface snapshot
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt-phase-02-audio/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Audio correctness
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-paste-as-keystrokes-phase-02-channel-cli/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Channel integration and CLI flags
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports-phase-02-channel-state/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Channel state snapshots
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops-phase-02-fill/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: DRAW_FILL (solid brush)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend-phase-02-encoder/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Encoder pipeline (framebuffer → H.264 NAL units)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging-phase-02-ci/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: GitHub Actions CI
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-screenshot-and-latency-hud-phase-02-latency-sparkline/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Latency sparkline
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webdav-phase-02-mux-protocol/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Mux protocol (demux and remux)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-capture-phase-02-pcap/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Pcap packet capture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-cursor-rendering-phase-02-render/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Render cursor as egui overlay
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Repaint cadence fix
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction-phase-02-reserve-names/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Reserve crate names on crates.io
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-notifications-phase-02-spice-notify/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: SPICE_MSG_NOTIFY end-to-end
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-02-usbredir-parser/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: usbredir protocol parser
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui-phase-02-wire-tx/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2: Wire usb_tx and channel events
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr31-followup-phase-03-polish/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3 — PR 31 follow-up: polish items
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bugreport-trigger-snapshot-phase-03-region/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3 — submit-time region crop
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-window-sizing-phase-03-tests/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3 — tests for the resize state machine
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports-phase-03-zip-output/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: Bug report assembly and zip output
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging-phase-03-debian/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: Debian Packaging
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: Demote protocol logging
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-03-device-backend/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: Device backend trait
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-screenshot-and-latency-hud-phase-03-docs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: Documentation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops-phase-03-monochrome/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: DRAW_BLACKNESS and DRAW_WHITENESS
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webdav-phase-03-webdav-server/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: Embedded WebDAV server
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction-phase-03-compression/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: Extract shakenfist-spice-compression
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-paste-as-keystrokes-phase-03-gui/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: GUI gesture for paste-as-keystrokes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt-phase-03-session/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: Input and session correctness
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-notifications-phase-03-existing-sources/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: migrate Gaps and bug-report status as sources
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui-phase-03-panel/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: USB panel and status bar button
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-capture-phase-03-video/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: Video frame capture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend-phase-03-webrtc/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 3: WebRTC plumbing (`webrtc-rs`)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-window-sizing-phase-04-docs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4 — documentation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4 — documentation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops-phase-04-copy-bits/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: COPY_BITS
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui-phase-04-enumerate/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: Device enumeration display
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-paste-as-keystrokes-phase-04-docs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: Documentation and cross-repo updates
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction-phase-04-protocol/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: Extract shakenfist-spice-protocol
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports-phase-04-gui-button/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: GUI report button and description dialog
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-notifications-phase-04-gui/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: GUI — bell, side panel, mark-read
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend-phase-04-server/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: HTTP server, token auth, signalling, browser shell
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webdav-phase-04-integration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: Integration (mux ↔ WebDAV server)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-04-real-devices/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: Real device enumeration and passthrough
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: Real latency from PING/PONG
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt-phase-04-robustness/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: Robustness and safety
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging-phase-04-rpm/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 4: RPM Packaging
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-window-sizing-phase-05-notify/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5 — resolution-change notifications
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: Capture runtime metrics in bug reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt-phase-05-cleanup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: Code quality and cleanup
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui-phase-05-connect/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: Connect and disconnect controls
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-05-device-connect/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: Device connection lifecycle
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-notifications-phase-05-docs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: docs and bug-report serialisation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops-phase-05-image-rop/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: DRAW_OPAQUE and DRAW_BLEND
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction-phase-05-usbredir/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: Extract shakenfist-spice-usbredir
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports-phase-05-region-select/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: GUI display region selection
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging-phase-05-macos/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: macOS Packaging
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend-phase-05-iac/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: Real frames, inputs, cursor, audio
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webdav-phase-05-ui/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 5: UI panel
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui-phase-06-add-disk/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 6: Add virtual disk at runtime
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-06-transfers/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 6: Control and bulk transfers
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops-phase-06-alpha/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 6: DRAW_TRANSPARENT and DRAW_ALPHA_BLEND
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports-phase-06-traffic-viewer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 6: GUI live traffic viewer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction-phase-06-client/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 6: Introduce ConnectionConfig and move SpiceClient
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend-phase-06-lifecycle/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 6: Reconnect and lifecycle
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt-phase-06-tests/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 6: Test coverage
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webdav-phase-06-testing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 6: Testing and documentation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging-phase-06-windows/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 6: Windows Packaging
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend-phase-07-ci/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 7: CI build + packaging
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports-phase-07-docs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 7: Documentation and testing
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops-phase-07-invers-and-warnings/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 7: DRAW_INVERS and warn-once for deferred ops
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging-phase-07-release/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 7: Release Automation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui-phase-07-polish/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 7: Status feedback and polish
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-07-virtual-msc/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 7: Virtual mass storage device (RAW images)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops-phase-08-pedantic/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 8: --pedantic mode and status-bar gap counter
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui-phase-08-docs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 8: Documentation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend-phase-08-docs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 8: Native TLS + operator docs + systemd
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-08-ui/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 8: UI integration and CLI flags
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir-phase-09-interrupt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 9: Interrupt transfers
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops-phase-09-pedantic-handles/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 9: Thread live bug-report handles to the pedantic observer
+    Plans index
   
 
     
@@ -9269,7 +7405,7 @@
   <span class="md-ellipsis">
     
   
-    Plan: Port Ryll SPICE Client to Rust
+    Initial porting plan
   
 
     
@@ -9290,14 +7426,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-release/" class="md-nav__link">
+      <a href="../../ryll/plans/PLAN-capture/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Plan: Publish workspace crates on release
+    Capture mode
   
 
     
@@ -9318,14 +7454,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
+      <a href="../../ryll/plans/PLAN-packaging/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    PR #20 follow-up fixes
+    Packaging
   
 
     
@@ -9346,70 +7482,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
+      <a href="../../ryll/plans/PLAN-usb-redir/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    PR 23 follow-up: audio playback channel
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up: UI improvements, reconnect, and protocol fixes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Remaining issues after initial bring-up
+    USB redirection
   
 
     
@@ -9437,7 +7517,7 @@
   <span class="md-ellipsis">
     
   
-    Render SPICE cursor on screen
+    Cursor rendering
   
 
     
@@ -9458,14 +7538,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
+      <a href="../../ryll/plans/PLAN-bug-reports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Replace audiopus with pure-Rust opus-decoder
+    Bug reports
   
 
     
@@ -9486,14 +7566,210 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
+      <a href="../../ryll/plans/PLAN-usb-ui/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screenshot capture and latency HUD
+    USB UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate extraction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remaining issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Display follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PR 20 follow-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PR 23 follow-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deferred debt
   
 
     
@@ -9521,7 +7797,7 @@
   <span class="md-ellipsis">
     
   
-    Supply-chain and prompt-injection scanning
+    Supply-chain scanning
   
 
     
@@ -9570,14 +7846,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir/" class="md-nav__link">
+      <a href="../../ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    USB device redirection via the SPICE usbredir channel
+    Screenshot and latency HUD
   
 
     
@@ -9598,14 +7874,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend/" class="md-nav__link">
+      <a href="../../ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Web frontend for ryll (SPICE → browser transcoder)
+    Idle CPU and latency
   
 
     
@@ -9626,14 +7902,210 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webdav/" class="md-nav__link">
+      <a href="../../ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    WebDAV folder sharing via the SPICE port channel
+    Display draw-op coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-android-apk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android APK port
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug-report trigger snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paste-as-keystrokes fallback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hamburger menu
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-notifications/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications system
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PR 31 follow-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-connection-properties/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connection properties
   
 
     
@@ -9661,7 +8133,231 @@
   <span class="md-ellipsis">
     
   
-    Window-follows-guest display sizing
+    Display window sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-web-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Opus decoder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-crate-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-session-001-feedback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session 001 feedback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-video-keeping-up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Video keeping up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS runtime metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-ci-platform-matrix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI platform matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stream caps and flap diagnostics
   
 
     
@@ -10725,6 +9421,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../developer_guide/network_dispatcher/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network dispatcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../developer_guide/release_process/" class="md-nav__link">
         
   
@@ -11149,6 +9873,34 @@
     
   
     Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
   
 
     
@@ -12235,6 +10987,691 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#measure-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        measure subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="measure subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-image-opts-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --image-opts is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-o-help-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -o help is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bitmaps-field-emission-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bitmaps field emission rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convert-vs-measure-size-bounds-for-vmdk-vpc-vhdx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convert-vs-measure size bounds for vmdk / vpc / vhdx
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-scanner-divergences-from-qemu-img" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known scanner divergences from qemu-img
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        map subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="map subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-image-opts-is-rejected_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --image-opts is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backing-chain-depth-is-always-0-in-v1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backing-chain depth is always 0 in v1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#raw-source-sparseness-is-not-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw source sparseness is not detected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhd-unallocated-blocks-are-reported-as-present-false" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD unallocated blocks are reported as present: false
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhdx-payload_block_partially_present-is-reported-as-data-true" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHDX PAYLOAD_BLOCK_PARTIALLY_PRESENT is reported as data: true
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmdk-multi-extent-sources-are-refused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMDK multi-extent sources are refused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-v3-standard-l2-qcow_oflag_zero-not-honoured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 v3 standard-L2 QCOW_OFLAG_ZERO not honoured
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-compressed-clusters-report-compressed-false" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 compressed clusters report compressed: false
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trailing-newline-after-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trailing newline after JSON ]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partial-output-on-guest-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial output on guest failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#window-filter-is-byte-level-not-cluster-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Window filter is byte-level, not cluster-aligned
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="create subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#raw-create-runs-entirely-host-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw create runs entirely host-side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backing-file-path-is-written-verbatim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backing-file path is written verbatim
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backing-file-format-inference-requires-f-or-u" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backing-file format inference requires -F or -u
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preallocation-accept-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preallocation accept set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhd-virtual_size-diverges-from-qemu-img-by-chs-rounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD virtual_size diverges from qemu-img by CHS rounding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-refcount_bits-is-hardcoded-to-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 refcount_bits is hardcoded to 16
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-compat010-is-silently-upgraded-to-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 compat=0.10 is silently upgraded to 1.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-compression_typezstd-is-accept-ignored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 compression_type=zstd is accept-ignored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhdx-default-block_size-differs-from-qemu-img" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vhdx default block_size differs from qemu-img
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhd-fixed-subformat-carries-footer-only-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD fixed subformat carries footer-only metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-check-failure-qcow2-refcount_bits64" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known check failure: qcow2 refcount_bits=64
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resize-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resize subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="resize subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#raw-resize-runs-entirely-host-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw resize runs entirely host-side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qemu-img-cannot-resize-vmdk-vpc-vhdx-on-any-shipped-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qemu-img cannot resize vmdk / vpc / vhdx on any shipped version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preallocation-covers-only-the-appended-file-region" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preallocation covers only the appended file region
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-preallocationfallocfull-shrink-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --preallocation=falloc|full + --shrink is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-preallocationmetadata-on-raw-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --preallocation=metadata on raw is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-preallocationmetadata-is-rejected-by-the-planner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 --preallocation=metadata is rejected by the planner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhd-chs-rounded-virtual_size-carries-forward-through-resize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD CHS-rounded virtual_size carries forward through resize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-resized-output-matches-qemu-byte-for-byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image resized. output matches qemu byte-for-byte
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-overlays-with-a-backing-file-are-rejected-up-front" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 overlays with a backing file are rejected up-front
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#same-file-is-exposed-as-input-device-0-and-output-device-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Same file is exposed as input device 0 and output device 1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow2-grow-has-no-image-size-ceiling-qcow2-shrink-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qcow2 grow has no image-size ceiling; qcow2 shrink does
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rebase-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rebase subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="rebase subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unsafe-u-is-byte-equivalent-across-qemu-img-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unsafe (-u) is byte-equivalent across qemu-img versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qemu-img-cannot-rebase-vmdk-vhd-vhdx-on-any-shipped-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qemu-img cannot rebase vmdk / vhd / vhdx on any shipped version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe-mode-rebase-for-vmdk-is-not-yet-supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe-mode rebase for vmdk is not yet supported
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#long-path-relocation-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-path relocation is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-cluster-size-rebase-is-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-cluster-size rebase is rejected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-rebased-image-detached-output-matches-qemu-byte-for-byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image rebased. / Image detached. output matches qemu byte-for-byte
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commit-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        commit subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="commit subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implicit-b-matches-the-overlays-recorded-parent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implicit -b matches the overlay's recorded parent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qemu-img-cannot-commit-vhd-vhdx-raw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        qemu-img cannot commit vhd / vhdx / raw
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmdk-implicit-b-is-blocked-by-a-host-info-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vmdk implicit--b is blocked by a host info gap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-size-mismatch-is-refused-up-front" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster-size mismatch is refused up-front
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-format-commit-is-refused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-format commit is refused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster_size-64-kib-overflows-the-commit-scratch-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cluster_size &gt; 64 KiB overflows the commit scratch budget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-d-p-r-t-are-not-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -d / -p / -r / -t are not implemented
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-committed-output-matches-qemu-byte-for-byte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image committed. output matches qemu byte-for-byte
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#same-file-is-exposed-as-input-device-0-and-output-device-1_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Same file is exposed as input device 0 and output device 1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-additions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13026,6 +12463,565 @@ to qemu-img:</p>
 <p>Users comparing instar output against <code>qemu-img check</code> may notice these
 discrepancies, particularly for images with refcount issues or extensive
 L2 table corruption beyond the first sector.</p>
+<h2 id="measure-subcommand-quirks">measure subcommand quirks<a class="headerlink" href="#measure-subcommand-quirks" title="Permanent link">&para;</a></h2>
+<h3 id="-image-opts-is-rejected"><code>--image-opts</code> is rejected<a class="headerlink" href="#-image-opts-is-rejected" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img measure --image-opts driver=qcow2,file.filename=...</code>
+accepts a descriptor-based source specification. instar does
+not support this form and errors out with a clear message.
+Use the positional <code>INPUT</code> argument or <code>--size SIZE</code> instead.</p>
+<h3 id="-o-help-is-rejected"><code>-o help</code> is rejected<a class="headerlink" href="#-o-help-is-rejected" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img measure -o help -O qcow2</code> prints the available
+options for the target format. instar errors out with a
+clear message. Use <code>instar measure --help</code> for the available
+individual flags; see <code>docs/measure.md</code> for the <code>-o</code> key
+reference per target.</p>
+<h3 id="bitmaps-field-emission-rule"><code>bitmaps</code> field emission rule<a class="headerlink" href="#bitmaps-field-emission-rule" title="Permanent link">&para;</a></h3>
+<p>For <code>--output=json</code> with <code>-O qcow2</code> and a qcow2 v3 source
+image, instar emits a leading <code>"bitmaps": 0</code> field (and the
+equivalent <code>bitmaps size: 0</code> trailing line in human output).
+This matches qemu-img's behaviour exactly:</p>
+<ul>
+<li>target = qcow2 AND source = qcow2 v3 (compat=1.1): emit
+  the field.</li>
+<li>target = qcow2 AND source = qcow2 v2 (compat=0.10): omit.</li>
+<li>target = qcow2 AND <code>--size SIZE</code> mode: omit.</li>
+<li>target ≠ qcow2: omit.</li>
+</ul>
+<p>instar's gate is a 4+4 byte peek of the source's first
+sector (magic + version field). See <code>src/vmm/src/chain.rs</code>
+for the helper <code>peek_is_qcow2_v3</code>.</p>
+<h3 id="convert-vs-measure-size-bounds-for-vmdk-vpc-vhdx">Convert-vs-measure size bounds for vmdk / vpc / vhdx<a class="headerlink" href="#convert-vs-measure-size-bounds-for-vmdk-vpc-vhdx" title="Permanent link">&para;</a></h3>
+<p>For target formats qemu-img cannot measure, the bound that
+<code>instar measure</code> predicts must accommodate the convert
+writer's actual output size. The relationship is:</p>
+<ul>
+<li><code>instar convert -O &lt;fmt&gt;</code> output ≤
+  <code>fully_allocated + max(1 MiB, fully_allocated / 16)</code>.</li>
+<li>The lower bound (<code>actual &gt;= required</code>) is permissive:
+  instar's parser scanners can over-report <code>allocated_bytes</code>
+  and convert's zero-skipping can produce strictly less than
+  <code>required</code>. That is not a bug.</li>
+</ul>
+<p>The cushion absorbs the convert writer's per-block sector
+alignment slack — each allocated block and metadata region
+is padded to the output sector size (default 64 KiB), so the
+cumulative overhead scales with block count.
+<code>scripts/differential-fuzz.py::op_measure</code> and the round-
+trip tests in <code>tests/test_measure.py::TestMeasureRoundTrip</code>
+both use this same bound.</p>
+<h3 id="known-scanner-divergences-from-qemu-img">Known scanner divergences from qemu-img<a class="headerlink" href="#known-scanner-divergences-from-qemu-img" title="Permanent link">&para;</a></h3>
+<p>For raw and qcow2 targets, instar measure matches qemu-img
+exactly on the cross-version baseline matrix. A handful of
+source-image cases exhibit small numeric divergences because
+instar's parser scanners are simpler than qemu-img's. The
+canonical list lives at
+<code>tests/test_measure.py::KNOWN_SOURCE_SCANNER_DIVERGENCES</code>.
+Categories:</p>
+<ul>
+<li>Raw sources with on-disk sparse extents: instar over-
+  reports <code>required</code> because the raw scanner does not use
+  <code>SEEK_HOLE</code>/<code>SEEK_DATA</code>.</li>
+<li>QCOW2 sources for some real-world images: instar's
+  scanner counts allocated bytes slightly differently
+  (compressed-cluster or extended-L2 subcluster edge
+  case under investigation).</li>
+<li>QCOW2 sources with backing chains: instar reports the
+  top layer's allocations only.</li>
+<li>VHDX sources: instar treats every BAT block as fully
+  allocated.</li>
+<li>VMDK multi-extent source layouts: instar's extent map
+  propagation differs.</li>
+<li>VHD legacy CHS-only sources: instar's reported
+  virtual_size differs by approximately 2 MiB.</li>
+</ul>
+<p>See <code>docs/measure.md</code> for the user-facing presentation of
+these divergences.</p>
+<h2 id="map-subcommand-quirks">map subcommand quirks<a class="headerlink" href="#map-subcommand-quirks" title="Permanent link">&para;</a></h2>
+<h3 id="-image-opts-is-rejected_1"><code>--image-opts</code> is rejected<a class="headerlink" href="#-image-opts-is-rejected_1" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img map --image-opts driver=qcow2,file.filename=...</code>
+accepts a descriptor-based source specification. instar does
+not support this form and errors out before launching the
+guest. Use the positional <code>FILENAME</code> argument instead.</p>
+<h3 id="backing-chain-depth-is-always-0-in-v1">Backing-chain <code>depth</code> is always 0 in v1<a class="headerlink" href="#backing-chain-depth-is-always-0-in-v1" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img map</code> walks the backing chain when present and
+emits a non-zero <code>depth</code> field in JSON output for extents
+that resolve through a parent image. instar's phase 1 / 2
+walkers report the active layer only and refuse sources
+that carry a backing/parent reference (qcow2
+<code>backing_file_offset != 0</code>, vhd <code>disk_type ==
+DISK_TYPE_DIFFERENCING</code>, vhdx <code>has_parent</code>). Chain
+composition is tracked as a follow-up under
+<a href="/components/instar/plans/PLAN-map/">PLAN-map.md</a>. In v1 the <code>depth</code> JSON
+field is always <code>0</code>.</p>
+<h3 id="raw-source-sparseness-is-not-detected">Raw source sparseness is not detected<a class="headerlink" href="#raw-source-sparseness-is-not-detected" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img map</code> calls <code>lseek(SEEK_HOLE)</code> / <code>lseek(SEEK_DATA)</code>
+on the underlying file for raw sources and reports the
+sparse vs. dense regions as separate extents
+(<code>present: true, zero: true, data: false</code> for the sparse
+runs). instar's no_std raw walker has no syscall surface
+inside the guest and reports one fully-allocated <code>data:
+true</code> extent covering the whole virtual size. A host-side
+<code>SEEK_HOLE</code> pre-pass that feeds an extent list through
+<code>MapConfig</code> is tracked as future work.</p>
+<h3 id="vhd-unallocated-blocks-are-reported-as-present-false">VHD unallocated blocks are reported as <code>present: false</code><a class="headerlink" href="#vhd-unallocated-blocks-are-reported-as-present-false" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img map</code> reports a dynamic VHD's unallocated BAT entries
+(<code>0xFFFFFFFF</code>) as <code>present: true, zero: true, data: false</code> —
+the same <code>ZeroAllocated</code> convention it applies to raw sparse
+runs. instar's vhd walker reports them as <code>present: false,
+zero: true, data: false</code> (<code>Hole</code>), faithful to the on-disk
+BAT marker. Functionally equivalent for downstream consumers
+that care only about which bytes contain data; visually
+different in the <code>present</code> field. Phase 6's
+<code>KNOWN_MAP_DIVERGENCES</code> (<code>hyperv-dynamic-vhd</code>,
+<code>virtualpc-vhd</code>) and phase 8's differential fuzzer
+(<code>MAP_FIELD_SKIPS</code> in <code>scripts/differential-fuzz.py</code>)
+both skip the <code>present</code> field on vpc sources for this
+reason.</p>
+<h3 id="vhdx-payload_block_partially_present-is-reported-as-data-true">VHDX <code>PAYLOAD_BLOCK_PARTIALLY_PRESENT</code> is reported as <code>data: true</code><a class="headerlink" href="#vhdx-payload_block_partially_present-is-reported-as-data-true" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img map</code> walks the per-sector bitmap for partially-
+present VHDX blocks and emits per-sector extents. instar's
+phase 1 vhdx walker treats <code>PARTIALLY_PRESENT</code> as fully
+present (same posture as <code>scan_allocation</code>) and reports
+the entire block as one <code>data: true</code> extent. The
+per-sector-bitmap walk is tracked as future work.</p>
+<h3 id="vmdk-multi-extent-sources-are-refused">VMDK multi-extent sources are refused<a class="headerlink" href="#vmdk-multi-extent-sources-are-refused" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img map</code> reads the VMDK descriptor and walks the
+multi-extent layout. instar's <code>VmdkState::init</code> only parses
+the VMDK4 binary header, so descriptor-driven (multi-extent
+monolithicFlat / 2GbMaxExtent…) sources fail init. The
+host CLI also refuses them via <code>peek_is_vmdk_descriptor</code>
+before launching the guest, pointing the user at <code>qemu-img
+map</code> as the workaround.</p>
+<h3 id="qcow2-v3-standard-l2-qcow_oflag_zero-not-honoured">qcow2 v3 standard-L2 <code>QCOW_OFLAG_ZERO</code> not honoured<a class="headerlink" href="#qcow2-v3-standard-l2-qcow_oflag_zero-not-honoured" title="Permanent link">&para;</a></h3>
+<p>In qcow2 v3 (compat=1.1) images that use <em>standard</em> L2 tables
+(8-byte entries, not extended L2), the <code>QCOW_OFLAG_ZERO</code> bit
+(bit 0) on an L2 entry signals <code>QCOW2_CLUSTER_ZERO_PLAIN</code>
+(when <code>host_offset == 0</code>) or <code>QCOW2_CLUSTER_ZERO_ALLOC</code> (when
+<code>host_offset != 0</code>) — both of which qemu-img reports as
+<code>present: true, zero: true, data: false</code> (<code>ZeroAllocated</code>).
+instar's <code>classify_qcow2_l2_standard</code> ignores the bit and
+treats any non-zero L2 entry without <code>OFLAG_COMPRESSED</code> as
+<code>Data</code>; if <code>host_offset == 0</code> it reports <code>Hole</code>. This is a
+pre-existing gap in the qcow2 parser (<code>cluster_lookup</code> has no
+<code>OFLAG_ZERO</code> branch either) inherited by map for consistency.
+Reporting the bit correctly is a single-edit change in
+<code>classify_qcow2_l2_standard</code> once we want to land it; tracked
+as future work in PLAN-map.md. Extended-L2 subcluster-bitmap
+<code>ZeroAllocated</code> reporting is unaffected — instar walks the
+bitmap and classifies subclusters correctly.</p>
+<h3 id="qcow2-compressed-clusters-report-compressed-false">qcow2 compressed clusters report <code>compressed: false</code><a class="headerlink" href="#qcow2-compressed-clusters-report-compressed-false" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img map</code> emits <code>compressed: true</code> for extents that
+back compressed-cluster L2 entries. instar's phase 1 qcow2
+walker classifies compressed clusters as <code>Data</code> with the
+compressed-payload file offset, but does not carry the
+compressed bit through the FFI / protobuf path. The phase 4
+renderer emits <code>compressed: false</code> for every extent
+unconditionally. Extending <code>MapExtentRecord</code> and
+<code>MapExtentMessage</code> with a <code>compressed: bool</code> field is
+tracked as future work; once landed, the differential
+fuzzer will catch any remaining divergence on
+compressed-cluster sources.</p>
+<h3 id="trailing-newline-after-json">Trailing newline after JSON <code>]</code><a class="headerlink" href="#trailing-newline-after-json" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img map --output=json</code> emits a single trailing
+newline after the closing <code>]</code>. instar matches this
+byte-for-byte. (An earlier draft of this document
+incorrectly stated "no trailing newline" based on a
+misread of <code>cat -A</code> output — <code>cat -A</code> places the <code>$</code>
+end-of-line marker <em>before</em> each newline, including the
+trailing one, which made the trailing newline easy to
+miss in spot-check verification. Phase 6's full baseline
+sweep surfaced the discrepancy and corrected the
+renderer.)</p>
+<h3 id="partial-output-on-guest-failure">Partial output on guest failure<a class="headerlink" href="#partial-output-on-guest-failure" title="Permanent link">&para;</a></h3>
+<p>The renderer writes the human header (or the JSON <code>[</code>)
+before any <code>MapExtentMessage</code> arrives. If the guest fails
+to start, or reports an error code mid-stream, the user
+sees a partial table or an unclosed JSON array on stdout
+plus a clear stderr message and a non-zero exit code.
+JSON consumers should always check the process exit code
+before parsing stdout. The trade-off keeps the streaming
+path clean — the alternative (buffer everything host-side
+until the success path is known) defeats the streaming
+memory bound.</p>
+<h3 id="window-filter-is-byte-level-not-cluster-aligned">Window filter is byte-level, not cluster-aligned<a class="headerlink" href="#window-filter-is-byte-level-not-cluster-aligned" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img map --start-offset=N --max-length=M</code> silently
+clamps <code>--start-offset</code> to a cluster boundary on output
+(the extent containing the offset is emitted in full
+starting from the cluster boundary). instar's
+<code>clip_to_window</code> operates at the byte level, which can
+produce a leading partial extent that qemu-img would not.
+Functionally equivalent for downstream consumers that
+care about byte ranges; visually different in human
+output.</p>
+<h2 id="create-subcommand-quirks">create subcommand quirks<a class="headerlink" href="#create-subcommand-quirks" title="Permanent link">&para;</a></h2>
+<h3 id="raw-create-runs-entirely-host-side">Raw <code>create</code> runs entirely host-side<a class="headerlink" href="#raw-create-runs-entirely-host-side" title="Permanent link">&para;</a></h3>
+<p><code>instar create -f raw</code> opens the output file with
+<code>O_CREAT|O_TRUNC|O_RDWR</code>, calls <code>ftruncate(virtual_size)</code>, and
+optionally applies <code>posix_fallocate</code> (<code>--preallocation falloc</code>)
+or zero-fills via <code>fallocate(FALLOC_FL_ZERO_RANGE)</code> with a
+<code>pwrite</code> fallback (<code>--preallocation full</code>). No KVM guest is
+launched — raw has no metadata to emit, so the single-code-path
+principle yields to a pure host-side shortcut. Every other target
+format runs <code>create.bin</code> in the sandbox. See open question 6 in
+<code>docs/plans/PLAN-create.md</code> for the design rationale.</p>
+<h3 id="backing-file-path-is-written-verbatim">Backing-file path is written verbatim<a class="headerlink" href="#backing-file-path-is-written-verbatim" title="Permanent link">&para;</a></h3>
+<p>The user-typed <code>-b BACKING</code> argument lands in the new image's
+metadata verbatim — relative paths stay relative, absolute paths
+stay absolute. The host resolves the path <strong>relative to the new
+image's directory</strong> when opening the backing file for the
+parser, so the resulting reference is portable across moves of
+the parent. Matches qemu-img exactly.</p>
+<h3 id="backing-file-format-inference-requires-f-or-u">Backing-file format inference requires <code>-F</code> or <code>-u</code><a class="headerlink" href="#backing-file-format-inference-requires-f-or-u" title="Permanent link">&para;</a></h3>
+<p><code>instar create -b BACKING ...</code> requires either <code>-F BACKING_FMT</code>
+(explicit format hint) or <code>-u</code> (unsafe; assume raw). Newer
+qemu-img versions enforce the same rule. The hint is the
+initial format guess; if the backing file's first sector
+contradicts the hint via its magic bytes, auto-detection wins
+and the metadata records the detected format. Three-level
+chains record only the immediate parent — instar does not
+recurse, matching qemu-img.</p>
+<h3 id="preallocation-accept-set">Preallocation accept set<a class="headerlink" href="#preallocation-accept-set" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>raw</th>
+<th>qcow2</th>
+<th>vmdk / vpc / vhdx</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>off</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>rejected</td>
+<td>yes</td>
+<td>rejected (future work)</td>
+</tr>
+<tr>
+<td><code>falloc</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>rejected (future work)</td>
+</tr>
+<tr>
+<td><code>full</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>rejected (future work)</td>
+</tr>
+</tbody>
+</table>
+<p><code>raw + metadata</code> is rejected because raw has no metadata to
+preallocate. Non-qcow2 sparse formats reject non-<code>off</code>
+preallocation with a "future work" pointer — each format needs
+its own BAT-population pattern plus the same host
+<code>apply_preallocation</code> post-pass qcow2 already uses.</p>
+<h3 id="vhd-virtual_size-diverges-from-qemu-img-by-chs-rounding">VHD <code>virtual_size</code> diverges from qemu-img by CHS rounding<a class="headerlink" href="#vhd-virtual_size-diverges-from-qemu-img-by-chs-rounding" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img create -f vpc</code> rounds the requested <code>virtual_size</code> up
+to the next CHS-aligned multiple (legacy VHD geometry layout);
+<code>instar create -f vpc</code> emits exact bytes. The divergence is
+typically &lt; 256 KiB across the supported size range. Both files
+are valid VHDs — the difference surfaces only in the
+<code>virtual-size</code> field reported by <code>qemu-img info</code>. Phase 8b's
+<code>tests/test_create.py::KNOWN_WRITER_DIVERGENCES</code> skips every
+affected case; closing this gap is documented future work.</p>
+<h3 id="qcow2-refcount_bits-is-hardcoded-to-16">qcow2 <code>refcount_bits</code> is hardcoded to 16<a class="headerlink" href="#qcow2-refcount_bits-is-hardcoded-to-16" title="Permanent link">&para;</a></h3>
+<p><code>crates/qcow2::create::build_header</code> emits <code>refcount_order = 4</code>
+(=&gt; 16-bit refcount entries on disk) regardless of the user's
+<code>-o refcount_bits=...</code> value. Honoured values that don't cause
+visible divergence: <code>1</code> and <code>8</code> (smaller widths still fit the
+16-bit encoding and produce valid files). <code>refcount_bits=64</code>
+produces a header <code>instar check</code> rejects on round-trip — the
+only entry in <code>tests/test_create.py::KNOWN_CHECK_FAILURES</code>.
+Closing the gap requires parameterising the L1/L2/refcount math
+over the user's choice. Future work.</p>
+<h3 id="qcow2-compat010-is-silently-upgraded-to-11">qcow2 <code>compat=0.10</code> is silently upgraded to <code>1.1</code><a class="headerlink" href="#qcow2-compat010-is-silently-upgraded-to-11" title="Permanent link">&para;</a></h3>
+<p>The writer hardcodes <code>compat=1.1</code> in the header. qemu-img
+honours <code>compat=0.10</code> for compatibility with pre-3.0 qemu
+releases. instar always emits the v3 header. Future work.</p>
+<h3 id="qcow2-compression_typezstd-is-accept-ignored">qcow2 <code>compression_type=zstd</code> is accept-ignored<a class="headerlink" href="#qcow2-compression_typezstd-is-accept-ignored" title="Permanent link">&para;</a></h3>
+<p>The <code>-o compression_type=zstd</code> option is accepted at parse
+time but the header records <code>zlib</code> regardless. A fresh image
+has no compressed cluster data so the field-only divergence
+has no functional impact — the discrepancy only surfaces in
+<code>qemu-img info</code>'s <code>format-specific.data.compression-type</code>
+field. Future work: drop the accept-ignore and emit the zstd
+header bit so a subsequent convert / write into the image can
+emit zstd-compressed clusters.</p>
+<h3 id="vhdx-default-block_size-differs-from-qemu-img">vhdx default <code>block_size</code> differs from qemu-img<a class="headerlink" href="#vhdx-default-block_size-differs-from-qemu-img" title="Permanent link">&para;</a></h3>
+<p>At virtual sizes ≤ 1 GiB, <code>instar create -f vhdx</code> defaults to
+an 8 MiB block size; <code>qemu-img create -f vhdx</code> always defaults
+to 32 MiB. Specifying <code>-o block_size=...</code> (or <code>--block-size</code>)
+explicitly avoids the divergence — phase 8b's matrix
+demonstrates clean round-trip for explicit block-size cases
+(<code>1G-block-16M</code>, <code>1G-block-32M</code>). Future work is to match
+qemu's 32 MiB default at all virtual sizes.</p>
+<h3 id="vhd-fixed-subformat-carries-footer-only-metadata">VHD fixed subformat carries footer-only metadata<a class="headerlink" href="#vhd-fixed-subformat-carries-footer-only-metadata" title="Permanent link">&para;</a></h3>
+<p><code>instar create -f vpc -o subformat=fixed FILENAME SIZE</code> produces
+a file of <code>SIZE + 512</code> bytes — zero data plus a 512-byte footer
+at end-of-file. The footer is the only metadata.
+<code>qemu-img info</code> without an explicit <code>-f</code> flag auto-detects the
+file as <code>format=raw</code> because the leading bytes carry no magic;
+pass <code>-f vpc</code> explicitly to surface the vhd format. This is
+qemu's native behaviour and not a bug in either tool. Phase 7's
+baselines were recorded without <code>-f</code>, so phase 8's matrix
+comparison naturally agrees on both sides.</p>
+<h3 id="known-check-failure-qcow2-refcount_bits64">Known check failure: qcow2 <code>refcount_bits=64</code><a class="headerlink" href="#known-check-failure-qcow2-refcount_bits64" title="Permanent link">&para;</a></h3>
+<p><code>instar create -f qcow2 -o refcount_bits=64 ...</code> produces a
+file whose internal validator rejects on <code>instar check</code>
+("image check failed: errors detected"). The header claims
+64-bit refcounts but the on-disk entries are 16-bit
+(refcount_bits hardcode, above). This is the only entry in
+<code>tests/test_create.py::KNOWN_CHECK_FAILURES</code>; <code>refcount_bits=1</code>
+and <code>=8</code> fit the encoding and pass.</p>
+<h2 id="resize-subcommand-quirks">resize subcommand quirks<a class="headerlink" href="#resize-subcommand-quirks" title="Permanent link">&para;</a></h2>
+<h3 id="raw-resize-runs-entirely-host-side">Raw <code>resize</code> runs entirely host-side<a class="headerlink" href="#raw-resize-runs-entirely-host-side" title="Permanent link">&para;</a></h3>
+<p><code>instar resize -f raw</code> opens the file <code>O_RDWR</code>, calls
+<code>ftruncate(new_virtual_size)</code>, and optionally applies
+<code>posix_fallocate</code> (<code>--preallocation falloc</code>) or zero-fills via
+<code>fallocate(FALLOC_FL_ZERO_RANGE)</code> with a <code>pwrite</code> fallback
+(<code>--preallocation full</code>) over the newly-added byte range.
+No KVM guest is launched — raw has no metadata to mutate.
+Every other target format runs <code>resize.bin</code> in the sandbox.
+Same shortcut and rationale as <code>create</code>.</p>
+<h3 id="qemu-img-cannot-resize-vmdk-vpc-vhdx-on-any-shipped-version">qemu-img cannot resize vmdk / vpc / vhdx on any shipped version<a class="headerlink" href="#qemu-img-cannot-resize-vmdk-vpc-vhdx-on-any-shipped-version" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img resize -f vpc|vmdk|vhdx ...</code> rejects with
+<code>qemu-img: Image format driver does not support resize</code> on
+every qemu-img version from 6.0.0 through 10.2.0 (the matrix
+phase 10 exercises). instar resizes all three. The phase 10
+baselines record qemu's rejection verbatim, both as
+documentation of the cross-tool gap and as a tripwire for the
+day qemu adds support. Phase 11's <code>TestResizeConsistency</code>
+covers vmdk/vhd/vhdx via an <code>instar create → resize → info →
+check</code> round-trip rather than a cross-tool diff. If
+<code>vmdkinfo</code> / <code>vhdiinfo</code> (libyal) ever gain resize support,
+the differential surface gets a third axis.</p>
+<h3 id="preallocation-covers-only-the-appended-file-region">Preallocation covers only the appended file region<a class="headerlink" href="#preallocation-covers-only-the-appended-file-region" title="Permanent link">&para;</a></h3>
+<p>For <code>--preallocation=falloc|full</code> on grow, instar preallocates
+only <code>[file_size_before, file_size_after)</code> — the bytes the
+planner physically appended past the pre-resize EOF.
+<code>qemu-img resize</code> preallocates the entire data region of the
+new virtual size (i.e. every cluster / block the resized
+image's metadata can address). Both behaviours satisfy the
+"reserve disk blocks" intent, but they're not identical: a
+qemu-resized 1 GiB qcow2 with <code>--preallocation=full</code> writes
+~1 GiB of zeros to disk; an instar-resized one writes only
+the new L1 region. This is a deliberate divergence — closing
+it requires per-format walk-and-populate logic comparable to
+a <code>dd if=/dev/zero</code> over the data region. Documented in
+<a href="/components/instar/
+plans/PLAN-resize-phase-09-preallocation/">docs/plans/PLAN-resize-phase-09-preallocation.md</a> and queued under
+PLAN-resize.md's Future-work section.</p>
+<h3 id="-preallocationfallocfull-shrink-is-rejected"><code>--preallocation=falloc|full</code> + <code>--shrink</code> is rejected<a class="headerlink" href="#-preallocationfallocfull-shrink-is-rejected" title="Permanent link">&para;</a></h3>
+<p>instar rejects the combination outright with
+<code>resize: --preallocation=&lt;mode&gt; is meaningless when shrinking</code>.
+qemu silently accepts the combination and discards the
+preallocation flag (the shrink still happens; the prealloc is
+a no-op). The deliberate divergence makes the user's
+intent explicit when they pass conflicting flags. Phase 11's
+<code>TestResizeErrorPaths</code> pins the rejection message.</p>
+<h3 id="-preallocationmetadata-on-raw-is-rejected"><code>--preallocation=metadata</code> on raw is rejected<a class="headerlink" href="#-preallocationmetadata-on-raw-is-rejected" title="Permanent link">&para;</a></h3>
+<p>instar rejects with <code>resize: --preallocation=metadata is not
+supported for raw</code>. qemu accepts the flag and silently
+no-ops (raw has no metadata to populate, so the operation
+degrades to a plain <code>ftruncate</code>). Same rationale as the
+shrink-+-prealloc rejection: explicit-reject for clarity.</p>
+<h3 id="qcow2-preallocationmetadata-is-rejected-by-the-planner">qcow2 <code>--preallocation=metadata</code> is rejected by the planner<a class="headerlink" href="#qcow2-preallocationmetadata-is-rejected-by-the-planner" title="Permanent link">&para;</a></h3>
+<p>The qcow2 grow planner returns
+<code>ResizeError::PreallocationUnsupported</code> for <code>metadata</code> mode
+(<code>resize: guest reported error 8: preallocation mode not
+supported by this format</code>). qemu supports it. The planner gap
+was deferred from phase 2c; the integration matrix carries it
+in <code>KNOWN_RESIZE_DIVERGENCES</code> and the differential fuzz
+picker filters the case so it doesn't show up as a finding.
+Closing the gap requires the same <code>Qcow2Layout</code> extension
+work that ships in create's metadata mode, adapted for the
+grow path. Future work.</p>
+<h3 id="vhd-chs-rounded-virtual_size-carries-forward-through-resize">VHD CHS-rounded <code>virtual_size</code> carries forward through resize<a class="headerlink" href="#vhd-chs-rounded-virtual_size-carries-forward-through-resize" title="Permanent link">&para;</a></h3>
+<p>The create-time CHS-rounding divergence (qemu rounds
+virtual_size up to the next CHS-aligned multiple; instar
+emits exact bytes — see <code>create subcommand quirks</code> above)
+persists across resize. The resize planner preserves whatever
+the create writer chose, so an <code>instar create -f vpc</code> →
+<code>instar resize -f vpc</code> round-trip stays internally
+consistent; an <code>instar resize</code> against a qemu-created VHD
+preserves the qemu CHS-rounded size in the output. Phase 11's
+<code>TestResizeConsistency</code> for vhd uses a <code>&gt;= expected_final_size</code>
+assertion (rather than equality) to accommodate any future
+CHS-rounding alignment in the resize writer.</p>
+<h3 id="image-resized-output-matches-qemu-byte-for-byte"><code>Image resized.</code> output matches qemu byte-for-byte<a class="headerlink" href="#image-resized-output-matches-qemu-byte-for-byte" title="Permanent link">&para;</a></h3>
+<p><code>instar resize</code> emits the literal string <code>Image resized.</code>
+(followed by a newline) on success in human mode — identical
+to qemu-img's output. <code>-q</code> suppresses it. <code>--output=json</code>
+swaps in a structured envelope (filename, format, action,
+old/new virtual size, new file size) and ignores <code>-q</code>.</p>
+<h3 id="qcow2-overlays-with-a-backing-file-are-rejected-up-front">qcow2 overlays with a backing file are rejected up-front<a class="headerlink" href="#qcow2-overlays-with-a-backing-file-are-rejected-up-front" title="Permanent link">&para;</a></h3>
+<p><code>instar resize</code> of a qcow2 image whose header carries a
+<code>backing_file_offset</code> / <code>backing_file_size</code> rejects with
+<code>resize: qcow2 images with a backing file are not yet
+supported (resize would orphan the backing reference);
+resize the base image directly or flatten via</code>instar convert<code>first</code>. The qcow2 resize planners do not
+yet thread the existing backing reference through the
+header-rewrite path, so without this guard the rewritten
+header would have <code>backing_file_offset = 0</code> and the overlay
+would lose its parent. The rejection mirrors VHDX's
+<code>has_parent</code> guard. Lifting it is queued under PLAN-resize.md
+Future work — see the "Planner gaps" section.</p>
+<h3 id="same-file-is-exposed-as-input-device-0-and-output-device-1">Same file is exposed as input device 0 and output device 1<a class="headerlink" href="#same-file-is-exposed-as-input-device-0-and-output-device-1" title="Permanent link">&para;</a></h3>
+<p>The resize guest binary reads via <code>read_output_sector</code> (new
+in phase 7) and writes via <code>write_output_sector</code>, both
+dispatching to the output device at MMIO slot 1. The core
+init unconditionally probes input device 0; the host
+satisfies the probe with a 1-sector tempfile stub that the
+resize op never reads, then attaches the real read-write
+output backing at slot 1. Mirrors the same pattern
+<code>run_create_nonraw</code> uses for the same reason. The first
+phase-11 integration run surfaced this contract: an earlier
+revision attached the output at slot 0, which broke the
+guest's <code>init stage=probe device=output address=0x10001000</code>
+walk. Caught and fixed before phase 11 landed.</p>
+<h3 id="qcow2-grow-has-no-image-size-ceiling-qcow2-shrink-does">qcow2 grow has no image-size ceiling; qcow2 shrink does<a class="headerlink" href="#qcow2-grow-has-no-image-size-ceiling-qcow2-shrink-does" title="Permanent link">&para;</a></h3>
+<p>After followup-01, qcow2 <em>grow</em> is bounded only by what the
+filesystem can hold — the guest's targeted pre-pass stages a
+small bounded set of refcount blocks (≤ 16) regardless of
+image size. Tested end-to-end through 1 TiB → 2 TiB in 163 ms.</p>
+<p>qcow2 <em>shrink</em> still uses the older "stage every non-zero
+refcount block" pre-pass and so retains a per-cluster-size
+ceiling: 4 MiB of <code>EXISTING_STATE</code> divided by <code>cluster_size</code>
+gives the maximum number of refcount blocks stage-able, each
+covering <code>cluster_size² / 2</code> bytes of file. At the default
+64 KiB cluster the ceiling is ~128 GiB; at 4 KiB it's ~8 GiB;
+at 1 MiB it's ~512 TiB (no practical limit). Lifting it
+requires a two-phase shrink pre-pass that walks the L2 tables
+first to identify which clusters are discarded, then stages
+only the refcount blocks containing those clusters; queued
+under PLAN-resize.md Future-work as a separate followup.</p>
+<p>Raw / vmdk / vpc / vhdx grow and shrink have no analogous
+metadata-staging step and are bounded only by filesystem
+capacity.</p>
+<h2 id="rebase-subcommand-quirks">rebase subcommand quirks<a class="headerlink" href="#rebase-subcommand-quirks" title="Permanent link">&para;</a></h2>
+<h3 id="unsafe-u-is-byte-equivalent-across-qemu-img-versions">Unsafe (<code>-u</code>) is byte-equivalent across qemu-img versions<a class="headerlink" href="#unsafe-u-is-byte-equivalent-across-qemu-img-versions" title="Permanent link">&para;</a></h3>
+<p>The post-rebase <code>qemu-img info --output=json</code> for <code>instar
+rebase -u</code> matches <code>qemu-img rebase -u</code> byte-for-byte across
+qemu-img 6.0.0 through 10.2.0 after the
+<code>KNOWN_REBASE_DIVERGENCES</code> whitelist
+(<code>tests/helpers/info_json.py</code>). Cross-version coverage:
+<code>tests/test_rebase.py:TestRebaseBaselineMatrix</code>.</p>
+<h3 id="qemu-img-cannot-rebase-vmdk-vhd-vhdx-on-any-shipped-version">qemu-img cannot rebase vmdk / vhd / vhdx on any shipped version<a class="headerlink" href="#qemu-img-cannot-rebase-vmdk-vhd-vhdx-on-any-shipped-version" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img rebase -f vpc|vmdk|vhdx ...</code> rejects with
+<code>qemu-img: Image format driver does not support rebase</code> on
+every version 6.0.0 through 10.2.0. instar rebase
+unsafe-mode supports vmdk monolithicSparse; the
+post-rebase descriptor records the new
+<code>parentFileNameHint</code> via the cross-tool comparison in
+<code>TestRebaseSuccessPaths</code>. Cross-version baselines cover
+qcow2 only — there is nothing to record for the
+instar-only targets.</p>
+<h3 id="safe-mode-rebase-for-vmdk-is-not-yet-supported">Safe-mode rebase for vmdk is not yet supported<a class="headerlink" href="#safe-mode-rebase-for-vmdk-is-not-yet-supported" title="Permanent link">&para;</a></h3>
+<p>instar's safe-mode planner refuses vmdk with
+<code>ERROR_UNSUPPORTED_FORMAT</code>; qemu-img refuses vmdk rebase
+entirely. Lifting the gap (cluster comparison loop +
+descriptor rewrite atomicity for vmdk grain tables) is
+tracked under PLAN-rebase-commit Future work.</p>
+<h3 id="long-path-relocation-is-rejected">Long-path relocation is rejected<a class="headerlink" href="#long-path-relocation-is-rejected" title="Permanent link">&para;</a></h3>
+<p>If the new backing-file path is longer than the overlay's
+existing slot (qcow2 <code>backing_file_size</code> field), instar
+refuses with <code>ERROR_BACKING_PATH_TOO_LONG</code>. qemu-img
+silently relocates the path string to a fresh cluster and
+updates the header offset. Lifting the gap (planner +
+guest scratch budget for the appended path cluster) is
+tracked under PLAN-rebase-commit Future work; until then,
+keep the new backing path's length ≤ the overlay's
+existing slot.</p>
+<h3 id="cross-cluster-size-rebase-is-rejected">Cross-cluster-size rebase is rejected<a class="headerlink" href="#cross-cluster-size-rebase-is-rejected" title="Permanent link">&para;</a></h3>
+<p>Safe-mode rebase requires the old and new backings to
+share a cluster size. If they differ, instar refuses with
+<code>ERROR_NEW_BACKING_INCOMPATIBLE</code>. qemu-img silently
+succeeds but the resulting overlay has inconsistent
+metadata; the master plan tracks this as a future
+hardening item. Use unsafe-mode rebase (<code>-u</code>) when the
+caller knows the new backing's data is bit-identical to
+the old.</p>
+<h3 id="image-rebased-image-detached-output-matches-qemu-byte-for-byte"><code>Image rebased.</code> / <code>Image detached.</code> output matches qemu byte-for-byte<a class="headerlink" href="#image-rebased-image-detached-output-matches-qemu-byte-for-byte" title="Permanent link">&para;</a></h3>
+<p>instar emits the same trailing-newline-terminated strings
+as <code>qemu-img rebase</code>. <code>--output=json</code> adds a structured
+envelope unique to instar (see
+<a href="/components/instar/rebase/">docs/rebase.md</a>).</p>
+<h2 id="commit-subcommand-quirks">commit subcommand quirks<a class="headerlink" href="#commit-subcommand-quirks" title="Permanent link">&para;</a></h2>
+<h3 id="implicit-b-matches-the-overlays-recorded-parent">Implicit <code>-b</code> matches the overlay's recorded parent<a class="headerlink" href="#implicit-b-matches-the-overlays-recorded-parent" title="Permanent link">&para;</a></h3>
+<p><code>instar commit FILENAME</code> (no <code>-b</code>) reads the overlay's
+recorded backing-file pointer and uses it as the commit
+target. Matches <code>qemu-img commit</code>'s implicit-<code>-b</code>
+semantics. v1 supports only the overlay's immediate
+parent; if <code>-b BASE</code> is supplied and resolves to a
+different file than the recorded parent, instar refuses
+with <code>commit through an intermediate layer is not yet
+supported</code>.</p>
+<h3 id="qemu-img-cannot-commit-vhd-vhdx-raw">qemu-img cannot commit vhd / vhdx / raw<a class="headerlink" href="#qemu-img-cannot-commit-vhd-vhdx-raw" title="Permanent link">&para;</a></h3>
+<p>qemu-img commit accepts qcow2 and vmdk monolithicSparse —
+the only formats with backing-chain support — and
+refuses every other format. instar matches that surface.</p>
+<h3 id="vmdk-implicit-b-is-blocked-by-a-host-info-gap">vmdk implicit-<code>-b</code> is blocked by a host info gap<a class="headerlink" href="#vmdk-implicit-b-is-blocked-by-a-host-info-gap" title="Permanent link">&para;</a></h3>
+<p>The host info operation doesn't currently surface vmdk
+monolithicSparse's <code>parentFileNameHint</code> via the
+<code>backing_file</code> field, so the host's <code>-b</code>-against-
+recorded-parent check refuses every vmdk commit without
+an explicit <code>-b</code>. Phase 9's matrix and round-trip vmdk
+cases all pass an explicit <code>-b base.vmdk</code>. Tracked
+separately under PLAN-info's vmdk follow-ups; once the
+info-side gap lifts, the implicit form will work too.</p>
+<h3 id="cluster-size-mismatch-is-refused-up-front">Cluster-size mismatch is refused up-front<a class="headerlink" href="#cluster-size-mismatch-is-refused-up-front" title="Permanent link">&para;</a></h3>
+<p>If the overlay and backing have different qcow2 cluster
+sizes, the host pre-check refuses with <code>commit between
+mismatched cluster sizes is not yet supported</code>. qemu-img
+silently succeeds with limited efficiency. Lifting the
+gap requires cluster-size adapters in the planner's
+per-cluster loop.</p>
+<h3 id="cross-format-commit-is-refused">Cross-format commit is refused<a class="headerlink" href="#cross-format-commit-is-refused" title="Permanent link">&para;</a></h3>
+<p>qcow2 → qcow2 and vmdk → vmdk only. Cross-format commit
+(e.g. qcow2 overlay onto a vmdk backing) is refused with
+<code>ERROR_UNSUPPORTED_FORMAT</code>. Lifting needs planner
+extensions plus a cluster-size translation layer.</p>
+<h3 id="cluster_size-64-kib-overflows-the-commit-scratch-budget"><code>cluster_size &gt; 64 KiB</code> overflows the commit scratch budget<a class="headerlink" href="#cluster_size-64-kib-overflows-the-commit-scratch-budget" title="Permanent link">&para;</a></h3>
+<p>The commit guest binary's <code>OVERLAY_RT_LIMIT</code> and
+<code>BACKING_RT_LIMIT</code> scratch regions are sized at
+<code>MAX_SECTOR_SIZE</code> (64 KiB), so a single-cluster refcount
+table for any <code>cluster_size &gt; 64 KiB</code> overflows the
+budget and returns <code>ERROR_SCRATCH_TOO_SMALL</code>. The
+differential fuzzer picker
+(<code>scripts/differential-fuzz.py:_commit_option_picker</code>)
+caps <code>cluster_size</code> at 64 KiB to match; lifting the
+guest-side limit is a master-plan TODO.</p>
+<h3 id="-d-p-r-t-are-not-implemented"><code>-d</code> / <code>-p</code> / <code>-r</code> / <code>-t</code> are not implemented<a class="headerlink" href="#-d-p-r-t-are-not-implemented" title="Permanent link">&para;</a></h3>
+<p>qemu-img commit's <code>-d</code> (drop overlay after commit), <code>-p</code>
+(progress bar), <code>-r</code> (rate limit), and <code>-t</code> (cache mode)
+flags are not implemented in instar v1. The user can
+manually <code>rm</code> the overlay after a successful commit when
+the equivalent of <code>-d</code> is needed. All four are tracked
+under PLAN-rebase-commit Future work.</p>
+<h3 id="image-committed-output-matches-qemu-byte-for-byte"><code>Image committed.</code> output matches qemu byte-for-byte<a class="headerlink" href="#image-committed-output-matches-qemu-byte-for-byte" title="Permanent link">&para;</a></h3>
+<p>instar emits the same trailing-newline-terminated string
+as <code>qemu-img commit</code>. <code>--output=json</code> adds a structured
+envelope unique to instar (see
+<a href="/components/instar/commit/">docs/commit.md</a>).</p>
+<h3 id="same-file-is-exposed-as-input-device-0-and-output-device-1_1">Same file is exposed as input device 0 and output device 1<a class="headerlink" href="#same-file-is-exposed-as-input-device-0-and-output-device-1_1" title="Permanent link">&para;</a></h3>
+<p>Commit's two-device layout has the overlay attached at
+input slot 0 opened RW (so the guest's overlay-clear
+pass can write through <code>write_input_sector(0, ...)</code>)
+and the backing attached as the output device opened
+RW. The backing's own ancestor chain occupies input
+slots [1..N) read-only — v1 doesn't consult them, but
+the slots are populated so the future "skip when chain
+provides this data" mode (see
+<a href="/components/instar/
+plans/PLAN-rebase-commit-phase-08-commit-host/">PLAN-rebase-commit-phase-08-commit-host.md</a>) can
+plug in without an ABI change.</p>
 <h2 id="future-additions">Future Additions<a class="headerlink" href="#future-additions" title="Permanent link">&para;</a></h2>
 <p>Additional quirks will be documented here as they are discovered during
 compatibility testing.</p>
