@@ -347,7 +347,7 @@ def _reset_database_stub() -> None:
 
 
 def _grpc_call(method: Any, request: Any) -> Any:
-    """Call a gRPC method with timeout, wait_for_ready, and retry.
+    """Call a gRPC method with timeout and retry.
 
     Retries on UNAVAILABLE and DEADLINE_EXCEEDED with a short delay
     between attempts. Resets the gRPC channel after persistent failures
@@ -364,6 +364,14 @@ def _grpc_call(method: Any, request: Any) -> Any:
     than an ``RpcError``. Treat that ValueError as retryable in the
     same way -- the channel was just closed under us, so the next
     attempt picks up a fresh stub from ``_get_database_stub()``.
+
+    ``wait_for_ready`` is deliberately left at the gRPC default of
+    False. With ``wait_for_ready=True`` a wedged subchannel (server
+    process alive but cygrpc no longer routing requests, as seen in
+    the slim-primary CI failures of June 2026) parks the caller in
+    ``_blocking`` forever instead of failing fast with UNAVAILABLE,
+    so the retry path here -- which closes and rebuilds the channel
+    -- never fires. Fail-fast plus retry recovers; fail-slow does not.
     """
     retryable_codes = {
         grpc.StatusCode.UNAVAILABLE,
@@ -385,7 +393,7 @@ def _grpc_call(method: Any, request: Any) -> Any:
             if attempt > 0 and method_name:
                 stub = _get_database_stub()
                 method = getattr(stub, method_name)
-            return method(request, timeout=GRPC_TIMEOUT, wait_for_ready=True)
+            return method(request, timeout=GRPC_TIMEOUT)
         except grpc.RpcError as e:
             last_error = e
             if e.code() not in retryable_codes:
@@ -4429,7 +4437,7 @@ def _grpc_prune_events() -> int:
     try:
         stub = _get_database_stub()
         request = database_pb2.PruneEventsRequest()
-        reply = stub.PruneEvents(request, timeout=300.0, wait_for_ready=True)
+        reply = stub.PruneEvents(request, timeout=300.0)
         if not reply.success:
             LOG.warning(f'gRPC PruneEvents failed: {reply.error}')
             return int(reply.rows_pruned)
@@ -4482,8 +4490,7 @@ def _grpc_get_object_events(
             limit=limit,
             event_type_filter=event_type if event_type is not None else '',
         )
-        reply = stub.GetObjectEvents(
-            request, timeout=30.0, wait_for_ready=True)
+        reply = stub.GetObjectEvents(request, timeout=30.0)
     except grpc.RpcError as e:
         LOG.error(f'gRPC GetObjectEvents failed: {e}')
         return []
@@ -4532,8 +4539,7 @@ def _grpc_delete_object_events(
                 ObjectType(object_type).proto_id),  # type: ignore[call-arg]
             object_uuid=object_uuid,
         )
-        reply = stub.DeleteObjectEvents(
-            request, timeout=30.0, wait_for_ready=True)
+        reply = stub.DeleteObjectEvents(request, timeout=30.0)
         if not reply.success:
             LOG.warning(
                 f'gRPC DeleteObjectEvents failed for '
