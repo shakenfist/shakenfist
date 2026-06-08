@@ -59,10 +59,17 @@ dependencies = [
     "flask-request-id-middleware==1.1",   # mit
 
     "protobuf==6.33.6",                   # bsd
-    "grpcio==1.81.0",                     # apache2
-    "grpcio-health-checking==1.81.0",     # apache2
-    "grpcio-status==1.81.0",              # apache2
-    "grpcio-tools==1.81.0",               # apache2
+    # Bisect step 1 between 1.70 (last known good) and 1.81 (current,
+    # broken). slim-primary CI shows sf-database's cygrpc layer
+    # silently dropping requests on the wire under burst load with
+    # 1.81. Park at 1.75.1 and let CI tell us which half of the range
+    # owns the regression. grpcio-tools >= 1.73 already requires
+    # protobuf 6, so the 6.33.6 pin above does not need to move for
+    # any version in the upper half (1.73 -- 1.81).
+    "grpcio==1.75.1",                     # apache2
+    "grpcio-health-checking==1.75.1",     # apache2
+    "grpcio-status==1.75.1",              # apache2
+    "grpcio-tools==1.75.1",               # apache2
     "googleapis-common-protos==1.75.0",   # apache2
 
     "requests==2.33.1",                   # apache2
