@@ -126,7 +126,7 @@ dependencies = [
     "oslo.concurrency==7.5.0",
     "oslo.config==10.3.0",
     "oslo.i18n==6.8.0",
-    "oslo.utils==10.0.1",
+    "oslo.utils==10.1.0",
     "packaging==26.0",
     "pylogrus==0.4.0",
     "pyparsing==3.3.2",
