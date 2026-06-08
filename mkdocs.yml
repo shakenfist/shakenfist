@@ -123,6 +123,7 @@ nav:
             - "Technology Primer": components/instar/technology-primer.md
             - "Why Rust for Instar": components/instar/rust-rationale.md
             - Commentary:
+                - "Instar Commentary": components/instar/commentary/index.md
                 - "Architectural Decisions": components/instar/commentary/architectural-decisions.md
                 - "Reading Order": components/instar/commentary/reading-order.md
             - Crates:
@@ -133,80 +134,20 @@ nav:
                 - "qcow2-v2 Test Image": components/instar/image_notes/qcow2-v2.md
                 - "virtualpc-vhd Test Image": components/instar/image_notes/virtualpc-vhd.md
             - Plans:
-                - "`instar create` subcommand": components/instar/plans/PLAN-create.md
-                - "`instar map` subcommand": components/instar/plans/PLAN-map.md
-                - "`instar measure` subcommand": components/instar/plans/PLAN-measure.md
-                - "`instar rebase` and `instar commit` subcommands": components/instar/plans/PLAN-rebase-commit.md
-                - "`instar resize` subcommand": components/instar/plans/PLAN-resize.md
-                - "Automated fuzzer bug fix workflow": components/instar/plans/PLAN-fuzz-autofix.md
-                - "Convert follow-ups: deferred work after PLAN-convert.md": components/instar/plans/PLAN-convert-followups.md
-                - "Coverage-guided fuzzing of parser crates (Phase 6)": components/instar/plans/PLAN-coverage-fuzzing.md
-                - "Instar and qemu-img security audit": components/instar/plans/PLAN-audit.md
-                - "Phase 1 — `plan_vmdk` capacity panic (category A1)": components/instar/plans/PLAN-fuzzing-bugs-phase-01-create-emitters.md
-                - "Phase 10: differential fuzzer extension for `instar create`": components/instar/plans/PLAN-create-phase-10-fuzz-differential.md
-                - "Phase 10: documentation, CHANGELOG polish, follow-ups": components/instar/plans/PLAN-measure-phase-10-docs.md
-                - "Phase 11: documentation, CHANGELOG polish, follow-ups": components/instar/plans/PLAN-create-phase-11-docs.md
-                - "Phase 1: per-format extent iterators on the parser crates": components/instar/plans/PLAN-map-phase-01-extent-iterators.md
-                - "Phase 1: per-format size calculators (`crates/measure/`)": components/instar/plans/PLAN-measure-phase-01-calculators.md
-                - "Phase 2 — qcow2 `scan_allocation` invariant break (category A2)": components/instar/plans/PLAN-fuzzing-bugs-phase-02-measure-scan.md
-                - "Phase 2: guest `map` operation + protobuf + call-table boundary": components/instar/plans/PLAN-map-phase-02-guest-op.md
-                - "Phase 2: source-allocation scanners on the parser crates": components/instar/plans/PLAN-measure-phase-02-allocation-scanners.md
-                - "Phase 3 — measure calculator overflow (category A3)": components/instar/plans/PLAN-fuzzing-bugs-phase-03-measure-calc.md
-                - "Phase 3: guest `measure` operation + protobuf result + call-table boundary": components/instar/plans/PLAN-measure-phase-03-guest-op.md
-                - "Phase 3: host VMM subcommand + clap surface": components/instar/plans/PLAN-map-phase-03-host-cli.md
-                - "Phase 4 — measure fixed-VHD source detection (category B1)": components/instar/plans/PLAN-fuzzing-bugs-phase-04-measure-fixed-vhd.md
-                - "Phase 4: host VMM subcommand and output formatting": components/instar/plans/PLAN-measure-phase-04-host-cli.md
-                - "Phase 4: output formatting": components/instar/plans/PLAN-map-phase-04-output-formatting.md
-                - "Phase 5 — differential-fuzz timeout classification (category B2)": components/instar/plans/PLAN-fuzzing-bugs-phase-05-diff-fuzz-timeouts.md
-                - "Phase 5: `-o key=value,...` qemu-img-style option parsing": components/instar/plans/PLAN-measure-phase-05-target-options.md
-                - "Phase 5: cross-version baselines": components/instar/plans/PLAN-map-phase-05-baselines.md
-                - "Phase 6: cross-version `qemu-img measure` baselines": components/instar/plans/PLAN-measure-phase-06-baselines.md
-                - "Phase 6: integration tests": components/instar/plans/PLAN-map-phase-06-integration-tests.md
-                - "Phase 7: coverage-guided fuzz harness for map iterators": components/instar/plans/PLAN-map-phase-07-fuzz-coverage.md
-                - "Phase 7: cross-version `qemu-img create` baselines": components/instar/plans/PLAN-create-phase-07-baselines.md
-                - "Phase 7: integration tests against the cross-version baselines": components/instar/plans/PLAN-measure-phase-07-integration-tests.md
-                - "Phase 8: coverage-guided fuzzing for `crates/measure/` and the scanners": components/instar/plans/PLAN-measure-phase-08-fuzz-coverage.md
-                - "Phase 8: differential fuzzing against `qemu-img map`": components/instar/plans/PLAN-map-phase-08-fuzz-differential.md
-                - "Phase 8: integration tests against the cross-version create baselines": components/instar/plans/PLAN-create-phase-08-integration-tests.md
-                - "Phase 9: coverage-guided fuzzing for `crates/create/` emitters": components/instar/plans/PLAN-create-phase-09-fuzz-coverage.md
-                - "Phase 9: differential fuzzer extension for `instar measure`": components/instar/plans/PLAN-measure-phase-09-fuzz-differential.md
-                - "Phase 9: documentation and CHANGELOG": components/instar/plans/PLAN-map-phase-09-docs.md
-                - "PLAN-create phase 1: per-format metadata emitters": components/instar/plans/PLAN-create-phase-01-emitters.md
-                - "PLAN-create phase 2: guest `create` operation binary": components/instar/plans/PLAN-create-phase-02-guest-op.md
-                - "PLAN-create phase 3: host VMM subcommand": components/instar/plans/PLAN-create-phase-03-host-cli.md
-                - "PLAN-create phase 4: qemu-img-style `-o key=value,...` parser": components/instar/plans/PLAN-create-phase-04-target-options.md
-                - "PLAN-create phase 5: backing-file polish": components/instar/plans/PLAN-create-phase-05-backing-file.md
-                - "PLAN-create phase 6: preallocation modes": components/instar/plans/PLAN-create-phase-06-preallocation.md
-                - "PLAN-rebase-commit phase 01: shared ABI": components/instar/plans/PLAN-rebase-commit-phase-01-abi.md
-                - "PLAN-rebase-commit phase 02: rebase planners": components/instar/plans/PLAN-rebase-commit-phase-02-rebase-planners.md
-                - "PLAN-rebase-commit phase 03: rebase guest binary": components/instar/plans/PLAN-rebase-commit-phase-03-rebase-guest.md
-                - "PLAN-rebase-commit phase 04: rebase host CLI": components/instar/plans/PLAN-rebase-commit-phase-04-rebase-host.md
-                - "PLAN-rebase-commit phase 05: rebase integration tests + baselines": components/instar/plans/PLAN-rebase-commit-phase-05-rebase-tests.md
-                - "PLAN-rebase-commit phase 06: commit planners": components/instar/plans/PLAN-rebase-commit-phase-06-commit-planners.md
-                - "PLAN-rebase-commit phase 07: commit guest binary": components/instar/plans/PLAN-rebase-commit-phase-07-commit-guest.md
-                - "PLAN-rebase-commit phase 08: commit host CLI": components/instar/plans/PLAN-rebase-commit-phase-08-commit-host.md
-                - "PLAN-rebase-commit phase 09: commit integration tests + baselines": components/instar/plans/PLAN-rebase-commit-phase-09-commit-tests.md
-                - "PLAN-rebase-commit phase 10: coverage-guided fuzzing": components/instar/plans/PLAN-rebase-commit-phase-10-fuzz.md
-                - "PLAN-rebase-commit phase 11: differential fuzzing vs qemu-img": components/instar/plans/PLAN-rebase-commit-phase-11-diff-fuzz.md
-                - "PLAN-rebase-commit phase 12: documentation, CHANGELOG, ARCHITECTURE": components/instar/plans/PLAN-rebase-commit-phase-12-docs.md
-                - "PLAN-resize followup 01: targeted refcount-block pre-pass": components/instar/plans/PLAN-resize-followup-01-targeted-prepass.md
-                - "PLAN-resize phase 10: cross-version baselines": components/instar/plans/PLAN-resize-phase-10-baselines.md
-                - "PLAN-resize phase 11: integration tests": components/instar/plans/PLAN-resize-phase-11-integration-tests.md
-                - "PLAN-resize phase 12: fuzz harnesses": components/instar/plans/PLAN-resize-phase-12-fuzz.md
-                - "PLAN-resize phase 13: documentation, CHANGELOG, follow-ups": components/instar/plans/PLAN-resize-phase-13-docs.md
-                - "PLAN-resize phase 1: planner skeleton, raw, and shared types": components/instar/plans/PLAN-resize-phase-01-skeleton.md
-                - "PLAN-resize phase 2: qcow2 grow planner": components/instar/plans/PLAN-resize-phase-02-qcow2-grow.md
-                - "PLAN-resize phase 3: qcow2 shrink planner": components/instar/plans/PLAN-resize-phase-03-qcow2-shrink.md
-                - "PLAN-resize phase 4: VHD resize planner": components/instar/plans/PLAN-resize-phase-04-vhd.md
-                - "PLAN-resize phase 5: VHDX resize planner": components/instar/plans/PLAN-resize-phase-05-vhdx.md
-                - "PLAN-resize phase 6: VMDK resize planner": components/instar/plans/PLAN-resize-phase-06-vmdk.md
-                - "PLAN-resize phase 7: guest `resize` operation": components/instar/plans/PLAN-resize-phase-07-guest-op.md
-                - "PLAN-resize phase 8: host VMM subcommand": components/instar/plans/PLAN-resize-phase-08-host-cli.md
-                - "PLAN-resize phase 9: preallocation modes": components/instar/plans/PLAN-resize-phase-09-preallocation.md
-                - "Plan: First Public Release of Instar": components/instar/plans/PLAN-release.md
-                - "Plan: Multi-distro install + qemu-img differential CI": components/instar/plans/PLAN-distro-matrix-ci.md
+                - "Plans index": components/instar/plans/index.md
+                - "Distro matrix CI": components/instar/plans/PLAN-distro-matrix-ci.md
                 - "Release v0.2.0": components/instar/plans/PLAN-release-v0.2.md
-                - "Triage and fix the standing fuzzing-bug backlog": components/instar/plans/PLAN-fuzzing-bugs.md
+                - "First public release of instar": components/instar/plans/PLAN-release.md
+                - "Security audit": components/instar/plans/PLAN-audit.md
+                - "Coverage-guided fuzzing": components/instar/plans/PLAN-coverage-fuzzing.md
+                - "Fuzz autofix workflow": components/instar/plans/PLAN-fuzz-autofix.md
+                - "Convert follow-ups": components/instar/plans/PLAN-convert-followups.md
+                - "instar measure subcommand": components/instar/plans/PLAN-measure.md
+                - "instar create subcommand": components/instar/plans/PLAN-create.md
+                - "instar resize subcommand": components/instar/plans/PLAN-resize.md
+                - "instar rebase and commit subcommands": components/instar/plans/PLAN-rebase-commit.md
+                - "instar map subcommand": components/instar/plans/PLAN-map.md
+                - "Fuzzing bug backlog": components/instar/plans/PLAN-fuzzing-bugs.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
@@ -253,6 +194,7 @@ nav:
             - "USB Redirection Protocol": components/kerbside/usb-redirection.md
             - "VD Agent Protocol": components/kerbside/vd-agent-protocol.md
             - Plans:
+                - "Plans index": components/kerbside/plans/index.md
                 - "Automated SPICE test harness": components/kerbside/plans/PLAN-test-harness.md
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
@@ -267,6 +209,7 @@ nav:
             - "Tar Format Selection": components/occystrap/tar-format-selection.md
             - "Use Cases": components/occystrap/use-cases.md
             - Plans:
+                - "LLM planning documents": components/occystrap/plans/index.md
                 - "A more structured and less verbose approach to logging": components/occystrap/plans/PLAN-structured-logging.md
                 - "Implementing `info` and `check` subcommands for occystrap": components/occystrap/plans/PLAN-info-check.md
                 - "Make the speed: occystrap performance overhaul": components/occystrap/plans/PLAN-make-the-speed.md
@@ -293,7 +236,6 @@ nav:
             - "Building and Testing on macOS": components/ryll/development-macos.md
             - "Channel diagnostics audit": components/ryll/channel-diagnostics-audit.md
             - "Configuration": components/ryll/configuration.md
-            - "Control Socket Protocol — Version 1.0": components/ryll/control-socket-protocol.md
             - "Installation": components/ryll/installation.md
             - "K1: tokio waker silently lost on main channel after T+465 s": components/ryll/TOKIO-WEDGING.md
             - "Libvirt / QEMU Settings for Best SPICE Performance with Ryll": components/ryll/libvirt-spice-recommendations.md
@@ -303,181 +245,42 @@ nav:
             - "ryll --web operator guide": components/ryll/web-frontend.md
             - "Troubleshooting": components/ryll/troubleshooting.md
             - Plans:
-                - "Android APK Port of Ryll": components/ryll/plans/PLAN-android-apk.md
-                - "Bug reporting mode for ryll": components/ryll/plans/PLAN-bug-reports.md
-                - "Bug-report trigger-time snapshot (2026-04-23)": components/ryll/plans/PLAN-bugreport-trigger-snapshot.md
-                - "Capture mode for protocol and display debugging": components/ryll/plans/PLAN-capture.md
-                - "CI platform-matrix expansion": components/ryll/plans/PLAN-ci-platform-matrix.md
-                - "Completed phase plans": components/ryll/plans/completed/README.md
-                - "Connection properties dialog": components/ryll/plans/PLAN-connection-properties.md
-                - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
-                - "Deferred debt: collating and paying down outstanding work": components/ryll/plans/PLAN-deferred-debt.md
-                - "Diagnosing "video stream not keeping up" reports": components/ryll/plans/PLAN-video-keeping-up.md
-                - "Display draw-op coverage": components/ryll/plans/PLAN-display-draw-ops.md
-                - "Display Iteration Follow-ups": components/ryll/plans/PLAN-display-iteration-followups.md
-                - "egui / eframe 0.34 follow-up cleanup": components/ryll/plans/PLAN-egui-0.34-followups.md
-                - "Extract reusable crates from ryll": components/ryll/plans/PLAN-crate-extraction.md
-                - "Hamburger menu for status-bar actions": components/ryll/plans/PLAN-hamburger-menu.md
-                - "Idle CPU reduction and real latency measurement": components/ryll/plans/PLAN-idle-cpu-and-latency.md
-                - "Interactive USB device management UI": components/ryll/plans/PLAN-usb-ui.md
-                - "Macbook bug-report fixes (2026-04-23)": components/ryll/plans/PLAN-macbook-bugreport-fixes.md
-                - "macOS runtime metrics for bug reports": components/ryll/plans/PLAN-macos-runtime-metrics.md
-                - "Notifications system": components/ryll/plans/PLAN-notifications.md
-                - "Open questions awaiting data": components/ryll/plans/OPEN-QUESTIONS.md
-                - "Paste-as-keystrokes fallback": components/ryll/plans/PLAN-paste-as-keystrokes.md
-                - "Phase 01: Auto-snapshot ring buffer at disconnect moment": components/ryll/plans/PLAN-session-001-feedback-phase-01-disconnect-snapshot.md
-                - "Phase 01: Idle CPU profile": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile.md
-                - "Phase 02: Main-channel reconnect / keepalive (originally framed as the K1 fix)": components/ryll/plans/PLAN-session-001-feedback-phase-02-reconnect.md
-                - "Phase 03: Preserve audio volume across reconnect": components/ryll/plans/PLAN-session-001-feedback-phase-03-audio-volume.md
-                - "Phase 04: Region-select zero-width guard": components/ryll/plans/PLAN-session-001-feedback-phase-04-region-select.md
-                - "Phase 05: Handle `SPICE_MSG_DISPLAY_STREAM_DESTROY_ALL`": components/ryll/plans/PLAN-session-001-feedback-phase-05-stream-destroy-all.md
-                - "Phase 06: Rebalance per-channel ring-buffer split by expected traffic": components/ryll/plans/PLAN-session-001-feedback-phase-06-channel-rebalance.md
-                - "Phase 07: `Arc<[u8]>` refactor for `TrafficEntry::pcap_frame`": components/ryll/plans/PLAN-session-001-feedback-phase-07-traffic-arc.md
-                - "Phase 08: Segment large messages in ring-buffer frame builder": components/ryll/plans/PLAN-session-001-feedback-phase-08-ring-segmentation.md
-                - "Phase 09: Connection events in the notifications pane (F1)": components/ryll/plans/PLAN-session-001-feedback-phase-09-connection-notifications.md
-                - "Phase 1 — always fit window to guest surface": components/ryll/plans/PLAN-display-window-sizing-phase-01-always-fit.md
-                - "Phase 1 — PR 31 follow-up: regression tests": components/ryll/plans/PLAN-pr31-followup-phase-01-tests.md
-                - "Phase 1 — STREAM_REPORT": components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report.md
-                - "Phase 1 — trigger-snapshot metadata plumbing": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-01-metadata.md
-                - "Phase 10: Notification → bug-report button (F2)": components/ryll/plans/PLAN-session-001-feedback-phase-10-notification-bug-button.md
-                - "Phase 10: Testing and QEMU setup": components/ryll/plans/PLAN-usb-redir-phase-10-testing.md
-                - "Phase 11 — Remove spurious-PONG keepalive": components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md
-                - "Phase 12 — Bounded image cache": components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache.md
-                - "Phase 13 — Investigate intermittent server-side streaming": components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md
-                - "Phase 14 — Stop status-bar pointer events leaking into the guest": components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak.md
-                - "Phase 15 — Track down `build_tcp_frame: payload too large` warns": components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn.md
-                - "Phase 16 — Evaluate guest driver options for video streaming": components/ryll/plans/PLAN-stream-caps-and-flap-phase-16-qxl-viability.md
-                - "Phase 17 — Patched libspice-server for hypothesis validation": components/ryll/plans/PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation.md
-                - "Phase 1: Capture infrastructure": components/ryll/plans/PLAN-capture-phase-01-infra.md
-                - "Phase 1: Convert ryll to a Cargo workspace": components/ryll/plans/PLAN-crate-extraction-phase-01-workspace.md
-                - "Phase 1: Display correctness": components/ryll/plans/PLAN-deferred-debt-phase-01-display.md
-                - "Phase 1: Display-channel instrumentation": components/ryll/plans/PLAN-video-keeping-up-phase-01-instrumentation.md
-                - "Phase 1: Fix enumerate_physical bus field": components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix.md
-                - "Phase 1: Migrate action buttons to hamburger menu": components/ryll/plans/PLAN-hamburger-menu-phase-01-migrate.md
-                - "Phase 1: Notification store and ring buffer": components/ryll/plans/PLAN-notifications-phase-01-store.md
-                - "Phase 1: Parse SpiceCursor image data": components/ryll/plans/PLAN-cursor-rendering-phase-01-parse.md
-                - "Phase 1: Paste-as-keystrokes translator": components/ryll/plans/PLAN-paste-as-keystrokes-phase-01-translator.md
-                - "Phase 1: Platform Portability": components/ryll/plans/PLAN-packaging-phase-01-portability.md
-                - "Phase 1: Plumbing": components/ryll/plans/PLAN-display-draw-ops-phase-01-plumbing.md
-                - "Phase 1: Process-level metrics on macOS": components/ryll/plans/PLAN-macos-runtime-metrics-phase-01-process.md
-                - "Phase 1: Renderer extraction (`shakenfist-spice-renderer`)": components/ryll/plans/PLAN-web-frontend-phase-01-extract.md
-                - "Phase 1: Ring buffer infrastructure": components/ryll/plans/PLAN-bug-reports-phase-01-ring-buffer.md
-                - "Phase 1: Screenshot hotkey and save dialog": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-01-screenshot.md
-                - "Phase 1: SpiceVMC channel transport": components/ryll/plans/PLAN-usb-redir-phase-01-vmc-channel.md
-                - "Phase 1: SpiceVMC port channel transport for WebDAV": components/ryll/plans/PLAN-webdav-phase-01-port-channel.md
-                - "Phase 2 — hamburger toggle and CLI flag": components/ryll/plans/PLAN-display-window-sizing-phase-02-toggle.md
-                - "Phase 2 — LZ4 compression": components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4.md
-                - "Phase 2 — PR 31 follow-up: docs sweep": components/ryll/plans/PLAN-pr31-followup-phase-02-docs.md
-                - "Phase 2 — trigger-time surface snapshot": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-02-snapshot.md
-                - "Phase 2: Audio correctness": components/ryll/plans/PLAN-deferred-debt-phase-02-audio.md
-                - "Phase 2: Channel integration and CLI flags": components/ryll/plans/PLAN-paste-as-keystrokes-phase-02-channel-cli.md
-                - "Phase 2: Channel state snapshots": components/ryll/plans/PLAN-bug-reports-phase-02-channel-state.md
-                - "Phase 2: DRAW_FILL (solid brush)": components/ryll/plans/PLAN-display-draw-ops-phase-02-fill.md
-                - "Phase 2: Encoder pipeline (framebuffer → H.264 NAL units)": components/ryll/plans/PLAN-web-frontend-phase-02-encoder.md
-                - "Phase 2: GitHub Actions CI": components/ryll/plans/PLAN-packaging-phase-02-ci.md
-                - "Phase 2: Latency sparkline": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-02-latency-sparkline.md
-                - "Phase 2: Move pcap writes to a dedicated writer task": components/ryll/plans/PLAN-video-keeping-up-phase-02-pcap-thread.md
-                - "Phase 2: Mux protocol (demux and remux)": components/ryll/plans/PLAN-webdav-phase-02-mux-protocol.md
-                - "Phase 2: Pcap packet capture": components/ryll/plans/PLAN-capture-phase-02-pcap.md
-                - "Phase 2: Per-thread enumeration and naming on macOS": components/ryll/plans/PLAN-macos-runtime-metrics-phase-02-threads.md
-                - "Phase 2: Render cursor as egui overlay": components/ryll/plans/PLAN-cursor-rendering-phase-02-render.md
-                - "Phase 2: Repaint cadence fix": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint.md
-                - "Phase 2: Reserve crate names on crates.io": components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names.md
-                - "Phase 2: SPICE_MSG_NOTIFY end-to-end": components/ryll/plans/PLAN-notifications-phase-02-spice-notify.md
-                - "Phase 2: usbredir protocol parser": components/ryll/plans/PLAN-usb-redir-phase-02-usbredir-parser.md
-                - "Phase 2: Wire usb_tx and channel events": components/ryll/plans/PLAN-usb-ui-phase-02-wire-tx.md
-                - "Phase 3 — Fast JPEG decode": components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders.md
-                - "Phase 3 — PR 31 follow-up: polish items": components/ryll/plans/PLAN-pr31-followup-phase-03-polish.md
-                - "Phase 3 — submit-time region crop": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-03-region.md
-                - "Phase 3 — tests for the resize state machine": components/ryll/plans/PLAN-display-window-sizing-phase-03-tests.md
-                - "Phase 3: Bug report assembly and zip output": components/ryll/plans/PLAN-bug-reports-phase-03-zip-output.md
-                - "Phase 3: Debian Packaging": components/ryll/plans/PLAN-packaging-phase-03-debian.md
-                - "Phase 3: Demote protocol logging": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging.md
-                - "Phase 3: Device backend trait": components/ryll/plans/PLAN-usb-redir-phase-03-device-backend.md
-                - "Phase 3: Documentation": components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-03-docs.md
-                - "Phase 3: DRAW_BLACKNESS and DRAW_WHITENESS": components/ryll/plans/PLAN-display-draw-ops-phase-03-monochrome.md
-                - "Phase 3: Embedded WebDAV server": components/ryll/plans/PLAN-webdav-phase-03-webdav-server.md
-                - "Phase 3: Extract shakenfist-spice-compression": components/ryll/plans/PLAN-crate-extraction-phase-03-compression.md
-                - "Phase 3: GUI gesture for paste-as-keystrokes": components/ryll/plans/PLAN-paste-as-keystrokes-phase-03-gui.md
-                - "Phase 3: Input and session correctness": components/ryll/plans/PLAN-deferred-debt-phase-03-session.md
-                - "Phase 3: macOS metrics integration verification and soak": components/ryll/plans/PLAN-macos-runtime-metrics-phase-03-integration.md
-                - "Phase 3: migrate Gaps and bug-report status as sources": components/ryll/plans/PLAN-notifications-phase-03-existing-sources.md
-                - "Phase 3: Move MP4 video encoding off the GUI event loop": components/ryll/plans/PLAN-video-keeping-up-phase-03-video-encode-thread.md
-                - "Phase 3: USB panel and status bar button": components/ryll/plans/PLAN-usb-ui-phase-03-panel.md
-                - "Phase 3: Video frame capture": components/ryll/plans/PLAN-capture-phase-03-video.md
-                - "Phase 3: WebRTC plumbing (`webrtc-rs`)": components/ryll/plans/PLAN-web-frontend-phase-03-webrtc.md
-                - "Phase 4 — Channel diagnostics audit + playback observability": components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics.md
-                - "Phase 4 — documentation": components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs.md
-                - "Phase 4 — documentation": components/ryll/plans/PLAN-display-window-sizing-phase-04-docs.md
-                - "Phase 4: COPY_BITS": components/ryll/plans/PLAN-display-draw-ops-phase-04-copy-bits.md
-                - "Phase 4: Device enumeration display": components/ryll/plans/PLAN-usb-ui-phase-04-enumerate.md
-                - "Phase 4: Documentation and cross-repo updates": components/ryll/plans/PLAN-paste-as-keystrokes-phase-04-docs.md
-                - "Phase 4: Extract shakenfist-spice-protocol": components/ryll/plans/PLAN-crate-extraction-phase-04-protocol.md
-                - "Phase 4: GUI report button and description dialog": components/ryll/plans/PLAN-bug-reports-phase-04-gui-button.md
-                - "Phase 4: GUI — bell, side panel, mark-read": components/ryll/plans/PLAN-notifications-phase-04-gui.md
-                - "Phase 4: HTTP server, token auth, signalling, browser shell": components/ryll/plans/PLAN-web-frontend-phase-04-server.md
-                - "Phase 4: Integration (mux ↔ WebDAV server)": components/ryll/plans/PLAN-webdav-phase-04-integration.md
-                - "Phase 4: Real device enumeration and passthrough": components/ryll/plans/PLAN-usb-redir-phase-04-real-devices.md
-                - "Phase 4: Real latency from PING/PONG": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency.md
-                - "Phase 4: Render-side arrival-to-display latency": components/ryll/plans/PLAN-video-keeping-up-phase-04-render-latency.md
-                - "Phase 4: Robustness and safety": components/ryll/plans/PLAN-deferred-debt-phase-04-robustness.md
-                - "Phase 4: RPM Packaging": components/ryll/plans/PLAN-packaging-phase-04-rpm.md
-                - "Phase 5 — Auto-snapshot bug-report mode": components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md
-                - "Phase 5 — resolution-change notifications": components/ryll/plans/PLAN-display-window-sizing-phase-05-notify.md
-                - "Phase 5: Capture runtime metrics in bug reports": components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics.md
-                - "Phase 5: Code quality and cleanup": components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup.md
-                - "Phase 5: Connect and disconnect controls": components/ryll/plans/PLAN-usb-ui-phase-05-connect.md
-                - "Phase 5: Device connection lifecycle": components/ryll/plans/PLAN-usb-redir-phase-05-device-connect.md
-                - "Phase 5: docs and bug-report serialisation": components/ryll/plans/PLAN-notifications-phase-05-docs.md
-                - "Phase 5: DRAW_OPAQUE and DRAW_BLEND": components/ryll/plans/PLAN-display-draw-ops-phase-05-image-rop.md
-                - "Phase 5: Extract shakenfist-spice-usbredir": components/ryll/plans/PLAN-crate-extraction-phase-05-usbredir.md
-                - "Phase 5: GUI display region selection": components/ryll/plans/PLAN-bug-reports-phase-05-region-select.md
-                - "Phase 5: macOS Packaging": components/ryll/plans/PLAN-packaging-phase-05-macos.md
-                - "Phase 5: Real frames, inputs, cursor, audio": components/ryll/plans/PLAN-web-frontend-phase-05-iac.md
-                - "Phase 5: UI panel": components/ryll/plans/PLAN-webdav-phase-05-ui.md
-                - "Phase 6 — Multi-codec + H.264": components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264.md
-                - "Phase 6: Add virtual disk at runtime": components/ryll/plans/PLAN-usb-ui-phase-06-add-disk.md
-                - "Phase 6: Control and bulk transfers": components/ryll/plans/PLAN-usb-redir-phase-06-transfers.md
-                - "Phase 6: DRAW_TRANSPARENT and DRAW_ALPHA_BLEND": components/ryll/plans/PLAN-display-draw-ops-phase-06-alpha.md
-                - "Phase 6: GUI live traffic viewer": components/ryll/plans/PLAN-bug-reports-phase-06-traffic-viewer.md
-                - "Phase 6: Introduce ConnectionConfig and move SpiceClient": components/ryll/plans/PLAN-crate-extraction-phase-06-client.md
-                - "Phase 6: Reconnect and lifecycle": components/ryll/plans/PLAN-web-frontend-phase-06-lifecycle.md
-                - "Phase 6: Test coverage": components/ryll/plans/PLAN-deferred-debt-phase-06-tests.md
-                - "Phase 6: Testing and documentation": components/ryll/plans/PLAN-webdav-phase-06-testing.md
-                - "Phase 6: Windows Packaging": components/ryll/plans/PLAN-packaging-phase-06-windows.md
-                - "Phase 7 — Preference messages": components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages.md
-                - "Phase 7: CI build + packaging": components/ryll/plans/PLAN-web-frontend-phase-07-ci.md
-                - "Phase 7: Documentation and testing": components/ryll/plans/PLAN-bug-reports-phase-07-docs.md
-                - "Phase 7: DRAW_INVERS and warn-once for deferred ops": components/ryll/plans/PLAN-display-draw-ops-phase-07-invers-and-warnings.md
-                - "Phase 7: Release Automation": components/ryll/plans/PLAN-packaging-phase-07-release.md
-                - "Phase 7: Status feedback and polish": components/ryll/plans/PLAN-usb-ui-phase-07-polish.md
-                - "Phase 7: Virtual mass storage device (RAW images)": components/ryll/plans/PLAN-usb-redir-phase-07-virtual-msc.md
-                - "Phase 8 — Live streaming indicator + flap notification": components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator.md
-                - "Phase 8: --pedantic mode and status-bar gap counter": components/ryll/plans/PLAN-display-draw-ops-phase-08-pedantic.md
-                - "Phase 8: Documentation": components/ryll/plans/PLAN-usb-ui-phase-08-docs.md
-                - "Phase 8: Native TLS + operator docs + systemd": components/ryll/plans/PLAN-web-frontend-phase-08-docs.md
-                - "Phase 8: UI integration and CLI flags": components/ryll/plans/PLAN-usb-redir-phase-08-ui.md
-                - "Phase 9 — Vdagent responsiveness probe": components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe.md
-                - "Phase 9: Interrupt transfers": components/ryll/plans/PLAN-usb-redir-phase-09-interrupt.md
-                - "Phase 9: Thread live bug-report handles to the pedantic observer": components/ryll/plans/PLAN-display-draw-ops-phase-09-pedantic-handles.md
-                - "Plan: Port Ryll SPICE Client to Rust": components/ryll/plans/PLAN-initial.md
-                - "Plan: Publish workspace crates on release": components/ryll/plans/PLAN-crate-release.md
-                - "PR #20 follow-up fixes": components/ryll/plans/PLAN-pr20-followup.md
-                - "PR 23 follow-up: audio playback channel": components/ryll/plans/PLAN-pr23-followup.md
-                - "PR 31 follow-up: UI improvements, reconnect, and protocol fixes": components/ryll/plans/PLAN-pr31-followup.md
-                - "Remaining issues after initial bring-up": components/ryll/plans/PLAN-remaining-issues.md
-                - "Render SPICE cursor on screen": components/ryll/plans/PLAN-cursor-rendering.md
-                - "Replace audiopus with pure-Rust opus-decoder": components/ryll/plans/PLAN-opus-decoder.md
-                - "Screenshot capture and latency HUD": components/ryll/plans/PLAN-screenshot-and-latency-hud.md
-                - "Session-001 dogfooding feedback triage": components/ryll/plans/PLAN-session-001-feedback.md
-                - "Streaming test automation": components/ryll/plans/PLAN-streaming-test-automation.md
-                - "Supply-chain and prompt-injection scanning": components/ryll/plans/PLAN-supply-chain-scanning.md
+                - "Plans index": components/ryll/plans/index.md
+                - "Initial porting plan": components/ryll/plans/PLAN-initial.md
+                - "Capture mode": components/ryll/plans/PLAN-capture.md
+                - "Packaging": components/ryll/plans/PLAN-packaging.md
+                - "USB redirection": components/ryll/plans/PLAN-usb-redir.md
+                - "Cursor rendering": components/ryll/plans/PLAN-cursor-rendering.md
+                - "Bug reports": components/ryll/plans/PLAN-bug-reports.md
+                - "USB UI": components/ryll/plans/PLAN-usb-ui.md
+                - "WebDAV": components/ryll/plans/PLAN-webdav.md
+                - "Crate extraction": components/ryll/plans/PLAN-crate-extraction.md
+                - "Remaining issues": components/ryll/plans/PLAN-remaining-issues.md
+                - "Display follow-ups": components/ryll/plans/PLAN-display-iteration-followups.md
+                - "PR 20 follow-up": components/ryll/plans/PLAN-pr20-followup.md
+                - "PR 23 follow-up": components/ryll/plans/PLAN-pr23-followup.md
+                - "Deferred debt": components/ryll/plans/PLAN-deferred-debt.md
+                - "Supply-chain scanning": components/ryll/plans/PLAN-supply-chain-scanning.md
                 - "Supply-chain follow-ups": components/ryll/plans/PLAN-supply-chain-followups.md
-                - "USB device redirection via the SPICE usbredir channel": components/ryll/plans/PLAN-usb-redir.md
-                - "Video stream capability expansion and flap diagnostics": components/ryll/plans/PLAN-stream-caps-and-flap.md
-                - "Web frontend for ryll (SPICE → browser transcoder)": components/ryll/plans/PLAN-web-frontend.md
-                - "WebDAV folder sharing via the SPICE port channel": components/ryll/plans/PLAN-webdav.md
-                - "Window-follows-guest display sizing": components/ryll/plans/PLAN-display-window-sizing.md
+                - "Screenshot and latency HUD": components/ryll/plans/PLAN-screenshot-and-latency-hud.md
+                - "Idle CPU and latency": components/ryll/plans/PLAN-idle-cpu-and-latency.md
+                - "Display draw-op coverage": components/ryll/plans/PLAN-display-draw-ops.md
+                - "Android APK port": components/ryll/plans/PLAN-android-apk.md
+                - "Bug-report trigger snapshot": components/ryll/plans/PLAN-bugreport-trigger-snapshot.md
+                - "Paste-as-keystrokes fallback": components/ryll/plans/PLAN-paste-as-keystrokes.md
+                - "Hamburger menu": components/ryll/plans/PLAN-hamburger-menu.md
+                - "Notifications system": components/ryll/plans/PLAN-notifications.md
+                - "PR 31 follow-up": components/ryll/plans/PLAN-pr31-followup.md
+                - "Connection properties": components/ryll/plans/PLAN-connection-properties.md
+                - "Display window sizing": components/ryll/plans/PLAN-display-window-sizing.md
+                - "Web frontend": components/ryll/plans/PLAN-web-frontend.md
+                - "Opus decoder": components/ryll/plans/PLAN-opus-decoder.md
+                - "Crate release": components/ryll/plans/PLAN-crate-release.md
+                - "Session 001 feedback": components/ryll/plans/PLAN-session-001-feedback.md
+                - "Video keeping up": components/ryll/plans/PLAN-video-keeping-up.md
+                - "macOS runtime metrics": components/ryll/plans/PLAN-macos-runtime-metrics.md
+                - "CI platform matrix": components/ryll/plans/PLAN-ci-platform-matrix.md
+                - "Stream caps and flap diagnostics": components/ryll/plans/PLAN-stream-caps-and-flap.md
     - Features: features.md
     - Release notes:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
