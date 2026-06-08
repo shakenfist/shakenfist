@@ -312,7 +312,7 @@ nav:
                 - "Connection properties dialog": components/ryll/plans/PLAN-connection-properties.md
                 - "Cross-Platform Packaging for Ryll": components/ryll/plans/PLAN-packaging.md
                 - "Deferred debt: collating and paying down outstanding work": components/ryll/plans/PLAN-deferred-debt.md
-                - "Diagnosing "video stream not keeping up" reports": components/ryll/plans/PLAN-video-keeping-up.md
+                - "Diagnosing \"video stream not keeping up\" reports": components/ryll/plans/PLAN-video-keeping-up.md
                 - "Display draw-op coverage": components/ryll/plans/PLAN-display-draw-ops.md
                 - "Display Iteration Follow-ups": components/ryll/plans/PLAN-display-iteration-followups.md
                 - "egui / eframe 0.34 follow-up cleanup": components/ryll/plans/PLAN-egui-0.34-followups.md
