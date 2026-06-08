@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=https://json.schemastore.org/ansible-playbook.json
+#
+# Capture a py-spy thread dump for every running SF daemon on every
+# cluster node, then fetch the dumps back into the runner's bundle
+# directory so they get zipped into the job artifact.
+#
+# Driven by the per-job teardown in .github/workflows/functional-tests.yml.
+# Installed into the SF venv (already present on every node) so we don't
+# need to fight PEP 668 on Debian 12 / Ubuntu 24.04. py-spy ships
+# manylinux wheels so the install is a binary copy.
+#
+# Failure-tolerant by design: this runs in the always-on teardown path
+# and must never fail the job.
+
+- hosts: all
+  become: yes
+  gather_facts: no
+  vars:
+    pyspy_bin: /srv/shakenfist/venv/bin/py-spy
+    sf_daemons:
+      - sf-database
+      - sf-api
+      - sf-cleaner
+      - sf-cluster
+      - sf-net
+      - sf-nodelock
+      - sf-privexec
+      - sf-queues
+      - sf-resources
+      - sf-sentinel-first
+      - sf-sentinel-last
+      - sf-sidechannel
+      - sf-transfers
+  tasks:
+    - name: Install py-spy into SF venv (if not already present)
+      shell: |
+        if [ ! -x {{ pyspy_bin }} ]; then
+            /srv/shakenfist/venv/bin/pip install py-spy
+        fi
+      changed_when: false
+
+    - name: Make pyspy capture directory
+      file:
+        path: /tmp/pyspy
+        state: directory
+        mode: '0755'
+
+    - name: Find SF daemon pids
+      shell: pgrep -x {{ item }} || true
+      register: sf_pids
+      changed_when: false
+      loop: "{{ sf_daemons }}"
+
+    - name: Capture py-spy dump for each running SF daemon
+      shell: |
+        {{ pyspy_bin }} dump --pid {{ item.stdout }} \
+            > /tmp/pyspy/{{ item.item }}.txt 2>&1 || true
+      when: item.stdout != ""
+      loop: "{{ sf_pids.results }}"
+      loop_control:
+        label: "{{ item.item }} (pid {{ item.stdout }})"
+
+    - name: List captured pyspy files
+      find:
+        paths: /tmp/pyspy
+        patterns: "*.txt"
+      register: pyspy_files
+
+    - name: Fetch py-spy dumps back to runner bundle
+      fetch:
+        src: "{{ item.path }}"
+        dest: "/srv/github/bundle/{{ inventory_hostname }}/pyspy/{{ item.path | basename }}"
+        flat: yes
+      loop: "{{ pyspy_files.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      ignore_errors: yes

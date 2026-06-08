@@ -635,6 +635,14 @@ jobs:
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
+      - name: Capture py-spy thread dumps
+        if: always()
+        continue-on-error: true
+        run: |
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
+
       - name: Bundle artifacts
         if: always()
         run: |
@@ -1203,6 +1211,14 @@ jobs:
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
+      - name: Capture py-spy thread dumps
+        if: always()
+        continue-on-error: true
+        run: |
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
+
       - name: Bundle artifacts
         if: always()
         run: |
@@ -1607,6 +1623,14 @@ jobs:
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
+      - name: Capture py-spy thread dumps
+        if: always()
+        continue-on-error: true
+        run: |
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
+
       - name: Bundle artifacts
         if: always()
         run: |
@@ -1866,6 +1890,14 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+
+      - name: Capture py-spy thread dumps
+        if: always()
+        continue-on-error: true
+        run: |
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
 
       - name: Bundle artifacts
         if: always()
