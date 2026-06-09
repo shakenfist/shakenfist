@@ -61,8 +61,10 @@ LOG, _ = logs.setup(__name__)
 # Shared across this module and ``mariadb.py`` so manual ``sa.Table``
 # registrations in mariadb (object_states, cluster_locks,
 # node_daemon_states) get the same protection as the
-# pydantic_to_sqlalchemy_table path.
-TABLE_CREATION_LOCK = threading.Lock()
+# pydantic_to_sqlalchemy_table path. RLock because the ``_get_*_table``
+# wrappers in ``mariadb.py`` take the lock and then call
+# ``pydantic_to_sqlalchemy_table``, which re-enters it.
+TABLE_CREATION_LOCK = threading.RLock()
 
 
 # Marker classes for use with Annotated types

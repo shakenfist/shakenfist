@@ -914,16 +914,19 @@ def _get_object_metadata_table() -> sa.Table:
     """
     global _object_metadata_table
     if _object_metadata_table is None:
-        metadata = _get_metadata()
-        _object_metadata_table = sa.Table(
-            'object_metadata',
-            metadata,
-            sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
-            sa.Column('metadata_json', sa.Text(), nullable=True),
-            # Composite primary key
-            sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _object_metadata_table is not None:
+                return _object_metadata_table
+            metadata = _get_metadata()
+            _object_metadata_table = sa.Table(
+                'object_metadata',
+                metadata,
+                sa.Column('object_uuid', sa.String(36), nullable=False),
+                sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
+                sa.Column('metadata_json', sa.Text(), nullable=True),
+                # Composite primary key
+                sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
+            )
     return _object_metadata_table
 
 
@@ -979,38 +982,41 @@ def _get_cluster_operation_targets_table() -> sa.Table:
     """
     global _cluster_operation_targets_table
     if _cluster_operation_targets_table is None:
-        metadata = _get_metadata()
-        # sequence_number is the primary key so MariaDB applies
-        # AUTO_INCREMENT (SQLAlchemy only emits AUTO_INCREMENT DDL for
-        # the first column of the primary key on MySQL backends).
-        #
-        # The unique constraint is on the triple (operation_uuid,
-        # target_object_type, target_uuid): one op can target many
-        # objects (e.g. node_inst_net_iface_op targets instance,
-        # network, and interface), but the same op-target pair must
-        # not appear twice. A column-level UNIQUE on operation_uuid
-        # alone (the v1 schema) silently truncated multi-target ops.
-        # idx_cot_operation keeps single-column operation_uuid
-        # lookups fast.
-        _cluster_operation_targets_table = sa.Table(
-            'cluster_operation_targets',
-            metadata,
-            sa.Column('sequence_number', sa.BigInteger(),
-                      primary_key=True, autoincrement=True),
-            sa.Column('operation_uuid', sa.String(36), nullable=False),
-            sa.Column('operation_type', sa.String(64), nullable=False),
-            sa.Column('target_object_type', sa.Enum(ObjectType),
-                      nullable=False),
-            sa.Column('target_uuid', sa.String(36), nullable=False),
-            sa.Column('created_at', sa.Double(), nullable=False),
-            sa.UniqueConstraint(
-                'operation_uuid', 'target_object_type', 'target_uuid',
-                name='uq_cot_op_target'),
-            # Indexes for common query patterns
-            sa.Index('idx_cot_target', 'target_object_type', 'target_uuid'),
-            sa.Index('idx_cot_operation', 'operation_uuid'),
-            sa.Index('idx_cot_created', 'created_at'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_operation_targets_table is not None:
+                return _cluster_operation_targets_table
+            metadata = _get_metadata()
+            # sequence_number is the primary key so MariaDB applies
+            # AUTO_INCREMENT (SQLAlchemy only emits AUTO_INCREMENT DDL for
+            # the first column of the primary key on MySQL backends).
+            #
+            # The unique constraint is on the triple (operation_uuid,
+            # target_object_type, target_uuid): one op can target many
+            # objects (e.g. node_inst_net_iface_op targets instance,
+            # network, and interface), but the same op-target pair must
+            # not appear twice. A column-level UNIQUE on operation_uuid
+            # alone (the v1 schema) silently truncated multi-target ops.
+            # idx_cot_operation keeps single-column operation_uuid
+            # lookups fast.
+            _cluster_operation_targets_table = sa.Table(
+                'cluster_operation_targets',
+                metadata,
+                sa.Column('sequence_number', sa.BigInteger(),
+                          primary_key=True, autoincrement=True),
+                sa.Column('operation_uuid', sa.String(36), nullable=False),
+                sa.Column('operation_type', sa.String(64), nullable=False),
+                sa.Column('target_object_type', sa.Enum(ObjectType),
+                          nullable=False),
+                sa.Column('target_uuid', sa.String(36), nullable=False),
+                sa.Column('created_at', sa.Double(), nullable=False),
+                sa.UniqueConstraint(
+                    'operation_uuid', 'target_object_type', 'target_uuid',
+                    name='uq_cot_op_target'),
+                # Indexes for common query patterns
+                sa.Index('idx_cot_target', 'target_object_type', 'target_uuid'),
+                sa.Index('idx_cot_operation', 'operation_uuid'),
+                sa.Index('idx_cot_created', 'created_at'),
+            )
     return _cluster_operation_targets_table
 
 
@@ -1107,15 +1113,18 @@ def _get_node_metrics_table() -> sa.Table:
     """
     global _node_metrics_table
     if _node_metrics_table is None:
-        metadata = _get_metadata()
-        _node_metrics_table = sa.Table(
-            'node_metrics',
-            metadata,
-            sa.Column('node_uuid', sa.Uuid(), primary_key=True),
-            sa.Column('fqdn', sa.String(255), nullable=False),
-            sa.Column('timestamp', sa.Double(), nullable=False),
-            sa.Column('metrics_json', sa.JSON(), nullable=True),
-        )
+        with TABLE_CREATION_LOCK:
+            if _node_metrics_table is not None:
+                return _node_metrics_table
+            metadata = _get_metadata()
+            _node_metrics_table = sa.Table(
+                'node_metrics',
+                metadata,
+                sa.Column('node_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('fqdn', sa.String(255), nullable=False),
+                sa.Column('timestamp', sa.Double(), nullable=False),
+                sa.Column('metrics_json', sa.JSON(), nullable=True),
+            )
     return _node_metrics_table
 
 
@@ -1161,24 +1170,27 @@ def _get_cluster_operations_table() -> sa.Table:
     """
     global _cluster_operations_table
     if _cluster_operations_table is None:
-        metadata = _get_metadata()
-        _cluster_operations_table = sa.Table(
-            'cluster_operations',
-            metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
-            sa.Column('operation_type', sa.String(64), nullable=False),
-            sa.Column('created_at', sa.Double(), nullable=False),
-            sa.Column('node_uuid', sa.Uuid(), nullable=True),
-            sa.Column('instance_uuid', sa.Uuid(), nullable=True),
-            sa.Column('network_uuid', sa.Uuid(), nullable=True),
-            sa.Column('priority', sa.String(32), nullable=True),
-            sa.Column('metadata_json', sa.JSON(), nullable=False),
-            sa.Index('ix_cluster_ops_node', 'node_uuid'),
-            sa.Index('ix_cluster_ops_instance', 'instance_uuid'),
-            sa.Index('ix_cluster_ops_network', 'network_uuid'),
-            sa.Index('ix_cluster_ops_type_created',
-                     'operation_type', 'created_at'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_operations_table is not None:
+                return _cluster_operations_table
+            metadata = _get_metadata()
+            _cluster_operations_table = sa.Table(
+                'cluster_operations',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('operation_type', sa.String(64), nullable=False),
+                sa.Column('created_at', sa.Double(), nullable=False),
+                sa.Column('node_uuid', sa.Uuid(), nullable=True),
+                sa.Column('instance_uuid', sa.Uuid(), nullable=True),
+                sa.Column('network_uuid', sa.Uuid(), nullable=True),
+                sa.Column('priority', sa.String(32), nullable=True),
+                sa.Column('metadata_json', sa.JSON(), nullable=False),
+                sa.Index('ix_cluster_ops_node', 'node_uuid'),
+                sa.Index('ix_cluster_ops_instance', 'instance_uuid'),
+                sa.Index('ix_cluster_ops_network', 'network_uuid'),
+                sa.Index('ix_cluster_ops_type_created',
+                         'operation_type', 'created_at'),
+            )
     return _cluster_operations_table
 
 
@@ -1231,14 +1243,17 @@ def _get_cluster_operation_errors_table() -> sa.Table:
     """
     global _cluster_operation_errors_table
     if _cluster_operation_errors_table is None:
-        metadata = _get_metadata()
-        _cluster_operation_errors_table = sa.Table(
-            'cluster_operation_errors',
-            metadata,
-            sa.Column('op_uuid', sa.Uuid(), primary_key=True),
-            sa.Column('error_report', sa.JSON(), nullable=False),
-            sa.Column('created_at', sa.Double(), nullable=False),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_operation_errors_table is not None:
+                return _cluster_operation_errors_table
+            metadata = _get_metadata()
+            _cluster_operation_errors_table = sa.Table(
+                'cluster_operation_errors',
+                metadata,
+                sa.Column('op_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('error_report', sa.JSON(), nullable=False),
+                sa.Column('created_at', sa.Double(), nullable=False),
+            )
     return _cluster_operation_errors_table
 
 
@@ -1284,24 +1299,27 @@ def _get_work_queue_table() -> sa.Table:
     """
     global _work_queue_table
     if _work_queue_table is None:
-        metadata = _get_metadata()
-        _work_queue_table = sa.Table(
-            'work_queue',
-            metadata,
-            sa.Column('id', sa.BigInteger(),
-                      primary_key=True, autoincrement=True),
-            sa.Column('queue_name', sa.String(255), nullable=False),
-            sa.Column('scheduled_at', sa.Double(), nullable=False),
-            sa.Column('claimed_at', sa.Double(), nullable=True),
-            sa.Column('claimed_by', sa.String(255), nullable=True),
-            sa.Column('attempts', sa.Integer(),
-                      nullable=False, server_default='0'),
-            sa.Column('payload', sa.JSON(), nullable=False),
-            sa.Column('created_at', sa.Double(), nullable=False),
-            sa.Index(
-                'ix_work_queue_ready',
-                'queue_name', 'claimed_at', 'scheduled_at'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _work_queue_table is not None:
+                return _work_queue_table
+            metadata = _get_metadata()
+            _work_queue_table = sa.Table(
+                'work_queue',
+                metadata,
+                sa.Column('id', sa.BigInteger(),
+                          primary_key=True, autoincrement=True),
+                sa.Column('queue_name', sa.String(255), nullable=False),
+                sa.Column('scheduled_at', sa.Double(), nullable=False),
+                sa.Column('claimed_at', sa.Double(), nullable=True),
+                sa.Column('claimed_by', sa.String(255), nullable=True),
+                sa.Column('attempts', sa.Integer(),
+                          nullable=False, server_default='0'),
+                sa.Column('payload', sa.JSON(), nullable=False),
+                sa.Column('created_at', sa.Double(), nullable=False),
+                sa.Index(
+                    'ix_work_queue_ready',
+                    'queue_name', 'claimed_at', 'scheduled_at'),
+            )
     return _work_queue_table
 
 
@@ -1484,17 +1502,20 @@ def _get_cluster_config_table() -> sa.Table:
     """
     global _cluster_config_table
     if _cluster_config_table is None:
-        metadata = _get_metadata()
-        _cluster_config_table = sa.Table(
-            'cluster_config',
-            metadata,
-            sa.Column('key_name', sa.String(128),
-                      primary_key=True),
-            sa.Column('value_json', sa.JSON(),
-                      nullable=False),
-            sa.Column('updated_at', sa.Double(),
-                      nullable=False),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_config_table is not None:
+                return _cluster_config_table
+            metadata = _get_metadata()
+            _cluster_config_table = sa.Table(
+                'cluster_config',
+                metadata,
+                sa.Column('key_name', sa.String(128),
+                          primary_key=True),
+                sa.Column('value_json', sa.JSON(),
+                          nullable=False),
+                sa.Column('updated_at', sa.Double(),
+                          nullable=False),
+            )
     return _cluster_config_table
 
 
@@ -1541,23 +1562,26 @@ def _get_events_table() -> sa.Table:
     """
     global _events_table
     if _events_table is None:
-        metadata = _get_metadata()
-        _events_table = sa.Table(
-            'events',
-            metadata,
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-            sa.Column('event_type', sa.String(32), nullable=False),
-            sa.Column('timestamp', sa.Double(), nullable=False),
-            sa.Column('fqdn', sa.String(255), nullable=False),
-            sa.Column('duration', sa.Double(), nullable=True),
-            sa.Column('message', sa.Text(), nullable=False),
-            sa.Column('extra', sa.JSON(), nullable=True),
-            sa.Column('request_id', sa.String(64), nullable=True),
-            sa.PrimaryKeyConstraint('event_uuid'),
-            sa.Index('idx_events_type_timestamp',
-                     'event_type', 'timestamp'),
-            sa.Index('idx_events_request_id', 'request_id'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _events_table is not None:
+                return _events_table
+            metadata = _get_metadata()
+            _events_table = sa.Table(
+                'events',
+                metadata,
+                sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+                sa.Column('event_type', sa.String(32), nullable=False),
+                sa.Column('timestamp', sa.Double(), nullable=False),
+                sa.Column('fqdn', sa.String(255), nullable=False),
+                sa.Column('duration', sa.Double(), nullable=True),
+                sa.Column('message', sa.Text(), nullable=False),
+                sa.Column('extra', sa.JSON(), nullable=True),
+                sa.Column('request_id', sa.String(64), nullable=True),
+                sa.PrimaryKeyConstraint('event_uuid'),
+                sa.Index('idx_events_type_timestamp',
+                         'event_type', 'timestamp'),
+                sa.Index('idx_events_request_id', 'request_id'),
+            )
     return _events_table
 
 
@@ -1605,17 +1629,20 @@ def _get_event_objects_table() -> sa.Table:
     """
     global _event_objects_table
     if _event_objects_table is None:
-        metadata = _get_metadata()
-        _event_objects_table = sa.Table(
-            'event_objects',
-            metadata,
-            sa.Column('object_type', sa.String(32), nullable=False),
-            sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-            sa.PrimaryKeyConstraint(
-                'object_type', 'object_uuid', 'event_uuid'),
-            sa.Index('idx_event_objects_event', 'event_uuid'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _event_objects_table is not None:
+                return _event_objects_table
+            metadata = _get_metadata()
+            _event_objects_table = sa.Table(
+                'event_objects',
+                metadata,
+                sa.Column('object_type', sa.String(32), nullable=False),
+                sa.Column('object_uuid', sa.String(36), nullable=False),
+                sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+                sa.PrimaryKeyConstraint(
+                    'object_type', 'object_uuid', 'event_uuid'),
+                sa.Index('idx_event_objects_event', 'event_uuid'),
+            )
     return _event_objects_table
 
 
@@ -1657,27 +1684,30 @@ def _get_ipam_reservations_table() -> sa.Table:
     """
     global _ipam_reservations_table
     if _ipam_reservations_table is None:
-        metadata = _get_metadata()
-        _ipam_reservations_table = sa.Table(
-            'ipam_reservations',
-            metadata,
-            sa.Column('ipam_uuid', sa.Uuid(), nullable=False),
-            sa.Column('address', INET4(), nullable=False),
-            sa.Column('reservation_type', sa.Enum(ReservationType),
-                      nullable=False),
-            sa.Column('user_type', sa.Enum(ObjectType), nullable=True),
-            sa.Column('user_uuid', sa.Uuid(), nullable=True),
-            sa.Column('reserved_at', sa.Double(), nullable=False),
-            sa.Column('comment', sa.Text(), nullable=True),
-            # Composite primary key ensures uniqueness
-            sa.PrimaryKeyConstraint('ipam_uuid', 'address'),
-            # Index for efficient queries by IPAM
-            sa.Index('idx_ipam_reservations_ipam', 'ipam_uuid'),
-            # Index for finding reservations by user
-            sa.Index('idx_ipam_reservations_user', 'user_type', 'user_uuid'),
-            # Index for finding reservations by type (e.g., deletion-halo)
-            sa.Index('idx_ipam_reservations_type', 'reservation_type'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _ipam_reservations_table is not None:
+                return _ipam_reservations_table
+            metadata = _get_metadata()
+            _ipam_reservations_table = sa.Table(
+                'ipam_reservations',
+                metadata,
+                sa.Column('ipam_uuid', sa.Uuid(), nullable=False),
+                sa.Column('address', INET4(), nullable=False),
+                sa.Column('reservation_type', sa.Enum(ReservationType),
+                          nullable=False),
+                sa.Column('user_type', sa.Enum(ObjectType), nullable=True),
+                sa.Column('user_uuid', sa.Uuid(), nullable=True),
+                sa.Column('reserved_at', sa.Double(), nullable=False),
+                sa.Column('comment', sa.Text(), nullable=True),
+                # Composite primary key ensures uniqueness
+                sa.PrimaryKeyConstraint('ipam_uuid', 'address'),
+                # Index for efficient queries by IPAM
+                sa.Index('idx_ipam_reservations_ipam', 'ipam_uuid'),
+                # Index for finding reservations by user
+                sa.Index('idx_ipam_reservations_user', 'user_type', 'user_uuid'),
+                # Index for finding reservations by type (e.g., deletion-halo)
+                sa.Index('idx_ipam_reservations_type', 'reservation_type'),
+            )
     return _ipam_reservations_table
 
 
@@ -1742,14 +1772,17 @@ def _get_uploads_table() -> sa.Table:
     """
     global _uploads_table
     if _uploads_table is None:
-        metadata = _get_metadata()
-        _uploads_table = pydantic_to_sqlalchemy_table(
-            UploadData,
-            'uploads',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _uploads_table is not None:
+                return _uploads_table
+            metadata = _get_metadata()
+            _uploads_table = pydantic_to_sqlalchemy_table(
+                UploadData,
+                'uploads',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _uploads_table
 
 
@@ -1805,14 +1838,17 @@ def _get_dnsmasq_table() -> sa.Table:
     """
     global _dnsmasq_table
     if _dnsmasq_table is None:
-        metadata = _get_metadata()
-        _dnsmasq_table = pydantic_to_sqlalchemy_table(
-            DnsMasqData,
-            'dnsmasq',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _dnsmasq_table is not None:
+                return _dnsmasq_table
+            metadata = _get_metadata()
+            _dnsmasq_table = pydantic_to_sqlalchemy_table(
+                DnsMasqData,
+                'dnsmasq',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _dnsmasq_table
 
 
@@ -1868,14 +1904,17 @@ def _get_blobs_table() -> sa.Table:
     """
     global _blobs_table
     if _blobs_table is None:
-        metadata = _get_metadata()
-        _blobs_table = pydantic_to_sqlalchemy_table(
-            BlobData,
-            'blobs',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _blobs_table is not None:
+                return _blobs_table
+            metadata = _get_metadata()
+            _blobs_table = pydantic_to_sqlalchemy_table(
+                BlobData,
+                'blobs',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _blobs_table
 
 
@@ -1931,17 +1970,20 @@ def _get_object_references_table() -> sa.Table:
     """
     global _object_references_table
     if _object_references_table is None:
-        metadata = _get_metadata()
-        _object_references_table = pydantic_to_sqlalchemy_table(
-            ObjectReference,
-            'object_references',
-            metadata,
-            primary_key_fields=[
-                'source_object_type', 'source_uuid', 'relationship',
-                'target_object_type', 'target_uuid'
-            ],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _object_references_table is not None:
+                return _object_references_table
+            metadata = _get_metadata()
+            _object_references_table = pydantic_to_sqlalchemy_table(
+                ObjectReference,
+                'object_references',
+                metadata,
+                primary_key_fields=[
+                    'source_object_type', 'source_uuid', 'relationship',
+                    'target_object_type', 'target_uuid'
+                ],
+                include_id_column=False
+            )
     return _object_references_table
 
 
@@ -1997,14 +2039,17 @@ def _get_blob_hashes_table() -> sa.Table:
     """
     global _blob_hashes_table
     if _blob_hashes_table is None:
-        metadata = _get_metadata()
-        _blob_hashes_table = pydantic_to_sqlalchemy_table(
-            BlobHash,
-            'blob_hashes',
-            metadata,
-            primary_key_fields=['blob_uuid', 'node', 'algorithm'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _blob_hashes_table is not None:
+                return _blob_hashes_table
+            metadata = _get_metadata()
+            _blob_hashes_table = pydantic_to_sqlalchemy_table(
+                BlobHash,
+                'blob_hashes',
+                metadata,
+                primary_key_fields=['blob_uuid', 'node', 'algorithm'],
+                include_id_column=False
+            )
     return _blob_hashes_table
 
 
@@ -2059,14 +2104,17 @@ def _get_blob_transfers_table() -> sa.Table:
     """
     global _blob_transfers_table
     if _blob_transfers_table is None:
-        metadata = _get_metadata()
-        _blob_transfers_table = pydantic_to_sqlalchemy_table(
-            BlobTransfer,
-            'blob_transfers',
-            metadata,
-            primary_key_fields=['source_node', 'transfer_name'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _blob_transfers_table is not None:
+                return _blob_transfers_table
+            metadata = _get_metadata()
+            _blob_transfers_table = pydantic_to_sqlalchemy_table(
+                BlobTransfer,
+                'blob_transfers',
+                metadata,
+                primary_key_fields=['source_node', 'transfer_name'],
+                include_id_column=False
+            )
     return _blob_transfers_table
 
 
@@ -2120,21 +2168,24 @@ def _get_blob_attributes_table() -> sa.Table:
     """
     global _blob_attributes_table
     if _blob_attributes_table is None:
-        metadata = _get_metadata()
-        _blob_attributes_table = sa.Table(
-            'blob_attributes',
-            metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
-            sa.Column('size', sa.BigInteger(), nullable=False, default=0),
-            sa.Column('info', sa.JSON(), nullable=True),
-            sa.Column('last_used', sa.Double(), nullable=True),
-            sa.Column('expires_at', sa.Double(), nullable=False, default=0.0),
-            # Indexes for query optimization
-            sa.Index('idx_blob_attrs_last_used', 'last_used'),
-            sa.Index('idx_blob_attrs_expires_at', 'expires_at'),
-            # Note: Foreign key to blobs table not enforced to allow
-            # flexible migration ordering
-        )
+        with TABLE_CREATION_LOCK:
+            if _blob_attributes_table is not None:
+                return _blob_attributes_table
+            metadata = _get_metadata()
+            _blob_attributes_table = sa.Table(
+                'blob_attributes',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('size', sa.BigInteger(), nullable=False, default=0),
+                sa.Column('info', sa.JSON(), nullable=True),
+                sa.Column('last_used', sa.Double(), nullable=True),
+                sa.Column('expires_at', sa.Double(), nullable=False, default=0.0),
+                # Indexes for query optimization
+                sa.Index('idx_blob_attrs_last_used', 'last_used'),
+                sa.Index('idx_blob_attrs_expires_at', 'expires_at'),
+                # Note: Foreign key to blobs table not enforced to allow
+                # flexible migration ordering
+            )
     return _blob_attributes_table
 
 
@@ -2186,14 +2237,17 @@ def _get_artifacts_table() -> sa.Table:
     """
     global _artifacts_table
     if _artifacts_table is None:
-        metadata = _get_metadata()
-        _artifacts_table = pydantic_to_sqlalchemy_table(
-            ArtifactData,
-            'artifacts',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _artifacts_table is not None:
+                return _artifacts_table
+            metadata = _get_metadata()
+            _artifacts_table = pydantic_to_sqlalchemy_table(
+                ArtifactData,
+                'artifacts',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _artifacts_table
 
 
@@ -2205,16 +2259,19 @@ def _get_artifact_attributes_table() -> sa.Table:
     """
     global _artifact_attributes_table
     if _artifact_attributes_table is None:
-        metadata = _get_metadata()
-        _artifact_attributes_table = sa.Table(
-            'artifact_attributes',
-            metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
-            sa.Column('max_versions', sa.Integer(), nullable=False, default=0),
-            sa.Column('shared', sa.Boolean(), nullable=False, default=False),
-            sa.Column('highest_index', sa.Integer(), nullable=False, default=0),
-            sa.Index('idx_artifact_attrs_shared', 'shared'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _artifact_attributes_table is not None:
+                return _artifact_attributes_table
+            metadata = _get_metadata()
+            _artifact_attributes_table = sa.Table(
+                'artifact_attributes',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('max_versions', sa.Integer(), nullable=False, default=0),
+                sa.Column('shared', sa.Boolean(), nullable=False, default=False),
+                sa.Column('highest_index', sa.Integer(), nullable=False, default=0),
+                sa.Index('idx_artifact_attrs_shared', 'shared'),
+            )
     return _artifact_attributes_table
 
 
@@ -2226,16 +2283,19 @@ def _get_artifact_indexes_table() -> sa.Table:
     """
     global _artifact_indexes_table
     if _artifact_indexes_table is None:
-        metadata = _get_metadata()
-        _artifact_indexes_table = sa.Table(
-            'artifact_indexes',
-            metadata,
-            sa.Column('artifact_uuid', sa.Uuid(), nullable=False),
-            sa.Column('index_number', sa.Integer(), nullable=False),
-            sa.Column('blob_uuid', sa.Uuid(), nullable=False),
-            sa.PrimaryKeyConstraint('artifact_uuid', 'index_number'),
-            sa.Index('idx_artifact_idx_blob_uuid', 'blob_uuid'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _artifact_indexes_table is not None:
+                return _artifact_indexes_table
+            metadata = _get_metadata()
+            _artifact_indexes_table = sa.Table(
+                'artifact_indexes',
+                metadata,
+                sa.Column('artifact_uuid', sa.Uuid(), nullable=False),
+                sa.Column('index_number', sa.Integer(), nullable=False),
+                sa.Column('blob_uuid', sa.Uuid(), nullable=False),
+                sa.PrimaryKeyConstraint('artifact_uuid', 'index_number'),
+                sa.Index('idx_artifact_idx_blob_uuid', 'blob_uuid'),
+            )
     return _artifact_indexes_table
 
 
@@ -8576,14 +8636,17 @@ def _get_nodes_table() -> sa.Table:
     """Get or create the nodes table definition."""
     global _nodes_table
     if _nodes_table is None:
-        metadata = _get_metadata()
-        _nodes_table = pydantic_to_sqlalchemy_table(
-            NodeData,
-            'nodes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _nodes_table is not None:
+                return _nodes_table
+            metadata = _get_metadata()
+            _nodes_table = pydantic_to_sqlalchemy_table(
+                NodeData,
+                'nodes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _nodes_table
 
 
@@ -8591,59 +8654,62 @@ def _get_node_attributes_table() -> sa.Table:
     """Get or create the node_attributes table definition."""
     global _node_attributes_table
     if _node_attributes_table is None:
-        metadata = _get_metadata()
-        _node_attributes_table = sa.Table(
-            'node_attributes',
-            metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
-            sa.Column(
-                'last_seen', sa.Double(),
-                nullable=False, default=0.0
-            ),
-            sa.Column(
-                'installed_version', sa.String(255),
-                nullable=True
-            ),
-            sa.Column(
-                'is_etcd_master', sa.Boolean(),
-                nullable=False, default=False
-            ),
-            sa.Column(
-                'is_hypervisor', sa.Boolean(),
-                nullable=False, default=False
-            ),
-            sa.Column(
-                'is_network_node', sa.Boolean(),
-                nullable=False, default=False
-            ),
-            sa.Column(
-                'is_eventlog_node', sa.Boolean(),
-                nullable=False, default=False
-            ),
-            sa.Column('instances', sa.JSON(), nullable=True),
-            sa.Column('daemons', sa.JSON(), nullable=True),
-            sa.Column('daemon_states', sa.JSON(), nullable=True),
-            sa.Column('qemu_version', sa.JSON(), nullable=True),
-            sa.Column(
-                'libvirt_version', sa.JSON(), nullable=True
-            ),
-            sa.Column(
-                'python_version', sa.JSON(), nullable=True
-            ),
-            sa.Column(
-                'python_implementation', sa.String(255),
-                nullable=True
-            ),
-            sa.Column(
-                'dependency_versions', sa.JSON(), nullable=True
-            ),
-            sa.Column(
-                'process_metrics', sa.JSON(), nullable=True
-            ),
-            sa.Index(
-                'idx_node_attrs_last_seen', 'last_seen'
-            ),
-        )
+        with TABLE_CREATION_LOCK:
+            if _node_attributes_table is not None:
+                return _node_attributes_table
+            metadata = _get_metadata()
+            _node_attributes_table = sa.Table(
+                'node_attributes',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column(
+                    'last_seen', sa.Double(),
+                    nullable=False, default=0.0
+                ),
+                sa.Column(
+                    'installed_version', sa.String(255),
+                    nullable=True
+                ),
+                sa.Column(
+                    'is_etcd_master', sa.Boolean(),
+                    nullable=False, default=False
+                ),
+                sa.Column(
+                    'is_hypervisor', sa.Boolean(),
+                    nullable=False, default=False
+                ),
+                sa.Column(
+                    'is_network_node', sa.Boolean(),
+                    nullable=False, default=False
+                ),
+                sa.Column(
+                    'is_eventlog_node', sa.Boolean(),
+                    nullable=False, default=False
+                ),
+                sa.Column('instances', sa.JSON(), nullable=True),
+                sa.Column('daemons', sa.JSON(), nullable=True),
+                sa.Column('daemon_states', sa.JSON(), nullable=True),
+                sa.Column('qemu_version', sa.JSON(), nullable=True),
+                sa.Column(
+                    'libvirt_version', sa.JSON(), nullable=True
+                ),
+                sa.Column(
+                    'python_version', sa.JSON(), nullable=True
+                ),
+                sa.Column(
+                    'python_implementation', sa.String(255),
+                    nullable=True
+                ),
+                sa.Column(
+                    'dependency_versions', sa.JSON(), nullable=True
+                ),
+                sa.Column(
+                    'process_metrics', sa.JSON(), nullable=True
+                ),
+                sa.Index(
+                    'idx_node_attrs_last_seen', 'last_seen'
+                ),
+            )
     return _node_attributes_table
 
 
@@ -9955,17 +10021,20 @@ def _get_namespaces_table() -> sa.Table:
     """Get or create the namespaces table definition."""
     global _namespaces_table
     if _namespaces_table is None:
-        metadata = _get_metadata()
-        _namespaces_table = sa.Table(
-            'namespaces',
-            metadata,
-            sa.Column(
-                'name', sa.String(255), primary_key=True
-            ),
-            sa.Column(
-                'version', sa.Integer(), nullable=False
-            ),
-        )
+        with TABLE_CREATION_LOCK:
+            if _namespaces_table is not None:
+                return _namespaces_table
+            metadata = _get_metadata()
+            _namespaces_table = sa.Table(
+                'namespaces',
+                metadata,
+                sa.Column(
+                    'name', sa.String(255), primary_key=True
+                ),
+                sa.Column(
+                    'version', sa.Integer(), nullable=False
+                ),
+            )
     return _namespaces_table
 
 
@@ -9973,16 +10042,19 @@ def _get_namespace_attributes_table() -> sa.Table:
     """Get or create the namespace_attributes table definition."""
     global _namespace_attributes_table
     if _namespace_attributes_table is None:
-        metadata = _get_metadata()
-        _namespace_attributes_table = sa.Table(
-            'namespace_attributes',
-            metadata,
-            sa.Column(
-                'name', sa.String(255), primary_key=True
-            ),
-            sa.Column('keys', sa.JSON(), nullable=True),
-            sa.Column('trust', sa.JSON(), nullable=True),
-        )
+        with TABLE_CREATION_LOCK:
+            if _namespace_attributes_table is not None:
+                return _namespace_attributes_table
+            metadata = _get_metadata()
+            _namespace_attributes_table = sa.Table(
+                'namespace_attributes',
+                metadata,
+                sa.Column(
+                    'name', sa.String(255), primary_key=True
+                ),
+                sa.Column('keys', sa.JSON(), nullable=True),
+                sa.Column('trust', sa.JSON(), nullable=True),
+            )
     return _namespace_attributes_table
 
 
@@ -11436,35 +11508,38 @@ def _get_network_interfaces_table() -> sa.Table:
     """
     global _network_interfaces_table
     if _network_interfaces_table is None:
-        metadata = _get_metadata()
-        _network_interfaces_table = pydantic_to_sqlalchemy_table(
-            NetworkInterfaceData,
-            'network_interfaces',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
-        # ``active`` is a server-managed flag, not part of the
-        # NetworkInterfaceData DTO. It is TRUE while an interface is
-        # live and NULLed when the interface enters the ``deleted``
-        # state — see ``_direct_set_state``. The flag exists so that
-        # the macaddr UNIQUE constraint below can ignore soft-deleted
-        # rows: NULL values do not collide with each other in MariaDB
-        # UNIQUE indexes, so a deleted interface keeps its row (for
-        # audit) without blocking MAC reuse during the
-        # ``CLEANER_DELAY`` window.
-        _network_interfaces_table.append_column(
-            sa.Column('active', sa.Boolean(), nullable=True))
-        # MAC must be unique among ACTIVE interfaces on the same
-        # network. Two soft-deleted rows (both with active=NULL) do
-        # not collide, and an active row coexists with deleted rows
-        # holding the same MAC. Cross-network MAC reuse is allowed —
-        # different VXLAN networks are isolated broadcast domains.
-        sa.UniqueConstraint(
-            _network_interfaces_table.c.macaddr,
-            _network_interfaces_table.c.active,
-            _network_interfaces_table.c.network_uuid,
-            name='uq_network_interfaces_macaddr_active_network')
+        with TABLE_CREATION_LOCK:
+            if _network_interfaces_table is not None:
+                return _network_interfaces_table
+            metadata = _get_metadata()
+            _network_interfaces_table = pydantic_to_sqlalchemy_table(
+                NetworkInterfaceData,
+                'network_interfaces',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+            # ``active`` is a server-managed flag, not part of the
+            # NetworkInterfaceData DTO. It is TRUE while an interface is
+            # live and NULLed when the interface enters the ``deleted``
+            # state — see ``_direct_set_state``. The flag exists so that
+            # the macaddr UNIQUE constraint below can ignore soft-deleted
+            # rows: NULL values do not collide with each other in MariaDB
+            # UNIQUE indexes, so a deleted interface keeps its row (for
+            # audit) without blocking MAC reuse during the
+            # ``CLEANER_DELAY`` window.
+            _network_interfaces_table.append_column(
+                sa.Column('active', sa.Boolean(), nullable=True))
+            # MAC must be unique among ACTIVE interfaces on the same
+            # network. Two soft-deleted rows (both with active=NULL) do
+            # not collide, and an active row coexists with deleted rows
+            # holding the same MAC. Cross-network MAC reuse is allowed —
+            # different VXLAN networks are isolated broadcast domains.
+            sa.UniqueConstraint(
+                _network_interfaces_table.c.macaddr,
+                _network_interfaces_table.c.active,
+                _network_interfaces_table.c.network_uuid,
+                name='uq_network_interfaces_macaddr_active_network')
     return _network_interfaces_table
 
 
@@ -11472,14 +11547,17 @@ def _get_network_interface_attributes_table() -> sa.Table:
     """Get or create the network_interface_attributes table definition."""
     global _network_interface_attributes_table
     if _network_interface_attributes_table is None:
-        metadata = _get_metadata()
-        _network_interface_attributes_table = pydantic_to_sqlalchemy_table(
-            NetworkInterfaceAttributesData,
-            'network_interface_attributes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _network_interface_attributes_table is not None:
+                return _network_interface_attributes_table
+            metadata = _get_metadata()
+            _network_interface_attributes_table = pydantic_to_sqlalchemy_table(
+                NetworkInterfaceAttributesData,
+                'network_interface_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _network_interface_attributes_table
 
 
@@ -12552,14 +12630,17 @@ def _get_ipams_table() -> sa.Table:
     """
     global _ipams_table
     if _ipams_table is None:
-        metadata = _get_metadata()
-        _ipams_table = pydantic_to_sqlalchemy_table(
-            IPAMData,
-            'ipams',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _ipams_table is not None:
+                return _ipams_table
+            metadata = _get_metadata()
+            _ipams_table = pydantic_to_sqlalchemy_table(
+                IPAMData,
+                'ipams',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _ipams_table
 
 
@@ -12876,17 +12957,20 @@ def _get_networks_table() -> sa.Table:
     """
     global _networks_table
     if _networks_table is None:
-        metadata = _get_metadata()
-        _networks_table = pydantic_to_sqlalchemy_table(
-            NetworkData,
-            'networks',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
-        # Add UNIQUE constraint on vxid for atomic VXLAN allocation
-        sa.UniqueConstraint(
-            _networks_table.c.vxid, name='uq_networks_vxid')
+        with TABLE_CREATION_LOCK:
+            if _networks_table is not None:
+                return _networks_table
+            metadata = _get_metadata()
+            _networks_table = pydantic_to_sqlalchemy_table(
+                NetworkData,
+                'networks',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+            # Add UNIQUE constraint on vxid for atomic VXLAN allocation
+            sa.UniqueConstraint(
+                _networks_table.c.vxid, name='uq_networks_vxid')
     return _networks_table
 
 
@@ -12894,14 +12978,17 @@ def _get_network_attributes_table() -> sa.Table:
     """Get or create the network_attributes table definition."""
     global _network_attributes_table
     if _network_attributes_table is None:
-        metadata = _get_metadata()
-        _network_attributes_table = pydantic_to_sqlalchemy_table(
-            NetworkAttributesData,
-            'network_attributes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _network_attributes_table is not None:
+                return _network_attributes_table
+            metadata = _get_metadata()
+            _network_attributes_table = pydantic_to_sqlalchemy_table(
+                NetworkAttributesData,
+                'network_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _network_attributes_table
 
 
@@ -13666,14 +13753,17 @@ def _get_agent_operations_table() -> sa.Table:
     """
     global _agent_operations_table
     if _agent_operations_table is None:
-        metadata = _get_metadata()
-        _agent_operations_table = pydantic_to_sqlalchemy_table(
-            AgentOperationData,
-            'agent_operations',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _agent_operations_table is not None:
+                return _agent_operations_table
+            metadata = _get_metadata()
+            _agent_operations_table = pydantic_to_sqlalchemy_table(
+                AgentOperationData,
+                'agent_operations',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _agent_operations_table
 
 
@@ -13681,14 +13771,17 @@ def _get_agent_operation_attributes_table() -> sa.Table:
     """Get or create the agent_operation_attributes table definition."""
     global _agent_operation_attributes_table
     if _agent_operation_attributes_table is None:
-        metadata = _get_metadata()
-        _agent_operation_attributes_table = pydantic_to_sqlalchemy_table(
-            AgentOperationAttributesData,
-            'agent_operation_attributes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _agent_operation_attributes_table is not None:
+                return _agent_operation_attributes_table
+            metadata = _get_metadata()
+            _agent_operation_attributes_table = pydantic_to_sqlalchemy_table(
+                AgentOperationAttributesData,
+                'agent_operation_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _agent_operation_attributes_table
 
 
@@ -14236,14 +14329,17 @@ def _get_instances_table() -> sa.Table:
     """
     global _instances_table
     if _instances_table is None:
-        metadata = _get_metadata()
-        _instances_table = pydantic_to_sqlalchemy_table(
-            InstanceData,
-            'instances',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _instances_table is not None:
+                return _instances_table
+            metadata = _get_metadata()
+            _instances_table = pydantic_to_sqlalchemy_table(
+                InstanceData,
+                'instances',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _instances_table
 
 
@@ -14251,14 +14347,17 @@ def _get_instance_attributes_table() -> sa.Table:
     """Get or create the instance_attributes table definition."""
     global _instance_attributes_table
     if _instance_attributes_table is None:
-        metadata = _get_metadata()
-        _instance_attributes_table = pydantic_to_sqlalchemy_table(
-            InstanceAttributesData,
-            'instance_attributes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _instance_attributes_table is not None:
+                return _instance_attributes_table
+            metadata = _get_metadata()
+            _instance_attributes_table = pydantic_to_sqlalchemy_table(
+                InstanceAttributesData,
+                'instance_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _instance_attributes_table
 
 
