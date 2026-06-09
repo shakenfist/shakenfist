@@ -438,27 +438,34 @@ class Monitor(daemon.Daemon):
 
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):
-                try:
-                    with util_general.RecordedOperation(
-                            'scheduled cluster operations', None, threshold=10):
-                        schedule.run_pending()
-                except Exception as e:
-                    util_exceptions.ignore_exception('cluster', e)
+                now = time.time()
+                if now - last_loop_run >= 60:
+                    try:
+                        with util_general.RecordedOperation(
+                                'scheduled cluster operations',
+                                None, threshold=10):
+                            schedule.run_pending()
+                    except Exception as e:
+                        util_exceptions.ignore_exception('cluster', e)
 
-                try:
-                    with util_general.RecordedOperation(
-                            'cluster wide cleanup', None, threshold=10):
-                        self._cluster_wide_cleanup(last_loop_run)
-                except Exception as e:
-                    util_exceptions.ignore_exception('cluster', e)
+                    try:
+                        with util_general.RecordedOperation(
+                                'cluster wide cleanup', None, threshold=10):
+                            self._cluster_wide_cleanup(last_loop_run)
+                    except Exception as e:
+                        util_exceptions.ignore_exception('cluster', e)
 
-                last_loop_run = time.time()
+                    last_loop_run = now
 
-                # Sleep up to 60s, but wake immediately if the
-                # background refresher reports our lease was stolen.
-                # If lost, drop maintainer status and re-enter the
-                # outer loop to fight for the lock again.
-                if self.lock.lost_event.wait(60):
+                # Sleep up to 5s. Wakes early if the background refresher
+                # reports our lease was stolen, OR when the timeout fires
+                # so the outer ``not os.path.exists(self.abort_path)``
+                # check runs again. The maintenance work above is gated
+                # at 60 s; this short poll is just so SIGTERM during a
+                # quiet period gets observed inside the systemd
+                # ``TimeoutStopSec=30s`` budget (the old wait(60) parked
+                # past it and got SIGKILLed).
+                if self.lock.lost_event.wait(5):
                     LOG.warning(
                         'Cluster maintenance lock lost; re-entering election')
                     self.is_elected = False
