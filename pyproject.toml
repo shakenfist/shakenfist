@@ -59,17 +59,21 @@ dependencies = [
     "flask-request-id-middleware==1.1",   # mit
 
     "protobuf==6.33.6",                   # bsd
-    # Bisect step 1 between 1.70 (last known good) and 1.81 (current,
-    # broken). slim-primary CI shows sf-database's cygrpc layer
-    # silently dropping requests on the wire under burst load with
-    # 1.81. Park at 1.75.1 and let CI tell us which half of the range
-    # owns the regression. grpcio-tools >= 1.73 already requires
-    # protobuf 6, so the 6.33.6 pin above does not need to move for
-    # any version in the upper half (1.73 -- 1.81).
-    "grpcio==1.75.1",                     # apache2
-    "grpcio-health-checking==1.75.1",     # apache2
-    "grpcio-status==1.75.1",              # apache2
-    "grpcio-tools==1.75.1",               # apache2
+    # Bisect step 2 between 1.70 (last known good) and 1.75.1 (still
+    # wedged in node-lifecycle's single-sf-database topology -- merge
+    # run 27186872317 reproduced the exact "Python idle, GOAWAY
+    # ping_timeout, clients can't get past SETTINGS" fingerprint from
+    # the 1.81 failure). Step 1 (0d19b1bbd) cleared the upper half of
+    # the range; this step picks the geometric midpoint of the lower
+    # half across the published stable releases (1.70.0, 1.71.0,
+    # 1.71.2, 1.72.0, 1.72.1, 1.72.2, 1.73.0, 1.73.1, 1.74.0, 1.75.0,
+    # 1.75.1) and lands at 1.72.2. grpcio-tools 1.72.2 requires
+    # protobuf >=6.30.0,<7.0.0, so the 6.33.6 pin above stays in
+    # range without further movement.
+    "grpcio==1.72.2",                     # apache2
+    "grpcio-health-checking==1.72.2",     # apache2
+    "grpcio-status==1.72.2",              # apache2
+    "grpcio-tools==1.72.2",               # apache2
     "googleapis-common-protos==1.75.0",   # apache2
 
     "requests==2.33.1",                   # apache2

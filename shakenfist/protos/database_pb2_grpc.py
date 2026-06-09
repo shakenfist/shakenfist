@@ -5,7 +5,7 @@ import warnings
 
 from shakenfist.protos import database_pb2 as database__pb2
 
-GRPC_GENERATED_VERSION = '1.75.1'
+GRPC_GENERATED_VERSION = '1.72.2'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
