@@ -237,10 +237,10 @@ searchable from one place.
 |-------|------|------|--------|
 | 1. Shared visual-digest crate | new (`shakenfist-visual-digest`) | [PLAN-test-harness-phase-01-digest-crate.md](/components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/) | Implementation complete; Sextant PR pending operator |
 | 2. Static source driver | kerbside | [PLAN-test-harness-phase-02-static-hypervisor.md](/components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/) | Implementation complete |
-| 3. Control socket on Ryll | ryll | [PLAN-test-harness-phase-03-control-socket.md](/components/kerbside/plans/PLAN-test-harness-phase-03-control-socket/) | Implementation complete; PR pending operator |
-| 4. Port latency loadtest to control socket and remove legacy `testclient/ryll/` | kerbside | PLAN-test-harness-phase-04-port-latency.md | Not started |
-| 5. Direct-qemu CI workflow | kerbside | PLAN-test-harness-phase-05-direct-qemu-ci.md | Not started |
-| 6. Digest decoding in Ryll | ryll | PLAN-test-harness-phase-06-digest-decoding.md | Not started |
+| 3. Control socket on Ryll | ryll | [PLAN-test-harness-phase-03-control-socket.md](/components/kerbside/plans/PLAN-test-harness-phase-03-control-socket/) | Merged to ryll develop |
+| 4. Port latency loadtest to control socket and remove legacy `testclient/ryll/` | kerbside | [PLAN-test-harness-phase-04-port-latency.md](/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/) | Implementation complete; PR pending operator |
+| 5. Direct-qemu CI workflow | kerbside | [PLAN-test-harness-phase-05-direct-qemu-ci.md](/components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/) | Implementation drafted; awaiting first CI run |
+| 6. Ryll Cargo feature work: digest decoding, headless feature, restore keypress-to-screen latency | ryll | [PLAN-test-harness-phase-06-digest-decoding.md](/components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/) | Phase plan drafted |
 | 7. First Sextant scenario tempest test | kerbside | PLAN-test-harness-phase-07-scenario-test.md | Not started |
 | 8. OpenStack CI lane disposition | kerbside | PLAN-test-harness-phase-08-openstack-disposition.md | Not started |
 
@@ -254,7 +254,7 @@ when each phase plan is written):
 | 3 | high | opus | New protocol design that must serve both tests and future MCP. Touches Ryll's tokio event loop. Getting the verb set wrong is expensive to undo. |
 | 4 | medium | sonnet | Rewrite the loadtest to drive the control socket, then delete the legacy `testclient/ryll/` tree (the loadtest is its only consumer). Also touches `loadtests/latency/Dockerfile` and any README / AGENTS.md references. Validates phase 3's API; small but high-signal. |
 | 5 | high | opus | New CI workflow integrating multiple binaries, debugging KVM/runner-environment unknowns, many edge cases. |
-| 6 | high | opus | SurfaceMirror integration, QR detection on draw-event change, subtle correctness around when to re-decode. |
+| 6 | high | opus | Three concerns bundled because they all touch Ryll's Cargo features and channel handlers. (1) SurfaceMirror integration + QR detection on draw-event change + correctness around when to re-decode, gated behind a `digest-decode` Cargo feature off by default. (2) A `headless` Cargo feature that excludes the GUI/audio stack (eframe, egui, egui-winit, cpal) so kerbside's loadtest and direct-qemu CI images can drop libgl1 / libx11-6 / libxcb1 / libxkbcommon0 / libwayland-client0 / libasound2 from the runtime layer. The phase 4 Dockerfile and phase 5 CI image both switch to `cargo build --release --no-default-features --features headless` once this lands; flagged in phase 4's `Bugs fixed during this work` for cross-reference. (3) A `surface_drawn` control-socket event so phase 4's loadtest can restore keypress-to-screen latency semantics (the user-perceivable metric Kerbside is being measured against); orchestrator switch-back is part of this phase. |
 | 7 | medium | sonnet | Composes phase 6 primitives into a scenario. Once the spine is in place this is mostly glue. |
 | 8 | low | sonnet | A CI workflow tweak plus a documentation update. |
 
@@ -268,10 +268,19 @@ when each phase plan is written):
   depend on phase 1 — the control socket lands without
   any digest knowledge.
 - Phase 4 validates phase 3 in isolation; it does not
-  need phase 6.
+  need phase 6. The loadtest image built in phase 4 carries
+  the full GUI/audio runtime stack because ryll has no
+  headless Cargo feature yet; phase 6 adds that feature and
+  the loadtest Dockerfile switches to it then. Tracked in
+  phase 4's Future work and phase 6's effort notes.
 - Phase 5 needs phases 2 (static hypervisor) and 3
-  (control socket) but not phases 1 / 6 / 7.
-- Phase 6 needs phase 1 (the decoder crate).
+  (control socket) but not phases 1 / 6 / 7. Like phase 4,
+  the phase 5 CI image carries the heavy ryll runtime until
+  phase 6's `headless` feature lands.
+- Phase 6 needs phase 1 (the decoder crate). It is the
+  natural home for any other ryll Cargo feature work,
+  including the `headless` feature that slims the kerbside
+  loadtest and CI images.
 - Phase 7 needs phases 1, 2, 3, 5, and 6 — the first
   phase that exercises the full stack.
 - Phase 8 is a follow-up to phase 7.
@@ -347,6 +356,12 @@ true:
 * Ryll's production binary does not carry the
   visual-digest crate unless built with the
   `digest-decode` feature.
+* Ryll's `headless` Cargo feature lets the loadtest and
+  direct-qemu CI images build a slim binary that does not
+  link eframe / egui / egui-winit / cpal, and their runtime
+  layers drop the corresponding system shared libraries
+  (libgl1, libx11-6, libxcb1, libxkbcommon0,
+  libwayland-client0, libasound2).
 * The shared `shakenfist-visual-digest` crate is the
   sole home of the digest format. Uncalibrated Sextant
   consumes it for encoding; Ryll consumes it for
@@ -378,6 +393,23 @@ Items deliberately deferred:
   `pre-commit install` to wire it as a git hook. Worth
   a contributors' note when we touch CONTRIBUTING / the
   readme.
+- **Remove the "direct" .vv endpoint and its UI affordance.**
+  `kerbside/api.py:368` exposes `ConsolesDirectVirtViewer` at
+  `/console/direct/<source>/<uuid>/console.vv`, which builds
+  a virt-viewer file pointing at the hypervisor's SPICE port
+  instead of kerbside's proxy. `kerbside/api/templates/consoles.html:62`
+  surfaces it as a "Connect directly" dropdown item. The
+  direct endpoint exists for historical debugging convenience
+  but bypasses every value kerbside provides (authentication,
+  TLS termination, audit, ticket abstraction). Phase 5's
+  smoke-check exposure of this trap (a sub-agent reached for
+  the direct endpoint and had to be redirected to the proxy
+  endpoint to actually test the proxy path) is the second
+  time it has caused confusion. Remove both the endpoint
+  registration and the UI link in a follow-up commit; do an
+  initial grep across the codebase, docs, and tempest plugin
+  to make sure no test or doc relies on the direct flow
+  before deleting.
 
 ### Bugs fixed during this work
 
