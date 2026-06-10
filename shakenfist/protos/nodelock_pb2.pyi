@@ -3,100 +3,88 @@
 isort:skip_file
 """
 
-from google.protobuf import descriptor as _descriptor
-from google.protobuf import message as _message
-from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
-import builtins as _builtins
+import builtins
+import google.protobuf.descriptor
+import google.protobuf.internal.enum_type_wrapper
+import google.protobuf.message
 import sys
-import typing as _typing
+import typing
 
-if sys.version_info >= (3, 11):
-    from typing import TypeAlias as _TypeAlias, Never as _Never
+if sys.version_info >= (3, 10):
+    import typing as typing_extensions
 else:
-    from typing_extensions import TypeAlias as _TypeAlias, Never as _Never
+    import typing_extensions
 
-DESCRIPTOR: _descriptor.FileDescriptor
+DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@_typing.final
-class LockRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class LockRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REQUESTER_FIELD_NUMBER: _builtins.int
-    KEY_FIELD_NUMBER: _builtins.int
-    requester: _builtins.str
-    key: _builtins.str
+    REQUESTER_FIELD_NUMBER: builtins.int
+    KEY_FIELD_NUMBER: builtins.int
+    requester: builtins.str
+    key: builtins.str
     def __init__(
         self,
         *,
-        requester: _builtins.str = ...,
-        key: _builtins.str = ...,
+        requester: builtins.str = ...,
+        key: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["key", b"key", "requester", b"requester"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["key", b"key", "requester", b"requester"]) -> None: ...
 
-Global___LockRequest: _TypeAlias = LockRequest  # noqa: Y015
+global___LockRequest = LockRequest
 
-@_typing.final
-class UnlockRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class UnlockRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REQUESTER_FIELD_NUMBER: _builtins.int
-    KEY_FIELD_NUMBER: _builtins.int
-    requester: _builtins.str
-    key: _builtins.str
+    REQUESTER_FIELD_NUMBER: builtins.int
+    KEY_FIELD_NUMBER: builtins.int
+    requester: builtins.str
+    key: builtins.str
     def __init__(
         self,
         *,
-        requester: _builtins.str = ...,
-        key: _builtins.str = ...,
+        requester: builtins.str = ...,
+        key: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["key", b"key", "requester", b"requester"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["key", b"key", "requester", b"requester"]) -> None: ...
 
-Global___UnlockRequest: _TypeAlias = UnlockRequest  # noqa: Y015
+global___UnlockRequest = UnlockRequest
 
-@_typing.final
-class NodeLockRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class NodeLockRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    LOCK_REQUEST_FIELD_NUMBER: _builtins.int
-    UNLOCK_REQUEST_FIELD_NUMBER: _builtins.int
-    @_builtins.property
-    def lock_request(self) -> Global___LockRequest: ...
-    @_builtins.property
-    def unlock_request(self) -> Global___UnlockRequest: ...
+    LOCK_REQUEST_FIELD_NUMBER: builtins.int
+    UNLOCK_REQUEST_FIELD_NUMBER: builtins.int
+    @property
+    def lock_request(self) -> global___LockRequest: ...
+    @property
+    def unlock_request(self) -> global___UnlockRequest: ...
     def __init__(
         self,
         *,
-        lock_request: Global___LockRequest | None = ...,
-        unlock_request: Global___UnlockRequest | None = ...,
+        lock_request: global___LockRequest | None = ...,
+        unlock_request: global___UnlockRequest | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["lock_request", b"lock_request", "request", b"request", "unlock_request", b"unlock_request"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["lock_request", b"lock_request", "request", b"request", "unlock_request", b"unlock_request"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    _WhichOneofReturnType_request: _TypeAlias = _typing.Literal["lock_request", "unlock_request"]  # noqa: Y015
-    _WhichOneofArgType_request: _TypeAlias = _typing.Literal["request", b"request"]  # noqa: Y015
-    def WhichOneof(self, oneof_group: _WhichOneofArgType_request) -> _WhichOneofReturnType_request | None: ...
+    def HasField(self, field_name: typing.Literal["lock_request", b"lock_request", "request", b"request", "unlock_request", b"unlock_request"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["lock_request", b"lock_request", "request", b"request", "unlock_request", b"unlock_request"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["request", b"request"]) -> typing.Literal["lock_request", "unlock_request"] | None: ...
 
-Global___NodeLockRequest: _TypeAlias = NodeLockRequest  # noqa: Y015
+global___NodeLockRequest = NodeLockRequest
 
-@_typing.final
-class LockReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class LockReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Outcome:
-        ValueType = _typing.NewType("ValueType", _builtins.int)
-        V: _TypeAlias = ValueType  # noqa: Y015
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
 
-    class _OutcomeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[LockReply._Outcome.ValueType], _builtins.type):
-        DESCRIPTOR: _descriptor.EnumDescriptor
+    class _OutcomeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[LockReply._Outcome.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: LockReply._Outcome.ValueType  # 0
         ALREADY_HELD: LockReply._Outcome.ValueType  # 1
         DENIED: LockReply._Outcome.ValueType  # 2
@@ -106,31 +94,27 @@ class LockReply(_message.Message):
     ALREADY_HELD: LockReply.Outcome.ValueType  # 1
     DENIED: LockReply.Outcome.ValueType  # 2
 
-    OUTCOME_FIELD_NUMBER: _builtins.int
-    outcome: Global___LockReply.Outcome.ValueType
+    OUTCOME_FIELD_NUMBER: builtins.int
+    outcome: global___LockReply.Outcome.ValueType
     def __init__(
         self,
         *,
-        outcome: Global___LockReply.Outcome.ValueType = ...,
+        outcome: global___LockReply.Outcome.ValueType = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["outcome", b"outcome"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["outcome", b"outcome"]) -> None: ...
 
-Global___LockReply: _TypeAlias = LockReply  # noqa: Y015
+global___LockReply = LockReply
 
-@_typing.final
-class UnlockReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class UnlockReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Outcome:
-        ValueType = _typing.NewType("ValueType", _builtins.int)
-        V: _TypeAlias = ValueType  # noqa: Y015
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
 
-    class _OutcomeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[UnlockReply._Outcome.ValueType], _builtins.type):
-        DESCRIPTOR: _descriptor.EnumDescriptor
+    class _OutcomeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[UnlockReply._Outcome.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: UnlockReply._Outcome.ValueType  # 0
         NOT_HELD: UnlockReply._Outcome.ValueType  # 2
 
@@ -138,43 +122,35 @@ class UnlockReply(_message.Message):
     OK: UnlockReply.Outcome.ValueType  # 0
     NOT_HELD: UnlockReply.Outcome.ValueType  # 2
 
-    OUTCOME_FIELD_NUMBER: _builtins.int
-    outcome: Global___UnlockReply.Outcome.ValueType
+    OUTCOME_FIELD_NUMBER: builtins.int
+    outcome: global___UnlockReply.Outcome.ValueType
     def __init__(
         self,
         *,
-        outcome: Global___UnlockReply.Outcome.ValueType = ...,
+        outcome: global___UnlockReply.Outcome.ValueType = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["outcome", b"outcome"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["outcome", b"outcome"]) -> None: ...
 
-Global___UnlockReply: _TypeAlias = UnlockReply  # noqa: Y015
+global___UnlockReply = UnlockReply
 
-@_typing.final
-class NodeLockReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class NodeLockReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    LOCK_REPLY_FIELD_NUMBER: _builtins.int
-    UNLOCK_REPLY_FIELD_NUMBER: _builtins.int
-    @_builtins.property
-    def lock_reply(self) -> Global___LockReply: ...
-    @_builtins.property
-    def unlock_reply(self) -> Global___UnlockReply: ...
+    LOCK_REPLY_FIELD_NUMBER: builtins.int
+    UNLOCK_REPLY_FIELD_NUMBER: builtins.int
+    @property
+    def lock_reply(self) -> global___LockReply: ...
+    @property
+    def unlock_reply(self) -> global___UnlockReply: ...
     def __init__(
         self,
         *,
-        lock_reply: Global___LockReply | None = ...,
-        unlock_reply: Global___UnlockReply | None = ...,
+        lock_reply: global___LockReply | None = ...,
+        unlock_reply: global___UnlockReply | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["lock_reply", b"lock_reply", "reply", b"reply", "unlock_reply", b"unlock_reply"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["lock_reply", b"lock_reply", "reply", b"reply", "unlock_reply", b"unlock_reply"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    _WhichOneofReturnType_reply: _TypeAlias = _typing.Literal["lock_reply", "unlock_reply"]  # noqa: Y015
-    _WhichOneofArgType_reply: _TypeAlias = _typing.Literal["reply", b"reply"]  # noqa: Y015
-    def WhichOneof(self, oneof_group: _WhichOneofArgType_reply) -> _WhichOneofReturnType_reply | None: ...
+    def HasField(self, field_name: typing.Literal["lock_reply", b"lock_reply", "reply", b"reply", "unlock_reply", b"unlock_reply"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["lock_reply", b"lock_reply", "reply", b"reply", "unlock_reply", b"unlock_reply"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["reply", b"reply"]) -> typing.Literal["lock_reply", "unlock_reply"] | None: ...
 
-Global___NodeLockReply: _TypeAlias = NodeLockReply  # noqa: Y015
+global___NodeLockReply = NodeLockReply

@@ -53,6 +53,18 @@ RuntimeDirectory=sf
 RuntimeDirectoryPreserve=yes
 
 EnvironmentFile=/etc/sf/config
+{% if item == "database" %}
+# Diagnostic gRPC tracing for the sf-database silent-wedge debug. The
+# Python layer goes idle ~20 s after start while clients fail with
+# "connection attempt timed out before SETTINGS frame"; py-spy can
+# only show Python state, so cygrpc's view of subchannels, ping
+# scheduling, and HTTP/2 framing is the missing piece. Channels, http,
+# call_error, ping, connectivity_state are the cheap, focused
+# subsystems for this question (avoiding GRPC_TRACE=all which is
+# multi-GiB/min under load). Remove once the wedge is diagnosed.
+Environment="GRPC_VERBOSITY=DEBUG"
+Environment="GRPC_TRACE=http,api,call_error,ping,connectivity_state,subchannel"
+{% endif %}
 ExecStartPre=/srv/shakenfist/venv/bin/sf-ctl verify-config
 ExecStartPre=rm -f /run/sf/{{ item }}*.abort
 ExecStartPre=rm -f /run/sf/{{ item }}*.pid

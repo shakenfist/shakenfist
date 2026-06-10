@@ -58,22 +58,29 @@ dependencies = [
     "Flask-JWT-Extended==4.7.4",          # mit
     "flask-request-id-middleware==1.1",   # mit
 
-    "protobuf==6.33.6",                   # bsd
-    # Bisect step 2 between 1.70 (last known good) and 1.75.1 (still
-    # wedged in node-lifecycle's single-sf-database topology -- merge
-    # run 27186872317 reproduced the exact "Python idle, GOAWAY
-    # ping_timeout, clients can't get past SETTINGS" fingerprint from
-    # the 1.81 failure). Step 1 (0d19b1bbd) cleared the upper half of
-    # the range; this step picks the geometric midpoint of the lower
-    # half across the published stable releases (1.70.0, 1.71.0,
-    # 1.71.2, 1.72.0, 1.72.1, 1.72.2, 1.73.0, 1.73.1, 1.74.0, 1.75.0,
-    # 1.75.1) and lands at 1.72.2. grpcio-tools 1.72.2 requires
-    # protobuf >=6.30.0,<7.0.0, so the 6.33.6 pin above stays in
-    # range without further movement.
-    "grpcio==1.72.2",                     # apache2
-    "grpcio-health-checking==1.72.2",     # apache2
-    "grpcio-status==1.72.2",              # apache2
-    "grpcio-tools==1.72.2",               # apache2
+    # grpcio-tools 1.70.0 requires ``protobuf<6.0dev,>=5.26.1``; the
+    # corresponding latest 5.x release is 5.29.6. Restored alongside
+    # the grpcio drop below so the pair is co-installable.
+    "protobuf==5.29.6",                   # bsd
+    # Bisect step 3 / sanity check. Steps 1 (0d19b1bbd, 1.75.1) and
+    # 2 (0820ef2e0, 1.72.2) both reproduced the same
+    # "Python idle, sf-database stops logging ~20 s after start,
+    # clients can't get past SETTINGS" wedge that drove the 1.81
+    # failure. The "1.70 = last known good" anchor in step 1 was
+    # measured against the pre-BYO-mariadb topology and the
+    # node-lifecycle merge_group job has not run at 1.70 since the
+    # BYO-mariadb work landed. Park at 1.70.0 -- the floor of the
+    # bisect range and the version SF rode for a long stretch -- to
+    # settle "is the wedge actually a grpcio regression at all?".
+    # Green at 1.70.0 means the regression lives in (1.70.0, 1.72.2)
+    # and a finer bisect makes sense; still hung at 1.70.0 exonerates
+    # grpcio and redirects to the SF-side diagnostics added in the
+    # same commit (faulthandler dumps + GRPC_TRACE +
+    # TABLE_CREATION_LOCK contention logging).
+    "grpcio==1.70.0",                     # apache2
+    "grpcio-health-checking==1.70.0",     # apache2
+    "grpcio-status==1.70.0",              # apache2
+    "grpcio-tools==1.70.0",               # apache2
     "googleapis-common-protos==1.75.0",   # apache2
 
     "requests==2.33.1",                   # apache2
@@ -208,7 +215,13 @@ test = [
     "mkdocs-material==9.7.6",   # mit
     "testscenarios==0.5.0",     # bsd
     "mypy==1.14.1",             # mit
-    "mypy-protobuf==5.1.0",     # apache2
+    # mypy-protobuf 5.1.0 ships protobuf 6.32.1 gencode and will not
+    # load against a protobuf 5.x runtime, so the proto regen plugin
+    # crashes when ``grpcio==1.70.0`` forces protobuf back to 5.29.6.
+    # mypy-protobuf 3.6.0 ships gencode 4.25.3, which protobuf 5.x
+    # accepts (newer runtime, older gencode is allowed). Bump back
+    # to 5.x once the grpcio bisect lets us return to protobuf 6.x.
+    "mypy-protobuf==3.6.0",     # apache2
     "grpc-stubs==1.53.0.6",     # mit
     "types-protobuf==6.32.1.20260221",    # apache2
     "types-PyYAML==6.0.12.20260518",      # apache2

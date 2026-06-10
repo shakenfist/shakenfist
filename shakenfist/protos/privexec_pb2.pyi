@@ -3,29 +3,29 @@
 isort:skip_file
 """
 
-from collections import abc as _abc
-from google.protobuf import descriptor as _descriptor
-from google.protobuf import message as _message
-from google.protobuf.internal import containers as _containers
-from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
-import builtins as _builtins
-from shakenfist.protos import common_pb2 as _common_pb2
+import builtins
+import collections.abc
+from shakenfist.protos import common_pb2
+import google.protobuf.descriptor
+import google.protobuf.internal.containers
+import google.protobuf.internal.enum_type_wrapper
+import google.protobuf.message
 import sys
-import typing as _typing
+import typing
 
-if sys.version_info >= (3, 11):
-    from typing import TypeAlias as _TypeAlias, Never as _Never
+if sys.version_info >= (3, 10):
+    import typing as typing_extensions
 else:
-    from typing_extensions import TypeAlias as _TypeAlias, Never as _Never
+    import typing_extensions
 
-DESCRIPTOR: _descriptor.FileDescriptor
+DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class _HashAlgorithm:
-    ValueType = _typing.NewType("ValueType", _builtins.int)
-    V: _TypeAlias = ValueType  # noqa: Y015
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
 
-class _HashAlgorithmEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_HashAlgorithm.ValueType], _builtins.type):
-    DESCRIPTOR: _descriptor.EnumDescriptor
+class _HashAlgorithmEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_HashAlgorithm.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SHA1: _HashAlgorithm.ValueType  # 0
     SHA256: _HashAlgorithm.ValueType  # 1
     SHA512: _HashAlgorithm.ValueType  # 2
@@ -37,40 +37,36 @@ SHA1: HashAlgorithm.ValueType  # 0
 SHA256: HashAlgorithm.ValueType  # 1
 SHA512: HashAlgorithm.ValueType  # 2
 XXH128: HashAlgorithm.ValueType  # 3
-Global___HashAlgorithm: _TypeAlias = HashAlgorithm  # noqa: Y015
+global___HashAlgorithm = HashAlgorithm
 
-@_typing.final
-class HashFileRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class HashFileRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    PATH_FIELD_NUMBER: _builtins.int
-    ALGORITHM_FIELD_NUMBER: _builtins.int
-    path: _builtins.str
-    algorithm: Global___HashAlgorithm.ValueType
+    PATH_FIELD_NUMBER: builtins.int
+    ALGORITHM_FIELD_NUMBER: builtins.int
+    path: builtins.str
+    algorithm: global___HashAlgorithm.ValueType
     def __init__(
         self,
         *,
-        path: _builtins.str = ...,
-        algorithm: Global___HashAlgorithm.ValueType = ...,
+        path: builtins.str = ...,
+        algorithm: global___HashAlgorithm.ValueType = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["algorithm", b"algorithm", "path", b"path"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["algorithm", b"algorithm", "path", b"path"]) -> None: ...
 
-Global___HashFileRequest: _TypeAlias = HashFileRequest  # noqa: Y015
+global___HashFileRequest = HashFileRequest
 
-@_typing.final
-class HashFileReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class HashFileReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Errors:
-        ValueType = _typing.NewType("ValueType", _builtins.int)
-        V: _TypeAlias = ValueType  # noqa: Y015
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
 
-    class _ErrorsEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[HashFileReply._Errors.ValueType], _builtins.type):
-        DESCRIPTOR: _descriptor.EnumDescriptor
+    class _ErrorsEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[HashFileReply._Errors.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: HashFileReply._Errors.ValueType  # 0
         FILE_NOT_FOUND: HashFileReply._Errors.ValueType  # 1
         UNKNOWN_ALGORITHM: HashFileReply._Errors.ValueType  # 2
@@ -84,71 +80,63 @@ class HashFileReply(_message.Message):
     ALGORITHM_NOT_FOUND: HashFileReply.Errors.ValueType  # 3
     ALGORITHM_FAILED: HashFileReply.Errors.ValueType  # 4
 
-    PATH_FIELD_NUMBER: _builtins.int
-    ALGORITHM_FIELD_NUMBER: _builtins.int
-    HASH_FIELD_NUMBER: _builtins.int
-    ERROR_FIELD_NUMBER: _builtins.int
-    ERROR_TEXT_FIELD_NUMBER: _builtins.int
-    path: _builtins.str
-    algorithm: Global___HashAlgorithm.ValueType
-    hash: _builtins.str
-    error: Global___HashFileReply.Errors.ValueType
-    error_text: _builtins.str
+    PATH_FIELD_NUMBER: builtins.int
+    ALGORITHM_FIELD_NUMBER: builtins.int
+    HASH_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
+    ERROR_TEXT_FIELD_NUMBER: builtins.int
+    path: builtins.str
+    algorithm: global___HashAlgorithm.ValueType
+    hash: builtins.str
+    error: global___HashFileReply.Errors.ValueType
+    error_text: builtins.str
     def __init__(
         self,
         *,
-        path: _builtins.str = ...,
-        algorithm: Global___HashAlgorithm.ValueType = ...,
-        hash: _builtins.str = ...,
-        error: Global___HashFileReply.Errors.ValueType = ...,
-        error_text: _builtins.str = ...,
+        path: builtins.str = ...,
+        algorithm: global___HashAlgorithm.ValueType = ...,
+        hash: builtins.str = ...,
+        error: global___HashFileReply.Errors.ValueType = ...,
+        error_text: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["algorithm", b"algorithm", "error", b"error", "error_text", b"error_text", "hash", b"hash", "path", b"path"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["algorithm", b"algorithm", "error", b"error", "error_text", b"error_text", "hash", b"hash", "path", b"path"]) -> None: ...
 
-Global___HashFileReply: _TypeAlias = HashFileReply  # noqa: Y015
+global___HashFileReply = HashFileReply
 
-@_typing.final
-class EnableNATRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class EnableNATRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NETWORK_UUID_FIELD_NUMBER: _builtins.int
-    NETWORK_ADDRESS_FIELD_NUMBER: _builtins.int
-    NETWORK_MASK_FIELD_NUMBER: _builtins.int
-    VXID_FIELD_NUMBER: _builtins.int
-    network_uuid: _builtins.str
-    network_address: _builtins.str
-    network_mask: _builtins.str
-    vxid: _builtins.int
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    NETWORK_ADDRESS_FIELD_NUMBER: builtins.int
+    NETWORK_MASK_FIELD_NUMBER: builtins.int
+    VXID_FIELD_NUMBER: builtins.int
+    network_uuid: builtins.str
+    network_address: builtins.str
+    network_mask: builtins.str
+    vxid: builtins.int
     def __init__(
         self,
         *,
-        network_uuid: _builtins.str = ...,
-        network_address: _builtins.str = ...,
-        network_mask: _builtins.str = ...,
-        vxid: _builtins.int = ...,
+        network_uuid: builtins.str = ...,
+        network_address: builtins.str = ...,
+        network_mask: builtins.str = ...,
+        vxid: builtins.int = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["network_address", b"network_address", "network_mask", b"network_mask", "network_uuid", b"network_uuid", "vxid", b"vxid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["network_address", b"network_address", "network_mask", b"network_mask", "network_uuid", b"network_uuid", "vxid", b"vxid"]) -> None: ...
 
-Global___EnableNATRequest: _TypeAlias = EnableNATRequest  # noqa: Y015
+global___EnableNATRequest = EnableNATRequest
 
-@_typing.final
-class EnableNATReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class EnableNATReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Errors:
-        ValueType = _typing.NewType("ValueType", _builtins.int)
-        V: _TypeAlias = ValueType  # noqa: Y015
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
 
-    class _ErrorsEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[EnableNATReply._Errors.ValueType], _builtins.type):
-        DESCRIPTOR: _descriptor.EnumDescriptor
+    class _ErrorsEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[EnableNATReply._Errors.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: EnableNATReply._Errors.ValueType  # 0
         IPTABLES_FAILED: EnableNATReply._Errors.ValueType  # 1
         RULES_ALREADY_PRESENT: EnableNATReply._Errors.ValueType  # 2
@@ -158,72 +146,64 @@ class EnableNATReply(_message.Message):
     IPTABLES_FAILED: EnableNATReply.Errors.ValueType  # 1
     RULES_ALREADY_PRESENT: EnableNATReply.Errors.ValueType  # 2
 
-    NETWORK_UUID_FIELD_NUMBER: _builtins.int
-    NETWORK_ADDRESS_FIELD_NUMBER: _builtins.int
-    NETWORK_MASK_FIELD_NUMBER: _builtins.int
-    VXID_FIELD_NUMBER: _builtins.int
-    ERROR_FIELD_NUMBER: _builtins.int
-    ERROR_TEXT_FIELD_NUMBER: _builtins.int
-    network_uuid: _builtins.str
-    network_address: _builtins.str
-    network_mask: _builtins.str
-    vxid: _builtins.int
-    error: Global___EnableNATReply.Errors.ValueType
-    error_text: _builtins.str
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    NETWORK_ADDRESS_FIELD_NUMBER: builtins.int
+    NETWORK_MASK_FIELD_NUMBER: builtins.int
+    VXID_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
+    ERROR_TEXT_FIELD_NUMBER: builtins.int
+    network_uuid: builtins.str
+    network_address: builtins.str
+    network_mask: builtins.str
+    vxid: builtins.int
+    error: global___EnableNATReply.Errors.ValueType
+    error_text: builtins.str
     def __init__(
         self,
         *,
-        network_uuid: _builtins.str = ...,
-        network_address: _builtins.str = ...,
-        network_mask: _builtins.str = ...,
-        vxid: _builtins.int = ...,
-        error: Global___EnableNATReply.Errors.ValueType = ...,
-        error_text: _builtins.str = ...,
+        network_uuid: builtins.str = ...,
+        network_address: builtins.str = ...,
+        network_mask: builtins.str = ...,
+        vxid: builtins.int = ...,
+        error: global___EnableNATReply.Errors.ValueType = ...,
+        error_text: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "error_text", b"error_text", "network_address", b"network_address", "network_mask", b"network_mask", "network_uuid", b"network_uuid", "vxid", b"vxid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error", b"error", "error_text", b"error_text", "network_address", b"network_address", "network_mask", b"network_mask", "network_uuid", b"network_uuid", "vxid", b"vxid"]) -> None: ...
 
-Global___EnableNATReply: _TypeAlias = EnableNATReply  # noqa: Y015
+global___EnableNATReply = EnableNATReply
 
-@_typing.final
-class EnsureVXLANMeshRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class EnsureVXLANMeshRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NETWORK_UUID_FIELD_NUMBER: _builtins.int
-    VXID_FIELD_NUMBER: _builtins.int
-    NODE_IPS_FIELD_NUMBER: _builtins.int
-    network_uuid: _builtins.str
-    vxid: _builtins.int
-    @_builtins.property
-    def node_ips(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    VXID_FIELD_NUMBER: builtins.int
+    NODE_IPS_FIELD_NUMBER: builtins.int
+    network_uuid: builtins.str
+    vxid: builtins.int
+    @property
+    def node_ips(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
-        network_uuid: _builtins.str = ...,
-        vxid: _builtins.int = ...,
-        node_ips: _abc.Iterable[_builtins.str] | None = ...,
+        network_uuid: builtins.str = ...,
+        vxid: builtins.int = ...,
+        node_ips: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["network_uuid", b"network_uuid", "node_ips", b"node_ips", "vxid", b"vxid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["network_uuid", b"network_uuid", "node_ips", b"node_ips", "vxid", b"vxid"]) -> None: ...
 
-Global___EnsureVXLANMeshRequest: _TypeAlias = EnsureVXLANMeshRequest  # noqa: Y015
+global___EnsureVXLANMeshRequest = EnsureVXLANMeshRequest
 
-@_typing.final
-class EnsureVXLANMeshReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class EnsureVXLANMeshReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Errors:
-        ValueType = _typing.NewType("ValueType", _builtins.int)
-        V: _TypeAlias = ValueType  # noqa: Y015
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
 
-    class _ErrorsEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[EnsureVXLANMeshReply._Errors.ValueType], _builtins.type):
-        DESCRIPTOR: _descriptor.EnumDescriptor
+    class _ErrorsEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[EnsureVXLANMeshReply._Errors.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: EnsureVXLANMeshReply._Errors.ValueType  # 0
         FAILURE: EnsureVXLANMeshReply._Errors.ValueType  # 1
 
@@ -231,73 +211,65 @@ class EnsureVXLANMeshReply(_message.Message):
     OK: EnsureVXLANMeshReply.Errors.ValueType  # 0
     FAILURE: EnsureVXLANMeshReply.Errors.ValueType  # 1
 
-    NETWORK_UUID_FIELD_NUMBER: _builtins.int
-    VXID_FIELD_NUMBER: _builtins.int
-    ADDED_ADDRESSES_FIELD_NUMBER: _builtins.int
-    REMOVED_ADDRESSES_FIELD_NUMBER: _builtins.int
-    ERROR_FIELD_NUMBER: _builtins.int
-    ERROR_TEXT_FIELD_NUMBER: _builtins.int
-    network_uuid: _builtins.str
-    vxid: _builtins.int
-    error: Global___EnsureVXLANMeshReply.Errors.ValueType
-    error_text: _builtins.str
-    @_builtins.property
-    def added_addresses(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
-    @_builtins.property
-    def removed_addresses(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    VXID_FIELD_NUMBER: builtins.int
+    ADDED_ADDRESSES_FIELD_NUMBER: builtins.int
+    REMOVED_ADDRESSES_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
+    ERROR_TEXT_FIELD_NUMBER: builtins.int
+    network_uuid: builtins.str
+    vxid: builtins.int
+    error: global___EnsureVXLANMeshReply.Errors.ValueType
+    error_text: builtins.str
+    @property
+    def added_addresses(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def removed_addresses(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
-        network_uuid: _builtins.str = ...,
-        vxid: _builtins.int = ...,
-        added_addresses: _abc.Iterable[_builtins.str] | None = ...,
-        removed_addresses: _abc.Iterable[_builtins.str] | None = ...,
-        error: Global___EnsureVXLANMeshReply.Errors.ValueType = ...,
-        error_text: _builtins.str = ...,
+        network_uuid: builtins.str = ...,
+        vxid: builtins.int = ...,
+        added_addresses: collections.abc.Iterable[builtins.str] | None = ...,
+        removed_addresses: collections.abc.Iterable[builtins.str] | None = ...,
+        error: global___EnsureVXLANMeshReply.Errors.ValueType = ...,
+        error_text: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["added_addresses", b"added_addresses", "error", b"error", "error_text", b"error_text", "network_uuid", b"network_uuid", "removed_addresses", b"removed_addresses", "vxid", b"vxid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["added_addresses", b"added_addresses", "error", b"error", "error_text", b"error_text", "network_uuid", b"network_uuid", "removed_addresses", b"removed_addresses", "vxid", b"vxid"]) -> None: ...
 
-Global___EnsureVXLANMeshReply: _TypeAlias = EnsureVXLANMeshReply  # noqa: Y015
+global___EnsureVXLANMeshReply = EnsureVXLANMeshReply
 
-@_typing.final
-class AddFloatingIPRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class AddFloatingIPRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NETWORK_UUID_FIELD_NUMBER: _builtins.int
-    FLOATING_ADDRESS_FIELD_NUMBER: _builtins.int
-    INNER_ADDRESS_FIELD_NUMBER: _builtins.int
-    network_uuid: _builtins.str
-    floating_address: _builtins.str
-    inner_address: _builtins.str
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    FLOATING_ADDRESS_FIELD_NUMBER: builtins.int
+    INNER_ADDRESS_FIELD_NUMBER: builtins.int
+    network_uuid: builtins.str
+    floating_address: builtins.str
+    inner_address: builtins.str
     def __init__(
         self,
         *,
-        network_uuid: _builtins.str = ...,
-        floating_address: _builtins.str = ...,
-        inner_address: _builtins.str = ...,
+        network_uuid: builtins.str = ...,
+        floating_address: builtins.str = ...,
+        inner_address: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["floating_address", b"floating_address", "inner_address", b"inner_address", "network_uuid", b"network_uuid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["floating_address", b"floating_address", "inner_address", b"inner_address", "network_uuid", b"network_uuid"]) -> None: ...
 
-Global___AddFloatingIPRequest: _TypeAlias = AddFloatingIPRequest  # noqa: Y015
+global___AddFloatingIPRequest = AddFloatingIPRequest
 
-@_typing.final
-class AddFloatingIPReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class AddFloatingIPReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Errors:
-        ValueType = _typing.NewType("ValueType", _builtins.int)
-        V: _TypeAlias = ValueType  # noqa: Y015
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
 
-    class _ErrorsEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[AddFloatingIPReply._Errors.ValueType], _builtins.type):
-        DESCRIPTOR: _descriptor.EnumDescriptor
+    class _ErrorsEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[AddFloatingIPReply._Errors.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: AddFloatingIPReply._Errors.ValueType  # 0
         CREATE_INTERFACE_FAILED: AddFloatingIPReply._Errors.ValueType  # 1
         ADD_ADDRESS_FAILED: AddFloatingIPReply._Errors.ValueType  # 2
@@ -309,65 +281,57 @@ class AddFloatingIPReply(_message.Message):
     ADD_ADDRESS_FAILED: AddFloatingIPReply.Errors.ValueType  # 2
     IPTABLES_FAILED: AddFloatingIPReply.Errors.ValueType  # 3
 
-    NETWORK_UUID_FIELD_NUMBER: _builtins.int
-    FLOATING_ADDRESS_FIELD_NUMBER: _builtins.int
-    INNER_ADDRESS_FIELD_NUMBER: _builtins.int
-    ERROR_FIELD_NUMBER: _builtins.int
-    ERROR_TEXT_FIELD_NUMBER: _builtins.int
-    network_uuid: _builtins.str
-    floating_address: _builtins.str
-    inner_address: _builtins.str
-    error: Global___AddFloatingIPReply.Errors.ValueType
-    error_text: _builtins.str
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    FLOATING_ADDRESS_FIELD_NUMBER: builtins.int
+    INNER_ADDRESS_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
+    ERROR_TEXT_FIELD_NUMBER: builtins.int
+    network_uuid: builtins.str
+    floating_address: builtins.str
+    inner_address: builtins.str
+    error: global___AddFloatingIPReply.Errors.ValueType
+    error_text: builtins.str
     def __init__(
         self,
         *,
-        network_uuid: _builtins.str = ...,
-        floating_address: _builtins.str = ...,
-        inner_address: _builtins.str = ...,
-        error: Global___AddFloatingIPReply.Errors.ValueType = ...,
-        error_text: _builtins.str = ...,
+        network_uuid: builtins.str = ...,
+        floating_address: builtins.str = ...,
+        inner_address: builtins.str = ...,
+        error: global___AddFloatingIPReply.Errors.ValueType = ...,
+        error_text: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "error_text", b"error_text", "floating_address", b"floating_address", "inner_address", b"inner_address", "network_uuid", b"network_uuid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error", b"error", "error_text", b"error_text", "floating_address", b"floating_address", "inner_address", b"inner_address", "network_uuid", b"network_uuid"]) -> None: ...
 
-Global___AddFloatingIPReply: _TypeAlias = AddFloatingIPReply  # noqa: Y015
+global___AddFloatingIPReply = AddFloatingIPReply
 
-@_typing.final
-class RemoveFloatingIPRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class RemoveFloatingIPRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NETWORK_UUID_FIELD_NUMBER: _builtins.int
-    FLOATING_ADDRESS_FIELD_NUMBER: _builtins.int
-    network_uuid: _builtins.str
-    floating_address: _builtins.str
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    FLOATING_ADDRESS_FIELD_NUMBER: builtins.int
+    network_uuid: builtins.str
+    floating_address: builtins.str
     def __init__(
         self,
         *,
-        network_uuid: _builtins.str = ...,
-        floating_address: _builtins.str = ...,
+        network_uuid: builtins.str = ...,
+        floating_address: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["floating_address", b"floating_address", "network_uuid", b"network_uuid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["floating_address", b"floating_address", "network_uuid", b"network_uuid"]) -> None: ...
 
-Global___RemoveFloatingIPRequest: _TypeAlias = RemoveFloatingIPRequest  # noqa: Y015
+global___RemoveFloatingIPRequest = RemoveFloatingIPRequest
 
-@_typing.final
-class RemoveFloatingIPReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class RemoveFloatingIPReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Errors:
-        ValueType = _typing.NewType("ValueType", _builtins.int)
-        V: _TypeAlias = ValueType  # noqa: Y015
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
 
-    class _ErrorsEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[RemoveFloatingIPReply._Errors.ValueType], _builtins.type):
-        DESCRIPTOR: _descriptor.EnumDescriptor
+    class _ErrorsEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[RemoveFloatingIPReply._Errors.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: RemoveFloatingIPReply._Errors.ValueType  # 0
         FAILED: RemoveFloatingIPReply._Errors.ValueType  # 1
 
@@ -375,62 +339,54 @@ class RemoveFloatingIPReply(_message.Message):
     OK: RemoveFloatingIPReply.Errors.ValueType  # 0
     FAILED: RemoveFloatingIPReply.Errors.ValueType  # 1
 
-    NETWORK_UUID_FIELD_NUMBER: _builtins.int
-    FLOATING_ADDRESS_FIELD_NUMBER: _builtins.int
-    ERROR_FIELD_NUMBER: _builtins.int
-    ERROR_TEXT_FIELD_NUMBER: _builtins.int
-    network_uuid: _builtins.str
-    floating_address: _builtins.str
-    error: Global___RemoveFloatingIPReply.Errors.ValueType
-    error_text: _builtins.str
+    NETWORK_UUID_FIELD_NUMBER: builtins.int
+    FLOATING_ADDRESS_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
+    ERROR_TEXT_FIELD_NUMBER: builtins.int
+    network_uuid: builtins.str
+    floating_address: builtins.str
+    error: global___RemoveFloatingIPReply.Errors.ValueType
+    error_text: builtins.str
     def __init__(
         self,
         *,
-        network_uuid: _builtins.str = ...,
-        floating_address: _builtins.str = ...,
-        error: Global___RemoveFloatingIPReply.Errors.ValueType = ...,
-        error_text: _builtins.str = ...,
+        network_uuid: builtins.str = ...,
+        floating_address: builtins.str = ...,
+        error: global___RemoveFloatingIPReply.Errors.ValueType = ...,
+        error_text: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "error_text", b"error_text", "floating_address", b"floating_address", "network_uuid", b"network_uuid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error", b"error", "error_text", b"error_text", "floating_address", b"floating_address", "network_uuid", b"network_uuid"]) -> None: ...
 
-Global___RemoveFloatingIPReply: _TypeAlias = RemoveFloatingIPReply  # noqa: Y015
+global___RemoveFloatingIPReply = RemoveFloatingIPReply
 
-@_typing.final
-class CreateVXLANInterfaceRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class CreateVXLANInterfaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    VX_ID_FIELD_NUMBER: _builtins.int
-    MESH_INTERFACE_FIELD_NUMBER: _builtins.int
-    vx_id: _builtins.int
-    mesh_interface: _builtins.str
+    VX_ID_FIELD_NUMBER: builtins.int
+    MESH_INTERFACE_FIELD_NUMBER: builtins.int
+    vx_id: builtins.int
+    mesh_interface: builtins.str
     def __init__(
         self,
         *,
-        vx_id: _builtins.int = ...,
-        mesh_interface: _builtins.str = ...,
+        vx_id: builtins.int = ...,
+        mesh_interface: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["mesh_interface", b"mesh_interface", "vx_id", b"vx_id"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["mesh_interface", b"mesh_interface", "vx_id", b"vx_id"]) -> None: ...
 
-Global___CreateVXLANInterfaceRequest: _TypeAlias = CreateVXLANInterfaceRequest  # noqa: Y015
+global___CreateVXLANInterfaceRequest = CreateVXLANInterfaceRequest
 
-@_typing.final
-class CreateVXLANInterfaceReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class CreateVXLANInterfaceReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Errors:
-        ValueType = _typing.NewType("ValueType", _builtins.int)
-        V: _TypeAlias = ValueType  # noqa: Y015
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
 
-    class _ErrorsEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[CreateVXLANInterfaceReply._Errors.ValueType], _builtins.type):
-        DESCRIPTOR: _descriptor.EnumDescriptor
+    class _ErrorsEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[CreateVXLANInterfaceReply._Errors.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: CreateVXLANInterfaceReply._Errors.ValueType  # 0
         FAILED: CreateVXLANInterfaceReply._Errors.ValueType  # 1
 
@@ -438,59 +394,51 @@ class CreateVXLANInterfaceReply(_message.Message):
     OK: CreateVXLANInterfaceReply.Errors.ValueType  # 0
     FAILED: CreateVXLANInterfaceReply.Errors.ValueType  # 1
 
-    VX_ID_FIELD_NUMBER: _builtins.int
-    MESH_INTERFACE_FIELD_NUMBER: _builtins.int
-    ERROR_FIELD_NUMBER: _builtins.int
-    ERROR_TEXT_FIELD_NUMBER: _builtins.int
-    vx_id: _builtins.int
-    mesh_interface: _builtins.str
-    error: Global___CreateVXLANInterfaceReply.Errors.ValueType
-    error_text: _builtins.str
+    VX_ID_FIELD_NUMBER: builtins.int
+    MESH_INTERFACE_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
+    ERROR_TEXT_FIELD_NUMBER: builtins.int
+    vx_id: builtins.int
+    mesh_interface: builtins.str
+    error: global___CreateVXLANInterfaceReply.Errors.ValueType
+    error_text: builtins.str
     def __init__(
         self,
         *,
-        vx_id: _builtins.int = ...,
-        mesh_interface: _builtins.str = ...,
-        error: Global___CreateVXLANInterfaceReply.Errors.ValueType = ...,
-        error_text: _builtins.str = ...,
+        vx_id: builtins.int = ...,
+        mesh_interface: builtins.str = ...,
+        error: global___CreateVXLANInterfaceReply.Errors.ValueType = ...,
+        error_text: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "error_text", b"error_text", "mesh_interface", b"mesh_interface", "vx_id", b"vx_id"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error", b"error", "error_text", b"error_text", "mesh_interface", b"mesh_interface", "vx_id", b"vx_id"]) -> None: ...
 
-Global___CreateVXLANInterfaceReply: _TypeAlias = CreateVXLANInterfaceReply  # noqa: Y015
+global___CreateVXLANInterfaceReply = CreateVXLANInterfaceReply
 
-@_typing.final
-class CreateNetworkNamespaceRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class CreateNetworkNamespaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NAMESPACE_FIELD_NUMBER: _builtins.int
-    namespace: _builtins.str
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
     def __init__(
         self,
         *,
-        namespace: _builtins.str = ...,
+        namespace: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["namespace", b"namespace"]) -> None: ...
 
-Global___CreateNetworkNamespaceRequest: _TypeAlias = CreateNetworkNamespaceRequest  # noqa: Y015
+global___CreateNetworkNamespaceRequest = CreateNetworkNamespaceRequest
 
-@_typing.final
-class CreateNetworkNamespaceReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class CreateNetworkNamespaceReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Errors:
-        ValueType = _typing.NewType("ValueType", _builtins.int)
-        V: _TypeAlias = ValueType  # noqa: Y015
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
 
-    class _ErrorsEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[CreateNetworkNamespaceReply._Errors.ValueType], _builtins.type):
-        DESCRIPTOR: _descriptor.EnumDescriptor
+    class _ErrorsEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[CreateNetworkNamespaceReply._Errors.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: CreateNetworkNamespaceReply._Errors.ValueType  # 0
         FAILED: CreateNetworkNamespaceReply._Errors.ValueType  # 1
 
@@ -498,123 +446,111 @@ class CreateNetworkNamespaceReply(_message.Message):
     OK: CreateNetworkNamespaceReply.Errors.ValueType  # 0
     FAILED: CreateNetworkNamespaceReply.Errors.ValueType  # 1
 
-    NAMESPACE_FIELD_NUMBER: _builtins.int
-    ERROR_FIELD_NUMBER: _builtins.int
-    ERROR_TEXT_FIELD_NUMBER: _builtins.int
-    namespace: _builtins.str
-    error: Global___CreateNetworkNamespaceReply.Errors.ValueType
-    error_text: _builtins.str
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
+    ERROR_TEXT_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    error: global___CreateNetworkNamespaceReply.Errors.ValueType
+    error_text: builtins.str
     def __init__(
         self,
         *,
-        namespace: _builtins.str = ...,
-        error: Global___CreateNetworkNamespaceReply.Errors.ValueType = ...,
-        error_text: _builtins.str = ...,
+        namespace: builtins.str = ...,
+        error: global___CreateNetworkNamespaceReply.Errors.ValueType = ...,
+        error_text: builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["error", b"error", "error_text", b"error_text", "namespace", b"namespace"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error", b"error", "error_text", b"error_text", "namespace", b"namespace"]) -> None: ...
 
-Global___CreateNetworkNamespaceReply: _TypeAlias = CreateNetworkNamespaceReply  # noqa: Y015
+global___CreateNetworkNamespaceReply = CreateNetworkNamespaceReply
 
-@_typing.final
-class PrivExecRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class PrivExecRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    EXECUTE_REQUEST_FIELD_NUMBER: _builtins.int
-    HASH_FILE_REQUEST_FIELD_NUMBER: _builtins.int
-    ENABLE_NAT_REQUEST_FIELD_NUMBER: _builtins.int
-    ENSURE_VXLAN_MESH_REQUEST_FIELD_NUMBER: _builtins.int
-    ADD_FLOATING_IP_REQUEST_FIELD_NUMBER: _builtins.int
-    REMOVE_FLOATING_IP_REQUEST_FIELD_NUMBER: _builtins.int
-    CREATE_VXLAN_INTERFACE_REQUEST_FIELD_NUMBER: _builtins.int
-    CREATE_NETWORK_NAMESPACE_REQUEST_FIELD_NUMBER: _builtins.int
-    @_builtins.property
-    def execute_request(self) -> _common_pb2.ExecuteRequest: ...
-    @_builtins.property
-    def hash_file_request(self) -> Global___HashFileRequest: ...
-    @_builtins.property
-    def enable_nat_request(self) -> Global___EnableNATRequest: ...
-    @_builtins.property
-    def ensure_vxlan_mesh_request(self) -> Global___EnsureVXLANMeshRequest: ...
-    @_builtins.property
-    def add_floating_ip_request(self) -> Global___AddFloatingIPRequest: ...
-    @_builtins.property
-    def remove_floating_ip_request(self) -> Global___RemoveFloatingIPRequest: ...
-    @_builtins.property
-    def create_vxlan_interface_request(self) -> Global___CreateVXLANInterfaceRequest: ...
-    @_builtins.property
-    def create_network_namespace_request(self) -> Global___CreateNetworkNamespaceRequest: ...
+    EXECUTE_REQUEST_FIELD_NUMBER: builtins.int
+    HASH_FILE_REQUEST_FIELD_NUMBER: builtins.int
+    ENABLE_NAT_REQUEST_FIELD_NUMBER: builtins.int
+    ENSURE_VXLAN_MESH_REQUEST_FIELD_NUMBER: builtins.int
+    ADD_FLOATING_IP_REQUEST_FIELD_NUMBER: builtins.int
+    REMOVE_FLOATING_IP_REQUEST_FIELD_NUMBER: builtins.int
+    CREATE_VXLAN_INTERFACE_REQUEST_FIELD_NUMBER: builtins.int
+    CREATE_NETWORK_NAMESPACE_REQUEST_FIELD_NUMBER: builtins.int
+    @property
+    def execute_request(self) -> common_pb2.ExecuteRequest: ...
+    @property
+    def hash_file_request(self) -> global___HashFileRequest: ...
+    @property
+    def enable_nat_request(self) -> global___EnableNATRequest: ...
+    @property
+    def ensure_vxlan_mesh_request(self) -> global___EnsureVXLANMeshRequest: ...
+    @property
+    def add_floating_ip_request(self) -> global___AddFloatingIPRequest: ...
+    @property
+    def remove_floating_ip_request(self) -> global___RemoveFloatingIPRequest: ...
+    @property
+    def create_vxlan_interface_request(self) -> global___CreateVXLANInterfaceRequest: ...
+    @property
+    def create_network_namespace_request(self) -> global___CreateNetworkNamespaceRequest: ...
     def __init__(
         self,
         *,
-        execute_request: _common_pb2.ExecuteRequest | None = ...,
-        hash_file_request: Global___HashFileRequest | None = ...,
-        enable_nat_request: Global___EnableNATRequest | None = ...,
-        ensure_vxlan_mesh_request: Global___EnsureVXLANMeshRequest | None = ...,
-        add_floating_ip_request: Global___AddFloatingIPRequest | None = ...,
-        remove_floating_ip_request: Global___RemoveFloatingIPRequest | None = ...,
-        create_vxlan_interface_request: Global___CreateVXLANInterfaceRequest | None = ...,
-        create_network_namespace_request: Global___CreateNetworkNamespaceRequest | None = ...,
+        execute_request: common_pb2.ExecuteRequest | None = ...,
+        hash_file_request: global___HashFileRequest | None = ...,
+        enable_nat_request: global___EnableNATRequest | None = ...,
+        ensure_vxlan_mesh_request: global___EnsureVXLANMeshRequest | None = ...,
+        add_floating_ip_request: global___AddFloatingIPRequest | None = ...,
+        remove_floating_ip_request: global___RemoveFloatingIPRequest | None = ...,
+        create_vxlan_interface_request: global___CreateVXLANInterfaceRequest | None = ...,
+        create_network_namespace_request: global___CreateNetworkNamespaceRequest | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["add_floating_ip_request", b"add_floating_ip_request", "create_network_namespace_request", b"create_network_namespace_request", "create_vxlan_interface_request", b"create_vxlan_interface_request", "enable_nat_request", b"enable_nat_request", "ensure_vxlan_mesh_request", b"ensure_vxlan_mesh_request", "execute_request", b"execute_request", "hash_file_request", b"hash_file_request", "remove_floating_ip_request", b"remove_floating_ip_request", "request", b"request"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["add_floating_ip_request", b"add_floating_ip_request", "create_network_namespace_request", b"create_network_namespace_request", "create_vxlan_interface_request", b"create_vxlan_interface_request", "enable_nat_request", b"enable_nat_request", "ensure_vxlan_mesh_request", b"ensure_vxlan_mesh_request", "execute_request", b"execute_request", "hash_file_request", b"hash_file_request", "remove_floating_ip_request", b"remove_floating_ip_request", "request", b"request"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    _WhichOneofReturnType_request: _TypeAlias = _typing.Literal["execute_request", "hash_file_request", "enable_nat_request", "ensure_vxlan_mesh_request", "add_floating_ip_request", "remove_floating_ip_request", "create_vxlan_interface_request", "create_network_namespace_request"]  # noqa: Y015
-    _WhichOneofArgType_request: _TypeAlias = _typing.Literal["request", b"request"]  # noqa: Y015
-    def WhichOneof(self, oneof_group: _WhichOneofArgType_request) -> _WhichOneofReturnType_request | None: ...
+    def HasField(self, field_name: typing.Literal["add_floating_ip_request", b"add_floating_ip_request", "create_network_namespace_request", b"create_network_namespace_request", "create_vxlan_interface_request", b"create_vxlan_interface_request", "enable_nat_request", b"enable_nat_request", "ensure_vxlan_mesh_request", b"ensure_vxlan_mesh_request", "execute_request", b"execute_request", "hash_file_request", b"hash_file_request", "remove_floating_ip_request", b"remove_floating_ip_request", "request", b"request"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["add_floating_ip_request", b"add_floating_ip_request", "create_network_namespace_request", b"create_network_namespace_request", "create_vxlan_interface_request", b"create_vxlan_interface_request", "enable_nat_request", b"enable_nat_request", "ensure_vxlan_mesh_request", b"ensure_vxlan_mesh_request", "execute_request", b"execute_request", "hash_file_request", b"hash_file_request", "remove_floating_ip_request", b"remove_floating_ip_request", "request", b"request"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["request", b"request"]) -> typing.Literal["execute_request", "hash_file_request", "enable_nat_request", "ensure_vxlan_mesh_request", "add_floating_ip_request", "remove_floating_ip_request", "create_vxlan_interface_request", "create_network_namespace_request"] | None: ...
 
-Global___PrivExecRequest: _TypeAlias = PrivExecRequest  # noqa: Y015
+global___PrivExecRequest = PrivExecRequest
 
-@_typing.final
-class PrivExecReply(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
+@typing.final
+class PrivExecReply(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    EXECUTE_REPLY_FIELD_NUMBER: _builtins.int
-    HASH_FILE_REPLY_FIELD_NUMBER: _builtins.int
-    ENABLE_NAT_REPLY_FIELD_NUMBER: _builtins.int
-    ENSURE_VXLAN_MESH_REPLY_FIELD_NUMBER: _builtins.int
-    ADD_FLOATING_IP_REPLY_FIELD_NUMBER: _builtins.int
-    REMOVE_FLOATING_IP_REPLY_FIELD_NUMBER: _builtins.int
-    CREATE_VXLAN_INTERFACE_REPLY_FIELD_NUMBER: _builtins.int
-    CREATE_NETWORK_NAMESPACE_REPLY_FIELD_NUMBER: _builtins.int
-    @_builtins.property
-    def execute_reply(self) -> _common_pb2.ExecuteReply: ...
-    @_builtins.property
-    def hash_file_reply(self) -> Global___HashFileReply: ...
-    @_builtins.property
-    def enable_nat_reply(self) -> Global___EnableNATReply: ...
-    @_builtins.property
-    def ensure_vxlan_mesh_reply(self) -> Global___EnsureVXLANMeshReply: ...
-    @_builtins.property
-    def add_floating_ip_reply(self) -> Global___AddFloatingIPReply: ...
-    @_builtins.property
-    def remove_floating_ip_reply(self) -> Global___RemoveFloatingIPReply: ...
-    @_builtins.property
-    def create_vxlan_interface_reply(self) -> Global___CreateVXLANInterfaceReply: ...
-    @_builtins.property
-    def create_network_namespace_reply(self) -> Global___CreateNetworkNamespaceReply: ...
+    EXECUTE_REPLY_FIELD_NUMBER: builtins.int
+    HASH_FILE_REPLY_FIELD_NUMBER: builtins.int
+    ENABLE_NAT_REPLY_FIELD_NUMBER: builtins.int
+    ENSURE_VXLAN_MESH_REPLY_FIELD_NUMBER: builtins.int
+    ADD_FLOATING_IP_REPLY_FIELD_NUMBER: builtins.int
+    REMOVE_FLOATING_IP_REPLY_FIELD_NUMBER: builtins.int
+    CREATE_VXLAN_INTERFACE_REPLY_FIELD_NUMBER: builtins.int
+    CREATE_NETWORK_NAMESPACE_REPLY_FIELD_NUMBER: builtins.int
+    @property
+    def execute_reply(self) -> common_pb2.ExecuteReply: ...
+    @property
+    def hash_file_reply(self) -> global___HashFileReply: ...
+    @property
+    def enable_nat_reply(self) -> global___EnableNATReply: ...
+    @property
+    def ensure_vxlan_mesh_reply(self) -> global___EnsureVXLANMeshReply: ...
+    @property
+    def add_floating_ip_reply(self) -> global___AddFloatingIPReply: ...
+    @property
+    def remove_floating_ip_reply(self) -> global___RemoveFloatingIPReply: ...
+    @property
+    def create_vxlan_interface_reply(self) -> global___CreateVXLANInterfaceReply: ...
+    @property
+    def create_network_namespace_reply(self) -> global___CreateNetworkNamespaceReply: ...
     def __init__(
         self,
         *,
-        execute_reply: _common_pb2.ExecuteReply | None = ...,
-        hash_file_reply: Global___HashFileReply | None = ...,
-        enable_nat_reply: Global___EnableNATReply | None = ...,
-        ensure_vxlan_mesh_reply: Global___EnsureVXLANMeshReply | None = ...,
-        add_floating_ip_reply: Global___AddFloatingIPReply | None = ...,
-        remove_floating_ip_reply: Global___RemoveFloatingIPReply | None = ...,
-        create_vxlan_interface_reply: Global___CreateVXLANInterfaceReply | None = ...,
-        create_network_namespace_reply: Global___CreateNetworkNamespaceReply | None = ...,
+        execute_reply: common_pb2.ExecuteReply | None = ...,
+        hash_file_reply: global___HashFileReply | None = ...,
+        enable_nat_reply: global___EnableNATReply | None = ...,
+        ensure_vxlan_mesh_reply: global___EnsureVXLANMeshReply | None = ...,
+        add_floating_ip_reply: global___AddFloatingIPReply | None = ...,
+        remove_floating_ip_reply: global___RemoveFloatingIPReply | None = ...,
+        create_vxlan_interface_reply: global___CreateVXLANInterfaceReply | None = ...,
+        create_network_namespace_reply: global___CreateNetworkNamespaceReply | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["add_floating_ip_reply", b"add_floating_ip_reply", "create_network_namespace_reply", b"create_network_namespace_reply", "create_vxlan_interface_reply", b"create_vxlan_interface_reply", "enable_nat_reply", b"enable_nat_reply", "ensure_vxlan_mesh_reply", b"ensure_vxlan_mesh_reply", "execute_reply", b"execute_reply", "hash_file_reply", b"hash_file_reply", "remove_floating_ip_reply", b"remove_floating_ip_reply", "reply", b"reply"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["add_floating_ip_reply", b"add_floating_ip_reply", "create_network_namespace_reply", b"create_network_namespace_reply", "create_vxlan_interface_reply", b"create_vxlan_interface_reply", "enable_nat_reply", b"enable_nat_reply", "ensure_vxlan_mesh_reply", b"ensure_vxlan_mesh_reply", "execute_reply", b"execute_reply", "hash_file_reply", b"hash_file_reply", "remove_floating_ip_reply", b"remove_floating_ip_reply", "reply", b"reply"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    _WhichOneofReturnType_reply: _TypeAlias = _typing.Literal["execute_reply", "hash_file_reply", "enable_nat_reply", "ensure_vxlan_mesh_reply", "add_floating_ip_reply", "remove_floating_ip_reply", "create_vxlan_interface_reply", "create_network_namespace_reply"]  # noqa: Y015
-    _WhichOneofArgType_reply: _TypeAlias = _typing.Literal["reply", b"reply"]  # noqa: Y015
-    def WhichOneof(self, oneof_group: _WhichOneofArgType_reply) -> _WhichOneofReturnType_reply | None: ...
+    def HasField(self, field_name: typing.Literal["add_floating_ip_reply", b"add_floating_ip_reply", "create_network_namespace_reply", b"create_network_namespace_reply", "create_vxlan_interface_reply", b"create_vxlan_interface_reply", "enable_nat_reply", b"enable_nat_reply", "ensure_vxlan_mesh_reply", b"ensure_vxlan_mesh_reply", "execute_reply", b"execute_reply", "hash_file_reply", b"hash_file_reply", "remove_floating_ip_reply", b"remove_floating_ip_reply", "reply", b"reply"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["add_floating_ip_reply", b"add_floating_ip_reply", "create_network_namespace_reply", b"create_network_namespace_reply", "create_vxlan_interface_reply", b"create_vxlan_interface_reply", "enable_nat_reply", b"enable_nat_reply", "ensure_vxlan_mesh_reply", b"ensure_vxlan_mesh_reply", "execute_reply", b"execute_reply", "hash_file_reply", b"hash_file_reply", "remove_floating_ip_reply", b"remove_floating_ip_reply", "reply", b"reply"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["reply", b"reply"]) -> typing.Literal["execute_reply", "hash_file_reply", "enable_nat_reply", "ensure_vxlan_mesh_reply", "add_floating_ip_reply", "remove_floating_ip_reply", "create_vxlan_interface_reply", "create_network_namespace_reply"] | None: ...
 
-Global___PrivExecReply: _TypeAlias = PrivExecReply  # noqa: Y015
+global___PrivExecReply = PrivExecReply
