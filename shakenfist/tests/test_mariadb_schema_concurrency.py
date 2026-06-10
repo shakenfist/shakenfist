@@ -233,3 +233,56 @@ class ExpectedSchemaVersionsTestCase(base.ShakenFistTestCase):
             len(EXPECTED_TABLE_NAMES),
             'EXPECTED_SCHEMA_VERSIONS entry count drifted from the expected '
             'list in this test.')
+
+
+class RegisterAllTablesTestCase(base.ShakenFistTestCase):
+    """Guard register_all_tables() against drift.
+
+    sf-database calls register_all_tables() at startup to pre-populate
+    the SQLAlchemy metadata, so request threads never take
+    TABLE_CREATION_LOCK on the hot path. If a new table is added to
+    ensure_schema() but its _get_*_table() helper is not added to
+    register_all_tables(), this test fails -- the metadata after the
+    call is missing the new table.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # Snapshot every module-level Table cache plus metadata, then
+        # zero them so register_all_tables() builds fresh objects we
+        # can assert against.
+        # Module-level table caches start as ``Optional[sa.Table]`` and
+        # are either ``None`` or an ``sa.Table`` instance. Filter on that
+        # to avoid sweeping the ``_get_*_table`` helpers themselves.
+        self._cached_tables = {
+            name: value
+            for name, value in vars(mariadb).items()
+            if name.startswith('_') and name.endswith('_table')
+            and (value is None or isinstance(value, sa.Table))
+        }
+        self._original_metadata = mariadb._metadata
+
+        for name in self._cached_tables:
+            setattr(mariadb, name, None)
+        mariadb._metadata = sa.MetaData()
+
+    def tearDown(self):
+        super().tearDown()
+        for name, value in self._cached_tables.items():
+            setattr(mariadb, name, value)
+        mariadb._metadata = self._original_metadata
+
+    def test_registers_every_expected_table(self):
+        """Every name in EXPECTED_TABLE_NAMES (plus schema_versions) lands
+        in the SQLAlchemy MetaData after register_all_tables()."""
+        mariadb.register_all_tables()
+
+        registered = set(mariadb._get_metadata().tables.keys())
+        expected = set(EXPECTED_TABLE_NAMES) | {'schema_versions'}
+
+        missing = expected - registered
+        self.assertFalse(
+            missing,
+            f'register_all_tables() failed to register: {sorted(missing)}. '
+            'Add the missing _get_*_table() calls to register_all_tables() '
+            'in shakenfist/mariadb.py.')

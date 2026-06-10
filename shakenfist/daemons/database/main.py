@@ -5178,6 +5178,14 @@ def main() -> None:
         LOG.error(str(e))
         raise SystemExit(1)
 
+    # Pre-populate every SQLAlchemy ``Table`` object before the gRPC
+    # server starts accepting requests. The lazy ``_get_*_table()``
+    # helpers serialise first-time inits behind a single RLock, and
+    # with 64 worker threads servicing the cluster-startup burst that
+    # one lock becomes a thundering-herd hot spot exactly when
+    # sf-database needs to be answering keepalives.
+    mariadb.register_all_tables()
+
     # Create the gRPC server.  Allow clients to send keepalive pings as
     # often as every 5 seconds — mariadb.py uses a 10-second interval.
     # Without this the default minimum (5 minutes) triggers GOAWAY with

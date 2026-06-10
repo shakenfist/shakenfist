@@ -2486,6 +2486,64 @@ def ensure_schema() -> list[dict[str, Any]]:
     return results
 
 
+def register_all_tables() -> None:
+    """Eagerly register every SQLAlchemy ``Table`` in module metadata.
+
+    Each ``_get_*_table()`` helper lazily builds its ``sa.Table`` on
+    first use behind ``TABLE_CREATION_LOCK``. With a 64-worker gRPC
+    pool every client daemon hammers sf-database during cluster
+    startup, so the first wave of requests serialises 30+ first-time
+    Table inits through a single RLock at the exact moment sf-database
+    is meant to be answering keepalives. Calling every helper once
+    here -- before ``server.start()`` -- pre-populates the module
+    globals so request threads find the cached Table object on the
+    cheap None-check path and never reach the lock.
+
+    Safe to call multiple times and from any process that has imported
+    this module. Touches no database connections; only builds in-memory
+    SQLAlchemy metadata.
+    """
+    _get_schema_versions_table()
+    _get_object_states_table()
+    _get_ipam_reservations_table()
+    _get_uploads_table()
+    _get_dnsmasq_table()
+    _get_blobs_table()
+    _get_object_references_table()
+    _get_blob_hashes_table()
+    _get_blob_transfers_table()
+    _get_blob_attributes_table()
+    _get_nodes_table()
+    _get_node_attributes_table()
+    _get_namespaces_table()
+    _get_namespace_attributes_table()
+    _get_artifacts_table()
+    _get_artifact_attributes_table()
+    _get_artifact_indexes_table()
+    _get_network_interfaces_table()
+    _get_network_interface_attributes_table()
+    _get_networks_table()
+    _get_network_attributes_table()
+    _get_ipams_table()
+    _get_agent_operations_table()
+    _get_agent_operation_attributes_table()
+    _get_instances_table()
+    _get_instance_attributes_table()
+    _get_object_metadata_table()
+    _get_cluster_operation_targets_table()
+    _get_node_metrics_table()
+    _get_node_daemon_states_table()
+    _get_cluster_operations_table()
+    _get_cluster_operation_errors_table()
+    _get_work_queue_table()
+    _get_cluster_locks_table()
+    _get_cluster_config_table()
+    _get_events_table()
+    _get_event_objects_table()
+    LOG.info('Registered %d MariaDB Table objects in metadata',
+             len(_get_metadata().tables))
+
+
 def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     """Read state for an object directly from MariaDB.
 
