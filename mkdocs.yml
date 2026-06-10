@@ -199,6 +199,9 @@ nav:
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
                 - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
+                - "Phase 4: Port latency loadtest to control socket": components/kerbside/plans/PLAN-test-harness-phase-04-port-latency.md
+                - "Phase 5: Direct-qemu CI workflow": components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci.md
+                - "Phase 6: Ryll Cargo feature work + digest decoding + restore keypress-to-screen latency": components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md
