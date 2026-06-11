@@ -658,7 +658,7 @@ REST API built with Flask-RESTful:
 Client
    |
    v
-Apache (reverse proxy, adds /api/ prefix)
+Operator-provided load balancer / reverse proxy (adds /api/ prefix)
    |
    v
 Gunicorn (port 13000)
