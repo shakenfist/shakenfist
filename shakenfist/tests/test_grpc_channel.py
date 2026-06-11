@@ -97,7 +97,7 @@ class MakeDatabaseChannelOptionsTestCase(base.ShakenFistTestCase):
 
 
 class MakeDatabaseChannelServiceConfigTestCase(base.ShakenFistTestCase):
-    """grpc.service_config option carries the expected LB and health config."""
+    """grpc.service_config option carries the expected LB config."""
 
     def _get_service_config(self, extra_options=None):
         with mock.patch('shakenfist.util.grpc_channel.grpc.insecure_channel') as mock_ic:
@@ -115,11 +115,22 @@ class MakeDatabaseChannelServiceConfigTestCase(base.ShakenFistTestCase):
         policies = [list(entry.keys())[0] for entry in lb_configs]
         self.assertIn('round_robin', policies)
 
-    def test_health_check_config_service_name_is_empty_string(self):
+    def test_health_check_config_absent(self):
+        """Client-side health checking must stay disabled.
+
+        healthCheckConfig opens a Health/Watch stream per subchannel,
+        and the synchronous HealthServicer on sf-database deadlocks
+        its server's single event-dispatch thread when a Watch open
+        (initial response sent under the servicer lock) races a Watch
+        close (close callback acquiring that lock inline on the event
+        thread). See the _DEFAULT_OPTIONS comment in
+        shakenfist/util/grpc_channel.py before re-enabling this.
+        """
         cfg = self._get_service_config()
-        health_cfg = cfg.get('healthCheckConfig', {})
-        self.assertIn('serviceName', health_cfg)
-        self.assertEqual(
-            health_cfg['serviceName'], '',
-            'serviceName must be empty string (overall server health convention)',
+        self.assertNotIn(
+            'healthCheckConfig', cfg,
+            'healthCheckConfig re-enables Watch-based client-side health '
+            'checking, which deadlocks the sync HealthServicer on '
+            'sf-database. Do not re-add without an async or '
+            'deadlock-safe server-side health implementation.',
         )

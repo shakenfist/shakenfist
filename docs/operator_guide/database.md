@@ -229,14 +229,17 @@ configuration.
 
 **Load balancing**: When `MARIADB_GATEWAY_HOSTS` is a multi-element list, every
 SF daemon connects to the tier with a gRPC channel that round-robins requests
-across the listed endpoints. Unhealthy endpoints are skipped automatically:
-`sf-database` publishes the standard `grpc.health.v1.Health` protocol against
-the empty-string service name, and clients use that protocol via the gRPC
-channel's own `healthCheckConfig`. There is no external load balancer to
-configure -- the round-robin behaviour and health-aware skipping are inside
-the gRPC client library. Rolling upgrades of the tier work cleanly because
-each `sf-database` flips its health status to `NOT_SERVING` before stopping,
-giving in-flight clients a window to drain to peer instances.
+across the listed endpoints. Dead endpoints are skipped automatically: the
+round-robin policy avoids subchannels whose TCP connection is down, and
+aggressive client keepalives (a ping every 10 seconds with a 5 second
+timeout) detect a hung instance within about 15 seconds. There is no
+external load balancer to configure -- the round-robin behaviour and
+failure detection are inside the gRPC client library. `sf-database` also
+publishes the standard `grpc.health.v1.Health` protocol against the
+empty-string service name for external monitoring via unary `Check` calls.
+Watch-based client-side health checking (`healthCheckConfig`) is
+deliberately not enabled: the synchronous health servicer can deadlock the
+gRPC server's event thread when Watch streams open and close concurrently.
 
 ## Administrative Commands
 

@@ -5223,11 +5223,17 @@ def main() -> None:
     )
 
     # Register the gRPC standard health-checking protocol against the
-    # empty-string service name. Empty-string is the convention for
-    # "overall server health" and is what client-side LB checks against
-    # via the healthCheckConfig in shakenfist/util/grpc_channel.py.
-    # The status flips to NOT_SERVING during the shutdown path so
-    # rolling-upgrade clients can drain to peer instances.
+    # empty-string service name (the convention for "overall server
+    # health") for external monitoring via unary Check calls. SF's own
+    # client channels deliberately do NOT consume this via
+    # healthCheckConfig: Watch-based client-side health checking
+    # deadlocks this synchronous servicer against the server's single
+    # event-dispatch thread (the initial Watch response is sent while
+    # holding the servicer lock; Watch close callbacks acquire that
+    # lock inline on the event thread). Nothing should open Watch
+    # streams against this server. See shakenfist/util/grpc_channel.py.
+    # The status still flips to NOT_SERVING during the shutdown path
+    # so external Check-based monitoring sees the drain.
     health_servicer = health.HealthServicer()
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
     health_servicer.set('', health_pb2.HealthCheckResponse.SERVING)
@@ -5253,9 +5259,10 @@ def main() -> None:
 
     m.run()
 
-    # Flip the health status to NOT_SERVING so LB-aware clients see
-    # the change via the standard gRPC health protocol and drain to
-    # peer instances before sf-database stops accepting requests.
+    # Flip the health status to NOT_SERVING so external Check-based
+    # monitoring sees the drain before sf-database stops accepting
+    # requests. SF's own clients fail over via connectivity state and
+    # keepalives, not the health protocol.
     health_servicer.set('', health_pb2.HealthCheckResponse.NOT_SERVING)
 
     server.stop(1).wait()

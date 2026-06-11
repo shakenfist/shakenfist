@@ -78,10 +78,13 @@ The database microservice (`sf-database`) centralizes all database access:
 The `sf-database` box in the diagram represents a tier of N >= 1 instances.
 All instances connect to the same MariaDB; none is elected. Every other SF
 daemon reaches the tier through a client-side load-balanced gRPC channel
-constructed over the `MARIADB_GATEWAY_HOSTS` list of endpoints. Unhealthy
-endpoints are skipped via the gRPC health protocol (`grpc.health.v1.Health`)
-on `MARIADB_GATEWAY_PORT`. Rolling upgrades of the tier work cleanly because
-each `sf-database` flips its health status to `NOT_SERVING` before stopping.
+constructed over the `MARIADB_GATEWAY_HOSTS` list of endpoints. Dead
+endpoints are skipped via subchannel connectivity state and client
+keepalives (10 s ping / 5 s timeout). `sf-database` also publishes the
+`grpc.health.v1.Health` protocol for external monitoring via unary `Check`
+calls; Watch-based client-side health checking is deliberately not enabled
+because the synchronous health servicer can deadlock the gRPC server's
+event thread (see `shakenfist/util/grpc_channel.py`).
 See [`docs/operator_guide/database.md`](docs/operator_guide/database.md) —
 "MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.
 

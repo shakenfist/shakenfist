@@ -7,7 +7,7 @@ construction here gives us:
 
   - one place to set the gRPC keepalive options
   - one place to attach the static `ipv4:` resolver + `round_robin`
-    load-balancing policy + empty-string client-side health checking
+    load-balancing policy
   - per-caller option overrides via the ``extra_options`` argument
     (gRPC's "last value wins" behaviour for duplicated option keys)
 
@@ -37,9 +37,21 @@ _DEFAULT_OPTIONS: list[tuple[str, Any]] = [
     # otherwise see localhost / mesh-IP database calls routed through
     # the proxy and rejected with 503.
     ('grpc.enable_http_proxy', 0),
+    # No healthCheckConfig here, deliberately. Client-side health
+    # checking opens a grpc.health.v1.Health/Watch stream on every
+    # subchannel, and the synchronous HealthServicer on sf-database
+    # sends the initial Watch response while holding its internal
+    # lock. The server's single event-dispatch thread runs Watch
+    # close callbacks inline, which acquire that same lock. A Watch
+    # opening while another closes deadlocks the event thread and
+    # wedges the entire gRPC server -- permanently. (Reproduced
+    # across grpcio 1.70-1.81; the lock pattern is still present
+    # upstream at master as of June 2026.) round_robin handles dead
+    # backends via subchannel connectivity state, and the aggressive
+    # keepalives above detect dead transports within ~15 s, so the
+    # health protocol is not needed for failover.
     ('grpc.service_config', json.dumps({
         'loadBalancingConfig': [{'round_robin': {}}],
-        'healthCheckConfig': {'serviceName': ''},
     })),
 ]
 
@@ -53,10 +65,10 @@ def make_database_channel(
 
     Uses the gRPC-native ``ipv4:`` static resolver and the
     ``round_robin`` load-balancing policy across every host in
-    ``hosts``. Subchannel health is reported via the gRPC health
-    protocol against the empty service name (the convention for
-    "overall server health"); the server side is registered in
-    ``daemons/database/main.py`` by step 2 of phase 3.
+    ``hosts``. Failed instances are avoided via subchannel
+    connectivity state and the keepalive options; the gRPC health
+    protocol's Watch-based client-side checking is deliberately NOT
+    enabled (see the comment on ``_DEFAULT_OPTIONS``).
 
     Per-caller overrides go in ``extra_options``. gRPC accepts
     duplicate option keys; the last entry wins. Callers therefore
