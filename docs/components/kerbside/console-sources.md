@@ -174,6 +174,16 @@ asserts against. See phase 3 of the test-harness plan for the full
 design:
 `docs/plans/PLAN-test-harness-phase-03-control-socket.md`.
 
+The direct-qemu lane's final step runs the Sextant scenario tempest
+test (`tests/scenario/test_sextant_scenario.py`), which drives the
+full Awaiting → Booting → bootloader-ignore → paste → Parked →
+shutdown sequence and asserts both the live `digest_updated` QR
+event stream and the post-mortem serial drain. The test skips when
+`CONF.kerbside.control_socket_path` is unset, so it is safe to load
+the plugin on the OpenStack lane where these direct-qemu options are
+not configured. `tools/direct-qemu/run-scenario.sh` handles tempest
+venv setup, config file generation, and test execution.
+
 ## Example sources.yaml
 
 An example configuration follows:

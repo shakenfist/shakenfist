@@ -1,4 +1,4 @@
-# Control Socket Protocol — Version 1.0
+# Control Socket Protocol — Version 1.1
 
 This document specifies the wire protocol spoken between Ryll's headless
 mode and any external driver that connects to its Unix-domain control
@@ -9,7 +9,21 @@ layer, and the phase 7 Sextant scenario tempest test — all implement
 against this document. Read the whole document before writing a client
 or implementing a verb.
 
-Protocol version: **1.0**
+Protocol version: **1.1**
+
+Version history:
+
+- **1.0** — initial.  `hello`, `status`, `send_key`, `paste`,
+  `screenshot`, `subscribe`, `unsubscribe` verbs; `latency`,
+  `agent_connected`, `paste_completed`, `paste_failed`,
+  `dropped` events.
+- **1.1** — added the `surface_drawn` event (one wire event per
+  display draw command) so the phase 4 loadtest can compute
+  keypress-to-screen latency rather than PING/PONG round-trip.
+  Added the `digest_updated` event behind the `digest-decode`
+  Cargo feature.  Backwards-compatible at the major-version
+  level: v1.0 clients can still hello and operate; they just
+  do not subscribe to v1.1 events.
 
 ---
 
@@ -230,7 +244,7 @@ Parameters:
 ### Hello response — success
 
 ```json
-{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.0", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped"]}}
+{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
 ```
 
 Result fields:
@@ -238,7 +252,7 @@ Result fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `server_name` | string | Always `"ryll"` in this implementation. |
-| `protocol_version` | string | The version the server will speak. In v1 this is always `"1.0"`. |
+| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.1"`; in v1.0 servers it was `"1.0"`. Clients should not compare for exact equality — see the compat note below. |
 | `supported_methods` | array of string | The complete set of verb names the server recognises. Clients should use this list rather than hard-coding expectations, especially when connecting to a newer server. |
 | `supported_events` | array of string | The complete set of event names the server can emit. |
 
@@ -257,10 +271,11 @@ will see EOF immediately after reading that line.
 
 **Minor version mismatches are accepted in both directions.** A v1.3
 client connecting to a v1.0 server, or vice versa, is fine: the server
-responds with `"protocol_version": "1.0"` and both sides behave
-according to the features they each know about. The client should check
-`supported_methods` and `supported_events` at runtime rather than
-assuming every verb in this document is available on every server.
+responds with whatever minor version *it* speaks (e.g. `"1.0"` or
+`"1.1"`), and both sides behave according to the features they each
+know about. The client should check `supported_methods` and
+`supported_events` at runtime rather than assuming every verb in this
+document is available on every server.
 
 ---
 
@@ -326,8 +341,8 @@ Verb-specific error codes:
 Worked example:
 
 ```
-→ {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.0"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.0", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped"]}}
+→ {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
 ```
 
 ---
@@ -739,6 +754,77 @@ Worked example:
 ```
 ← {"event": "dropped", "data": {"count": 14}}
 ```
+
+---
+
+### `surface_drawn`
+
+Added in v1.1.  Emitted once per draw command that modifies a display
+surface.  Fires unconditionally on every `ImageReady`, `ImageReadyChroma`,
+`ImageReadyAlpha`, `FillRect`, `CopyBits`, and `Invert` event produced
+by the renderer's display channel — `DisplayMark` (frame boundary) does
+not fire `surface_drawn`.
+
+The intended use case is computing keypress-to-screen latency: a
+subscriber sends a `send_key down` and records its keypress wallclock,
+then takes the wallclock of the first `surface_drawn` it receives
+afterwards as the time-of-first-visible-pixel.  Subsequent
+`surface_drawn` events from the same logical frame are deduplicated by
+the consumer, not by the server.
+
+Data fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_channel_id` | u8 | The display channel that produced the draw. |
+| `surface_id` | u32 | The SPICE surface id painted (0 is the primary surface). |
+| `produced_at_secs` | f64 | Renderer-internal session-relative seconds at the moment the channel handler called `event_tx.send`.  Monotonic. |
+| `wallclock_us` | u64 | Server wallclock at translation time, microseconds since the Unix epoch.  Cross-process consumers should compute deltas in this clock rather than mixing it with `produced_at_secs`. |
+
+Worked example:
+
+```
+← {"event": "surface_drawn", "data": {"display_channel_id": 0, "surface_id": 0, "produced_at_secs": 1.234, "wallclock_us": 1717000000123456}}
+```
+
+Backpressure note: `surface_drawn` shares the same 256-slot per-client
+event buffer as every other event (see [Backpressure](#backpressure)).
+A guest that paints aggressively can fire hundreds of `surface_drawn`
+events per second; slow consumers will see `dropped` events.  The
+recommended pattern for the loadtest is to drain the queue as fast as
+the consumer's CSV writer can flush, and to treat `dropped` as a soft
+quality signal rather than a fatal error.
+
+---
+
+### `digest_updated`
+
+Added in v1.1.  Available only when ryll is built with
+`--features digest-decode`; on a default-features build (or any build
+without `digest-decode`) the event is not advertised in the hello
+response and `subscribe` for it returns an empty `subscribed` list.
+
+Emitted when a new QR-encoded visual digest is detected on the primary
+surface and decoded successfully.  The payload carries the parsed
+digest record rather than the raw QR bytes; clients do not need to know
+the visual-digest wire format.
+
+Data fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `frame_counter` | u32 | Monotonic frame counter from the digest header.  The polling task deduplicates by this value: an unchanged counter does not fire an event. |
+| `framebuffer_hash` | u32 | CRC32C of the framebuffer at the moment the digest was encoded. |
+| `events` | array | Decoded raw-record events from the digest, each `{"kind": "...", "payload": ...}`. |
+| `wallclock_us` | u64 | Server wallclock at translation time, microseconds since the Unix epoch. |
+
+Future-work notes:
+
+- The polling task runs on a fixed 100 ms interval.  A rate-limit knob
+  (`--digest-min-interval-ms`) may be added if phase 7 needs it.
+- The wire `events` schema is a thin pass-through of
+  `shakenfist-visual-digest::Record`.  If the digest crate ships a
+  schema-breaking v2 the protocol will need a re-cut.
 
 ---
 
