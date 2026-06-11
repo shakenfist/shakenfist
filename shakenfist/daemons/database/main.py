@@ -9,10 +9,8 @@ enable future migration to other database backends.
 """
 
 from concurrent import futures
-import faulthandler
 from ipaddress import IPv4Address
 import json
-import sys
 import time
 from typing import Any
 from typing import cast
@@ -5142,17 +5140,12 @@ def main() -> None:
     util_exceptions.install_exception_tracking()
     daemon.write_pid_file('database')
 
-    # Periodic Python-thread traceback dump for diagnosing the silent
-    # sf-database wedge seen in node-lifecycle merge_group runs (the
-    # daemon stops handling RPCs ~20 s after start while clients see
-    # only "connection attempt timed out before SETTINGS frame"). The
-    # CI bundle's py-spy snapshot is taken after the test restarts
-    # the cluster, so by the time we capture it the wedge has
-    # cleared. dump_traceback_later() runs in a dedicated C thread
-    # outside the GIL, so it still fires if every Python thread is
-    # blocked. Output lands on stderr, which systemd forwards into
-    # /var/log/syslog alongside the rest of sf-database's logs.
-    faulthandler.dump_traceback_later(30, repeat=True, file=sys.stderr)
+    # NOTE: do not add faulthandler.dump_traceback_later() here. Its
+    # watchdog thread walks every thread's frame stack without holding
+    # the GIL, and under sf-database's 64-thread load it dereferences
+    # frames mid-mutation -- we measured five SIGSEGVs across three CI
+    # jobs in a single merge run before removing it. For on-demand
+    # thread dumps use py-spy from outside the process instead.
 
     # MariaDB is required for the database service. Abort early with a clear
     # error message if it's not configured.
