@@ -98,7 +98,6 @@
       vars:
         role_action: "bootstrap"
         server_package: "{{ server_package }}"
-        agent_package: "{{ agent_package }}"
         client_package: "{{ client_package }}"
         pip_extra: "{{ pip_extra }}"
 
@@ -185,19 +184,6 @@
         role_action: "syslog"
         syslog_target: "{{ hostvars[groups['primary_node'][0]]['node_mesh_ip'] }}"
 
-### MariaDB
-
-- hosts: etcd_master
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-  roles:
-    - role: mariadb
-      vars:
-        role_action: "bootstrap"
-        mariadb_password: "{{ mariadb_password }}"
-
 ### Write config and configure client
 
 - hosts: allsf
@@ -217,10 +203,9 @@
 # Cluster config must run before register because register starts the
 # sf-database daemon, and sf-database's ExecStartPre=verify-config
 # requires AUTH_SECRET_SEED to already be in the cluster_config table.
-# The cluster_config tasks delegate to etcd_master[0] with
-# SHAKENFIST_MARIADB_HOST=localhost so that set-config writes directly
-# to MariaDB rather than going through the not-yet-running gRPC
-# database service.
+# The cluster_config tasks delegate to etcd_master[0]; direct MariaDB
+# access works because /etc/sf/config on that node has
+# SHAKENFIST_MARIADB_HOST set to the operator-provided host.
 - hosts: primary_node
   become: yes
   become_method: sudo
@@ -230,7 +215,8 @@
     - role: primary
       vars:
         role_action: "cluster_config"
-        database_node_ip: "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
+        mariadb_gateway_hosts:
+          - "{{ hostvars[groups['etcd_master'][0]]['node_mesh_ip'] }}"
         auth_secret: "{{ hostvars['localhost']['auth_secret'] }}"
         ram_system_reservation: "{{ hostvars['localhost']['ram_system_reservation'] }}"
         lowest_mtu: "{{ hostvars[groups['primary_node'][0]]['lowest_mtu'] }}"

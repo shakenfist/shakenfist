@@ -3,50 +3,54 @@
 isort:skip_file
 """
 
-import builtins
-import collections.abc
-import google.protobuf.descriptor
-import google.protobuf.internal.containers
-import google.protobuf.internal.enum_type_wrapper
-import google.protobuf.message
+from collections import abc as _abc
+from google.protobuf import descriptor as _descriptor
+from google.protobuf import message as _message
+from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
+import builtins as _builtins
 import sys
-import typing
+import typing as _typing
 
-if sys.version_info >= (3, 10):
-    import typing as typing_extensions
+if sys.version_info >= (3, 11):
+    from typing import TypeAlias as _TypeAlias, Never as _Never
 else:
-    import typing_extensions
+    from typing_extensions import TypeAlias as _TypeAlias, Never as _Never
 
-DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
+DESCRIPTOR: _descriptor.FileDescriptor
 
-@typing.final
-class EnvironmentVariable(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class EnvironmentVariable(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    NAME_FIELD_NUMBER: builtins.int
-    VALUE_FIELD_NUMBER: builtins.int
-    name: builtins.str
-    value: builtins.str
+    NAME_FIELD_NUMBER: _builtins.int
+    VALUE_FIELD_NUMBER: _builtins.int
+    name: _builtins.str
+    value: _builtins.str
     def __init__(
         self,
         *,
-        name: builtins.str = ...,
-        value: builtins.str = ...,
+        name: _builtins.str = ...,
+        value: _builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["name", b"name", "value", b"value"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "value", b"value"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___EnvironmentVariable = EnvironmentVariable
+Global___EnvironmentVariable: _TypeAlias = EnvironmentVariable  # noqa: Y015
 
-@typing.final
-class ExecuteRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class ExecuteRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
     class _IOPriority:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
+        ValueType = _typing.NewType("ValueType", _builtins.int)
+        V: _TypeAlias = ValueType  # noqa: Y015
 
-    class _IOPriorityEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ExecuteRequest._IOPriority.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    class _IOPriorityEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[ExecuteRequest._IOPriority.ValueType], _builtins.type):
+        DESCRIPTOR: _descriptor.EnumDescriptor
         NORMAL: ExecuteRequest._IOPriority.ValueType  # 0
         LOW: ExecuteRequest._IOPriority.ValueType  # 1
         HIGH: ExecuteRequest._IOPriority.ValueType  # 2
@@ -56,62 +60,70 @@ class ExecuteRequest(google.protobuf.message.Message):
     LOW: ExecuteRequest.IOPriority.ValueType  # 1
     HIGH: ExecuteRequest.IOPriority.ValueType  # 2
 
-    COMMAND_FIELD_NUMBER: builtins.int
-    ENVIRONMENT_VARIABLES_FIELD_NUMBER: builtins.int
-    NETWORK_NAMESPACE_FIELD_NUMBER: builtins.int
-    IO_PRIORITY_FIELD_NUMBER: builtins.int
-    WORKING_DIRECTORY_FIELD_NUMBER: builtins.int
-    REQUEST_ID_FIELD_NUMBER: builtins.int
-    EXECUTION_ID_FIELD_NUMBER: builtins.int
-    command: builtins.str
-    network_namespace: builtins.str
-    io_priority: global___ExecuteRequest.IOPriority.ValueType
-    working_directory: builtins.str
-    request_id: builtins.str
-    execution_id: builtins.str
-    @property
-    def environment_variables(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___EnvironmentVariable]: ...
+    COMMAND_FIELD_NUMBER: _builtins.int
+    ENVIRONMENT_VARIABLES_FIELD_NUMBER: _builtins.int
+    NETWORK_NAMESPACE_FIELD_NUMBER: _builtins.int
+    IO_PRIORITY_FIELD_NUMBER: _builtins.int
+    WORKING_DIRECTORY_FIELD_NUMBER: _builtins.int
+    REQUEST_ID_FIELD_NUMBER: _builtins.int
+    EXECUTION_ID_FIELD_NUMBER: _builtins.int
+    command: _builtins.str
+    network_namespace: _builtins.str
+    io_priority: Global___ExecuteRequest.IOPriority.ValueType
+    working_directory: _builtins.str
+    request_id: _builtins.str
+    execution_id: _builtins.str
+    @_builtins.property
+    def environment_variables(self) -> _containers.RepeatedCompositeFieldContainer[Global___EnvironmentVariable]: ...
     def __init__(
         self,
         *,
-        command: builtins.str = ...,
-        environment_variables: collections.abc.Iterable[global___EnvironmentVariable] | None = ...,
-        network_namespace: builtins.str = ...,
-        io_priority: global___ExecuteRequest.IOPriority.ValueType = ...,
-        working_directory: builtins.str = ...,
-        request_id: builtins.str = ...,
-        execution_id: builtins.str = ...,
+        command: _builtins.str = ...,
+        environment_variables: _abc.Iterable[Global___EnvironmentVariable] | None = ...,
+        network_namespace: _builtins.str = ...,
+        io_priority: Global___ExecuteRequest.IOPriority.ValueType = ...,
+        working_directory: _builtins.str = ...,
+        request_id: _builtins.str = ...,
+        execution_id: _builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["command", b"command", "environment_variables", b"environment_variables", "execution_id", b"execution_id", "io_priority", b"io_priority", "network_namespace", b"network_namespace", "request_id", b"request_id", "working_directory", b"working_directory"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["command", b"command", "environment_variables", b"environment_variables", "execution_id", b"execution_id", "io_priority", b"io_priority", "network_namespace", b"network_namespace", "request_id", b"request_id", "working_directory", b"working_directory"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___ExecuteRequest = ExecuteRequest
+Global___ExecuteRequest: _TypeAlias = ExecuteRequest  # noqa: Y015
 
-@typing.final
-class ExecuteReply(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+@_typing.final
+class ExecuteReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
 
-    STDOUT_FIELD_NUMBER: builtins.int
-    STDERR_FIELD_NUMBER: builtins.int
-    EXIT_CODE_FIELD_NUMBER: builtins.int
-    REQUEST_ID_FIELD_NUMBER: builtins.int
-    EXECUTION_ID_FIELD_NUMBER: builtins.int
-    EXECUTION_SECONDS_FIELD_NUMBER: builtins.int
-    stdout: builtins.str
-    stderr: builtins.str
-    exit_code: builtins.int
-    request_id: builtins.str
-    execution_id: builtins.str
-    execution_seconds: builtins.float
+    STDOUT_FIELD_NUMBER: _builtins.int
+    STDERR_FIELD_NUMBER: _builtins.int
+    EXIT_CODE_FIELD_NUMBER: _builtins.int
+    REQUEST_ID_FIELD_NUMBER: _builtins.int
+    EXECUTION_ID_FIELD_NUMBER: _builtins.int
+    EXECUTION_SECONDS_FIELD_NUMBER: _builtins.int
+    stdout: _builtins.str
+    stderr: _builtins.str
+    exit_code: _builtins.int
+    request_id: _builtins.str
+    execution_id: _builtins.str
+    execution_seconds: _builtins.float
     def __init__(
         self,
         *,
-        stdout: builtins.str = ...,
-        stderr: builtins.str = ...,
-        exit_code: builtins.int = ...,
-        request_id: builtins.str = ...,
-        execution_id: builtins.str = ...,
-        execution_seconds: builtins.float = ...,
+        stdout: _builtins.str = ...,
+        stderr: _builtins.str = ...,
+        exit_code: _builtins.int = ...,
+        request_id: _builtins.str = ...,
+        execution_id: _builtins.str = ...,
+        execution_seconds: _builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["execution_id", b"execution_id", "execution_seconds", b"execution_seconds", "exit_code", b"exit_code", "request_id", b"request_id", "stderr", b"stderr", "stdout", b"stdout"]) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["execution_id", b"execution_id", "execution_seconds", b"execution_seconds", "exit_code", b"exit_code", "request_id", b"request_id", "stderr", b"stderr", "stdout", b"stdout"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-global___ExecuteReply = ExecuteReply
+Global___ExecuteReply: _TypeAlias = ExecuteReply  # noqa: Y015

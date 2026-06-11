@@ -102,8 +102,6 @@ class Network(dbowo):
 
     @classmethod
     def _upgrade_step_8_to_9(cls, static_values):
-        # Migration to MariaDB networks/network_attributes tables is
-        # handled by sf-ctl migrate-data-to-mariadb.
         ...
 
     @classmethod

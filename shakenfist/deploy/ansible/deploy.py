@@ -149,7 +149,6 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
 
     update_if_specified('server_package', 'shakenfist')
     update_if_specified('client_package', 'shakenfist-client')
-    update_if_specified('agent_package', 'shakenfist-agent')
     update_if_specified('pip_extra', '')
     update_if_specified('topology', None)
 
@@ -163,8 +162,26 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         'admin_password', ''.join(secrets.choice(PASSWORD_CHARS) for i in range(12)))
     update_if_specified(
         'auth_secret', ''.join(secrets.choice(PASSWORD_CHARS) for i in range(50)))
-    update_if_specified(
-        'mariadb_password', ''.join(secrets.choice(PASSWORD_CHARS) for i in range(24)))
+    # MariaDB connection details. Operators provide these via getsf prompts
+    # (GETSF_MARIADB_*). The bundled MariaDB install was removed in
+    # PLAN-byo-mariadb phase 4; see tools/bootstrap-mariadb.sql for the
+    # operator-applied bootstrap snippet.
+    update_if_specified('mariadb_host', '')
+    update_if_specified('mariadb_port', '3306')
+    update_if_specified('mariadb_user', 'shakenfist')
+    update_if_specified('mariadb_password', '')
+    update_if_specified('mariadb_database', 'shakenfist')
+
+    if not variables['mariadb_host']:
+        raise SystemExit(
+            'mariadb_host is required. Set GETSF_MARIADB_HOST or '
+            'run getsf interactively. See tools/bootstrap-mariadb.sql '
+            'and docs/operator_guide/database.md for setup.')
+    if not variables['mariadb_password']:
+        raise SystemExit(
+            'mariadb_password is required. Set GETSF_MARIADB_PASSWORD or '
+            'run getsf interactively. See tools/bootstrap-mariadb.sql '
+            'and docs/operator_guide/database.md for setup.')
 
     # vault_system_key_path must be absent not empty if unset
     update_if_specified('vault_system_key_path', '')

@@ -7,12 +7,14 @@
 # 3. Start the database daemon on etcd_master nodes (provides gRPC access)
 # 4. Start remaining daemons
 #
-# All sf-ctl commands run on etcd_master[0] with MARIADB_HOST set so they can
-# directly write to MariaDB. This avoids the chicken-and-egg problem where
-# we'd need the database service to register the database daemon itself.
+# All sf-ctl commands are delegated to etcd_master[0] (the first database-tier
+# node). Direct MariaDB access works because /etc/sf/config on that node
+# has SHAKENFIST_MARIADB_HOST set to the operator-provided host. This
+# avoids the chicken-and-egg problem where we'd need the database gRPC
+# service to register the database daemon itself.
 
 # Step 1: Ensure MariaDB schema exists before anything else. This runs on
-# etcd_master[0] which has direct MariaDB access via MARIADB_HOST.
+# etcd_master[0], which has direct MariaDB access via /etc/sf/config.
 - name: Ensure MariaDB schema exists
   shell: |
     /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
@@ -53,8 +55,7 @@
     enabled: yes
     state: restarted
     daemon_reload: no
-  delegate_to: "{{ groups['etcd_master'][0] }}"
-  run_once: true
+  when: inventory_hostname in groups.get('etcd_master', [])
 
 # Step 4: Start the remaining daemons. The ordering here is to match the order
 # they must start in, not alphabetical order.

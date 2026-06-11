@@ -51,13 +51,10 @@ class Upload(dbo):
 
     @classmethod
     def _upgrade_step_3_to_4(cls, static_values: dict[str, Any]) -> None:
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values: dict[str, Any]) -> None:
-        # Static values migration to MariaDB is handled by
-        # sf-ctl migrate-uploads-to-mariadb
         ...
 
     @classmethod

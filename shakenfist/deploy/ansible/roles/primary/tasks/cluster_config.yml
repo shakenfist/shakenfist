@@ -4,54 +4,49 @@
 # startup. register.yml starts sf-database, so AUTH_SECRET_SEED
 # must already be written by the time register runs.
 #
-# Each sf-ctl command is delegated to etcd_master[0] with
-# SHAKENFIST_MARIADB_HOST=localhost so that set-config writes
-# directly to MariaDB rather than routing through the
-# not-yet-running database gRPC service.
+# Each sf-ctl command needs direct MariaDB access and is delegated
+# to etcd_master[0] (the database-tier node) via delegate_to. Direct
+# access works because /etc/sf/config on a database-tier node has
+# SHAKENFIST_MARIADB_HOST set to the operator-provided host, written
+# by the deploy playbook in the cluster_config phase.
 
 - name: Ensure the MariaDB schema exists
   shell: |
-    SHAKENFIST_MARIADB_HOST=localhost \
-        /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
+    /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
 
 - name: Set auth secret in cluster config
   shell: |
-    SHAKENFIST_MARIADB_HOST=localhost \
-        /srv/shakenfist/venv/bin/sf-ctl set-config \
+    /srv/shakenfist/venv/bin/sf-ctl set-config \
         AUTH_SECRET_SEED "{{ auth_secret }}"
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
 
 - name: Set ram reservation in cluster config
   shell: |
-    SHAKENFIST_MARIADB_HOST=localhost \
-        /srv/shakenfist/venv/bin/sf-ctl set-config \
+    /srv/shakenfist/venv/bin/sf-ctl set-config \
         RAM_SYSTEM_RESERVATION "{{ ram_system_reservation }}"
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
 
 - name: Set lowest_mtu in cluster config
   shell: |
-    SHAKENFIST_MARIADB_HOST=localhost \
-        /srv/shakenfist/venv/bin/sf-ctl set-config \
+    /srv/shakenfist/venv/bin/sf-ctl set-config \
         MAX_HYPERVISOR_MTU "{{ lowest_mtu }}"
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
 
 - name: Set DNS server in cluster config
   shell: |
-    SHAKENFIST_MARIADB_HOST=localhost \
-        /srv/shakenfist/venv/bin/sf-ctl set-config \
+    /srv/shakenfist/venv/bin/sf-ctl set-config \
         DNS_SERVER "{{ dns_server }}"
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
 
 - name: Set HTTP proxy in cluster config
   shell: |
-    SHAKENFIST_MARIADB_HOST=localhost \
-        /srv/shakenfist/venv/bin/sf-ctl set-config \
+    /srv/shakenfist/venv/bin/sf-ctl set-config \
         HTTP_PROXY "{{ http_proxy }}"
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
@@ -63,8 +58,7 @@
 
 - name: Apply additional config
   shell: |
-    SHAKENFIST_MARIADB_HOST=localhost \
-        /srv/shakenfist/venv/bin/sf-ctl set-config \
+    /srv/shakenfist/venv/bin/sf-ctl set-config \
         "{{item['name']}}" "{{item['value']}}"
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
@@ -72,15 +66,13 @@
 
 - name: Verify configuration
   shell: |
-    SHAKENFIST_MARIADB_HOST=localhost \
-        /srv/shakenfist/venv/bin/sf-ctl verify-config
+    /srv/shakenfist/venv/bin/sf-ctl verify-config
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
 
 - name: Parse back cluster configuration
   shell: |
-    SHAKENFIST_MARIADB_HOST=localhost \
-        /srv/shakenfist/venv/bin/sf-ctl show-config
+    /srv/shakenfist/venv/bin/sf-ctl show-config
   delegate_to: "{{ groups['etcd_master'][0] }}"
   run_once: true
   register: cluster_config

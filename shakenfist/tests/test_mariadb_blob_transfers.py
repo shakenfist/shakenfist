@@ -16,8 +16,8 @@ from shakenfist.tests import base
 
 
 class FakeConfig(BaseSettings):
-    DATABASE_NODE_IP: str = '192.168.1.1'
-    DATABASE_API_PORT: int = 13005
+    MARIADB_GATEWAY_HOSTS: list[str] = ['192.168.1.1']
+    MARIADB_GATEWAY_PORT: int = 13005
     MARIADB_HOST: str = 'localhost'
     NODE_NAME: str = 'testnode'
 
@@ -295,46 +295,3 @@ class DeleteBlobTransfersForBlobTestCase(base.ShakenFistTestCase):
 
         # -1 indicates error
         self.assertEqual(result, -1)
-
-
-class CleanupEtcdBlobTransfersTestCase(base.ShakenFistTestCase):
-    """Tests for _cleanup_etcd_blob_transfers() cleanup function."""
-
-    def setUp(self):
-        super().setUp()
-        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
-        self.mock_config = self.config.start()
-        self.addCleanup(self.config.stop)
-
-    @mock.patch('shakenfist.etcd.delete')
-    @mock.patch('shakenfist.etcd.get_all')
-    def test_cleanup_no_transfers(self, mock_get_all, mock_delete):
-        mock_get_all.return_value = []
-        mock_engine = mock.MagicMock()
-
-        result = mariadb._cleanup_etcd_blob_transfers(mock_engine)
-
-        self.assertEqual(result['deleted_transfers'], 0)
-        self.assertEqual(result['deleted_incomplete'], 0)
-
-    @mock.patch('shakenfist.etcd.delete')
-    @mock.patch('shakenfist.etcd.get_all')
-    def test_cleanup_with_transfers(self, mock_get_all, mock_delete):
-        mock_get_all.side_effect = [
-            # First call: transfer records
-            [
-                ('/sf/transfer/sf-1/transfer-1', {}),
-                ('/sf/transfer/sf-1/transfer-2', {}),
-            ],
-            # Second call: attribute records
-            [
-                ('/sf/attribute/blob/uuid-1/incomplete_locations', {}),
-            ]
-        ]
-        mock_engine = mock.MagicMock()
-
-        result = mariadb._cleanup_etcd_blob_transfers(mock_engine)
-
-        self.assertEqual(result['deleted_transfers'], 2)
-        self.assertEqual(result['deleted_incomplete'], 1)
-        self.assertEqual(mock_delete.call_count, 3)

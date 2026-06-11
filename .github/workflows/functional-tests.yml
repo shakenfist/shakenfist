@@ -349,6 +349,24 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} python3 tools/buffer.py
 
+      - name: Install BYO MariaDB on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/bootstrap-mariadb.sql \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-mariadb.sh \
+              ${GITHUB_WORKSPACE}/shakenfist/examples/mariadb-tuning.cnf \
+              ${{ matrix.pr.base_image_user }}@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.pr.base_image_user }}@${primary} \
+              'sudo bash /tmp/ci-install-mariadb.sh \
+                   /tmp/bootstrap-mariadb.sql \
+                   /tmp/mariadb-tuning.cnf \
+                   citestpw'
+
       - name: Run getsf installer on primary
         timeout-minutes: 45
         run: |
@@ -356,7 +374,13 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.pr.base_image_user }}@${primary} /tmp/getsf-wrapper
+              ${{ matrix.pr.base_image_user }}@${primary} \
+              "GETSF_MARIADB_HOST=127.0.0.1 \
+               GETSF_MARIADB_PORT=3306 \
+               GETSF_MARIADB_USER=shakenfist \
+               GETSF_MARIADB_PASSWORD=citestpw \
+               GETSF_MARIADB_DATABASE=shakenfist \
+               /tmp/getsf-wrapper"
 
       - name: Wait for API to start answering
         run: |
@@ -611,6 +635,14 @@ jobs:
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
+      - name: Capture py-spy thread dumps
+        if: always()
+        continue-on-error: true
+        run: |
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
+
       - name: Bundle artifacts
         if: always()
         run: |
@@ -799,6 +831,15 @@ jobs:
             topology: 'slim-primary',
             concurrency: 5,
             stestr_config: 'guest-ci.conf'
+          },
+          {
+            name: 'Debian 12 tier',
+            job_name: 'debian-12-slim-tier',
+            base_image: 'sf://label/ci-images/debian-12',
+            base_image_user: 'debian',
+            topology: 'slim-tier',
+            concurrency: 5,
+            stestr_config: 'cluster-ci.conf'
           }
         ]
     runs-on: [self-hosted, vm, debian-12]
@@ -828,9 +869,13 @@ jobs:
 
           if [ "${{ matrix.merge.topology }}" == "localhost" ]; then
             echo "UPLOAD_TARGET=10.0.0.10" >> $GITHUB_ENV
+          elif [ "${{ matrix.merge.topology }}" == "slim-tier" ]; then
+            nodes=(10.0.0.20 10.0.0.21 10.0.0.22)
+            random_index=$(( RANDOM % ${#nodes[@]} ))
+            echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
           else
             nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
-            random_index=$(( RANDOM % 5 ))
+            random_index=$(( RANDOM % ${#nodes[@]} ))
             echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
           fi
 
@@ -864,6 +909,24 @@ jobs:
           cd ${GITHUB_WORKSPACE}/actions
           tools/run_remote ${primary} python3 tools/buffer.py
 
+      - name: Install BYO MariaDB on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/bootstrap-mariadb.sql \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-mariadb.sh \
+              ${GITHUB_WORKSPACE}/shakenfist/examples/mariadb-tuning.cnf \
+              ${{ matrix.merge.base_image_user }}@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.merge.base_image_user }}@${primary} \
+              'sudo bash /tmp/ci-install-mariadb.sh \
+                   /tmp/bootstrap-mariadb.sql \
+                   /tmp/mariadb-tuning.cnf \
+                   citestpw'
+
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
@@ -871,7 +934,13 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.merge.base_image_user }}@${primary} /tmp/getsf-wrapper
+              ${{ matrix.merge.base_image_user }}@${primary} \
+              "GETSF_MARIADB_HOST=${{ matrix.merge.topology == 'slim-tier' && '10.0.1.10' || '127.0.0.1' }} \
+               GETSF_MARIADB_PORT=3306 \
+               GETSF_MARIADB_USER=shakenfist \
+               GETSF_MARIADB_PASSWORD=citestpw \
+               GETSF_MARIADB_DATABASE=shakenfist \
+               /tmp/getsf-wrapper"
 
       - name: Wait for API to start answering
         run: |
@@ -1142,6 +1211,14 @@ jobs:
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
+      - name: Capture py-spy thread dumps
+        if: always()
+        continue-on-error: true
+        run: |
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
+
       - name: Bundle artifacts
         if: always()
         run: |
@@ -1394,6 +1471,24 @@ jobs:
               -o UserKnownHostsFile=/dev/null -rp tools \
               debian@$primary:.
 
+      - name: Install BYO MariaDB on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/bootstrap-mariadb.sql \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-mariadb.sh \
+              ${GITHUB_WORKSPACE}/shakenfist/examples/mariadb-tuning.cnf \
+              debian@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@${primary} \
+              'sudo bash /tmp/ci-install-mariadb.sh \
+                   /tmp/bootstrap-mariadb.sql \
+                   /tmp/mariadb-tuning.cnf \
+                   citestpw'
+
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
@@ -1401,7 +1496,13 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              debian@$primary /tmp/getsf-wrapper
+              debian@$primary \
+              "GETSF_MARIADB_HOST=127.0.0.1 \
+               GETSF_MARIADB_PORT=3306 \
+               GETSF_MARIADB_USER=shakenfist \
+               GETSF_MARIADB_PASSWORD=citestpw \
+               GETSF_MARIADB_DATABASE=shakenfist \
+               /tmp/getsf-wrapper"
 
       - name: Wait for API to start answering
         run: |
@@ -1522,6 +1623,14 @@ jobs:
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
 
+      - name: Capture py-spy thread dumps
+        if: always()
+        continue-on-error: true
+        run: |
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
+
       - name: Bundle artifacts
         if: always()
         run: |
@@ -1613,6 +1722,24 @@ jobs:
               -o UserKnownHostsFile=/dev/null -rp tools \
               debian@$primary:.
 
+      - name: Install BYO MariaDB on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/bootstrap-mariadb.sql \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-mariadb.sh \
+              ${GITHUB_WORKSPACE}/shakenfist/examples/mariadb-tuning.cnf \
+              debian@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@${primary} \
+              'sudo bash /tmp/ci-install-mariadb.sh \
+                   /tmp/bootstrap-mariadb.sql \
+                   /tmp/mariadb-tuning.cnf \
+                   citestpw'
+
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
@@ -1620,7 +1747,13 @@ jobs:
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              debian@$primary /tmp/getsf-wrapper
+              debian@$primary \
+              "GETSF_MARIADB_HOST=127.0.0.1 \
+               GETSF_MARIADB_PORT=3306 \
+               GETSF_MARIADB_USER=shakenfist \
+               GETSF_MARIADB_PASSWORD=citestpw \
+               GETSF_MARIADB_DATABASE=shakenfist \
+               /tmp/getsf-wrapper"
 
       - name: Wait for API to start answering
         run: |
@@ -1668,11 +1801,11 @@ jobs:
               ${GITHUB_WORKSPACE}/shakenfist \
               debian@$primary:shakenfist
           # ServerAliveInterval/ServerAliveCountMax: if the remote host
-          # halts itself (e.g. the lifecycle test does `halt --force --force`
-          # on a victim that turns out to be the script's own host), the
-          # TCP connection can sit half-open until the default TCP
-          # keepalive eventually times out -- hours later, well past the
-          # GitHub step budget. With these options ssh notices a dead
+          # goes down (e.g. the lifecycle test does `poweroff --force
+          # --force` on a victim that turns out to be the script's own
+          # host), the TCP connection can sit half-open until the default
+          # TCP keepalive eventually times out -- hours later, well past
+          # the GitHub step budget. With these options ssh notices a dead
           # connection in roughly 30 s and the step fails fast instead.
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
@@ -1711,9 +1844,13 @@ jobs:
           # GitHub runner already has under-cloud sf-client credentials
           # (the topology playbooks use sf_instance from here). Don't
           # let one failed reboot abort the rest of the loop -- we want
-          # all five attempted before log collection.
+          # all five attempted before log collection. The lifecycle test
+          # powers its maintainer victim off entirely (`poweroff --force
+          # --force` exits the QEMU domain), and reboot is not valid for
+          # a powered-off instance, so fall back to poweron.
           for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
-              sf-client instance reboot --hard ${node} || true
+              sf-client instance reboot --hard ${node} || \
+                  sf-client instance poweron ${node} || true
           done
           sleep 90
 
@@ -1757,6 +1894,14 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+
+      - name: Capture py-spy thread dumps
+        if: always()
+        continue-on-error: true
+        run: |
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
 
       - name: Bundle artifacts
         if: always()

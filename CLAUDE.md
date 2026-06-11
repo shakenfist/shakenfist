@@ -55,7 +55,7 @@ Install `actionlint`:
 
 - `sf-ctl` - Control CLI
 - `sf-api` - REST API server
-- `sf-database` - Database microservice daemon (runs on etcd_master)
+- `sf-database` - Database microservice daemon (runs on database-tier nodes)
 - `sf-cleaner`, `sf-cluster`, `sf-net`, `sf-queues`, `sf-resources` - Daemons
 
 ### Generating gRPC Stubs from Proto Files
@@ -158,7 +158,6 @@ shakenfist/
 │   ├── artifact.py          # Disk images and artifacts
 │   ├── blob.py              # Content-addressable blob storage
 │   ├── baseobject.py        # Base framework for all persistable objects
-│   ├── etcd.py              # Minimal etcd shim for drain migrations only
 │   ├── locks.py             # Distributed cluster locks (MariaDB-backed)
 │   ├── eventlog.py          # Event logging (gRPC)
 │   ├── cache.py             # In-memory caching layer
@@ -175,7 +174,6 @@ shakenfist/
 │   │   ├── cleaner/         # Resource cleanup
 │   │   ├── cluster/         # Cluster maintenance
 │   │   ├── database/        # Database microservice (MariaDB gRPC wrapper)
-│   │   ├── eventlog/        # Event logging service
 │   │   ├── network/         # Network daemon
 │   │   ├── queues/          # Job queue processing
 │   │   ├── resources/       # Resource tracking
@@ -188,7 +186,7 @@ shakenfist/
 │   ├── operations/          # Task operation definitions
 │   │   ├── baseoperation.py # Base operation class
 │   │   └── *_op.py          # Specific operations
-│   ├── etcd_schema/         # Legacy schema directory (Pydantic models)
+│   ├── schema/              # Pydantic models
 │   ├── util/                # Utility modules
 │   ├── client/              # CLI tools
 │   └── tests/               # Test suite
@@ -214,8 +212,9 @@ shakenfist/
 Shaken Fist uses MariaDB as its sole datastore. Object state, queues,
 locks, and cluster config all live in MariaDB.
 
-The database microservice (`sf-database`) runs on the database node and
-provides a gRPC interface for all database operations:
+The database microservice (`sf-database`) provides a gRPC interface for all
+database operations. One or more `sf-database` instances can run as a tier;
+clients reach them through the gateway-hosts list.
 
 ```python
 # MariaDB state access (automatically routed through database service)
@@ -232,20 +231,21 @@ This abstraction layer:
 - Enables clean separation of concerns
 
 Configuration options:
-- `DATABASE_NODE_IP` - IP address of the database service node
-- `DATABASE_API_PORT` - gRPC API port (default: 13005)
-- `DATABASE_METRICS_PORT` - Prometheus metrics port (default: 13006)
-- `MARIADB_HOST` - Set only on the database daemon node; enables direct
-  MariaDB access for the daemon itself
+- `MARIADB_GATEWAY_HOSTS` - List of `sf-database` gRPC endpoints that clients
+  connect to (e.g. `['10.0.0.1']`). A single-instance deployment sets this to a
+  one-element list. Phase 3 of PLAN-byo-mariadb will add client-side load
+  balancing across multiple entries.
+- `MARIADB_GATEWAY_PORT` - gRPC API port on each gateway host (default: 13005)
+- `MARIADB_GATEWAY_METRICS_PORT` - Prometheus metrics port on each gateway host
+  (default: 13006)
+- `MARIADB_HOST` - Set only on nodes that run `sf-database` or where
+  `sf-ctl ensure-mariadb-schema` is executed; enables direct MariaDB access.
+  Do **not** set this on ordinary cluster nodes.
 
 **Database daemon special case**: The database daemon has `MARIADB_HOST`
 set, which causes it to use direct MariaDB access for its own startup and
 shutdown recording. All other daemons access MariaDB via the database
 service's gRPC interface.
-
-Note: the `etcd.py` module is retained only to service DATA_MIGRATIONS
-entries which drain leftover etcd keys from older clusters. The module
-will be removed in the next minor version.
 
 ### Systemd Service Ordering
 
@@ -366,7 +366,6 @@ Queue priorities (per-node and global):
 
 ## Key Dependencies
 
-- **etcd3gw** - etcd client (retained for DATA_MIGRATIONS drain only)
 - **grpcio/protobuf** - gRPC communication
 - **Flask/Flask-RESTful/Flasgger** - REST API
 - **Flask-JWT-Extended** - Authentication
@@ -462,9 +461,9 @@ performance. This is required for all deployments - MariaDB must be configured.
 
 ### Migrating Existing Deployments
 
-Data migrations from etcd to MariaDB run automatically when the database
-daemon starts. Simply upgrade and restart the `sf-database` service.
-Migrations are idempotent and safe to re-run.
+Object schema upgrade steps run automatically when the database daemon
+starts. Simply upgrade and restart the `sf-database` service. Migrations
+are idempotent and safe to re-run.
 
 ### State Class
 

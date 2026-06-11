@@ -30,7 +30,9 @@ role to be removed), `shakenfist/deploy/ansible/roles/base/`
 galaxy role), `shakenfist/mariadb.py` (database access and
 the `DATA_MIGRATIONS` machinery that the bootstrap_operations
 table will sit alongside), and `shakenfist/daemons/database/`
-(the gRPC service that becomes electable).
+(the gRPC service that becomes a deployer-chosen tier of
+equal stateless instances — see
+[`PLAN-byo-mariadb.md`](PLAN-byo-mariadb.md) for that work).
 
 When we get to detailed planning, I prefer a separate plan
 file per detailed phase. These separate files should be named
@@ -94,10 +96,16 @@ Shaken Fist stops being a platform deployer and becomes an
 **opinionated application that runs against operator-provided
 infrastructure**. Concretely:
 
-- The deployer ceases to install Loki/rsyslog aggregation,
-  an API load balancer, or the MariaDB server. (Grafana and
-  the primary-node Prometheus server are already gone — see
-  the situation section.)
+- The deployer ceases to install Loki/rsyslog aggregation
+  or an API load balancer. (Grafana and the primary-node
+  Prometheus server are already gone — see the situation
+  section. MariaDB-server install and the `sf-database`
+  SPOF removal have been lifted out of this plan and are
+  tracked separately in
+  [`PLAN-byo-mariadb.md`](PLAN-byo-mariadb.md), which makes
+  MariaDB operator-provided infrastructure and reshapes
+  `sf-database` into a deployer-chosen tier of equal
+  instances.)
 - The deployer is repackaged as an ansible-galaxy role that
   configures one SF node — installing packages, writing
   config, managing systemd — parameterised by which daemons
@@ -106,20 +114,16 @@ infrastructure**. Concretely:
   expressing topology in ansible inventory directly. The
   current single-node and CI deployments become *example
   consumers* of the role, not the product.
-- Cluster-wide bootstrap (schema, `AUTH_SECRET_SEED`, admin
+- Cluster-wide bootstrap (`AUTH_SECRET_SEED`, admin
   namespace, cluster_config defaults) is exposed as a
   single idempotent `sf-ctl bootstrap-cluster` command that
   records completion in a new `bootstrap_operations` table,
   with each operation and its completion record written in
   the same transaction so partial-bootstrap states are
-  impossible.
-- The single-instance `sf-database` SPOF goes away: it
-  becomes electable like `sf-cluster`, with non-elected
-  candidates serving as discovery surface that refers
-  clients to the current leader. The MariaDB *server* stays
-  outside that election (operator concern, with HA via
-  Galera / managed service / accepted SPOF for small
-  deploys).
+  impossible. Schema initialisation and migration are
+  *not* part of this command — they are handled by the
+  separate `sf-ctl ensure-mariadb-schema` command
+  introduced in `PLAN-byo-mariadb.md`.
 - Stale `etcd_master` naming throughout the deployer is
   renamed to `database_node`. (The `shakenfist/etcd.py`
   drain code itself remains, as already documented in
@@ -230,27 +234,20 @@ separately in `PLAN-sticky-transfers.md`.
    config")? Per-key gives finer recovery; per-step gives
    a cleaner audit trail. Phase 2 should resolve this with
    a concrete schema proposal.
-3. **`sf-database` leader discovery cache lifetime.** How
-   long should a client cache "host-X is the leader" before
-   asking again? Too short and we hammer the candidate list;
-   too long and failover takes longer than necessary. The
-   `cluster_locks` lease is 60s with a 20s refresh, so 30-60s
-   on the client side is the obvious starting point, but the
-   tradeoff against connection-pool churn needs measurement.
-4. **Dev/test convenience preservation.** The single-node /
+3. **Dev/test convenience preservation.** The single-node /
    "I just want a working SF on my laptop" experience needs
-   to survive. Options: keep an opt-in `mariadb_local` task
-   in the role, ship a separate `examples/single-node/`
-   playbook that exercises every convenience together, or
-   document a quickstart that uses docker for the
-   convenience layer. Decide before phase 6.
-5. **CI rig migration.** `shakenfist/deploy/shakenfist_ci`
+   to survive. Options: ship a separate `examples/single-
+   node/` playbook that exercises every convenience together,
+   or document a quickstart that wires the new galaxy role
+   together with the documented BYO-MariaDB single-box flow
+   from `PLAN-byo-mariadb.md`. Decide before phase 6.
+4. **CI rig migration.** `shakenfist/deploy/shakenfist_ci`
    currently exercises the deployer end-to-end. As the
    deployer changes shape, the CI rig becomes one of the
    first consumers of the new galaxy role. Sequencing this
    so CI never goes dark for more than one phase needs care
    — every phase must leave CI green.
-6. **Topology.json migration.** Existing operators with
+5. **Topology.json migration.** Existing operators with
    `topology.json` files need either a shim that translates
    them to ansible inventory, or a clear "here's how to
    rewrite this by hand" doc. Phase 7 should decide which.
@@ -269,8 +266,7 @@ care.
 | 1. Remove rsyslog aggregation from deployer | PLAN-remove-primary-phase-01-remove-monitoring.md | Not started |
 | 2. `bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster` | PLAN-remove-primary-phase-02-bootstrap-cli.md | Not started |
 | 3. Remove Apache reverse proxy from deployer | PLAN-remove-primary-phase-03-remove-lb.md | Not started |
-| 4. Make MariaDB BYO; demote local mariadb role to opt-in convenience | PLAN-remove-primary-phase-04-byo-mariadb.md | Not started |
-| 5. Elect `sf-database`; introduce candidate-list discovery library | PLAN-remove-primary-phase-05-elect-database.md | Not started |
+| 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | _(see byo-mariadb)_ |
 | 6. Repackage deployer as a galaxy-style role; example consumers | PLAN-remove-primary-phase-06-galaxy-role.md | Not started |
 | 7. Rename `etcd_master` → `database_node`; final cleanup | PLAN-remove-primary-phase-07-rename-cleanup.md | Not started |
 
@@ -309,19 +305,21 @@ Phase notes:
   `files/apache-site-primary.conf`. Documents the
   load-balancing requirement for production operators and
   the localhost:13000 single-node escape hatch.
-- **Phase 4** removes the mariadb install from the default
-  deploy.yml flow and demotes `roles/mariadb` to an opt-in
-  "for dev/test or evaluation" role. Removes the
-  `SHAKENFIST_MARIADB_HOST=localhost` direct-access hack in
-  the bootstrap path — bootstrap now goes through `sf-database`
-  like every other database access.
-- **Phase 5** is the largest. Adds `cluster_locks`-based
-  election to the `sf-database` daemon, exposes a "who is
-  the leader" gRPC endpoint that non-elected candidates can
-  answer, introduces a candidate-list discovery client in
-  `shakenfist-utilities` (or in-tree if the utilities repo
-  release cadence is awkward), and migrates every consumer
-  off the single `DATABASE_NODE_IP` config.
+- **Phases 4 and 5** (MariaDB BYO and the sf-database
+  tier model) have been lifted out of this plan and are
+  tracked in [`PLAN-byo-mariadb.md`](PLAN-byo-mariadb.md).
+  That plan removes the MariaDB-server install from the
+  deployer entirely (no opt-in demotion — the role is
+  deleted), reshapes `sf-database` into a deployer-chosen
+  tier of equal stateless instances reached via client-
+  side gRPC load balancing (not leader election), and
+  carves schema/migration execution out of daemon startup
+  into a new `sf-ctl ensure-mariadb-schema` command.
+  Phase 6 below assumes the BYO-MariaDB plan has landed
+  first (the galaxy role's documented quickstart for a
+  single-box deploy points at byo-mariadb's
+  `tools/bootstrap-mariadb.sql` and `apt install
+  mariadb-server` flow).
 - **Phase 6** moves `roles/base` and its dependents into a
   galaxy-shaped layout, replaces `deploy.py`'s topology JSON
   translation with direct ansible inventory consumption, and
@@ -463,19 +461,20 @@ because the following statements will be true:
 * `shakenfist/deploy/ansible/roles/primary/` no longer
   exists.
 * No part of the deployer installs Grafana, Prometheus,
-  rsyslog server, Apache, or MariaDB by default.
+  rsyslog server, or Apache by default. (MariaDB-install
+  removal is handled by
+  [`PLAN-byo-mariadb.md`](PLAN-byo-mariadb.md) and is
+  outside this plan's scope.)
 * `sf-ctl bootstrap-cluster` exists, is idempotent, and is
-  the only path through which a cluster's initial schema,
-  auth secret, admin namespace, and default config are
+  the only path through which a cluster's initial auth
+  secret, admin namespace, and default config are
   established. Re-running it on a bootstrapped cluster is
-  a no-op.
+  a no-op. (Schema initialisation is handled by the
+  separate `sf-ctl ensure-mariadb-schema` command
+  introduced in `PLAN-byo-mariadb.md`.)
 * The `bootstrap_operations` table exists and is populated
   by every bootstrap step in the same transaction as that
   step's artefact.
-* `sf-database` is electable; non-elected candidates can be
-  queried for the current leader. Every other SF daemon
-  obtains its database endpoint via a candidate list, not a
-  single `DATABASE_NODE_IP`.
 * The deployer is consumable as an ansible-galaxy role: an
   operator can write a one-page playbook that calls the
   role with a daemon mix and arrive at a working node
@@ -487,11 +486,11 @@ because the following statements will be true:
   out of scope).
 * Documentation in `docs/` is updated:
   `docs/operator_guide/` gains a "deploying SF against your
-  own infrastructure" section; `docs/operator_guide/database.md`
-  is updated for the BYO MariaDB story; `ARCHITECTURE.md`
-  loses the primary-node references; `README.md` and
-  `AGENTS.md` are updated to reflect the new deployment
-  shape.
+  own infrastructure" section; `ARCHITECTURE.md` loses the
+  primary-node references; `README.md` and `AGENTS.md` are
+  updated to reflect the new deployment shape. (BYO-MariaDB
+  updates to `docs/operator_guide/database.md` are owned
+  by `PLAN-byo-mariadb.md`.)
 
 ### Future work
 
@@ -551,11 +550,15 @@ because the following statements will be true:
   Honeycomb) and stabilises the metrics surface as a
   documented contract. Subsumes the originally-named
   "metrics audit" thread. Its own plan.
-- **Discovery library home.** If the candidate-list client
-  is published from `shakenfist-utilities`, the utilities
-  repo release cadence becomes a coupling. Reconsider
-  whether utilities is the right home once phase 5 is
-  designed in detail.
+- **MariaDB BYO and `sf-database` as a tier.** Tracked in
+  [`PLAN-byo-mariadb.md`](PLAN-byo-mariadb.md). Removes
+  MariaDB-server install from the deployer entirely,
+  reshapes `sf-database` into a deployer-chosen tier of
+  equal stateless instances reached via client-side gRPC
+  load balancing, and carves schema/migration execution
+  out of daemon startup into a new
+  `sf-ctl ensure-mariadb-schema` command. Was originally
+  phases 4-5 of this plan.
 - **Sticky session affinity for blob transfers.** Tracked in
   `PLAN-sticky-transfers.md`. The streaming-proxy baseline
   this plan delivers is the universal fallback; sticky

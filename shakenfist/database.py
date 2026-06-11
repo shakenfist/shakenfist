@@ -18,6 +18,7 @@ from shakenfist.config import config
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.util import json as util_json
+from shakenfist.util.grpc_channel import make_database_channel
 
 
 LOG, _ = logs.setup(__name__)
@@ -44,20 +45,19 @@ def get_database_client():
             c = None
 
     if not c:
-        if not config.DATABASE_NODE_IP:
+        if not config.MARIADB_GATEWAY_HOSTS:
             LOG.error('Cannot communicate with database service, no '
                       'configured server!')
             return None
 
-        local.sf_database_client = grpc.insecure_channel(
-            f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}',
-            options=[
+        local.sf_database_client = make_database_channel(
+            config.MARIADB_GATEWAY_HOSTS,
+            config.MARIADB_GATEWAY_PORT,
+            extra_options=[
                 ('grpc.keepalive_timeout_ms', 200),
-                ('grpc.http2.max_pings_without_data', 0),
-                ('grpc.keepalive_permit_without_calls', 1),
                 ('grpc.max_send_message_length', 100000000),
                 ('grpc.max_receive_message_length', 100000000),
-            ]
+            ],
         )
         c = local.sf_database_client
     return c
@@ -106,7 +106,7 @@ def _retry_database(func):
 
 def is_available():
     """Check if the database service is configured and available."""
-    if not config.DATABASE_NODE_IP:
+    if not config.MARIADB_GATEWAY_HOSTS:
         return False
     return True
 

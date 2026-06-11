@@ -3,28 +3,43 @@ import json
 import os
 import socket
 import sys
+from typing import Annotated
 from typing import NoReturn
 from typing import Optional
 
 from pydantic import AnyHttpUrl
+from pydantic import BeforeValidator
 from pydantic import Field
 from pydantic_settings import BaseSettings
+from pydantic_settings import NoDecode
 
 
 def get_node_name() -> str:
     return socket.getfqdn()
 
 
+def _parse_comma_separated_hosts(value: object) -> object:
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(',') if item.strip()]
+    return value
+
+
 def load_cluster_config() -> None:
     """Load cluster-wide config into environment variables.
 
-    On the database node (MARIADB_HOST set), read directly from
-    MariaDB. This is important during bootstrap, when sf-database's
-    own ExecStartPre=verify-config runs before the daemon is
-    listening and therefore cannot self-loop through gRPC.
+    If MARIADB_HOST is set, this process has direct MariaDB
+    access available and uses it -- this path is used by
+    sf-database itself and by `sf-ctl ensure-mariadb-schema`.
+    Direct access is preferred when available because it
+    avoids a self-loop through the sf-database gRPC tier.
 
-    On every other node, fetch via the database microservice gRPC
-    API. Falls back silently on any failure so that fresh-install
+    Otherwise, if MARIADB_GATEWAY_HOSTS is set, the process
+    reaches the sf-database tier via gRPC. Phase 3 of
+    PLAN-byo-mariadb will reshape this into a client-side
+    load-balanced channel; today we connect to the first
+    endpoint in the list.
+
+    Falls back silently on any failure so that fresh-install
     nodes with no database daemon yet can still start.
 
     Built inline to avoid circular imports (database.py and
@@ -69,18 +84,21 @@ def load_cluster_config() -> None:
             # so bootstrap keeps working.
             return
 
-    db_ip = os.getenv('SHAKENFIST_DATABASE_NODE_IP')
-    if not db_ip:
+    hosts_raw = os.getenv('SHAKENFIST_MARIADB_GATEWAY_HOSTS', '')
+    if not hosts_raw:
+        return
+    hosts = [h.strip() for h in hosts_raw.split(',') if h.strip()]
+    if not hosts:
         return
 
-    db_port = os.getenv('SHAKENFIST_DATABASE_API_PORT', '13005')
+    db_port = os.getenv('SHAKENFIST_MARIADB_GATEWAY_PORT', '13005')
 
     try:
-        import grpc
         from shakenfist.protos import database_pb2
         from shakenfist.protos import database_pb2_grpc
+        from shakenfist.util.grpc_channel import make_database_channel
 
-        channel = grpc.insecure_channel(f'{db_ip}:{db_port}')
+        channel = make_database_channel(hosts, int(db_port))
         stub = database_pb2_grpc.DatabaseServiceStub(channel)
         request = database_pb2.ClusterConfigRequest()
 
@@ -326,17 +344,29 @@ class SFConfig(BaseSettings):
     )
 
     # Database Service Options
-    DATABASE_NODE_IP: str = Field(
-        '',
-        description='Mesh IP of the node running the database service.'
+    # NoDecode prevents pydantic-settings from attempting to JSON-decode
+    # the env value before the BeforeValidator runs. Without it, a bare
+    # comma-separated string like "10.0.0.10" raises JSONDecodeError
+    # ("Extra data") because the source treats list[str] as a complex
+    # type and tries json.loads() first.
+    MARIADB_GATEWAY_HOSTS: Annotated[
+        list[str], NoDecode, BeforeValidator(_parse_comma_separated_hosts)
+    ] = Field(
+        default_factory=list,
+        description=(
+            'List of sf-database tier endpoints clients connect to. A '
+            'single-instance deployment sets this to a one-element list. '
+            'When supplied via environment variable, comma-separated '
+            'values are parsed into the list.'
+        )
     )
-    DATABASE_API_PORT: int = Field(
+    MARIADB_GATEWAY_PORT: int = Field(
         13005,
-        description='Port for the internal database gRPC API.'
+        description='Port the sf-database gRPC service listens on.'
     )
-    DATABASE_METRICS_PORT: int = Field(
+    MARIADB_GATEWAY_METRICS_PORT: int = Field(
         13006,
-        description='Prometheus metrics port for the database daemon.'
+        description='Prometheus metrics port for the sf-database daemon.'
     )
     USAGE_EVENT_FREQUENCY: int = Field(
         60,
@@ -484,15 +514,6 @@ class SFConfig(BaseSettings):
     LOGLEVEL_RESOURCES: str = 'info'
     LOGLEVEL_SIDECHANNEL: str = 'info'
     LOGLEVEL_QUEUES: str = 'info'
-
-    # etcd (retained only for DATA_MIGRATIONS drain — remove in next release)
-    ETCD_HOST: str = Field(
-        '',
-        description=(
-            'Hostname or IP of the etcd host to query for drain migrations. '
-            'Retained only for one-time migration of legacy clusters.'
-        )
-    )
 
     # MariaDB
     MARIADB_HOST: str = Field(

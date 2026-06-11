@@ -34,7 +34,6 @@ dependencies = [
     "click==8.4.1",                       # bsd
     "werkzeug==3.1.8",                    # bsd
     "prometheus-client==0.24.1",          # apache2
-    "etcd3gw==2.6.0",                     # apache2
     "bcrypt==5.0.0",                      # apache2
     "python-magic==0.4.27",               # mit
     "webargs==8.7.1",                     # mit
@@ -59,10 +58,21 @@ dependencies = [
     "Flask-JWT-Extended==4.7.4",          # mit
     "flask-request-id-middleware==1.1",   # mit
 
-    "protobuf==5.29.6",                   # bsd
-    "grpcio==1.70.0",                     # apache2
-    "grpcio-status==1.70.0",              # apache2
-    "grpcio-tools==1.70.0",               # apache2
+    # The 2026-06 grpcio bisect (1.81 -> 1.75.1 -> 1.72.2 -> 1.70.0)
+    # is over: the "sf-database stops handling RPCs ~20 s after
+    # start" wedge reproduced identically at every version because it
+    # was never a grpcio regression. It was an ABBA deadlock between
+    # the synchronous grpc_health HealthServicer (initial Watch
+    # response sent under the servicer lock) and the gRPC server's
+    # single event-dispatch thread (Watch close callbacks acquire
+    # that lock inline), armed by client-side healthCheckConfig in
+    # our channel factory. Fixed by disabling Watch-based client-side
+    # health checking in shakenfist/util/grpc_channel.py.
+    "protobuf==6.33.6",                   # bsd
+    "grpcio==1.81.0",                     # apache2
+    "grpcio-health-checking==1.81.0",     # apache2
+    "grpcio-status==1.81.0",              # apache2
+    "grpcio-tools==1.81.0",               # apache2
     "googleapis-common-protos==1.75.0",   # apache2
 
     "requests==2.33.1",                   # apache2
@@ -197,9 +207,9 @@ test = [
     "mkdocs-material==9.7.6",   # mit
     "testscenarios==0.5.0",     # bsd
     "mypy==1.14.1",             # mit
-    "mypy-protobuf==3.6.0",     # apache2
+    "mypy-protobuf==5.1.0",     # apache2
     "grpc-stubs==1.53.0.6",     # mit
-    "types-protobuf==5.29.1.20250403",    # apache2
+    "types-protobuf==6.32.1.20260221",    # apache2
     "types-PyYAML==6.0.12.20260518",      # apache2
     "types-requests==2.33.0.20260513",    # apache2
 ]

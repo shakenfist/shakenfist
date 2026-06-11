@@ -117,9 +117,6 @@ class Artifact(dbowo):
 
     @classmethod
     def _upgrade_step_8_to_9(cls, static_values):
-        # Static values and attributes migration to MariaDB is handled by
-        # sf-ctl migrate-data-to-mariadb (artifacts, artifact_attributes,
-        # artifact_indexes tables)
         ...
 
     @classmethod

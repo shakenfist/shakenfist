@@ -123,6 +123,7 @@ sf_config.verify_config(skip_auth_seed=True)
 config = sf_config.config
 
 # These imports _must_ occur after the extra config setup has run.
+from shakenfist import exceptions                          # noqa
 from shakenfist import mariadb                             # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
@@ -179,23 +180,6 @@ def set_config(flag: str, value: str) -> None:
     mariadb.set_cluster_config(flag, converted_value)
 
 
-# Backward compatibility aliases
-@click.command(name='show-etcd-config', hidden=True)
-def show_etcd_config() -> None:
-    """Deprecated: use show-config instead."""
-    config_data = mariadb.get_cluster_config()
-    click.echo(json.dumps(config_data, indent=4, sort_keys=True))
-
-
-@click.command(name='set-etcd-config', hidden=True)
-@click.argument('flag')
-@click.argument('value')
-def set_etcd_config(flag: str, value: str) -> None:
-    """Deprecated: use set-config instead."""
-    ctx = click.get_current_context()
-    ctx.invoke(set_config, flag=flag, value=value)
-
-
 @click.command()
 def verify_config() -> None:
     sf_config.verify_config()
@@ -216,6 +200,12 @@ def ensure_mariadb_schema() -> None:
         raise click.ClickException(
             'This command requires MARIADB_HOST to be configured. '
             'It should only be run on database nodes (etcd_master).')
+
+    engine = mariadb._get_engine()
+    try:
+        mariadb.verify_mariadb_compat(engine)
+    except exceptions.MariaDBIncompatibleError as e:
+        raise click.ClickException(str(e))
 
     results = mariadb.ensure_schema()
 
@@ -347,8 +337,6 @@ OBJECT_TYPES_WITH_STATE = [
 cli.add_command(bootstrap_system_key)
 cli.add_command(show_config)
 cli.add_command(set_config)
-cli.add_command(show_etcd_config)
-cli.add_command(set_etcd_config)
 cli.add_command(verify_config)
 cli.add_command(ensure_mariadb_schema)
 cli.add_command(initialise_node)

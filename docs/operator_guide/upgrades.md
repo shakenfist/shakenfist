@@ -38,27 +38,42 @@ will upgrade.
 ## MariaDB schema migrations
 
 Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The
-MariaDB schema is versioned, and migrations are applied automatically during
-cluster deployment via `getsf`.
+MariaDB schema is versioned; migrations must be applied by an operator (or
+operator automation) before starting `sf-database`.
 
 Each MariaDB table has a version number tracked in the `schema_versions` table.
 When the cluster is deployed or upgraded, the `sf-ctl ensure-mariadb-schema`
-command runs automatically on an etcd_master node to:
+command must be run on a node with direct database access to:
 
-1. Create any missing tables
-2. Apply any pending schema migrations to bring tables up to the current version
+1. Perform a compatibility check against the server requirements (MariaDB
+   not MySQL, version >= 10.6.0, InnoDB engine, utf8mb4 charset and
+   collation) — the command refuses to proceed if any check fails
+2. Create any missing tables
+3. Apply any pending schema migrations to bring tables up to the current
+   version
+
+`sf-database` also performs the same compatibility check at startup and
+will refuse to start if the server is incompatible. Importantly, if
+`sf-ctl ensure-mariadb-schema` has not been run after an SF upgrade that
+includes schema changes, `sf-database` will refuse to start with a clear
+schema-version mismatch error that names the command to run. This replaces
+the old behaviour where migrations ran silently inside the daemon on
+startup.
+
+See [MariaDB compatibility requirements](database.md#mariadb-compatibility-requirements)
+in the database reference for the full list of server requirements.
 
 ### Manual schema verification
 
-You can manually check or apply schema migrations by running on an etcd_master
-node:
+You can manually check or apply schema migrations by running on a node
+with direct database access:
 
 ```
 sudo /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
 ```
 
-This will output the current version of each table and whether any migrations
-were applied. For example:
+This will output the current version of each table and whether any
+migrations were applied. For example:
 
 ```
 Table 'object_states' is up to date (version 1)
@@ -102,10 +117,13 @@ in-flight v1 ops drain.
 
 ### Database service architecture
 
-Only etcd_master nodes have direct access to MariaDB credentials. All other
+Only the database node has direct access to MariaDB credentials. All other
 nodes access MariaDB data through a gRPC database microservice that runs on
-etcd_master nodes. This means:
+the database node. This means:
 
-* Schema migrations only need to run on etcd_master nodes
-* Non-etcd_master nodes do not require MariaDB credentials
-* The database service must be running before other daemons can access state data
+* Schema migrations only need to run on the database node
+* Other nodes do not require MariaDB credentials
+* `sf-ctl ensure-mariadb-schema` must be run (or re-run after an upgrade)
+  before starting `sf-database`
+* The database service must be running before other daemons can access
+  state data

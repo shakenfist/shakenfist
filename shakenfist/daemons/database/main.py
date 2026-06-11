@@ -17,6 +17,9 @@ from typing import cast
 from uuid import UUID
 
 import grpc
+from grpc_health.v1 import health
+from grpc_health.v1 import health_pb2
+from grpc_health.v1 import health_pb2_grpc
 from prometheus_client import Counter
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
@@ -24,6 +27,7 @@ from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import eventlog
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -5072,7 +5076,11 @@ class Monitor(daemon.WorkerPoolDaemon):
             'Current row count in the events table.'
         )
 
-        start_http_server(config.DATABASE_METRICS_PORT)
+        # Bind the Prometheus metrics server on this node's mesh IP rather
+        # than listing it in MARIADB_GATEWAY_HOSTS. The two are the same
+        # address today but will diverge once sf-database can run as a
+        # tier of several instances; clients scrape via their own discovery.
+        start_http_server(config.MARIADB_GATEWAY_METRICS_PORT, addr=config.NODE_MESH_IP)
 
     def record_start(self) -> None:
         # The database daemon records its own startup. Events flow into the
@@ -5132,6 +5140,13 @@ def main() -> None:
     util_exceptions.install_exception_tracking()
     daemon.write_pid_file('database')
 
+    # NOTE: do not add faulthandler.dump_traceback_later() here. Its
+    # watchdog thread walks every thread's frame stack without holding
+    # the GIL, and under sf-database's 64-thread load it dereferences
+    # frames mid-mutation -- we measured five SIGSEGVs across three CI
+    # jobs in a single merge run before removing it. For on-demand
+    # thread dumps use py-spy from outside the process instead.
+
     # MariaDB is required for the database service. Abort early with a clear
     # error message if it's not configured.
     if not config.MARIADB_HOST:
@@ -5139,11 +5154,30 @@ def main() -> None:
                   'MARIADB_HOST to be set. Aborting.')
         raise SystemExit(1)
 
-    # Ensure the MariaDB schema exists before accepting requests
-    mariadb.ensure_schema()
+    # Verify the MariaDB server is compatible before serving any request.
+    # Schema creation and migrations are operator-driven via
+    # `sf-ctl ensure-mariadb-schema`; sf-database refuses to start if the
+    # schema is not at the version this build expects.
+    engine = mariadb._get_engine()
+    try:
+        mariadb.verify_mariadb_compat(engine)
+    except exceptions.MariaDBIncompatibleError as e:
+        LOG.error(str(e))
+        raise SystemExit(1)
 
-    # Run any pending data migrations (e.g., etcd -> MariaDB)
-    mariadb.ensure_data_migrations()
+    try:
+        mariadb.verify_schema_versions(engine)
+    except exceptions.SchemaVersionMismatchError as e:
+        LOG.error(str(e))
+        raise SystemExit(1)
+
+    # Pre-populate every SQLAlchemy ``Table`` object before the gRPC
+    # server starts accepting requests. The lazy ``_get_*_table()``
+    # helpers serialise first-time inits behind a single RLock, and
+    # with 64 worker threads servicing the cluster-startup burst that
+    # one lock becomes a thundering-herd hot spot exactly when
+    # sf-database needs to be answering keepalives.
+    mariadb.register_all_tables()
 
     # Create the gRPC server.  Allow clients to send keepalive pings as
     # often as every 5 seconds — mariadb.py uses a 10-second interval.
@@ -5180,8 +5214,28 @@ def main() -> None:
             ('grpc.http2.max_ping_strikes', 0),
         ]
     )
+
+    # Register the gRPC standard health-checking protocol against the
+    # empty-string service name (the convention for "overall server
+    # health") for external monitoring via unary Check calls. SF's own
+    # client channels deliberately do NOT consume this via
+    # healthCheckConfig: Watch-based client-side health checking
+    # deadlocks this synchronous servicer against the server's single
+    # event-dispatch thread (the initial Watch response is sent while
+    # holding the servicer lock; Watch close callbacks acquire that
+    # lock inline on the event thread). Nothing should open Watch
+    # streams against this server. See shakenfist/util/grpc_channel.py.
+    # The status still flips to NOT_SERVING during the shutdown path
+    # so external Check-based monitoring sees the drain.
+    health_servicer = health.HealthServicer()
+    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+    health_servicer.set('', health_pb2.HealthCheckResponse.SERVING)
+
+    # Bind the gRPC server on this node's mesh IP. Clients discover where
+    # to connect via MARIADB_GATEWAY_HOSTS; the bind address is intentionally
+    # separate so a tier of sf-database instances can each bind locally.
     server.add_insecure_port(
-        f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
+        f'{config.NODE_MESH_IP}:{config.MARIADB_GATEWAY_PORT}')
 
     # Create the monitor and register the service BEFORE starting the server.
     # This is critical - if we start the server before registering the service,
@@ -5194,9 +5248,16 @@ def main() -> None:
     # Now start the server - it's ready to accept requests
     server.start()
     LOG.info('gRPC server started and listening on '
-             f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}')
+             f'{config.NODE_MESH_IP}:{config.MARIADB_GATEWAY_PORT}')
 
     m.run()
+
+    # Flip the health status to NOT_SERVING so external Check-based
+    # monitoring sees the drain before sf-database stops accepting
+    # requests. SF's own clients fail over via connectivity state and
+    # keepalives, not the health protocol.
+    health_servicer.set('', health_pb2.HealthCheckResponse.NOT_SERVING)
+
     server.stop(1).wait()
 
     daemon.force_clean_exit()

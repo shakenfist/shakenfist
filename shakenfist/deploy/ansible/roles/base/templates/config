@@ -31,17 +31,17 @@ SHAKENFIST_NODE_IS_DATABASE_NODE=True
 {% else %}
 SHAKENFIST_NODE_IS_DATABASE_NODE=False
 {% endif %}
-SHAKENFIST_DATABASE_NODE_IP="{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
-SHAKENFIST_DATABASE_API_PORT=13005
-SHAKENFIST_DATABASE_METRICS_PORT=13006
+SHAKENFIST_MARIADB_GATEWAY_HOSTS="{{ groups['etcd_master'] | map('extract', hostvars, 'node_mesh_ip') | join(',') }}"
+SHAKENFIST_MARIADB_GATEWAY_PORT=13005
+SHAKENFIST_MARIADB_GATEWAY_METRICS_PORT=13006
 
 # MariaDB configuration - only rendered on database nodes for security.
 # Only the database service daemon needs direct MariaDB access; all other
 # daemons access MariaDB through the database service's gRPC interface.
 {% if inventory_hostname in groups['etcd_master'] %}
-SHAKENFIST_MARIADB_HOST="{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
-SHAKENFIST_MARIADB_PORT=3306
-SHAKENFIST_MARIADB_USER="shakenfist"
-SHAKENFIST_MARIADB_PASSWORD="{{mariadb_password}}"
-SHAKENFIST_MARIADB_DATABASE="shakenfist"
+SHAKENFIST_MARIADB_HOST="{{ mariadb_host }}"
+SHAKENFIST_MARIADB_PORT={{ mariadb_port }}
+SHAKENFIST_MARIADB_USER="{{ mariadb_user }}"
+SHAKENFIST_MARIADB_PASSWORD="{{ mariadb_password }}"
+SHAKENFIST_MARIADB_DATABASE="{{ mariadb_database }}"
 {% endif %}

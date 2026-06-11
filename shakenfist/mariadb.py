@@ -25,7 +25,6 @@ import time
 import threading
 from typing import Any, Callable, cast, Optional, TypeVar
 from uuid import UUID
-from uuid import uuid4
 
 import grpc
 from prometheus_client import Counter
@@ -38,10 +37,12 @@ from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
+from shakenfist import exceptions
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
 from shakenfist.protos import database_pb2_grpc
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.util.grpc_channel import make_database_channel
 from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
 from shakenfist.schema.agentoperation_data import AgentOperationData
 from shakenfist.schema.instance_attributes import InstanceAttributesData
@@ -229,18 +230,87 @@ EVENTS_VERSION = 1
 EVENT_OBJECTS_VERSION = 1
 
 
+# Minimum supported MariaDB version. See docs/plans/PLAN-byo-mariadb-phase-01-
+# statelessness.md decision 1 for the rationale; in short: comfortably above
+# the 10.2 JSON-features floor SF uses today, matches Ubuntu 22.04 LTS so the
+# floor lines up with a vendor-supported LTS distro, and well below what
+# cluster_ci's debian-12 functional tests (MariaDB 10.11) exercise.
+MIN_MARIADB_VERSION: tuple[int, int, int] = (10, 6, 0)
+
+
+# Consolidated mapping of every MariaDB table managed by ensure_schema() to
+# the expected version of that table. The named constants above remain the
+# source of truth -- humans bump those when changing a schema. This dict is
+# derived from them so verify_schema_versions() and similar helpers have a
+# single place to look without invoking the _ensure_*_schema() functions.
+#
+# When you add or remove a table here, you must also update:
+#   1. ensure_schema() in this file (the canonical list of tables).
+#   2. EXPECTED_TABLE_NAMES in
+#      shakenfist/tests/test_mariadb_schema_concurrency.py (which guards
+#      against drift between this dict and ensure_schema()).
+EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
+    'object_states': OBJECT_STATES_VERSION,
+    'ipam_reservations': IPAM_RESERVATIONS_VERSION,
+    'uploads': UPLOADS_VERSION,
+    'dnsmasq': DNSMASQ_VERSION,
+    'blobs': BLOBS_VERSION,
+    'object_references': OBJECT_REFERENCES_VERSION,
+    'blob_hashes': BLOB_HASHES_VERSION,
+    'blob_transfers': BLOB_TRANSFERS_VERSION,
+    'blob_attributes': BLOB_ATTRIBUTES_VERSION,
+    'nodes': NODES_VERSION,
+    'node_attributes': NODE_ATTRIBUTES_VERSION,
+    'namespaces': NAMESPACES_VERSION,
+    'namespace_attributes': NAMESPACE_ATTRIBUTES_VERSION,
+    'artifacts': ARTIFACTS_VERSION,
+    'artifact_attributes': ARTIFACT_ATTRIBUTES_VERSION,
+    'artifact_indexes': ARTIFACT_INDEXES_VERSION,
+    'network_interfaces': NETWORK_INTERFACES_VERSION,
+    'network_interface_attributes': NETWORK_INTERFACE_ATTRIBUTES_VERSION,
+    'networks': NETWORKS_VERSION,
+    'network_attributes': NETWORK_ATTRIBUTES_VERSION,
+    'ipams': IPAMS_VERSION,
+    'agent_operations': AGENT_OPERATIONS_VERSION,
+    'agent_operation_attributes': AGENT_OPERATION_ATTRIBUTES_VERSION,
+    'instances': INSTANCES_VERSION,
+    'instance_attributes': INSTANCE_ATTRIBUTES_VERSION,
+    'object_metadata': OBJECT_METADATA_VERSION,
+    'cluster_operation_targets': CLUSTER_OPERATION_TARGETS_VERSION,
+    'node_metrics': NODE_METRICS_VERSION,
+    'node_daemon_states': NODE_DAEMON_STATES_VERSION,
+    'cluster_operations': CLUSTER_OPERATIONS_VERSION,
+    'cluster_operation_errors': CLUSTER_OPERATION_ERRORS_VERSION,
+    'work_queue': WORK_QUEUE_VERSION,
+    'cluster_locks': CLUSTER_LOCKS_VERSION,
+    'cluster_config': CLUSTER_CONFIG_VERSION,
+    'events': EVENTS_VERSION,
+    'event_objects': EVENT_OBJECTS_VERSION,
+}
+
+
 def _use_database_service() -> bool:
-    """Check if we should use the database microservice instead of direct access.
+    """Decide whether to route a MariaDB access through the gRPC tier.
 
-    Returns True if the database service is configured and we should use it.
-    Returns False if we should use direct MariaDB access (database daemon mode).
+    Returns True if the gRPC tier should be used, False if
+    this process has direct MariaDB access available and
+    should prefer it.
 
-    Only the database daemon has MARIADB_HOST configured directly. All other
-    daemons access MariaDB via the database service gRPC interface.
+    MARIADB_HOST being set signals direct access is available
+    (sf-database itself, or sf-ctl ensure-mariadb-schema).
+    Direct access wins when both configs are set, because
+    the only process with direct access does not gain anything
+    by hopping through the tier to reach itself.
+
+    MARIADB_GATEWAY_HOSTS provides one or more sf-database
+    endpoints for processes without direct access. Phase 3 of
+    PLAN-byo-mariadb will reshape the consuming code into a
+    client-side load-balanced channel; today the channel
+    construction simply takes the first entry.
     """
     if config.MARIADB_HOST:
         return False
-    if not config.DATABASE_NODE_IP:
+    if not config.MARIADB_GATEWAY_HOSTS:
         return False
     return True
 
@@ -256,14 +326,9 @@ def _get_database_stub() -> Any:
     Returns Any because the generated protobuf stubs are untyped.
     """
     if not hasattr(_local, 'database_channel') or _local.database_channel is None:
-        _local.database_channel = grpc.insecure_channel(
-            f'{config.DATABASE_NODE_IP}:{config.DATABASE_API_PORT}',
-            options=[
-                ('grpc.keepalive_time_ms', 10000),
-                ('grpc.keepalive_timeout_ms', 5000),
-                ('grpc.http2.max_pings_without_data', 0),
-                ('grpc.keepalive_permit_without_calls', 1),
-            ]
+        _local.database_channel = make_database_channel(
+            config.MARIADB_GATEWAY_HOSTS,
+            config.MARIADB_GATEWAY_PORT,
         )
         _local.database_stub = database_pb2_grpc.DatabaseServiceStub(
             _local.database_channel)
@@ -282,7 +347,7 @@ def _reset_database_stub() -> None:
 
 
 def _grpc_call(method: Any, request: Any) -> Any:
-    """Call a gRPC method with timeout, wait_for_ready, and retry.
+    """Call a gRPC method with timeout and retry.
 
     Retries on UNAVAILABLE and DEADLINE_EXCEEDED with a short delay
     between attempts. Resets the gRPC channel after persistent failures
@@ -299,12 +364,28 @@ def _grpc_call(method: Any, request: Any) -> Any:
     than an ``RpcError``. Treat that ValueError as retryable in the
     same way -- the channel was just closed under us, so the next
     attempt picks up a fresh stub from ``_get_database_stub()``.
+
+    ``wait_for_ready`` is deliberately left at the gRPC default of
+    False. With ``wait_for_ready=True`` a wedged subchannel (server
+    process alive but cygrpc no longer routing requests, as seen in
+    the slim-primary CI failures of June 2026) parks the caller in
+    ``_blocking`` forever instead of failing fast with UNAVAILABLE,
+    so the retry path here -- which closes and rebuilds the channel
+    -- never fires. Fail-fast plus retry recovers; fail-slow does not.
     """
     retryable_codes = {
         grpc.StatusCode.UNAVAILABLE,
         grpc.StatusCode.DEADLINE_EXCEEDED,
     }
-    method_name = getattr(method, '__name__', None)
+    # grpcio's ``_UnaryUnaryMultiCallable`` (returned by ``stub.X``) uses
+    # ``__slots__`` and exposes no ``__name__``; the wire method name lives
+    # in ``self._method`` as bytes shaped like
+    # ``b'/shakenfist.protos.DatabaseService/GetNodeByFqdn'``. Take the part
+    # after the last ``/`` -- that matches the attribute name set on the
+    # stub in the generated ``_pb2_grpc`` module, so ``getattr(stub, name)``
+    # resolves cleanly on the retry path.
+    raw_method = getattr(method, '_method', b'') or b''
+    method_name = raw_method.decode().rsplit('/', 1)[-1] or None
 
     last_error: BaseException = grpc.RpcError()
     for attempt in range(GRPC_RETRIES):
@@ -312,7 +393,7 @@ def _grpc_call(method: Any, request: Any) -> Any:
             if attempt > 0 and method_name:
                 stub = _get_database_stub()
                 method = getattr(stub, method_name)
-            return method(request, timeout=GRPC_TIMEOUT, wait_for_ready=True)
+            return method(request, timeout=GRPC_TIMEOUT)
         except grpc.RpcError as e:
             last_error = e
             if e.code() not in retryable_codes:
@@ -481,14 +562,20 @@ def _get_schema_versions_table() -> sa.Table:
     """
     global _schema_versions_table
     if _schema_versions_table is None:
-        metadata = _get_metadata()
-        _schema_versions_table = sa.Table(
-            'schema_versions',
-            metadata,
-            sa.Column('table_name', sa.String(64), primary_key=True),
-            sa.Column('version', sa.Integer(), nullable=False),
-            sa.Column('updated_at', sa.Double(), nullable=False),
-        )
+        with TABLE_CREATION_LOCK:
+            if _schema_versions_table is not None:
+                return _schema_versions_table
+            metadata = _get_metadata()
+            if 'schema_versions' in metadata.tables:
+                _schema_versions_table = metadata.tables['schema_versions']
+                return _schema_versions_table
+            _schema_versions_table = sa.Table(
+                'schema_versions',
+                metadata,
+                sa.Column('table_name', sa.String(64), primary_key=True),
+                sa.Column('version', sa.Integer(), nullable=False),
+                sa.Column('updated_at', sa.Double(), nullable=False),
+            )
     return _schema_versions_table
 
 
@@ -551,6 +638,127 @@ def _ensure_schema_versions_table(engine: sa.Engine) -> None:
     versions_table = _get_schema_versions_table()
     versions_table.metadata.create_all(engine, tables=[versions_table],
                                        checkfirst=True)
+
+
+def _parse_mariadb_version(version_string: str) -> tuple[int, int, int]:
+    """Parse a MariaDB ``VERSION()`` string into a (major, minor, patch) tuple.
+
+    MariaDB returns strings like ``10.11.5-MariaDB-1:10.11.5+maria~ubu2204``
+    on Debian/Ubuntu builds or ``10.6.16-MariaDB`` in older formats. MySQL
+    returns strings like ``8.0.35`` or ``8.0.36-0ubuntu0.22.04.1``. In every
+    case the leading chunk before the first ``-`` is dotted numerics, so
+    splitting on ``-`` then on ``.`` recovers the version triple.
+
+    Raises ``ValueError`` if the string does not contain three integer-valued
+    dot-separated components in its first chunk.
+    """
+    head = version_string.split('-', 1)[0]
+    parts = head.split('.')
+    if len(parts) < 3:
+        raise ValueError(
+            f'Expected at least three dot-separated components, got {head!r}')
+    return (int(parts[0]), int(parts[1]), int(parts[2]))
+
+
+def verify_mariadb_compat(engine: sa.Engine) -> None:
+    """Verify the connected MariaDB server is compatible with this SF release.
+
+    Performs four independent checks and accumulates all failures into a
+    single ``MariaDBIncompatibleError`` so operators see every problem at
+    once rather than chasing them one-by-one:
+
+      (a) Server version is MariaDB and at least ``MIN_MARIADB_VERSION``.
+      (b) Default storage engine is InnoDB.
+      (c) Default character set is utf8mb4.
+      (d) Default collation is a utf8mb4_* collation.
+
+    Raises ``MariaDBIncompatibleError`` listing every detected problem if
+    any check fails. Returns silently on success.
+    """
+    failures: list[str] = []
+
+    with engine.connect() as conn:
+        version_str = str(conn.execute(sa.text('SELECT VERSION()')).scalar() or '')
+        storage_engine = str(
+            conn.execute(sa.text('SELECT @@default_storage_engine')).scalar() or '')
+        charset = str(
+            conn.execute(sa.text('SELECT @@character_set_database')).scalar() or '')
+        collation = str(
+            conn.execute(sa.text('SELECT @@collation_database')).scalar() or '')
+
+    # (a) Server version + MariaDB-not-MySQL.
+    try:
+        observed_version = _parse_mariadb_version(version_str)
+    except ValueError:
+        failures.append(
+            f'Could not parse MariaDB version string: {version_str!r}')
+    else:
+        if observed_version < MIN_MARIADB_VERSION:
+            observed = '.'.join(str(p) for p in observed_version)
+            minimum = '.'.join(str(p) for p in MIN_MARIADB_VERSION)
+            failures.append(
+                f'MariaDB server version {observed} is older than the '
+                f'minimum supported version {minimum}')
+
+    if 'MariaDB' not in version_str:
+        failures.append(
+            f'Connected to non-MariaDB server (VERSION() returned '
+            f'{version_str!r}); only MariaDB is supported')
+
+    # (b) Default storage engine.
+    if storage_engine != 'InnoDB':
+        failures.append(
+            f'Default storage engine is {storage_engine!r}; SF requires InnoDB')
+
+    # (c) Default character set.
+    if charset != 'utf8mb4':
+        failures.append(
+            f'Default character set is {charset!r}; SF requires utf8mb4')
+
+    # (d) Default collation.
+    if not collation.startswith('utf8mb4_'):
+        failures.append(
+            f'Default collation is {collation!r}; SF requires a utf8mb4_* '
+            f'collation')
+
+    if failures:
+        message = 'MariaDB server is incompatible:\n' + '\n'.join(
+            f'  - {f}' for f in failures)
+        raise exceptions.MariaDBIncompatibleError(message)
+
+
+def verify_schema_versions(engine: sa.Engine) -> None:
+    """Verify every managed table is at the expected schema version.
+
+    Reads ``EXPECTED_SCHEMA_VERSIONS`` and compares each entry to the
+    actual version recorded in the ``schema_versions`` table. If the
+    ``schema_versions`` table itself does not exist, raises a clearer
+    error pointing the operator at ``sf-ctl ensure-mariadb-schema``
+    rather than producing N parallel "expected v2, found v-1" lines.
+
+    Raises ``SchemaVersionMismatchError`` listing every mismatched table
+    if any are out of date. Returns silently on success.
+    """
+    if not sa.inspect(engine).has_table('schema_versions'):
+        raise exceptions.SchemaVersionMismatchError(
+            'MariaDB schema has not been initialised; run '
+            '`sf-ctl ensure-mariadb-schema`')
+
+    mismatches: list[tuple[str, int, int]] = []
+    for table_name, expected in EXPECTED_SCHEMA_VERSIONS.items():
+        actual = _get_table_version(engine, table_name)
+        if actual != expected:
+            mismatches.append((table_name, expected, actual))
+
+    if mismatches:
+        lines = [
+            'Schema version mismatches detected. Run '
+            '`sf-ctl ensure-mariadb-schema` to apply pending migrations.'
+        ]
+        for table_name, expected, actual in mismatches:
+            lines.append(
+                f'  - {table_name}: expected v{expected}, found v{actual}')
+        raise exceptions.SchemaVersionMismatchError('\n'.join(lines))
 
 
 def _get_object_states_table() -> sa.Table:
@@ -669,10 +877,12 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_object_states_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {OBJECT_STATES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -683,7 +893,7 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = OBJECT_STATES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -704,16 +914,19 @@ def _get_object_metadata_table() -> sa.Table:
     """
     global _object_metadata_table
     if _object_metadata_table is None:
-        metadata = _get_metadata()
-        _object_metadata_table = sa.Table(
-            'object_metadata',
-            metadata,
-            sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
-            sa.Column('metadata_json', sa.Text(), nullable=True),
-            # Composite primary key
-            sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _object_metadata_table is not None:
+                return _object_metadata_table
+            metadata = _get_metadata()
+            _object_metadata_table = sa.Table(
+                'object_metadata',
+                metadata,
+                sa.Column('object_uuid', sa.String(36), nullable=False),
+                sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
+                sa.Column('metadata_json', sa.Text(), nullable=True),
+                # Composite primary key
+                sa.PrimaryKeyConstraint('object_type', 'object_uuid'),
+            )
     return _object_metadata_table
 
 
@@ -769,38 +982,41 @@ def _get_cluster_operation_targets_table() -> sa.Table:
     """
     global _cluster_operation_targets_table
     if _cluster_operation_targets_table is None:
-        metadata = _get_metadata()
-        # sequence_number is the primary key so MariaDB applies
-        # AUTO_INCREMENT (SQLAlchemy only emits AUTO_INCREMENT DDL for
-        # the first column of the primary key on MySQL backends).
-        #
-        # The unique constraint is on the triple (operation_uuid,
-        # target_object_type, target_uuid): one op can target many
-        # objects (e.g. node_inst_net_iface_op targets instance,
-        # network, and interface), but the same op-target pair must
-        # not appear twice. A column-level UNIQUE on operation_uuid
-        # alone (the v1 schema) silently truncated multi-target ops.
-        # idx_cot_operation keeps single-column operation_uuid
-        # lookups fast.
-        _cluster_operation_targets_table = sa.Table(
-            'cluster_operation_targets',
-            metadata,
-            sa.Column('sequence_number', sa.BigInteger(),
-                      primary_key=True, autoincrement=True),
-            sa.Column('operation_uuid', sa.String(36), nullable=False),
-            sa.Column('operation_type', sa.String(64), nullable=False),
-            sa.Column('target_object_type', sa.Enum(ObjectType),
-                      nullable=False),
-            sa.Column('target_uuid', sa.String(36), nullable=False),
-            sa.Column('created_at', sa.Double(), nullable=False),
-            sa.UniqueConstraint(
-                'operation_uuid', 'target_object_type', 'target_uuid',
-                name='uq_cot_op_target'),
-            # Indexes for common query patterns
-            sa.Index('idx_cot_target', 'target_object_type', 'target_uuid'),
-            sa.Index('idx_cot_operation', 'operation_uuid'),
-            sa.Index('idx_cot_created', 'created_at'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_operation_targets_table is not None:
+                return _cluster_operation_targets_table
+            metadata = _get_metadata()
+            # sequence_number is the primary key so MariaDB applies
+            # AUTO_INCREMENT (SQLAlchemy only emits AUTO_INCREMENT DDL for
+            # the first column of the primary key on MySQL backends).
+            #
+            # The unique constraint is on the triple (operation_uuid,
+            # target_object_type, target_uuid): one op can target many
+            # objects (e.g. node_inst_net_iface_op targets instance,
+            # network, and interface), but the same op-target pair must
+            # not appear twice. A column-level UNIQUE on operation_uuid
+            # alone (the v1 schema) silently truncated multi-target ops.
+            # idx_cot_operation keeps single-column operation_uuid
+            # lookups fast.
+            _cluster_operation_targets_table = sa.Table(
+                'cluster_operation_targets',
+                metadata,
+                sa.Column('sequence_number', sa.BigInteger(),
+                          primary_key=True, autoincrement=True),
+                sa.Column('operation_uuid', sa.String(36), nullable=False),
+                sa.Column('operation_type', sa.String(64), nullable=False),
+                sa.Column('target_object_type', sa.Enum(ObjectType),
+                          nullable=False),
+                sa.Column('target_uuid', sa.String(36), nullable=False),
+                sa.Column('created_at', sa.Double(), nullable=False),
+                sa.UniqueConstraint(
+                    'operation_uuid', 'target_object_type', 'target_uuid',
+                    name='uq_cot_op_target'),
+                # Indexes for common query patterns
+                sa.Index('idx_cot_target', 'target_object_type', 'target_uuid'),
+                sa.Index('idx_cot_operation', 'operation_uuid'),
+                sa.Index('idx_cot_created', 'created_at'),
+            )
     return _cluster_operation_targets_table
 
 
@@ -897,15 +1113,18 @@ def _get_node_metrics_table() -> sa.Table:
     """
     global _node_metrics_table
     if _node_metrics_table is None:
-        metadata = _get_metadata()
-        _node_metrics_table = sa.Table(
-            'node_metrics',
-            metadata,
-            sa.Column('node_uuid', sa.Uuid(), primary_key=True),
-            sa.Column('fqdn', sa.String(255), nullable=False),
-            sa.Column('timestamp', sa.Double(), nullable=False),
-            sa.Column('metrics_json', sa.JSON(), nullable=True),
-        )
+        with TABLE_CREATION_LOCK:
+            if _node_metrics_table is not None:
+                return _node_metrics_table
+            metadata = _get_metadata()
+            _node_metrics_table = sa.Table(
+                'node_metrics',
+                metadata,
+                sa.Column('node_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('fqdn', sa.String(255), nullable=False),
+                sa.Column('timestamp', sa.Double(), nullable=False),
+                sa.Column('metrics_json', sa.JSON(), nullable=True),
+            )
     return _node_metrics_table
 
 
@@ -916,10 +1135,14 @@ def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_node_metrics_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NODE_METRICS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
-        current_ver = 1
+        current_ver = NODE_METRICS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -947,24 +1170,27 @@ def _get_cluster_operations_table() -> sa.Table:
     """
     global _cluster_operations_table
     if _cluster_operations_table is None:
-        metadata = _get_metadata()
-        _cluster_operations_table = sa.Table(
-            'cluster_operations',
-            metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
-            sa.Column('operation_type', sa.String(64), nullable=False),
-            sa.Column('created_at', sa.Double(), nullable=False),
-            sa.Column('node_uuid', sa.Uuid(), nullable=True),
-            sa.Column('instance_uuid', sa.Uuid(), nullable=True),
-            sa.Column('network_uuid', sa.Uuid(), nullable=True),
-            sa.Column('priority', sa.String(32), nullable=True),
-            sa.Column('metadata_json', sa.JSON(), nullable=False),
-            sa.Index('ix_cluster_ops_node', 'node_uuid'),
-            sa.Index('ix_cluster_ops_instance', 'instance_uuid'),
-            sa.Index('ix_cluster_ops_network', 'network_uuid'),
-            sa.Index('ix_cluster_ops_type_created',
-                     'operation_type', 'created_at'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_operations_table is not None:
+                return _cluster_operations_table
+            metadata = _get_metadata()
+            _cluster_operations_table = sa.Table(
+                'cluster_operations',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('operation_type', sa.String(64), nullable=False),
+                sa.Column('created_at', sa.Double(), nullable=False),
+                sa.Column('node_uuid', sa.Uuid(), nullable=True),
+                sa.Column('instance_uuid', sa.Uuid(), nullable=True),
+                sa.Column('network_uuid', sa.Uuid(), nullable=True),
+                sa.Column('priority', sa.String(32), nullable=True),
+                sa.Column('metadata_json', sa.JSON(), nullable=False),
+                sa.Index('ix_cluster_ops_node', 'node_uuid'),
+                sa.Index('ix_cluster_ops_instance', 'instance_uuid'),
+                sa.Index('ix_cluster_ops_network', 'network_uuid'),
+                sa.Index('ix_cluster_ops_type_created',
+                         'operation_type', 'created_at'),
+            )
     return _cluster_operations_table
 
 
@@ -975,10 +1201,14 @@ def _ensure_cluster_operations_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_cluster_operations_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {CLUSTER_OPERATIONS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
-        current_ver = 1
+        current_ver = CLUSTER_OPERATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1013,14 +1243,17 @@ def _get_cluster_operation_errors_table() -> sa.Table:
     """
     global _cluster_operation_errors_table
     if _cluster_operation_errors_table is None:
-        metadata = _get_metadata()
-        _cluster_operation_errors_table = sa.Table(
-            'cluster_operation_errors',
-            metadata,
-            sa.Column('op_uuid', sa.Uuid(), primary_key=True),
-            sa.Column('error_report', sa.JSON(), nullable=False),
-            sa.Column('created_at', sa.Double(), nullable=False),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_operation_errors_table is not None:
+                return _cluster_operation_errors_table
+            metadata = _get_metadata()
+            _cluster_operation_errors_table = sa.Table(
+                'cluster_operation_errors',
+                metadata,
+                sa.Column('op_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('error_report', sa.JSON(), nullable=False),
+                sa.Column('created_at', sa.Double(), nullable=False),
+            )
     return _cluster_operation_errors_table
 
 
@@ -1066,24 +1299,27 @@ def _get_work_queue_table() -> sa.Table:
     """
     global _work_queue_table
     if _work_queue_table is None:
-        metadata = _get_metadata()
-        _work_queue_table = sa.Table(
-            'work_queue',
-            metadata,
-            sa.Column('id', sa.BigInteger(),
-                      primary_key=True, autoincrement=True),
-            sa.Column('queue_name', sa.String(255), nullable=False),
-            sa.Column('scheduled_at', sa.Double(), nullable=False),
-            sa.Column('claimed_at', sa.Double(), nullable=True),
-            sa.Column('claimed_by', sa.String(255), nullable=True),
-            sa.Column('attempts', sa.Integer(),
-                      nullable=False, server_default='0'),
-            sa.Column('payload', sa.JSON(), nullable=False),
-            sa.Column('created_at', sa.Double(), nullable=False),
-            sa.Index(
-                'ix_work_queue_ready',
-                'queue_name', 'claimed_at', 'scheduled_at'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _work_queue_table is not None:
+                return _work_queue_table
+            metadata = _get_metadata()
+            _work_queue_table = sa.Table(
+                'work_queue',
+                metadata,
+                sa.Column('id', sa.BigInteger(),
+                          primary_key=True, autoincrement=True),
+                sa.Column('queue_name', sa.String(255), nullable=False),
+                sa.Column('scheduled_at', sa.Double(), nullable=False),
+                sa.Column('claimed_at', sa.Double(), nullable=True),
+                sa.Column('claimed_by', sa.String(255), nullable=True),
+                sa.Column('attempts', sa.Integer(),
+                          nullable=False, server_default='0'),
+                sa.Column('payload', sa.JSON(), nullable=False),
+                sa.Column('created_at', sa.Double(), nullable=False),
+                sa.Index(
+                    'ix_work_queue_ready',
+                    'queue_name', 'claimed_at', 'scheduled_at'),
+            )
     return _work_queue_table
 
 
@@ -1094,10 +1330,14 @@ def _ensure_work_queue_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_work_queue_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {WORK_QUEUE_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
-        current_ver = 1
+        current_ver = WORK_QUEUE_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1171,9 +1411,10 @@ def _cluster_lock_key(
         object_type: str, subtype: str, name: str) -> str:
     """Build a lock key from the gRPC request fields.
 
-    Mirrors etcd._construct_key(prefix='sflocks') but without
-    the /sflocks/ prefix so we don't leak the old etcd naming
-    into MariaDB.
+    Builds the {type}/{subtype}/{name} shape stored in the
+    ``cluster_locks.lock_key`` column. The lock_key intentionally
+    omits any leading prefix; callers identify the namespace via
+    the table itself.
     """
     if subtype and name:
         return f'{object_type}/{subtype}/{name}'
@@ -1261,17 +1502,20 @@ def _get_cluster_config_table() -> sa.Table:
     """
     global _cluster_config_table
     if _cluster_config_table is None:
-        metadata = _get_metadata()
-        _cluster_config_table = sa.Table(
-            'cluster_config',
-            metadata,
-            sa.Column('key_name', sa.String(128),
-                      primary_key=True),
-            sa.Column('value_json', sa.JSON(),
-                      nullable=False),
-            sa.Column('updated_at', sa.Double(),
-                      nullable=False),
-        )
+        with TABLE_CREATION_LOCK:
+            if _cluster_config_table is not None:
+                return _cluster_config_table
+            metadata = _get_metadata()
+            _cluster_config_table = sa.Table(
+                'cluster_config',
+                metadata,
+                sa.Column('key_name', sa.String(128),
+                          primary_key=True),
+                sa.Column('value_json', sa.JSON(),
+                          nullable=False),
+                sa.Column('updated_at', sa.Double(),
+                          nullable=False),
+            )
     return _cluster_config_table
 
 
@@ -1283,11 +1527,15 @@ def _ensure_cluster_config_schema(
     start_ver = current_ver
     table = _get_cluster_config_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {CLUSTER_CONFIG_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True)
-        current_ver = 1
+        current_ver = CLUSTER_CONFIG_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1314,23 +1562,26 @@ def _get_events_table() -> sa.Table:
     """
     global _events_table
     if _events_table is None:
-        metadata = _get_metadata()
-        _events_table = sa.Table(
-            'events',
-            metadata,
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-            sa.Column('event_type', sa.String(32), nullable=False),
-            sa.Column('timestamp', sa.Double(), nullable=False),
-            sa.Column('fqdn', sa.String(255), nullable=False),
-            sa.Column('duration', sa.Double(), nullable=True),
-            sa.Column('message', sa.Text(), nullable=False),
-            sa.Column('extra', sa.JSON(), nullable=True),
-            sa.Column('request_id', sa.String(64), nullable=True),
-            sa.PrimaryKeyConstraint('event_uuid'),
-            sa.Index('idx_events_type_timestamp',
-                     'event_type', 'timestamp'),
-            sa.Index('idx_events_request_id', 'request_id'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _events_table is not None:
+                return _events_table
+            metadata = _get_metadata()
+            _events_table = sa.Table(
+                'events',
+                metadata,
+                sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+                sa.Column('event_type', sa.String(32), nullable=False),
+                sa.Column('timestamp', sa.Double(), nullable=False),
+                sa.Column('fqdn', sa.String(255), nullable=False),
+                sa.Column('duration', sa.Double(), nullable=True),
+                sa.Column('message', sa.Text(), nullable=False),
+                sa.Column('extra', sa.JSON(), nullable=True),
+                sa.Column('request_id', sa.String(64), nullable=True),
+                sa.PrimaryKeyConstraint('event_uuid'),
+                sa.Index('idx_events_type_timestamp',
+                         'event_type', 'timestamp'),
+                sa.Index('idx_events_request_id', 'request_id'),
+            )
     return _events_table
 
 
@@ -1378,17 +1629,20 @@ def _get_event_objects_table() -> sa.Table:
     """
     global _event_objects_table
     if _event_objects_table is None:
-        metadata = _get_metadata()
-        _event_objects_table = sa.Table(
-            'event_objects',
-            metadata,
-            sa.Column('object_type', sa.String(32), nullable=False),
-            sa.Column('object_uuid', sa.String(36), nullable=False),
-            sa.Column('event_uuid', sa.CHAR(36), nullable=False),
-            sa.PrimaryKeyConstraint(
-                'object_type', 'object_uuid', 'event_uuid'),
-            sa.Index('idx_event_objects_event', 'event_uuid'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _event_objects_table is not None:
+                return _event_objects_table
+            metadata = _get_metadata()
+            _event_objects_table = sa.Table(
+                'event_objects',
+                metadata,
+                sa.Column('object_type', sa.String(32), nullable=False),
+                sa.Column('object_uuid', sa.String(36), nullable=False),
+                sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+                sa.PrimaryKeyConstraint(
+                    'object_type', 'object_uuid', 'event_uuid'),
+                sa.Index('idx_event_objects_event', 'event_uuid'),
+            )
     return _event_objects_table
 
 
@@ -1430,27 +1684,30 @@ def _get_ipam_reservations_table() -> sa.Table:
     """
     global _ipam_reservations_table
     if _ipam_reservations_table is None:
-        metadata = _get_metadata()
-        _ipam_reservations_table = sa.Table(
-            'ipam_reservations',
-            metadata,
-            sa.Column('ipam_uuid', sa.Uuid(), nullable=False),
-            sa.Column('address', INET4(), nullable=False),
-            sa.Column('reservation_type', sa.Enum(ReservationType),
-                      nullable=False),
-            sa.Column('user_type', sa.Enum(ObjectType), nullable=True),
-            sa.Column('user_uuid', sa.Uuid(), nullable=True),
-            sa.Column('reserved_at', sa.Double(), nullable=False),
-            sa.Column('comment', sa.Text(), nullable=True),
-            # Composite primary key ensures uniqueness
-            sa.PrimaryKeyConstraint('ipam_uuid', 'address'),
-            # Index for efficient queries by IPAM
-            sa.Index('idx_ipam_reservations_ipam', 'ipam_uuid'),
-            # Index for finding reservations by user
-            sa.Index('idx_ipam_reservations_user', 'user_type', 'user_uuid'),
-            # Index for finding reservations by type (e.g., deletion-halo)
-            sa.Index('idx_ipam_reservations_type', 'reservation_type'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _ipam_reservations_table is not None:
+                return _ipam_reservations_table
+            metadata = _get_metadata()
+            _ipam_reservations_table = sa.Table(
+                'ipam_reservations',
+                metadata,
+                sa.Column('ipam_uuid', sa.Uuid(), nullable=False),
+                sa.Column('address', INET4(), nullable=False),
+                sa.Column('reservation_type', sa.Enum(ReservationType),
+                          nullable=False),
+                sa.Column('user_type', sa.Enum(ObjectType), nullable=True),
+                sa.Column('user_uuid', sa.Uuid(), nullable=True),
+                sa.Column('reserved_at', sa.Double(), nullable=False),
+                sa.Column('comment', sa.Text(), nullable=True),
+                # Composite primary key ensures uniqueness
+                sa.PrimaryKeyConstraint('ipam_uuid', 'address'),
+                # Index for efficient queries by IPAM
+                sa.Index('idx_ipam_reservations_ipam', 'ipam_uuid'),
+                # Index for finding reservations by user
+                sa.Index('idx_ipam_reservations_user', 'user_type', 'user_uuid'),
+                # Index for finding reservations by type (e.g., deletion-halo)
+                sa.Index('idx_ipam_reservations_type', 'reservation_type'),
+            )
     return _ipam_reservations_table
 
 
@@ -1474,10 +1731,12 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_ipam_reservations_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {IPAM_RESERVATIONS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1488,7 +1747,7 @@ def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = IPAM_RESERVATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1513,14 +1772,17 @@ def _get_uploads_table() -> sa.Table:
     """
     global _uploads_table
     if _uploads_table is None:
-        metadata = _get_metadata()
-        _uploads_table = pydantic_to_sqlalchemy_table(
-            UploadData,
-            'uploads',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _uploads_table is not None:
+                return _uploads_table
+            metadata = _get_metadata()
+            _uploads_table = pydantic_to_sqlalchemy_table(
+                UploadData,
+                'uploads',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _uploads_table
 
 
@@ -1535,10 +1797,12 @@ def _ensure_uploads_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_uploads_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {UPLOADS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1549,7 +1813,7 @@ def _ensure_uploads_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = UPLOADS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1574,14 +1838,17 @@ def _get_dnsmasq_table() -> sa.Table:
     """
     global _dnsmasq_table
     if _dnsmasq_table is None:
-        metadata = _get_metadata()
-        _dnsmasq_table = pydantic_to_sqlalchemy_table(
-            DnsMasqData,
-            'dnsmasq',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _dnsmasq_table is not None:
+                return _dnsmasq_table
+            metadata = _get_metadata()
+            _dnsmasq_table = pydantic_to_sqlalchemy_table(
+                DnsMasqData,
+                'dnsmasq',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _dnsmasq_table
 
 
@@ -1596,10 +1863,12 @@ def _ensure_dnsmasq_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_dnsmasq_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {DNSMASQ_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1610,7 +1879,7 @@ def _ensure_dnsmasq_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = DNSMASQ_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1635,14 +1904,17 @@ def _get_blobs_table() -> sa.Table:
     """
     global _blobs_table
     if _blobs_table is None:
-        metadata = _get_metadata()
-        _blobs_table = pydantic_to_sqlalchemy_table(
-            BlobData,
-            'blobs',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _blobs_table is not None:
+                return _blobs_table
+            metadata = _get_metadata()
+            _blobs_table = pydantic_to_sqlalchemy_table(
+                BlobData,
+                'blobs',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _blobs_table
 
 
@@ -1657,10 +1929,12 @@ def _ensure_blobs_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_blobs_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {BLOBS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1671,7 +1945,7 @@ def _ensure_blobs_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = BLOBS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1696,17 +1970,20 @@ def _get_object_references_table() -> sa.Table:
     """
     global _object_references_table
     if _object_references_table is None:
-        metadata = _get_metadata()
-        _object_references_table = pydantic_to_sqlalchemy_table(
-            ObjectReference,
-            'object_references',
-            metadata,
-            primary_key_fields=[
-                'source_object_type', 'source_uuid', 'relationship',
-                'target_object_type', 'target_uuid'
-            ],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _object_references_table is not None:
+                return _object_references_table
+            metadata = _get_metadata()
+            _object_references_table = pydantic_to_sqlalchemy_table(
+                ObjectReference,
+                'object_references',
+                metadata,
+                primary_key_fields=[
+                    'source_object_type', 'source_uuid', 'relationship',
+                    'target_object_type', 'target_uuid'
+                ],
+                include_id_column=False
+            )
     return _object_references_table
 
 
@@ -1721,10 +1998,12 @@ def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_object_references_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {OBJECT_REFERENCES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1735,7 +2014,7 @@ def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = OBJECT_REFERENCES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1760,14 +2039,17 @@ def _get_blob_hashes_table() -> sa.Table:
     """
     global _blob_hashes_table
     if _blob_hashes_table is None:
-        metadata = _get_metadata()
-        _blob_hashes_table = pydantic_to_sqlalchemy_table(
-            BlobHash,
-            'blob_hashes',
-            metadata,
-            primary_key_fields=['blob_uuid', 'node', 'algorithm'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _blob_hashes_table is not None:
+                return _blob_hashes_table
+            metadata = _get_metadata()
+            _blob_hashes_table = pydantic_to_sqlalchemy_table(
+                BlobHash,
+                'blob_hashes',
+                metadata,
+                primary_key_fields=['blob_uuid', 'node', 'algorithm'],
+                include_id_column=False
+            )
     return _blob_hashes_table
 
 
@@ -1782,10 +2064,12 @@ def _ensure_blob_hashes_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_blob_hashes_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Data migration from etcd will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {BLOB_HASHES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1796,7 +2080,7 @@ def _ensure_blob_hashes_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = BLOB_HASHES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1820,14 +2104,17 @@ def _get_blob_transfers_table() -> sa.Table:
     """
     global _blob_transfers_table
     if _blob_transfers_table is None:
-        metadata = _get_metadata()
-        _blob_transfers_table = pydantic_to_sqlalchemy_table(
-            BlobTransfer,
-            'blob_transfers',
-            metadata,
-            primary_key_fields=['source_node', 'transfer_name'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _blob_transfers_table is not None:
+                return _blob_transfers_table
+            metadata = _get_metadata()
+            _blob_transfers_table = pydantic_to_sqlalchemy_table(
+                BlobTransfer,
+                'blob_transfers',
+                metadata,
+                primary_key_fields=['source_node', 'transfer_name'],
+                include_id_column=False
+            )
     return _blob_transfers_table
 
 
@@ -1842,10 +2129,12 @@ def _ensure_blob_transfers_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_blob_transfers_table()
 
-    # Version 0 or -1 means table doesn't exist yet - create it at version 1.
-    # Cleanup migration will upgrade to version 2.
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {BLOB_TRANSFERS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         # Create indexes
@@ -1856,7 +2145,7 @@ def _ensure_blob_transfers_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = BLOB_TRANSFERS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1879,21 +2168,24 @@ def _get_blob_attributes_table() -> sa.Table:
     """
     global _blob_attributes_table
     if _blob_attributes_table is None:
-        metadata = _get_metadata()
-        _blob_attributes_table = sa.Table(
-            'blob_attributes',
-            metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
-            sa.Column('size', sa.BigInteger(), nullable=False, default=0),
-            sa.Column('info', sa.JSON(), nullable=True),
-            sa.Column('last_used', sa.Double(), nullable=True),
-            sa.Column('expires_at', sa.Double(), nullable=False, default=0.0),
-            # Indexes for query optimization
-            sa.Index('idx_blob_attrs_last_used', 'last_used'),
-            sa.Index('idx_blob_attrs_expires_at', 'expires_at'),
-            # Note: Foreign key to blobs table not enforced to allow
-            # flexible migration ordering
-        )
+        with TABLE_CREATION_LOCK:
+            if _blob_attributes_table is not None:
+                return _blob_attributes_table
+            metadata = _get_metadata()
+            _blob_attributes_table = sa.Table(
+                'blob_attributes',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('size', sa.BigInteger(), nullable=False, default=0),
+                sa.Column('info', sa.JSON(), nullable=True),
+                sa.Column('last_used', sa.Double(), nullable=True),
+                sa.Column('expires_at', sa.Double(), nullable=False, default=0.0),
+                # Indexes for query optimization
+                sa.Index('idx_blob_attrs_last_used', 'last_used'),
+                sa.Index('idx_blob_attrs_expires_at', 'expires_at'),
+                # Note: Foreign key to blobs table not enforced to allow
+                # flexible migration ordering
+            )
     return _blob_attributes_table
 
 
@@ -1945,14 +2237,17 @@ def _get_artifacts_table() -> sa.Table:
     """
     global _artifacts_table
     if _artifacts_table is None:
-        metadata = _get_metadata()
-        _artifacts_table = pydantic_to_sqlalchemy_table(
-            ArtifactData,
-            'artifacts',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _artifacts_table is not None:
+                return _artifacts_table
+            metadata = _get_metadata()
+            _artifacts_table = pydantic_to_sqlalchemy_table(
+                ArtifactData,
+                'artifacts',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _artifacts_table
 
 
@@ -1964,16 +2259,19 @@ def _get_artifact_attributes_table() -> sa.Table:
     """
     global _artifact_attributes_table
     if _artifact_attributes_table is None:
-        metadata = _get_metadata()
-        _artifact_attributes_table = sa.Table(
-            'artifact_attributes',
-            metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
-            sa.Column('max_versions', sa.Integer(), nullable=False, default=0),
-            sa.Column('shared', sa.Boolean(), nullable=False, default=False),
-            sa.Column('highest_index', sa.Integer(), nullable=False, default=0),
-            sa.Index('idx_artifact_attrs_shared', 'shared'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _artifact_attributes_table is not None:
+                return _artifact_attributes_table
+            metadata = _get_metadata()
+            _artifact_attributes_table = sa.Table(
+                'artifact_attributes',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('max_versions', sa.Integer(), nullable=False, default=0),
+                sa.Column('shared', sa.Boolean(), nullable=False, default=False),
+                sa.Column('highest_index', sa.Integer(), nullable=False, default=0),
+                sa.Index('idx_artifact_attrs_shared', 'shared'),
+            )
     return _artifact_attributes_table
 
 
@@ -1985,16 +2283,19 @@ def _get_artifact_indexes_table() -> sa.Table:
     """
     global _artifact_indexes_table
     if _artifact_indexes_table is None:
-        metadata = _get_metadata()
-        _artifact_indexes_table = sa.Table(
-            'artifact_indexes',
-            metadata,
-            sa.Column('artifact_uuid', sa.Uuid(), nullable=False),
-            sa.Column('index_number', sa.Integer(), nullable=False),
-            sa.Column('blob_uuid', sa.Uuid(), nullable=False),
-            sa.PrimaryKeyConstraint('artifact_uuid', 'index_number'),
-            sa.Index('idx_artifact_idx_blob_uuid', 'blob_uuid'),
-        )
+        with TABLE_CREATION_LOCK:
+            if _artifact_indexes_table is not None:
+                return _artifact_indexes_table
+            metadata = _get_metadata()
+            _artifact_indexes_table = sa.Table(
+                'artifact_indexes',
+                metadata,
+                sa.Column('artifact_uuid', sa.Uuid(), nullable=False),
+                sa.Column('index_number', sa.Integer(), nullable=False),
+                sa.Column('blob_uuid', sa.Uuid(), nullable=False),
+                sa.PrimaryKeyConstraint('artifact_uuid', 'index_number'),
+                sa.Index('idx_artifact_idx_blob_uuid', 'blob_uuid'),
+            )
     return _artifact_indexes_table
 
 
@@ -2051,8 +2352,12 @@ def _ensure_artifact_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_artifact_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {ARTIFACT_ATTRIBUTES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -2062,7 +2367,7 @@ def _ensure_artifact_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = ARTIFACT_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -2081,8 +2386,12 @@ def _ensure_artifact_indexes_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_artifact_indexes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {ARTIFACT_INDEXES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -2092,7 +2401,7 @@ def _ensure_artifact_indexes_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = ARTIFACT_INDEXES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -2177,2657 +2486,62 @@ def ensure_schema() -> list[dict[str, Any]]:
     return results
 
 
-# Data Migration Framework
-#
-# Data migrations transfer data from other storage systems (e.g., etcd) into
-# MariaDB tables. They use the same version numbers as schema migrations,
-# allowing a single version to track both "schema created" and "data migrated"
-# states.
-#
-# To add a new data migration:
-# 1. Register it in DATA_MIGRATIONS with table name and target version
-# 2. Implement the migration function that returns a dict with migration stats
-# 3. The migration runs automatically on daemon startup when version is lower
-#
-# Example:
-#   DATA_MIGRATIONS = {
-#       'blob_hashes': {
-#           2: _migrate_blob_checksums_from_etcd,
-#       },
-#   }
-#
-# The migration function signature should be:
-#   def _migrate_foo(engine: sa.Engine) -> dict[str, Any]
-#
-# It should return a dict with at least:
-#   {'migrated_count': int, 'error_count': int}
+def register_all_tables() -> None:
+    """Eagerly register every SQLAlchemy ``Table`` in module metadata.
 
-# Registry of data migrations: table_name -> {version: migration_function}
-# Migrations are run in version order when current version is below target.
-# NOTE: This is populated at the end of this section, after migration functions
-# are defined.
-DATA_MIGRATIONS: dict[str, dict[int, Callable[[sa.Engine], dict[str, Any]]]] = {}
+    Each ``_get_*_table()`` helper lazily builds its ``sa.Table`` on
+    first use behind ``TABLE_CREATION_LOCK``. With a 64-worker gRPC
+    pool every client daemon hammers sf-database during cluster
+    startup, so the first wave of requests serialises 30+ first-time
+    Table inits through a single RLock at the exact moment sf-database
+    is meant to be answering keepalives. Calling every helper once
+    here -- before ``server.start()`` -- pre-populates the module
+    globals so request threads find the cached Table object on the
+    cheap None-check path and never reach the lock.
 
-
-def ensure_data_migrations() -> list[dict[str, Any]]:
-    """Run pending data migrations after schema setup.
-
-    Data migrations transfer data from other storage systems (e.g., etcd)
-    into MariaDB tables. They're tracked using the same version numbers
-    as schema migrations, allowing a single version to represent both
-    "schema created" and "data migrated" states.
-
-    This function should be called after ensure_schema() to ensure all
-    tables exist before attempting data migrations.
-
-    Safe to call multiple times - it's idempotent. Migrations that have
-    already run (version >= target) are skipped.
-
-    Important notes for migration authors:
-    - Migration functions MUST be idempotent (use upserts, not inserts)
-    - If a migration fails partway through, it will retry from the start
-      on the next daemon restart
-    - No concurrency protection: assumes only one database daemon runs
-      migrations at a time (typical deployment)
-
-    Returns:
-        List of dicts describing the migration status for each table.
-
-    Raises:
-        RuntimeError: If MARIADB_HOST is not configured.
+    Safe to call multiple times and from any process that has imported
+    this module. Touches no database connections; only builds in-memory
+    SQLAlchemy metadata.
     """
-    if not config.MARIADB_HOST:
-        raise RuntimeError('MariaDB is not configured (MARIADB_HOST not set)')
-
-    if not DATA_MIGRATIONS:
-        LOG.debug('No data migrations registered')
-        return []
-
-    engine = _get_engine()
-    results = []
-
-    # All registered data migrations drain residual state from etcd into
-    # MariaDB. Fresh clusters (and clusters already fully migrated) have
-    # ETCD_HOST unset, in which case there is nothing to drain: mark the
-    # pending versions as complete without touching etcd so we neither
-    # spam the log with "Cannot communicate with etcd" errors nor retry
-    # the same no-op on every database daemon restart.
-    if not config.ETCD_HOST:
-        LOG.info(
-            'No etcd server configured; marking pending data migrations '
-            'as complete without running them'
-        )
-        for table_name, migrations in DATA_MIGRATIONS.items():
-            current_ver = _get_table_version(engine, table_name)
-            if current_ver <= 0:
-                continue
-            target_ver = max(migrations.keys())
-            if current_ver >= target_ver:
-                continue
-            _set_table_version(engine, table_name, target_ver)
-            results.append({
-                'table': table_name,
-                'from_version': current_ver,
-                'to_version': target_ver,
-                'migrated': True,
-                'stats': {'migrated_count': 0, 'error_count': 0,
-                          'skipped_reason': 'no etcd configured'},
-            })
-        return results
-
-    for table_name, migrations in DATA_MIGRATIONS.items():
-        current_ver = _get_table_version(engine, table_name)
-
-        # Skip if table doesn't exist yet (schema migration hasn't run)
-        if current_ver <= 0:
-            LOG.warning(
-                f'Skipping data migrations for {table_name}: '
-                f'table does not exist (run ensure_schema first)'
-            )
-            continue
-
-        # Run migrations in version order
-        for target_ver in sorted(migrations.keys()):
-            if current_ver >= target_ver:
-                continue  # Already at or past this version
-
-            migrate_func = migrations[target_ver]
-            LOG.info(
-                f'Running data migration for {table_name}: '
-                f'v{current_ver} -> v{target_ver}'
-            )
-
-            try:
-                from_ver = current_ver
-                stats = migrate_func(engine)
-
-                error_count = stats.get('error_count', 0)
-                if error_count > 0:
-                    LOG.error(
-                        f'Data migration for {table_name} had '
-                        f'{error_count} errors, not bumping version '
-                        f'(will retry on next restart)')
-                    results.append({
-                        'table': table_name,
-                        'from_version': from_ver,
-                        'to_version': target_ver,
-                        'migrated': False,
-                        'stats': stats,
-                        'error': f'{error_count} objects failed'
-                    })
-                    break
-
-                _set_table_version(engine, table_name, target_ver)
-                current_ver = target_ver
-
-                results.append({
-                    'table': table_name,
-                    'from_version': from_ver,
-                    'to_version': target_ver,
-                    'migrated': True,
-                    'stats': stats
-                })
-
-                LOG.info(
-                    f'Data migration complete for {table_name}: '
-                    f'migrated {stats.get("migrated_count", "?")} items'
-                )
-
-            except Exception as e:
-                LOG.error(
-                    f'Data migration failed for {table_name} '
-                    f'v{current_ver} -> v{target_ver}: {e}'
-                )
-                results.append({
-                    'table': table_name,
-                    'from_version': current_ver,
-                    'to_version': target_ver,
-                    'migrated': False,
-                    'error': str(e)
-                })
-                # Stop processing this table on error
-                break
-
-    # Log summary
-    migrated = [r for r in results if r.get('migrated')]
-    failed = [r for r in results if not r.get('migrated')]
-    if migrated:
-        LOG.info(f'Data migrations complete: {len(migrated)} succeeded')
-    if failed:
-        LOG.error(f'Data migrations failed: {len(failed)} errors')
-
-    return results
-
-
-# =============================================================================
-# Data Migration Functions
-#
-# These functions migrate data from etcd to MariaDB. They are called
-# automatically by ensure_data_migrations() when the table version is below
-# the target version.
-#
-# All migration functions must:
-# - Be idempotent (use upserts, handle already-migrated data)
-# - Return a dict with 'migrated_count' and 'error_count' keys
-# - Delete source data from etcd after successful migration
-# - Use LOG for progress reporting (not click.echo)
-# =============================================================================
-
-# Object types that have state stored in etcd
-_OBJECT_TYPES_WITH_STATE = [
-    'agentoperation', 'artifact', 'blob', 'dhcp', 'instance', 'interface',
-    'ipam', 'namespace', 'network', 'node', 'upload',
-    'artifact_fetch_op', 'imgcache_op', 'node_blob_op', 'node_op'
-]
-
-
-def _migrate_etcd_object_states(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate object state from etcd attributes to MariaDB.
-
-    Scans all object types that store state in etcd and migrates them
-    to the object_states table.
-    """
-    from shakenfist import etcd
-
-    migrated_count = 0
-    error_count = 0
-
-    for object_type in _OBJECT_TYPES_WITH_STATE:
-        LOG.info(f'Migrating {object_type} state from etcd...')
-        type_count = 0
-
-        for objkey, _ in etcd.get_all(object_type, None):
-            objuuid = objkey.split('/')[-1]
-            state_data = etcd.get(f'attribute/{object_type}', objuuid, 'state')
-            if not state_data:
-                continue
-
-            try:
-                state = State(**state_data)
-                success = _direct_set_state(
-                    ObjectType(object_type),  # type: ignore[call-arg]
-                    objuuid, state)
-                if success:
-                    etcd.delete(f'attribute/{object_type}', objuuid, 'state')
-                    migrated_count += 1
-                    type_count += 1
-            except Exception as e:
-                LOG.warning(f'Error migrating state for {object_type}/{objuuid}: {e}')
-                error_count += 1
-
-            if type_count > 0 and type_count % 100 == 0:
-                LOG.info(f'  ... {type_count} {object_type} objects processed')
-
-        if type_count > 0:
-            LOG.info(f'  Migrated {type_count} {object_type} objects')
-
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_ipam_reservations(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate IPAM reservations from etcd to MariaDB."""
-    from shakenfist import etcd
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating IPAM reservations from etcd...')
-
-    for key, data in etcd.get_prefix_raw('/sf/ipam_reservations/'):
-        parts = key.split('/')
-        if len(parts) < 5:
-            LOG.warning(f'Skipping invalid IPAM key: {key}')
-            error_count += 1
-            continue
-
-        ipam_uuid = parts[3]
-        # address = parts[4]  # Not needed, in data
-
-        try:
-            reservation = IPAMReservation.from_legacy_dict(ipam_uuid, data)
-            success = _direct_reserve_address(reservation)
-            if success:
-                etcd.delete_raw(key)
-                migrated_count += 1
-            else:
-                # Already exists, just delete from etcd
-                etcd.delete_raw(key)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating IPAM reservation {key}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(f'  ... {migrated_count + skipped_count} reservations processed')
-
-    LOG.info(f'IPAM migration: {migrated_count} migrated, {skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_uploads(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate upload objects from etcd to MariaDB."""
-    from shakenfist import etcd
-    from shakenfist.upload import Upload
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating uploads from etcd...')
-
-    for objkey, data in etcd.get_all('upload', None):
-        upload_uuid = objkey.split('/')[-1]
-
-        try:
-            upload_uuid_obj = UUIDType(upload_uuid)
-            success = create_upload(
-                upload_uuid_obj,
-                data['node'],
-                data['created_at'],
-                data.get('version', Upload.current_version)
-            )
-            if success:
-                etcd.delete('upload', None, upload_uuid)
-                migrated_count += 1
-            else:
-                # Already exists
-                etcd.delete('upload', None, upload_uuid)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating upload {upload_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(f'  ... {migrated_count + skipped_count} uploads processed')
-
-    LOG.info(f'Upload migration: {migrated_count} migrated, {skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_dnsmasq(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate DnsMasq objects from etcd to MariaDB."""
-    from shakenfist import etcd
-    from shakenfist.managed_executables.dnsmasq import DnsMasq
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating DnsMasq objects from etcd...')
-
-    # DnsMasq uses ObjectType.DHCP for historical reasons
-    for objkey, data in etcd.get_all('dhcp', None):
-        dnsmasq_uuid = objkey.split('/')[-1]
-
-        try:
-            # Apply upgrades to legacy data
-            version = data.get('version', DnsMasq.initial_version)
-            while version < DnsMasq.current_version:
-                step_name = f'_upgrade_step_{version}_to_{version + 1}'
-                step_func = getattr(DnsMasq, step_name, None)
-                if step_func:
-                    step_func(data)
-                version += 1
-                data['version'] = version
-
-            # Convert owner_type to ObjectType if it's a string
-            owner_type_value = data.get('owner_type')
-            if isinstance(owner_type_value, str):
-                owner_type = ObjectType(owner_type_value)  # type: ignore[call-arg]
-            else:
-                owner_type = ObjectType.UNKNOWN
-
-            from uuid import UUID as UUIDType
-            dnsmasq_data = DnsMasqData(
-                uuid=UUIDType(dnsmasq_uuid),
-                namespace=data.get('namespace', 'unknown'),
-                owner_type=owner_type,
-                owner_uuid=UUIDType(data.get('owner_uuid', dnsmasq_uuid)),
-                version=DnsMasq.current_version,
-                provide_dhcp=data.get('provide_dhcp', True),
-                provide_dns=data.get('provide_dns', False)
-            )
-            success = create_dnsmasq(dnsmasq_data)
-            if success:
-                etcd.delete('dhcp', None, dnsmasq_uuid)
-                migrated_count += 1
-            else:
-                # Already exists
-                etcd.delete('dhcp', None, dnsmasq_uuid)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating DnsMasq {dnsmasq_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(f'  ... {migrated_count + skipped_count} DnsMasq objects processed')
-
-    LOG.info(f'DnsMasq migration: {migrated_count} migrated, {skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_blobs(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate blob static values from etcd to MariaDB.
-
-    This migration scans all blobs in etcd and copies their static values
-    (modified, fetched_at, version) to the MariaDB blobs table. After
-    successful migration, the etcd entry is deleted.
-
-    Note: depends_on is NOT migrated here - it's already in the
-    object_references table as a DEPENDS_ON relationship.
-    """
-    from shakenfist import etcd
-    from shakenfist.blob import Blob
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating blobs from etcd...')
-
-    for objkey, data in etcd.get_all('blob', None):
-        blob_uuid = objkey.split('/')[-1]
-
-        try:
-            blob_uuid_obj = UUIDType(blob_uuid)
-            success = create_blob(
-                blob_uuid_obj,
-                data.get('modified', 0.0),
-                data.get('fetched_at', 0.0),
-                data.get('version', Blob.current_version)
-            )
-            if success:
-                etcd.delete('blob', None, blob_uuid)
-                migrated_count += 1
-            else:
-                # Already exists
-                etcd.delete('blob', None, blob_uuid)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating blob {blob_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(f'  ... {migrated_count + skipped_count} blobs processed')
-
-    LOG.info(f'Blob migration: {migrated_count} migrated, {skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_object_references(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate blob references from various objects to MariaDB.
-
-    This is a complex migration that scans multiple object types to build
-    the object_references table. It migrates:
-    - Instance disk and nvram_template references
-    - Artifact index references
-    - Blob depends_on and transcoded references
-    - Agent operation blob references
-    - Blob location references
-    """
-    from shakenfist import etcd
-    from shakenfist.schema.relationship_types import RelationshipType
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    def parse_uuid(uuid_str: str) -> Optional[UUIDType]:
-        try:
-            return UUIDType(uuid_str)
-        except (ValueError, AttributeError):
-            return None
-
-    # --- Instances: disk references and nvram_template ---
-    LOG.info('Migrating instance blob references...')
-    for objkey, data in etcd.get_all('instance', None):
-        instance_uuid = objkey.split('/')[-1]
-        instance_uuid_obj = parse_uuid(instance_uuid)
-        if not instance_uuid_obj:
-            error_count += 1
-            continue
-
-        disk_spec = data.get('disk_spec', [])
-
-        # Create DISK references for each disk with a blob_uuid
-        for disk_idx, disk in enumerate(disk_spec):
-            blob_uuid = disk.get('blob_uuid')
-            if not blob_uuid:
-                continue
-
-            blob_uuid_obj = parse_uuid(blob_uuid)
-            if not blob_uuid_obj:
-                error_count += 1
-                continue
-
-            success = record_relationship(
-                ObjectType.INSTANCE, instance_uuid_obj,
-                RelationshipType.DISK, str(disk_idx),
-                ObjectType.BLOB, blob_uuid_obj)
-            if success:
-                migrated_count += 1
-            else:
-                skipped_count += 1
-
-        # Handle nvram_template
-        nvram_template = data.get('nvram_template')
-        if nvram_template:
-            nvram_uuid_obj = parse_uuid(nvram_template)
-            if nvram_uuid_obj:
-                success = record_relationship(
-                    ObjectType.INSTANCE, instance_uuid_obj,
-                    RelationshipType.NVRAM_TEMPLATE, None,
-                    ObjectType.BLOB, nvram_uuid_obj)
-                if success:
-                    migrated_count += 1
-                else:
-                    skipped_count += 1
-
-        # Remove old blob_references attribute
-        etcd.delete('attribute/instance', instance_uuid, 'blob_references')
-
-    # --- Artifacts: index_* references ---
-    LOG.info('Migrating artifact index references...')
-    for objkey, _ in etcd.get_all('artifact', None):
-        artifact_uuid = objkey.split('/')[-1]
-        artifact_uuid_obj = parse_uuid(artifact_uuid)
-        if not artifact_uuid_obj:
-            error_count += 1
-            continue
-
-        # Get all index_* attributes
-        for attrkey, index_data in etcd.get_all(
-                'attribute/artifact', artifact_uuid, prefix='index_'):
-            if not index_data:
-                continue
-
-            index_str = attrkey.split('/')[-1].replace('index_', '')
-            blob_uuid = index_data.get('blob_uuid')
-            if not blob_uuid:
-                continue
-
-            blob_uuid_obj = parse_uuid(blob_uuid)
-            if not blob_uuid_obj:
-                error_count += 1
-                continue
-
-            success = record_relationship(
-                ObjectType.ARTIFACT, artifact_uuid_obj,
-                RelationshipType.ARTIFACT_INDEX, index_str,
-                ObjectType.BLOB, blob_uuid_obj)
-            if success:
-                migrated_count += 1
-            else:
-                skipped_count += 1
-
-    # --- Blobs: depends_on and transcoded references ---
-    LOG.info('Migrating blob depends_on and transcoded references...')
-    for objkey, data in etcd.get_all('blob', None):
-        blob_uuid = objkey.split('/')[-1]
-        blob_uuid_obj = parse_uuid(blob_uuid)
-        if not blob_uuid_obj:
-            error_count += 1
-            continue
-
-        # Handle depends_on
-        depends_on = data.get('depends_on')
-        if depends_on:
-            dep_uuid_obj = parse_uuid(depends_on)
-            if dep_uuid_obj:
-                success = record_relationship(
-                    ObjectType.BLOB, blob_uuid_obj,
-                    RelationshipType.DEPENDS_ON, None,
-                    ObjectType.BLOB, dep_uuid_obj)
-                if success:
-                    migrated_count += 1
-                else:
-                    skipped_count += 1
-
-        # Handle transcoded
-        transcoded = etcd.get('attribute/blob', blob_uuid, 'transcoded')
-        if transcoded:
-            for style, transcoded_blob_uuid in transcoded.items():
-                trans_uuid_obj = parse_uuid(transcoded_blob_uuid)
-                if not trans_uuid_obj:
-                    error_count += 1
-                    continue
-
-                success = record_relationship(
-                    ObjectType.BLOB, blob_uuid_obj,
-                    RelationshipType.TRANSCODE, style,
-                    ObjectType.BLOB, trans_uuid_obj)
-                if success:
-                    migrated_count += 1
-                else:
-                    skipped_count += 1
-
-        # Remove old attributes
-        etcd.delete('attribute/blob', blob_uuid, 'ref_count')
-        etcd.delete('attribute/blob', blob_uuid, 'transcoded')
-
-    # --- AgentOperations: *_blob references ---
-    LOG.info('Migrating agent operation blob references...')
-    for objkey, _ in etcd.get_all('agentoperation', None):
-        aop_uuid = objkey.split('/')[-1]
-        aop_uuid_obj = parse_uuid(aop_uuid)
-        if not aop_uuid_obj:
-            error_count += 1
-            continue
-
-        results_data = etcd.get('attribute/agentoperation', aop_uuid, 'results')
-        if not results_data:
-            continue
-
-        results = results_data.get('results', {})
-        for result_idx, result in results.items():
-            if not isinstance(result, dict):
-                continue
-            for key, value in result.items():
-                if not key.endswith('_blob'):
-                    continue
-                output_type = key.replace('_blob', '')
-
-                result_blob_uuid_obj = parse_uuid(value)
-                if not result_blob_uuid_obj:
-                    error_count += 1
-                    continue
-
-                success = record_relationship(
-                    ObjectType.AGENTOPERATION, aop_uuid_obj,
-                    RelationshipType.AGENT_OUTPUT, output_type,
-                    ObjectType.BLOB, result_blob_uuid_obj)
-                if success:
-                    migrated_count += 1
-                else:
-                    skipped_count += 1
-
-    # --- Blobs: locations -> BLOB_LOCATION ---
-    LOG.info('Migrating blob location references...')
-    for objkey, _ in etcd.get_all('blob', None):
-        blob_uuid = objkey.split('/')[-1]
-        blob_uuid_obj = parse_uuid(blob_uuid)
-        if not blob_uuid_obj:
-            error_count += 1
-            continue
-
-        locations_data = etcd.get('attribute/blob', blob_uuid, 'locations')
-        if not locations_data:
-            continue
-
-        locations = locations_data.get('locations', [])
-        for node_name in locations:
-            # Legacy blob locations use node FQDNs as identifiers
-            success = record_relationship(
-                ObjectType.NODE, node_name,
-                RelationshipType.BLOB_LOCATION, None,
-                ObjectType.BLOB, blob_uuid_obj)
-            if success:
-                migrated_count += 1
-            else:
-                skipped_count += 1
-
-        # Remove old locations attribute
-        etcd.delete('attribute/blob', blob_uuid, 'locations')
-
-    LOG.info(
-        f'References migration: {migrated_count} created, '
-        f'{skipped_count} skipped, {error_count} errors')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_blob_hashes(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate blob checksums from etcd to MariaDB blob_hashes table.
-
-    This migration scans all blobs in etcd and migrates their checksums
-    attribute to the MariaDB blob_hashes table. This enables O(1) hash
-    lookups and proper per-node verification tracking.
-
-    After migration, the checksums attributes are removed from etcd, but
-    only if ALL hash records for that blob were successfully created.
-    """
-    from shakenfist import etcd
-
-    migrated_count = 0
-    skipped_count = 0
-    error_count = 0
-
-    LOG.info('Migrating blob checksums from etcd to MariaDB...')
-
-    for objkey, data in etcd.get_all('blob', None):
-        blob_uuid = objkey.split('/')[-1]
-
-        # Get checksums attribute from etcd
-        checksums = etcd.get('attribute/blob', blob_uuid, 'checksums')
-        if not checksums:
-            continue
-
-        # Get the nodes dict (node_name -> last_verified_timestamp)
-        nodes = checksums.get('nodes', {})
-        if not nodes:
-            # If no nodes recorded, use sentinel name as fallback
-            nodes = {MIGRATION_UNKNOWN_NODE: time.time()}
-
-        # Get file_size from blob object data
-        file_size = data.get('size', 0)
-
-        # Track success for this blob to handle partial failures
-        blob_success = True
-        blob_migrated = 0
-
-        # For each algorithm that has a hash value
-        for algorithm in ['sha512', 'sha256', 'sha1', 'xxh128']:
-            hash_value = checksums.get(algorithm)
-            if not hash_value:
-                continue
-
-            # Create a hash record for each node that has verified this blob
-            for node_name, last_verified in nodes.items():
-                blob_hash = BlobHash(
-                    blob_uuid=blob_uuid,
-                    node=node_name,
-                    algorithm=algorithm,
-                    hash_value=hash_value,
-                    file_size=file_size,
-                    computed_at=last_verified,
-                    last_verified_at=last_verified,
-                    verification_status='valid',
-                    error_message=None
-                )
-                try:
-                    success = upsert_blob_hash(blob_hash)
-                    if success:
-                        blob_migrated += 1
-                    else:
-                        # upsert_blob_hash returned False - skip, already exists
-                        skipped_count += 1
-                except Exception as e:
-                    LOG.warning(
-                        f'Error migrating blob hash for {blob_uuid}: {e}')
-                    blob_success = False
-                    error_count += 1
-
-        # Only delete the etcd attribute if ALL upserts succeeded for this blob
-        if blob_success and blob_migrated > 0:
-            etcd.delete('attribute/blob', blob_uuid, 'checksums')
-            migrated_count += blob_migrated
-        elif not blob_success:
-            LOG.warning(
-                f'Partial failure migrating blob {blob_uuid}, '
-                f'etcd attribute retained')
-
-    LOG.info(
-        f'Blob hashes migration: {migrated_count} created, '
-        f'{skipped_count} skipped, {error_count} errors')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _cleanup_etcd_blob_transfers(engine: sa.Engine) -> dict[str, Any]:
-    """Clean up old etcd transfer keys during migration.
-
-    Unlike other migrations, we don't migrate transfer data - transfers are
-    transient and any in-flight transfer during an upgrade will fail anyway.
-    The requesting node will simply retry, creating a new record in MariaDB.
-
-    This function just deletes the old etcd keys:
-    - /sf/transfer/{node}/{name} - transfer handshake records
-    - /sf/attribute/blob/{uuid}/incomplete_locations - progress tracking
-    """
-    from shakenfist import etcd
-
-    deleted_transfers = 0
-    deleted_incomplete = 0
-
-    # Delete all transfer records
-    LOG.info('Cleaning up etcd transfer records...')
-    try:
-        for objkey, _data in etcd.get_all('transfer', None):
-            # objkey format: /sf/transfer/{node}/{name}
-            parts = objkey.split('/')
-            if len(parts) >= 4:
-                node = parts[-2]
-                name = parts[-1]
-                etcd.delete('transfer', node, name)
-                deleted_transfers += 1
-    except Exception as e:
-        LOG.warning(f'Error cleaning up transfer records: {e}')
-
-    # Delete all incomplete_locations attributes
-    LOG.info('Cleaning up etcd incomplete_locations attributes...')
-    try:
-        for objkey, _data in etcd.get_all('attribute/blob', None):
-            # Check if this is an incomplete_locations attribute
-            if objkey.endswith('/incomplete_locations'):
-                parts = objkey.split('/')
-                if len(parts) >= 3:
-                    blob_uuid = parts[-2]
-                    etcd.delete('attribute/blob', blob_uuid, 'incomplete_locations')
-                    deleted_incomplete += 1
-    except Exception as e:
-        LOG.warning(f'Error cleaning up incomplete_locations: {e}')
-
-    LOG.info(
-        f'Blob transfers cleanup: {deleted_transfers} transfer records deleted, '
-        f'{deleted_incomplete} incomplete_locations deleted')
-    return {
-        'deleted_transfers': deleted_transfers,
-        'deleted_incomplete': deleted_incomplete
-    }
-
-
-def _cleanup_legacy_port_reservation_keys() -> tuple[int, int]:
-    """Clean up legacy etcd port and vsock CID reservation keys.
-
-    Earlier versions of shakenfist tracked allocated console/VDI
-    ports under /sf/console/{node}/{port} via etcd.create('console',
-    ...) and allocated vsock CIDs under /sf/cid/{cid} via
-    etcd.create('cid', ...). Both allocators have moved to MariaDB
-    (the instance_attributes.ports and .vsock_cids columns
-    respectively), but those etcd keys are not touched by any of
-    the per-object attribute migrations and so leak indefinitely on
-    upgraded clusters.
-
-    Called from _migrate_etcd_instance_attributes (which is the
-    natural home for instance-port-related cleanup) so that it
-    runs once on the same upgrade where the underlying allocator
-    moved to MariaDB. The reservations themselves are no longer
-    authoritative for any allocation decision, so dropping them is
-    safe.
-
-    Returns (deleted_console, deleted_cid).
-    """
-    from shakenfist import etcd
-
-    deleted_console = 0
-    deleted_cid = 0
-
-    # /sf/console/{node}/{port} -> port reservation per node
-    LOG.info(
-        'Cleaning up legacy etcd console port reservations...')
-    try:
-        for objkey, _data in etcd.get_all('console', None):
-            # objkey looks like /sf/console/{node}/{port}
-            parts = objkey.split('/')
-            if len(parts) >= 4:
-                node = parts[-2]
-                port = parts[-1]
-                etcd.delete('console', node, port)
-                deleted_console += 1
-    except Exception as e:
-        LOG.warning(
-            f'Error cleaning up console reservations: {e}')
-
-    # /sf/cid/{cid} -> per-CID vsock reservation
-    LOG.info(
-        'Cleaning up legacy etcd vsock CID reservations...')
-    try:
-        for objkey, _data in etcd.get_all('cid', None):
-            # objkey looks like /sf/cid/{cid}
-            parts = objkey.split('/')
-            if len(parts) >= 3:
-                cid = parts[-1]
-                etcd.delete('cid', None, cid)
-                deleted_cid += 1
-    except Exception as e:
-        LOG.warning(
-            f'Error cleaning up vsock CID reservations: {e}')
-
-    LOG.info(
-        f'Port reservation cleanup: {deleted_console} console '
-        f'records deleted, {deleted_cid} vsock CID records '
-        f'deleted')
-    return deleted_console, deleted_cid
-
-
-def _migrate_etcd_blob_attributes(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate blob attributes from etcd to MariaDB blob_attributes table.
-
-    This migration scans all blob UUIDs from the blobs table and migrates
-    their attributes (size, info, last_used, expires_at) from etcd to MariaDB.
-    After successful migration, the etcd entries are deleted.
-
-    The etcd attribute keys are:
-    - attribute/blob/{uuid}/size -> {'size': int}
-    - attribute/blob/{uuid}/info -> {...qemu-img metadata...}
-    - attribute/blob/{uuid}/last_used -> {'last_used': float|null}
-    - attribute/blob/{uuid}/retention -> {'expires_at': float}
-    """
-    from shakenfist import etcd
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    # Get all blob UUIDs from the blobs table
-    blobs_table = _get_blobs_table()
-    with engine.connect() as conn:
-        stmt = sa.select(blobs_table.c.uuid)
-        result = conn.execute(stmt)
-        blob_uuids = [str(row.uuid) for row in result]
-
-    LOG.info(f'Migrating attributes for {len(blob_uuids)} blobs...')
-
-    for blob_uuid in blob_uuids:
-        try:
-            # Check if attributes already exist in MariaDB
-            existing = _direct_get_blob_attributes(UUIDType(blob_uuid))
-            if existing:
-                skipped_count += 1
-                continue
-
-            # Read attributes from etcd
-            size_data = etcd.get('attribute/blob', blob_uuid, 'size')
-            info_data = etcd.get('attribute/blob', blob_uuid, 'info')
-            last_used_data = etcd.get('attribute/blob', blob_uuid, 'last_used')
-            retention_data = etcd.get('attribute/blob', blob_uuid, 'retention')
-
-            # Extract values with defaults
-            size = size_data.get('size', 0) if size_data else 0
-            info = info_data if info_data else {}
-            last_used = (last_used_data.get('last_used')
-                         if last_used_data else None)
-            expires_at = (retention_data.get('expires_at', 0.0)
-                          if retention_data else 0.0)
-
-            # Create blob_attributes record
-            attrs = BlobAttributesData(
-                uuid=UUIDType(blob_uuid),
-                size=size,
-                info=info,
-                last_used=last_used,
-                expires_at=expires_at
-            )
-            success = _direct_create_blob_attributes(attrs)
-
-            if success:
-                # Delete etcd attributes after successful migration
-                if size_data:
-                    etcd.delete('attribute/blob', blob_uuid, 'size')
-                if info_data:
-                    etcd.delete('attribute/blob', blob_uuid, 'info')
-                if last_used_data:
-                    etcd.delete('attribute/blob', blob_uuid, 'last_used')
-                if retention_data:
-                    etcd.delete('attribute/blob', blob_uuid, 'retention')
-                migrated_count += 1
-            else:
-                error_count += 1
-
-        except Exception as e:
-            LOG.warning(f'Failed to migrate attributes for blob {blob_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count + error_count) % 100 == 0:
-            LOG.info(f'  ... {migrated_count + skipped_count + error_count} '
-                     f'blobs processed')
-
-    LOG.info(f'Blob attribute migration: {migrated_count} migrated, '
-             f'{skipped_count} skipped, {error_count} errors')
-
-    return {
-        'migrated_count': migrated_count,
-        'skipped_count': skipped_count,
-        'error_count': error_count
-    }
-
-
-def _migrate_node_state_key(fqdn: str, new_uuid: str) -> None:
-    """Re-key a node's object_states entry from FQDN to UUID4.
-
-    The object_states migration runs before the node migration, so node
-    state entries are stored with the FQDN as the object_uuid.  After
-    the node migration assigns a real UUID4, we must update the state
-    entry to use the new key so that subsequent lookups succeed.
-    """
-    old_state = get_state(ObjectType.NODE, fqdn)
-    if old_state and old_state.value is not None:
-        set_state(ObjectType.NODE, new_uuid, old_state)
-        delete_state(ObjectType.NODE, fqdn)
-
-
-def _migrate_etcd_nodes(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate node static values from etcd to MariaDB.
-
-    Old etcd format: key='node/None/{fqdn}', value={'uuid': fqdn, 'fqdn': fqdn,
-    'ip': ip, 'version': int}
-
-    New MariaDB format: real UUID4 with FQDN as a separate indexed column.
-    """
-    from shakenfist import etcd as etcd_mod
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating nodes from etcd...')
-
-    for objkey, data in etcd_mod.get_all('node', None):
-        fqdn = objkey.split('/')[-1]
-
-        try:
-            node_uuid = uuid4()
-            node_ip = data.get('ip', '')
-            node_version = 11  # Current version
-
-            success = create_node(node_uuid, fqdn, node_ip, node_version)
-            if success:
-                # Update the object_states entry from the old FQDN key
-                # to the new UUID4 key. The earlier object_states
-                # migration stored node state keyed by FQDN.
-                _migrate_node_state_key(fqdn, str(node_uuid))
-                etcd_mod.delete('node', None, fqdn)
-                migrated_count += 1
-            else:
-                # Already exists (by FQDN unique index); look up the
-                # existing UUID and re-key the state entry.
-                existing = get_node_by_fqdn(fqdn)
-                if existing:
-                    _migrate_node_state_key(fqdn, str(existing.uuid))
-                etcd_mod.delete('node', None, fqdn)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating node {fqdn}: {e}')
-            error_count += 1
-
-        total = migrated_count + skipped_count + error_count
-        if total % 100 == 0:
-            LOG.info(f'  ... {total} nodes processed')
-
-    LOG.info(f'Node migration: {migrated_count} migrated, '
-             f'{skipped_count} skipped, {error_count} errors')
-
-    return {
-        'migrated_count': migrated_count,
-        'skipped_count': skipped_count,
-        'error_count': error_count
-    }
-
-
-def _migrate_etcd_node_attributes(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate node attributes from etcd to MariaDB.
-
-    Consolidates multiple etcd attribute keys per node into a single
-    node_attributes row. Must run after _migrate_etcd_nodes so that node UUIDs
-    exist in MariaDB.
-
-    Old etcd attributes (at 'attribute/node/{fqdn}/'):
-    - observed: {at: float, release: str}
-    - roles: {is_etcd_master: bool, ...}
-    - daemons: {daemons: [str, ...]}
-    - daemon:{name}: {value: str, update_time: float, ...}
-    - instances: {instances: [str, ...]}
-    - dependency_versions, qemu_version, libvirt_version, python_version,
-      python_implementation, process_metrics
-    """
-    from shakenfist import etcd as etcd_mod
-    from shakenfist.schema.node_attributes import NodeAttributesData
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating node attributes from etcd...')
-
-    # Get all nodes from MariaDB (must have been migrated by _migrate_etcd_nodes)
-    all_uuids = get_all_node_uuids()
-
-    for node_uuid_str in all_uuids:
-        parsed_uuid = UUID(node_uuid_str)
-        node_data = get_node(parsed_uuid)
-        if not node_data:
-            continue
-
-        fqdn = node_data.fqdn
-
-        try:
-            # Read old etcd attributes
-            observed = etcd_mod.get('attribute/node', fqdn, 'observed')
-            roles = etcd_mod.get('attribute/node', fqdn, 'roles')
-            daemons_data = etcd_mod.get('attribute/node', fqdn, 'daemons')
-            instances_data = etcd_mod.get('attribute/node', fqdn, 'instances')
-            dep_versions = etcd_mod.get(
-                'attribute/node', fqdn, 'dependency_versions')
-            qemu_ver = etcd_mod.get('attribute/node', fqdn, 'qemu_version')
-            libvirt_ver = etcd_mod.get('attribute/node', fqdn, 'libvirt_version')
-            python_ver = etcd_mod.get('attribute/node', fqdn, 'python_version')
-            python_impl = etcd_mod.get(
-                'attribute/node', fqdn, 'python_implementation')
-            proc_metrics = etcd_mod.get('attribute/node', fqdn, 'process_metrics')
-
-            # Collect daemon states from individual etcd keys
-            daemon_states: dict[str, Any] = {}
-            daemons_list = []
-            if daemons_data:
-                daemons_list = daemons_data.get('daemons', [])
-            for daemon_name in daemons_list:
-                ds = etcd_mod.get(
-                    'attribute/node', fqdn, f'daemon:{daemon_name}')
-                if ds:
-                    daemon_states[daemon_name] = ds
-
-            # Build the consolidated attributes model
-            attrs = NodeAttributesData(
-                uuid=parsed_uuid,
-                last_seen=observed.get('at', 0) if observed else 0,
-                installed_version=observed.get('release') if observed else None,
-                is_etcd_master=roles.get('is_etcd_master', False) if roles else False,
-                is_hypervisor=roles.get('is_hypervisor', False) if roles else False,
-                is_network_node=roles.get('is_network_node', False) if roles else False,
-                is_eventlog_node=(
-                    roles.get('is_eventlog_node', False) if roles else False),
-                instances=(
-                    instances_data.get('instances', []) if instances_data else []),
-                daemons=daemons_list,
-                daemon_states=daemon_states,
-                qemu_version=qemu_ver if isinstance(qemu_ver, list) else None,
-                libvirt_version=libvirt_ver if isinstance(libvirt_ver, list) else None,
-                python_version=python_ver if isinstance(python_ver, list) else None,
-                python_implementation=(
-                    python_impl if isinstance(python_impl, str) else None),
-                dependency_versions=(
-                    dep_versions if isinstance(dep_versions, dict) else {}),
-                process_metrics=(
-                    proc_metrics if isinstance(proc_metrics, dict) else {}),
-            )
-
-            success = create_node_attributes(attrs)
-            if success:
-                migrated_count += 1
-            else:
-                skipped_count += 1
-
-            # Clean up old etcd attributes regardless of whether we created or
-            # skipped (already existed).
-            _etcd_attrs = [
-                'observed', 'roles', 'daemons', 'instances',
-                'dependency_versions', 'qemu_version', 'libvirt_version',
-                'python_version', 'python_implementation', 'process_metrics',
-            ]
-            for attr in _etcd_attrs:
-                etcd_mod.delete('attribute/node', fqdn, attr)
-            for daemon_name in daemons_list:
-                etcd_mod.delete('attribute/node', fqdn, f'daemon:{daemon_name}')
-
-        except Exception as e:
-            LOG.warning(f'Failed to migrate attributes for node {fqdn}: {e}')
-            error_count += 1
-
-        total = migrated_count + skipped_count + error_count
-        if total % 100 == 0:
-            LOG.info(f'  ... {total} node attributes processed')
-
-    LOG.info(
-        f'Node attribute migration: '
-        f'{migrated_count} migrated, '
-        f'{skipped_count} skipped, '
-        f'{error_count} errors')
-
-    return {
-        'migrated_count': migrated_count,
-        'skipped_count': skipped_count,
-        'error_count': error_count
-    }
-
-
-def _migrate_etcd_namespaces(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate namespace static values from etcd to MariaDB.
-
-    Old etcd format: key='namespace/None/{name}', value={'uuid': name, 'version': int}
-    New MariaDB format: name (VARCHAR PK), version (INT).
-    """
-    from shakenfist import etcd as etcd_mod
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating namespaces from etcd...')
-
-    for objkey, data in etcd_mod.get_all('namespace', None):
-        name = objkey.split('/')[-1]
-
-        try:
-            version = data.get('version', 7)
-            success = create_namespace(name, version)
-            if success:
-                etcd_mod.delete('namespace', None, name)
-                migrated_count += 1
-            else:
-                etcd_mod.delete('namespace', None, name)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating namespace {name}: {e}')
-            error_count += 1
-
-        total = migrated_count + skipped_count + error_count
-        if total % 100 == 0:
-            LOG.info(f'  ... {total} namespaces processed')
-
-    LOG.info(f'Namespace migration: {migrated_count} migrated, '
-             f'{skipped_count} skipped, {error_count} errors')
-
-    return {
-        'migrated_count': migrated_count,
-        'skipped_count': skipped_count,
-        'error_count': error_count
-    }
-
-
-def _migrate_etcd_namespace_attributes(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate namespace attributes from etcd to MariaDB.
-
-    Consolidates separate etcd attribute keys per namespace into a single
-    namespace_attributes row. Must run after _migrate_etcd_namespaces.
-
-    Old etcd attributes (at 'attribute/namespace/{name}/'):
-    - keys: {'nonced_keys': {...}}
-    - trust: {'full_trust': [...]}
-    """
-    from shakenfist import etcd as etcd_mod
-    from shakenfist.schema.namespace_attributes import NamespaceAttributesData
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating namespace attributes from etcd...')
-
-    all_names = get_all_namespace_names()
-
-    for name in all_names:
-        try:
-            keys_data = etcd_mod.get('attribute/namespace', name, 'keys')
-            trust_data = etcd_mod.get('attribute/namespace', name, 'trust')
-
-            keys: dict[str, Any] = {'nonced_keys': {}}
-            if keys_data:
-                keys = keys_data
-
-            trust = ['system']
-            if trust_data and 'full_trust' in trust_data:
-                trust = trust_data['full_trust']
-
-            attrs = NamespaceAttributesData(name=name, keys=keys, trust=trust)
-            success = create_namespace_attributes(attrs)
-
-            if success:
-                # Clean up etcd entries
-                if keys_data:
-                    etcd_mod.delete('attribute/namespace', name, 'keys')
-                if trust_data:
-                    etcd_mod.delete('attribute/namespace', name, 'trust')
-                migrated_count += 1
-            else:
-                skipped_count += 1
-
-        except Exception as e:
-            LOG.warning(f'Error migrating namespace attributes for {name}: {e}')
-            error_count += 1
-
-        total = migrated_count + skipped_count + error_count
-        if total % 100 == 0:
-            LOG.info(f'  ... {total} namespace attributes processed')
-
-    LOG.info(f'Namespace attribute migration: {migrated_count} migrated, '
-             f'{skipped_count} skipped, {error_count} errors')
-
-    return {
-        'migrated_count': migrated_count,
-        'skipped_count': skipped_count,
-        'error_count': error_count
-    }
-
-
-def _migrate_etcd_artifacts(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate artifact static values from etcd to MariaDB.
-
-    This migration scans all artifacts in etcd and copies their static values
-    to the MariaDB artifacts table. After successful migration, the etcd
-    entry is deleted.
-    """
-    from shakenfist import etcd
-    from shakenfist.artifact import Artifact
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating artifacts from etcd...')
-
-    for objkey, data in etcd.get_all('artifact', None):
-        artifact_uuid = objkey.split('/')[-1]
-
-        try:
-            artifact_uuid_obj = UUIDType(artifact_uuid)
-            success = create_artifact(
-                artifact_uuid_obj,
-                data.get('artifact_type', ''),
-                data.get('source_url', ''),
-                data.get('name', ''),
-                data.get('namespace', ''),
-                data.get('version', Artifact.current_version)
-            )
-            if success:
-                etcd.delete('artifact', None, artifact_uuid)
-                migrated_count += 1
-            else:
-                # Already exists
-                etcd.delete('artifact', None, artifact_uuid)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating artifact {artifact_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} artifacts processed')
-
-    LOG.info(f'Artifact migration: {migrated_count} migrated, '
-             f'{skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_artifact_attributes(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate artifact attributes from etcd to MariaDB.
-
-    Reads max_versions, shared, and highest_index from etcd attributes
-    and creates artifact_attributes records.
-
-    The etcd attribute keys are:
-    - attribute/artifact/{uuid}/max_versions -> {'max_versions': int}
-    - attribute/artifact/{uuid}/shared -> {'shared': bool}
-    - attribute/artifact/{uuid}/highest_index -> {'index': int}
-    """
-    from shakenfist import etcd
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    # Get all artifact UUIDs from the artifacts table
-    artifacts_table = _get_artifacts_table()
-    with engine.connect() as conn:
-        stmt = sa.select(artifacts_table.c.uuid)
-        result = conn.execute(stmt)
-        artifact_uuids = [str(row.uuid) for row in result]
-
-    LOG.info(f'Migrating attributes for {len(artifact_uuids)} artifacts...')
-
-    for artifact_uuid in artifact_uuids:
-        try:
-            existing = _direct_get_artifact_attributes(
-                UUIDType(artifact_uuid))
-            if existing:
-                skipped_count += 1
-                continue
-
-            max_versions_data = etcd.get(
-                'attribute/artifact', artifact_uuid, 'max_versions')
-            shared_data = etcd.get(
-                'attribute/artifact', artifact_uuid, 'shared')
-            highest_index_data = etcd.get(
-                'attribute/artifact', artifact_uuid, 'highest_index')
-
-            max_versions = (max_versions_data.get('max_versions', 0)
-                            if max_versions_data else 0)
-            shared = (shared_data.get('shared', False)
-                      if shared_data else False)
-            highest_index = (highest_index_data.get('index', 0)
-                             if highest_index_data else 0)
-
-            attrs = ArtifactAttributesData(
-                uuid=UUIDType(artifact_uuid),
-                max_versions=max_versions,
-                shared=shared,
-                highest_index=highest_index
-            )
-            success = _direct_create_artifact_attributes(attrs)
-
-            if success:
-                if max_versions_data:
-                    etcd.delete(
-                        'attribute/artifact', artifact_uuid, 'max_versions')
-                if shared_data:
-                    etcd.delete(
-                        'attribute/artifact', artifact_uuid, 'shared')
-                if highest_index_data:
-                    etcd.delete(
-                        'attribute/artifact', artifact_uuid, 'highest_index')
-                migrated_count += 1
-            else:
-                error_count += 1
-
-        except Exception as e:
-            LOG.warning(
-                f'Failed to migrate attributes for artifact '
-                f'{artifact_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count + error_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count + error_count} '
-                f'artifacts processed')
-
-    LOG.info(f'Artifact attribute migration: {migrated_count} migrated, '
-             f'{skipped_count} skipped, {error_count} errors')
-
-    return {
-        'migrated_count': migrated_count,
-        'skipped_count': skipped_count,
-        'error_count': error_count
-    }
-
-
-def _migrate_etcd_artifact_indexes(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate artifact indexes from etcd to MariaDB.
-
-    Reads all index_* attributes from etcd for each artifact and creates
-    artifact_indexes records.
-
-    The etcd attribute keys are:
-    - attribute/artifact/{uuid}/index_NNNNNNNNNNNN -> {
-          'index': int, 'blob_uuid': str}
-    """
-    from shakenfist import etcd
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    # Get all artifact UUIDs from the artifacts table
-    artifacts_table = _get_artifacts_table()
-    with engine.connect() as conn:
-        stmt = sa.select(artifacts_table.c.uuid)
-        result = conn.execute(stmt)
-        artifact_uuids = [str(row.uuid) for row in result]
-
-    LOG.info(f'Migrating indexes for {len(artifact_uuids)} artifacts...')
-
-    for artifact_uuid in artifact_uuids:
-        try:
-            for key, data in etcd.get_all(
-                    'attribute/artifact', artifact_uuid, prefix='index_'):
-                if not data or 'index' not in data or 'blob_uuid' not in data:
-                    continue
-
-                index_number = data['index']
-                blob_uuid = data['blob_uuid']
-
-                try:
-                    success = _direct_create_artifact_index(
-                        UUIDType(artifact_uuid),
-                        index_number,
-                        UUIDType(blob_uuid)
-                    )
-                    if success:
-                        etcd.delete(
-                            'attribute/artifact', artifact_uuid, key)
-                        migrated_count += 1
-                    else:
-                        skipped_count += 1
-                except Exception as e:
-                    LOG.warning(
-                        f'Failed to migrate index {key} for artifact '
-                        f'{artifact_uuid}: {e}')
-                    error_count += 1
-
-        except Exception as e:
-            LOG.warning(
-                f'Failed to scan indexes for artifact '
-                f'{artifact_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count + error_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count + error_count} '
-                f'indexes processed')
-
-    LOG.info(f'Artifact index migration: {migrated_count} migrated, '
-             f'{skipped_count} skipped, {error_count} errors')
-
-    return {
-        'migrated_count': migrated_count,
-        'skipped_count': skipped_count,
-        'error_count': error_count
-    }
-
-
-def _migrate_etcd_network_interfaces(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate NetworkInterface static values from etcd to MariaDB."""
-    from shakenfist import etcd
-    from shakenfist.network.interface import NetworkInterface
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating NetworkInterface objects from etcd...')
-
-    for objkey, data in etcd.get_all('networkinterface', None):
-        ni_uuid = objkey.split('/')[-1]
-
-        try:
-            # Apply upgrades to legacy data
-            version = data.get('version', NetworkInterface.initial_version)
-            while version < NetworkInterface.current_version:
-                step_name = f'_upgrade_step_{version}_to_{version + 1}'
-                step_func = getattr(NetworkInterface, step_name, None)
-                if step_func:
-                    step_func(data)
-                version += 1
-                data['version'] = version
-
-            ni_data = NetworkInterfaceData(
-                uuid=UUIDType(ni_uuid),
-                network_uuid=UUIDType(data['network_uuid']),
-                instance_uuid=UUIDType(data['instance_uuid']),
-                macaddr=data.get('macaddr', ''),
-                ipv4=data.get('ipv4') or None,
-                order=data.get('order', 0),
-                model=data.get('model', 'virtio'),
-                version=NetworkInterface.current_version,
-            )
-            success = create_network_interface(ni_data)
-            if success:
-                etcd.delete('networkinterface', None, ni_uuid)
-                migrated_count += 1
-            else:
-                etcd.delete('networkinterface', None, ni_uuid)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating NetworkInterface {ni_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} '
-                f'NetworkInterface objects processed')
-
-    # Clean up macaddress allocation keys — uniqueness is now enforced by
-    # the UNIQUE constraint on network_interfaces.macaddr.
-    mac_cleaned = 0
-    for objkey, _data in etcd.get_all('macaddress', None):
-        mac = objkey.split('/')[-1]
-        etcd.delete('macaddress', None, mac)
-        mac_cleaned += 1
-    if mac_cleaned:
-        LOG.info(f'Cleaned up {mac_cleaned} etcd macaddress keys')
-
-    LOG.info(
-        f'NetworkInterface migration: {migrated_count} migrated, '
-        f'{skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_network_interface_attributes(
-        engine: sa.Engine) -> dict[str, Any]:
-    """Migrate NetworkInterface attributes from etcd to MariaDB.
-
-    Reads the 'floating' attribute from etcd for each NetworkInterface and
-    creates network_interface_attributes records.
-    """
-    from shakenfist import etcd
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    # Get all network interface UUIDs from the network_interfaces table
-    ni_table = _get_network_interfaces_table()
-    with engine.connect() as conn:
-        stmt = sa.select(ni_table.c.uuid)
-        result = conn.execute(stmt)
-        ni_uuids = [str(row.uuid) for row in result]
-
-    LOG.info(
-        f'Migrating attributes for {len(ni_uuids)} '
-        f'NetworkInterface objects...')
-
-    for ni_uuid in ni_uuids:
-        try:
-            # Check if already migrated
-            existing = get_network_interface_attributes(UUIDType(ni_uuid))
-            if existing:
-                skipped_count += 1
-                continue
-
-            # Read floating attribute from etcd
-            floating_data = etcd.get(
-                'attribute/networkinterface', ni_uuid, 'floating')
-            floating_address = None
-            if floating_data:
-                floating_address = floating_data.get('floating_address')
-
-            attrs = NetworkInterfaceAttributesData(
-                uuid=UUIDType(ni_uuid),
-                floating_address=floating_address,
-            )
-            success = create_network_interface_attributes(attrs)
-            if success:
-                # Delete the etcd attribute after migration
-                if floating_data:
-                    etcd.delete(
-                        'attribute/networkinterface', ni_uuid, 'floating')
-                migrated_count += 1
-            else:
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(
-                f'Error migrating NetworkInterface attributes '
-                f'{ni_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} '
-                f'NetworkInterface attributes processed')
-
-    LOG.info(
-        f'NetworkInterface attributes migration: {migrated_count} '
-        f'migrated, {skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_ipams(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate IPAM static values from etcd to MariaDB."""
-    from shakenfist import etcd
-    from shakenfist.ipam import IPAM
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating IPAM objects from etcd...')
-
-    for objkey, data in etcd.get_all('ipam', None):
-        ipam_uuid = objkey.split('/')[-1]
-
-        try:
-            # Apply upgrades to legacy data
-            version = data.get('version', IPAM.initial_version)
-            while version < IPAM.current_version:
-                step_name = f'_upgrade_step_{version}_to_{version + 1}'
-                step_func = getattr(IPAM, step_name, None)
-                if step_func:
-                    step_func(data)
-                version += 1
-                data['version'] = version
-
-            ipam_data = IPAMData(
-                uuid=UUIDType(ipam_uuid),
-                namespace=data.get('namespace'),
-                network_uuid=UUIDType(data['network_uuid']),
-                ipblock=data['ipblock'],
-                version=IPAM.current_version,
-            )
-            success = create_ipam(ipam_data)
-            if success:
-                etcd.delete('ipam', None, ipam_uuid)
-                migrated_count += 1
-            else:
-                etcd.delete('ipam', None, ipam_uuid)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating IPAM {ipam_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} '
-                f'IPAM objects processed')
-
-    LOG.info(
-        f'IPAM migration: {migrated_count} migrated, '
-        f'{skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_networks(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate Network static values from etcd to MariaDB."""
-    from shakenfist import etcd
-    from shakenfist.network.network import Network
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating Network objects from etcd...')
-
-    for objkey, data in etcd.get_all('network', None):
-        net_uuid = objkey.split('/')[-1]
-
-        try:
-            # Apply upgrades to legacy data
-            version = data.get('version', Network.initial_version)
-            while version < Network.current_version:
-                step_name = f'_upgrade_step_{version}_to_{version + 1}'
-                step_func = getattr(Network, step_name, None)
-                if step_func:
-                    step_func(data)
-                version += 1
-                data['version'] = version
-
-            net_data = NetworkData(
-                uuid=UUIDType(net_uuid),
-                name=data.get('name', ''),
-                namespace=data.get('namespace'),
-                netblock=data.get('netblock', ''),
-                provide_dhcp=data.get('provide_dhcp', False),
-                provide_nat=data.get('provide_nat', False),
-                provide_dns=data.get('provide_dns', False),
-                vxid=data.get('vxid', 0),
-                egress_nic=data.get('egress_nic'),
-                mesh_nic=data.get('mesh_nic'),
-                version=Network.current_version,
-            )
-            success = create_network(net_data)
-            if success:
-                etcd.delete('network', None, net_uuid)
-                migrated_count += 1
-            else:
-                etcd.delete('network', None, net_uuid)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating Network {net_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} '
-                f'Network objects processed')
-
-    # Clean up vxlan allocation keys — uniqueness is now enforced by
-    # the UNIQUE constraint on networks.vxid.
-    vxlan_cleaned = 0
-    for objkey, _data in etcd.get_all('vxlan', None):
-        vxid = objkey.split('/')[-1]
-        etcd.delete('vxlan', None, vxid)
-        vxlan_cleaned += 1
-
-    LOG.info(
-        f'Network migration: {migrated_count} migrated, '
-        f'{skipped_count} skipped, '
-        f'{vxlan_cleaned} vxlan keys cleaned')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_network_attributes(
-        engine: sa.Engine) -> dict[str, Any]:
-    """Migrate Network attributes from etcd to MariaDB."""
-    from shakenfist import etcd
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating Network attributes from etcd...')
-
-    # Get all network UUIDs from the static values table
-    static_table = _get_networks_table()
-    with engine.connect() as conn:
-        stmt = sa.select(static_table.c.uuid)
-        result = conn.execute(stmt)
-        net_uuids = [str(row.uuid) for row in result]
-
-    for net_uuid in net_uuids:
-        try:
-            existing = _direct_get_network_attributes(
-                UUIDType(net_uuid))
-            if existing:
-                skipped_count += 1
-                continue
-
-            # Read attributes from etcd
-            routing_data = etcd.get(
-                'attribute/network', net_uuid, 'routing')
-            dns_data = etcd.get(
-                'attribute/network', net_uuid, 'hosteddns')
-
-            # Extract values with defaults
-            floating_gateway = None
-            if routing_data:
-                floating_gateway = routing_data.get(
-                    'floating_gateway')
-
-            hosteddns: dict[str, Any] = {}
-            if dns_data:
-                hosteddns = dns_data
-
-            attrs = NetworkAttributesData(
-                uuid=UUIDType(net_uuid),
-                floating_gateway=floating_gateway,
-                hosteddns=hosteddns,
-            )
-            success = _direct_create_network_attributes(attrs)
-
-            if success:
-                # Delete etcd attributes after successful migration. The
-                # ``networkinterfaces`` etcd key is also dropped here even
-                # though we no longer read it -- phase 7 made the cached
-                # list redundant, but stale etcd data should still be
-                # cleaned up so re-migrations are idempotent.
-                etcd.delete(
-                    'attribute/network', net_uuid, 'routing')
-                etcd.delete(
-                    'attribute/network', net_uuid,
-                    'networkinterfaces')
-                etcd.delete(
-                    'attribute/network', net_uuid, 'hosteddns')
-                migrated_count += 1
-            else:
-                error_count += 1
-
-        except Exception as e:
-            LOG.warning(
-                f'Failed to migrate attributes for '
-                f'Network {net_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} '
-                f'Network attributes processed')
-
-    LOG.info(
-        f'Network attributes migration: {migrated_count} '
-        f'migrated, {skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_agent_operations(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate AgentOperation static values from etcd to MariaDB."""
-    from shakenfist import etcd
-    from shakenfist.operations.agentoperation import AgentOperation
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating AgentOperation objects from etcd...')
-
-    for objkey, data in etcd.get_all('agentoperation', None):
-        aop_uuid = objkey.split('/')[-1]
-
-        try:
-            # Apply upgrades to legacy data
-            version = data.get('version', AgentOperation.initial_version)
-            while version < AgentOperation.current_version:
-                step_name = f'_upgrade_step_{version}_to_{version + 1}'
-                step_func = getattr(AgentOperation, step_name, None)
-                if step_func:
-                    step_func(data)
-                version += 1
-                data['version'] = version
-
-            aop_data = AgentOperationData(
-                uuid=UUIDType(aop_uuid),
-                namespace=data.get('namespace', ''),
-                instance_uuid=UUIDType(data['instance_uuid']),
-                commands=data.get('commands', []),
-                version=AgentOperation.current_version,
-            )
-            success = create_agent_operation(aop_data)
-            if success:
-                etcd.delete('agentoperation', None, aop_uuid)
-                migrated_count += 1
-            else:
-                etcd.delete('agentoperation', None, aop_uuid)
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(f'Error migrating AgentOperation {aop_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} '
-                f'AgentOperation objects processed')
-
-    LOG.info(
-        f'AgentOperation migration: {migrated_count} migrated, '
-        f'{skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_agent_operation_attributes(
-        engine: sa.Engine) -> dict[str, Any]:
-    """Migrate AgentOperation attributes from etcd to MariaDB."""
-    from shakenfist import etcd
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating AgentOperation attributes from etcd...')
-
-    # Get all agent operation UUIDs from the static values table
-    static_table = _get_agent_operations_table()
-    with engine.connect() as conn:
-        stmt = sa.select(static_table.c.uuid)
-        result = conn.execute(stmt)
-        aop_uuids = [str(row.uuid) for row in result]
-
-    for aop_uuid in aop_uuids:
-        try:
-            existing = _direct_get_agent_operation_attributes(
-                UUIDType(aop_uuid))
-            if existing:
-                skipped_count += 1
-                continue
-
-            # Read results attribute from etcd
-            results_data = etcd.get(
-                'attribute/agentoperation', aop_uuid, 'results')
-
-            results: dict[str, Any] = {}
-            if results_data:
-                results = results_data.get('results', {})
-
-            attrs = AgentOperationAttributesData(
-                uuid=UUIDType(aop_uuid),
-                results=results,
-            )
-            success = _direct_create_agent_operation_attributes(attrs)
-
-            if success:
-                # Delete etcd attributes after successful migration
-                etcd.delete(
-                    'attribute/agentoperation', aop_uuid, 'results')
-                migrated_count += 1
-            else:
-                error_count += 1
-
-        except Exception as e:
-            LOG.warning(
-                f'Failed to migrate attributes for '
-                f'AgentOperation {aop_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} '
-                f'AgentOperation attributes processed')
-
-    LOG.info(
-        f'AgentOperation attributes migration: {migrated_count} '
-        f'migrated, {skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_instances(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate Instance static values from etcd to MariaDB."""
-    from shakenfist import etcd
-    from shakenfist.instance import Instance
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating Instance objects from etcd...')
-
-    for objkey, data in etcd.get_all('instance', None):
-        inst_uuid = objkey.split('/')[-1]
-
-        try:
-            # Apply upgrades to legacy data
-            version = data.get('version', Instance.initial_version)
-            while version < Instance.current_version:
-                step_name = f'_upgrade_step_{version}_to_{version + 1}'
-                step_func = getattr(Instance, step_name, None)
-                if step_func:
-                    step_func(data)
-                version += 1
-                data['version'] = version
-
-            # Normalize values for Pydantic validation
-            requested_placement = data.get('requested_placement')
-            if not isinstance(requested_placement, dict):
-                requested_placement = None
-
-            video = data.get('video', {})
-            if not isinstance(video, dict):
-                video = {'model': str(video)} if video else {}
-
-            side_channels = data.get('side_channels')
-            if not isinstance(side_channels, list):
-                side_channels = []
-
-            inst_data = InstanceData(
-                uuid=UUIDType(inst_uuid),
-                cpus=data.get('cpus', 0),
-                disk_spec=data.get('disk_spec', []),
-                memory=data.get('memory', 0),
-                name=data.get('name', ''),
-                namespace=data.get('namespace', ''),
-                requested_placement=requested_placement,
-                ssh_key=data.get('ssh_key'),
-                user_data=data.get('user_data'),
-                video=video,
-                uefi=data.get('uefi', False),
-                configdrive=data.get(
-                    'configdrive', 'openstack-disk'),
-                nvram_template=data.get('nvram_template'),
-                secure_boot=data.get('secure_boot', False),
-                machine_type=data.get('machine_type', 'pc'),
-                side_channels=side_channels,
-                version=Instance.current_version,
-            )
-            success = create_instance(inst_data)
-            if success:
-                etcd.delete('instance', None, inst_uuid)
-                migrated_count += 1
-            else:
-                skipped_count += 1
-        except Exception as e:
-            LOG.warning(
-                f'Error migrating Instance {inst_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} '
-                f'Instance objects processed')
-
-    LOG.info(
-        f'Instance migration: {migrated_count} migrated, '
-        f'{skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_instance_attributes(
-        engine: sa.Engine) -> dict[str, Any]:
-    """Migrate Instance attributes from etcd to MariaDB."""
-    from shakenfist import etcd
-    from uuid import UUID as UUIDType
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating Instance attributes from etcd...')
-
-    # Get all instance UUIDs from the static values table
-    static_table = _get_instances_table()
-    with engine.connect() as conn:
-        stmt = sa.select(static_table.c.uuid)
-        result = conn.execute(stmt)
-        inst_uuids = [str(row.uuid) for row in result]
-
-    for inst_uuid in inst_uuids:
-        try:
-            existing = _direct_get_instance_attributes(
-                UUIDType(inst_uuid))
-            if existing:
-                skipped_count += 1
-                continue
-
-            # Read each attribute from etcd
-            placement = etcd.get(
-                'attribute/instance', inst_uuid, 'placement')
-            power_state = etcd.get(
-                'attribute/instance', inst_uuid, 'power_state')
-            ports = etcd.get(
-                'attribute/instance', inst_uuid, 'ports')
-            enforced_deletes = etcd.get(
-                'attribute/instance', inst_uuid,
-                'enforced_deletes')
-            block_devices = etcd.get(
-                'attribute/instance', inst_uuid, 'block_devices')
-            agent_state = etcd.get(
-                'attribute/instance', inst_uuid, 'agent_state')
-            agent_attributes = etcd.get(
-                'attribute/instance', inst_uuid,
-                'agent_attributes')
-            agent_operations = etcd.get(
-                'attribute/instance', inst_uuid,
-                'agent_operations')
-            kvm_pid_data = etcd.get(
-                'attribute/instance', inst_uuid, 'kvm_pid')
-            error_data = etcd.get(
-                'attribute/instance', inst_uuid, 'error')
-
-            # Extract values from etcd format
-            kvm_pid = None
-            if kvm_pid_data and isinstance(
-                    kvm_pid_data, dict):
-                kvm_pid = kvm_pid_data.get('pid')
-
-            error_message = None
-            if error_data and isinstance(
-                    error_data, dict):
-                error_message = error_data.get('message')
-
-            # Migrate vsock_cid:* dynamic keys into a single
-            # vsock_cids dict
-            vsock_cids: dict[str, int] = {}
-            vsock_keys_to_delete: list[str] = []
-            for attr_key, attr_val in etcd.get_all(
-                    'attribute/instance', inst_uuid):
-                if attr_key.startswith('vsock_cid:'):
-                    channel = attr_key[len('vsock_cid:'):]
-                    if isinstance(attr_val, (int, float)):
-                        vsock_cids[channel] = int(attr_val)
-                    vsock_keys_to_delete.append(attr_key)
-
-            attrs = InstanceAttributesData(
-                uuid=UUIDType(inst_uuid),
-                placement=placement if isinstance(
-                    placement, dict) else None,
-                power_state=power_state if isinstance(
-                    power_state, dict) else None,
-                ports=ports if isinstance(
-                    ports, dict) else None,
-                enforced_deletes=enforced_deletes if isinstance(
-                    enforced_deletes, dict) else None,
-                block_devices=block_devices if isinstance(
-                    block_devices, dict) else None,
-                agent_state=agent_state if isinstance(
-                    agent_state, dict) else None,
-                agent_attributes=agent_attributes if isinstance(
-                    agent_attributes, dict) else None,
-                agent_operations=agent_operations if isinstance(
-                    agent_operations, dict) else None,
-                kvm_pid=kvm_pid,
-                error_message=error_message,
-                vsock_cids=vsock_cids if vsock_cids else None,
-            )
-            success = _direct_create_instance_attributes(attrs)
-
-            if success:
-                # Delete etcd attributes after successful migration
-                for attr_name in [
-                    'placement', 'power_state', 'ports',
-                    'enforced_deletes', 'block_devices',
-                    'interfaces', 'agent_state',
-                    'agent_attributes', 'agent_operations',
-                    'kvm_pid', 'error',
-                ] + vsock_keys_to_delete:
-                    etcd.delete(
-                        'attribute/instance', inst_uuid,
-                        attr_name)
-                migrated_count += 1
-            else:
-                error_count += 1
-
-        except Exception as e:
-            LOG.warning(
-                f'Failed to migrate attributes for '
-                f'Instance {inst_uuid}: {e}')
-            error_count += 1
-
-        if (migrated_count + skipped_count) % 100 == 0:
-            LOG.info(
-                f'  ... {migrated_count + skipped_count} '
-                f'Instance attributes processed')
-
-    LOG.info(
-        f'Instance attributes migration: {migrated_count} '
-        f'migrated, {skipped_count} skipped')
-
-    # Once instance attributes are in MariaDB, the legacy
-    # /sf/console/* and /sf/cid/* reservation keys (used by the
-    # old etcd-backed port and vsock CID allocators) are no
-    # longer referenced by anything. Clean them up here so the
-    # cleanup is gated on the same version bump as the migration
-    # that obsoletes them.
-    deleted_console, deleted_cid = (
-        _cleanup_legacy_port_reservation_keys())
-
-    return {
-        'migrated_count': migrated_count,
-        'error_count': error_count,
-        'deleted_console_reservations': deleted_console,
-        'deleted_vsock_cid_reservations': deleted_cid,
-    }
-
-
-def _migrate_etcd_object_metadata(
-    engine: sa.Engine
-) -> dict[str, Any]:
-    """Migrate metadata and last_cluster_operation from etcd to MariaDB.
-
-    Iterates all object types and migrates metadata and
-    last_cluster_operation attributes from etcd into the shared
-    object_metadata table.
-
-    This migration must run after all object type migrations (phases 1-13)
-    because those migrations may move or delete etcd keys.
-    """
-    from shakenfist import etcd
-
-    migrated_count = 0
-    skipped_count = 0
-    error_count = 0
-
-    for ot in ObjectType:
-        # Collect UUIDs for this object type by scanning etcd attribute keys.
-        # We can't rely on MariaDB static value tables because not all object
-        # types have been migrated to MariaDB (e.g., operations).
-        try:
-            uuids_seen: set[str] = set()
-            for key, _data in etcd.get_all(
-                    'attribute/%s' % ot.value, None):
-                # Keys look like: /sf/attribute/{type}/{uuid}/{attr}
-                # After get_all, key is just the UUID/attr portion.
-                parts = key.split('/')
-                if parts:
-                    uuids_seen.add(parts[0])
-        except Exception as e:
-            LOG.warning(
-                f'Object metadata migration: failed to scan '
-                f'etcd for {ot.value}: {e}')
-            continue
-
-        for obj_uuid in uuids_seen:
-            try:
-                # Check if already migrated
-                existing = _direct_get_object_metadata(ot, obj_uuid)
-                if existing is not None:
-                    skipped_count += 1
-                    continue
-
-                # Read metadata and last_cluster_operation from etcd
-                md = etcd.get(
-                    f'attribute/{ot.value}', obj_uuid, 'metadata')
-                lco = etcd.get(
-                    f'attribute/{ot.value}', obj_uuid,
-                    'last_cluster_operation')
-
-                if md is None:
-                    # Only metadata is migrated to object_metadata
-                    # table. last_cluster_operation is now in
-                    # cluster_operation_targets (etcd key is still
-                    # cleaned up below).
-                    if lco is None:
-                        skipped_count += 1
-                        continue
-
-                # Write to MariaDB using direct upsert functions
-                if md is not None:
-                    _direct_set_metadata(ot, obj_uuid, md)
-
-                # Delete from etcd after successful migration
-                if md is not None:
-                    etcd.delete(
-                        f'attribute/{ot.value}', obj_uuid,
-                        'metadata')
-                # Clean up legacy etcd last_cluster_operation
-                # (now stored in cluster_operation_targets table)
-                if lco is not None:
-                    etcd.delete(
-                        f'attribute/{ot.value}', obj_uuid,
-                        'last_cluster_operation')
-
-                migrated_count += 1
-            except Exception as e:
-                LOG.warning(
-                    f'Object metadata migration: failed for '
-                    f'{ot.value}/{obj_uuid}: {e}')
-                error_count += 1
-
-            if (migrated_count + skipped_count) % 100 == 0:
-                LOG.info(
-                    f'Object metadata migration progress: '
-                    f'{migrated_count} migrated, '
-                    f'{skipped_count} skipped')
-
-    LOG.info(
-        f'Object metadata migration: {migrated_count} '
-        f'migrated, {skipped_count} skipped')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_node_metrics(engine: sa.Engine) -> dict[str, Any]:
-    """Migrate node metrics from etcd to MariaDB.
-
-    Reads all /sf/metrics/ entries from etcd, upserts them into the
-    node_metrics table, then deletes the etcd entries. This is a one-time
-    migration that runs automatically on database daemon startup.
-    """
-    migrated_count = 0
-    error_count = 0
-
-    try:
-        from shakenfist import etcd as etcd_module
-        for k, d in etcd_module.get_all('metrics', None):
-            try:
-                node_uuid_str = d.get('node_uuid')
-                if not node_uuid_str:
-                    # Legacy FQDN-keyed entry without node_uuid, skip
-                    etcd_module.delete_raw(k)
-                    continue
-
-                _direct_upsert_node_metrics(
-                    UUID(node_uuid_str),
-                    d.get('fqdn', ''),
-                    d.get('timestamp', 0.0),
-                    d.get('metrics', {})
-                )
-                etcd_module.delete_raw(k)
-                migrated_count += 1
-            except Exception as e:
-                LOG.warning(
-                    f'Failed to migrate node_metrics entry {k}: {e}')
-                error_count += 1
-    except Exception as e:
-        LOG.warning(f'Node metrics migration failed: {e}')
-        error_count += 1
-
-    LOG.info(
-        f'Node metrics migration: {migrated_count} '
-        f'migrated, {error_count} errors')
-    return {'migrated_count': migrated_count, 'error_count': error_count}
-
-
-def _migrate_etcd_cluster_operations(
-        engine: sa.Engine) -> dict[str, Any]:
-    """Drain residual /sf/{op_type}/{uuid} etcd keys into the
-    cluster_operations table.
-
-    One-shot migration used when a pre-phase-6 cluster is upgraded
-    and may have leftover cluster-operation header keys. Iterates
-    the authoritative OPERATION_NAMES_TO_CLASSES list from
-    constants.py and walks each type's etcd prefix. Idempotent on
-    re-run: a duplicate uuid returns False from the insert and the
-    etcd key is deleted anyway.
-    """
-    from shakenfist import etcd
-    from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating cluster operation headers from etcd...')
-
-    for op_type in OPERATION_NAMES_TO_CLASSES:
-        for key, data in etcd.get_all(op_type, None):
-            op_uuid_str = key.split('/')[-1]
-            try:
-                op_uuid = UUID(op_uuid_str)
-            except ValueError:
-                LOG.warning(
-                    f'Cluster operation migration: invalid uuid '
-                    f'in key {key}; leaving in place')
-                error_count += 1
-                continue
-
-            if not isinstance(data, dict):
-                LOG.warning(
-                    f'Cluster operation migration: malformed '
-                    f'payload at {key}; leaving in place')
-                error_count += 1
-                continue
-
-            created_at = data.get('created_at') or time.time()
-            try:
-                inserted = _direct_create_cluster_operation(
-                    op_uuid, op_type, data, created_at)
-            except Exception as e:
-                LOG.warning(
-                    f'Cluster operation migration: insert raised '
-                    f'for {key}: {e}')
-                error_count += 1
-                continue
-
-            etcd.delete_raw(key)
-            if inserted:
-                migrated_count += 1
-            else:
-                skipped_count += 1
-
-    LOG.info(
-        f'Cluster operation migration: {migrated_count} migrated, '
-        f'{skipped_count} skipped, {error_count} errors')
-    return {
-        'migrated_count': migrated_count,
-        'error_count': error_count,
-        'skipped_count': skipped_count,
-    }
-
-
-def _migrate_etcd_work_queue(engine: sa.Engine) -> dict[str, Any]:
-    """Drain residual /sf/queue/* and /sf/processing/* etcd keys
-    into the work_queue table.
-
-    Queue rows are inserted via _direct_work_queue_enqueue with a
-    delay computed from the legacy {timestamp}-{random} job name.
-    Processing rows (rows that were in flight when the old cluster
-    stopped) are re-queued with claimed_at=None so a worker picks
-    them up again -- the old worker is gone and we cannot preserve
-    attempt count across the etcd->MariaDB boundary.
-
-    If the legacy job name's timestamp prefix cannot be parsed the
-    migration falls back to scheduled_at=now (the row becomes
-    immediately eligible). Malformed JSON payloads are skipped and
-    the etcd key is left in place for the operator to investigate.
-    """
-    from shakenfist import etcd
-    from shakenfist import exceptions
-
-    migrated_count = 0
-    error_count = 0
-    skipped_count = 0
-
-    LOG.info('Migrating work queue rows from etcd...')
-
-    for source_prefix in ('/sf/queue/', '/sf/processing/'):
-        for key, workitem in etcd.get_prefix_raw(source_prefix):
-            parts = key.split('/')
-            # /sf/{queue|processing}/{queue_name}/{jobname}
-            if len(parts) < 5:
-                LOG.warning(
-                    f'Work queue migration: malformed key {key}; '
-                    f'leaving in place')
-                error_count += 1
-                continue
-
-            queue_name = parts[3]
-            jobname = '/'.join(parts[4:])
-
-            if not isinstance(workitem, dict):
-                LOG.warning(
-                    f'Work queue migration: malformed payload at '
-                    f'{key}; leaving in place')
-                error_count += 1
-                continue
-
-            try:
-                legacy_ts = float(jobname.split('-')[0])
-            except (ValueError, IndexError):
-                LOG.warning(
-                    f'Work queue migration: cannot parse timestamp '
-                    f'from {jobname}; scheduling immediately')
-                legacy_ts = time.time()
-
-            delay = max(0.0, legacy_ts - time.time())
-            try:
-                _direct_work_queue_enqueue(queue_name, workitem, delay)
-            except exceptions.CannotEnqueueWork as e:
-                LOG.warning(
-                    f'Work queue migration: enqueue failed for '
-                    f'{key}: {e}')
-                error_count += 1
-                continue
-
-            etcd.delete_raw(key)
-            migrated_count += 1
-
-    LOG.info(
-        f'Work queue migration: {migrated_count} migrated, '
-        f'{skipped_count} skipped, {error_count} errors')
-    return {
-        'migrated_count': migrated_count,
-        'error_count': error_count,
-        'skipped_count': skipped_count,
-    }
-
-
-def _migrate_etcd_cluster_locks(engine: sa.Engine) -> dict[str, Any]:
-    """Drain residual /sflocks/* etcd keys into the cluster_locks table.
-
-    Each etcd key at /sflocks/{type}/{subtype}/{name} holds a JSON dict
-    with node, pid, thread, line, operation, id. We insert each into
-    cluster_locks with INSERT IGNORE (so re-runs skip already-migrated
-    rows) and delete the etcd key on success.
-
-    Stale locks from crashed daemons are acceptable -- the queues daemon
-    reaper will clear them on its next startup.
-    """
-    from shakenfist import etcd
-
-    migrated = 0
-    errors = 0
-
-    LOG.info('Migrating cluster locks from etcd...')
-
-    for key, holder in etcd.get_prefix_raw('/sflocks/'):
-        lock_key = key.replace('/sflocks/', '', 1)
-
-        if not isinstance(holder, dict):
-            LOG.warning(
-                f'Lock migration: malformed payload at '
-                f'{key}; leaving in place')
-            errors += 1
-            continue
-
-        acquired = _direct_acquire_cluster_lock(
-            lock_key=lock_key,
-            holder_json=holder,
-            node_uuid=holder.get('node', ''),
-            pid=int(holder.get('pid', 0)),
-            lock_id=holder.get('id', ''),
-            now=time.time(),
-        )
-
-        if acquired:
-            etcd.delete_raw(key)
-            migrated += 1
-        else:
-            # Row already exists -- somebody migrated it or a live lock
-            # is held. Skip without error.
-            LOG.debug(
-                f'Lock migration: key {lock_key} already '
-                f'exists in MariaDB; skipping')
-
-    LOG.info(
-        f'Lock migration: {migrated} migrated, {errors} errors')
-    return {
-        'migrated_count': migrated,
-        'error_count': errors,
-    }
-
-
-def _migrate_etcd_cluster_config(engine: sa.Engine) -> dict[str, Any]:
-    """Drain /sf/config from etcd into the cluster_config table.
-
-    The etcd key is a single JSON blob. We split it into one row
-    per top-level key and delete the etcd key.
-    """
-    from shakenfist import etcd
-
-    migrated = 0
-    errors = 0
-
-    LOG.info('Migrating cluster config from etcd...')
-
-    raw = etcd.get_raw('/sf/config')
-    if raw is None or raw == {}:
-        LOG.info('No /sf/config in etcd; nothing to migrate')
-        return {'migrated_count': 0, 'error_count': 0}
-
-    if not isinstance(raw, dict):
-        LOG.warning(
-            'Cluster config migration: /sf/config is not a '
-            'dict; leaving in place')
-        return {'migrated_count': 0, 'error_count': 1}
-
-    for key_name, value in raw.items():
-        _direct_set_cluster_config(key_name, value)
-        migrated += 1
-
-    etcd.delete_raw('/sf/config')
-
-    LOG.info(
-        f'Cluster config migration: {migrated} keys migrated, '
-        f'{errors} errors')
-    return {
-        'migrated_count': migrated,
-        'error_count': errors,
-    }
-
-
-# Populate DATA_MIGRATIONS now that all migration functions are defined.
-# All data migrations happen at version 2 (after table creation at version 1).
-DATA_MIGRATIONS.update({
-    'object_states': {
-        2: _migrate_etcd_object_states,
-    },
-    'ipam_reservations': {
-        2: _migrate_etcd_ipam_reservations,
-    },
-    'uploads': {
-        2: _migrate_etcd_uploads,
-    },
-    'dnsmasq': {
-        2: _migrate_etcd_dnsmasq,
-    },
-    'blobs': {
-        2: _migrate_etcd_blobs,
-    },
-    'object_references': {
-        2: _migrate_etcd_object_references,
-    },
-    'blob_hashes': {
-        2: _migrate_etcd_blob_hashes,
-    },
-    'blob_transfers': {
-        2: _cleanup_etcd_blob_transfers,
-    },
-    'blob_attributes': {
-        2: _migrate_etcd_blob_attributes,
-    },
-    'nodes': {
-        2: _migrate_etcd_nodes,
-    },
-    'node_attributes': {
-        2: _migrate_etcd_node_attributes,
-    },
-    'namespaces': {
-        2: _migrate_etcd_namespaces,
-    },
-    'namespace_attributes': {
-        2: _migrate_etcd_namespace_attributes,
-    },
-    'artifacts': {
-        2: _migrate_etcd_artifacts,
-    },
-    'artifact_attributes': {
-        2: _migrate_etcd_artifact_attributes,
-    },
-    'artifact_indexes': {
-        2: _migrate_etcd_artifact_indexes,
-    },
-    'network_interfaces': {
-        2: _migrate_etcd_network_interfaces,
-    },
-    'network_interface_attributes': {
-        2: _migrate_etcd_network_interface_attributes,
-    },
-    'ipams': {
-        2: _migrate_etcd_ipams,
-    },
-    'networks': {
-        2: _migrate_etcd_networks,
-    },
-    'network_attributes': {
-        2: _migrate_etcd_network_attributes,
-    },
-    'agent_operations': {
-        2: _migrate_etcd_agent_operations,
-    },
-    'agent_operation_attributes': {
-        2: _migrate_etcd_agent_operation_attributes,
-    },
-    'instances': {
-        2: _migrate_etcd_instances,
-    },
-    'instance_attributes': {
-        2: _migrate_etcd_instance_attributes,
-    },
-    'object_metadata': {
-        2: _migrate_etcd_object_metadata,
-    },
-    'node_metrics': {
-        2: _migrate_etcd_node_metrics,
-    },
-    'cluster_operations': {
-        2: _migrate_etcd_cluster_operations,
-    },
-    'work_queue': {
-        2: _migrate_etcd_work_queue,
-    },
-    'cluster_locks': {
-        2: _migrate_etcd_cluster_locks,
-    },
-    'cluster_config': {
-        2: _migrate_etcd_cluster_config,
-    },
-})
+    _get_schema_versions_table()
+    _get_object_states_table()
+    _get_ipam_reservations_table()
+    _get_uploads_table()
+    _get_dnsmasq_table()
+    _get_blobs_table()
+    _get_object_references_table()
+    _get_blob_hashes_table()
+    _get_blob_transfers_table()
+    _get_blob_attributes_table()
+    _get_nodes_table()
+    _get_node_attributes_table()
+    _get_namespaces_table()
+    _get_namespace_attributes_table()
+    _get_artifacts_table()
+    _get_artifact_attributes_table()
+    _get_artifact_indexes_table()
+    _get_network_interfaces_table()
+    _get_network_interface_attributes_table()
+    _get_networks_table()
+    _get_network_attributes_table()
+    _get_ipams_table()
+    _get_agent_operations_table()
+    _get_agent_operation_attributes_table()
+    _get_instances_table()
+    _get_instance_attributes_table()
+    _get_object_metadata_table()
+    _get_cluster_operation_targets_table()
+    _get_node_metrics_table()
+    _get_node_daemon_states_table()
+    _get_cluster_operations_table()
+    _get_cluster_operation_errors_table()
+    _get_work_queue_table()
+    _get_cluster_locks_table()
+    _get_cluster_config_table()
+    _get_events_table()
+    _get_event_objects_table()
+    LOG.info('Registered %d MariaDB Table objects in metadata',
+             len(_get_metadata().tables))
 
 
 def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
@@ -5300,7 +3014,8 @@ def get_objects_by_state(object_type: ObjectType,
     """Get all object UUIDs of a given type in specified states.
 
     This is the primary use case for MariaDB state storage - efficient
-    queries across object states without scanning all objects in etcd.
+    queries across object states without scanning every row of every
+    object table.
 
     Args:
         object_type: The type of object.
@@ -6840,7 +4555,7 @@ def _grpc_prune_events() -> int:
     try:
         stub = _get_database_stub()
         request = database_pb2.PruneEventsRequest()
-        reply = stub.PruneEvents(request, timeout=300.0, wait_for_ready=True)
+        reply = stub.PruneEvents(request, timeout=300.0)
         if not reply.success:
             LOG.warning(f'gRPC PruneEvents failed: {reply.error}')
             return int(reply.rows_pruned)
@@ -6893,8 +4608,7 @@ def _grpc_get_object_events(
             limit=limit,
             event_type_filter=event_type if event_type is not None else '',
         )
-        reply = stub.GetObjectEvents(
-            request, timeout=30.0, wait_for_ready=True)
+        reply = stub.GetObjectEvents(request, timeout=30.0)
     except grpc.RpcError as e:
         LOG.error(f'gRPC GetObjectEvents failed: {e}')
         return []
@@ -6943,8 +4657,7 @@ def _grpc_delete_object_events(
                 ObjectType(object_type).proto_id),  # type: ignore[call-arg]
             object_uuid=object_uuid,
         )
-        reply = stub.DeleteObjectEvents(
-            request, timeout=30.0, wait_for_ready=True)
+        reply = stub.DeleteObjectEvents(request, timeout=30.0)
         if not reply.success:
             LOG.warning(
                 f'gRPC DeleteObjectEvents failed for '
@@ -10981,14 +8694,17 @@ def _get_nodes_table() -> sa.Table:
     """Get or create the nodes table definition."""
     global _nodes_table
     if _nodes_table is None:
-        metadata = _get_metadata()
-        _nodes_table = pydantic_to_sqlalchemy_table(
-            NodeData,
-            'nodes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _nodes_table is not None:
+                return _nodes_table
+            metadata = _get_metadata()
+            _nodes_table = pydantic_to_sqlalchemy_table(
+                NodeData,
+                'nodes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _nodes_table
 
 
@@ -10996,59 +8712,62 @@ def _get_node_attributes_table() -> sa.Table:
     """Get or create the node_attributes table definition."""
     global _node_attributes_table
     if _node_attributes_table is None:
-        metadata = _get_metadata()
-        _node_attributes_table = sa.Table(
-            'node_attributes',
-            metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
-            sa.Column(
-                'last_seen', sa.Double(),
-                nullable=False, default=0.0
-            ),
-            sa.Column(
-                'installed_version', sa.String(255),
-                nullable=True
-            ),
-            sa.Column(
-                'is_etcd_master', sa.Boolean(),
-                nullable=False, default=False
-            ),
-            sa.Column(
-                'is_hypervisor', sa.Boolean(),
-                nullable=False, default=False
-            ),
-            sa.Column(
-                'is_network_node', sa.Boolean(),
-                nullable=False, default=False
-            ),
-            sa.Column(
-                'is_eventlog_node', sa.Boolean(),
-                nullable=False, default=False
-            ),
-            sa.Column('instances', sa.JSON(), nullable=True),
-            sa.Column('daemons', sa.JSON(), nullable=True),
-            sa.Column('daemon_states', sa.JSON(), nullable=True),
-            sa.Column('qemu_version', sa.JSON(), nullable=True),
-            sa.Column(
-                'libvirt_version', sa.JSON(), nullable=True
-            ),
-            sa.Column(
-                'python_version', sa.JSON(), nullable=True
-            ),
-            sa.Column(
-                'python_implementation', sa.String(255),
-                nullable=True
-            ),
-            sa.Column(
-                'dependency_versions', sa.JSON(), nullable=True
-            ),
-            sa.Column(
-                'process_metrics', sa.JSON(), nullable=True
-            ),
-            sa.Index(
-                'idx_node_attrs_last_seen', 'last_seen'
-            ),
-        )
+        with TABLE_CREATION_LOCK:
+            if _node_attributes_table is not None:
+                return _node_attributes_table
+            metadata = _get_metadata()
+            _node_attributes_table = sa.Table(
+                'node_attributes',
+                metadata,
+                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column(
+                    'last_seen', sa.Double(),
+                    nullable=False, default=0.0
+                ),
+                sa.Column(
+                    'installed_version', sa.String(255),
+                    nullable=True
+                ),
+                sa.Column(
+                    'is_etcd_master', sa.Boolean(),
+                    nullable=False, default=False
+                ),
+                sa.Column(
+                    'is_hypervisor', sa.Boolean(),
+                    nullable=False, default=False
+                ),
+                sa.Column(
+                    'is_network_node', sa.Boolean(),
+                    nullable=False, default=False
+                ),
+                sa.Column(
+                    'is_eventlog_node', sa.Boolean(),
+                    nullable=False, default=False
+                ),
+                sa.Column('instances', sa.JSON(), nullable=True),
+                sa.Column('daemons', sa.JSON(), nullable=True),
+                sa.Column('daemon_states', sa.JSON(), nullable=True),
+                sa.Column('qemu_version', sa.JSON(), nullable=True),
+                sa.Column(
+                    'libvirt_version', sa.JSON(), nullable=True
+                ),
+                sa.Column(
+                    'python_version', sa.JSON(), nullable=True
+                ),
+                sa.Column(
+                    'python_implementation', sa.String(255),
+                    nullable=True
+                ),
+                sa.Column(
+                    'dependency_versions', sa.JSON(), nullable=True
+                ),
+                sa.Column(
+                    'process_metrics', sa.JSON(), nullable=True
+                ),
+                sa.Index(
+                    'idx_node_attrs_last_seen', 'last_seen'
+                ),
+            )
     return _node_attributes_table
 
 
@@ -11061,8 +8780,12 @@ def _ensure_nodes_schema(
     start_ver = current_ver
     table = _get_nodes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NODES_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True
         )
@@ -11077,7 +8800,7 @@ def _ensure_nodes_schema(
                         f'skipped: {e}'
                     )
 
-        current_ver = 1
+        current_ver = NODES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -11098,8 +8821,12 @@ def _ensure_node_attributes_schema(
     start_ver = current_ver
     table = _get_node_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NODE_ATTRIBUTES_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True
         )
@@ -11114,7 +8841,7 @@ def _ensure_node_attributes_schema(
                         f'skipped: {e}'
                     )
 
-        current_ver = 1
+        current_ver = NODE_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -12352,17 +10079,20 @@ def _get_namespaces_table() -> sa.Table:
     """Get or create the namespaces table definition."""
     global _namespaces_table
     if _namespaces_table is None:
-        metadata = _get_metadata()
-        _namespaces_table = sa.Table(
-            'namespaces',
-            metadata,
-            sa.Column(
-                'name', sa.String(255), primary_key=True
-            ),
-            sa.Column(
-                'version', sa.Integer(), nullable=False
-            ),
-        )
+        with TABLE_CREATION_LOCK:
+            if _namespaces_table is not None:
+                return _namespaces_table
+            metadata = _get_metadata()
+            _namespaces_table = sa.Table(
+                'namespaces',
+                metadata,
+                sa.Column(
+                    'name', sa.String(255), primary_key=True
+                ),
+                sa.Column(
+                    'version', sa.Integer(), nullable=False
+                ),
+            )
     return _namespaces_table
 
 
@@ -12370,16 +10100,19 @@ def _get_namespace_attributes_table() -> sa.Table:
     """Get or create the namespace_attributes table definition."""
     global _namespace_attributes_table
     if _namespace_attributes_table is None:
-        metadata = _get_metadata()
-        _namespace_attributes_table = sa.Table(
-            'namespace_attributes',
-            metadata,
-            sa.Column(
-                'name', sa.String(255), primary_key=True
-            ),
-            sa.Column('keys', sa.JSON(), nullable=True),
-            sa.Column('trust', sa.JSON(), nullable=True),
-        )
+        with TABLE_CREATION_LOCK:
+            if _namespace_attributes_table is not None:
+                return _namespace_attributes_table
+            metadata = _get_metadata()
+            _namespace_attributes_table = sa.Table(
+                'namespace_attributes',
+                metadata,
+                sa.Column(
+                    'name', sa.String(255), primary_key=True
+                ),
+                sa.Column('keys', sa.JSON(), nullable=True),
+                sa.Column('trust', sa.JSON(), nullable=True),
+            )
     return _namespace_attributes_table
 
 
@@ -12390,8 +10123,12 @@ def _ensure_namespaces_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_namespaces_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NAMESPACES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -12401,7 +10138,7 @@ def _ensure_namespaces_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = NAMESPACES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -12420,8 +10157,12 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_namespace_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NAMESPACE_ATTRIBUTES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -12431,7 +10172,7 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = NAMESPACE_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -13825,35 +11566,38 @@ def _get_network_interfaces_table() -> sa.Table:
     """
     global _network_interfaces_table
     if _network_interfaces_table is None:
-        metadata = _get_metadata()
-        _network_interfaces_table = pydantic_to_sqlalchemy_table(
-            NetworkInterfaceData,
-            'network_interfaces',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
-        # ``active`` is a server-managed flag, not part of the
-        # NetworkInterfaceData DTO. It is TRUE while an interface is
-        # live and NULLed when the interface enters the ``deleted``
-        # state — see ``_direct_set_state``. The flag exists so that
-        # the macaddr UNIQUE constraint below can ignore soft-deleted
-        # rows: NULL values do not collide with each other in MariaDB
-        # UNIQUE indexes, so a deleted interface keeps its row (for
-        # audit) without blocking MAC reuse during the
-        # ``CLEANER_DELAY`` window.
-        _network_interfaces_table.append_column(
-            sa.Column('active', sa.Boolean(), nullable=True))
-        # MAC must be unique among ACTIVE interfaces on the same
-        # network. Two soft-deleted rows (both with active=NULL) do
-        # not collide, and an active row coexists with deleted rows
-        # holding the same MAC. Cross-network MAC reuse is allowed —
-        # different VXLAN networks are isolated broadcast domains.
-        sa.UniqueConstraint(
-            _network_interfaces_table.c.macaddr,
-            _network_interfaces_table.c.active,
-            _network_interfaces_table.c.network_uuid,
-            name='uq_network_interfaces_macaddr_active_network')
+        with TABLE_CREATION_LOCK:
+            if _network_interfaces_table is not None:
+                return _network_interfaces_table
+            metadata = _get_metadata()
+            _network_interfaces_table = pydantic_to_sqlalchemy_table(
+                NetworkInterfaceData,
+                'network_interfaces',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+            # ``active`` is a server-managed flag, not part of the
+            # NetworkInterfaceData DTO. It is TRUE while an interface is
+            # live and NULLed when the interface enters the ``deleted``
+            # state — see ``_direct_set_state``. The flag exists so that
+            # the macaddr UNIQUE constraint below can ignore soft-deleted
+            # rows: NULL values do not collide with each other in MariaDB
+            # UNIQUE indexes, so a deleted interface keeps its row (for
+            # audit) without blocking MAC reuse during the
+            # ``CLEANER_DELAY`` window.
+            _network_interfaces_table.append_column(
+                sa.Column('active', sa.Boolean(), nullable=True))
+            # MAC must be unique among ACTIVE interfaces on the same
+            # network. Two soft-deleted rows (both with active=NULL) do
+            # not collide, and an active row coexists with deleted rows
+            # holding the same MAC. Cross-network MAC reuse is allowed —
+            # different VXLAN networks are isolated broadcast domains.
+            sa.UniqueConstraint(
+                _network_interfaces_table.c.macaddr,
+                _network_interfaces_table.c.active,
+                _network_interfaces_table.c.network_uuid,
+                name='uq_network_interfaces_macaddr_active_network')
     return _network_interfaces_table
 
 
@@ -13861,14 +11605,17 @@ def _get_network_interface_attributes_table() -> sa.Table:
     """Get or create the network_interface_attributes table definition."""
     global _network_interface_attributes_table
     if _network_interface_attributes_table is None:
-        metadata = _get_metadata()
-        _network_interface_attributes_table = pydantic_to_sqlalchemy_table(
-            NetworkInterfaceAttributesData,
-            'network_interface_attributes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _network_interface_attributes_table is not None:
+                return _network_interface_attributes_table
+            metadata = _get_metadata()
+            _network_interface_attributes_table = pydantic_to_sqlalchemy_table(
+                NetworkInterfaceAttributesData,
+                'network_interface_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _network_interface_attributes_table
 
 
@@ -13998,8 +11745,12 @@ def _ensure_network_interface_attributes_schema(
     start_ver = current_ver
     table = _get_network_interface_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {NETWORK_INTERFACE_ATTRIBUTES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -14009,7 +11760,7 @@ def _ensure_network_interface_attributes_schema(
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = NETWORK_INTERFACE_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -14937,14 +12688,17 @@ def _get_ipams_table() -> sa.Table:
     """
     global _ipams_table
     if _ipams_table is None:
-        metadata = _get_metadata()
-        _ipams_table = pydantic_to_sqlalchemy_table(
-            IPAMData,
-            'ipams',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _ipams_table is not None:
+                return _ipams_table
+            metadata = _get_metadata()
+            _ipams_table = pydantic_to_sqlalchemy_table(
+                IPAMData,
+                'ipams',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _ipams_table
 
 
@@ -14955,8 +12709,12 @@ def _ensure_ipams_schema(engine: sa.Engine) -> dict[str, Any]:
     start_ver = current_ver
     table = _get_ipams_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {IPAMS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
         with engine.connect() as conn:
@@ -14966,7 +12724,7 @@ def _ensure_ipams_schema(engine: sa.Engine) -> dict[str, Any]:
                 except Exception as e:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = IPAMS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -15257,17 +13015,20 @@ def _get_networks_table() -> sa.Table:
     """
     global _networks_table
     if _networks_table is None:
-        metadata = _get_metadata()
-        _networks_table = pydantic_to_sqlalchemy_table(
-            NetworkData,
-            'networks',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
-        # Add UNIQUE constraint on vxid for atomic VXLAN allocation
-        sa.UniqueConstraint(
-            _networks_table.c.vxid, name='uq_networks_vxid')
+        with TABLE_CREATION_LOCK:
+            if _networks_table is not None:
+                return _networks_table
+            metadata = _get_metadata()
+            _networks_table = pydantic_to_sqlalchemy_table(
+                NetworkData,
+                'networks',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+            # Add UNIQUE constraint on vxid for atomic VXLAN allocation
+            sa.UniqueConstraint(
+                _networks_table.c.vxid, name='uq_networks_vxid')
     return _networks_table
 
 
@@ -15275,14 +13036,17 @@ def _get_network_attributes_table() -> sa.Table:
     """Get or create the network_attributes table definition."""
     global _network_attributes_table
     if _network_attributes_table is None:
-        metadata = _get_metadata()
-        _network_attributes_table = pydantic_to_sqlalchemy_table(
-            NetworkAttributesData,
-            'network_attributes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _network_attributes_table is not None:
+                return _network_attributes_table
+            metadata = _get_metadata()
+            _network_attributes_table = pydantic_to_sqlalchemy_table(
+                NetworkAttributesData,
+                'network_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _network_attributes_table
 
 
@@ -16047,14 +13811,17 @@ def _get_agent_operations_table() -> sa.Table:
     """
     global _agent_operations_table
     if _agent_operations_table is None:
-        metadata = _get_metadata()
-        _agent_operations_table = pydantic_to_sqlalchemy_table(
-            AgentOperationData,
-            'agent_operations',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _agent_operations_table is not None:
+                return _agent_operations_table
+            metadata = _get_metadata()
+            _agent_operations_table = pydantic_to_sqlalchemy_table(
+                AgentOperationData,
+                'agent_operations',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _agent_operations_table
 
 
@@ -16062,14 +13829,17 @@ def _get_agent_operation_attributes_table() -> sa.Table:
     """Get or create the agent_operation_attributes table definition."""
     global _agent_operation_attributes_table
     if _agent_operation_attributes_table is None:
-        metadata = _get_metadata()
-        _agent_operation_attributes_table = pydantic_to_sqlalchemy_table(
-            AgentOperationAttributesData,
-            'agent_operation_attributes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _agent_operation_attributes_table is not None:
+                return _agent_operation_attributes_table
+            metadata = _get_metadata()
+            _agent_operation_attributes_table = pydantic_to_sqlalchemy_table(
+                AgentOperationAttributesData,
+                'agent_operation_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _agent_operation_attributes_table
 
 
@@ -16081,8 +13851,12 @@ def _ensure_agent_operations_schema(
     start_ver = current_ver
     table = _get_agent_operations_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {AGENT_OPERATIONS_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True)
 
@@ -16094,7 +13868,7 @@ def _ensure_agent_operations_schema(
                     LOG.debug(
                         f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = AGENT_OPERATIONS_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -16114,8 +13888,12 @@ def _ensure_agent_operation_attributes_schema(
     start_ver = current_ver
     table = _get_agent_operation_attributes_table()
 
+    # Version 0 or -1 means table doesn't exist yet - create it at the
+    # current schema version. The historical v1->v2 step was the etcd
+    # data-import marker; with etcd purged, fresh installs are at the
+    # target version by construction.
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table (version {AGENT_OPERATION_ATTRIBUTES_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True)
 
@@ -16127,7 +13905,7 @@ def _ensure_agent_operation_attributes_schema(
                     LOG.debug(
                         f'Index {idx.name} creation skipped: {e}')
 
-        current_ver = 1
+        current_ver = AGENT_OPERATION_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -16609,14 +14387,17 @@ def _get_instances_table() -> sa.Table:
     """
     global _instances_table
     if _instances_table is None:
-        metadata = _get_metadata()
-        _instances_table = pydantic_to_sqlalchemy_table(
-            InstanceData,
-            'instances',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _instances_table is not None:
+                return _instances_table
+            metadata = _get_metadata()
+            _instances_table = pydantic_to_sqlalchemy_table(
+                InstanceData,
+                'instances',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _instances_table
 
 
@@ -16624,14 +14405,17 @@ def _get_instance_attributes_table() -> sa.Table:
     """Get or create the instance_attributes table definition."""
     global _instance_attributes_table
     if _instance_attributes_table is None:
-        metadata = _get_metadata()
-        _instance_attributes_table = pydantic_to_sqlalchemy_table(
-            InstanceAttributesData,
-            'instance_attributes',
-            metadata,
-            primary_key_fields=['uuid'],
-            include_id_column=False
-        )
+        with TABLE_CREATION_LOCK:
+            if _instance_attributes_table is not None:
+                return _instance_attributes_table
+            metadata = _get_metadata()
+            _instance_attributes_table = pydantic_to_sqlalchemy_table(
+                InstanceAttributesData,
+                'instance_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
     return _instance_attributes_table
 
 
@@ -16714,9 +14498,9 @@ def _ensure_instance_attributes_schema(
         # column already exists (e.g. new deployments where
         # create_all included it).
         #
-        # NOTE: We do NOT bump the version here. The version is
-        # bumped by the data migration in ensure_data_migrations()
-        # which also migrates instance attribute data from etcd.
+        # NOTE: We do NOT bump the version here. The per-version
+        # block immediately below handles the version increment
+        # once any additional v2 schema changes have run.
         with engine.connect() as conn:
             conn.execute(sa.text(
                 'ALTER TABLE instance_attributes '
@@ -18122,13 +15906,12 @@ def _maybe_uuid(value: Any) -> Optional[UUID]:
 
 
 def _cluster_operation_row_to_dict(row: Any) -> dict[str, Any]:
-    """Convert a cluster_operations row into the legacy-etcd payload shape.
+    """Convert a cluster_operations row into the canonical payload shape.
 
-    Phase 5's from_db() switch depends on this shape being identical
-    to the dict previously stored at /sf/{operation_type}/{uuid} in
-    etcd. The full metadata dict is flattened into the top level,
-    with uuid/operation_type/created_at overlaid from the columnar
-    fields.
+    The shape mirrors what ``ClusterOperation.from_db()`` and
+    downstream callers expect: the full metadata dict is flattened
+    into the top level, with uuid/operation_type/created_at overlaid
+    from the columnar fields.
     """
     md = dict(row.metadata_json or {})
     md['uuid'] = str(row.uuid)
@@ -19003,9 +16786,7 @@ def create_and_enqueue_cluster_operation(
 
     Writes the cluster_operations header, an object_states row
     (state='queued'), and a work_queue row in a single MariaDB
-    transaction. Replaces the legacy
-    shakenfist/schema/operations/util.py:enqueue() path that used
-    etcd.replace_many_raw.
+    transaction.
 
     Audit events are NOT written by this function; callers should
     emit them via shakenfist.eventlog.add_event_multi() after this
@@ -19133,7 +16914,7 @@ def _direct_work_queue_enqueue(
     """Insert a work item on the queue.
 
     Raises shakenfist.exceptions.CannotEnqueueWork on unrecoverable
-    failure, matching the current etcd.enqueue() contract.
+    failure.
     """
     from shakenfist import exceptions
     engine = _get_engine()
@@ -19243,9 +17024,8 @@ def _direct_work_queue_resolve(
         queue_name: str, job_name: str) -> None:
     """Mark a claimed job as complete by deleting the row.
 
-    queue_name is accepted for parity with etcd.resolve() and for
-    logging / safety; the id in job_name is already unique across
-    queues.
+    queue_name is accepted for logging / safety; the id in job_name
+    is already unique across queues.
     """
     engine = _get_engine()
     table = _get_work_queue_table()

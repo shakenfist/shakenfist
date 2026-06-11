@@ -49,14 +49,11 @@ class DnsMasq(managedexecutable.ManagedExecutable):
 
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod
     def _upgrade_step_3_to_4(cls, static_values: dict[str, Any]) -> None:
-        # Static values migration to MariaDB is handled by
-        # sf-ctl migrate-dnsmasq-to-mariadb. This step also converts owner_type
-        # from a string to ObjectType enum if needed.
+        # Converts owner_type from a string to ObjectType enum if needed.
         owner_type = static_values.get('owner_type')
         if isinstance(owner_type, str):
             static_values['owner_type'] = ObjectType(owner_type)  # type: ignore[call-arg]

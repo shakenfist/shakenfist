@@ -1,113 +1,119 @@
 # Database Architecture
 
-Shaken Fist uses a combination of databases for different purposes. This page
-describes the database architecture, how data is organized, and how the schema
-system works.
+Shaken Fist uses MariaDB as its sole data store. This page describes the
+bring-your-own MariaDB setup workflow, the compatibility requirements, the
+configuration keys that control how cluster nodes reach the database tier,
+the administrative commands, the table inventory, and the schema system.
 
-## Overview
+## Bring-your-own MariaDB setup
 
-Shaken Fist currently uses two database backends:
+Shaken Fist does not bundle or install MariaDB. The operator provisions the
+database server before running `getsf`.
 
-- **etcd**: A distributed key-value store used for cluster coordination,
-  configuration, locks, and object storage.
-- **MariaDB**: A relational database being introduced for structured data that
-  benefits from SQL queries and indexing.
+### Provisioning checklist
 
-## etcd
+1. **Provision a MariaDB server.** Any host reachable from every SF node
+   works — it need not be an SF node itself. The server must meet the
+   [compatibility requirements](#mariadb-compatibility-requirements) below
+   (MariaDB 10.6.0+, InnoDB, utf8mb4).
 
-etcd is the primary database for Shaken Fist and is used for:
+2. **Apply the bootstrap snippet.** The repository ships
+   `tools/bootstrap-mariadb.sql`, which creates the `shakenfist` database,
+   the `shakenfist` user, and the required grants. Replace
+   `__REPLACE_ME__` with the password you want:
 
-- **Object storage**: Shaken Fist objects not yet migrated to MariaDB
-  (instances, networks, etc.) are stored in etcd.
-- **Cluster coordination**: Node discovery, leader election, and distributed
-  state.
-- **Distributed locking**: See the [Locks](locks.md) documentation.
-- **Configuration**: Cluster-wide configuration stored at `/sf/config`.
-- **Event storage**: Primary storage for cluster audit, status, mutation,
-  usage, and resource events in the `events` and `event_objects` tables.
-  See [Events](events.md) for the full write-path, retention, and
-  metrics picture.
+    ```bash
+    sed 's/__REPLACE_ME__/your-password/' tools/bootstrap-mariadb.sql | mysql -u root
+    ```
 
-Cluster operation headers and the per-node work queues were originally
-stored in etcd under `/sf/{op_type}/{uuid}`, `/sf/queue/{queue}/...`
-and `/sf/processing/{queue}/...`. They have been moved to the
-`cluster_operations` and `work_queue` MariaDB tables; the
-corresponding data migrations run automatically on database daemon
-startup and drain any residual etcd keys into MariaDB.
+    The snippet is idempotent and safe to re-run.
 
-### Key Structure
+3. **(Optional) install the recommended tuning.** `examples/mariadb-tuning.cnf`
+   ships a set of starting-point InnoDB and connection-pool settings tuned for
+   a small-to-medium SF cluster. Copy it and restart MariaDB:
 
-etcd keys follow a hierarchical structure:
+    ```bash
+    sudo cp examples/mariadb-tuning.cnf /etc/mysql/mariadb.conf.d/
+    sudo systemctl restart mariadb
+    ```
 
+    The values are starting points, not prescriptions — adjust them to match
+    your hardware and workload.
+
+4. **Run `getsf`.** The installer will prompt for the MariaDB host, port, user,
+   password, and database name. The defaults match what `bootstrap-mariadb.sql`
+   creates: port `3306`, user `shakenfist`, database `shakenfist`.
+
+5. **Schema initialisation.** After the deploy completes,
+   `sf-ctl ensure-mariadb-schema` runs automatically on a database-tier node
+   and creates all SF tables. You can also run it manually at any time from a
+   node that has `MARIADB_HOST` configured (see
+   [Administrative Commands](#administrative-commands)).
+
+### Single-box example
+
+For a single-machine deployment, the complete workflow is:
+
+```bash
+sudo apt install mariadb-server
+sed 's/__REPLACE_ME__/mypassword/' tools/bootstrap-mariadb.sql | sudo mysql -u root
+sudo cp examples/mariadb-tuning.cnf /etc/mysql/mariadb.conf.d/   # optional
+sudo systemctl restart mariadb
+sudo ./getsf                                                      # answers the new prompts
 ```
-/sf/                          # Root prefix for all Shaken Fist data
-/sf/object/{type}/{uuid}      # Object definitions
-/sf/attribute/{type}/{uuid}/  # Object attributes (state, placement, etc.)
-/sflocks/                     # Distributed locks
-```
 
-### Object Types
+## MariaDB compatibility requirements
 
-Each object type has a dedicated key prefix:
+Before `sf-database` starts, and before `sf-ctl ensure-mariadb-schema` applies
+any schema work, the server is checked against these requirements:
 
-| Object Type | Key Prefix |
-|-------------|------------|
-| Instance | MariaDB `instances` table (migrated from etcd) |
-| Network | MariaDB `networks` table (migrated from etcd) |
-| Network Interface | MariaDB `network_interfaces` table (migrated from etcd) |
-| AgentOperation | MariaDB `agent_operations` table (migrated from etcd) |
-| Blob | `/sf/object/blob/` |
-| Artifact | MariaDB `artifacts` table (migrated from etcd) |
-| Node | MariaDB `nodes` table (migrated from etcd) |
-| Namespace | MariaDB `namespaces` table (migrated from etcd) |
+- **MariaDB, not MySQL.** The `VERSION()` string must contain `MariaDB`.
+  Shaken Fist uses MariaDB-specific column types (such as `INET4`) that are
+  not available in MySQL.
+- **Version 10.6.0 or later.** This matches the version shipped with
+  Ubuntu 22.04 LTS and is well above the 10.2 JSON-features floor.
+- **Default storage engine: InnoDB.** Shaken Fist relies on row-level
+  locking and transactional semantics provided by InnoDB.
+- **Default character set: utf8mb4.** Required for full Unicode support,
+  including supplementary characters.
+- **Default collation: any `utf8mb4_*` collation.** The exact collation
+  within the `utf8mb4` family is not mandated.
 
-## MariaDB
+`sf-ctl ensure-mariadb-schema` runs these checks before touching any schema
+objects and refuses to proceed if the server does not meet them, printing a
+multi-line error that lists every failing check. The same checks run at
+`sf-database` startup; the daemon refuses to start on an incompatible server.
 
-MariaDB is used for object state storage and IPAM reservation tracking,
-providing:
+After an SF version bump that includes schema changes, you must run
+`sf-ctl ensure-mariadb-schema` **before** starting `sf-database`. If you
+skip this step, the daemon will refuse to start with a schema-version
+mismatch error that names the command to run.
 
-- Efficient queries by object type and state value
-- Indexed lookups for state-based filtering
-- Better performance than etcd for scanning large numbers of objects
-- Atomic IP address reservation with database-level uniqueness constraints
+## Why MariaDB and what it stores
 
-MariaDB is deployed on etcd master nodes and uses Galera for multi-master
-replication across the cluster.
+MariaDB is the sole data store for Shaken Fist. All object state, IPAM
+reservations, cluster operations, work queues, locks, metrics, and cluster
+configuration live there. The single-store shape gives the system efficient
+indexed queries by object type and state value, atomic IP-address reservation
+via database uniqueness constraints, and transactional operation enqueue (the
+cluster-operation header, the state row, and the queue row are written
+atomically in a single transaction).
 
-### MariaDB Required (Not MySQL)
+Only the database service daemon (`sf-database`) has direct access to MariaDB.
+All other daemons reach MariaDB through `sf-database`'s gRPC interface. This
+keeps connection management in one place, gives consistent Prometheus metrics
+for every database operation, and makes the tier independently scalable. The
+`shakenfist.mariadb` module dispatches automatically: if `MARIADB_HOST` is set
+(the `sf-database` daemon and the schema tool) it uses direct SQLAlchemy
+access; otherwise it goes over gRPC to the `sf-database` tier listed in
+`MARIADB_GATEWAY_HOSTS`.
 
-Shaken Fist requires **MariaDB** specifically, not MySQL. While MariaDB is
-largely compatible with MySQL at the protocol level, Shaken Fist uses
-MariaDB-specific features that are not available in MySQL:
+The driver layer uses the `mariadb://` SQLAlchemy dialect so MariaDB-specific
+column types such as `INET4` (4-byte IPv4 storage with native comparison and
+indexing) are available. The underlying client library (`mysqlclient`)
+remains the same because MariaDB maintains MySQL protocol compatibility.
 
-- **INET4 column type**: Provides efficient 4-byte storage for IPv4 addresses
-  (vs 15 bytes for VARCHAR) with native comparison and indexing support. This
-  type was introduced in MariaDB 10.10 and is not available in MySQL.
-
-SQLAlchemy is configured to use the `mariadb://` dialect (not `mysql://`) to
-ensure proper support for these MariaDB-specific types. The underlying driver
-(`mysqlclient`) remains the same since MariaDB maintains MySQL protocol
-compatibility.
-
-### Access Pattern
-
-**Important**: Only the database service daemon (`sf-database`) has direct
-access to MariaDB. All other daemons access MariaDB through the database
-service's gRPC interface.
-
-This architecture:
-
-- Centralizes database access in a single service
-- Provides consistent Prometheus metrics for all database operations
-- Enables clean separation of concerns
-- Simplifies connection management
-
-The `shakenfist.mariadb` module automatically routes requests:
-
-- If `DATABASE_USE_DIRECT_ETCD=True` (database daemon): Direct MariaDB access
-- If `DATABASE_USE_DIRECT_ETCD=False` (all other daemons): gRPC to database service
-
-#### SQL Filter Pushdown
+### SQL Filter Pushdown
 
 Object iteration uses a single indexed SQL query per call rather than materialising all rows and filtering in Python.
 
@@ -179,10 +185,404 @@ for a in mariadb.find_artifacts(criteria):
     ...
 ```
 
-### Connection
+## MARIADB_HOST vs MARIADB_GATEWAY_HOSTS
 
-The database service connects to MariaDB using SQLAlchemy. Connection details
-are configured during cluster deployment.
+These two config keys are orthogonal and serve different purposes. Understanding
+the distinction helps when troubleshooting or planning a deployment.
+
+**`MARIADB_HOST`** is set only on nodes that have *direct* access to the MariaDB
+server. In practice this means nodes running `sf-database`, and any node where
+an operator runs `sf-ctl ensure-mariadb-schema`. The presence of `MARIADB_HOST`
+tells the `shakenfist.mariadb` module to bypass the gRPC layer and talk to
+MariaDB directly using SQLAlchemy. Ordinary cluster nodes (running `sf-api`,
+`sf-queues`, etc.) do **not** have `MARIADB_HOST` set and should never need it.
+
+**`MARIADB_GATEWAY_HOSTS`** is set on every cluster node. It is the list of
+`sf-database` gRPC endpoints that non-database daemons connect to. For a
+single-instance deployment this list has one entry; for higher availability,
+list multiple `sf-database` endpoints and the gRPC client library round-robins
+requests across them.
+
+A node running `sf-database` has **both** keys set: `MARIADB_HOST` for its own
+direct MariaDB access, and `MARIADB_GATEWAY_HOSTS` so that any client library
+running on the same node can still reach the database tier over gRPC (for
+example, when `sf-api` and `sf-database` are co-located).
+
+In summary:
+
+| Who uses it | Config key | What it does |
+|-------------|------------|--------------|
+| `sf-database`, schema tool | `MARIADB_HOST` | Direct SQLAlchemy → MariaDB |
+| All other daemons | `MARIADB_GATEWAY_HOSTS` | gRPC → `sf-database` tier |
+| `sf-database` itself (gRPC listener) | `MARIADB_GATEWAY_PORT` | Port each `sf-database` binds on (default 13005) |
+| Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` instance (default 13006) |
+
+**Multi-instance deployments**: More than one `sf-database` instance can run
+against the same MariaDB server. List every instance's mesh IP in
+`MARIADB_GATEWAY_HOSTS`, comma-separated — for example,
+`MARIADB_GATEWAY_HOSTS="10.0.0.20,10.0.0.21,10.0.0.22"`. Every `sf-database`
+instance must be able to reach the MariaDB server; in BYO deployments this
+typically means the operator's MariaDB is bound to a routable interface rather
+than `127.0.0.1`. This multi-instance shape is exercised by CI on every
+merge-queue run, so operators can rely on it as a supported production
+configuration.
+
+**Load balancing**: When `MARIADB_GATEWAY_HOSTS` is a multi-element list, every
+SF daemon connects to the tier with a gRPC channel that round-robins requests
+across the listed endpoints. Dead endpoints are skipped automatically: the
+round-robin policy avoids subchannels whose TCP connection is down, and
+aggressive client keepalives (a ping every 10 seconds with a 5 second
+timeout) detect a hung instance within about 15 seconds. There is no
+external load balancer to configure -- the round-robin behaviour and
+failure detection are inside the gRPC client library. `sf-database` also
+publishes the standard `grpc.health.v1.Health` protocol against the
+empty-string service name for external monitoring via unary `Check` calls.
+Watch-based client-side health checking (`healthCheckConfig`) is
+deliberately not enabled: the synchronous health servicer can deadlock the
+gRPC server's event thread when Watch streams open and close concurrently.
+
+## Administrative Commands
+
+The `sf-ctl` command provides several database-related administrative functions.
+These commands are typically used during cluster bootstrap and maintenance.
+
+### ensure-mariadb-schema
+
+Ensures the MariaDB schema exists and is up to date. This command must be run
+on a node with direct database access (i.e. `MARIADB_HOST` configured):
+
+```bash
+sf-ctl ensure-mariadb-schema
+```
+
+The command first performs a compatibility check against the requirements
+listed in [MariaDB compatibility requirements](#mariadb-compatibility-requirements)
+above, then creates any missing tables and applies pending schema migrations.
+Operators must run this command (or ensure their deployment automation runs
+it) before starting `sf-database` whenever an SF upgrade includes schema
+changes.
+
+### initialise-node
+
+Creates a node record in the database. By default, it uses the local node's
+configuration:
+
+```bash
+sf-ctl initialise-node
+```
+
+From a database-tier node (one with `MARIADB_HOST` already in
+`/etc/sf/config`), the command can initialise any node in the cluster without
+any env-var prefix:
+
+```bash
+sf-ctl initialise-node --node-name sf-2 --node-mesh-ip 10.0.0.2
+```
+
+### register-daemon
+
+Registers one or more daemons on a node. By default, it registers on the local
+node:
+
+```bash
+sf-ctl register-daemon sentinel-first privexec nodelock
+```
+
+From a database-tier node (one with `MARIADB_HOST` already in
+`/etc/sf/config`), daemons can be registered against any node in the cluster:
+
+```bash
+sf-ctl register-daemon database --node-name sf-1
+```
+
+## MariaDB Table Inventory
+
+The MariaDB schema uses different table patterns depending on the data
+characteristics. This section is a developer- and operator-facing reference
+for the per-table layout.
+
+### Table Architecture
+
+#### Shared Tables (DatabaseBackedObject level)
+
+Data that has the same schema across all object types is stored in shared
+tables with `(object_type, object_uuid)` keys:
+
+| Table | Purpose |
+|-------|---------|
+| `object_states` | State value, update time, message for all objects |
+| `object_metadata` | User-defined metadata for all objects |
+
+These tables are efficient for cross-type queries (e.g., "find all objects
+in error state").
+
+#### High-Churn Dedicated Tables
+
+Some data has high write frequency or requires atomic operations with database
+constraints. These get dedicated tables optimized for their access patterns:
+
+| Table | Purpose |
+|-------|---------|
+| `ipam_reservations` | IP address allocations with uniqueness constraints |
+| `cluster_operations` | Full cluster operation metadata with indexed `node_uuid`, `instance_uuid`, `network_uuid` and `priority` columns extracted from JSON for dispatch-time filtering |
+| `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
+| `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
+| `cluster_operation_errors` | One row per failed cluster operation, keyed by `op_uuid`. Stores the structured `ErrorReport` (code, message, details, origin_class, traceback) JSON. Cleaned up alongside the `cluster_operations` row by `BaseClusterOperation.hard_delete()` when the cluster cleaner reaps a terminal-state op |
+| `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload |
+| `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
+| `cluster_locks` | Leased distributed locks. `expires_at` lets candidates steal a dead holder's lock without external GC; holders refresh every ~20 s while alive |
+
+IPAM reservations are stored separately because:
+
+- **Atomic allocation**: Database uniqueness constraints prevent race conditions
+- **High churn**: Addresses are frequently reserved and released
+- **Cross-object queries**: Need to find all addresses for an IPAM, not just
+  one object
+
+Cluster operation headers (`cluster_operations`) and work queue rows
+(`work_queue`) live in MariaDB so the create-and-enqueue step can run in a
+single transaction (header row + state row + queue row). The `work_queue`
+table uses MariaDB row locking with `SELECT ... FOR UPDATE SKIP LOCKED` for
+race-safe dequeue.
+
+The cluster daemon runs
+`reap_stuck_cluster_operation_jobs()` from
+`shakenfist/daemons/cluster/scheduled_tasks.py` on a one-minute
+schedule. It re-queues or rejects rows whose claim has gone stale:
+
+- **`CLUSTER_OP_STUCK_THRESHOLD`** — seconds before a claimed row is
+  considered stuck (default `1800`). Lower values detect crashed
+  workers faster at the cost of possibly re-queuing merely slow jobs.
+- **`CLUSTER_OP_MAX_ATTEMPTS`** — maximum claim attempts before the
+  reaper stops re-queuing and transitions the underlying cluster
+  operation to `STATE_ERROR` (default `5`). Protects the queue from
+  a "job of death" that crashes every worker.
+- **`CLUSTER_METRICS_PORT`** — Prometheus scrape port exposed by the
+  cluster daemon (default `13007`). Metrics
+  `cluster_op_reaper_requeued_total` and
+  `cluster_op_reaper_rejected_total` record reaper activity.
+
+Cluster operation targets are stored separately because:
+
+- **Append-only history**: Every operation enqueued against an object creates
+  a row, giving full operation history per target
+- **Automatic ordering**: AUTO_INCREMENT sequence_number replaces the implicit
+  dependency chain traversal
+- **Indexed queries**: Efficient lookups for "latest operation on this instance"
+  and "all operations on this object in order"
+
+Because the table is append-only, it is bounded by a periodic prune in the
+cluster daemon (alongside the existing `delete_stale_transfers` cleanup).
+The cluster daemon runs cluster-wide cleanup under `ClusterLock` election,
+so the prune naturally runs from a single node at a time. The prune
+removes rows whose `created_at` is older than
+`CLUSTER_OPERATION_TARGET_RETENTION` seconds **and** whose operation is not
+currently in an active state (`queued`, `preflight`, or `executing`) in
+`object_states`. Operations still in flight are never pruned regardless of
+age. Set `CLUSTER_OPERATION_TARGET_RETENTION` to 0 to disable pruning
+entirely (the default is 7 days).
+
+#### Cluster Operation Target Tracking
+
+The `cluster_operation_targets` table holds one row per (operation, target
+object) pair. Each row carries the target's object type and UUID, plus the
+`operation_uuid` and an `AUTO_INCREMENT` `sequence_number` that gives
+total ordering per target.
+
+Two query shapes are exposed to the rest of the system:
+
+- **`get_latest_cluster_operation_target`**: returns the highest-sequence
+  row for a given `(object_type, uuid)` pair, regardless of state. Used
+  by the `last_cluster_operation` property and `external_view()`
+  projections to provide the familiar "which op ran last?" answer.
+- **`has_pending_cluster_operation_target`**: returns `True` if any row
+  for the object references an operation whose state is `queued`,
+  `preflight`, or `executing`. Used by `Network.is_okay()` and any other
+  gate that must defer while work is in flight. Because it checks all
+  rows rather than only the latest one, a later terminal operation cannot
+  mask an earlier in-flight one.
+
+Rows are written automatically by `enqueue_cluster_operation`; operators
+do not need to manage them. Pruning is performed by the cluster daemon
+under `ClusterLock` election via
+`_direct_delete_stale_cluster_operation_targets`: rows older than
+`CLUSTER_OPERATION_TARGET_RETENTION` whose operation has reached a
+terminal state are removed; in-flight operations are never pruned.
+
+#### Per-Type Static Value Tables
+
+Each concrete object type that is migrated gets its own table for static
+values (immutable data set at creation time):
+
+| Table | Object Type | Fields |
+|-------|-------------|--------|
+| `uploads` | Upload | uuid, node, created_at, version |
+| `dnsmasq` | DnsMasq | uuid, namespace, owner_type, owner_uuid, provide_dhcp, provide_dns, version |
+| `blobs` | Blob | uuid, modified, fetched_at, version |
+| `nodes` | Node | uuid, fqdn (unique index), ip, version |
+| `namespaces` | Namespace | name (VARCHAR PK), version |
+| `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
+| `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
+| `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
+| `networks` | Network | uuid, name, namespace, netblock, provide_dhcp, provide_nat, provide_dns, vxid (unique), egress_nic, mesh_nic, version |
+| `agent_operations` | AgentOperation | uuid, namespace, instance_uuid (indexed), commands (JSON list), version |
+| `instances` | Instance | uuid, cpus, disk_spec (JSON), memory, name, namespace (indexed), requested_placement (JSON), ssh_key, user_data, video (JSON), uefi, configdrive, nvram_template, secure_boot, machine_type, side_channels (JSON), version |
+
+These tables use the object's UUID as the primary key, except for
+`namespaces` which uses the namespace name (a string) as its primary key.
+
+#### Per-Type Attribute Tables
+
+Mutable attributes that are specific to an object type are stored in
+dedicated attribute tables:
+
+| Table | Object Type | Key Fields |
+|-------|-------------|------------|
+| `blob_attributes` | Blob | uuid, size, info, last_used, retention |
+| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written |
+| `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON) |
+| `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
+| `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
+| `network_interface_attributes` | NetworkInterface | uuid, floating_address |
+| `network_attributes` | Network | uuid, floating_gateway, hosteddns (JSON dict) |
+| `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict) |
+| `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message, vsock_cids (JSON dict) |
+
+Node attributes consolidate observed state, roles, daemons, instances and
+versions into a single row.
+
+Namespace attributes consolidate keys (authentication) and trust
+(namespace trust relationships) into a single row.
+
+#### Node Identity and UUID Persistence
+
+Each node in the cluster is assigned a real UUID (UUID version 4) when it
+first registers with the cluster. Previously, nodes used their FQDN as a
+fake UUID, but all nodes now have proper UUIDs stored in the `nodes`
+MariaDB table with the FQDN as a separate uniquely-indexed column.
+
+To avoid an FQDN-to-UUID database lookup on every daemon startup, the
+node UUID is persisted locally to `{STORAGE_PATH}/node_uuid` (typically
+`/srv/shakenfist/node_uuid`). On subsequent daemon starts, the UUID is
+read from this local file for a direct database lookup by primary key.
+
+The node UUID can also be set explicitly via the `SHAKENFIST_NODE_UUID`
+environment variable or the `NODE_UUID` configuration field, which takes
+precedence over the local file. This is useful for disaster recovery
+scenarios where local storage has been lost but the node's UUID is known.
+
+The lookup precedence order is:
+
+1. `NODE_UUID` configuration field / `SHAKENFIST_NODE_UUID` environment
+   variable
+2. Local file at `{STORAGE_PATH}/node_uuid`
+3. FQDN-based lookup in the `nodes` table (fallback)
+
+If the persisted UUID does not match the current node's FQDN, it is
+ignored and the FQDN-based fallback is used. This guards against stale
+UUID files left over from a previous node installation.
+
+Each attribute table follows the same pattern — typed scalar columns
+for hot-path fields, JSON columns for complex structures, and one
+indexed FK column per parent — for example:
+
+```sql
+CREATE TABLE node_attributes (
+    uuid UUID PRIMARY KEY,
+    last_seen DOUBLE,
+    installed_version VARCHAR(64),
+    -- Complex structures as JSON
+    roles JSON,
+    daemons JSON,
+    metrics JSON
+);
+```
+
+Cached lists of *child* object UUIDs are deliberately not stored on
+the parent attribute table — querying the child table by an indexed
+FK column is the source of truth. Phase 7 of the SQL-pushdown plan
+removed the last two such caches (`network_attributes.networkinterfaces`
+and `instance_attributes.interfaces`); see `PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md`.
+
+This approach:
+
+- **Avoids wide generic tables**: Each type has exactly the columns it needs
+- **Enables proper typing**: Native SQL types instead of JSON everywhere
+- **Supports efficient indexes**: Can index frequently-queried columns
+- **Keeps queries simple**: No joins needed for common operations
+
+### Abstract Base Classes
+
+Abstract base classes like `DatabaseBackedObject` and `ManagedExecutable` do
+not get their own tables. Only concrete classes that are actually instantiated
+have tables. For example:
+
+- `ManagedExecutable` (abstract) - no table
+- `DnsMasq` (concrete, inherits ManagedExecutable) - gets `dnsmasq` table
+
+### Pydantic Models as Schema Source
+
+Each table is defined by a Pydantic model that serves as the single source of
+truth:
+
+```python
+from typing import Annotated
+from pydantic import BaseModel, ConfigDict, UUID4
+from shakenfist.schema.sqlalchemy import SQLIndex, SQLNativeUUID
+
+class DnsMasqData(BaseModel):
+    """Schema for DnsMasq static values in MariaDB."""
+    model_config = ConfigDict(frozen=True)
+
+    uuid: Annotated[UUID4, SQLNativeUUID()]
+    namespace: Annotated[str, SQLIndex()]
+    owner_type: Annotated[str, SQLIndex()]
+    owner_uuid: Annotated[str, SQLIndex()]
+    version: int
+    provide_dhcp: bool
+    provide_dns: bool
+```
+
+The table is then generated from this model:
+
+```python
+from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
+
+table = pydantic_to_sqlalchemy_table(
+    DnsMasqData, 'dnsmasq', metadata,
+    primary_key_field='uuid', include_id_column=False
+)
+```
+
+### Adding New Attributes
+
+When adding a new attribute to an object type:
+
+**For shared attributes (DatabaseBackedObject level):**
+
+1. Consider if it belongs in an existing shared table (like `object_states`)
+2. If it's a new shared concept, create a new shared table
+
+**For type-specific attributes:**
+
+1. Add the field to the Pydantic model
+2. `ALTER TABLE` to add the column (with default if needed)
+3. Bump the object's version number
+4. Add an upgrade step (can be no-op if column has a DB default)
+
+### Object Version Upgrades
+
+Objects have version numbers that track schema changes. When an object is
+read from the database with an older version:
+
+1. **Lazy upgrade**: The `upgrade_pydantic_data()` method applies upgrade steps
+2. **Persistence**: If the cluster minimum version equals current version, the
+   upgraded data is written back to MariaDB
+3. **Background migration**: A future background worker will upgrade objects
+   that are never read
+
+This allows rolling upgrades without requiring all objects to be migrated
+immediately.
 
 ## Schema System
 
@@ -190,7 +590,7 @@ Shaken Fist uses Pydantic models for schema definition. These models serve
 multiple purposes:
 
 1. **Validation**: Ensuring data conforms to expected types and constraints
-2. **Serialization**: Converting between Python objects and JSON for etcd
+2. **Serialization**: Converting between Python objects and JSON payloads
 3. **SQL Generation**: Automatically generating SQLAlchemy tables for MariaDB
 
 ### Pydantic Models
@@ -385,16 +785,6 @@ print(state.update_time)  # 1234567890.123
 print(state.obj_dict())   # {'value': 'created', 'update_time': 1234567890.123}
 ```
 
-### Migration from etcd
-
-For existing deployments that stored state in etcd, migration happens
-automatically when the database daemon starts. The migration reads state
-from etcd for all object types, writes it to MariaDB, and removes the old
-etcd entries.
-
-MariaDB is now required for all deployments - state is stored only in
-MariaDB, not in etcd.
-
 ## IPAM Reservation Storage
 
 IPAM (IP Address Manager) reservations are stored in MariaDB for atomic address
@@ -450,79 +840,6 @@ IPAM supports several reservation types:
 | `instance` | An IP assigned to an instance interface |
 | `deletion-halo` | A recently-released address in the deletion halo |
 
-### Migration from etcd
-
-For existing deployments that stored IPAM reservations in etcd, migration
-happens automatically when the database daemon starts. The migration reads
-all reservations from etcd, writes them to the MariaDB `ipam_reservations`
-table, and removes the original etcd entries.
-
-## Administrative Commands
-
-The `sf-ctl` command provides several database-related administrative functions.
-These commands are typically used during cluster bootstrap and maintenance.
-
-### ensure-mariadb-schema
-
-Ensures the MariaDB schema exists and is up to date. This command must be run
-on an etcd_master node (which has `MARIADB_HOST` configured):
-
-```bash
-sf-ctl ensure-mariadb-schema
-```
-
-This is automatically run during cluster deployment before any nodes are
-initialized.
-
-### initialise-node
-
-Creates a node record in the database. By default, it uses the local node's
-configuration:
-
-```bash
-sf-ctl initialise-node
-```
-
-For cluster bootstrap, this command can initialize any node when run from an
-etcd_master with direct database access:
-
-```bash
-# Run on the database node to initialize a remote node
-SHAKENFIST_MARIADB_HOST=localhost \
-sf-ctl initialise-node --node-name sf-2 --node-mesh-ip 10.0.0.2
-```
-
-This is useful during deployment when the database service isn't running yet.
-
-### register-daemon
-
-Registers one or more daemons on a node. By default, it registers on the local
-node:
-
-```bash
-sf-ctl register-daemon sentinel-first privexec nodelock
-```
-
-For cluster bootstrap, daemons can be registered on any node when run from an
-etcd_master with direct database access:
-
-```bash
-# Run on the database node to register daemons on a remote node
-SHAKENFIST_MARIADB_HOST=localhost \
-sf-ctl register-daemon database --node-name sf-1
-```
-
-This allows all node and daemon registration to happen before the database
-service starts, avoiding chicken-and-egg problems during bootstrap.
-
-### Data Migrations
-
-Data migrations from etcd to MariaDB (for object states, IPAM reservations,
-uploads, blobs, nodes, and other types) run automatically when the database
-daemon starts. No manual commands are needed -- simply upgrade and restart
-the `sf-database` service. See the
-[Automatic Data Migrations](#automatic-data-migrations) section for details.
-
 ## Upload Object Storage
 
 Upload objects (temporary objects that receive streamed data during artifact
@@ -571,354 +888,4 @@ During rolling upgrades where nodes may run different versions:
 - Use indexes for fields that are frequently queried
 - Prefer compound indexes for queries that filter on multiple columns
 - Keep JSON/LONGTEXT fields for data that doesn't need indexing
-- Use MariaDB for data requiring complex queries; etcd for simple key-value
-  lookups
-
-## etcd to MariaDB Migration Strategy
-
-Shaken Fist is progressively migrating data from etcd to MariaDB. This section
-documents the overall strategy and table architecture for developers and
-operators.
-
-### Why Migrate?
-
-etcd is excellent for distributed coordination but has limitations for object
-storage:
-
-- **Scan performance**: etcd is optimized for key lookups, not range scans
-- **Query flexibility**: No support for filtering, sorting, or aggregation
-- **Storage efficiency**: JSON serialization is less efficient than native types
-- **Index support**: No secondary indexes for efficient lookups by attribute
-
-MariaDB addresses these limitations while maintaining the distributed nature
-of the cluster through Galera replication.
-
-### Migration Phases
-
-The migration is happening in phases:
-
-| Phase | Data | Status |
-|-------|------|--------|
-| 1 | Object state | Complete - `object_states` table |
-| 2 | IPAM reservations | Complete - `ipam_reservations` table |
-| 3 | Upload objects | Complete - `uploads` table |
-| 4 | Blob objects | Complete - `blobs`, `blob_attributes`, `blob_hashes` tables |
-| 5 | Node objects | Complete - `nodes`, `node_attributes` tables |
-| 6 | DnsMasq objects | Complete - `dnsmasq` table |
-| 7 | Namespace objects | Complete - `namespaces`, `namespace_attributes` tables |
-| 8 | Artifact objects | Complete - `artifacts`, `artifact_attributes`, `artifact_indexes` tables |
-| 9 | NetworkInterface objects | Complete - `network_interfaces`, `network_interface_attributes` tables |
-| 10 | IPAM objects | Complete - `ipams` table |
-| 11 | Network objects | Complete - `networks`, `network_attributes` tables |
-| 12 | AgentOperation objects | Complete - `agent_operations`, `agent_operation_attributes` tables |
-| 13 | Instance objects | Complete - `instances`, `instance_attributes` tables |
-| 14 | Object metadata | Complete - `object_metadata` table (user metadata). Schema v3 drops the legacy `last_cluster_operation_json` column via `ALTER TABLE ... DROP COLUMN IF EXISTS`; the column was unused since `last_cluster_operation` moved to `cluster_operation_targets`. |
-| 15 | Cluster operation targets | Complete - `cluster_operation_targets` table (operation ordering per object) |
-| 16 | Node metrics | Complete - `node_metrics` table (ephemeral per-node resource metrics, JSON payload) |
-| 17 | Cluster operations | Complete - `cluster_operations` table (full operation metadata with indexed node/instance/network/priority columns) |
-| 18 | Work queues | Complete - `work_queue` table (per-job row with claim state, replacing etcd two-prefix design) |
-| 19 | Per-daemon state | Complete - `node_daemon_states` table; replaces the JSON `daemon_states` dict that used to live on `node_attributes` |
-| 20 | Leased cluster locks | Complete - `cluster_locks` schema bumped to v3 to add `expires_at`; lock rows now self-expire on dead-holder partition rather than requiring a reaper |
-
-### Table Architecture
-
-The MariaDB schema uses different table patterns depending on the data
-characteristics:
-
-#### Shared Tables (DatabaseBackedObject level)
-
-Data that has the same schema across all object types is stored in shared
-tables with `(object_type, object_uuid)` keys:
-
-| Table | Purpose |
-|-------|---------|
-| `object_states` | State value, update time, message for all objects |
-| `object_metadata` | User-defined metadata for all objects |
-
-These tables are efficient for cross-type queries (e.g., "find all objects
-in error state").
-
-#### High-Churn Dedicated Tables
-
-Some data has high write frequency or requires atomic operations with database
-constraints. These get dedicated tables optimized for their access patterns:
-
-| Table | Purpose |
-|-------|---------|
-| `ipam_reservations` | IP address allocations with uniqueness constraints |
-| `cluster_operations` | Full cluster operation metadata with indexed `node_uuid`, `instance_uuid`, `network_uuid` and `priority` columns extracted from JSON for dispatch-time filtering |
-| `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
-| `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
-| `cluster_operation_errors` | One row per failed cluster operation, keyed by `op_uuid`. Stores the structured `ErrorReport` (code, message, details, origin_class, traceback) JSON. Cleaned up alongside the `cluster_operations` row by `BaseClusterOperation.hard_delete()` when the cluster cleaner reaps a terminal-state op |
-| `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload |
-| `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
-| `cluster_locks` | Leased distributed locks. `expires_at` lets candidates steal a dead holder's lock without external GC; holders refresh every ~20 s while alive |
-
-IPAM reservations are stored separately because:
-
-- **Atomic allocation**: Database uniqueness constraints prevent race conditions
-- **High churn**: Addresses are frequently reserved and released
-- **Cross-object queries**: Need to find all addresses for an IPAM, not just
-  one object
-
-Cluster operation headers (`cluster_operations`) and work queue rows
-(`work_queue`) are stored in MariaDB so the create-and-enqueue step
-can run in a single transaction (header row + state row + queue
-row). The old etcd design split queued and claimed work items across
-`/sf/queue/` and `/sf/processing/` prefixes; MariaDB row locking
-allows a single table with claim fields instead, and
-`SELECT ... FOR UPDATE SKIP LOCKED` gives race-safe dequeue.
-
-The cluster daemon runs
-`reap_stuck_cluster_operation_jobs()` from
-`shakenfist/daemons/cluster/scheduled_tasks.py` on a one-minute
-schedule. It re-queues or rejects rows whose claim has gone stale:
-
-- **`CLUSTER_OP_STUCK_THRESHOLD`** — seconds before a claimed row is
-  considered stuck (default `1800`). Lower values detect crashed
-  workers faster at the cost of possibly re-queuing merely slow jobs.
-- **`CLUSTER_OP_MAX_ATTEMPTS`** — maximum claim attempts before the
-  reaper stops re-queuing and transitions the underlying cluster
-  operation to `STATE_ERROR` (default `5`). Protects the queue from
-  a "job of death" that crashes every worker.
-- **`CLUSTER_METRICS_PORT`** — Prometheus scrape port exposed by the
-  cluster daemon (default `13007`). Metrics
-  `cluster_op_reaper_requeued_total` and
-  `cluster_op_reaper_rejected_total` record reaper activity.
-
-Cluster operation targets are stored separately because:
-
-- **Append-only history**: Every operation enqueued against an object creates
-  a row, giving full operation history per target
-- **Automatic ordering**: AUTO_INCREMENT sequence_number replaces the implicit
-  dependency chain traversal
-- **Indexed queries**: Efficient lookups for "latest operation on this instance"
-  and "all operations on this object in order"
-
-Because the table is append-only, it is bounded by a periodic prune in the
-cluster daemon (alongside the existing `delete_stale_transfers` cleanup).
-The cluster daemon runs cluster-wide cleanup under `ClusterLock` election,
-so the prune naturally runs from a single node at a time. The prune
-removes rows whose `created_at` is older than
-`CLUSTER_OPERATION_TARGET_RETENTION` seconds **and** whose operation is not
-currently in an active state (`queued`, `preflight`, or `executing`) in
-`object_states`. Operations still in flight are never pruned regardless of
-age. Set `CLUSTER_OPERATION_TARGET_RETENTION` to 0 to disable pruning
-entirely (the default is 7 days).
-
-#### Cluster Operation Target Tracking
-
-The `cluster_operation_targets` table holds one row per (operation, target
-object) pair. Each row carries the target's object type and UUID, plus the
-`operation_uuid` and an `AUTO_INCREMENT` `sequence_number` that gives
-total ordering per target.
-
-Two query shapes are exposed to the rest of the system:
-
-- **`get_latest_cluster_operation_target`**: returns the highest-sequence
-  row for a given `(object_type, uuid)` pair, regardless of state. Used
-  by the `last_cluster_operation` property and `external_view()`
-  projections to provide the familiar "which op ran last?" answer.
-- **`has_pending_cluster_operation_target`**: returns `True` if any row
-  for the object references an operation whose state is `queued`,
-  `preflight`, or `executing`. Used by `Network.is_okay()` and any other
-  gate that must defer while work is in flight. Because it checks all
-  rows rather than only the latest one, a later terminal operation cannot
-  mask an earlier in-flight one.
-
-Rows are written automatically by `enqueue_cluster_operation`; operators
-do not need to manage them. Pruning is performed by the cluster daemon
-under `ClusterLock` election via
-`_direct_delete_stale_cluster_operation_targets`: rows older than
-`CLUSTER_OPERATION_TARGET_RETENTION` whose operation has reached a
-terminal state are removed; in-flight operations are never pruned.
-
-#### Per-Type Static Value Tables
-
-Each concrete object type that is migrated gets its own table for static
-values (immutable data set at creation time):
-
-| Table | Object Type | Fields |
-|-------|-------------|--------|
-| `uploads` | Upload | uuid, node, created_at, version |
-| `dnsmasq` | DnsMasq | uuid, namespace, owner_type, owner_uuid, provide_dhcp, provide_dns, version |
-| `blobs` | Blob | uuid, modified, fetched_at, version |
-| `nodes` | Node | uuid, fqdn (unique index), ip, version |
-| `namespaces` | Namespace | name (VARCHAR PK), version |
-| `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
-| `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
-| `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
-| `networks` | Network | uuid, name, namespace, netblock, provide_dhcp, provide_nat, provide_dns, vxid (unique), egress_nic, mesh_nic, version |
-| `agent_operations` | AgentOperation | uuid, namespace, instance_uuid (indexed), commands (JSON list), version |
-| `instances` | Instance | uuid, cpus, disk_spec (JSON), memory, name, namespace (indexed), requested_placement (JSON), ssh_key, user_data, video (JSON), uefi, configdrive, nvram_template, secure_boot, machine_type, side_channels (JSON), version |
-
-These tables use the object's UUID as the primary key, except for
-`namespaces` which uses the namespace name (a string) as its primary key.
-
-#### Per-Type Attribute Tables
-
-Mutable attributes that are specific to an object type are stored in
-dedicated attribute tables:
-
-| Table | Object Type | Key Fields |
-|-------|-------------|------------|
-| `blob_attributes` | Blob | uuid, size, info, last_used, retention |
-| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written |
-| `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON) |
-| `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
-| `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
-| `network_interface_attributes` | NetworkInterface | uuid, floating_address |
-| `network_attributes` | Network | uuid, floating_gateway, hosteddns (JSON dict) |
-| `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict) |
-| `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message, vsock_cids (JSON dict) |
-
-Node attributes consolidate many separate etcd keys (observed, roles,
-daemons, daemon:{name}, instances, versions, etc.) into a single row.
-
-Namespace attributes consolidate keys (authentication) and trust
-(namespace trust relationships) from separate etcd keys into a single row.
-
-#### Node Identity and UUID Persistence
-
-Each node in the cluster is assigned a real UUID (UUID version 4) when it
-first registers with the cluster. Previously, nodes used their FQDN as a
-fake UUID, but all nodes now have proper UUIDs stored in the `nodes`
-MariaDB table with the FQDN as a separate uniquely-indexed column.
-
-To avoid an FQDN-to-UUID database lookup on every daemon startup, the
-node UUID is persisted locally to `{STORAGE_PATH}/node_uuid` (typically
-`/srv/shakenfist/node_uuid`). On subsequent daemon starts, the UUID is
-read from this local file for a direct database lookup by primary key.
-
-The node UUID can also be set explicitly via the `SHAKENFIST_NODE_UUID`
-environment variable or the `NODE_UUID` configuration field, which takes
-precedence over the local file. This is useful for disaster recovery
-scenarios where local storage has been lost but the node's UUID is known.
-
-The lookup precedence order is:
-
-1. `NODE_UUID` configuration field / `SHAKENFIST_NODE_UUID` environment
-   variable
-2. Local file at `{STORAGE_PATH}/node_uuid`
-3. FQDN-based lookup in the `nodes` table (fallback)
-
-If the persisted UUID does not match the current node's FQDN, it is
-ignored and the FQDN-based fallback is used. This guards against stale
-UUID files left over from a previous node installation.
-
-Each attribute table follows the same pattern — typed scalar columns
-for hot-path fields, JSON columns for complex structures, and one
-indexed FK column per parent — for example:
-
-```sql
-CREATE TABLE node_attributes (
-    uuid UUID PRIMARY KEY,
-    last_seen DOUBLE,
-    installed_version VARCHAR(64),
-    -- Complex structures as JSON
-    roles JSON,
-    daemons JSON,
-    metrics JSON
-);
-```
-
-Cached lists of *child* object UUIDs are deliberately not stored on
-the parent attribute table — querying the child table by an indexed
-FK column is the source of truth. Phase 7 of the SQL-pushdown plan
-removed the last two such caches (`network_attributes.networkinterfaces`
-and `instance_attributes.interfaces`); see `PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md`.
-
-This approach:
-
-- **Avoids wide generic tables**: Each type has exactly the columns it needs
-- **Enables proper typing**: Native SQL types instead of JSON everywhere
-- **Supports efficient indexes**: Can index frequently-queried columns
-- **Keeps queries simple**: No joins needed for common operations
-
-### Abstract Base Classes
-
-Abstract base classes like `DatabaseBackedObject` and `ManagedExecutable` do
-not get their own tables. Only concrete classes that are actually instantiated
-have tables. For example:
-
-- `ManagedExecutable` (abstract) - no table
-- `DnsMasq` (concrete, inherits ManagedExecutable) - gets `dnsmasq` table
-
-### Pydantic Models as Schema Source
-
-Each table is defined by a Pydantic model that serves as the single source of
-truth:
-
-```python
-from typing import Annotated
-from pydantic import BaseModel, ConfigDict, UUID4
-from shakenfist.schema.sqlalchemy import SQLIndex, SQLNativeUUID
-
-class DnsMasqData(BaseModel):
-    """Schema for DnsMasq static values in MariaDB."""
-    model_config = ConfigDict(frozen=True)
-
-    uuid: Annotated[UUID4, SQLNativeUUID()]
-    namespace: Annotated[str, SQLIndex()]
-    owner_type: Annotated[str, SQLIndex()]
-    owner_uuid: Annotated[str, SQLIndex()]
-    version: int
-    provide_dhcp: bool
-    provide_dns: bool
-```
-
-The table is then generated from this model:
-
-```python
-from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
-
-table = pydantic_to_sqlalchemy_table(
-    DnsMasqData, 'dnsmasq', metadata,
-    primary_key_field='uuid', include_id_column=False
-)
-```
-
-### Adding New Attributes
-
-When adding a new attribute to an object type:
-
-**For shared attributes (DatabaseBackedObject level):**
-
-1. Consider if it belongs in an existing shared table (like `object_states`)
-2. If it's a new shared concept, create a new shared table
-
-**For type-specific attributes:**
-
-1. Add the field to the Pydantic model
-2. `ALTER TABLE` to add the column (with default if needed)
-3. Bump the object's version number
-4. Add an upgrade step (can be no-op if column has a DB default)
-
-### Object Version Upgrades
-
-Objects have version numbers that track schema changes. When an object is
-read from the database with an older version:
-
-1. **Lazy upgrade**: The `upgrade_pydantic_data()` method applies upgrade steps
-2. **Persistence**: If the cluster minimum version equals current version, the
-   upgraded data is written back to MariaDB
-3. **Background migration**: A future background worker will upgrade objects
-   that are never read
-
-This allows rolling upgrades without requiring all objects to be migrated
-immediately.
-
-### Automatic Data Migrations
-
-Data migrations from etcd to MariaDB run automatically when the database
-daemon starts. The `ensure_data_migrations()` function checks each table's
-version and runs any pending migrations. This includes migrations for object
-states, IPAM reservations, uploads, blobs, nodes, and other object types.
-
-No manual `sf-ctl` commands are needed for data migration -- simply
-upgrading and restarting the database daemon is sufficient. Migrations are
-idempotent and safe to re-run if the daemon restarts during migration.
-
-If any objects fail to migrate, the table version is not bumped and the
-migration will retry on the next daemon restart. This ensures all objects
-are successfully migrated before the version advances.
+- Use MariaDB for data requiring complex queries

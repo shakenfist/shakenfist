@@ -30,8 +30,10 @@
 #           }
 #       )
 
+import sys
 import threading
 from enum import Enum
+from types import TracebackType
 from typing import Annotated
 from typing import Any
 from typing import get_args
@@ -49,6 +51,69 @@ from shakenfist_utilities import logs
 
 LOG, _ = logs.setup(__name__)
 
+
+class _ContentionLoggingRLock:
+    """RLock wrapper that logs contention to surface lock deadlocks.
+
+    Same semantics as ``threading.RLock`` (re-entrant by the holding
+    thread, ``with`` protocol, ``acquire`` / ``release``). On entry
+    the wrapper first tries a non-blocking acquire; if that fails it
+    logs the calling thread + caller frame, then blocks for the real
+    acquire and logs again on success. A wrapping thread that ever
+    logs "blocking" without a matching "acquired after block" is
+    deadlocked on the lock -- the visibility the sf-database silent
+    wedge needs to pin "table init deadlock" vs "wedge is elsewhere".
+
+    Cheap when uncontended: one non-blocking acquire and two
+    attribute lookups per ``with`` site. Logging only fires on real
+    contention, so the steady-state cost is effectively zero.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
+        return self._lock.acquire(blocking, timeout)
+
+    def release(self) -> None:
+        self._lock.release()
+
+    def __enter__(self) -> bool:
+        if self._lock.acquire(blocking=False):
+            return True
+        tid = threading.get_ident()
+        caller = _short_caller()
+        LOG.debug(
+            'TABLE_CREATION_LOCK blocking; thread=%d; caller=%s',
+            tid, caller)
+        self._lock.acquire()
+        LOG.debug(
+            'TABLE_CREATION_LOCK acquired after block; thread=%d; '
+            'caller=%s', tid, caller)
+        return True
+
+    def __exit__(
+            self,
+            exc_type: Optional[type[BaseException]],
+            exc: Optional[BaseException],
+            tb: Optional[TracebackType]) -> None:
+        self._lock.release()
+
+
+def _short_caller() -> str:
+    """Return ``filename:lineno`` for the frame two above this call.
+
+    Skips the wrapper's own frame and the ``__enter__`` frame so the
+    label points at the ``with TABLE_CREATION_LOCK:`` site. Best-effort
+    -- returns ``<unknown>`` if sys._getframe is unavailable.
+    """
+    try:
+        frame = sys._getframe(2)
+        return f'{frame.f_code.co_filename.rsplit("/", 1)[-1]}:{frame.f_lineno}'
+    except Exception:
+        return '<unknown>'
+
+
 # Lazy-init of SQLAlchemy Table objects from many ``_get_*_table()``
 # helpers in ``mariadb.py`` is not thread-safe: two threads can both
 # observe the module-level cache as ``None`` and both call this
@@ -61,8 +126,14 @@ LOG, _ = logs.setup(__name__)
 # Shared across this module and ``mariadb.py`` so manual ``sa.Table``
 # registrations in mariadb (object_states, cluster_locks,
 # node_daemon_states) get the same protection as the
-# pydantic_to_sqlalchemy_table path.
-TABLE_CREATION_LOCK = threading.Lock()
+# pydantic_to_sqlalchemy_table path. RLock because the ``_get_*_table``
+# wrappers in ``mariadb.py`` take the lock and then call
+# ``pydantic_to_sqlalchemy_table``, which re-enters it.
+#
+# Wrapped with contention logging so the sf-database silent-wedge
+# investigation can see whether the wedge is a deadlock here vs.
+# elsewhere -- see ``_ContentionLoggingRLock`` above.
+TABLE_CREATION_LOCK = _ContentionLoggingRLock()
 
 
 # Marker classes for use with Annotated types

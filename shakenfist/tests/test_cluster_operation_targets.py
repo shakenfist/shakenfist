@@ -92,11 +92,8 @@ class HardDeleteWithTargetsTestCase(base.ShakenFistTestCase):
     @mock.patch(
         'shakenfist.mariadb.delete_cluster_operation_targets_for_object',
         return_value=True)
-    @mock.patch('shakenfist.etcd.delete_all')
-    @mock.patch('shakenfist.etcd.delete')
     def test_hard_delete_cleans_up_targets(
-            self, mock_etcd_del, mock_etcd_del_all,
-            mock_del_targets, mock_del_state,
+            self, mock_del_targets, mock_del_state,
             mock_del_meta, mock_del_events, mock_event):
         d = DatabaseBackedObjectWithOperations(TEST_UUID)
         d.hard_delete()
@@ -176,8 +173,8 @@ class DirectDeleteStaleClusterOperationTargetsTestCase(
         from shakenfist.config import BaseSettings
 
         class _FakeConfig(BaseSettings):
-            DATABASE_NODE_IP: str = '192.168.1.1'
-            DATABASE_API_PORT: int = 13005
+            MARIADB_GATEWAY_HOSTS: list[str] = ['192.168.1.1']
+            MARIADB_GATEWAY_PORT: int = 13005
             MARIADB_HOST: str = 'localhost'
             NODE_NAME: str = 'testnode'
 
@@ -401,8 +398,8 @@ class DirectHasPendingClusterOperationTargetTestCase(
         from shakenfist.config import BaseSettings
 
         class _FakeConfig(BaseSettings):
-            DATABASE_NODE_IP: str = '192.168.1.1'
-            DATABASE_API_PORT: int = 13005
+            MARIADB_GATEWAY_HOSTS: list[str] = ['192.168.1.1']
+            MARIADB_GATEWAY_PORT: int = 13005
             MARIADB_HOST: str = 'localhost'
             NODE_NAME: str = 'testnode'
 
@@ -1322,8 +1319,8 @@ class DirectListClusterOperationsForTargetTestCase(
         from shakenfist.config import BaseSettings
 
         class _FakeConfig(BaseSettings):
-            DATABASE_NODE_IP: str = '192.168.1.1'
-            DATABASE_API_PORT: int = 13005
+            MARIADB_GATEWAY_HOSTS: list[str] = ['192.168.1.1']
+            MARIADB_GATEWAY_PORT: int = 13005
             MARIADB_HOST: str = 'localhost'
             NODE_NAME: str = 'testnode'
 

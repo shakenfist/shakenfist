@@ -398,7 +398,6 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
 
         fake_config = SFConfig(
             NODE_NAME='node1',
-            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch('shakenfist.instance.config', fake_config)
         self.mock_config = self.config.start()
@@ -600,8 +599,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(404, resp.status_code)
 
     @mock.patch('shakenfist.locks.ClusterLock')
-    @mock.patch('shakenfist.etcd.put')
-    def test_delete_namespace_key(self, mock_put, mock_lock):
+    def test_delete_namespace_key(self, mock_lock):
         resp = self.client.delete('/auth/namespaces/system/keys/key1',
                                   headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)

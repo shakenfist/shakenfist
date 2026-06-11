@@ -16,7 +16,7 @@ Shaken Fist runs several daemons on each cluster node:
 | Daemon | Purpose | Port |
 |--------|---------|------|
 | `sf-api` | REST API server (Flask/Gunicorn) | 13000 |
-| `sf-database` | Database microservice (MariaDB access) | 13005 |
+| `sf-database` | Database microservice (MariaDB access; runs on database-tier nodes) | 13005 |
 | `sf-cleaner` | Resource cleanup | - |
 | `sf-cluster` | Cluster maintenance | - |
 | `sf-net` | Network daemon | - |
@@ -63,7 +63,10 @@ Shaken Fist runs several daemons on each cluster node:
                         |  config,    |
                         |  events,    |
                         |  event_     |
-                        |  objects)   |
+                        |  objects,   |
+                        |  node_      |
+                        |  daemon_    |
+                        |  states)    |
                         +-------------+
 ```
 
@@ -71,6 +74,19 @@ The database microservice (`sf-database`) centralizes all database access:
 - Only the database daemon has direct access to MariaDB
 - All other daemons use the gRPC interface
 - Provides Prometheus metrics for database operations
+
+The `sf-database` box in the diagram represents a tier of N >= 1 instances.
+All instances connect to the same MariaDB; none is elected. Every other SF
+daemon reaches the tier through a client-side load-balanced gRPC channel
+constructed over the `MARIADB_GATEWAY_HOSTS` list of endpoints. Dead
+endpoints are skipped via subchannel connectivity state and client
+keepalives (10 s ping / 5 s timeout). `sf-database` also publishes the
+`grpc.health.v1.Health` protocol for external monitoring via unary `Check`
+calls; Watch-based client-side health checking is deliberately not enabled
+because the synchronous health servicer can deadlock the gRPC server's
+event thread (see `shakenfist/util/grpc_channel.py`).
+See [`docs/operator_guide/database.md`](docs/operator_guide/database.md) —
+"MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.
 
 #### SQL Filter-Pushdown Discipline
 

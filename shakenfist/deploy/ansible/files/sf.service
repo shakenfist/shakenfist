@@ -25,7 +25,7 @@ Description=Shaken Fist {{ item }} daemon
 # MariaDB for all other daemons. It must start before everything else,
 # including sentinel-first.
 After=multi-user.target mariadb.service
-Requires=mariadb.service
+Wants=mariadb.service
 {% elif item == "sentinel-first" %}
 # sentinel-first starts after database so it can use the database service for
 # MariaDB access.

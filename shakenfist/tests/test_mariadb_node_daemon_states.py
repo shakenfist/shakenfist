@@ -14,8 +14,8 @@ from shakenfist.tests import base
 
 
 class FakeConfig(BaseSettings):
-    DATABASE_NODE_IP: str = '192.168.1.1'
-    DATABASE_API_PORT: int = 13005
+    MARIADB_GATEWAY_HOSTS: list[str] = ['192.168.1.1']
+    MARIADB_GATEWAY_PORT: int = 13005
     MARIADB_HOST: str = 'localhost'
     NODE_NAME: str = 'testnode'
 

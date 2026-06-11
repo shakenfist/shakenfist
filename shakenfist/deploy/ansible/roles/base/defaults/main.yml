@@ -6,7 +6,6 @@ node_mesh_ip: "127.0.0.1"
 
 # bootstrap
 server_package: "shakenfist"
-agent_package: "shakenfist-agent"
 client_package: "shakenfist-client"
 pip_extra: ""
 

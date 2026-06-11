@@ -7,15 +7,19 @@
 **Documentation:** https://shakenfist.com/
 **Source Code:** https://github.com/shakenfist/shakenfist
 
+## Prerequisites
+
+Shaken Fist requires an operator-provided MariaDB 10.6.0+ server. Before
+running the installer (`getsf`), provision a MariaDB instance and apply the
+bootstrap snippet. See
+[`docs/operator_guide/database.md`](docs/operator_guide/database.md) for the
+complete setup workflow.
+
 ## Claude Code Skills
 
 This repository includes Claude Code skills in `.claude/skills/` to assist with
 common development tasks:
 
-- **migrate-etcd-to-mariadb**: Guides the migration of object data from etcd
-  to MariaDB, covering both static values (immutable) and attributes (mutable)
-  in separate tables. Follows established patterns from Upload, DnsMasq, IPAM,
-  and blob migrations.
 - **add-grpc-service**: Guides adding new gRPC service methods to the database
   microservice, including proto definitions, handler implementation, and client
   functions.

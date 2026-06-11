@@ -13,9 +13,9 @@
 - PLAN-network-facade.md: Network operations facade and queue-only mutation
 - PLAN-queue-performance.md: Queue performance and coalescing
 - PLAN-recurring-operations.md: Recurring cluster operations framework
-- PLAN-remove-etcd.md: Retire etcd from the Shaken Fist codebase
 - PLAN-health-checks.md: Health checks, readiness, and graceful drain for SF daemons
 - PLAN-remove-primary.md: Remove the primary node and adopt a BYO-infrastructure deployer
+- PLAN-byo-mariadb.md: Bring-your-own MariaDB and sf-database as a tier
 - PLAN-embrace-tls.md: Embrace TLS across Shaken Fist
 - PLAN-sticky-transfers.md: Sticky session affinity for SF blob transfers
 - PLAN-replace-exec-with-netlink.md: Replace exec'd network commands with native netlink operations

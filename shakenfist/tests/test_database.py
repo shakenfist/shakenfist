@@ -16,9 +16,9 @@ LOG, _ = logs.setup(__name__)
 
 
 class FakeConfig(BaseSettings):
-    DATABASE_NODE_IP: str = '192.168.1.1'
-    DATABASE_API_PORT: int = 13005
-    DATABASE_METRICS_PORT: int = 13006
+    MARIADB_GATEWAY_HOSTS: list[str] = ['192.168.1.1']
+    MARIADB_GATEWAY_PORT: int = 13005
+    MARIADB_GATEWAY_METRICS_PORT: int = 13006
     NODE_NAME: str = 'testnode'
 
 
@@ -136,7 +136,7 @@ class IsAvailableTestCase(base.ShakenFistTestCase):
 
     def test_is_available_when_no_ip(self):
         config_no_ip = FakeConfig()
-        config_no_ip.DATABASE_NODE_IP = ''
+        config_no_ip.MARIADB_GATEWAY_HOSTS = []
         with mock.patch('shakenfist.database.config', config_no_ip):
             result = database.is_available()
         self.assertFalse(result)

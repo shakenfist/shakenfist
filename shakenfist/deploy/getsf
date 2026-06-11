@@ -519,6 +519,100 @@ else
 fi
 echo
 
+# Determine the MariaDB connection details. Shaken Fist no longer
+# bundles a MariaDB install; operators must provide one and bootstrap
+# it using tools/bootstrap-mariadb.sql.
+question_start
+echo "Shaken Fist needs to talk to a MariaDB server you provide."
+echo "See tools/bootstrap-mariadb.sql for the SQL snippet that"
+echo "creates the database and user Shaken Fist expects, and"
+echo "docs/operator_guide/database.md for the full BYO setup."
+echo
+echo "What is the MariaDB server's hostname or IP address?"
+echo
+if [ -z "${GETSF_MARIADB_HOST}" ]; then
+    echo -n "(a hostname or IP address) >> "
+    read GETSF_MARIADB_HOST
+    record_answer GETSF_MARIADB_HOST "${GETSF_MARIADB_HOST}"
+else
+    echo "(a hostname or IP address) >> ${GETSF_MARIADB_HOST}"
+fi
+question_end
+if [ -z "${GETSF_MARIADB_HOST}" ]; then
+    error "MARIADB host is required."
+fi
+echo
+
+question_start
+echo "What TCP port does the MariaDB server listen on? The"
+echo "default of 3306 is correct for most installations."
+echo
+if [ -z "${GETSF_MARIADB_PORT}" ]; then
+    echo -n "(a TCP port, default 3306) >> "
+    read GETSF_MARIADB_PORT
+    if [ -z "${GETSF_MARIADB_PORT}" ]; then
+        GETSF_MARIADB_PORT="3306"
+    fi
+    record_answer GETSF_MARIADB_PORT "${GETSF_MARIADB_PORT}"
+else
+    echo "(a TCP port, default 3306) >> ${GETSF_MARIADB_PORT}"
+fi
+question_end
+echo
+
+question_start
+echo "What MariaDB username should Shaken Fist connect as? The"
+echo "default of 'shakenfist' matches tools/bootstrap-mariadb.sql."
+echo
+if [ -z "${GETSF_MARIADB_USER}" ]; then
+    echo -n "(a username, default shakenfist) >> "
+    read GETSF_MARIADB_USER
+    if [ -z "${GETSF_MARIADB_USER}" ]; then
+        GETSF_MARIADB_USER="shakenfist"
+    fi
+    record_answer GETSF_MARIADB_USER "${GETSF_MARIADB_USER}"
+else
+    echo "(a username, default shakenfist) >> ${GETSF_MARIADB_USER}"
+fi
+question_end
+echo
+
+question_start
+echo "What is the password for the MariaDB user? This is the"
+echo "password you set in place of the __REPLACE_ME__ token in"
+echo "tools/bootstrap-mariadb.sql when you bootstrapped the"
+echo "database."
+echo
+if [ -z "${GETSF_MARIADB_PASSWORD}" ]; then
+    echo -n "(a password) >> "
+    read GETSF_MARIADB_PASSWORD
+    record_answer GETSF_MARIADB_PASSWORD "${GETSF_MARIADB_PASSWORD}"
+else
+    echo "(a password) >> [redacted, sourced from environment]"
+fi
+question_end
+if [ -z "${GETSF_MARIADB_PASSWORD}" ]; then
+    error "MARIADB password is required."
+fi
+echo
+
+question_start
+echo "What MariaDB database should Shaken Fist use? The default"
+echo "of 'shakenfist' matches tools/bootstrap-mariadb.sql."
+echo
+if [ -z "${GETSF_MARIADB_DATABASE}" ]; then
+    echo -n "(a database name, default shakenfist) >> "
+    read GETSF_MARIADB_DATABASE
+    if [ -z "${GETSF_MARIADB_DATABASE}" ]; then
+        GETSF_MARIADB_DATABASE="shakenfist"
+    fi
+    record_answer GETSF_MARIADB_DATABASE "${GETSF_MARIADB_DATABASE}"
+else
+    echo "(a database name, default shakenfist) >> ${GETSF_MARIADB_DATABASE}"
+fi
+question_end
+echo
+
 question_start
 echo "Is there any additional cluster configuration you'd like applied"
 echo "before Shaken Fist starts? This is an advanced feature used to deploy"
@@ -763,20 +857,21 @@ fi
 
 local_client_package="/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
 if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
-    local_server_package=shakenfist-client
+    local_client_package=shakenfist-client
 fi
 
-local_agent_package="/tmp/"$(basename ${GETSF_AGENT_PACKAGE})
-if [ ${GETSF_AGENT_PACKAGE} == "shakenfist-agent" ]; then
-    local_server_package=shakenfist-agent
-fi
+# The shakenfist-agent package used to be installed into the server venv
+# because the pre-gRPC guest-protocol definitions lived there. The agent
+# is now standalone (vsock + gRPC) and the server does not import it, so
+# we install only the server and client packages here. The agent wheel
+# is still copied to /tmp on every node for operators who want to push
+# it into guests, but it is no longer a dependency of the server venv.
 
 echo
 status "Install Shaken Fist server from \${local_server_package}."
 status "Install Shaken Fist client from \${local_client_package}."
-status "Install Shaken Fist agent from \${local_agent_package}."
 echo
-uv pip install --reinstall ${PIP_EXTRA} \${local_server_package} \${local_client_package} \${local_agent_package}
+uv pip install --reinstall ${PIP_EXTRA} \${local_server_package} \${local_client_package}
 
 deactivate
 PERNODEEOF
@@ -880,6 +975,11 @@ export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
 export DNS_SERVER="${GETSF_DNS_SERVER}"
 export DEPLOY_NAME="${GETSF_DEPLOY_NAME}"
 export EXTRA_CONFIG='${GETSF_EXTRA_CONFIG}'
+export MARIADB_HOST="${GETSF_MARIADB_HOST}"
+export MARIADB_PORT="${GETSF_MARIADB_PORT}"
+export MARIADB_USER="${GETSF_MARIADB_USER}"
+export MARIADB_PASSWORD='${GETSF_MARIADB_PASSWORD}'
+export MARIADB_DATABASE="${GETSF_MARIADB_DATABASE}"
 DEPLOYEOF
 
 if [ ${GETSF_RELEASE} == "local" ]; then

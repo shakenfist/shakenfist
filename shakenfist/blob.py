@@ -134,19 +134,14 @@ class Blob(dbo):
 
     @classmethod
     def _upgrade_step_8_to_9(cls, static_values: dict[str, Any]) -> None:
-        # State migration to MariaDB is now handled by sf-ctl migrate-state-to-mariadb
         ...
 
     @classmethod
     def _upgrade_step_9_to_10(cls, static_values: dict[str, Any]) -> None:
-        # Static values migration to MariaDB is handled by
-        # sf-ctl migrate-data-to-mariadb (blobs table)
         ...
 
     @classmethod
     def _upgrade_step_10_to_11(cls, static_values: dict[str, Any]) -> None:
-        # Attributes migration to MariaDB blob_attributes table is handled by
-        # sf-ctl migrate-data-to-mariadb (blob_attributes table)
         ...
 
     @classmethod
