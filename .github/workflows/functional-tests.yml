@@ -1801,11 +1801,11 @@ jobs:
               ${GITHUB_WORKSPACE}/shakenfist \
               debian@$primary:shakenfist
           # ServerAliveInterval/ServerAliveCountMax: if the remote host
-          # halts itself (e.g. the lifecycle test does `halt --force --force`
-          # on a victim that turns out to be the script's own host), the
-          # TCP connection can sit half-open until the default TCP
-          # keepalive eventually times out -- hours later, well past the
-          # GitHub step budget. With these options ssh notices a dead
+          # goes down (e.g. the lifecycle test does `poweroff --force
+          # --force` on a victim that turns out to be the script's own
+          # host), the TCP connection can sit half-open until the default
+          # TCP keepalive eventually times out -- hours later, well past
+          # the GitHub step budget. With these options ssh notices a dead
           # connection in roughly 30 s and the step fails fast instead.
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
@@ -1844,9 +1844,13 @@ jobs:
           # GitHub runner already has under-cloud sf-client credentials
           # (the topology playbooks use sf_instance from here). Don't
           # let one failed reboot abort the rest of the loop -- we want
-          # all five attempted before log collection.
+          # all five attempted before log collection. The lifecycle test
+          # powers its maintainer victim off entirely (`poweroff --force
+          # --force` exits the QEMU domain), and reboot is not valid for
+          # a powered-off instance, so fall back to poweron.
           for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
-              sf-client instance reboot --hard ${node} || true
+              sf-client instance reboot --hard ${node} || \
+                  sf-client instance poweron ${node} || true
           done
           sleep 90
 

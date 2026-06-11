@@ -280,16 +280,27 @@ log "Will hard stop the cluster maintainer, ${maintainer}"
 maintainer_uuid=$(sf-client --json node show ${maintainer} | jq --raw-output ".uuid")
 other_victim_uuid=$(sf-client --json node show ${other_victim} | jq --raw-output ".uuid")
 
-# Terminate the node uncleanly for ${maintainer}. Wrap in `timeout` so a
-# stuck SSH cannot consume the entire 60-minute step budget; observed in
-# CI when the keepalive failed to fire after the remote halted. A clean
-# disconnect (rc 255) or the timeout itself (rc 124) are both fine -- the
-# point is that the node is going away.
+# Terminate the node uncleanly for ${maintainer}. Use `poweroff`, not
+# `halt`: a halted SMP guest is still a running QEMU domain and can
+# spontaneously reset and reboot (observed in merge run 27324192652,
+# where the halted maintainer came back 63 seconds after
+# `halt --force --force` -- the under-cloud reported the domain
+# "running" throughout, so the reset was guest-internal -- and the
+# resurrected node re-registered and failed the missing-state check).
+# `poweroff --force --force` exits the domain entirely, so the node
+# deterministically stays down; the workflow's post-test revival step
+# powers it back on for log collection.
+#
+# Wrap in `timeout` so a stuck SSH cannot consume the entire
+# 60-minute step budget; observed in CI when the keepalive failed to
+# fire after the remote went down. A clean disconnect (rc 255) or the
+# timeout itself (rc 124) are both fine -- the point is that the node
+# is going away.
 timeout 300 sudo ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=1 \
-    -o ServerAliveCountMax=1 debian@${maintainer} "sudo halt --force --force"
+    -o ServerAliveCountMax=1 debian@${maintainer} "sudo poweroff --force --force"
 rc=$?
 if [ ${rc} -ne 0 ]; then
-    log "Halt SSH exited ${rc} (124=timeout, 255=connection lost are expected)"
+    log "Poweroff SSH exited ${rc} (124=timeout, 255=connection lost are expected)"
 fi
 echo
 
