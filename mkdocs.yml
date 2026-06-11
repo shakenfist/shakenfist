@@ -202,6 +202,7 @@ nav:
                 - "Phase 4: Port latency loadtest to control socket": components/kerbside/plans/PLAN-test-harness-phase-04-port-latency.md
                 - "Phase 5: Direct-qemu CI workflow": components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci.md
                 - "Phase 6: Ryll Cargo feature work + digest decoding + restore keypress-to-screen latency": components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding.md
+                - "Phase 7: First Sextant scenario tempest test": components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md
@@ -239,7 +240,7 @@ nav:
             - "Building and Testing on macOS": components/ryll/development-macos.md
             - "Channel diagnostics audit": components/ryll/channel-diagnostics-audit.md
             - "Configuration": components/ryll/configuration.md
-            - "Control Socket Protocol — Version 1.0": components/ryll/control-socket-protocol.md
+            - "Control Socket Protocol — Version 1.1": components/ryll/control-socket-protocol.md
             - "Installation": components/ryll/installation.md
             - "K1: tokio waker silently lost on main channel after T+465 s": components/ryll/TOKIO-WEDGING.md
             - "Libvirt / QEMU Settings for Best SPICE Performance with Ryll": components/ryll/libvirt-spice-recommendations.md

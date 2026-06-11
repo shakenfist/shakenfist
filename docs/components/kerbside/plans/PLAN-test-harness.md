@@ -236,12 +236,12 @@ searchable from one place.
 | Phase | Repo | Plan | Status |
 |-------|------|------|--------|
 | 1. Shared visual-digest crate | new (`shakenfist-visual-digest`) | [PLAN-test-harness-phase-01-digest-crate.md](/components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/) | Implementation complete; Sextant PR pending operator |
-| 2. Static source driver | kerbside | [PLAN-test-harness-phase-02-static-hypervisor.md](/components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/) | Implementation complete |
+| 2. Static source driver | kerbside | [PLAN-test-harness-phase-02-static-hypervisor.md](/components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/) | Merged |
 | 3. Control socket on Ryll | ryll | [PLAN-test-harness-phase-03-control-socket.md](/components/kerbside/plans/PLAN-test-harness-phase-03-control-socket/) | Merged to ryll develop |
-| 4. Port latency loadtest to control socket and remove legacy `testclient/ryll/` | kerbside | [PLAN-test-harness-phase-04-port-latency.md](/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/) | Implementation complete; PR pending operator |
-| 5. Direct-qemu CI workflow | kerbside | [PLAN-test-harness-phase-05-direct-qemu-ci.md](/components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/) | Implementation drafted; awaiting first CI run |
-| 6. Ryll Cargo feature work: digest decoding, headless feature, restore keypress-to-screen latency | ryll | [PLAN-test-harness-phase-06-digest-decoding.md](/components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/) | Phase plan drafted |
-| 7. First Sextant scenario tempest test | kerbside | PLAN-test-harness-phase-07-scenario-test.md | Not started |
+| 4. Port latency loadtest to control socket and remove legacy `testclient/ryll/` | kerbside | [PLAN-test-harness-phase-04-port-latency.md](/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/) | Merged |
+| 5. Direct-qemu CI workflow | kerbside | [PLAN-test-harness-phase-05-direct-qemu-ci.md](/components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/) | Merged; lane green in CI |
+| 6. Ryll Cargo feature work: digest decoding, headless feature, restore keypress-to-screen latency | ryll | [PLAN-test-harness-phase-06-digest-decoding.md](/components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/) | Merged (ryll and kerbside sides) |
+| 7. First Sextant scenario tempest test | kerbside | [PLAN-test-harness-phase-07-scenario-test.md](/components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test/) | Implementation complete; PR pending operator |
 | 8. OpenStack CI lane disposition | kerbside | PLAN-test-harness-phase-08-openstack-disposition.md | Not started |
 
 Indicative effort and model recommendations (firmed up
@@ -255,7 +255,7 @@ when each phase plan is written):
 | 4 | medium | sonnet | Rewrite the loadtest to drive the control socket, then delete the legacy `testclient/ryll/` tree (the loadtest is its only consumer). Also touches `loadtests/latency/Dockerfile` and any README / AGENTS.md references. Validates phase 3's API; small but high-signal. |
 | 5 | high | opus | New CI workflow integrating multiple binaries, debugging KVM/runner-environment unknowns, many edge cases. |
 | 6 | high | opus | Three concerns bundled because they all touch Ryll's Cargo features and channel handlers. (1) SurfaceMirror integration + QR detection on draw-event change + correctness around when to re-decode, gated behind a `digest-decode` Cargo feature off by default. (2) A `headless` Cargo feature that excludes the GUI/audio stack (eframe, egui, egui-winit, cpal) so kerbside's loadtest and direct-qemu CI images can drop libgl1 / libx11-6 / libxcb1 / libxkbcommon0 / libwayland-client0 / libasound2 from the runtime layer. The phase 4 Dockerfile and phase 5 CI image both switch to `cargo build --release --no-default-features --features headless` once this lands; flagged in phase 4's `Bugs fixed during this work` for cross-reference. (3) A `surface_drawn` control-socket event so phase 4's loadtest can restore keypress-to-screen latency semantics (the user-perceivable metric Kerbside is being measured against); orchestrator switch-back is part of this phase. |
-| 7 | medium | sonnet | Composes phase 6 primitives into a scenario. Once the spine is in place this is mostly glue. |
+| 7 | high | mixed (fable / opus / sonnet) | Originally rated medium/sonnet ("mostly glue"); re-rated while drafting the phase plan. The scenario test composes two oracles (busy digest event stream, post-mortem serial drain) with destructive teardown ordering and credential-less tempest integration — more than glue. The phase plan assigns Fable 5 (a tier above opus, released after this table was first written) to the scenario-test step as a deliberate first experiment, opus to the CI wiring, sonnet to the glue. |
 | 8 | low | sonnet | A CI workflow tweak plus a documentation update. |
 
 ### Sequencing notes
@@ -337,15 +337,19 @@ true:
 * `pre-commit run --all-files` passes on every commit
   on this branch.
 * A new tempest test in
-  `tempest-plugin/kerbside_tempest_plugin/tests/api/`
-  boots an Uncalibrated Sextant qcow2 under direct
-  qemu/KVM, fronts it with Kerbside via the static
+  `tempest-plugin/kerbside_tempest_plugin/tests/scenario/`
+  (originally written as `tests/api/`; corrected during
+  phase 7 planning — it is a scenario test by tempest's
+  own taxonomy) boots an Uncalibrated Sextant qcow2 under
+  direct qemu/KVM, fronts it with Kerbside via the static
   hypervisor driver, drives the
   Awaiting → Booting → paste → Parked sequence via
   Ryll's control socket, asserts the QR digest reflects
   the inputs sent, and asserts the serial drain at
   shutdown matches the expected event sequence. All of
-  this runs without OpenStack.
+  this runs without OpenStack. (The test consumes a lane
+  brought up by `tools/direct-qemu/`; it does not boot
+  qemu itself.)
 * The legacy latency loadtest in `loadtests/latency/`
   drives Ryll's control socket. Its latency numbers
   are unchanged within noise vs the pre-port baseline.
@@ -414,9 +418,19 @@ Items deliberately deferred:
 ### Bugs fixed during this work
 
 This section should list any bugs we encounter during
-development that we fixed.
+development that we fixed. Per-phase bugs are logged in the
+phase plans; cross-phase interaction bugs are logged here.
 
-(None yet.)
+- **The phase 5 smoke client hard-asserted control-socket
+  protocol version "1.0".** When phase 6's ryll merge bumped
+  main to v1.1, every direct-qemu lane run began failing at
+  the smoke step (the workflow builds ryll from main), which
+  also masked the phase 7 scenario step on the phase 7 PR
+  itself. Fixed post-phase-7-merge: the smoke client now
+  asserts the major version only, matching the protocol's
+  compatibility model. Lesson: lane checks against a
+  fresh-from-main ryll must never assert exact minor
+  versions.
 
 ### Documentation index maintenance
 
