@@ -4589,6 +4589,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: First Sextant scenario tempest test
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5728,7 +5756,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.0
+    Control Socket Protocol — Version 1.1
   
 
     
@@ -9182,6 +9210,15 @@ is the bridge between the test driver and the SPICE session it
 asserts against. See phase 3 of the test-harness plan for the full
 design:
 <code>docs/plans/PLAN-test-harness-phase-03-control-socket.md</code>.</p>
+<p>The direct-qemu lane's final step runs the Sextant scenario tempest
+test (<code>tests/scenario/test_sextant_scenario.py</code>), which drives the
+full Awaiting → Booting → bootloader-ignore → paste → Parked →
+shutdown sequence and asserts both the live <code>digest_updated</code> QR
+event stream and the post-mortem serial drain. The test skips when
+<code>CONF.kerbside.control_socket_path</code> is unset, so it is safe to load
+the plugin on the OpenStack lane where these direct-qemu options are
+not configured. <code>tools/direct-qemu/run-scenario.sh</code> handles tempest
+venv setup, config file generation, and test execution.</p>
 <h2 id="example-sourcesyaml">Example sources.yaml<a class="headerlink" href="#example-sourcesyaml" title="Permanent link">&para;</a></h2>
 <p>An example configuration follows:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sfmel</span>

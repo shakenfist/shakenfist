@@ -4675,6 +4675,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: First Sextant scenario tempest test
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5814,7 +5842,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.0
+    Control Socket Protocol — Version 1.1
   
 
     
@@ -9299,7 +9327,7 @@ searchable from one place.</p>
 <td>2. Static source driver</td>
 <td>kerbside</td>
 <td><a href="/components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/">PLAN-test-harness-phase-02-static-hypervisor.md</a></td>
-<td>Implementation complete</td>
+<td>Merged</td>
 </tr>
 <tr>
 <td>3. Control socket on Ryll</td>
@@ -9311,25 +9339,25 @@ searchable from one place.</p>
 <td>4. Port latency loadtest to control socket and remove legacy <code>testclient/ryll/</code></td>
 <td>kerbside</td>
 <td><a href="/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/">PLAN-test-harness-phase-04-port-latency.md</a></td>
-<td>Implementation complete; PR pending operator</td>
+<td>Merged</td>
 </tr>
 <tr>
 <td>5. Direct-qemu CI workflow</td>
 <td>kerbside</td>
 <td><a href="/components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/">PLAN-test-harness-phase-05-direct-qemu-ci.md</a></td>
-<td>Implementation drafted; awaiting first CI run</td>
+<td>Merged; lane green in CI</td>
 </tr>
 <tr>
 <td>6. Ryll Cargo feature work: digest decoding, headless feature, restore keypress-to-screen latency</td>
 <td>ryll</td>
 <td><a href="/components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/">PLAN-test-harness-phase-06-digest-decoding.md</a></td>
-<td>Phase plan drafted</td>
+<td>Merged (ryll and kerbside sides)</td>
 </tr>
 <tr>
 <td>7. First Sextant scenario tempest test</td>
 <td>kerbside</td>
-<td>PLAN-test-harness-phase-07-scenario-test.md</td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test/">PLAN-test-harness-phase-07-scenario-test.md</a></td>
+<td>Implementation complete; PR pending operator</td>
 </tr>
 <tr>
 <td>8. OpenStack CI lane disposition</td>
@@ -9389,9 +9417,9 @@ when each phase plan is written):</p>
 </tr>
 <tr>
 <td>7</td>
-<td>medium</td>
-<td>sonnet</td>
-<td>Composes phase 6 primitives into a scenario. Once the spine is in place this is mostly glue.</td>
+<td>high</td>
+<td>mixed (fable / opus / sonnet)</td>
+<td>Originally rated medium/sonnet ("mostly glue"); re-rated while drafting the phase plan. The scenario test composes two oracles (busy digest event stream, post-mortem serial drain) with destructive teardown ordering and credential-less tempest integration — more than glue. The phase plan assigns Fable 5 (a tier above opus, released after this table was first written) to the scenario-test step as a deliberate first experiment, opus to the CI wiring, sonnet to the glue.</td>
 </tr>
 <tr>
 <td>8</td>
@@ -9473,15 +9501,19 @@ true:</p>
 <li><code>pre-commit run --all-files</code> passes on every commit
   on this branch.</li>
 <li>A new tempest test in
-  <code>tempest-plugin/kerbside_tempest_plugin/tests/api/</code>
-  boots an Uncalibrated Sextant qcow2 under direct
-  qemu/KVM, fronts it with Kerbside via the static
+  <code>tempest-plugin/kerbside_tempest_plugin/tests/scenario/</code>
+  (originally written as <code>tests/api/</code>; corrected during
+  phase 7 planning — it is a scenario test by tempest's
+  own taxonomy) boots an Uncalibrated Sextant qcow2 under
+  direct qemu/KVM, fronts it with Kerbside via the static
   hypervisor driver, drives the
   Awaiting → Booting → paste → Parked sequence via
   Ryll's control socket, asserts the QR digest reflects
   the inputs sent, and asserts the serial drain at
   shutdown matches the expected event sequence. All of
-  this runs without OpenStack.</li>
+  this runs without OpenStack. (The test consumes a lane
+  brought up by <code>tools/direct-qemu/</code>; it does not boot
+  qemu itself.)</li>
 <li>The legacy latency loadtest in <code>loadtests/latency/</code>
   drives Ryll's control socket. Its latency numbers
   are unchanged within noise vs the pre-port baseline.</li>
@@ -9548,8 +9580,20 @@ true:</p>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during
-development that we fixed.</p>
-<p>(None yet.)</p>
+development that we fixed. Per-phase bugs are logged in the
+phase plans; cross-phase interaction bugs are logged here.</p>
+<ul>
+<li><strong>The phase 5 smoke client hard-asserted control-socket
+  protocol version "1.0".</strong> When phase 6's ryll merge bumped
+  main to v1.1, every direct-qemu lane run began failing at
+  the smoke step (the workflow builds ryll from main), which
+  also masked the phase 7 scenario step on the phase 7 PR
+  itself. Fixed post-phase-7-merge: the smoke client now
+  asserts the major version only, matching the protocol's
+  compatibility model. Lesson: lane checks against a
+  fresh-from-main ryll must never assert exact minor
+  versions.</li>
+</ul>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p><code>docs/plans/index.md</code> should gain a Master-plans entry
 for this plan when the first phase plan is written, and
