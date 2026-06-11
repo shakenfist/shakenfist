@@ -1142,11 +1142,6 @@ if [ -z $1 ]; then
     status "Pause briefly to let Shaken Fist settle."
     sleep 5
 
-    status "Setup apache2 load balancing."
-    sudo rm /etc/apache2/sites-enabled/*
-    sudo a2ensite sf-example.conf
-    sudo apachectl graceful
-
     status "Load sfrc."
     . /etc/sf/sfrc
 
