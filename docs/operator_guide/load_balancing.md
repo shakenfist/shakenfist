@@ -132,9 +132,12 @@ location = /apispec_1.json {
 }
 ```
 
-The full file (including the `Host` and `X-Forwarded-*` headers, the bare
-`/api` redirect, the HTTP-to-HTTPS redirect, TLS configuration, and the
-blob-transfer directives) is in `examples/nginx-loadbalancer.conf`.
+The full file in `examples/nginx-loadbalancer.conf` adds the rest of a
+production-ready configuration: the `Host`, `X-Real-IP` and `X-Forwarded-*`
+headers, upstream keepalive, a block that drops PHP vulnerability scanners, a
+root catch-all so clients that omit the `/api` prefix still work, the bare
+`/api` redirect, the HTTP-to-HTTPS redirect, TLS termination, and the
+blob-transfer directives described below.
 
 ## Blob transfers
 
