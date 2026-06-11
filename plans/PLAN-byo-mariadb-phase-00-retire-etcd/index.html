@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-remove-etcd/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-byo-mariadb-phase-00-retire-etcd/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Retire etcd from the Shaken Fist codebase - Shaken Fist</title>
+        <title>Phase 0: Retire etcd machinery and migration-era scaffolding - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#retire-etcd-from-the-shaken-fist-codebase" class="md-skip">
+        <a href="#phase-0-retire-etcd-machinery-and-migration-era-scaffolding" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Retire etcd from the Shaken Fist codebase
+              Phase 0: Retire etcd machinery and migration-era scaffolding
             
           </span>
         </div>
@@ -8673,10 +8673,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        Context
       
     </span>
   </a>
@@ -8684,10 +8684,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mission-and-problem-statement" class="md-nav__link">
+  <a href="#decisions-phase-local" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mission and problem statement
+        Decisions (phase-local)
       
     </span>
   </a>
@@ -8695,10 +8695,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#preconditions" class="md-nav__link">
+  <a href="#steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Preconditions
+        Steps
       
     </span>
   </a>
@@ -8706,10 +8706,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#scope" class="md-nav__link">
+  <a href="#validation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Scope
+        Validation
       
     </span>
   </a>
@@ -8717,10 +8717,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
+  <a href="#risks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Open questions
+        Risks
       
     </span>
   </a>
@@ -8728,140 +8728,17 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
+  <a href="#out-of-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Execution
+        Out of scope
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Execution">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#execution-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution steps
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent guidance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Agent guidance">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#execution-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution model
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-level-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step-level guidance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#management-session-review-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Management session review checklist
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8869,11 +8746,6 @@
       
     </span>
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -8898,189 +8770,197 @@
   
 
 
-<h1 id="retire-etcd-from-the-shaken-fist-codebase">Retire etcd from the Shaken Fist codebase<a class="headerlink" href="#retire-etcd-from-the-shaken-fist-codebase" title="Permanent link">&para;</a></h1>
+<h1 id="phase-0-retire-etcd-machinery-and-migration-era-scaffolding">Phase 0: Retire etcd machinery and migration-era scaffolding<a class="headerlink" href="#phase-0-retire-etcd-machinery-and-migration-era-scaffolding" title="Permanent link">&para;</a></h1>
+<p>Parent plan: <a href="../PLAN-byo-mariadb/">PLAN-byo-mariadb.md</a>.
+Supersedes the formerly-separate <code>PLAN-remove-etcd.md</code>
+(absorbed by this plan; that file was deleted in commit
+<code>76fa8ee8b</code>).</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the shakenfist codebase thoroughly. Read
-<code>shakenfist/etcd.py</code> in full, the <code>DATA_MIGRATIONS</code>
-machinery in <code>shakenfist/mariadb.py</code>, and grep for <code>etcd</code>
-across the tree. Ground your answers in what the code
-actually does today.</p>
-<p>All planning documents should go into <code>docs/plans/</code>.</p>
-<p>Consult <code>CLAUDE.md</code> for the existing commitment to remove
-the etcd shim "in the next minor version" and the database
-architecture summary. The key references for this plan are
-<code>shakenfist/etcd.py</code>, the <code>_migrate_etcd_*</code> functions and
-<code>DATA_MIGRATIONS</code> registry in <code>shakenfist/mariadb.py</code>,
-<code>shakenfist/deploy/ansible/files/sfrc</code>,
-<code>shakenfist/deploy/ansible/roles/base/defaults/main.yml</code>,
-and any residual <code>from etcd...</code> comments throughout
-<code>mariadb.py</code>.</p>
-<p>This plan is <strong>small and almost mechanical</strong>. It exists as
-a standalone plan because its preconditions are external
-(another plan landing, then a production redeploy) and
-deserve to be stated explicitly so the deletion does not
-happen prematurely.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>Shaken Fist used etcd as its primary datastore until the
-move to MariaDB. The <code>etcd.py</code> module and the
-<code>DATA_MIGRATIONS</code> drain functions in <code>mariadb.py</code> exist
-solely to migrate residual state out of etcd into MariaDB
-on first boot against an old cluster. The module is
-already documented in <code>CLAUDE.md</code> as "retained only to
-service <code>DATA_MIGRATIONS</code> entries which drain leftover
-etcd keys from older clusters" and "will be removed in the
-next minor version."</p>
-<p>The one known SF deployment still running on the etcd-era
-shape (Mikal's own production cluster) is going to be
-<strong>wiped and reinstalled</strong>, not upgraded in place, against
-the new BYO-infrastructure shape established by
-<code>PLAN-remove-primary.md</code>. Once that decision is made, the
-drain code is dead weight forever — there is no scenario
-in which it executes against a real cluster.</p>
-<p>The mitigation for any <em>unknown</em> etcd-era deployment is
-modest: pin the last release that still carries the drain
-code (the release immediately before this plan lands), and
-note in the changelog that anyone still on etcd-era SF
-must upgrade through that pinned release first or rebuild
-from scratch. Operators who have not surfaced their
-deployments to the project are accepting the
-responsibility to either follow the pinned-release path or
-do the rebuild themselves.</p>
-<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Delete every reference to etcd from the Shaken Fist server
-codebase in a single coordinated sweep. The work is small,
-mechanical, and well-bounded; its only real complexity is
-<em>timing</em>.</p>
-<h2 id="preconditions">Preconditions<a class="headerlink" href="#preconditions" title="Permanent link">&para;</a></h2>
-<p>This plan needs only one thing to be true: <strong>a recorded
-decision that in-place upgrade from etcd-era Shaken Fist
-is no longer supported.</strong> The decision was made during
-the planning conversation that produced this document and
-its sibling plans. Operationally, that means:</p>
-<ol>
-<li>The PR that lands this deletion sweep notes the
-   pinned-release upgrade path in its description, so the
-   changelog / release notes for the release containing
-   this deletion can point at the prior release as the
-   intermediate-upgrade target for anyone still on
-   etcd-era SF.</li>
-<li><code>CLAUDE.md</code>'s claim that the shim is "retained only to
-   service <code>DATA_MIGRATIONS</code> entries which drain leftover
-   etcd keys from older clusters" is updated as part of
-   the same PR, since it is no longer true.</li>
-</ol>
-<p>This plan is <strong>not</strong> gated on <code>PLAN-remove-primary.md</code>
-landing. The two are independent: this plan removes the
-drain <em>code</em> in <code>shakenfist/</code>; phase 7 of remove-primary
-removes the stale <code>etcd_master</code> <em>naming</em> in the deployer.
-Either can land first. Practically, this plan is small and
-mechanical and should land <strong>early in the sequence</strong> so the
-remove-primary work is not navigating misleading etcd
-references while it tries to rename the ansible group.</p>
-<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
-<p>The deletion sweep removes:</p>
+<p>Before responding, read these source files end-to-end —
+they are the substrate this phase deletes:</p>
 <ul>
-<li><code>shakenfist/etcd.py</code> (entire file).</li>
-<li>Every <code>_migrate_etcd_*</code> function in
-  <code>shakenfist/mariadb.py</code> (currently includes
-  <code>_migrate_etcd_object_states</code>,
-  <code>_migrate_etcd_ipam_reservations</code>, and any siblings
-  added since this plan was written — confirm by
-  inspection at execution time).</li>
-<li>The <code>DATA_MIGRATIONS</code> registry entries pointing at
-  those drain functions. The registry mechanism itself
-  may stay if other (non-etcd) migrations use it; remove
-  it entirely if it is left with no callers.</li>
-<li>The "No etcd server configured; marking pending data
-  migrations as complete" log line and the surrounding
-  short-circuit that exists today to avoid spamming
-  "Cannot communicate with etcd" errors on fresh
-  clusters.</li>
-<li>The <code>etcd_host: "127.0.0.1"</code> default in
-  <code>shakenfist/deploy/ansible/roles/base/defaults/main.yml</code>.</li>
-<li>The <code>export ETCDCTL_API=3</code> line in
-  <code>shakenfist/deploy/ansible/files/sfrc</code>.</li>
-<li>Every residual <code># ... from etcd ...</code> style comment in
-  <code>mariadb.py</code> and elsewhere that explains a table
-  schema, key naming, or migration history in terms of
-  the old etcd layout. After the sweep, the codebase
-  should not have to mention etcd to explain itself.</li>
-<li>Any tests that exercise the drain functions or import
-  <code>shakenfist.etcd</code>.</li>
-<li>The <code>etcd3gw</code> dependency in <code>pyproject.toml</code> (and any
-  transitive references in <code>tox.ini</code> or CI config).</li>
-<li>Any documentation in <code>docs/</code> that still mentions etcd
-  outside of a clearly-historical context. The
-  operator guide's references to etcd ports and tuning
-  go entirely; release notes / changelog mentions stay
-  as historical record.</li>
+<li><code>shakenfist/etcd.py</code> (473 lines; the entire etcd shim
+  layer used to be the dependency surface for every
+  drain function).</li>
+<li><code>shakenfist/mariadb.py</code> lines 2364-2553 (the
+  <code>DATA_MIGRATIONS</code> framework comment block,
+  declaration, and <code>ensure_data_migrations()</code> function)
+  and lines 2571-~4920 (the ~31 <code>_migrate_etcd_*</code> /
+  <code>_cleanup_etcd_*</code> functions, the <code>_migrate_node_state
+  _key</code> helper, and the <code>DATA_MIGRATIONS.update()</code>
+  block at ~4923).</li>
+<li><code>shakenfist/protos/etcd_pb2.py</code>, <code>etcd_pb2_grpc.py</code>
+  and their <code>.pyi</code> siblings (generated stubs for the
+  etcd v3 gRPC API).</li>
+<li><code>protos/etcd.proto</code> (the proto source the stubs come
+  from).</li>
+<li><code>shakenfist/tests/test_cluster_config_drain.py</code> (117
+  lines) and <code>shakenfist/tests/test_etcd_ops_queues_
+  drain.py</code> (218 lines) — unit tests that exercise the
+  drain path; both die when the code they cover dies.</li>
+<li><code>shakenfist/client/ctl.py</code> lines 183-196 (the hidden
+  <code>show-etcd-config</code> / <code>set-etcd-config</code> aliases
+  preserved from the etcd era).</li>
+<li><code>shakenfist/config.py</code> line 488 area (the <code>ETCD_HOST</code>
+  config field, comment already says "remove in next
+  release").</li>
+<li><code>pyproject.toml</code> (<code>etcd3gw==2.6.0</code> dependency).</li>
+<li><code>CLAUDE.md</code> lines mentioning etcd (58, 246, 369 by
+  the latest count — find by string, not line).</li>
+<li><code>docs/developer_guide/authentication.md</code> line 56
+  (<code>ETCDCTL_API=3</code> example).</li>
 </ul>
-<p>The sweep does <strong>not</strong> touch the <code>cluster_locks</code>,
-<code>cluster_config</code>, or event-log tables in MariaDB, even
-though their schema comments reference their etcd
-predecessors. Update the comments rather than the schema.</p>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<p>This phase deletes Python-side etcd machinery. It does
+<strong>not</strong> touch:</p>
+<ul>
+<li>The <code>etcd_master</code> ansible group name in <code>deploy.py</code>,
+  <code>deploy.yml</code>, or any ansible role. That rename
+  belongs to <code>PLAN-remove-primary</code> phase 7.</li>
+<li>The <code>is_etcd_master</code> Python attribute on <code>Node</code>, the
+  matching column on the <code>nodes</code> table, the gRPC
+  protobuf field, or any other "is this the database
+  node?" boolean threaded through the codebase. Per the
+  master plan, that attribute is functionally identical
+  to "is database node" today and will be renamed in
+  <code>PLAN-remove-primary</code> phase 7 alongside the ansible
+  group rename. Phase 0 leaves the attribute alone to
+  avoid cross-scope churn.</li>
+</ul>
+<p>One commit per step at minimum. Each commit must build,
+pass <code>pre-commit run --all-files</code>, and have a clear
+message.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The originally-separate <code>PLAN-remove-etcd.md</code> was
+absorbed into this plan because the master-plan
+exploration found that the etcd machinery was still in
+tree even though the data drain had finished. The
+master plan's decision 11 records this as the rationale.</p>
+<p>That same exploration claimed <code>DATA_MIGRATIONS</code> was an
+empty dict. The post-phase-1 inventory reveals this was
+wrong: <code>DATA_MIGRATIONS</code> is declared empty at
+<code>mariadb.py:2396</code> but populated via
+<code>DATA_MIGRATIONS.update({...})</code> at line 4923 with 31
+table-keyed migration functions that drain etcd into
+MariaDB. Those functions never run on a cluster without
+<code>ETCD_HOST</code> set (<code>ensure_data_migrations()</code> short-
+circuits at lines 2440-2444 when <code>ETCD_HOST</code> is
+empty), but they are still in tree as ~2400 lines of
+dead code.</p>
+<p>Phase 1 of this plan removed the only daemon-side
+caller of <code>ensure_data_migrations()</code> (commit
+<code>6a4ac7b69</code>). The function is now orphaned: no code
+path invokes it. The orphan is harmless but conspicuous
+— phase 0 deletes it along with the rest of the
+machinery so the tree reflects reality.</p>
+<p>After this phase lands, the following statements are
+true:</p>
+<ul>
+<li><code>shakenfist/etcd.py</code> no longer exists. No SF code
+  imports etcd v3 gRPC stubs or <code>etcd3gw</code>. The
+  <code>etcd3gw</code> PyPI dependency is gone.</li>
+<li><code>ensure_data_migrations()</code>, the <code>DATA_MIGRATIONS</code>
+  dict, every <code>_migrate_etcd_*</code> / <code>_cleanup_etcd_*</code>
+  function, and the framework comment block are
+  removed from <code>mariadb.py</code>. <code>ensure_schema()</code> is the
+  only entry point for schema management.</li>
+<li>The <code>ETCD_HOST</code> config field is gone from
+  <code>shakenfist/config.py</code>. <code>sf-ctl show-etcd-config</code> /
+  <code>set-etcd-config</code> aliases are gone from
+  <code>shakenfist/client/ctl.py</code>.</li>
+<li>Source comments referencing retired
+  <code>sf-ctl migrate-*</code> commands (in <code>blob.py</code>,
+  <code>upload.py</code>, <code>artifact.py</code>, <code>node.py</code>,
+  <code>namespace.py</code>, <code>network/network.py</code>,
+  <code>constants.py</code>) are removed or reworded.</li>
+<li>The two etcd-drain test files
+  (<code>test_cluster_config_drain.py</code>,
+  <code>test_etcd_ops_queues_drain.py</code>) are deleted.</li>
+<li><code>CLAUDE.md</code> etcd notes (the "etcd.py module is
+  retained only to service DATA_MIGRATIONS"
+  paragraph and the <code>etcd3gw</code> line in the
+  Dependencies list) are removed.</li>
+<li><code>docs/developer_guide/authentication.md</code> no longer
+  references <code>ETCDCTL_API=3</code>.</li>
+<li>The stale comment at <code>mariadb.py:16904-16906</code> that
+  defers version-bumping to <code>ensure_data_migrations</code>
+  is reworded (the v1→v2 ALTER TABLE for
+  <code>instance_attributes.vsock_cids</code> is now standalone;
+  the schema migration block immediately below
+  bumps the version itself).</li>
+<li>The stale <code>_construct_key</code> cross-reference at
+  <code>mariadb.py:1361-1362</code> is reworded — the comment
+  explains lock-key naming and pointed at the
+  defunct <code>etcd._construct_key</code> function for the
+  historical justification.</li>
+</ul>
+<h2 id="decisions-phase-local">Decisions (phase-local)<a class="headerlink" href="#decisions-phase-local" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>Single commit or split?</strong> This plan's working
-   assumption is one coordinated deletion commit, because
-   the pieces are interdependent (deleting <code>etcd.py</code>
-   without also deleting the importers breaks the build).
-   If the deletion turns out to span more than ~500 lines
-   of removed code, consider splitting into two commits:
-   one for the drain code and module, one for the
-   dependency / config / comment sweep. Decide on the day.</li>
-<li><strong>Dependency version pinning.</strong> If <code>etcd3gw</code> is the
-   only consumer of any other transitive dependency,
-   those drop out automatically when it does. Worth a
-   <code>pip freeze</code> comparison before and after to confirm
-   no unrelated package versions move.</li>
+<li>
+<p><strong><code>is_etcd_master</code> Python attribute is left alone.</strong>
+   The attribute is read and written across <code>node.py</code>,
+   <code>mariadb.py</code> (the <code>nodes</code> table column at line
+   ~11200), <code>daemons/database/main.py</code> (gRPC proto
+   round-trips), and <code>daemons/resources/main.py</code>. It
+   is dead in the sense that no code path reacts to
+   its value, but it is alive in the sense that
+   removing it requires a coordinated schema migration,
+   protobuf change, gRPC client recompile, and Node-
+   accessor rewrite. The master plan already scopes
+   the rename (<code>is_etcd_master</code> → <code>is_database_node</code>)
+   to <code>PLAN-remove-primary</code> phase 7. Phase 0 keeps to
+   that boundary.</p>
+</li>
+<li>
+<p><strong>No staged removal across releases.</strong> Per master
+   plan decision 7 (greenfields only), there is no
+   compatibility shim, no deprecation warning, no
+   <code>--legacy</code> flag preserving the old behaviour. The
+   single operating SF cluster will be redeployed
+   against the post-phase-0 tree.</p>
+</li>
+<li>
+<p><strong>Schema-version comment update is in-scope.</strong> The
+   comment at <code>mariadb.py:16904-16906</code> says "We do NOT
+   bump the version here. The version is bumped by the
+   data migration in <code>ensure_data_migrations()</code>." Once
+   <code>ensure_data_migrations</code> is deleted, that comment
+   is misleading. The actual code immediately below
+   (lines 16913+) handles version bumping in a
+   schema-only manner. Step 0a rewords the comment to
+   reflect that the v1→v2 ALTER TABLE is now a pure
+   schema migration with the version bump landing in
+   the per-version block that follows.</p>
+</li>
+<li>
+<p><strong>The <code>_construct_key</code> historical-reference comment
+   is reworded, not deleted.</strong> At <code>mariadb.py:1361-
+   1362</code> a comment explains the lock_key column naming
+   convention by referring to the defunct
+   <code>etcd._construct_key(prefix='sflocks')</code> function.
+   The convention is real and worth documenting; the
+   etcd reference is stale. Step 0a rewords the
+   comment to describe the convention directly
+   without referring to the removed function.</p>
+</li>
+<li>
+<p><strong><code>tox -e genprotos</code> is not re-run as part of this
+   phase.</strong> Phase 0 deletes the etcd <code>.proto</code> source
+   and its generated stubs by hand. Re-running
+   <code>genprotos</code> would re-generate stubs for whatever
+   <code>.proto</code> files remain, which is exactly what we
+   want — but doing it after-the-fact in this phase
+   risks regenerating other stubs as a side effect
+   (whitespace, version markers, etc.). The phase
+   leaves the rest of <code>shakenfist/protos/</code> untouched.</p>
+</li>
 </ol>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<p>This plan is a single phase. Phase plans below the master
-plan are unnecessary given the size.</p>
-<table>
-<thead>
-<tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1. Sweep</td>
-<td>(no separate phase plan needed)</td>
-<td>Blocked on preconditions</td>
-</tr>
-</tbody>
-</table>
-<h3 id="execution-steps">Execution steps<a class="headerlink" href="#execution-steps" title="Permanent link">&para;</a></h3>
-<p>When the preconditions are satisfied:</p>
-<ol>
-<li>Re-run the grep audit (<code>grep -rn etcd shakenfist/ docs/
-   tools/</code>) to confirm the scope above is still accurate.
-   Add anything that has appeared since this plan was
-   written.</li>
-<li>Make the deletions in one branch.</li>
-<li>Run <code>pre-commit run --all-files</code> and <code>tox</code>. The build
-   must pass cleanly with no stale imports, no dangling
-   references in tests, and no documentation links
-   pointing at removed sections.</li>
-<li>Open the PR with a description that explicitly cites
-   this plan and confirms the preconditions are met.</li>
-<li>Update <code>CLAUDE.md</code> to remove the "retained only to
-   service <code>DATA_MIGRATIONS</code>" paragraph in the database
-   section, since the sentence is no longer true.</li>
-</ol>
-<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
-<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
-<p>This plan is small enough to be executed by a single
-sub-agent in one pass. Use <code>isolation: "worktree"</code> because
-the deletion is irreversible and worth being able to
-discard if the precondition check at the top of the work
-turns up a surprise.</p>
-<h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
+<h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
+<p>Four steps. They are strictly sequential — step 0a
+removes the <code>etcd</code> module's only Python importer,
+which is the prerequisite for step 0b's actual
+deletion of <code>etcd.py</code> and its protos. Steps 0c and 0d
+follow after the imports are gone but are independent
+of each other.</p>
 <table>
 <thead>
 <tr>
@@ -9093,62 +8973,125 @@ turns up a surprise.</p>
 </thead>
 <tbody>
 <tr>
-<td>1a</td>
+<td>0a</td>
 <td>medium</td>
-<td>sonnet</td>
+<td>opus</td>
 <td>worktree</td>
-<td>Re-audit <code>grep -rn etcd shakenfist/ docs/ tools/</code> and produce a concrete list of every file and line to be touched. Output the list as a markdown checklist; do not modify any files in this step.</td>
+<td>Purge dead etcd-migration code from <code>shakenfist/mariadb.py</code>. Delete: (i) the <code>from shakenfist import etcd</code> import at the top of the file (find the exact line); (ii) the <code>DATA_MIGRATIONS</code> framework block at ~lines 2364-2553 — the multi-line docstring-comment intro, the <code>DATA_MIGRATIONS: dict[...] = {}</code> declaration, and the <code>ensure_data_migrations()</code> function in its entirety; (iii) every <code>_migrate_etcd_*</code> and <code>_cleanup_etcd_*</code> function at lines ~2571-~4920 (31 functions in total — confirm count with <code>grep -c '^def _migrate_etcd_\\|^def _cleanup_etcd_' shakenfist/mariadb.py</code> after the delete to verify zero remain); (iv) the <code>_migrate_node_state_key</code> helper at ~line 3325 (only called by other migration functions in the same block); (v) the <code>DATA_MIGRATIONS.update({...})</code> block at ~line 4923-~4960 that registers the functions. Then update two stale comments: (vi) at lines ~16904-16906, replace the "We do NOT bump the version here. The version is bumped by the data migration in ensure_data_migrations()" comment with one that describes the v1→v2 ALTER TABLE as a standalone schema migration (the per-version bump immediately below already handles the version increment); (vii) at lines ~1361-1362, replace the "Mirrors etcd._construct_key(prefix='sflocks')" comment with a direct explanation of the <code>/sflocks/{type}/{subtype}/{name}</code> convention without referencing the removed function. Verify with grep that no <code>etcd.</code> references remain in <code>mariadb.py</code>. Run <code>pre-commit run --all-files</code>; the existing test suite should pass (no test should rely on the removed migration functions — they are dead code; the dedicated drain tests are deleted in step 0b). Worktree isolation: this is the highest-volume single-step deletion in the phase (~2400 lines), and it is worth being able to discard if the boundary detection went wrong. One commit.</td>
 </tr>
 <tr>
-<td>1b</td>
-<td>medium</td>
+<td>0b</td>
+<td>low</td>
 <td>sonnet</td>
-<td>worktree</td>
-<td>Execute the deletion sweep against the audit from 1a. Files to delete: <code>shakenfist/etcd.py</code> in full; the <code>_migrate_etcd_*</code> functions and their <code>DATA_MIGRATIONS</code> registry entries in <code>shakenfist/mariadb.py</code>; the <code>etcd_host</code> default; the <code>ETCDCTL_API=3</code> line in <code>sfrc</code>; the <code>etcd3gw</code> dependency in <code>pyproject.toml</code>; residual comments. Update <code>CLAUDE.md</code> to remove the etcd shim paragraph. Run <code>pre-commit run --all-files</code> and <code>tox</code> and fix until they pass.</td>
+<td>none</td>
+<td>Delete the etcd module, its protos, the proto source, and the drain tests. Files: <code>shakenfist/etcd.py</code>, <code>shakenfist/protos/etcd_pb2.py</code>, <code>shakenfist/protos/etcd_pb2.pyi</code>, <code>shakenfist/protos/etcd_pb2_grpc.py</code>, <code>shakenfist/protos/etcd_pb2_grpc.pyi</code>, <code>protos/etcd.proto</code>, <code>shakenfist/tests/test_cluster_config_drain.py</code>, <code>shakenfist/tests/test_etcd_ops_queues_drain.py</code>. Use <code>git rm</code> for each. After deletion, run <code>grep -rn 'shakenfist\\.etcd\\|shakenfist/etcd\\|protos\\.etcd_pb2\\|etcd_pb2_grpc' --include='*.py' shakenfist/</code> and confirm no hits — if anything remains, stop and report. Run <code>pre-commit run --all-files</code> to confirm the tree is consistent (no orphaned references). Note: <code>etcd3gw</code> is still listed in <code>pyproject.toml</code> after this step; step 0c removes it. The dependency staying in place across this step keeps the tree installable from <code>pyproject.toml</code> even though no code imports <code>etcd3gw</code> any more — sequencing the dep removal into a separate commit makes the bisect history clearer. One commit.</td>
+</tr>
+<tr>
+<td>0c</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Remove etcd-era surface area from config and the CLI. Three changes: (i) drop the <code>etcd3gw==2.6.0</code> entry from <code>pyproject.toml</code>'s dependencies list (find the exact line; preserve apparent formatting); (ii) remove the <code>ETCD_HOST</code> config field and its accompanying "etcd (retained only for DATA_MIGRATIONS drain — remove in next release)" comment from <code>shakenfist/config.py</code> (around line 488); (iii) remove the hidden <code>show-etcd-config</code> and <code>set-etcd-config</code> <code>@click.command(name=..., hidden=True)</code> blocks from <code>shakenfist/client/ctl.py</code> (lines ~183-196), AND remove the matching <code>cli.add_command(show_etcd_config)</code> / <code>cli.add_command(set_etcd_config)</code> entries further down in the file (around line ~350). Run <code>grep -rn 'ETCD_HOST\\|show-etcd-config\\|set-etcd-config\\|etcd3gw' --include='*.py' --include='*.toml' shakenfist/ pyproject.toml</code> and confirm only doc/comment references remain (those are step 0d's job). Run <code>pre-commit run --all-files</code>. One commit.</td>
+</tr>
+<tr>
+<td>0d</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Clean stale source comments and developer docs that reference the retired <code>sf-ctl migrate-*</code> commands and etcd. Source comments to remove or rephrase: <code>shakenfist/blob.py:137,143,149</code> (three "State migration to MariaDB is now handled by sf-ctl migrate-*" comments); <code>shakenfist/upload.py:54,60</code>; <code>shakenfist/artifact.py:121</code>; <code>shakenfist/node.py:138</code>; <code>shakenfist/namespace.py:101</code>; <code>shakenfist/network/network.py:106</code>; <code>shakenfist/constants.py:88</code> (the "Use 'sf-ctl migrate-floating-network-uuid' to migrate" line — the function it talks about no longer exists). For each: read the surrounding code to decide whether the comment can be deleted entirely (preferred when the comment was only there to document the migration path) or whether a brief rewrite preserves useful context. Docs: in <code>CLAUDE.md</code>, remove the "Note: the etcd.py module is retained only to service DATA_MIGRATIONS entries which drain leftover etcd keys from older clusters. The module will be removed in the next minor version." paragraph (currently around line 246) and remove the <code>etcd3gw - etcd client (retained for DATA_MIGRATIONS drain only)</code> bullet from the Dependencies list (around line 369). In <code>docs/developer_guide/authentication.md</code>, remove the <code>export ETCDCTL_API=3</code> line (around line 56) — read context to decide whether the surrounding paragraph also needs adjustment. Final verification: <code>grep -rn 'etcd' --include='*.py' --include='*.md' --include='*.toml' shakenfist/ docs/ CLAUDE.md README.md pyproject.toml 2&gt;/dev/null | grep -v 'is_etcd_master\\|etcd_master' | head -30</code> should show only references in <code>docs/plans/</code> (the plan documents themselves), nothing in source code or operator docs. One commit.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rn etcd shakenfist/ docs/ tools/</code> returns no
-      live-code matches after the sweep. Historical
-      changelog / release-notes references are acceptable.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>tox</code> passes (unit tests, type checks, style).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pip freeze</code> before/after shows no unrelated
-      dependency version drift.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>CLAUDE.md</code> no longer claims the shim is "retained
-      only to service <code>DATA_MIGRATIONS</code>".</li>
-</ul>
-<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
-<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>grep -rn etcd shakenfist/ docs/ tools/</code> returns only
-  historical changelog or release-notes matches.</li>
-<li><code>shakenfist/etcd.py</code> does not exist.</li>
-<li><code>etcd3gw</code> is no longer a project dependency.</li>
-<li><code>pre-commit run --all-files</code> and <code>tox</code> pass.</li>
-<li><code>CLAUDE.md</code> and <code>ARCHITECTURE.md</code> are updated to remove
-  any remaining references to the etcd shim.</li>
-<li>No deployment can be broken by the removal because the
-  preconditions guarantee no remaining cluster needs the
-  drain code.</li>
+<li><code>pre-commit run --all-files</code> passes after each step.</li>
+<li>Final state grep: <code>grep -rn 'from shakenfist import etcd\\|from shakenfist.etcd\\|import etcd3gw\\|from etcd3gw\\|DATA_MIGRATIONS\\|ensure_data_migrations\\|ETCD_HOST\\|show-etcd-config\\|set-etcd-config\\|_migrate_etcd_\\|_cleanup_etcd_\\|ETCDCTL_API' --include='*.py' --include='*.toml' --include='*.md' shakenfist/ docs/ CLAUDE.md pyproject.toml 2&gt;/dev/null</code> should show only references in <code>docs/plans/</code> (this plan describing the deletion) and <code>docs/release_notes/</code> (historical record).</li>
+<li><code>python -c "import shakenfist.mariadb; import shakenfist.config; import shakenfist.client.ctl"</code> succeeds. (Doesn't run the daemon, but proves the imports unwind cleanly.)</li>
+<li>The CI deploy path (cluster_ci) still stands up a cluster end-to-end. This is the integration check that nothing operator-visible regressed; CI is what catches the case where a deleted comment was actually load-bearing (e.g. someone parsed a docstring at runtime, which I don't believe happens but is worth verifying).</li>
+<li>The set of <code>is_etcd_master</code> references is unchanged before vs. after the phase. Verifies that scope was respected.</li>
 </ul>
-<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
-<p>None expected. This plan is terminal: once executed, the
-etcd thread in Shaken Fist's history is closed.</p>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>This section should list any bugs we encounter during
-development that we fixed.</p>
-<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
+<h2 id="risks">Risks<a class="headerlink" href="#risks" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><code>index.md</code></strong> — add a row to the <em>Plan Status</em> table.</li>
-<li><strong><code>order.yml</code></strong> — add an entry for the new master plan.</li>
+<li><strong>Boundary-detection error in step 0a.</strong> Deleting
+  ~2400 lines from a 17,000-line file by line range
+  risks slicing wrong: catching one line of a non-
+  migration helper that happens to be in the middle
+  of the migration block, or missing the trailing
+  <code>}</code> of <code>DATA_MIGRATIONS.update({...})</code>. The brief
+  for step 0a calls out the grep-after-delete check
+  (<code>grep -c '^def _migrate_etcd_\|^def _cleanup_etcd_'</code>
+  must return <code>0</code>) and the standalone-import check
+  (<code>grep -n 'etcd\.' shakenfist/mariadb.py</code> must
+  return nothing) as concrete verification steps.
+  Worktree isolation lets the management session
+  discard the sub-agent's output and re-spin with a
+  better brief if the cut went wrong.</li>
+<li><strong>A migration helper turns out to be reachable
+  from non-migration code.</strong> Specifically:
+  <code>_migrate_node_state_key</code> at line 3325 has the
+  shape of a generic helper. The grep does say it
+  is only called from within <code>_migrate_etcd_nodes</code>,
+  but the brief tells the sub-agent to verify with a
+  grep before deleting. If a non-migration caller
+  exists, the sub-agent reports rather than deleting.</li>
+<li><strong>Dropping <code>ETCD_HOST</code> reveals other readers.</strong> The
+  master-plan-time grep showed <code>ETCD_HOST</code> consumed
+  only by <code>mariadb.py:2442</code> (the short-circuit in
+  <code>ensure_data_migrations</code>). Step 0a deletes that
+  consumer first; step 0c then drops the config
+  field. If another reader exists somewhere not yet
+  identified (e.g. an ansible template), the
+  pre-commit run on step 0c will not catch it (ansible
+  templates aren't linted for Pydantic config
+  references), but the cluster_ci validation will. If
+  pre-commit fails on step 0c with a config-related
+  error, that's the signal to find the unexpected
+  reader.</li>
+<li><strong>The <code># sf-ctl migrate-*</code> comments in step 0d are
+  scattered.</strong> It is easy to miss one. The final grep
+  in the step 0d brief (<code>grep -rn 'sf-ctl migrate'
+  --include='*.py' shakenfist/</code>) covers this.</li>
 </ul>
-<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
-<p>Before executing this plan, please back brief the operator
-as to your understanding of the preconditions and confirm
-that they are met on the day.</p>
+<h2 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h2>
+<p>For clarity, none of these are touched by phase 0:</p>
+<ul>
+<li><code>is_etcd_master</code> Python attribute on <code>Node</code>, the
+  matching column on <code>nodes</code>, the gRPC field, any
+  caller. → <code>PLAN-remove-primary</code> phase 7.</li>
+<li><code>etcd_master</code> ansible-group name in <code>deploy.py</code>,
+  <code>deploy.yml</code>, ansible roles, inventory templates,
+  <code>installation.md</code> examples. → <code>PLAN-remove-primary</code>
+  phase 7.</li>
+<li>The release-notes files under <code>docs/release_notes/</code>
+  (e.g. <code>v07-v08.md</code>) that mention retired
+  <code>sf-ctl migrate-*</code> commands. These are historical
+  records; leaving them as-is is correct.</li>
+<li>The <code>.claude/skills/migrate-etcd-to-mariadb.md</code>
+  skill — already deleted in master-plan commit
+  <code>76fa8ee8b</code>.</li>
+<li><code>PLAN-remove-etcd.md</code> — already deleted in master-
+  plan commit <code>76fa8ee8b</code>.</li>
+</ul>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing this phase, please back brief the
+operator on:</p>
+<ul>
+<li>The four steps in order, with the file or line-
+  range each touches.</li>
+<li>The deliberate decision to leave <code>is_etcd_master</code>
+  alone (left for <code>PLAN-remove-primary</code> phase 7), so
+  the management session and the sub-agents do not
+  accidentally widen scope.</li>
+<li>The corrected understanding that <code>DATA_MIGRATIONS</code>
+  was <em>not</em> empty as the master plan claimed — step
+  0a is removing 31 active migration-function
+  registrations along with the function bodies. The
+  functions never run on a cluster without
+  <code>ETCD_HOST</code>, but they are not zero-byte stubs.</li>
+<li>The validation step that confirms <code>is_etcd_master</code>
+  references are unchanged before and after the
+  phase, as the cross-check that scope was respected.</li>
+</ul>
 
 
 
@@ -9169,7 +9112,7 @@ that they are met on the day.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-remove-etcd.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-remove-etcd.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-remove-etcd/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-byo-mariadb-phase-00-retire-etcd.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-byo-mariadb-phase-00-retire-etcd.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-byo-mariadb-phase-00-retire-etcd/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

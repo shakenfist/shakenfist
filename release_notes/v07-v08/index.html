@@ -7175,6 +7175,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#bring-your-own-mariadb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bring your own MariaDB
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#performance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9052,6 +9063,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#bring-your-own-mariadb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bring your own MariaDB
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#performance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9319,6 +9341,101 @@
   <code>sf-ctl migrate-floating-network-uuid</code> after stopping services to migrate.
   This change enables proper UUID4 type validation in the IPAM schema.</li>
 </ul>
+<h2 id="bring-your-own-mariadb">Bring your own MariaDB<a class="headerlink" href="#bring-your-own-mariadb" title="Permanent link">&para;</a></h2>
+<p>Earlier in the v0.8 cycle the Shaken Fist deployer installed and
+configured MariaDB for you. As of this batch of changes that stopped:
+operators provide their own MariaDB and the deployer slots into existing
+infrastructure rather than prescribing it. This is a breaking change —
+existing deployments must be rebuilt against the new shape.</p>
+<ul>
+<li>
+<p><strong>Deployer no longer installs MariaDB.</strong> The <code>roles/mariadb/</code> Ansible
+  role has been deleted. Operators are responsible for running a MariaDB
+  10.6.0+ server before deploying Shaken Fist.</p>
+</li>
+<li>
+<p><strong>Bootstrap and tuning helpers ship in the source tree.</strong>
+  <code>tools/bootstrap-mariadb.sql</code> creates the <code>shakenfist</code> database, the
+  <code>shakenfist</code> user, and the required grants. Apply it once against your
+  MariaDB before the first deploy; the script is idempotent and safe to
+  re-run. <code>examples/mariadb-tuning.cnf</code> is an optional drop-in with
+  starting-point InnoDB and connection-pool settings; copy it to
+  <code>/etc/mysql/mariadb.conf.d/</code> if you want SF's recommended baseline.</p>
+</li>
+<li>
+<p><strong><code>getsf</code> prompts for connection details.</strong> The installer now asks for
+  <code>GETSF_MARIADB_HOST</code>, <code>GETSF_MARIADB_PORT</code> (default <code>3306</code>),
+  <code>GETSF_MARIADB_USER</code> (default <code>shakenfist</code>),
+  <code>GETSF_MARIADB_PASSWORD</code>, and <code>GETSF_MARIADB_DATABASE</code> (default
+  <code>shakenfist</code>). All five can be passed as environment variables for
+  non-interactive deploys. The deployer no longer generates a password —
+  operators choose it when they apply <code>tools/bootstrap-mariadb.sql</code>.</p>
+</li>
+<li>
+<p><strong><code>sf-ctl ensure-mariadb-schema</code> is the only path for schema work.</strong>
+  <code>sf-database</code> no longer calls <code>ensure_schema()</code> or runs data
+  migrations at startup. Instead it reads the recorded schema version,
+  compares it against its own expectations, and refuses to start on
+  mismatch. Run <code>sf-ctl ensure-mariadb-schema</code> to create or migrate the
+  schema; this command is the single authoritative path for all schema
+  changes.</p>
+</li>
+<li>
+<p><strong>MariaDB compatibility check at startup.</strong> Both
+  <code>sf-ctl ensure-mariadb-schema</code> and <code>sf-database</code> at startup verify
+  that the server is MariaDB (not MySQL), version 10.6.0 or later, with
+  the default storage engine set to InnoDB, the connection charset
+  <code>utf8mb4</code>, and a <code>utf8mb4_*</code> collation. An incompatible server
+  surfaces as a clear refusal-to-start with a multi-line error rather
+  than a runtime failure on the first JSON-column write.</p>
+</li>
+<li>
+<p><strong><code>MARIADB_GATEWAY_HOSTS</code> replaces <code>DATABASE_NODE_IP</code>.</strong> The new
+  config key is a comma-separated list of <code>sf-database</code> gRPC endpoints;
+  single-instance deployments use a one-element list. The companion keys
+  <code>MARIADB_GATEWAY_PORT</code> (default <code>13005</code>) and
+  <code>MARIADB_GATEWAY_METRICS_PORT</code> (default <code>13006</code>) set the gRPC and
+  Prometheus ports that each <code>sf-database</code> instance binds on.</p>
+</li>
+<li>
+<p><strong><code>MARIADB_HOST</code> scope is now narrow.</strong> Set <code>MARIADB_HOST</code> only on
+  nodes that run <code>sf-database</code> and on any node where an operator
+  manually runs <code>sf-ctl ensure-mariadb-schema</code>. The previous
+  <code>MARIADB_HOST=localhost</code> direct-access hack used at config-bootstrap
+  time is gone.</p>
+</li>
+<li>
+<p><strong><code>sf-database</code> is a tier of N &gt;= 1 instances.</strong> All instances
+  connect to the same MariaDB. None is elected leader; all serve any
+  inbound gRPC request. Every other SF daemon reaches the tier through
+  a client-side load-balanced gRPC channel that round-robins requests
+  across the <code>MARIADB_GATEWAY_HOSTS</code> list, skipping dead endpoints via
+  subchannel connectivity state and client keepalives. No external L4
+  load balancer is required. The <code>grpc.health.v1.Health</code> protocol is
+  published for external monitoring via unary <code>Check</code> calls.</p>
+</li>
+<li>
+<p><strong>CI exercises N &gt; 1.</strong> The <code>slim-tier</code> CI topology runs two
+  <code>sf-database</code> instances on every merge-queue run. The multi-instance
+  shape is a supported production configuration.</p>
+</li>
+<li>
+<p><strong>Several <code>sf-ctl</code> commands have been deleted.</strong>
+  <code>migrate-state-to-mariadb</code>, <code>migrate-floating-network-uuid</code>, and all
+  other <code>sf-ctl migrate-*</code> commands tied to the etcd era are gone.
+  Operators on the new shape do not run any migration command. The
+  <code>migrate-etcd-to-mariadb</code> Claude Code skill in <code>.claude/skills/</code> has
+  also been removed.</p>
+</li>
+<li>
+<p><strong>Greenfields only.</strong> PLAN-byo-mariadb does not preserve compatibility
+  with deployments that took the earlier-in-the-v0.8-cycle shape
+  (deployer-installed MariaDB, singular <code>DATABASE_NODE_IP</code>, etc.).
+  Operators rebuild against the new shape.</p>
+</li>
+</ul>
+<p>See <code>docs/plans/PLAN-byo-mariadb.md</code> for the multi-phase rollout
+details.</p>
 <h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Events are written directly to MariaDB via a per-daemon local spool

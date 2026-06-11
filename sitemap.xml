@@ -1745,6 +1745,42 @@
          <lastmod>2026-06-11</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-00-retire-etcd/</loc>
+         <lastmod>2026-06-11</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-01-statelessness/</loc>
+         <lastmod>2026-06-11</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-02-config-untangle/</loc>
+         <lastmod>2026-06-11</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-03-grpc-tier/</loc>
+         <lastmod>2026-06-11</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-04-deploy-byo/</loc>
+         <lastmod>2026-06-11</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-05-ci-byo/</loc>
+         <lastmod>2026-06-11</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-06-ci-tier/</loc>
+         <lastmod>2026-06-11</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-07-docs/</loc>
+         <lastmod>2026-06-11</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb/</loc>
+         <lastmod>2026-06-11</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/plans/PLAN-embrace-tls/</loc>
          <lastmod>2026-06-11</lastmod>
     </url>
@@ -1850,10 +1886,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-recurring-operations/</loc>
-         <lastmod>2026-06-11</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-etcd/</loc>
          <lastmod>2026-06-11</lastmod>
     </url>
     <url>

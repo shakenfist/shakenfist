@@ -8919,22 +8919,35 @@ a good first approach is simple to run this command on each node:</p>
 will upgrade.</p>
 <h2 id="mariadb-schema-migrations">MariaDB schema migrations<a class="headerlink" href="#mariadb-schema-migrations" title="Permanent link">&para;</a></h2>
 <p>Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The
-MariaDB schema is versioned, and migrations are applied automatically during
-cluster deployment via <code>getsf</code>.</p>
+MariaDB schema is versioned; migrations must be applied by an operator (or
+operator automation) before starting <code>sf-database</code>.</p>
 <p>Each MariaDB table has a version number tracked in the <code>schema_versions</code> table.
 When the cluster is deployed or upgraded, the <code>sf-ctl ensure-mariadb-schema</code>
-command runs automatically on an etcd_master node to:</p>
+command must be run on a node with direct database access to:</p>
 <ol>
+<li>Perform a compatibility check against the server requirements (MariaDB
+   not MySQL, version &gt;= 10.6.0, InnoDB engine, utf8mb4 charset and
+   collation) — the command refuses to proceed if any check fails</li>
 <li>Create any missing tables</li>
-<li>Apply any pending schema migrations to bring tables up to the current version</li>
+<li>Apply any pending schema migrations to bring tables up to the current
+   version</li>
 </ol>
+<p><code>sf-database</code> also performs the same compatibility check at startup and
+will refuse to start if the server is incompatible. Importantly, if
+<code>sf-ctl ensure-mariadb-schema</code> has not been run after an SF upgrade that
+includes schema changes, <code>sf-database</code> will refuse to start with a clear
+schema-version mismatch error that names the command to run. This replaces
+the old behaviour where migrations ran silently inside the daemon on
+startup.</p>
+<p>See <a href="../database/#mariadb-compatibility-requirements">MariaDB compatibility requirements</a>
+in the database reference for the full list of server requirements.</p>
 <h3 id="manual-schema-verification">Manual schema verification<a class="headerlink" href="#manual-schema-verification" title="Permanent link">&para;</a></h3>
-<p>You can manually check or apply schema migrations by running on an etcd_master
-node:</p>
+<p>You can manually check or apply schema migrations by running on a node
+with direct database access:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
 </code></pre></div>
-<p>This will output the current version of each table and whether any migrations
-were applied. For example:</p>
+<p>This will output the current version of each table and whether any
+migrations were applied. For example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Table &#39;object_states&#39; is up to date (version 1)
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>MariaDB schema verified.
 </code></pre></div>
@@ -8966,13 +8979,16 @@ functional breakage; only the audit event.</p>
 their targets correctly, so the gate behaves as designed once the
 in-flight v1 ops drain.</p>
 <h3 id="database-service-architecture">Database service architecture<a class="headerlink" href="#database-service-architecture" title="Permanent link">&para;</a></h3>
-<p>Only etcd_master nodes have direct access to MariaDB credentials. All other
+<p>Only the database node has direct access to MariaDB credentials. All other
 nodes access MariaDB data through a gRPC database microservice that runs on
-etcd_master nodes. This means:</p>
+the database node. This means:</p>
 <ul>
-<li>Schema migrations only need to run on etcd_master nodes</li>
-<li>Non-etcd_master nodes do not require MariaDB credentials</li>
-<li>The database service must be running before other daemons can access state data</li>
+<li>Schema migrations only need to run on the database node</li>
+<li>Other nodes do not require MariaDB credentials</li>
+<li><code>sf-ctl ensure-mariadb-schema</code> must be run (or re-run after an upgrade)
+  before starting <code>sf-database</code></li>
+<li>The database service must be running before other daemons can access
+  state data</li>
 </ul>
 
 
