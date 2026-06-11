@@ -335,11 +335,12 @@ else
     question_start
     echo "The node you are running this script on is called the 'primary node'."
     echo "The primary node is largely an operations console. It deploys the other"
-    echo "nodes and receives all nodes' logs via syslog. Most importantly, the"
-    echo "primary node is where we will configure the load balancer for API"
-    echo "traffic. Therefore, its public address needs to be the one which is in"
-    echo "the API URL. Don't worry about the URL for now, but please be aware"
-    echo "that this node requires both ingress and egress network connectivity."
+    echo "nodes and receives all nodes' logs via syslog. Shaken Fist does not"
+    echo "install a load balancer for API traffic -- you are expected to place"
+    echo "your own reverse proxy or load balancer in front of the API. For a"
+    echo "single-node install no proxy is needed: the API is reachable locally"
+    echo "at http://127.0.0.1:13000. Please be aware that this node requires"
+    echo "both ingress and egress network connectivity."
     echo
     echo "The primary node can also be just a hypervisor node as well, depending"
     echo "on your needs."
@@ -1047,7 +1048,7 @@ for node in ${GETSF_NODES[@]}; do
 
     if [ ${node} == "localhost" ]; then
         primary_node="true"
-        api_stanza='"api_url": "http://127.0.0.1/api"'
+        api_stanza='"api_url": "http://127.0.0.1:13000"'
         api_comma=','
         network_node="true"
         etcd_master_node="true"
@@ -1056,7 +1057,7 @@ for node in ${GETSF_NODES[@]}; do
     else
         if [ $(echo "${GETSF_NODE_PRIMARY}" | grep -c ${node}) -gt 0 ]; then
             primary_node="true"
-            api_stanza='"api_url": "http://127.0.0.1/api"'
+            api_stanza='"api_url": "http://127.0.0.1:13000"'
             api_comma=','
         else
             primary_node="false"
