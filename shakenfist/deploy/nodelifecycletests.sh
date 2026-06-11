@@ -191,18 +191,21 @@ log "Instances are in correct state"
 # Determine which node is the current cluster maintenance node
 echo
 log "=== Terminate cluster maintenance node, stop another node ==="
-maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
-other_victim=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer != true) | .name' | head -1)
 
-# Refuse to halt the host this script is running on -- the script
-# dies when its host halts, leaving the CI runner's outer SSH waiting
-# on a connection that will never close (no keepalive) until the
-# 60-minute job budget burns out. Election is first-acquire-wins on a
-# cluster lock so the same node holds the role for the lifetime of a
-# fresh cluster, but a `sudo systemctl restart sf-cluster` releases
-# the lock and lets another candidate acquire it. The lease is 60 s,
-# so we sleep 90 s -- comfortably past expiry plus a couple of
-# refresh cycles -- and then re-read the role.
+# Two nodes are off limits as victims:
+#
+# The script's own host -- the script dies when its host halts,
+# leaving the CI runner's outer SSH waiting on a connection that will
+# never close (no keepalive) until the 60-minute job budget burns out.
+#
+# The network node -- the cluster-wide networknode-* work queues are
+# drained only by the net-worker on the node with the network role
+# (see the single-worker safety invariant in
+# shakenfist/daemons/network/workitem.py), and there is no failover
+# for that role. Stopping and deleting the network node strands every
+# subsequently enqueued remove_dhcp_lease cleanup operation, and the
+# resulting OperationTimeout tracebacks from sf-cluster and sf-net
+# fail the forbidden-strings log check.
 #
 # Use SHAKENFIST_NODE_NAME -- the SF-level node name registered via
 # `--node-name` -- rather than `hostname`: the kernel hostname is
@@ -225,18 +228,49 @@ if [ -z "${script_host}" ]; then
     log "SHAKENFIST_NODE_NAME not set in /etc/sf/config. Aborting."
     exit 1
 fi
-if [ "${maintainer}" == "${script_host}" ]; then
-    log "Maintainer ${maintainer} == script host ${script_host}; forcing re-election"
-    sudo systemctl restart sf-cluster
+
+network_node=$(sf-client --json node list | jq --raw-output \
+    '.[] | select(.is_network_node == true) | .name' | head -1)
+log "Script host is ${script_host}; network node is ${network_node}"
+
+# The maintainer is hard-halted below, so it must not be the script
+# host or the network node. Election is first-acquire-wins on a
+# cluster lock so the same node holds the role for the lifetime of a
+# fresh cluster, but a `sudo systemctl restart sf-cluster` on the
+# holder releases the lock and lets another candidate acquire it. The
+# lease is 60 s, so we sleep 90 s -- comfortably past expiry plus a
+# couple of refresh cycles -- and then re-read the role. sf-cluster
+# runs on every node, so an ineligible node can win again; retry a
+# few times before giving up.
+maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
+attempts=0
+while [[ "${maintainer}" == "${script_host}" || "${maintainer}" == "${network_node}" ]]; do
+    attempts=$((attempts + 1))
+    if [ ${attempts} -gt 5 ]; then
+        log "No eligible maintainer after ${attempts} re-elections; aborting"
+        exit 1
+    fi
+    log "Maintainer ${maintainer} is the script host or network node; forcing re-election"
+    if [ "${maintainer}" == "${script_host}" ]; then
+        sudo systemctl restart sf-cluster
+    else
+        sudo ssh -o StrictHostKeyChecking=no debian@${maintainer} \
+            "sudo systemctl restart sf-cluster"
+    fi
     log "Pausing for cluster lock to expire and be re-acquired..."
     sleep 90
     maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
-    other_victim=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer != true) | .name' | head -1)
     log "New maintainer: ${maintainer}"
-    if [ "${maintainer}" == "${script_host}" ]; then
-        log "Re-election still elected the script host; aborting before self-destruct"
-        exit 1
-    fi
+done
+
+# The graceful-stop victim must equally not be the maintainer (it is
+# already being halted), the script host, or the network node.
+other_victim=$(sf-client --json node list | jq --raw-output \
+    --arg script_host "${script_host}" --arg network_node "${network_node}" \
+    '.[] | select(.is_cluster_maintainer != true and .is_network_node != true and .name != $script_host and .name != $network_node) | .name' | head -1)
+if [ -z "${other_victim}" ]; then
+    log "No eligible node to gracefully stop. Aborting."
+    exit 1
 fi
 
 log "Will hard stop the cluster maintainer, ${maintainer}"
