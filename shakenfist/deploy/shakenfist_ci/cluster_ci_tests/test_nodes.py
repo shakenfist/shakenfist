@@ -27,3 +27,21 @@ class TestNodes(base.BaseNamespacedTestCase):
         self.assertRaises(
             apiclient.ResourceNotFoundException, self.system_client.get_node,
             'banana')
+
+    def test_cluster_resources(self):
+        # Regression test for the /admin/resources endpoint
+        # (AdminResourcesEndpoint). It was historically defined but never
+        # registered as a route, so it always returned a 404. The CI readiness
+        # gate and the scheduler both depend on it accurately reporting which
+        # hypervisors are schedulable, so ensure it stays wired up and reports
+        # at least one schedulable hypervisor with capacity. A node only
+        # appears in per_node once it is active and reporting fresh metrics,
+        # which is exactly what prevents the cold-start 507 "No nodes remaining
+        # at scheduling stage is_hypervisor" race.
+        resources = self.system_client.get_cluster_resources()
+        self.addDetail('resources', content.text_content(json.dumps(
+            resources, indent=4, sort_keys=True)))
+        self.assertIn('total', resources)
+        self.assertIn('per_node', resources)
+        self.assertGreaterEqual(len(resources['per_node']), 1)
+        self.assertGreater(resources['total']['cpu_available'], 0)

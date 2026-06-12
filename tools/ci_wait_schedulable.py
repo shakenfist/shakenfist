@@ -9,11 +9,12 @@ several seconds before that first metrics write, so a test that creates an
 instance immediately can hit a spurious 507 "No nodes remaining at scheduling
 stage is_hypervisor".
 
-This is a single-shot check: it exits 0 if every hypervisor node has logged at
-least one 'resources' event (the resources daemon emits one in the same cycle
-as the node-metrics write), and exits non-zero otherwise. The caller is
-expected to retry it in a loop. Run it with /etc/sf/sfrc sourced, using the SF
-venv python so shakenfist_client is importable, for example:
+This is a single-shot check: it asks the cluster-resources endpoint
+(/admin/resources) which hypervisors the scheduler currently considers
+schedulable -- a node only appears there once it is active and reporting fresh
+metrics -- and exits 0 if there is at least one, non-zero otherwise. The caller
+is expected to retry it in a loop. Run it with /etc/sf/sfrc sourced, using the
+SF venv python so shakenfist_client is importable, for example:
 
     . /etc/sf/sfrc; /srv/shakenfist/venv/bin/python3 - < tools/ci_wait_schedulable.py
 """
@@ -30,28 +31,17 @@ def main():
             key=os.environ.get('SHAKENFIST_KEY'),
             base_url=os.environ.get('SHAKENFIST_API_URL', 'http://localhost:13000'))
 
-        hypervisors = [n for n in client.get_nodes() if n.get('is_hypervisor')]
-        if not hypervisors:
-            print('No hypervisor nodes are registered yet.')
-            return 1
-
-        waiting = []
-        for node in hypervisors:
-            events = client.get_node_events(
-                node['name'], event_type='resources', limit=1)
-            if not events:
-                waiting.append(node['name'])
-
-        if waiting:
-            print('Hypervisors yet to report resources: %s.' % ', '.join(sorted(waiting)))
-            return 1
-
+        resources = client.get_cluster_resources()
     except Exception as e:
         print('Cluster is not answering as expected yet: %s' % e)
         return 1
 
-    print('All %d hypervisor(s) have reported resources; the cluster is schedulable.'
-          % len(hypervisors))
+    schedulable = resources.get('per_node', {})
+    if not schedulable:
+        print('No hypervisors are schedulable yet (none reporting fresh metrics).')
+        return 1
+
+    print('%d hypervisor(s) are schedulable; the cluster is ready.' % len(schedulable))
     return 0
 
 
