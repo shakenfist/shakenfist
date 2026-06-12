@@ -224,6 +224,7 @@ api.add_resource(Root, '/')
 
 api.add_resource(api_admin.AdminLocksEndpoint, '/admin/locks')
 api.add_resource(api_admin.AdminClusterCaCertificateEndpoint, '/admin/cacert')
+api.add_resource(api_admin.AdminResourcesEndpoint, '/admin/resources')
 
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_ref>')
 api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
