@@ -49,6 +49,12 @@ nginx. Both implement the proxy contract above, terminate TLS, and balance
 across the per-hypervisor backends. They are starting points, not
 prescriptions: you own the certificates, cipher policy, WAF, and logging.
 
+The proxy terminates TLS and then connects to the `:13000` backends over plain
+HTTP. Run that proxy-to-backend hop over your trusted cluster network (the same
+network the node mesh uses), not a public segment — Shaken Fist assumes the
+backend network is trusted, and securing the in-cluster hop is tracked
+separately under embracing TLS across the cluster.
+
 ### Apache
 
 Copy `examples/apache-loadbalancer.conf`, edit it for your environment, and
@@ -156,7 +162,7 @@ off` and `proxy_buffering off` to stream rather than buffer, and
 If you run everything on a single machine and do not want to operate a proxy at
 all, you can skip the load balancer entirely. Point `api_url` (and the
 `SHAKENFIST_API_URL` environment variable) straight at
-`http://localhost:13000`, with **no** `/api` prefix. `sf-api` serves the API at
+`http://127.0.0.1:13000`, with **no** `/api` prefix. `sf-api` serves the API at
 `/` directly, so the prefix is neither added nor stripped in this mode.
 
 ## Health checks
