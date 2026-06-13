@@ -128,6 +128,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 10: Migration | Not started | Cutover from singleton network node to smeared carriers |
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 11: Operator documentation | Not started | VIP failover modes and pool sizing |
 | [OIDC authentication](PLAN-oidc-authentication.md) | Master plan | Stub | OIDC as an authentication option for human users; existing namespace keys re-framed as service-account tokens for automation |
+| [Artifact UX rework](PLAN-artifact-ux-rework.md) | Master plan | Stub | Rework the upload/blob/artifact/label/snapshot surface to remove usability sharp edges (ambiguous name resolution, blob-UUID juggling, underpowered labels, instance-costumed snapshots); adopts #3271, #1634, #1167, #592, #877, #1386, #833, #422 |
 
 ### Status Definitions
 
