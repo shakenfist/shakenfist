@@ -936,3 +936,20 @@ instar measure -O qcow2 --output=json mydisk.vmdk
 Supports raw and qcow2 targets (byte-identical output to qemu-img)
 plus vmdk, vpc, and vhdx targets that qemu-img cannot measure. See
 [docs/measure.md](/components/instar/measure/) for the full reference.
+
+### snapshot
+
+```
+instar snapshot [-l] [--output=json] IMAGE
+instar snapshot -c NAME IMAGE
+instar snapshot -a SNAPSHOT IMAGE
+instar snapshot -d SNAPSHOT IMAGE
+```
+
+Manage the internal snapshots of a qcow2 image — the operation
+Proxmox's `PVE/Storage/Plugin.pm` invokes for snapshot create /
+rollback / delete (see the Proxmox sections above). List output
+is byte-identical to `qemu-img snapshot -l`; mutating modes
+produce bit-for-bit identical images given identical inputs
+(modulo documented freed-cluster / file-tail notes). See
+[docs/snapshot.md](/components/instar/snapshot/) for the full reference.
