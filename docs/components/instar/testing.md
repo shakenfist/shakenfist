@@ -169,6 +169,39 @@ surfaces totalling 114 tests:
 Wall clock: ~32 s serial / ~10 s with `make test-container`'s
 `--concurrency 4`.
 
+### Snapshot Tests (`test_snapshot.py`)
+
+Tests for the `instar snapshot` subcommand (phase 11 of
+PLAN-snapshot), 94 tests across five families:
+
+- **List matrix (human)**: per baselined image, `TZ=UTC instar
+  snapshot -l` byte-equals the host-resolved profile baseline
+  from `instar-testdata/expected-outputs/snapshot-list-human/`
+  (80 qemu-img versions captured; instar tracks the modern
+  ≥9.0 layout); plus the bare-filename-defaults-to-list check.
+- **List goldens (JSON)**: `--output=json` byte-equals the
+  instar-side self-baselines in `tests/golden/snapshot-list/`,
+  plus a structural vmstate cross-check and a QMP-key schema
+  test.
+- **Mutation round-trips**: create / delete / apply on tempdir
+  copies with post-op `qemu-img check` clean, content verified
+  via `qemu-img compare`, and structural behaviour on the
+  name-collision / duplicate-name / cap-boundary fixtures.
+- **Error paths**: qcow2-only enforcement across raw / vmdk /
+  vhdx, feature-gate refusals (zstd, dirty bit, external data
+  file, LUKS), not-found exit codes, `-U`+mutating refusal,
+  `--image-opts` rejection.
+- **Empty table**: empty stdout + exit 0; JSON emits `[]`.
+
+The suite is the CI regression net. The **snapshot shell
+harnesses** (`tools/snapshot-{create,delete,apply}-{matrix,
+refusals}.sh` and `tools/snapshot-cli-parity.sh` — seven
+scripts, 241 assertions) are the live differential layer:
+byte-identity against the host `qemu-img` from identical
+inputs, run with `make snapshot-harnesses` (requires a built
+instar and `/dev/kvm`; CI runs it in the functional-tests
+workflow's `snapshot-harnesses` job). They overlap by design.
+
 ### Adversarial Image Tests (`test_adversarial.py`)
 
 Tests verifying that instar safely handles malicious and malformed images
@@ -404,9 +437,20 @@ For each iteration the fuzzer:
    compression, and data patterns (zeros, random, sparse, MBR).
 3. Creates separate copies for instar and qemu-img.
 4. Runs a random chain of 2-4 operations (info, check, convert,
-   compressed convert) against both tools.
+   compressed convert, create, measure, resize, rebase, commit,
+   map, snapshot) against both tools.
 5. Compares outputs at each stage: exit codes, normalized JSON info
    output, and converted file content (SHA-256 of raw-flattened output).
+
+The `op_snapshot` arm (phase 13 of PLAN-snapshot) generates a
+fresh qcow2, then applies an identical random chain of
+`snapshot -c` / `-d` / `-a` and `qemu-io` write elements to the
+instar and qemu-img copies, asserting **byte-identity of the
+whole image after every chain element** (the qemu side runs with
+`file.discard=ignore`; dates and dead padding bytes are
+normalized per docs/quirks.md). Its first runs surfaced a real
+multibyte list-padding bug and delete's missing surviving-L2
+COPIED refresh, both since fixed.
 
 Known quirks (see [quirks.md](/components/instar/quirks/)) are excluded from comparison:
 disk size fields and format-specific metadata.
@@ -478,7 +522,8 @@ fuzzing (Phase 3) cannot reach.
 
 ### Fuzz targets
 
-13 targets across all parser crates, organized in `src/fuzz/`:
+22 targets across the parser and planner crates, organized in
+`src/fuzz/`:
 
 | Target | Crate | Type |
 |--------|-------|------|
@@ -495,11 +540,31 @@ fuzzing (Phase 3) cannot reach.
 | `fuzz_vhdx_metadata` | vhdx | CallTable |
 | `fuzz_raw_partition` | raw | Buffer-based |
 | `fuzz_luks_header` | luks | Buffer-based |
+| `fuzz_measure_calc` | measure | Buffer-based |
+| `fuzz_measure_scan` | all parsers | CallTable |
+| `fuzz_create_emitters` | create | Buffer-based |
+| `fuzz_resize_planners` | resize | Buffer-based |
+| `fuzz_rebase_planners` | rebase | Buffer-based |
+| `fuzz_commit_planners` | commit | Buffer-based |
+| `fuzz_map_iter` | all parsers | CallTable |
+| `fuzz_snapshot_parse` | qcow2 | CallTable |
+| `fuzz_snapshot_refcount` | snapshot | Buffer-based |
 
 **Buffer-based** targets call parser functions that take `&[u8]`
 directly (e.g. `QcowHeader::parse(data)`). **CallTable** targets
 use the mock CallTable from `src/fuzz/src/lib.rs` to simulate
 sector-based I/O from the fuzzer input.
+
+The two snapshot targets (phase 12 of PLAN-snapshot) cover the
+streaming snapshot-table parser (`fuzz_snapshot_parse` drives
+`for_each_snapshot_entry` and the planner converter against
+adversarial qcow2 fragments) and the mutator primitives
+(`fuzz_snapshot_refcount` dispatches one of seven ops per exec —
+refcount increment/decrement/swap, the COPIED-flag walker, the
+contiguous allocator, the flag helpers, and the
+table-serialisation round-trip — asserting semantic invariants
+such as precheck-never-mutates, inc/dec byte-identity, and
+allocator containment).
 
 ### Running locally
 

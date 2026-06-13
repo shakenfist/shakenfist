@@ -108,6 +108,7 @@ nav:
             - "`instar measure` — predict file size for a target format": components/instar/measure.md
             - "`instar rebase` — change an overlay's backing-file reference": components/instar/rebase.md
             - "`instar resize` — change a disk image's virtual size": components/instar/resize.md
+            - "`instar snapshot` — manage internal qcow2 snapshots": components/instar/snapshot.md
             - "Announcement": components/instar/openstack-announcement-email.md
             - "Backing Chain Discovery": components/instar/chain-discovery.md
             - "Chain Config Protocol": components/instar/chain-config.md
@@ -147,7 +148,9 @@ nav:
                 - "instar resize subcommand": components/instar/plans/PLAN-resize.md
                 - "instar rebase and commit subcommands": components/instar/plans/PLAN-rebase-commit.md
                 - "instar map subcommand": components/instar/plans/PLAN-map.md
+                - "instar snapshot subcommand": components/instar/plans/PLAN-snapshot.md
                 - "Fuzzing bug backlog": components/instar/plans/PLAN-fuzzing-bugs.md
+                - "June 2026 fuzzer bug backlog": components/instar/plans/PLAN-bug-fixes.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md

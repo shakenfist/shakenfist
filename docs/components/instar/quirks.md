@@ -1072,18 +1072,6 @@ are valid VHDs — the difference surfaces only in the
 `tests/test_create.py::KNOWN_WRITER_DIVERGENCES` skips every
 affected case; closing this gap is documented future work.
 
-### qcow2 `refcount_bits` is hardcoded to 16
-
-`crates/qcow2::create::build_header` emits `refcount_order = 4`
-(=> 16-bit refcount entries on disk) regardless of the user's
-`-o refcount_bits=...` value. Honoured values that don't cause
-visible divergence: `1` and `8` (smaller widths still fit the
-16-bit encoding and produce valid files). `refcount_bits=64`
-produces a header `instar check` rejects on round-trip — the
-only entry in `tests/test_create.py::KNOWN_CHECK_FAILURES`.
-Closing the gap requires parameterising the L1/L2/refcount math
-over the user's choice. Future work.
-
 ### qcow2 `compat=0.10` is silently upgraded to `1.1`
 
 The writer hardcodes `compat=1.1` in the header. qemu-img
@@ -1122,16 +1110,6 @@ pass `-f vpc` explicitly to surface the vhd format. This is
 qemu's native behaviour and not a bug in either tool. Phase 7's
 baselines were recorded without `-f`, so phase 8's matrix
 comparison naturally agrees on both sides.
-
-### Known check failure: qcow2 `refcount_bits=64`
-
-`instar create -f qcow2 -o refcount_bits=64 ...` produces a
-file whose internal validator rejects on `instar check`
-("image check failed: errors detected"). The header claims
-64-bit refcounts but the on-disk entries are 16-bit
-(refcount_bits hardcode, above). This is the only entry in
-`tests/test_create.py::KNOWN_CHECK_FAILURES`; `refcount_bits=1`
-and `=8` fit the encoding and pass.
 
 ## resize subcommand quirks
 
@@ -1432,6 +1410,442 @@ provides this data" mode (see
 [PLAN-rebase-commit-phase-08-commit-host.md](/components/instar/
 plans/PLAN-rebase-commit-phase-08-commit-host/)) can
 plug in without an ABI change.
+
+## convert subcommand quirks
+
+### `--snapshot` resolves ID-then-name over a bounded 16-entry table
+
+`instar convert --snapshot ARG` resolves `ARG` with the same
+two-full-pass matcher as `qemu-img convert -l` (qemu's
+`find_snapshot_by_id_or_name`, shared with `snapshot -a`): one
+full pass over the snapshot table comparing **IDs**, then — only
+if no ID matched — a second full pass comparing **names**. A
+later entry matching by ID beats an earlier entry matching by
+name; see the `snapshot -a` matcher-asymmetry table below for
+the collision example. (Before PLAN-snapshot phase 14, instar
+returned the first per-entry id-or-name hit, which picked the
+wrong snapshot on ID/name-collision images.)
+
+**Residual divergence**: the lookup walks the bounded in-memory
+table from `parse_snapshot_table`, which caps at 16 entries
+(`MAX_SNAPSHOTS`). A snapshot stored beyond the first 16 table
+entries is reported not-found by `instar convert --snapshot`
+where `qemu-img convert -l` finds it. This is the same v1
+16-snapshot cap family as the snapshot subcommand's create cap
+(see "16-snapshot cap" under the `snapshot -c` quirks); raising
+it is future work.
+
+## snapshot subcommand quirks
+
+### Bare `snapshot FILE` defaults to list mode (D2)
+
+`qemu-img snapshot` documents `-l` as "the default" — running
+`qemu-img snapshot image.qcow2` without a mode flag lists the
+snapshot table and exits 0. Before phase 9, instar's clap ArgGroup
+had `required = true`, so the bare form produced a clap usage error
+(exit 2). Phase 9 fixes this: the ArgGroup is now `required = false`,
+and `run_snapshot` routes an absent mode flag to the real list path
+(`run_snapshot_list`), producing byte-identical output to the
+explicit `-l` form.
+
+### `--force-share` (`-U`) is list-only (D1)
+
+`qemu-img` refuses `-U` combined with any mutating mode (`-c`, `-d`,
+`-a`) with exit 1 and the message:
+
+```
+qemu-img: Could not open 'IMAGE': force-share=on can only be used with read-only images
+```
+
+Before phase 9, instar accepted `-U` with mutating modes and
+performed the mutation (the flag was plumbed to the guest but
+unenforced at the host). Phase 9 adds a host-side gate in
+`run_snapshot` that fires before any file access: `-U` combined with
+`-c`, `-d`, or `-a` exits 1 with:
+
+```
+snapshot: --force-share (-U) can only be used with read-only operations; -l is the only sharing-safe mode
+```
+
+The message wording differs from qemu's (which mentions
+`force-share=on` and "read-only images" — artefacts of qemu's
+open-flags machinery). The substance is the same: refusal, exit 1,
+image untouched.
+
+`-U -l` is accepted by both tools. instar takes no image locks, so
+the flag is a no-op for the read-only path; the bit is still
+forwarded to the guest via `FLAG_FORCE_SHARE` but the guest likewise
+ignores it.
+
+### `-q` is a no-op for all snapshot modes
+
+`-q` (quiet) has no visible effect on any snapshot mode under either
+tool:
+
+- `-c` (create): success is always silent (no stdout line exists to
+  suppress). `-q` changes nothing.
+- `-d` (delete): success is always silent. Error messages (e.g.
+  "snapshot not found") are printed to stderr and are **not**
+  suppressed by `-q` under either tool; both exit 1.
+- `-a` (apply): success is always silent. Error messages not
+  suppressed.
+- `-l` (list): the snapshot table goes to stdout regardless of `-q`.
+
+The flag is accepted for CLI compatibility and forwarded to the guest
+via `FLAG_QUIET`, but the guest likewise ignores it for all modes
+implemented so far. The phase 6 note ("`-q` has no visible effect on
+create") generalises to all four modes.
+
+### Mixed mode flags: clap exits 2, qemu exits 1 (D3)
+
+Supplying two or more mode flags (`-c snap -d snap`, `-l -c snap`,
+etc.) is a mutually-exclusive-argument violation under both tools,
+but the exit codes and messages differ:
+
+- `qemu-img`: prints `Cannot mix '-l', '-a', '-c', '-d'`, exits 1.
+- `instar`: clap detects the conflict at parse time, prints its own
+  usage-error message, exits 2.
+
+The behaviours agree in substance (refusal, non-zero exit, no image
+access); the exit code and message differ cosmetically. Fighting clap
+for a one-digit exit-code delta buys nothing — instar's other
+subcommands already expose clap usage-error semantics — so this
+divergence is documented rather than fixed.
+
+### `DATE` column is rendered in local time
+
+`instar snapshot -l` formats the `DATE` column using the host's
+local timezone, matching `qemu-img snapshot -l`'s behaviour
+(both use `strftime("%Y-%m-%d %H:%M:%S", localtime(&date_sec))`).
+For deterministic output (CI runs, cross-version baselines, byte-
+exact diff harnesses), set `TZ=UTC` in the environment before
+invoking either tool. Without `TZ=UTC` the rendered date depends
+on the operator's locale and the two tools' output will only
+match when they're invoked under the same TZ.
+
+The `--output=json` form is an instar extension; its `date`
+object reports the raw `seconds` since the Unix epoch alongside
+the `nanoseconds` subsecond component, so JSON consumers do not
+need to round-trip the human-readable column to recover the
+underlying timestamp.
+
+### TAG / ID columns pad to a byte-measured minimum width
+
+qemu's `qemu-img snapshot -l` renders rows with C
+`printf("%-7s %-16s …")`, whose minimum field widths count
+**bytes**. Rust's `{:<7}` / `{:<16}` count chars, which over-pads
+multibyte UTF-8 names (`snäp-名前` is 7 chars but 12 bytes).
+instar's renderer pads the ID and TAG columns by byte length so
+the row layout is byte-identical to qemu's for any name. Found
+by PLAN-snapshot phase 13's differential fuzzer on its first
+smoke run — the phase 10/11 fixture names were all ASCII, where
+the two semantics agree.
+
+### Inter-entry snapshot-table padding bytes may differ
+
+Snapshot-table entries start 8-aligned, leaving up to 7 padding
+bytes between an entry's unaligned end and the next entry's
+start. instar serializes the whole table with zeroed gaps;
+qemu's `qcow2_write_snapshots` writes each entry field-by-field
+and never touches the pad bytes. On a table allocated into a
+**reused** (previously freed, dirty) cluster — e.g. a create or
+delete following an apply that freed data clusters — qemu's
+padding therefore retains stale bytes while instar's reads zero.
+Both images are valid: the padding is dead bytes no parser
+reads. Unreachable in the phase 6–8 byte-identity matrices
+(their tables always landed in fresh zero clusters); found by
+the phase 13 differential fuzzer, whose comparator zeroes the
+live table's pad bytes on both sides per step, alongside its
+date normalization.
+
+### Snapshot names are rendered raw, like qemu-img
+
+`instar snapshot -l` writes snapshot IDs and names to stdout
+byte-for-byte as stored in the image, exactly as `qemu-img
+snapshot -l` does (qemu `printf`s them raw). A hostile image can
+therefore embed terminal control characters (ANSI escapes,
+carriage returns, newlines) in a snapshot name and have them
+reach the operator's terminal — a cosmetic output-spoofing
+vector, noted by the PLAN-snapshot pre-push security review and
+**accepted deliberately as qemu-img parity**: sanitizing would
+break the byte-identical `-l` contract the cross-version
+baselines and harnesses pin. The JSON output path escapes per
+the JSON spec (`"`, `\`, and C0 controls) and is the right
+choice for untrusted automation. Pipe human output through
+`less` or similar when listing images you do not trust.
+
+### Zero `date_sec` renders the epoch (fixed in phase 14)
+
+For a snapshot-table entry whose `date_sec` is 0, `instar
+snapshot -l` renders the Unix epoch in local time
+(`1970-01-01 00:00:00` under `TZ=UTC`), byte-identical to
+`qemu-img snapshot -l`, which feeds 0 through `localtime` like
+any other value. instar originally early-returned a blank
+`DATE` column here; PLAN-snapshot phase 14 resolved the
+divergence in favour of parity (the project's standing
+principle) and removed the early return — the `localtime_r`
+path handles 0 fine, and the JSON output path carries raw
+numeric date fields either way.
+
+The input is degenerate: it is unreachable via qemu-created
+images — both `qemu-img snapshot -c` and `instar snapshot -c`
+always stamp the wall-clock creation time, so a zero `date_sec`
+requires a hand-crafted table. The original divergence was
+found by PLAN-snapshot phase 13's date-normalization probes,
+which is why the differential fuzzer's comparator normalizes
+`date_sec`/`date_nsec` to a fixed **nonzero** sentinel
+(`0x60000000`/`0`): with the nonzero value both tools rendered
+identically even before the fix, and nothing depends on the
+zero case, so the sentinel stays as-is.
+
+### `vm_state_size == 0` renders as `0 B`
+
+qemu's `qemu-img snapshot -l` uses `size_to_str()` for the
+`VM_SIZE` column, which emits the literal string `"0 B"` for a
+zero `vm_state_size`. The shared `format_size_human(_, qemu_compat
+= true)` helper used elsewhere in instar (e.g. `instar info`)
+returns the bare string `"0"` for zero bytes, matching qemu-img's
+**info** output. The snapshot renderer therefore wraps the helper
+with a `0`-byte short-circuit so the `VM_SIZE` column matches the
+qemu-img snapshot dump rather than the qemu-img info dump.
+
+### Cross-version listing format: instar tracks the modern layout
+
+`qemu-img snapshot -l` output changed format between qemu 8.x and
+9.0. The cross-version baseline matrix (phase 10) captures exactly
+two profile families:
+
+- **Old format** (qemu 6.0.0 through 8.2.x): column headers `VM
+  SIZE` and `VM CLOCK` (space-separated), clock rendered with
+  2-digit hours (`00:00:00.000`).
+- **New format** (qemu 9.0.0 onward): column headers `VM_SIZE` and
+  `VM_CLOCK` (underscore-separated), clock rendered with 4-digit
+  hours (`0000:00:00.000`), matching instar's renderer from phase 4.
+
+instar implements the new (≥9.0) format. Phase 11 integration tests
+compare `instar snapshot -l` output against the newest-format
+profile and use the old-format profiles only to validate the
+captured baselines. The raw per-version baselines for all 80
+matrix versions live in
+`instar-testdata/expected-outputs/snapshot-list-human/`.
+
+### Snapshot names up to 255 bytes are listed in full
+
+`SnapshotEntry::name` was widened from `[u8; 64]` to `[u8; 256]`
+and the parser's copy cap raised from `.min(63)` to `.min(255)`.
+The wire record's `name` field is 256 bytes, so no truncation
+occurs for any name qemu-img can produce (qemu caps creation at
+255 bytes). Fixture `snap-qcow2-longname` (200-byte name) in the
+phase 10 baseline matrix produces byte-identical output to
+`qemu-img snapshot -l`.
+
+**Residual note**: names longer than the 256-byte wire buffer
+(i.e. longer than 255 usable bytes) would still be silently
+truncated at the converter. This is unreachable via `qemu-img
+snapshot -c`, which caps creation at 255 bytes; instar's own
+create path refuses 256+ byte names with an error.
+
+### `snapshot -c` (create) quirks
+
+The following apply to `instar snapshot -c NAME` (create mode,
+landed in PLAN-snapshot phase 6).
+
+- **Duplicate names are allowed.** Creating two snapshots with the
+  same `NAME` succeeds and yields two distinct entries (IDs `1`
+  and `2`, both tagged `NAME`), matching `qemu-img snapshot -c`
+  exactly. There is *no* "already exists" error — that message
+  belongs to QEMU's HMP `savevm`, not to `qemu-img snapshot -c`.
+  (`ERROR_DUPLICATE_NAME` remains reserved in the ABI for a future
+  savevm-style mode.)
+
+- **16-snapshot cap.** instar v1 refuses to create the 17th
+  snapshot (`ERROR_SNAPSHOT_TABLE_FULL`). The qcow2 spec allows up
+  to 65536; raising the cap is future work. Delete a snapshot
+  first, or use `qemu-img` for images that need more than 16.
+
+- **`refcount_bits != 16` refused for mutating modes.** The v1
+  cluster allocator is 16-bit-refcount only (the `qemu-img`
+  default since qcow2 v3, and the only width v2 uses). Images with
+  a different `refcount_order` are refused by `-c`
+  (`ERROR_UNSUPPORTED_FEATURE`); list mode still works on them.
+
+- **Create may exhaust the image's existing refblocks.** instar
+  v1 allocates new clusters (the snapshot's L1 copy, the
+  reallocated snapshot table) only from the refblocks already
+  present in the image's refcount table — it never allocates a
+  new refblock and never grows the refcount table. When no free
+  run remains in the present refblocks, `-c` fails with
+  `ERROR_ALLOCATION_FAILED` ("no free clusters available") and
+  the image is untouched; `qemu-img snapshot -c` grows the
+  refcount structures and succeeds. In practice this bites at
+  small cluster sizes, where per-create allocations are many
+  clusters (at `cluster_size=512` a 64M image's L1 copy alone is
+  32 clusters) and each refblock covers little file range. Found
+  by the phase 13 differential fuzzer; its chain generator pairs
+  512-byte clusters only with 4M images (the phase 6–8 matrix
+  pairing). Refcount-structure growth is future work (phase 6
+  open question 7).
+
+- **Dirty / corrupt images refused.** `qemu-img` auto-repairs a
+  dirty lazy-refcount image when it opens it read-write; instar v1
+  refuses instead (`ERROR_UNSUPPORTED_FEATURE`). Refcounts in a
+  dirty image are not trustworthy, and instar will not mutate on
+  top of them. Run `qemu-img check -r all` first to clear the
+  dirty bit, then retry.
+
+- **Compressed clusters refused.** Images with zstd compression
+  (header bit) or any zlib-compressed cluster (detected during the
+  L2 walk) are refused by the mutating modes
+  (`ERROR_UNSUPPORTED_FEATURE`). Refcounting a compressed extent
+  needs a multi-cluster walk deferred to future work. List mode
+  works regardless.
+
+- **External data file / encryption / dirty bitmaps refused.**
+  Same `ERROR_UNSUPPORTED_FEATURE` posture as the other mutating
+  modes — these features change the refcount semantics or require
+  a write path instar does not yet have.
+
+- **`-q` has no visible effect on create.** `qemu-img snapshot -c`
+  prints nothing on success and exits 0; instar matches that, so
+  `-q` changes nothing visible for `-c`. See the general `-q`
+  no-op note above for all four modes.
+
+- **Names longer than 255 bytes are refused (not truncated).**
+  The qcow2 on-disk `name` field tops out at 255 usable bytes.
+  `qemu-img snapshot -c` *silently truncates* a longer name to 255
+  bytes and exits 0; instar refuses loudly with a clear host-side
+  error instead, on the principle that silently dropping bytes the
+  user typed is surprising. An **empty** name is likewise refused
+  (qemu-img accepts an empty name); supply a non-empty `NAME`.
+
+- **The created file may be physically larger than `qemu-img`'s.**
+  instar writes through 64 KiB virtio sectors, so the final
+  snapshot-table write rounds the file up to the next sector
+  boundary; `qemu-img` writes at byte granularity and leaves the
+  trailing cluster sparse. The result is a benign difference in
+  `qemu-img info`'s `disk size` / `file length` — the trailing
+  bytes are zero, `qemu-img check` is clean with no leaks, and the
+  qcow2 structure (snapshot table, L1 copy, refcounts, COPIED
+  flags) is byte-for-byte identical to `qemu-img`'s. This is an
+  instar-wide property of its sector-granular I/O, not specific to
+  snapshots.
+
+### `snapshot -d` (delete) quirks
+
+The following apply to `instar snapshot -d SNAPSHOT` (delete
+mode, landed in PLAN-snapshot phase 7). The feature gates
+(`refcount_bits != 16`, compressed clusters, encryption, external
+data file, bitmaps, dirty/corrupt) are the same uniform set as
+`-c` above.
+
+- **`-d` matches by NAME only, first match in table order.** The
+  modern `qemu-img` this tracks (10.x) resolves the `-d` argument
+  via `bdrv_snapshot_find`, which is a plain name comparison —
+  **there is no ID matching on the delete path**. On an image
+  whose snapshots are `alpha` (id 1) and `gamma` (id 3),
+  `qemu-img snapshot -d 3` fails with "snapshot not found", and
+  instar matches that exactly. With duplicate names, the first
+  entry in table order is deleted; with a snapshot *named* "2"
+  and another with *ID* 2, `-d 2` deletes the one named "2".
+  *Cross-version note:* older `qemu-img` releases resolved IDs
+  first (the since-removed `bdrv_snapshot_delete_by_id_or_name`);
+  instar follows 10.x, and the cross-version baseline phases must
+  pin delete baselines accordingly.
+
+- **Deleting never truncates the file.** Freed clusters (the
+  snapshot's L1, the old snapshot table, and any data / L2
+  cluster whose refcount reaches 0) remain in the file until
+  reused, matching qemu.
+
+- **Freed-cluster bytes may differ from `qemu-img`'s.** By
+  default qemu-img passes a *discard* down to the file for the
+  clusters a delete frees (`QCOW2_DISCARD_SNAPSHOT` /
+  `QCOW2_DISCARD_ALWAYS` default on), punching holes so those
+  regions read back as zeros; qemu's `-1` refcount walk also
+  rewrites COPIED flags inside the about-to-be-freed L1/L2
+  clusters. instar never writes to freed clusters at all — their
+  stale bytes remain. All *live* metadata is byte-for-byte
+  identical: running the qemu side with
+  `--image-opts driver=qcow2,file.filename=…,file.discard=ignore`
+  (which disables only the protocol-level hole punching) yields
+  post-delete images that are **bit-for-bit identical** to
+  instar's, modulo the sector-granular file-tail quirk above.
+  `qemu-img check` is clean either way.
+
+- **An empty `-d` argument is passed through.** `qemu-img
+  snapshot -c ''` happily creates an empty-named snapshot, and
+  `-d ''` deletes it; instar refuses *creating* empty names (see
+  the `-c` quirks) but still deletes them for parity. There is no
+  host-side validation of the delete argument; an argument longer
+  than the 256-byte wire buffer cannot name any matchable
+  snapshot (qemu-img truncates names to 255 bytes at creation)
+  and resolves to the same not-found error.
+
+### `snapshot -a` (apply) quirks
+
+The following apply to `instar snapshot -a SNAPSHOT` (apply /
+"goto" mode, landed in PLAN-snapshot phase 8). The feature gates
+are the same uniform set as `-c` / `-d` above.
+
+- **Snapshot argument matching is asymmetric between `-d` and
+  `-a`.** qemu 10.x resolves the two modes' arguments through
+  *different* matchers, and instar matches each exactly:
+
+  | Mode | Matcher | Semantics |
+  |------|---------|-----------|
+  | `-d` | `bdrv_snapshot_find` | name only, first match |
+  | `-a` | `find_snapshot_by_id_or_name` | one full pass over the table comparing **IDs**, then — only if no ID matched — a second full pass comparing **names** |
+
+  The two-full-pass structure means a *later* entry matching by
+  ID beats an *earlier* entry matching by name. Example: on an
+  image with `id=1 name="2"` and `id=2 name="x"`, `-a 2` applies
+  the snapshot with **ID 2** (the one named "x"), while `-d 2`
+  deletes the one **named** "2". A pure-ID argument (`-a 1`)
+  works for apply but is not-found for delete.
+  *Cross-version note:* as with delete (above), older `qemu-img`
+  releases resolved delete arguments differently; instar follows
+  10.x and the cross-version baseline phases must pin per-version
+  behaviour.
+
+- **Applying a snapshot to a since-resized image is refused.**
+  Modern `qemu-img` allows `resize` on images with internal
+  snapshots, and a later `qemu-img snapshot -a` **truncates the
+  image** back to the snapshot's stored `disk_size`
+  (`blk_truncate` inside `qcow2_snapshot_goto`). instar refuses
+  instead (`ERROR_L1_SIZE_MISMATCH`) and leaves the image
+  untouched — a full virtual-size truncate embedded in apply is
+  out of scope for v1. Workaround: `qemu-img resize` the image
+  back to the snapshot's size, then apply. (A snapshot entry
+  with *absent* extra data carries no `disk_size`; qemu defaults
+  it to the current virtual size, so such entries always pass
+  the check — instar mirrors that.) For the same reason a
+  hand-crafted snapshot whose L1 is *larger* than the active L1
+  is refused (qemu would grow the active L1); a *smaller*
+  snapshot L1 is supported via zero-padding, like qemu.
+
+- **Apply is best-effort crash-consistent, like qemu.** Apply
+  rewrites the active L1 in place; it writes no timestamps, no
+  snapshot-table bytes and no header bytes. instar's write order
+  is: refblock increments (group A), fsync; the snapshot's raw
+  L1 over the active L1 — the commit point (group B), fsync;
+  refblock decrements + refreshed COPIED flags (group C), fsync.
+  A crash before B leaves the image unchanged except
+  over-referenced refcounts (repairable leaks); a crash between
+  B and C leaves the active view switched with leaks and stale
+  COPIED flags — `qemu-img check` reports repairable issues,
+  never a dangling reference. qemu's goto has the same
+  best-effort character; one window differs cosmetically (qemu
+  scrubs the snapshot's stored L1 before its active-L1
+  overwrite, instar after), but both orders leave only
+  repairable states and the final bytes are identical.
+
+- **Freed-cluster bytes may differ from `qemu-img`'s.** Same as
+  delete: qemu punches holes over the clusters the apply frees
+  (the old active chain's exclusive L2/data clusters) unless run
+  with `file.discard=ignore`, while instar never writes freed
+  clusters. With the protocol-level discard disabled, post-apply
+  images are **bit-for-bit identical** to instar's across every
+  verified scenario, including diverged applies.
 
 ## Future Additions
 

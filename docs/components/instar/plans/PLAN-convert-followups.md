@@ -72,7 +72,7 @@ effort:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. `qemu-img` subcommand parity (~~create~~ / ~~map~~ / ~~measure~~ / ~~resize~~ / snapshot / ~~rebase~~ / ~~commit~~) | PLAN-convert-followups-phase-01-subcommands.md (not yet written) | Not started (`measure` complete — see [PLAN-measure.md](/components/instar/plans/PLAN-measure/); `create` complete — see [PLAN-create.md](/components/instar/plans/PLAN-create/); `resize` complete — see [PLAN-resize.md](/components/instar/plans/PLAN-resize/); `rebase` and `commit` complete — see [PLAN-rebase-commit.md](/components/instar/plans/PLAN-rebase-commit/); `map` complete — see [PLAN-map.md](/components/instar/plans/PLAN-map/); `snapshot` remains.) |
+| 1. `qemu-img` subcommand parity (~~create~~ / ~~map~~ / ~~measure~~ / ~~resize~~ / ~~snapshot~~ / ~~rebase~~ / ~~commit~~) | PLAN-convert-followups-phase-01-subcommands.md (never needed — each subcommand got its own master plan) | Complete (`measure` — see [PLAN-measure.md](/components/instar/plans/PLAN-measure/); `create` — see [PLAN-create.md](/components/instar/plans/PLAN-create/); `resize` — see [PLAN-resize.md](/components/instar/plans/PLAN-resize/); `rebase` and `commit` — see [PLAN-rebase-commit.md](/components/instar/plans/PLAN-rebase-commit/); `map` — see [PLAN-map.md](/components/instar/plans/PLAN-map/); `snapshot` — see [PLAN-snapshot.md](/components/instar/plans/PLAN-snapshot/). The roster is complete; this plan now needs only the phase 2 `check --repair` work.) |
 | 2. `check --repair` wiring | PLAN-convert-followups-phase-02-check-repair.md (not yet written) | Not started |
 
 Subcommands in phase 1 should be split into one phase plan each
@@ -89,8 +89,7 @@ For phase 1 detail planning, the original scope notes from
 - ~~**map**~~ — Shipped. See [PLAN-map.md](/components/instar/plans/PLAN-map/).
 - ~~**measure**~~ — Shipped. See [PLAN-measure.md](/components/instar/plans/PLAN-measure/).
 - ~~**resize**~~ — Shipped. See [PLAN-resize.md](/components/instar/plans/PLAN-resize/).
-- **snapshot** — List, apply, create, delete internal QCOW2
-  snapshots.
+- ~~**snapshot**~~ — Shipped. See [PLAN-snapshot.md](/components/instar/plans/PLAN-snapshot/).
 - ~~**rebase**~~ — Shipped. See [PLAN-rebase-commit.md](/components/instar/plans/PLAN-rebase-commit/).
 - ~~**commit**~~ — Shipped. See [PLAN-rebase-commit.md](/components/instar/plans/PLAN-rebase-commit/).
 

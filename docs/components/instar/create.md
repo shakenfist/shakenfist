@@ -184,7 +184,7 @@ the `MetadataPlan`. The host's `apply_preallocation` helper handles
 ## Known divergences from `qemu-img create`
 
 The cross-version baseline matrix passes for the bulk of supported
-options, but five categories of writer divergence are documented and
+options, but four categories of writer divergence are documented and
 tracked as future work. The canonical list (with per-case rationale)
 is `KNOWN_WRITER_DIVERGENCES` in `tests/test_create.py`.
 
@@ -192,12 +192,6 @@ is `KNOWN_WRITER_DIVERGENCES` in `tests/test_create.py`.
   multiple (legacy VHD geometry); instar emits exact bytes. The
   divergence is typically < 256 KiB. Both files are valid VHDs; the
   difference surfaces only in `qemu-img info`'s `virtual-size` field.
-- **qcow2 `refcount_bits ≠ 16`**: the writer hardcodes
-  `refcount_order=4` (=> 16-bit refcount entries on disk) regardless
-  of the `-o refcount_bits=...` value. `refcount_bits=1` and `=8` fit
-  in the encoding and produce a valid file; `=64` produces a header
-  the instar reader rejects (the canonical `KNOWN_CHECK_FAILURES`
-  entry in `tests/test_create.py`).
 - **qcow2 `compat=0.10`**: the writer always emits `compat=1.1`.
   qemu-img honours both.
 - **qcow2 `compression_type=zstd`**: the writer records `zlib` in the
@@ -210,18 +204,15 @@ is `KNOWN_WRITER_DIVERGENCES` in `tests/test_create.py`.
   `-o block_size=...` (or `--block-size`) explicitly to match.
   Explicit block sizes round-trip cleanly.
 
-A sixth, latent gap is that `instar create -f qcow2 -o
-refcount_bits=64` produces a file whose internal validator rejects on
-`instar check`. That case is the only entry in
-`tests/test_create.py:KNOWN_CHECK_FAILURES` and shares the root cause
-with the refcount_bits hardcode above.
+All `-o refcount_bits=` widths (1/2/4/8/16/32/64) are now written
+correctly: `build_header` derives `refcount_order` from `refcount_bits`
+and sub-byte widths pack LSB-first, so the produced files round-trip
+through `instar check` and match `qemu-img` (instar #365).
 
 ## Future work
 
 - VHD CHS-geometry round-trip matching (close the `virtual_size`
   divergence).
-- qcow2 `refcount_bits` parameterisation (drive the L1/L2/refcount math
-  off the user's choice instead of the hardcoded 4).
 - qcow2 `compat=0.10` honouring.
 - zstd-aware qcow2 create (drop the accept-ignore; emit the zstd
   header bit).

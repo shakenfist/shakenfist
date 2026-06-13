@@ -153,9 +153,11 @@ the codebase after `vmm/main.rs`.
 **What you will find:** Every type, constant, and address that both
 the host-side VMM and the guest-side operations must agree on. The
 `CallTable` struct (the guest's "syscall table"). All operation config
-structs (`InfoConfig`, `CopyConfig`, `CheckConfig`, `CompareConfig`,
-`ConvertConfig`). All result structs. Memory layout constants with
-compile-time overlap assertions.
+structs — one per subcommand (`InfoConfig`, `CopyConfig`,
+`CheckConfig`, `CompareConfig`, `ConvertConfig`, `MeasureConfig`,
+`CreateConfig`, `ResizeConfig`, `RebaseConfig`, `CommitConfig`,
+`MapConfig`, `SnapshotConfig`). All result structs. Memory layout
+constants with compile-time overlap assertions.
 
 **What to pay attention to:**
 
