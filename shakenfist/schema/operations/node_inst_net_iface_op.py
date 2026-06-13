@@ -26,6 +26,12 @@ current_version = 1
 
 class model_tasks(Enum):
     hot_plug_instance_interface = 1
+    # hot_plug_instance_interface reconciles the network onto this node and
+    # enqueues the mesh op it needs, then hands off to a follow-up op
+    # carrying this task and a depends_on on that op. The dispatcher defers
+    # the follow-up until the mesh op is terminal, so the worker is never
+    # parked blocking on it.
+    attach_instance_interface = 2
 
 
 class model(BaseModel):

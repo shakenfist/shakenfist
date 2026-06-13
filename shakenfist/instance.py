@@ -2019,11 +2019,11 @@ class Instance(dbowo):
         return blob_uuid
 
     def hot_plug_interface(self, n, ni):
-        create_op = n.create_on_hypervisor()
-        create_op.raise_for_error()
-        mesh_op = n.ensure_mesh()
-        mesh_op.raise_for_error()
-
+        # Attach the interface device via libvirt. The network reconcile
+        # (create-on-hypervisor + ensure_mesh) and the wait for it are the
+        # caller's responsibility -- node_inst_net_iface_op does the
+        # reconcile and defers this attach on the mesh op rather than
+        # blocking a worker on raise_for_error().
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)
             if not inst or not inst.isActive():
