@@ -27,10 +27,13 @@ class NodeInstSnapOpException(BaseOperationException):
         self.op_uuid = op.uuid
         self.node_uuid = op.node_uuid
         self.instance_uuid = op.instance_uuid
-        self.disk = op.disk
-        self.artifact_uuid = op.artifact_uuid
-        self.blob_uuid = op.blob_uuid
-        self.thin = op.thin
+        # NodeInstSnapOp carries a list of per-disk snapshot specs (each
+        # with its own 'disk'/'blob_uuid'/'thin'); it has no op-level
+        # disk/artifact_uuid/blob_uuid/thin attributes. Referencing those
+        # here raised AttributeError while building the exception -- which
+        # the dispatcher then logged as an unhandled error -- so capture
+        # the snapshots list instead.
+        self.snapshots = op.snapshots
 
 
 class NoSuchTask(NodeInstSnapOpException):
