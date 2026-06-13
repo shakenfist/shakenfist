@@ -181,6 +181,10 @@
          <lastmod>2026-06-13</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/snapshot/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/technology-primer/</loc>
          <lastmod>2026-06-13</lastmod>
     </url>
@@ -230,6 +234,22 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-audit/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-bug-fixes-phase-01-fixed-vhd-overflow/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-bug-fixes-phase-02-vhdx-resize-seqnum/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-bug-fixes-phase-03-qcow2-shrink-subbyte-refcount/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-bug-fixes/</loc>
          <lastmod>2026-06-13</lastmod>
     </url>
     <url>
@@ -522,6 +542,66 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-01-abi/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-02-list-planner/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-03-list-guest/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-04-list-host/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-05-refcount-planners/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-06-create/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-07-delete/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-08-apply/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-09-mutate-host/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-10-baselines/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-11-integration-tests/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-12-fuzz-coverage/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-13-fuzz-differential/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-14-docs/</loc>
+         <lastmod>2026-06-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot/</loc>
          <lastmod>2026-06-13</lastmod>
     </url>
     <url>

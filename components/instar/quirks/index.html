@@ -1578,6 +1578,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../snapshot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar snapshot` — manage internal qcow2 snapshots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../openstack-announcement-email/" class="md-nav__link">
         
   
@@ -3010,17 +3038,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#qcow2-refcount_bits-is-hardcoded-to-16" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        qcow2 refcount_bits is hardcoded to 16
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#qcow2-compat010-is-silently-upgraded-to-11" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3058,17 +3075,6 @@
     <span class="md-ellipsis">
       
         VHD fixed subformat carries footer-only metadata
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#known-check-failure-qcow2-refcount_bits64" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Known check failure: qcow2 refcount_bits=64
       
     </span>
   </a>
@@ -3418,6 +3424,216 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#convert-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        convert subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="convert subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-snapshot-resolves-id-then-name-over-a-bounded-16-entry-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --snapshot resolves ID-then-name over a bounded 16-entry table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        snapshot subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="snapshot subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bare-snapshot-file-defaults-to-list-mode-d2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bare snapshot FILE defaults to list mode (D2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-force-share-u-is-list-only-d1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --force-share (-U) is list-only (D1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-q-is-a-no-op-for-all-snapshot-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -q is a no-op for all snapshot modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-mode-flags-clap-exits-2-qemu-exits-1-d3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed mode flags: clap exits 2, qemu exits 1 (D3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date-column-is-rendered-in-local-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DATE column is rendered in local time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tag-id-columns-pad-to-a-byte-measured-minimum-width" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TAG / ID columns pad to a byte-measured minimum width
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inter-entry-snapshot-table-padding-bytes-may-differ" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inter-entry snapshot-table padding bytes may differ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-names-are-rendered-raw-like-qemu-img" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot names are rendered raw, like qemu-img
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-date_sec-renders-the-epoch-fixed-in-phase-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zero date_sec renders the epoch (fixed in phase 14)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vm_state_size-0-renders-as-0-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vm_state_size == 0 renders as 0 B
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-version-listing-format-instar-tracks-the-modern-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-version listing format: instar tracks the modern layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-names-up-to-255-bytes-are-listed-in-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot names up to 255 bytes are listed in full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-c-create-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        snapshot -c (create) quirks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-d-delete-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        snapshot -d (delete) quirks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-a-apply-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        snapshot -a (apply) quirks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-additions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3564,10 +3780,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_22" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_23" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_22" id="__nav_3_6_22_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_23" id="__nav_3_6_23_label" tabindex="0">
             
   
   
@@ -3585,8 +3801,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_22_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_22">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_23_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_23">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3703,10 +3919,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_23" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_24" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_23" id="__nav_3_6_23_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_24" id="__nav_3_6_24_label" tabindex="0">
             
   
   
@@ -3724,8 +3940,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_23_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_23">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_24">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3786,10 +4002,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_24" id="__nav_3_6_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_25" id="__nav_3_6_25_label" tabindex="0">
             
   
   
@@ -3807,8 +4023,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3953,10 +4169,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_25" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_26" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_25" id="__nav_3_6_25_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_26" id="__nav_3_6_26_label" tabindex="0">
             
   
   
@@ -3974,8 +4190,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_25_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_25">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_26_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_26">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4356,6 +4572,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-snapshot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar snapshot subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-fuzzing-bugs/" class="md-nav__link">
         
   
@@ -4364,6 +4608,34 @@
     
   
     Fuzzing bug backlog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-bug-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    June 2026 fuzzer bug backlog
   
 
     
@@ -4400,10 +4672,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_26" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_27" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_26" id="__nav_3_6_26_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_27" id="__nav_3_6_27_label" tabindex="0">
             
   
   
@@ -4421,8 +4693,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_26_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_26">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_27_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_27">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4875,10 +5147,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_27" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_28" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_27" id="__nav_3_6_27_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_28" id="__nav_3_6_28_label" tabindex="0">
             
   
   
@@ -4896,8 +5168,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_27_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_27">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_28_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_28">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -5126,10 +5398,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_28" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_29" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_28" id="__nav_3_6_28_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_29" id="__nav_3_6_29_label" tabindex="0">
             
   
   
@@ -5147,8 +5419,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_28_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_28">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_29_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_29">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -5209,10 +5481,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_29" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_30" >
         
           
-          <label class="md-nav__link" for="__nav_3_6_29" id="__nav_3_6_29_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_6_30" id="__nav_3_6_30_label" tabindex="0">
             
   
   
@@ -5230,8 +5502,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_29_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_6_29">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_30_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_30">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -11404,17 +11676,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#qcow2-refcount_bits-is-hardcoded-to-16" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        qcow2 refcount_bits is hardcoded to 16
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#qcow2-compat010-is-silently-upgraded-to-11" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11452,17 +11713,6 @@
     <span class="md-ellipsis">
       
         VHD fixed subformat carries footer-only metadata
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#known-check-failure-qcow2-refcount_bits64" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Known check failure: qcow2 refcount_bits=64
       
     </span>
   </a>
@@ -11800,6 +12050,216 @@
     <span class="md-ellipsis">
       
         Same file is exposed as input device 0 and output device 1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#convert-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        convert subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="convert subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-snapshot-resolves-id-then-name-over-a-bounded-16-entry-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --snapshot resolves ID-then-name over a bounded 16-entry table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-subcommand-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        snapshot subcommand quirks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="snapshot subcommand quirks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bare-snapshot-file-defaults-to-list-mode-d2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bare snapshot FILE defaults to list mode (D2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-force-share-u-is-list-only-d1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --force-share (-U) is list-only (D1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-q-is-a-no-op-for-all-snapshot-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -q is a no-op for all snapshot modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-mode-flags-clap-exits-2-qemu-exits-1-d3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed mode flags: clap exits 2, qemu exits 1 (D3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date-column-is-rendered-in-local-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DATE column is rendered in local time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tag-id-columns-pad-to-a-byte-measured-minimum-width" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TAG / ID columns pad to a byte-measured minimum width
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inter-entry-snapshot-table-padding-bytes-may-differ" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inter-entry snapshot-table padding bytes may differ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-names-are-rendered-raw-like-qemu-img" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot names are rendered raw, like qemu-img
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-date_sec-renders-the-epoch-fixed-in-phase-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zero date_sec renders the epoch (fixed in phase 14)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vm_state_size-0-renders-as-0-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vm_state_size == 0 renders as 0 B
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-version-listing-format-instar-tracks-the-modern-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-version listing format: instar tracks the modern layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-names-up-to-255-bytes-are-listed-in-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot names up to 255 bytes are listed in full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-c-create-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        snapshot -c (create) quirks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-d-delete-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        snapshot -d (delete) quirks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snapshot-a-apply-quirks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        snapshot -a (apply) quirks
       
     </span>
   </a>
@@ -12871,16 +13331,6 @@ are valid VHDs — the difference surfaces only in the
 <code>virtual-size</code> field reported by <code>qemu-img info</code>. Phase 8b's
 <code>tests/test_create.py::KNOWN_WRITER_DIVERGENCES</code> skips every
 affected case; closing this gap is documented future work.</p>
-<h3 id="qcow2-refcount_bits-is-hardcoded-to-16">qcow2 <code>refcount_bits</code> is hardcoded to 16<a class="headerlink" href="#qcow2-refcount_bits-is-hardcoded-to-16" title="Permanent link">&para;</a></h3>
-<p><code>crates/qcow2::create::build_header</code> emits <code>refcount_order = 4</code>
-(=&gt; 16-bit refcount entries on disk) regardless of the user's
-<code>-o refcount_bits=...</code> value. Honoured values that don't cause
-visible divergence: <code>1</code> and <code>8</code> (smaller widths still fit the
-16-bit encoding and produce valid files). <code>refcount_bits=64</code>
-produces a header <code>instar check</code> rejects on round-trip — the
-only entry in <code>tests/test_create.py::KNOWN_CHECK_FAILURES</code>.
-Closing the gap requires parameterising the L1/L2/refcount math
-over the user's choice. Future work.</p>
 <h3 id="qcow2-compat010-is-silently-upgraded-to-11">qcow2 <code>compat=0.10</code> is silently upgraded to <code>1.1</code><a class="headerlink" href="#qcow2-compat010-is-silently-upgraded-to-11" title="Permanent link">&para;</a></h3>
 <p>The writer hardcodes <code>compat=1.1</code> in the header. qemu-img
 honours <code>compat=0.10</code> for compatibility with pre-3.0 qemu
@@ -12912,14 +13362,6 @@ pass <code>-f vpc</code> explicitly to surface the vhd format. This is
 qemu's native behaviour and not a bug in either tool. Phase 7's
 baselines were recorded without <code>-f</code>, so phase 8's matrix
 comparison naturally agrees on both sides.</p>
-<h3 id="known-check-failure-qcow2-refcount_bits64">Known check failure: qcow2 <code>refcount_bits=64</code><a class="headerlink" href="#known-check-failure-qcow2-refcount_bits64" title="Permanent link">&para;</a></h3>
-<p><code>instar create -f qcow2 -o refcount_bits=64 ...</code> produces a
-file whose internal validator rejects on <code>instar check</code>
-("image check failed: errors detected"). The header claims
-64-bit refcounts but the on-disk entries are 16-bit
-(refcount_bits hardcode, above). This is the only entry in
-<code>tests/test_create.py::KNOWN_CHECK_FAILURES</code>; <code>refcount_bits=1</code>
-and <code>=8</code> fit the encoding and pass.</p>
 <h2 id="resize-subcommand-quirks">resize subcommand quirks<a class="headerlink" href="#resize-subcommand-quirks" title="Permanent link">&para;</a></h2>
 <h3 id="raw-resize-runs-entirely-host-side">Raw <code>resize</code> runs entirely host-side<a class="headerlink" href="#raw-resize-runs-entirely-host-side" title="Permanent link">&para;</a></h3>
 <p><code>instar resize -f raw</code> opens the file <code>O_RDWR</code>, calls
@@ -13162,6 +13604,436 @@ provides this data" mode (see
 <a href="/components/instar/
 plans/PLAN-rebase-commit-phase-08-commit-host/">PLAN-rebase-commit-phase-08-commit-host.md</a>) can
 plug in without an ABI change.</p>
+<h2 id="convert-subcommand-quirks">convert subcommand quirks<a class="headerlink" href="#convert-subcommand-quirks" title="Permanent link">&para;</a></h2>
+<h3 id="-snapshot-resolves-id-then-name-over-a-bounded-16-entry-table"><code>--snapshot</code> resolves ID-then-name over a bounded 16-entry table<a class="headerlink" href="#-snapshot-resolves-id-then-name-over-a-bounded-16-entry-table" title="Permanent link">&para;</a></h3>
+<p><code>instar convert --snapshot ARG</code> resolves <code>ARG</code> with the same
+two-full-pass matcher as <code>qemu-img convert -l</code> (qemu's
+<code>find_snapshot_by_id_or_name</code>, shared with <code>snapshot -a</code>): one
+full pass over the snapshot table comparing <strong>IDs</strong>, then — only
+if no ID matched — a second full pass comparing <strong>names</strong>. A
+later entry matching by ID beats an earlier entry matching by
+name; see the <code>snapshot -a</code> matcher-asymmetry table below for
+the collision example. (Before PLAN-snapshot phase 14, instar
+returned the first per-entry id-or-name hit, which picked the
+wrong snapshot on ID/name-collision images.)</p>
+<p><strong>Residual divergence</strong>: the lookup walks the bounded in-memory
+table from <code>parse_snapshot_table</code>, which caps at 16 entries
+(<code>MAX_SNAPSHOTS</code>). A snapshot stored beyond the first 16 table
+entries is reported not-found by <code>instar convert --snapshot</code>
+where <code>qemu-img convert -l</code> finds it. This is the same v1
+16-snapshot cap family as the snapshot subcommand's create cap
+(see "16-snapshot cap" under the <code>snapshot -c</code> quirks); raising
+it is future work.</p>
+<h2 id="snapshot-subcommand-quirks">snapshot subcommand quirks<a class="headerlink" href="#snapshot-subcommand-quirks" title="Permanent link">&para;</a></h2>
+<h3 id="bare-snapshot-file-defaults-to-list-mode-d2">Bare <code>snapshot FILE</code> defaults to list mode (D2)<a class="headerlink" href="#bare-snapshot-file-defaults-to-list-mode-d2" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img snapshot</code> documents <code>-l</code> as "the default" — running
+<code>qemu-img snapshot image.qcow2</code> without a mode flag lists the
+snapshot table and exits 0. Before phase 9, instar's clap ArgGroup
+had <code>required = true</code>, so the bare form produced a clap usage error
+(exit 2). Phase 9 fixes this: the ArgGroup is now <code>required = false</code>,
+and <code>run_snapshot</code> routes an absent mode flag to the real list path
+(<code>run_snapshot_list</code>), producing byte-identical output to the
+explicit <code>-l</code> form.</p>
+<h3 id="-force-share-u-is-list-only-d1"><code>--force-share</code> (<code>-U</code>) is list-only (D1)<a class="headerlink" href="#-force-share-u-is-list-only-d1" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img</code> refuses <code>-U</code> combined with any mutating mode (<code>-c</code>, <code>-d</code>,
+<code>-a</code>) with exit 1 and the message:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>qemu-img: Could not open &#39;IMAGE&#39;: force-share=on can only be used with read-only images
+</code></pre></div>
+<p>Before phase 9, instar accepted <code>-U</code> with mutating modes and
+performed the mutation (the flag was plumbed to the guest but
+unenforced at the host). Phase 9 adds a host-side gate in
+<code>run_snapshot</code> that fires before any file access: <code>-U</code> combined with
+<code>-c</code>, <code>-d</code>, or <code>-a</code> exits 1 with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>snapshot: --force-share (-U) can only be used with read-only operations; -l is the only sharing-safe mode
+</code></pre></div>
+<p>The message wording differs from qemu's (which mentions
+<code>force-share=on</code> and "read-only images" — artefacts of qemu's
+open-flags machinery). The substance is the same: refusal, exit 1,
+image untouched.</p>
+<p><code>-U -l</code> is accepted by both tools. instar takes no image locks, so
+the flag is a no-op for the read-only path; the bit is still
+forwarded to the guest via <code>FLAG_FORCE_SHARE</code> but the guest likewise
+ignores it.</p>
+<h3 id="-q-is-a-no-op-for-all-snapshot-modes"><code>-q</code> is a no-op for all snapshot modes<a class="headerlink" href="#-q-is-a-no-op-for-all-snapshot-modes" title="Permanent link">&para;</a></h3>
+<p><code>-q</code> (quiet) has no visible effect on any snapshot mode under either
+tool:</p>
+<ul>
+<li><code>-c</code> (create): success is always silent (no stdout line exists to
+  suppress). <code>-q</code> changes nothing.</li>
+<li><code>-d</code> (delete): success is always silent. Error messages (e.g.
+  "snapshot not found") are printed to stderr and are <strong>not</strong>
+  suppressed by <code>-q</code> under either tool; both exit 1.</li>
+<li><code>-a</code> (apply): success is always silent. Error messages not
+  suppressed.</li>
+<li><code>-l</code> (list): the snapshot table goes to stdout regardless of <code>-q</code>.</li>
+</ul>
+<p>The flag is accepted for CLI compatibility and forwarded to the guest
+via <code>FLAG_QUIET</code>, but the guest likewise ignores it for all modes
+implemented so far. The phase 6 note ("<code>-q</code> has no visible effect on
+create") generalises to all four modes.</p>
+<h3 id="mixed-mode-flags-clap-exits-2-qemu-exits-1-d3">Mixed mode flags: clap exits 2, qemu exits 1 (D3)<a class="headerlink" href="#mixed-mode-flags-clap-exits-2-qemu-exits-1-d3" title="Permanent link">&para;</a></h3>
+<p>Supplying two or more mode flags (<code>-c snap -d snap</code>, <code>-l -c snap</code>,
+etc.) is a mutually-exclusive-argument violation under both tools,
+but the exit codes and messages differ:</p>
+<ul>
+<li><code>qemu-img</code>: prints <code>Cannot mix '-l', '-a', '-c', '-d'</code>, exits 1.</li>
+<li><code>instar</code>: clap detects the conflict at parse time, prints its own
+  usage-error message, exits 2.</li>
+</ul>
+<p>The behaviours agree in substance (refusal, non-zero exit, no image
+access); the exit code and message differ cosmetically. Fighting clap
+for a one-digit exit-code delta buys nothing — instar's other
+subcommands already expose clap usage-error semantics — so this
+divergence is documented rather than fixed.</p>
+<h3 id="date-column-is-rendered-in-local-time"><code>DATE</code> column is rendered in local time<a class="headerlink" href="#date-column-is-rendered-in-local-time" title="Permanent link">&para;</a></h3>
+<p><code>instar snapshot -l</code> formats the <code>DATE</code> column using the host's
+local timezone, matching <code>qemu-img snapshot -l</code>'s behaviour
+(both use <code>strftime("%Y-%m-%d %H:%M:%S", localtime(&amp;date_sec))</code>).
+For deterministic output (CI runs, cross-version baselines, byte-
+exact diff harnesses), set <code>TZ=UTC</code> in the environment before
+invoking either tool. Without <code>TZ=UTC</code> the rendered date depends
+on the operator's locale and the two tools' output will only
+match when they're invoked under the same TZ.</p>
+<p>The <code>--output=json</code> form is an instar extension; its <code>date</code>
+object reports the raw <code>seconds</code> since the Unix epoch alongside
+the <code>nanoseconds</code> subsecond component, so JSON consumers do not
+need to round-trip the human-readable column to recover the
+underlying timestamp.</p>
+<h3 id="tag-id-columns-pad-to-a-byte-measured-minimum-width">TAG / ID columns pad to a byte-measured minimum width<a class="headerlink" href="#tag-id-columns-pad-to-a-byte-measured-minimum-width" title="Permanent link">&para;</a></h3>
+<p>qemu's <code>qemu-img snapshot -l</code> renders rows with C
+<code>printf("%-7s %-16s …")</code>, whose minimum field widths count
+<strong>bytes</strong>. Rust's <code>{:&lt;7}</code> / <code>{:&lt;16}</code> count chars, which over-pads
+multibyte UTF-8 names (<code>snäp-名前</code> is 7 chars but 12 bytes).
+instar's renderer pads the ID and TAG columns by byte length so
+the row layout is byte-identical to qemu's for any name. Found
+by PLAN-snapshot phase 13's differential fuzzer on its first
+smoke run — the phase 10/11 fixture names were all ASCII, where
+the two semantics agree.</p>
+<h3 id="inter-entry-snapshot-table-padding-bytes-may-differ">Inter-entry snapshot-table padding bytes may differ<a class="headerlink" href="#inter-entry-snapshot-table-padding-bytes-may-differ" title="Permanent link">&para;</a></h3>
+<p>Snapshot-table entries start 8-aligned, leaving up to 7 padding
+bytes between an entry's unaligned end and the next entry's
+start. instar serializes the whole table with zeroed gaps;
+qemu's <code>qcow2_write_snapshots</code> writes each entry field-by-field
+and never touches the pad bytes. On a table allocated into a
+<strong>reused</strong> (previously freed, dirty) cluster — e.g. a create or
+delete following an apply that freed data clusters — qemu's
+padding therefore retains stale bytes while instar's reads zero.
+Both images are valid: the padding is dead bytes no parser
+reads. Unreachable in the phase 6–8 byte-identity matrices
+(their tables always landed in fresh zero clusters); found by
+the phase 13 differential fuzzer, whose comparator zeroes the
+live table's pad bytes on both sides per step, alongside its
+date normalization.</p>
+<h3 id="snapshot-names-are-rendered-raw-like-qemu-img">Snapshot names are rendered raw, like qemu-img<a class="headerlink" href="#snapshot-names-are-rendered-raw-like-qemu-img" title="Permanent link">&para;</a></h3>
+<p><code>instar snapshot -l</code> writes snapshot IDs and names to stdout
+byte-for-byte as stored in the image, exactly as <code>qemu-img
+snapshot -l</code> does (qemu <code>printf</code>s them raw). A hostile image can
+therefore embed terminal control characters (ANSI escapes,
+carriage returns, newlines) in a snapshot name and have them
+reach the operator's terminal — a cosmetic output-spoofing
+vector, noted by the PLAN-snapshot pre-push security review and
+<strong>accepted deliberately as qemu-img parity</strong>: sanitizing would
+break the byte-identical <code>-l</code> contract the cross-version
+baselines and harnesses pin. The JSON output path escapes per
+the JSON spec (<code>"</code>, <code>\</code>, and C0 controls) and is the right
+choice for untrusted automation. Pipe human output through
+<code>less</code> or similar when listing images you do not trust.</p>
+<h3 id="zero-date_sec-renders-the-epoch-fixed-in-phase-14">Zero <code>date_sec</code> renders the epoch (fixed in phase 14)<a class="headerlink" href="#zero-date_sec-renders-the-epoch-fixed-in-phase-14" title="Permanent link">&para;</a></h3>
+<p>For a snapshot-table entry whose <code>date_sec</code> is 0, <code>instar
+snapshot -l</code> renders the Unix epoch in local time
+(<code>1970-01-01 00:00:00</code> under <code>TZ=UTC</code>), byte-identical to
+<code>qemu-img snapshot -l</code>, which feeds 0 through <code>localtime</code> like
+any other value. instar originally early-returned a blank
+<code>DATE</code> column here; PLAN-snapshot phase 14 resolved the
+divergence in favour of parity (the project's standing
+principle) and removed the early return — the <code>localtime_r</code>
+path handles 0 fine, and the JSON output path carries raw
+numeric date fields either way.</p>
+<p>The input is degenerate: it is unreachable via qemu-created
+images — both <code>qemu-img snapshot -c</code> and <code>instar snapshot -c</code>
+always stamp the wall-clock creation time, so a zero <code>date_sec</code>
+requires a hand-crafted table. The original divergence was
+found by PLAN-snapshot phase 13's date-normalization probes,
+which is why the differential fuzzer's comparator normalizes
+<code>date_sec</code>/<code>date_nsec</code> to a fixed <strong>nonzero</strong> sentinel
+(<code>0x60000000</code>/<code>0</code>): with the nonzero value both tools rendered
+identically even before the fix, and nothing depends on the
+zero case, so the sentinel stays as-is.</p>
+<h3 id="vm_state_size-0-renders-as-0-b"><code>vm_state_size == 0</code> renders as <code>0 B</code><a class="headerlink" href="#vm_state_size-0-renders-as-0-b" title="Permanent link">&para;</a></h3>
+<p>qemu's <code>qemu-img snapshot -l</code> uses <code>size_to_str()</code> for the
+<code>VM_SIZE</code> column, which emits the literal string <code>"0 B"</code> for a
+zero <code>vm_state_size</code>. The shared <code>format_size_human(_, qemu_compat
+= true)</code> helper used elsewhere in instar (e.g. <code>instar info</code>)
+returns the bare string <code>"0"</code> for zero bytes, matching qemu-img's
+<strong>info</strong> output. The snapshot renderer therefore wraps the helper
+with a <code>0</code>-byte short-circuit so the <code>VM_SIZE</code> column matches the
+qemu-img snapshot dump rather than the qemu-img info dump.</p>
+<h3 id="cross-version-listing-format-instar-tracks-the-modern-layout">Cross-version listing format: instar tracks the modern layout<a class="headerlink" href="#cross-version-listing-format-instar-tracks-the-modern-layout" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img snapshot -l</code> output changed format between qemu 8.x and
+9.0. The cross-version baseline matrix (phase 10) captures exactly
+two profile families:</p>
+<ul>
+<li><strong>Old format</strong> (qemu 6.0.0 through 8.2.x): column headers <code>VM
+  SIZE</code> and <code>VM CLOCK</code> (space-separated), clock rendered with
+  2-digit hours (<code>00:00:00.000</code>).</li>
+<li><strong>New format</strong> (qemu 9.0.0 onward): column headers <code>VM_SIZE</code> and
+  <code>VM_CLOCK</code> (underscore-separated), clock rendered with 4-digit
+  hours (<code>0000:00:00.000</code>), matching instar's renderer from phase 4.</li>
+</ul>
+<p>instar implements the new (≥9.0) format. Phase 11 integration tests
+compare <code>instar snapshot -l</code> output against the newest-format
+profile and use the old-format profiles only to validate the
+captured baselines. The raw per-version baselines for all 80
+matrix versions live in
+<code>instar-testdata/expected-outputs/snapshot-list-human/</code>.</p>
+<h3 id="snapshot-names-up-to-255-bytes-are-listed-in-full">Snapshot names up to 255 bytes are listed in full<a class="headerlink" href="#snapshot-names-up-to-255-bytes-are-listed-in-full" title="Permanent link">&para;</a></h3>
+<p><code>SnapshotEntry::name</code> was widened from <code>[u8; 64]</code> to <code>[u8; 256]</code>
+and the parser's copy cap raised from <code>.min(63)</code> to <code>.min(255)</code>.
+The wire record's <code>name</code> field is 256 bytes, so no truncation
+occurs for any name qemu-img can produce (qemu caps creation at
+255 bytes). Fixture <code>snap-qcow2-longname</code> (200-byte name) in the
+phase 10 baseline matrix produces byte-identical output to
+<code>qemu-img snapshot -l</code>.</p>
+<p><strong>Residual note</strong>: names longer than the 256-byte wire buffer
+(i.e. longer than 255 usable bytes) would still be silently
+truncated at the converter. This is unreachable via <code>qemu-img
+snapshot -c</code>, which caps creation at 255 bytes; instar's own
+create path refuses 256+ byte names with an error.</p>
+<h3 id="snapshot-c-create-quirks"><code>snapshot -c</code> (create) quirks<a class="headerlink" href="#snapshot-c-create-quirks" title="Permanent link">&para;</a></h3>
+<p>The following apply to <code>instar snapshot -c NAME</code> (create mode,
+landed in PLAN-snapshot phase 6).</p>
+<ul>
+<li>
+<p><strong>Duplicate names are allowed.</strong> Creating two snapshots with the
+  same <code>NAME</code> succeeds and yields two distinct entries (IDs <code>1</code>
+  and <code>2</code>, both tagged <code>NAME</code>), matching <code>qemu-img snapshot -c</code>
+  exactly. There is <em>no</em> "already exists" error — that message
+  belongs to QEMU's HMP <code>savevm</code>, not to <code>qemu-img snapshot -c</code>.
+  (<code>ERROR_DUPLICATE_NAME</code> remains reserved in the ABI for a future
+  savevm-style mode.)</p>
+</li>
+<li>
+<p><strong>16-snapshot cap.</strong> instar v1 refuses to create the 17th
+  snapshot (<code>ERROR_SNAPSHOT_TABLE_FULL</code>). The qcow2 spec allows up
+  to 65536; raising the cap is future work. Delete a snapshot
+  first, or use <code>qemu-img</code> for images that need more than 16.</p>
+</li>
+<li>
+<p><strong><code>refcount_bits != 16</code> refused for mutating modes.</strong> The v1
+  cluster allocator is 16-bit-refcount only (the <code>qemu-img</code>
+  default since qcow2 v3, and the only width v2 uses). Images with
+  a different <code>refcount_order</code> are refused by <code>-c</code>
+  (<code>ERROR_UNSUPPORTED_FEATURE</code>); list mode still works on them.</p>
+</li>
+<li>
+<p><strong>Create may exhaust the image's existing refblocks.</strong> instar
+  v1 allocates new clusters (the snapshot's L1 copy, the
+  reallocated snapshot table) only from the refblocks already
+  present in the image's refcount table — it never allocates a
+  new refblock and never grows the refcount table. When no free
+  run remains in the present refblocks, <code>-c</code> fails with
+  <code>ERROR_ALLOCATION_FAILED</code> ("no free clusters available") and
+  the image is untouched; <code>qemu-img snapshot -c</code> grows the
+  refcount structures and succeeds. In practice this bites at
+  small cluster sizes, where per-create allocations are many
+  clusters (at <code>cluster_size=512</code> a 64M image's L1 copy alone is
+  32 clusters) and each refblock covers little file range. Found
+  by the phase 13 differential fuzzer; its chain generator pairs
+  512-byte clusters only with 4M images (the phase 6–8 matrix
+  pairing). Refcount-structure growth is future work (phase 6
+  open question 7).</p>
+</li>
+<li>
+<p><strong>Dirty / corrupt images refused.</strong> <code>qemu-img</code> auto-repairs a
+  dirty lazy-refcount image when it opens it read-write; instar v1
+  refuses instead (<code>ERROR_UNSUPPORTED_FEATURE</code>). Refcounts in a
+  dirty image are not trustworthy, and instar will not mutate on
+  top of them. Run <code>qemu-img check -r all</code> first to clear the
+  dirty bit, then retry.</p>
+</li>
+<li>
+<p><strong>Compressed clusters refused.</strong> Images with zstd compression
+  (header bit) or any zlib-compressed cluster (detected during the
+  L2 walk) are refused by the mutating modes
+  (<code>ERROR_UNSUPPORTED_FEATURE</code>). Refcounting a compressed extent
+  needs a multi-cluster walk deferred to future work. List mode
+  works regardless.</p>
+</li>
+<li>
+<p><strong>External data file / encryption / dirty bitmaps refused.</strong>
+  Same <code>ERROR_UNSUPPORTED_FEATURE</code> posture as the other mutating
+  modes — these features change the refcount semantics or require
+  a write path instar does not yet have.</p>
+</li>
+<li>
+<p><strong><code>-q</code> has no visible effect on create.</strong> <code>qemu-img snapshot -c</code>
+  prints nothing on success and exits 0; instar matches that, so
+  <code>-q</code> changes nothing visible for <code>-c</code>. See the general <code>-q</code>
+  no-op note above for all four modes.</p>
+</li>
+<li>
+<p><strong>Names longer than 255 bytes are refused (not truncated).</strong>
+  The qcow2 on-disk <code>name</code> field tops out at 255 usable bytes.
+  <code>qemu-img snapshot -c</code> <em>silently truncates</em> a longer name to 255
+  bytes and exits 0; instar refuses loudly with a clear host-side
+  error instead, on the principle that silently dropping bytes the
+  user typed is surprising. An <strong>empty</strong> name is likewise refused
+  (qemu-img accepts an empty name); supply a non-empty <code>NAME</code>.</p>
+</li>
+<li>
+<p><strong>The created file may be physically larger than <code>qemu-img</code>'s.</strong>
+  instar writes through 64 KiB virtio sectors, so the final
+  snapshot-table write rounds the file up to the next sector
+  boundary; <code>qemu-img</code> writes at byte granularity and leaves the
+  trailing cluster sparse. The result is a benign difference in
+  <code>qemu-img info</code>'s <code>disk size</code> / <code>file length</code> — the trailing
+  bytes are zero, <code>qemu-img check</code> is clean with no leaks, and the
+  qcow2 structure (snapshot table, L1 copy, refcounts, COPIED
+  flags) is byte-for-byte identical to <code>qemu-img</code>'s. This is an
+  instar-wide property of its sector-granular I/O, not specific to
+  snapshots.</p>
+</li>
+</ul>
+<h3 id="snapshot-d-delete-quirks"><code>snapshot -d</code> (delete) quirks<a class="headerlink" href="#snapshot-d-delete-quirks" title="Permanent link">&para;</a></h3>
+<p>The following apply to <code>instar snapshot -d SNAPSHOT</code> (delete
+mode, landed in PLAN-snapshot phase 7). The feature gates
+(<code>refcount_bits != 16</code>, compressed clusters, encryption, external
+data file, bitmaps, dirty/corrupt) are the same uniform set as
+<code>-c</code> above.</p>
+<ul>
+<li>
+<p><strong><code>-d</code> matches by NAME only, first match in table order.</strong> The
+  modern <code>qemu-img</code> this tracks (10.x) resolves the <code>-d</code> argument
+  via <code>bdrv_snapshot_find</code>, which is a plain name comparison —
+  <strong>there is no ID matching on the delete path</strong>. On an image
+  whose snapshots are <code>alpha</code> (id 1) and <code>gamma</code> (id 3),
+  <code>qemu-img snapshot -d 3</code> fails with "snapshot not found", and
+  instar matches that exactly. With duplicate names, the first
+  entry in table order is deleted; with a snapshot <em>named</em> "2"
+  and another with <em>ID</em> 2, <code>-d 2</code> deletes the one named "2".
+  <em>Cross-version note:</em> older <code>qemu-img</code> releases resolved IDs
+  first (the since-removed <code>bdrv_snapshot_delete_by_id_or_name</code>);
+  instar follows 10.x, and the cross-version baseline phases must
+  pin delete baselines accordingly.</p>
+</li>
+<li>
+<p><strong>Deleting never truncates the file.</strong> Freed clusters (the
+  snapshot's L1, the old snapshot table, and any data / L2
+  cluster whose refcount reaches 0) remain in the file until
+  reused, matching qemu.</p>
+</li>
+<li>
+<p><strong>Freed-cluster bytes may differ from <code>qemu-img</code>'s.</strong> By
+  default qemu-img passes a <em>discard</em> down to the file for the
+  clusters a delete frees (<code>QCOW2_DISCARD_SNAPSHOT</code> /
+  <code>QCOW2_DISCARD_ALWAYS</code> default on), punching holes so those
+  regions read back as zeros; qemu's <code>-1</code> refcount walk also
+  rewrites COPIED flags inside the about-to-be-freed L1/L2
+  clusters. instar never writes to freed clusters at all — their
+  stale bytes remain. All <em>live</em> metadata is byte-for-byte
+  identical: running the qemu side with
+  <code>--image-opts driver=qcow2,file.filename=…,file.discard=ignore</code>
+  (which disables only the protocol-level hole punching) yields
+  post-delete images that are <strong>bit-for-bit identical</strong> to
+  instar's, modulo the sector-granular file-tail quirk above.
+  <code>qemu-img check</code> is clean either way.</p>
+</li>
+<li>
+<p><strong>An empty <code>-d</code> argument is passed through.</strong> <code>qemu-img
+  snapshot -c ''</code> happily creates an empty-named snapshot, and
+  <code>-d ''</code> deletes it; instar refuses <em>creating</em> empty names (see
+  the <code>-c</code> quirks) but still deletes them for parity. There is no
+  host-side validation of the delete argument; an argument longer
+  than the 256-byte wire buffer cannot name any matchable
+  snapshot (qemu-img truncates names to 255 bytes at creation)
+  and resolves to the same not-found error.</p>
+</li>
+</ul>
+<h3 id="snapshot-a-apply-quirks"><code>snapshot -a</code> (apply) quirks<a class="headerlink" href="#snapshot-a-apply-quirks" title="Permanent link">&para;</a></h3>
+<p>The following apply to <code>instar snapshot -a SNAPSHOT</code> (apply /
+"goto" mode, landed in PLAN-snapshot phase 8). The feature gates
+are the same uniform set as <code>-c</code> / <code>-d</code> above.</p>
+<ul>
+<li><strong>Snapshot argument matching is asymmetric between <code>-d</code> and
+  <code>-a</code>.</strong> qemu 10.x resolves the two modes' arguments through
+  <em>different</em> matchers, and instar matches each exactly:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Matcher</th>
+<th>Semantics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-d</code></td>
+<td><code>bdrv_snapshot_find</code></td>
+<td>name only, first match</td>
+</tr>
+<tr>
+<td><code>-a</code></td>
+<td><code>find_snapshot_by_id_or_name</code></td>
+<td>one full pass over the table comparing <strong>IDs</strong>, then — only if no ID matched — a second full pass comparing <strong>names</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The two-full-pass structure means a <em>later</em> entry matching by
+  ID beats an <em>earlier</em> entry matching by name. Example: on an
+  image with <code>id=1 name="2"</code> and <code>id=2 name="x"</code>, <code>-a 2</code> applies
+  the snapshot with <strong>ID 2</strong> (the one named "x"), while <code>-d 2</code>
+  deletes the one <strong>named</strong> "2". A pure-ID argument (<code>-a 1</code>)
+  works for apply but is not-found for delete.
+  <em>Cross-version note:</em> as with delete (above), older <code>qemu-img</code>
+  releases resolved delete arguments differently; instar follows
+  10.x and the cross-version baseline phases must pin per-version
+  behaviour.</p>
+<ul>
+<li>
+<p><strong>Applying a snapshot to a since-resized image is refused.</strong>
+  Modern <code>qemu-img</code> allows <code>resize</code> on images with internal
+  snapshots, and a later <code>qemu-img snapshot -a</code> <strong>truncates the
+  image</strong> back to the snapshot's stored <code>disk_size</code>
+  (<code>blk_truncate</code> inside <code>qcow2_snapshot_goto</code>). instar refuses
+  instead (<code>ERROR_L1_SIZE_MISMATCH</code>) and leaves the image
+  untouched — a full virtual-size truncate embedded in apply is
+  out of scope for v1. Workaround: <code>qemu-img resize</code> the image
+  back to the snapshot's size, then apply. (A snapshot entry
+  with <em>absent</em> extra data carries no <code>disk_size</code>; qemu defaults
+  it to the current virtual size, so such entries always pass
+  the check — instar mirrors that.) For the same reason a
+  hand-crafted snapshot whose L1 is <em>larger</em> than the active L1
+  is refused (qemu would grow the active L1); a <em>smaller</em>
+  snapshot L1 is supported via zero-padding, like qemu.</p>
+</li>
+<li>
+<p><strong>Apply is best-effort crash-consistent, like qemu.</strong> Apply
+  rewrites the active L1 in place; it writes no timestamps, no
+  snapshot-table bytes and no header bytes. instar's write order
+  is: refblock increments (group A), fsync; the snapshot's raw
+  L1 over the active L1 — the commit point (group B), fsync;
+  refblock decrements + refreshed COPIED flags (group C), fsync.
+  A crash before B leaves the image unchanged except
+  over-referenced refcounts (repairable leaks); a crash between
+  B and C leaves the active view switched with leaks and stale
+  COPIED flags — <code>qemu-img check</code> reports repairable issues,
+  never a dangling reference. qemu's goto has the same
+  best-effort character; one window differs cosmetically (qemu
+  scrubs the snapshot's stored L1 before its active-L1
+  overwrite, instar after), but both orders leave only
+  repairable states and the final bytes are identical.</p>
+</li>
+<li>
+<p><strong>Freed-cluster bytes may differ from <code>qemu-img</code>'s.</strong> Same as
+  delete: qemu punches holes over the clusters the apply frees
+  (the old active chain's exclusive L2/data clusters) unless run
+  with <code>file.discard=ignore</code>, while instar never writes freed
+  clusters. With the protocol-level discard disabled, post-apply
+  images are <strong>bit-for-bit identical</strong> to instar's across every
+  verified scenario, including diverged applies.</p>
+</li>
+</ul>
 <h2 id="future-additions">Future Additions<a class="headerlink" href="#future-additions" title="Permanent link">&para;</a></h2>
 <p>Additional quirks will be documented here as they are discovered during
 compatibility testing.</p>
