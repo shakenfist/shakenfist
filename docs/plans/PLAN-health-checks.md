@@ -207,6 +207,31 @@ following:
    operator's LB has its own client cert for health probes
    only. The cleanest answer is a dedicated, plaintext-OK
    health port the operator opens only to their LB. Phase 0.
+10. **Daemon inventory classification.** There are presently
+    thirteen `sf-*` systemd units, and the operator's
+    standing question is whether that count is itself a
+    mistake to be cleaned up. This plan does not consolidate
+    daemons, but it must not silently build health-check
+    surface for daemons that should not exist. Phase 0
+    therefore produces a classification of every daemon into
+    one of three buckets, as an explicit artifact:
+    - **sentinel / trivial** — pure systemd-ordering or
+      lock-holding units (`sentinel-first`, `sentinel-last`,
+      and any others that serve no requests) that need *no*
+      health surface at all; the decisions document records
+      why each needs nothing.
+    - **permanent boundary** — daemons whose separateness is
+      load-bearing and not a candidate for merging, with the
+      reason stated (e.g. `privexec` is a privilege-
+      separation boundary; `database` is a deliberate tier
+      per `PLAN-byo-mariadb.md`).
+    - **merge candidate** — daemons thin enough that a future
+      `PLAN-consolidate-daemons.md` might fold them together;
+      flagged here, *not* acted on here.
+    This classification both scopes the health-check work
+    (only non-trivial daemons get a probe) and becomes the
+    evidence base for a later, separate consolidation
+    decision. It does not block any health-check phase.
 
 ## Execution
 
@@ -224,7 +249,10 @@ Notes on sequencing:
 
 - **Phase 0 is decisions.** No code. Output is appended to
   this master plan as a "Decisions" section and the phase
-  table is re-cut against it.
+  table is re-cut against it. One required artifact of that
+  section is the daemon inventory classification from open
+  question 10 (sentinel / permanent boundary / merge
+  candidate), which scopes which daemons get a probe at all.
 - **Phase 1 is the canary.** sf-api is the most operator-
   visible daemon and the one the LB actually probes; if
   the pattern doesn't work for sf-api it doesn't work
