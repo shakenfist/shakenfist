@@ -42,6 +42,14 @@ LOG, _ = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
+# Unauthenticated paths hit by load balancer / orchestrator health probes.
+# These short-circuit audit logging and are downgraded from INFO to DEBUG so
+# that frequent probes do not swamp the logs or the eventlog server. Kept here
+# (rather than in app.py) because base.py is imported by app.py, avoiding a
+# circular import while letting both modules share the single tuple.
+HEALTH_PROBE_PATHS = ('/', '/livez', '/readyz', '/healthz')
+
+
 def caller_is_admin(func):
     # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):
@@ -584,8 +592,8 @@ def log_request(func):
             'kwargs': kwargs_log,
             'headers': headers_log
         })
-        if flask.request.path == '/':
-            # This is likely a load balancer health check
+        if flask.request.path in HEALTH_PROBE_PATHS:
+            # This is likely a load balancer or orchestrator health check
             log.debug('API request parsed')
         else:
             log.info('API request parsed')
