@@ -136,6 +136,15 @@ class SFConfig(BaseSettings):
             'startup paths still override this explicitly.'
         )
     )
+    API_DRAIN_GRACE: int = Field(
+        25,
+        description=(
+            'On SIGTERM, how long sf-api keeps serving while /readyz reports '
+            '503 so the load balancer drops this node on its next probe before '
+            'workers stop. systemd TimeoutStopSec must exceed this plus '
+            'gunicorn graceful_timeout.'
+        )
+    )
     AUTH_SECRET_SEED: str = Field(
         '~~unconfigured~~',
         description='A random string to seed auth secrets with.'
