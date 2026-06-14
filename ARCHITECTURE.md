@@ -85,6 +85,11 @@ keepalives (10 s ping / 5 s timeout). `sf-database` also publishes the
 calls; Watch-based client-side health checking is deliberately not enabled
 because the synchronous health servicer can deadlock the gRPC server's
 event thread (see `shakenfist/util/grpc_channel.py`).
+The overall (`''`) service status is dependency-aware: while `sf-database`
+is running it reports `SERVING` only while it can reach MariaDB, and flips
+to `NOT_SERVING` (on the ~10 s background loop) when MariaDB becomes
+unreachable. Schema currency is a refuse-to-start precondition enforced at
+startup, not a runtime health signal.
 See [`docs/operator_guide/database.md`](docs/operator_guide/database.md) —
 "MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.
 
