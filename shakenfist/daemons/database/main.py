@@ -4916,9 +4916,16 @@ class Monitor(daemon.WorkerPoolDaemon):
     shutdown recording, otherwise we'd have a chicken-and-egg problem.
     """
 
-    def __init__(self, id: str) -> None:
+    def __init__(self, id: str,
+                 health_servicer: health.HealthServicer | None = None) -> None:
         super().__init__(id)
         self.counters: dict[str, Counter] = {}
+
+        # The gRPC health servicer whose '' (overall server health) status we
+        # drive from live MariaDB reachability in _run_inner. Optional so other
+        # construction sites and tests don't need to supply one.
+        self.health_servicer = health_servicer
+        self._last_health_status: int | None = None
 
         # Create counters for all operations
         operations = [
@@ -5113,6 +5120,33 @@ class Monitor(daemon.WorkerPoolDaemon):
                 f'{self.daemon_name} daemon stopped')
         send_systemd_status('Terminated')
 
+    def _update_health(self) -> None:
+        # Drive the gRPC health protocol's overall ('') status from live
+        # MariaDB reachability. check_reachable() is bounded and never raises;
+        # the in-memory .set() is safe but wrapped defensively so a health
+        # update can never break the daemon's main loop. We only log on a
+        # SERVING<->NOT_SERVING transition to avoid spamming every ~10s tick.
+        if self.health_servicer is None:
+            return
+
+        try:
+            reachable = mariadb.check_reachable()
+            status = (health_pb2.HealthCheckResponse.SERVING if reachable
+                      else health_pb2.HealthCheckResponse.NOT_SERVING)
+
+            if status != self._last_health_status:
+                if reachable:
+                    LOG.info('sf-database health: MariaDB reachable again, '
+                             'reporting SERVING')
+                else:
+                    LOG.warning('sf-database health: MariaDB became '
+                                'unreachable, reporting NOT_SERVING')
+                self._last_health_status = status
+
+            self.health_servicer.set('', status)
+        except Exception as e:
+            LOG.warning(f'sf-database health update failed: {e}')
+
     def _run_inner(self) -> None:
         refresh_tick = 0
         while daemon.check_abort_path(self.abort_path):
@@ -5121,6 +5155,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # it just serves gRPC requests. We check health periodically
                 # and refresh the events row-count gauge every ~60s (every
                 # 6 ticks of the 10s idle).
+                self._update_health()
+
                 refresh_tick += 1
                 if refresh_tick % 6 == 0:
                     try:
@@ -5241,7 +5277,7 @@ def main() -> None:
     # This is critical - if we start the server before registering the service,
     # clients that connect during that window will fail because no service
     # handlers are registered.
-    m = Monitor('database')
+    m = Monitor('database', health_servicer)
     database_pb2_grpc.add_DatabaseServiceServicer_to_server(
         DatabaseService(m), server)
 
