@@ -378,7 +378,7 @@ Decisions section above and is no longer provisional.
 |-------|------|--------|
 | 0. Research and decisions document | PLAN-health-checks-phase-00-decisions.md | Complete |
 | 1. sf-api `/livez` `/readyz` `/healthz` + readiness checker + SIGTERM drain | PLAN-health-checks-phase-01-sf-api.md | Complete |
-| 2. Dependency-aware `grpc.health.v1` on sf-database | PLAN-health-checks-phase-02-grpc-health.md | Not started |
+| 2. Dependency-aware `grpc.health.v1` on sf-database | PLAN-health-checks-phase-02-grpc-health.md | Complete |
 | 3. `WATCHDOG` liveness wiring (worker + elected daemons) | PLAN-health-checks-phase-03-watchdog.md | Not started |
 | 4. Operator documentation and LB-config examples | PLAN-health-checks-phase-04-operator-docs.md | Not started |
 
