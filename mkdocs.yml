@@ -339,6 +339,7 @@ nav:
        - "Database": operator_guide/database.md
        - "Events": operator_guide/events.md
        - "Exception Tracking": operator_guide/exception_tracking.md
+       - "Load Balancing": operator_guide/load_balancing.md
        - "Locks": operator_guide/locks.md
        - "Networking": operator_guide/networking/overview.md
        - "Power States": operator_guide/power_states.md
