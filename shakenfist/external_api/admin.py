@@ -67,7 +67,7 @@ admin_resources_get_example = """{
 }"""
 
 
-class AdminREsourcesEndpoint(api_base.Resource):
+class AdminResourcesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'admin', 'List resources currently available in the cluster.', [],
         [(200, 'All summary of resource usage and availability in the cluster.',

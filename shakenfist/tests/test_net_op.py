@@ -116,26 +116,53 @@ class EnsureMeshFailedExceptionTestCase(base.ShakenFistTestCase):
         report_arg = mock_set_error.call_args[0][1]
         self.assertEqual('network.ensure_mesh.failed', report_arg.code)
 
+    @mock.patch('shakenfist.operations.baseoperation.mariadb.enqueue_work_item')
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
     @mock.patch('shakenfist.operations.net_op.Network.from_db')
-    def test_ensure_mesh_failed_in_active_network_sets_error_and_persists_report(
-            self, mock_network_from_db, mock_apply, mock_set_error):
-        """EnsureMeshFailed on an active network still sets STATE_ERROR and persists report.
-
-        The active-network carve-out in the except branch only controls whether
-        ignore_exception is called; STATE_ERROR is always set, and the report is
-        always persisted.
-        """
+    def test_ensure_mesh_failed_in_active_network_defers_for_retry(
+            self, mock_network_from_db, mock_apply, mock_set_error,
+            mock_enqueue):
+        """EnsureMeshFailed on an active network is a likely vxlan-interface
+        race, so the op defers (retries) rather than erroring."""
         mock_network_from_db.return_value = _make_network_mock(
             state_value='created', active=True)
         mock_apply.side_effect = EnsureMeshFailed('mesh broke on active network')
 
         op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_ensure_mesh])
         op.state = NetOp.STATE_EXECUTING
+        op.queue_name = 'test-net-queue'
+        op.current_defer_count = 0
+        op.dispatch_task(model_tasks.network_ensure_mesh)
+
+        # Deferred for retry: re-enqueued, back in QUEUED, no error persisted.
+        self.assertEqual(NetOp.STATE_QUEUED, op.state.value)
+        mock_enqueue.assert_called_once()
+        mock_set_error.assert_not_called()
+
+    @mock.patch('shakenfist.operations.baseoperation.mariadb.enqueue_work_item')
+    @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
+    @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
+    @mock.patch('shakenfist.operations.net_op.Network.from_db')
+    def test_ensure_mesh_failed_in_active_network_errors_after_retry_budget(
+            self, mock_network_from_db, mock_apply, mock_set_error,
+            mock_enqueue):
+        """Once the retry budget is exhausted on an active network,
+        EnsureMeshFailed sets STATE_ERROR and persists the report."""
+        mock_network_from_db.return_value = _make_network_mock(
+            state_value='created', active=True)
+        mock_apply.side_effect = EnsureMeshFailed('mesh broke on active network')
+
+        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+        op.state = NetOp.STATE_EXECUTING
+        op.queue_name = 'test-net-queue'
+        # defer_with_backoff()'s default schedule has three entries; a
+        # defer_count at or beyond that exhausts the budget.
+        op.current_defer_count = 3
         op.dispatch_task(model_tasks.network_ensure_mesh)
 
         self.assertEqual(NetOp.STATE_ERROR, op.state.value)
+        mock_enqueue.assert_not_called()
         mock_set_error.assert_called_once()
         report_arg = mock_set_error.call_args[0][1]
         self.assertEqual('network.ensure_mesh.failed', report_arg.code)

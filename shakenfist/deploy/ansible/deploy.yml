@@ -259,7 +259,4 @@
   connection: ssh
   roles:
     - role: primary
-      vars:
-        role_action: "apache2"
-    - role: primary
       role_action: "postinstall"

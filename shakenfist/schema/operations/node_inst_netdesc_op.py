@@ -29,6 +29,12 @@ current_version = 1
 class model_tasks(Enum):
     instance_preflight = 1
     instance_start = 2
+    # instance_start reconciles the instance's networks onto this node and
+    # enqueues the mesh/dnsmasq ops they need, then hands off to a follow-up
+    # op carrying this task and a depends_on on those ops. The dispatcher
+    # defers the follow-up until the network ops are terminal, so the worker
+    # is never parked blocking on them.
+    instance_create = 3
 
 
 class model(BaseModel):

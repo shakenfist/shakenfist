@@ -5,9 +5,11 @@ from shakenfist.schema.operations.net_iface_op \
 from shakenfist.schema.operations.net_iface_op \
     import model_tasks as ni_tasks
 from shakenfist.schema.operations import node_inst_net_iface_op as schema
+from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.exceptions import InvalidLifecycleState
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.instance import Instance
+from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -145,6 +147,37 @@ class NodeInstNetIfaceOp(BaseClusterOperation):
                     f'error state, current state is {ni.state}')
 
     def _hot_plug_instance_interface(self, inst, n, ni):
+        # Reconcile the network onto this node and enqueue the mesh op it
+        # needs, then hand the actual libvirt attach off to a follow-up
+        # ``attach_instance_interface`` op that depends on the mesh op. We
+        # deliberately do NOT block this worker waiting for the mesh op to
+        # finish -- the synchronous ``raise_for_error()`` waits this
+        # replaced parked a sf-queues worker for up to ``API_ASYNC_WAIT``
+        # per op, starving the small pool of slots for short ops (notably
+        # agent execute, which shares the ``{node}-clusteroperation-*``
+        # queues). Letting the dispatcher defer the attach op on its
+        # ``depends_on`` (see the dep check in
+        # ``shakenfist/daemons/queues/workitem.py``) returns the worker to
+        # the pool immediately and re-checks the dependency cheaply. This
+        # mirrors the instance-start/instance-create split in
+        # ``node_inst_netdesc_op``.
+        BridgedVXLanNetwork(n)._apply_create_on_hypervisor()
+        mesh_op = n.ensure_mesh()
+
+        schema.create_and_enqueue(
+            self.node_uuid, self.instance_uuid, self.network_uuid,
+            self.interface_uuid,
+            [schema.model_tasks.attach_instance_interface], self.priority,
+            request_id=self.request_id,
+            depends_on=[dependency(
+                op_type=mesh_op.object_type, op_uuid=mesh_op.uuid)])
+
+    def _attach_instance_interface(self, inst, n, ni):
+        # Runs only after the mesh op enqueued by
+        # ``_hot_plug_instance_interface`` has reached a terminal state --
+        # the dispatcher enforces that via this op's ``depends_on`` (and
+        # aborts this op if the mesh op errors). Perform the libvirt attach
+        # and then float the interface if required.
         try:
             inst.hot_plug_interface(n, ni)
         except InvalidLifecycleState as e:

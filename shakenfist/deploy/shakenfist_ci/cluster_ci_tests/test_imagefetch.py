@@ -1,4 +1,5 @@
 import json
+import socket
 import subprocess
 import time
 
@@ -7,13 +8,53 @@ from testtools import content
 from shakenfist_ci import base
 
 
+# These tests need a throwaway HTTP image source on the primary that they can
+# create and then delete mid-test. The deployer used to install Apache, which
+# provided /var/www/html served on port 80; it no longer does, so we serve the
+# same docroot ourselves with a stdlib http.server.
+IMAGE_SOURCE_ROOT = '/var/www/html'
+IMAGE_SOURCE_PORT = 80
+
+
 class TestHTTPFetch(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'httpfetch'
         super().__init__(*args, **kwargs)
 
+    def _ensure_image_source_server(self):
+        # Idempotent and tolerant of parallel test workers racing to bind the
+        # port: whichever worker wins serves the shared docroot for all of
+        # them, and the server is left running for the (ephemeral) test node's
+        # lifetime rather than torn down per test.
+        subprocess.run(['sudo', 'mkdir', '-p', IMAGE_SOURCE_ROOT], check=True)
+
+        def _listening():
+            try:
+                with socket.create_connection(
+                        ('127.0.0.1', IMAGE_SOURCE_PORT), timeout=2):
+                    return True
+            except OSError:
+                return False
+
+        if _listening():
+            return
+
+        subprocess.Popen(
+            ['sudo', 'python3', '-m', 'http.server', str(IMAGE_SOURCE_PORT),
+             '--bind', '0.0.0.0', '--directory', IMAGE_SOURCE_ROOT],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        for _ in range(30):
+            if _listening():
+                return
+            time.sleep(1)
+        raise Exception(
+            'Local HTTP image source failed to start on port %d'
+            % IMAGE_SOURCE_PORT)
+
     def setUp(self):
         super().setUp()
+        self._ensure_image_source_server()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])

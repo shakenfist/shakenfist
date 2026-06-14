@@ -2,8 +2,8 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist import mariadb
 from shakenfist.schema.operations import node_inst_netdesc_op as schema
+from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
@@ -190,6 +190,22 @@ class NodeInstNetdescOp(BaseClusterOperation):
             raise AbortInstanceStart(self, 'Unable to find suitable node')
 
     def _instance_start(self, inst):
+        # Reconcile the instance's networks onto this node and enqueue the
+        # mesh/dnsmasq ops they need, then hand the actual creation off to a
+        # follow-up ``instance_create`` op that depends on those ops.
+        #
+        # We deliberately do NOT block this worker waiting for the network
+        # ops to finish. The synchronous ``raise_for_error()`` wait this
+        # replaced parked a sf-queues worker for up to ``API_ASYNC_WAIT``
+        # per op, and combined with the per-hypervisor ``ensure_mesh``
+        # fan-out (each instance start feeds mesh ops into every node's
+        # single-threaded net-worker) it starved the small sf-queues pool
+        # of slots for short ops -- notably agent execute, which shares the
+        # ``{node}-clusteroperation-*`` queues -- so those ops sat in
+        # ``queued`` until the client timed out. Letting the dispatcher
+        # defer the create op on its ``depends_on`` (see the dep check in
+        # ``shakenfist/daemons/queues/workitem.py``) returns the worker to
+        # the pool immediately and re-checks the dependency cheaply.
         if not inst:
             self.add_event(EVENT_TYPE_AUDIT, 'task requires an instance')
             raise AbortInstanceStart(self, 'Task requires an instance')
@@ -203,25 +219,13 @@ class NodeInstNetdescOp(BaseClusterOperation):
 
         with inst.get_lock(op='Instance start', global_scope=False):
             try:
-                # Ensure networks are connected to this node.
-                #
                 # ``net_desc`` is per-interface, so an instance with N
-                # interfaces on the same network used to enqueue N
-                # ``ensure_mesh`` / ``update_dnsmasq`` ops. After the
-                # enqueue-side dedup landed in
-                # ``shakenfist/schema/operations/net_op.py`` those
-                # second-and-subsequent enqueues collapse onto the
-                # first op's uuid anyway, but we still pay the gRPC
-                # round-trip for the lookup, the
-                # ``_apply_create_on_hypervisor`` no-op (and its
-                # eventlog noise) and the redundant ``raise_for_error``
-                # poll. Tracking which networks we've already
-                # reconciled in this start eliminates all three on the
-                # rare multi-interface-same-network case without
-                # touching the common one-interface-per-network case
-                # at all. Interface-level work (state flip, floating
-                # IP fan-out) stays per-interface inside the loop.
-                float_tasks = []
+                # interfaces on the same network would reconcile it N
+                # times. Track which networks we've reconciled in this
+                # start so the per-network work (and its mesh/dnsmasq
+                # enqueues) happens once. Interface-level work (state
+                # flip) stays per-interface.
+                network_dependencies = []
                 reconciled_network_uuids: 'set[str]' = set()
                 for netdesc in self.net_desc:
                     n = Network.from_db(netdesc['network_uuid'])
@@ -262,7 +266,8 @@ class NodeInstNetdescOp(BaseClusterOperation):
                     if n.uuid not in reconciled_network_uuids:
                         BridgedVXLanNetwork(n)._apply_create_on_hypervisor()
                         mesh_op = n.ensure_mesh()
-                        mesh_op.raise_for_error()
+                        network_dependencies.append(dependency(
+                            op_type=mesh_op.object_type, op_uuid=mesh_op.uuid))
                         # dnsmasq lives on the network node only.
                         # Calling ``_apply_update_dnsmasq`` here
                         # directly silently wrote to this
@@ -274,12 +279,53 @@ class NodeInstNetdescOp(BaseClusterOperation):
                         # dispatcher runs the refresh.
                         dnsmasq_op = n.update_dnsmasq()
                         if dnsmasq_op is not None:
-                            dnsmasq_op.raise_for_error()
+                            network_dependencies.append(dependency(
+                                op_type=dnsmasq_op.object_type,
+                                op_uuid=dnsmasq_op.uuid))
                         reconciled_network_uuids.add(n.uuid)
 
-                    if ni.floating['floating_address']:
+                # Hand the actual instance creation off to a follow-up op
+                # that the dispatcher defers until the network ops above
+                # are terminal.
+                schema.create_and_enqueue(
+                    self.node_uuid, self.instance_uuid, self.net_desc,
+                    [schema.model_tasks.instance_create], self.priority,
+                    request_id=self.request_id,
+                    depends_on=network_dependencies or None)
+
+            except InvalidStateException as e:
+                # This instance is in an error or deleted state. Given the check
+                # at the top of this method, that indicates a race.
+                inst.enqueue_delete_due_error(
+                    'invalid state transition: %s' % e)
+                return
+
+    def _instance_create(self, inst):
+        # Runs only after the network reconcile ops enqueued by
+        # ``_instance_start`` have reached a terminal state -- the
+        # dispatcher enforces that via this op's ``depends_on`` (and aborts
+        # this op if one of them errors, matching how the image-fetch
+        # dependencies on the original start op behave). Float the required
+        # interfaces, allocate ports, and start the VM.
+        if not inst:
+            self.add_event(EVENT_TYPE_AUDIT, 'task requires an instance')
+            raise AbortInstanceStart(self, 'Task requires an instance')
+
+        if inst.state.value in Instance.TERMINAL_STATES:
+            add_event_multi(
+                EVENT_TYPE_AUDIT,
+                [self, inst],
+                'you cannot start an instance in a terminal state')
+            raise AbortInstanceStart(self, 'Instance in terminal state')
+
+        with inst.get_lock(op='Instance create', global_scope=False):
+            try:
+                # Float any interfaces that asked for a floating IP.
+                for netdesc in self.net_desc:
+                    ni = NetworkInterface.from_db(netdesc['iface_uuid'])
+                    if ni and ni.floating['floating_address']:
                         ni_create_and_enqueue(
-                            n.uuid,
+                            netdesc['network_uuid'],
                             ni.uuid,
                             [ni_tasks.interface_float],
                             priority=self.priority,
@@ -291,11 +337,6 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 # Now we can start the instance
                 with util_general.RecordedOperation('instance creation', inst):
                     inst.create()
-
-                # And now float any required interfaces
-                for ft in float_tasks:
-                    mariadb.enqueue_work_item(
-                        'networknode-clusteroperation-user_waiting', ft)
 
             except InvalidStateException as e:
                 # This instance is in an error or deleted state. Given the check

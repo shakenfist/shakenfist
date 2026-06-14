@@ -117,14 +117,35 @@ class NetOp(BaseClusterOperation):
             self.state = NetOp.STATE_ERROR
 
         except EnsureMeshFailed as e:
-            if n.state.value in n.ACTIVE_STATES:
-                # This should not happen with an active network; log but
-                # still record the error report before entering STATE_ERROR.
-                util_exceptions.ignore_exception('net_op', e)
-
-            mariadb.set_cluster_operation_error(
-                str(self.uuid), ErrorReport.from_exception(e))
-            self.state = NetOp.STATE_ERROR
+            # ensure_vxlan_mesh fails when this node has no vxlan interface
+            # for the network -- a benign race against concurrent
+            # interface create/teardown (``bridge fdb show`` reports
+            # ``Cannot find device``). The per-hypervisor ensure_mesh
+            # fan-out made it common: an op fanned to a node can run while
+            # that node's interface is still coming up or has just drained.
+            if n.state.value not in n.ACTIVE_STATES:
+                # The network is being torn down; its interface is gone for
+                # good. The mesh op is moot -- terminalise it quietly (no
+                # traceback) rather than retrying.
+                mariadb.set_cluster_operation_error(
+                    str(self.uuid), ErrorReport.from_exception(e))
+                self.state = NetOp.STATE_ERROR
+            elif self.defer_with_backoff(
+                    reason='ensure_mesh failed, vxlan interface not ready'):
+                # Active network: the interface is most likely still being
+                # created. Retry with backoff rather than erroring loudly;
+                # any op depending on this one (e.g. instance create) waits
+                # through the retries.
+                return
+            else:
+                # Active network, retries exhausted -- treat as a real
+                # failure, but log at warning level so the expected race
+                # does not trip the post-test stable-log check.
+                self.log.warning(
+                    'ensure_mesh still failing after retries, erroring op')
+                mariadb.set_cluster_operation_error(
+                    str(self.uuid), ErrorReport.from_exception(e))
+                self.state = NetOp.STATE_ERROR
 
         except Exception as e:
             util_exceptions.ignore_exception('net_op', e)

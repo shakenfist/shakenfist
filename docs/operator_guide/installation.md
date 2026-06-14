@@ -48,12 +48,12 @@ sudo --preserve-env ./getsf
 
 Not every node needs to be an etcd_master. I'd select three in most situations. One node must be marked as the primary node, and one must be marked as the network node. It is not currently supported having more than one of each of those node types.
 
-* The primary node runs an apache load balancer across the API servers in the cluster, and therefore needs to be accessable to your users on HTTP and HTTPS.
+* Shaken Fist does not install a load balancer. You must place your own reverse proxy or load balancer in front of the cluster's `sf-api` daemons, which listen on port 13000. See [Load Balancing](load_balancing.md) for details.
 * The network node is the ingress and egress point for all virtual networks, and is where floating IPs live, so it needs to be setup as the gateway fro your floating IP block.
 
 Some of the considerations here can be subtle. Please reach out if you need a hand.
 
-`getsf` writes a configuration file called `sf-deploy`. For a more complicated installation, `sf-deploy` might like this:
+`getsf` writes a configuration file called `sf-deploy`. For a more complicated installation, `sf-deploy` might like this. Note that the `api_url` in the topology below is the address of your own load balancer, which must proxy to the cluster's `sf-api` daemons as described on the [Load Balancing](load_balancing.md) page:
 
 ```
 #!/bin/bash

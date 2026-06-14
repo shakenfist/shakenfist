@@ -327,8 +327,8 @@ points about URL structure:
   - Example: `http://localhost:13000/auth/namespaces`
   - Example: `http://localhost:13000/instances`
 
-- **When talking through Apache** (standard external access): The `/api/`
-  prefix is added by the Apache reverse proxy configuration
+- **When talking through the operator's reverse proxy / load balancer**
+  (standard external access): The `/api/` prefix is added by that proxy
   - Example: `http://host/api/auth/namespaces`
 
 - **There is no version prefix** (no `/v1/` or `/2/`) in the API paths
