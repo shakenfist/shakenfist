@@ -461,9 +461,15 @@ performance. This is required for all deployments - MariaDB must be configured.
 
 ### Migrating Existing Deployments
 
-Object schema upgrade steps run automatically when the database daemon
-starts. Simply upgrade and restart the `sf-database` service. Migrations
-are idempotent and safe to re-run.
+Schema creation and migration are run **explicitly** via `sf-ctl
+ensure-mariadb-schema` (which requires `MARIADB_HOST` and runs on a
+database-tier node). As of `PLAN-byo-mariadb.md`, `sf-database` no longer
+migrates at startup: it runs `verify_mariadb_compat` and
+`verify_schema_versions` (`shakenfist/daemons/database/main.py`) and
+**refuses to start** if the schema is not at the version its build
+expects. After an upgrade that includes schema changes, run `sf-ctl
+ensure-mariadb-schema` against your MariaDB *before* rolling the daemons.
+Migrations are idempotent and safe to re-run.
 
 ### State Class
 

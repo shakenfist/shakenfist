@@ -564,10 +564,18 @@ signal. The two are orthogonal — eventual cluster state vs
 real-time routing/liveness. **OQ8:** no separate startup probe
 — `/readyz` staying 503 until ready already distinguishes
 startup from stuck. Operator-doc note: set the LB start-period
-≥60s and healthy-threshold to 2. *Open flag:* MariaDB
-first-boot schema-migration time is unmeasured; if it can run
-to minutes, add an `API_READYZ_START_PERIOD` knob — revisit in
-phase 1.
+≥60s and healthy-threshold to 2. No `API_READYZ_START_PERIOD`
+knob is needed: schema migration is **not** in the daemon
+startup path. `PLAN-byo-mariadb.md` (landed) already moved
+migration to the explicit, deployer-run `sf-ctl
+ensure-mariadb-schema`; sf-database only runs the fast
+`verify_mariadb_compat` + `verify_schema_versions` checks
+(`daemons/database/main.py:5157-5169`) and **refuses to start**
+on mismatch. So sf-database is either up with a current schema
+(SERVING) or not running at all — readiness is never gated on
+a migration, and "schema is current" is a startup precondition
+rather than something `/readyz` waits through. (An earlier
+phase-0 note wrongly assumed the daemon migrates at startup.)
 
 ### Ratifications (OQ1, OQ4, OQ9)
 
@@ -804,6 +812,30 @@ because the following statements will be true:
   could consume `/readyz` responses to bias retry behaviour
   (don't hammer a node that just told you it isn't ready).
   Out of scope here.
+- **Schema-stale readiness state (decide in phase 2).** Today
+  sf-database *refuses to start* on a schema mismatch
+  (`verify_schema_versions`,
+  `daemons/database/main.py:5157-5169`) — fail-fast and
+  unambiguous, but the process is down, so a probe cannot
+  distinguish "schema stale" from "crashed," and systemd
+  crash-loops it until the operator runs
+  `ensure-mariadb-schema`. An alternative is a distinct
+  readiness state: sf-database starts, its gRPC health `Check`
+  returns `NOT_SERVING` with a reason ("schema out of date;
+  awaiting `ensure-mariadb-schema`"), re-checks periodically,
+  and flips to `SERVING` once migrated — enabling a
+  deploy-then-migrate workflow and observable, automatable
+  upgrades without crash-loop noise. Two obstacles to weigh in
+  phase 2: (1) it reverses `PLAN-byo-mariadb.md`'s deliberate
+  refuse-to-start choice; (2) the client channel is
+  intentionally *not* health-aware (no `healthCheckConfig`, to
+  avoid the Watch deadlock — `util/grpc_channel.py`), so an
+  up-but-`NOT_SERVING` sf-database would still receive RPCs via
+  `round_robin` and its handlers would have to actively reject
+  requests while waiting. A cheaper middle ground that keeps
+  refuse-to-start but adds observability: emit an `sd_notify
+  STATUS=` line so `systemctl status sf-database` shows the
+  reason without the daemon serving. Phase 2 decides.
 - **Per-request "drainable" flag.** A long-running blob
   upload cannot reasonably be drained inside a 30-second
   grace period. Either the client knows to retry from
