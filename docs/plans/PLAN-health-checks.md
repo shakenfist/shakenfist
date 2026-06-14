@@ -371,14 +371,15 @@ following:
 
 ## Execution
 
-Provisional. Phase 0 may re-cut the phase table.
+Phase 0 is complete; the table below is re-cut against its
+Decisions section above and is no longer provisional.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 0. Research and decisions document | PLAN-health-checks-phase-00-decisions.md | Not started |
-| 1. sf-api health endpoints and SIGTERM drain | PLAN-health-checks-phase-01-sf-api.md | Not started |
+| 0. Research and decisions document | PLAN-health-checks-phase-00-decisions.md | Complete |
+| 1. sf-api `/livez` `/readyz` `/healthz` + readiness checker + SIGTERM drain | PLAN-health-checks-phase-01-sf-api.md | Not started |
 | 2. Dependency-aware `grpc.health.v1` on sf-database | PLAN-health-checks-phase-02-grpc-health.md | Not started |
-| 3. Remaining daemons | PLAN-health-checks-phase-03-other-daemons.md | Not started |
+| 3. `WATCHDOG` liveness wiring (worker + elected daemons) | PLAN-health-checks-phase-03-watchdog.md | Not started |
 | 4. Operator documentation and LB-config examples | PLAN-health-checks-phase-04-operator-docs.md | Not started |
 
 Notes on sequencing:
@@ -443,6 +444,144 @@ Notes on sequencing:
   shape to wait on and can proceed independently. (This
   supersedes an earlier dependency on a since-abandoned
   "remove-primary phase 5 sf-database election.")
+
+## Decisions (phase 0)
+
+Phase 0 resolved every open question against the code. The
+values below are **committed** and bind the implementation
+phases; each rests on cited code, with fuller working in the
+phase-0 sub-agent records. Where a value carries an assumption
+(e.g. the LB probe interval) it is flagged.
+
+### Daemon classification (OQ10)
+
+| Daemon | Bucket | Transport | Health surface | Reason |
+|--------|--------|-----------|----------------|--------|
+| sentinel-first / sentinel-last | sentinel/trivial | none | none | Pure systemd-ordering; mark node state only (`sentinel_first/main.py:41`). |
+| nodelock | node-local boundary | unix socket | none (probed by consumers) | Node-local lock server; health already exercised by `health_check_nodelock()` (`daemon.py:143`) and the sf-queues supervisor (`queues/main.py:22-74`). |
+| privexec | permanent boundary | unix socket | none (probed by consumers) | Privilege-separation boundary; probed via `health_check_privexec()` (`daemon.py:126`). |
+| database | permanent boundary (gRPC tier) | gRPC + Prom metrics | grpc.health.v1 (primary) + WATCHDOG | Deliberate tier per `PLAN-byo-mariadb.md`; already serves `Check` (`database/main.py:5230`). |
+| cleaner, queues, network, resources, transfers, sidechannel | worker/periodic | none / vsock / TCP | WATCHDOG | Queue workers and periodic pollers; never LB-routed. |
+| cluster | elected | none | WATCHDOG + lock proof-of-life | Single elected maintainer via `_await_election` (`cluster/main.py:53`). |
+
+*Merge candidates* (advisory only, for a future
+`PLAN-consolidate-daemons.md`; not acted on here):
+sentinel-first + sentinel-last (near-identical ~56-line
+loops), and nodelock + privexec (both node-local unix-socket
+protobuf servers).
+
+### sf-api readiness (OQ3)
+
+Per-worker in-memory ready flag + timestamp, maintained by a
+background checker started in gunicorn's `post_fork` hook
+(`gunicorn_config.py:23` — threads do not survive the
+`--preload` fork, so the checker must start post-fork, not at
+import). `/readyz` reads only the flag, so a probe burst makes
+**zero** DB/gRPC calls. Single dependency edge: **sf-api ready
+⇔ sf-database `Check('')` SERVING**, which phase 2 makes mean
+MariaDB-reachable + schema-current. No other hard runtime
+dependency (the auth secret is an import-time invariant;
+NODE_UUID is best-effort). Committed values: poll **5s**,
+per-`Check` timeout **2s**, hysteresis **K=3** failures →
+not-ready and **1** success → ready, staleness bound **15s**
+(a stale flag returns 503, catching a dead checker thread).
+Health routes reuse `_is_health_probe()` (`app.py:125`) to
+bypass the eventlog audit hooks.
+
+### sf-api drain (OQ5)
+
+On SIGTERM: flip the per-worker draining flag (→ `/readyz`
+503) **first**, keep serving for `API_DRAIN_GRACE`, then let
+gunicorn finish in-flight work, then exit. Seam: a SIGTERM
+handler installed in gunicorn's **`post_worker_init`** hook
+(`post_fork` is clobbered by gunicorn's `init_signals`;
+`worker_int` only fires on SIGQUIT, which systemd does not
+send). The handler arms a deadline via a **timer thread**, not
+`sleep()` in the handler, so requests keep being served during
+the drain. New knob **`API_DRAIN_GRACE` = 25s** (`config.py`).
+Reconciled timeouts on `sf-api.service`: **`TimeoutStopSec`
+30s → 70s**, add gunicorn **`--graceful-timeout 30`**,
+**`--timeout 300` unchanged** (it is the per-request worker
+watchdog, *not* the shutdown grace). Invariant:
+`TimeoutStopSec > API_DRAIN_GRACE + graceful_timeout +
+margin`. The generic `sf.service` is unchanged. Long requests
+(mid-stream blob upload) are not gracefully drained — the
+client retries; a per-request "drainable" flag is future work.
+*Assumption:* 25s/70s assume an LB probe interval ≈10s;
+re-derive if the deployed LB differs.
+
+### sf-api endpoints and auth (OQ2 surface, OQ6)
+
+Three unauthenticated GET routes on port 13000, registered
+like the existing `Root` resource (no `@verify_token`;
+`app.py:223`): **`/livez`** (always 200 `ok`, no dependency
+check), **`/readyz`** (200 `ready` / 503 `not ready` from the
+cached flag), **`/healthz` ≡ `/readyz`** (documented alias — an
+LB hitting the conventional `/healthz` wants a routing =
+readiness answer). Minimal `text/plain` bodies, no
+version/topology leak — strictly less than the unauthenticated
+`Root` API catalogue already exposes (version lives behind
+`/apidocs`). Extend `_is_health_probe()` and the `log_request`
+`path=='/'` downgrade (`base.py:587`) to the health set. **No
+separate health port**; the operator firewalls 13000 to the LB
+subnet (documented, not built). **sf-database gets no HTTP
+health** — `grpc-health-probe` suffices and nothing LB-routes
+to it (closes OQ2's residual).
+
+### Liveness watchdog and lock proof-of-life (OQ11)
+
+Emit `WATCHDOG=1` via the existing notify helper
+(`daemon.py:354`) from the base-class `idle()` tick — already
+a 0.2s internal loop (`daemon.py:322`), so it covers long
+logical sleeps like cleaner's `idle(60)` trivially —
+rate-limited to ~10s. **`WatchdogSec=60s`** in `sf.service`
+(`Restart=on-failure` is already set; a missed watchdog →
+SIGABRT → restart). Pets must **also** be added inside the
+heavy *work* iterators of cleaner (`_maintain_blobs` glob) and
+cluster (`_cluster_wide_cleanup` per-blob/artifact/node
+loops), and per dispatch tick in `WorkerPoolDaemon` (which
+does not route through `idle()`) — a single work pass on a
+large node can otherwise exceed 60s. Lock proof-of-life chain:
+a wedged cluster daemon stops petting → systemd kills it → its
+independent lease refresher thread (`locks.py:199`, renews
+every `REFRESH_INTERVAL=20s`) dies → the lease
+(`CLUSTER_LOCK_LEASE_SECONDS=60`, `constants.py:21`) expires →
+a standby steals it. Worst-case failover ≈ `WatchdogSec` +
+lease ≈ **120s**. **No `locks.py` change.** The
+belt-and-suspenders option (refresher sheds the lease on
+heartbeat staleness, without waiting for the kill) is
+**deferred** to its own micro-plan with hysteresis tests.
+
+### node_daemon_states and startup (OQ7, OQ8)
+
+**OQ7:** the real-time probe does **not** write
+`node_daemon_states`. That table stays the orderly-transition
+/ kill-signal substrate (read by `check_daemon_state()`
+`daemon.py:299`, `get_degraded_daemons()` `node.py:430`,
+`external_view()`, and `sf-ctl`); health pulses there would
+pollute the degraded-node logic and could mask a STOPPING
+signal. The two are orthogonal — eventual cluster state vs
+real-time routing/liveness. **OQ8:** no separate startup probe
+— `/readyz` staying 503 until ready already distinguishes
+startup from stuck. Operator-doc note: set the LB start-period
+≥60s and healthy-threshold to 2. *Open flag:* MariaDB
+first-boot schema-migration time is unmeasured; if it can run
+to minutes, add an `API_READYZ_START_PERIOD` knob — revisit in
+phase 1.
+
+### Ratifications (OQ1, OQ4, OQ9)
+
+- **OQ1:** no per-node readiness aggregator; worker/elected
+  liveness is carried by `WATCHDOG`, and no new HTTP listeners
+  are added to any worker daemon.
+- **OQ4:** elected daemons have no readiness probe; sf-cluster
+  presents no client API and is never LB-routed; sf-database
+  is a stateless tier of equals, not a leader, so there is no
+  leader/standby readiness to model.
+- **OQ9:** health adds no TLS surface of its own — the probe
+  rides the LB→sf-api backend leg and gRPC health rides the
+  mesh channel. No dedicated health port or health-only cert.
+  Phase-4 doc note covers L4 passthrough only.
 
 ## Agent guidance
 
