@@ -186,6 +186,19 @@ letting callers that want exception-flow control use a familiar `try/raise`
 pattern without the error type being load-bearing across process
 boundaries.
 
+### sf-api health probing
+
+`shakenfist/external_api/health.py` is the per-worker readiness module. Each
+gunicorn worker process runs a background checker thread (started in the
+`post_fork` hook in `gunicorn_config.py`) that polls sf-database's
+`grpc.health.v1.Health/Check` every 5 seconds and caches the result. The
+`/readyz` and `/healthz` endpoints call `health.is_ready()` to answer in
+microseconds without an RPC on the request path.
+
+The `post_worker_init` hook in `gunicorn_config.py` installs a SIGTERM
+handler that calls `health.begin_drain()` (flipping `/readyz` to 503) and
+then waits `API_DRAIN_GRACE` seconds before the normal worker shutdown.
+
 ### Key Directories
 
 - `shakenfist/` - Core package

@@ -88,6 +88,34 @@ event thread (see `shakenfist/util/grpc_channel.py`).
 See [`docs/operator_guide/database.md`](docs/operator_guide/database.md) —
 "MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.
 
+#### sf-api HTTP health surface
+
+`sf-api` exposes three unauthenticated HTTP endpoints on port 13000 for load
+balancer probing:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /livez` | Liveness — always returns `200 ok`; indicates the worker process is alive |
+| `GET /readyz` | Readiness — returns `200 ready` when the worker can serve traffic, or `503 not ready` when draining or when sf-database is unreachable |
+| `GET /healthz` | Alias of `/readyz` |
+
+Readiness is evaluated by a per-worker background checker thread
+(`shakenfist/external_api/health.py`) that polls sf-database's
+`grpc.health.v1.Health/Check` every 5 seconds and caches the result. The
+cached flag flips to False only after three consecutive failures
+(`READINESS_FAIL_THRESHOLD`), debouncing transient blips. A staleness guard
+means a wedged checker is also treated as not-ready.
+
+On SIGTERM the worker latches a one-way draining flag (`begin_drain()`), which
+causes `/readyz` to return 503 immediately. The worker then continues serving
+live requests for `API_DRAIN_GRACE` seconds (default 25 s) before shutting
+down. This allows the load balancer to detect the draining node and stop
+routing new connections before the process exits.
+
+**Load balancer guidance**: probe `/readyz` (or `/healthz`) on port 13000 for
+the readiness signal. `sf-api` is the only LB-routable surface — all other
+daemons communicate internally via gRPC or the MariaDB-backed work queue.
+
 #### SQL Filter-Pushdown Discipline
 
 Object iteration uses one indexed SQL query per call rather than the older pattern of materialising all rows
@@ -659,13 +687,16 @@ Client
    |
    v
 Operator-provided load balancer / reverse proxy (adds /api/ prefix)
-   |
+   |  (probes /readyz on port 13000 for readiness)
    v
 Gunicorn (port 13000)
    |
    v
 Flask app (external_api/app.py)
    |
+   +-> /livez    - Liveness probe (unauthenticated, always 200)
+   +-> /readyz   - Readiness probe (unauthenticated, 200/503)
+   +-> /healthz  - Alias of /readyz
    +-> /auth/* - Authentication endpoints
    +-> /instances/* - Instance management
    +-> /networks/* - Network management
