@@ -8981,11 +8981,11 @@ in v0.8.</p>
 <h2 id="notes-for-multi-node-installations">Notes for multi-node installations<a class="headerlink" href="#notes-for-multi-node-installations" title="Permanent link">&para;</a></h2>
 <p>Not every node needs to be an etcd_master. I'd select three in most situations. One node must be marked as the primary node, and one must be marked as the network node. It is not currently supported having more than one of each of those node types.</p>
 <ul>
-<li>The primary node runs an apache load balancer across the API servers in the cluster, and therefore needs to be accessable to your users on HTTP and HTTPS.</li>
+<li>Shaken Fist does not install a load balancer. You must place your own reverse proxy or load balancer in front of the cluster's <code>sf-api</code> daemons, which listen on port 13000. See <a href="../load_balancing/">Load Balancing</a> for details.</li>
 <li>The network node is the ingress and egress point for all virtual networks, and is where floating IPs live, so it needs to be setup as the gateway fro your floating IP block.</li>
 </ul>
 <p>Some of the considerations here can be subtle. Please reach out if you need a hand.</p>
-<p><code>getsf</code> writes a configuration file called <code>sf-deploy</code>. For a more complicated installation, <code>sf-deploy</code> might like this:</p>
+<p><code>getsf</code> writes a configuration file called <code>sf-deploy</code>. For a more complicated installation, <code>sf-deploy</code> might like this. Note that the <code>api_url</code> in the topology below is the address of your own load balancer, which must proxy to the cluster's <code>sf-api</code> daemons as described on the <a href="../load_balancing/">Load Balancing</a> page:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>#!/bin/bash
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>export ADMIN_PASSWORD=engeeF1o
