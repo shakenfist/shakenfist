@@ -186,6 +186,23 @@ letting callers that want exception-flow control use a familiar `try/raise`
 pattern without the error type being load-bearing across process
 boundaries.
 
+### Daemon liveness (systemd watchdog)
+
+`Daemon.pet_watchdog()` in `shakenfist/daemons/daemon.py` is the liveness
+seam for every non-trivial daemon. `Daemon.idle()` calls it automatically,
+so any daemon whose main loop reaches `idle()` at the end of each pass
+already pets the watchdog.
+
+Any daemon loop that performs a **long pass without going through `idle()`**
+must call `pet_watchdog()` explicitly — otherwise systemd will kill the
+process once `WatchdogSec` (60s) elapses, even though the daemon is working
+normally. The existing explicit callers are the `sf-cluster` elected loop
+and the `_cluster_wide_cleanup`, `_maintain_blobs`, and
+`_find_missing_blobs` passes in `sf-cluster`/`sf-cleaner`. If you add a
+new long-running maintenance pass to any of the eight armed daemons
+(database, net, cleaner, cluster, queues, resources, transfers,
+sidechannel), add `self.pet_watchdog()` calls inside its inner loop.
+
 ### sf-api health probing
 
 `shakenfist/external_api/health.py` is the per-worker readiness module. Each

@@ -121,6 +121,49 @@ routing new connections before the process exits.
 the readiness signal. `sf-api` is the only LB-routable surface — all other
 daemons communicate internally via gRPC or the MariaDB-backed work queue.
 
+#### Daemon liveness (systemd watchdog)
+
+The eight non-trivial daemons — `sf-database`, `sf-net`, `sf-cleaner`,
+`sf-cluster`, `sf-queues`, `sf-resources`, `sf-transfers`, and
+`sf-sidechannel` — are armed with `WatchdogSec=60s` in `sf.service`.
+Four units are deliberately excluded: `sentinel-first`, `sentinel-last`,
+`sf-privexec`, and `sf-nodelock`. Those are short-lived or event-driven
+processes that do not run the `idle()`-based keepalive loop; arming them
+would kill a healthy daemon that is simply waiting for its trigger.
+`sf-api` is also excluded — Gunicorn has its own `--timeout` worker-liveness
+mechanism.
+
+The keepalive is emitted by `Daemon.pet_watchdog()` in
+`shakenfist/daemons/daemon.py`, which writes `sd_notify(WATCHDOG=1)` at
+most every ~10s. `Daemon.idle()` (the standard end-of-pass sleep) calls
+it automatically, so every daemon whose main loop reaches `idle()` pets the
+watchdog without additional instrumentation.
+
+Daemon passes that do substantial work **without** returning to `idle()`
+must call `pet_watchdog()` explicitly:
+
+- `sf-cluster` elected loop: this loop sleeps on
+  `lock.lost_event.wait(5)` rather than `idle()`, so it calls
+  `pet_watchdog()` explicitly at the top of each iteration.
+- `sf-cluster` `_cluster_wide_cleanup` and `sf-cleaner`
+  `_maintain_blobs` / `_find_missing_blobs`: call `pet_watchdog()` around
+  inner-loop iterations that may each take several seconds.
+
+If a daemon's main loop wedges and stops petting, systemd delivers SIGABRT
+after `WatchdogSec` (60s) and restarts the process (`Restart=on-failure`).
+
+For the **elected `sf-cluster`** this also acts as the cluster-lock
+failover trigger: when the wedged process is killed, its in-process lease
+refresher thread dies with it. The `cluster/` lease has a 60s lifetime
+(refreshed every ~20s). Once it lapses a standby `sf-cluster` node steals
+the lock via `UPDATE ... WHERE expires_at < NOW()` and resumes the
+maintenance loop. Worst-case failover time is approximately 120s (60s
+watchdog timeout + 60s lease expiry). No manual operator intervention is
+needed.
+
+See [`docs/operator_guide/locks.md`](docs/operator_guide/locks.md) for
+the full lease-expiry and lock-steal protocol.
+
 #### SQL Filter-Pushdown Discipline
 
 Object iteration uses one indexed SQL query per call rather than the older pattern of materialising all rows
