@@ -2826,6 +2826,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-check-repair/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar check --repair for QCOW2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-fuzzing-bugs/" class="md-nav__link">
         
   
@@ -3765,6 +3793,56 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repairing-refcount-inconsistencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repairing Refcount Inconsistencies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Repairing Refcount Inconsistencies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-two-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two tiers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crash-safe-write-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crash-safe write ordering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refuse-rather-than-guess" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refuse rather than guess
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -9202,6 +9280,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#repairing-refcount-inconsistencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repairing Refcount Inconsistencies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Repairing Refcount Inconsistencies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-two-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two tiers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crash-safe-write-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crash-safe write ordering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refuse-rather-than-guess" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refuse rather than guess
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#refcount-metadata-sizing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9491,6 +9619,70 @@ computing refcounts for new structures.</p>
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>qemu-img check image.qcow2
 </code></pre></div>
+<h2 id="repairing-refcount-inconsistencies">Repairing Refcount Inconsistencies<a class="headerlink" href="#repairing-refcount-inconsistencies" title="Permanent link">&para;</a></h2>
+<p><code>instar check --repair[=leaks|all]</code> repairs the refcount inconsistencies the
+consistency check above detects, in place, mirroring <code>qemu-img check -r
+leaks</code>/<code>-r all</code>. The read-only <code>instar check</code> is the safe default; <code>--repair</code>
+is opt-in and writes to the image. qcow2 only.</p>
+<h3 id="the-two-tiers">The two tiers<a class="headerlink" href="#the-two-tiers" title="Permanent link">&para;</a></h3>
+<p><strong><code>leaks</code> (safe, lossless — the bare <code>--repair</code> default).</strong> Frees every
+cluster the integrity walk proved allocated-but-unreferenced (refcount &gt; 0 but
+no L2 entry references it) by setting its refcount to 0. It never lowers a
+<em>referenced</em> cluster's refcount, even when that cluster is over-counted —
+correcting an over-count requires a full recount and is the lossy tier's
+concern. Setting a leaked entry to 0 is a single monotonic write and is
+crash-safe on its own; no <code>corrupt</code>-bit dance is needed.</p>
+<p><strong><code>all</code> (lossy).</strong> Rebuilds the refcount structure against a computed
+reference count and reconciles the COPIED flags. For the supported scope —
+snapshot-free, uncompressed, single-file images with no other detected
+corruption — every cluster's correct refcount is exactly 0 or 1, so the
+detection bitmap <em>is</em> the computed refcount (no separate counting walk is
+needed). Per refcount block it raises under-counts, lowers over-counts, and
+frees zero-counts (so it subsumes the leaks tier), then reconciles each L1/L2
+entry's <code>OFLAG_COPIED</code> bit to match — set if and only if the referenced
+cluster's refcount is exactly 1.</p>
+<h3 id="crash-safe-write-ordering">Crash-safe write ordering<a class="headerlink" href="#crash-safe-write-ordering" title="Permanent link">&para;</a></h3>
+<p>The lossy tier rewrites refcounts and COPIED flags, so an interrupted run must
+never leave a silently-inconsistent image presenting as clean. It writes under
+the <code>INCOMPAT_CORRUPT</code> header bit (incompatible-features field, header offset
+72), in four fsync-separated steps:</p>
+<ol>
+<li>Set <code>INCOMPAT_CORRUPT</code>; fsync.</li>
+<li>Correct refcounts per refcount block; fsync.</li>
+<li>Reconcile <code>OFLAG_COPIED</code> over the active L1 table and its L2 tables; fsync.</li>
+<li>Clear <code>INCOMPAT_CORRUPT</code>; fsync.</li>
+</ol>
+<p>A failure at any point aborts and leaves the <code>corrupt</code> bit <strong>set</strong>: the image
+refuses read-write open until it is re-repaired, rather than presenting as
+clean while half-written. The leaks tier needs none of this — freeing an
+unreferenced cluster is a single monotonic refcount write.</p>
+<h3 id="refuse-rather-than-guess">Refuse rather than guess<a class="headerlink" href="#refuse-rather-than-guess" title="Permanent link">&para;</a></h3>
+<p>The lossy <code>all</code> tier declines its rebuild — reporting the result incomplete —
+when the correct fix is not mechanically determined by the rest of the
+metadata. The safe <code>leaks</code> reclamation is lossless, so it still runs in these
+cases (the image is only guaranteed byte-identical for snapshotted images,
+where both tiers refuse):</p>
+<ul>
+<li><strong>Snapshotted images</strong> (<code>nb_snapshots &gt; 0</code>) — the detection walk does not
+  traverse snapshot L1/L2 tables, so a cluster referenced only by an internal
+  snapshot looks unreferenced; freeing it would corrupt the snapshot. This
+  guard refuses <strong>both</strong> tiers (it takes precedence over the <code>all</code> tier), so a
+  snapshotted image is left byte-identical.</li>
+<li><strong>Compressed and external-data images</strong> (zstd <code>INCOMPAT_COMPRESSION</code>,
+  <code>INCOMPAT_EXTERNAL_DATA</code>, or any <code>OFLAG_COMPRESSED</code> cluster) — shared
+  compressed host clusters and the COPIED-on-compressed rule fall outside the
+  bitmap-as-count model.</li>
+<li><strong>Already-<code>corrupt</code>-flagged images</strong> (any other detected corruption) — the
+  recount identity holds only when no corruption is present.</li>
+<li><strong>Refcount-table exhaustion</strong> — v1 does not grow the refcount table; an
+  out-of-space repair is reported, never worked around.</li>
+<li><strong>Structural overlaps</strong> (two L2 entries → one host cluster) — the leaks tier
+  reclaims any genuine leak but leaves the overlap in place: a safe <em>partial</em>
+  repair, reported incomplete.</li>
+</ul>
+<p>The safe (<code>leaks</code>) tier is deliberately narrower than <code>qemu-img check -r
+leaks</code>, which also trims over-counts; see
+<a href="/components/instar/quirks/#check---repairleaks-scope-vs-qemu-img-check--r-leaks">../quirks.md</a>.</p>
 <h2 id="refcount-metadata-sizing">Refcount Metadata Sizing<a class="headerlink" href="#refcount-metadata-sizing" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1">// Calculate metadata requirements</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kt">int64_t</span><span class="w"> </span><span class="n">clusters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">disk_size</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">cluster_size</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">cluster_size</span><span class="p">;</span>

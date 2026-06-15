@@ -1918,6 +1918,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#repair-tests-test_check_repairpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repair Tests (test_check_repair.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#compare-tests-test_comparepy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3279,6 +3290,34 @@
     
   
     instar snapshot subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-check-repair/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar check --repair for QCOW2
   
 
     
@@ -9339,6 +9378,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#repair-tests-test_check_repairpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repair Tests (test_check_repair.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#compare-tests-test_comparepy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9770,6 +9820,35 @@ defeats the security purpose of instar.</p>
 <code>instar-testdata/custom/check-validation/create-corrupt-images.py</code>, which creates
 images with <code>qemu-img</code>/<code>qemu-io</code> and then surgically corrupts specific QCOW2
 structures via binary manipulation.</p>
+<h3 id="repair-tests-test_check_repairpy">Repair Tests (<code>test_check_repair.py</code>)<a class="headerlink" href="#repair-tests-test_check_repairpy" title="Permanent link">&para;</a></h3>
+<p>Tests for <code>instar check --repair</code>, codifying the phase-7-verified
+behaviour against the corrupt-fixture matrix (each on a tempdir
+copy, never the committed fixture):</p>
+<ul>
+<li><strong>Leaks/all tiers repair to clean</strong>: <code>leaked</code> + <code>--repair=leaks</code>,
+  and <code>refcount-zero</code> / <code>refcount-too-high</code> / <code>stale-copied</code> +
+  <code>--repair=all</code>, are asserted <code>qemu-img check</code>-clean afterward with
+  the surviving data patterns still readable via <code>qemu-io read -P</code>.</li>
+<li><strong>Refuse paths stay byte-identical</strong>: <code>corrupt-bit-set</code>,
+  <code>snapshot-leak</code>, and <code>compressed-leak</code> are sha256-identical after
+  repair, with the snapshot and compressed data intact.</li>
+<li><strong>Overlapping is a safe partial repair</strong>: the genuine leak is
+  reclaimed, the structural overlap remains, no new error classes
+  appear, and instar exits 2 with <code>repair-incomplete</code>.</li>
+<li><strong>CLI</strong>: <code>--repair</code>+<code>--chain</code> rejection, clean-image no-op,
+  qcow2-only not-supported on a raw image, and idempotence.</li>
+<li><strong>Repaired counters</strong> (<code>TestRepairCounters</code>): the per-class
+  <code>repaired-leaks</code> / <code>repaired-refcounts</code> / <code>repaired-corruptions</code>
+  counts reach the host over the <code>CheckResultMessage</code> protobuf and
+  render in both the JSON and human <code>--repair</code> output, and are
+  <em>omitted</em> on a read-only check so its schema is unchanged.</li>
+</ul>
+<p>The structural tests assert post-repair <em>state</em> (<code>qemu-img
+check</code>-clean, data reads, byte-identity) rather than instar's exit
+code, since the exit code still reflects the detected corruption
+after a clean repair; the repaired-counter output is asserted
+separately by <code>TestRepairCounters</code> now that those counts travel on
+the guest→host wire.</p>
 <h3 id="compare-tests-test_comparepy">Compare Tests (<code>test_compare.py</code>)<a class="headerlink" href="#compare-tests-test_comparepy" title="Permanent link">&para;</a></h3>
 <p>Tests for the <code>instar compare</code> operation, cross-validated against <code>qemu-img
 compare</code>:</p>
@@ -10147,6 +10226,23 @@ whole image after every chain element</strong> (the qemu side runs with
 normalized per docs/quirks.md). Its first runs surfaced a real
 multibyte list-padding bug and delete's missing surviving-L2
 COPIED refresh, both since fixed.</p>
+<p>The <code>op_repair</code> arm (phase 10 of PLAN-check-repair) builds a fresh
+qcow2 with known data, injects one random qcow2 corruption
+(refcount-zero / too-high / leaked / stale-copied / overlapping),
+forks the corrupt file to two byte-identical copies, and repairs
+one with <code>instar check --repair</code> and the other with <code>qemu-img check
+-r</code> at a random tier. A three-tier oracle asserts: <strong>safety</strong>
+(unconditional — instar must never produce check-errors or raise
+the corruption/leak count above the original, even when it
+refuses); <strong>convergence</strong> (<code>all</code> tier only, where the two tools
+have matching scope — when instar claims a complete repair via
+<code>repair-incomplete == false</code>, the image must be <code>qemu-img
+check</code>-clean); and <strong>data equivalence</strong> (when both reach clean, the
+raw-flattened guest data must match). instar's deliberate
+refuse/partial behaviour is recorded as conservative, never a
+divergence; the leaks tier is excluded from convergence because it
+is intentionally narrower than <code>qemu-img -r leaks</code> (see
+<a href="/components/instar/quirks/#check---repairleaks-scope-vs-qemu-img-check--r-leaks">quirks.md</a>).</p>
 <p>Known quirks (see <a href="/components/instar/quirks/">quirks.md</a>) are excluded from comparison:
 disk size fields and format-specific metadata.</p>
 <h3 id="libyal-cross-validation">libyal cross-validation<a class="headerlink" href="#libyal-cross-validation" title="Permanent link">&para;</a></h3>
@@ -10225,7 +10321,7 @@ mock <code>CallTable</code> backed by fuzzer input provides the I/O layer,
 allowing libFuzzer to explore malformed input space that differential
 fuzzing (Phase 3) cannot reach.</p>
 <h3 id="fuzz-targets">Fuzz targets<a class="headerlink" href="#fuzz-targets" title="Permanent link">&para;</a></h3>
-<p>22 targets across the parser and planner crates, organized in
+<p>23 targets across the parser and planner crates, organized in
 <code>src/fuzz/</code>:</p>
 <table>
 <thead>
@@ -10346,6 +10442,11 @@ fuzzing (Phase 3) cannot reach.</p>
 <td>snapshot</td>
 <td>Buffer-based</td>
 </tr>
+<tr>
+<td><code>fuzz_check_repair</code></td>
+<td>check</td>
+<td>Buffer-based</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Buffer-based</strong> targets call parser functions that take <code>&amp;[u8]</code>
@@ -10362,6 +10463,15 @@ contiguous allocator, the flag helpers, and the
 table-serialisation round-trip — asserting semantic invariants
 such as precheck-never-mutates, inc/dec byte-identity, and
 allocator containment).</p>
+<p><code>fuzz_check_repair</code> (phase 9 of PLAN-check-repair) dispatches one
+of four <code>crates/check</code> repair planners per exec — leak
+reclamation, count accumulation, refcount correction, and COPIED
+reconciliation — asserting sub-byte-masked containment (co-resident
+refcount entries in a shared byte are preserved at widths 1/2/4),
+raised/lowered/freed tally correctness, the overflow→<code>AmbiguousCorruption</code>
+and bounds→<code>MisalignedAccess</code> error classifications, idempotence,
+and the "correct generalises reclaim" cross-check. The COPIED
+walker's deep invariants are delegated to <code>fuzz_snapshot_refcount</code>.</p>
 <h3 id="running-locally_1">Running locally<a class="headerlink" href="#running-locally_1" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Inside the instar-build container:</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz

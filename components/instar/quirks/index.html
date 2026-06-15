@@ -3634,6 +3634,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-repairleaks-scope-vs-qemu-img-check-r-leaks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check --repair=leaks Scope vs qemu-img check -r leaks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="check --repair=leaks Scope vs qemu-img check -r leaks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#observed-behavior_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observed Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instar-behavior_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        instar Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-additions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4580,6 +4619,34 @@
     
   
     instar snapshot subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-check-repair/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar check --repair for QCOW2
   
 
     
@@ -12300,6 +12367,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-repairleaks-scope-vs-qemu-img-check-r-leaks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check --repair=leaks Scope vs qemu-img check -r leaks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="check --repair=leaks Scope vs qemu-img check -r leaks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#observed-behavior_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observed Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instar-behavior_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        instar Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-additions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14062,6 +14168,31 @@ are the same uniform set as <code>-c</code> / <code>-d</code> above.</p>
   verified scenario, including diverged applies.</p>
 </li>
 </ul>
+<h2 id="check-repairleaks-scope-vs-qemu-img-check-r-leaks"><code>check --repair=leaks</code> Scope vs <code>qemu-img check -r leaks</code><a class="headerlink" href="#check-repairleaks-scope-vs-qemu-img-check-r-leaks" title="Permanent link">&para;</a></h2>
+<h3 id="observed-behavior_11">Observed Behavior<a class="headerlink" href="#observed-behavior_11" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img check -r leaks</code> repairs more than literal leaks: it also trims an
+<em>over-counted</em> but still-referenced cluster's refcount down to its true value
+(it treats, for example, <code>refcount=2 reference=1</code> as a repairable leak).
+<code>instar check --repair=leaks</code> does <strong>not</strong> — it only frees clusters that are
+unreferenced (refcount &gt; 0 with no L2 reference), and never lowers a
+<em>referenced</em> cluster's refcount. So a refcount-too-high cluster stays flagged
+by <code>qemu-img check</code> after <code>instar --repair=leaks</code>, but is cleaned by <code>qemu-img
+-r leaks</code>.</p>
+<h3 id="instar-behavior_10">instar Behavior<a class="headerlink" href="#instar-behavior_10" title="Permanent link">&para;</a></h3>
+<p>This is intentional. instar's safe (<code>leaks</code>) tier is strictly lossless and
+monotonic: freeing an unreferenced cluster cannot lose live data, whereas
+lowering a referenced cluster's refcount is a metadata rewrite that belongs to
+the lossy tier. Over-count correction is therefore deferred to <code>instar check
+--repair=all</code>, which recounts every cluster and corrects in both directions
+under the crash-safe <code>corrupt</code>-bit ordering. Run <code>--repair=all</code> to match (and
+exceed) <code>qemu-img -r leaks</code>'s over-count trimming.</p>
+<p>Note that the leaks tier reports its own work as <em>complete</em> once it has freed
+every genuine leak — a residual over-count is simply outside its remit, not a
+failure, so it is not flagged as <code>repair-incomplete</code>; a subsequent read-only
+<code>instar check</code> still reports the over-count. The difference is surfaced by the
+differential fuzzer (<code>scripts/differential-fuzz.py</code>, the <code>repair</code> op), which
+gates its cleanliness-convergence check on the <code>all</code> tier precisely because
+the two tools' <code>leaks</code> tiers have deliberately different scope.</p>
 <h2 id="future-additions">Future Additions<a class="headerlink" href="#future-additions" title="Permanent link">&para;</a></h2>
 <p>Additional quirks will be documented here as they are discovered during
 compatibility testing.</p>

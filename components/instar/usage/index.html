@@ -2884,6 +2884,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-check-repair/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar check --repair for QCOW2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-fuzzing-bugs/" class="md-nav__link">
         
   
@@ -9017,7 +9045,20 @@ instar would need to support.</p>
 - <strong>Instar extension</strong>: <code>instar check --chain</code> validates the entire backing
   chain by discovering all backing images, loading them as separate
   virtio-block devices, and checking format consistency, virtual size
-  validity, and QCOW2 header integrity for each backing image</p>
+  validity, and QCOW2 header integrity for each backing image
+- <strong>Instar extension</strong>: <code>instar check --repair[=leaks|all]</code> repairs a qcow2
+  image in place (qcow2 only). The safe <code>leaks</code> tier (bare <code>--repair</code> or
+  <code>--repair=leaks</code>) frees clusters the integrity walk proved unreferenced —
+  crash-safe and lossless, mirroring <code>qemu-img check -r leaks</code>. The lossy
+  <code>--repair=all</code> tier additionally corrects wrong refcounts in both
+  directions and reconciles the refcount↔COPIED invariant under a crash-safe
+  <code>corrupt</code>-bit write ordering, mirroring <code>qemu-img check -r all</code>; back up
+  valuable images first. instar refuses rather than guessing: snapshotted
+  images are repaired by neither tier, and the lossy <code>all</code> tier declines its
+  rebuild on compressed, external-data, or already-<code>corrupt</code>-flagged images
+  (the safe leak reclamation still runs, and the result is reported
+  incomplete). <code>--repair</code> cannot be combined with <code>--chain</code>. See
+  <a href="/components/instar/qcow2/qcow2-refcount/#repairing-refcount-inconsistencies">docs/qcow2/qcow2-refcount.md</a></p>
 <h4 id="measure">measure<a class="headerlink" href="#measure" title="Permanent link">&para;</a></h4>
 <p><div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>qemu-img<span class="w"> </span>measure<span class="w"> </span>--output<span class="w"> </span>json<span class="w"> </span>-O<span class="w"> </span>OUTPUT_FORMAT<span class="w"> </span><span class="o">[</span>--force-share<span class="o">]</span><span class="w"> </span>&lt;image&gt;
 </code></pre></div>

@@ -253,6 +253,54 @@
          <lastmod>2026-06-15</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-01-abi/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-02-leak-planner/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-03-refcount-planner/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-04-guest-leaks/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-05-guest-all/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-06-host/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-07-baselines/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-08-integration/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-09-fuzz-coverage/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-10-fuzz-differential/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-11-docs/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair/</loc>
+         <lastmod>2026-06-15</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-convert-followups/</loc>
          <lastmod>2026-06-15</lastmod>
     </url>

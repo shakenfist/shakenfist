@@ -2886,6 +2886,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-check-repair/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar check --repair for QCOW2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-fuzzing-bugs/" class="md-nav__link">
         
   
@@ -8967,7 +8995,7 @@ at the repo root).</p>
 <td>2026-05-10</td>
 <td><a href="/components/instar/plans/PLAN-convert-followups/">Convert follow-ups</a></td>
 <td>Track the deferred work from the (now-removed) convert master plan: extra <code>qemu-img</code> subcommands (create / map / measure / resize / snapshot / rebase / commit) and <code>check --repair</code> wiring</td>
-<td>Phase 1 complete (all seven subcommands shipped; <code>snapshot</code> closed the roster) — phase 2 <code>check --repair</code> not started</td>
+<td>Complete — phase 1 (all seven subcommands shipped; <code>snapshot</code> closed the roster) and phase 2 (<code>check --repair</code>, promoted to <a href="/components/instar/plans/PLAN-check-repair/">PLAN-check-repair.md</a>, all 11 phases landed) both done</td>
 <td>1: subcommand parity, 2: check --repair</td>
 </tr>
 <tr>
@@ -9032,6 +9060,13 @@ at the repo root).</p>
 <td>Triage and fix the 10 open bug GitHub issues outstanding after the May 2026 backlog drain. Three root-cause fix phases: Fixed-VHD <code>virtual_size</code> overflow in <code>plan_vhd</code> (7 <code>fuzz_create_emitters</code> issues), unchecked VHDX resize sequence-number increment (2 <code>fuzz_resize_planners</code> issues), and qcow2 <code>resize --shrink</code> sub-byte refcount corruption (1 hand-filed snapshot-audit issue).</td>
 <td>Complete (phases 1-3: <code>bbfdfc9</code>, <code>514c52a</code>, <code>a54cef8</code>)</td>
 <td><a href="/components/instar/plans/PLAN-bug-fixes-phase-01-fixed-vhd-overflow/">01: fixed-vhd overflow</a>, <a href="/components/instar/plans/PLAN-bug-fixes-phase-02-vhdx-resize-seqnum/">02: vhdx resize seqnum</a>, <a href="/components/instar/plans/PLAN-bug-fixes-phase-03-qcow2-shrink-subbyte-refcount/">03: qcow2 shrink sub-byte refcount</a></td>
+</tr>
+<tr>
+<td>2026-06-13</td>
+<td><a href="/components/instar/plans/PLAN-check-repair/"><code>instar check --repair</code> for QCOW2</a></td>
+<td>Wire <code>CheckConfig::FLAG_REPAIR</code> (reserved but dead since the original <code>check</code> op) to real QCOW2 repair logic, mirroring <code>qemu-img check -r leaks</code>/<code>-r all</code>. Settles the repair safety model (tiered safe-vs-lossy repair, dry-run-by-default, in-place mutation with no mandatory backup, crash-safe write ordering guarded by the <code>corrupt</code> header bit, refuse-rather-than-guess) and implements leak reclamation + refcount/COPIED rebuild inside the KVM guest, reusing the <code>src/crates/snapshot/</code> refcount mutators. Corrupt-fixture baselines, integration tests with post-op <code>qemu-img check</code>/<code>info</code>/<code>compare</code>, coverage and differential fuzzing. Promoted from convert-followups phase 2.</td>
+<td>Complete (all 11 phases landed)</td>
+<td>1: ABI + crate, 2: leak planner, 3: refcount planner, 4: guest (leaks tier), 5: guest (all tier), 6: host CLI, 7: baselines, 8: integration tests, 9: coverage fuzz, 10: differential fuzz, 11: docs</td>
 </tr>
 </tbody>
 </table>
