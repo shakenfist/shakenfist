@@ -51,6 +51,19 @@ SuccessExitStatus=SIGTERM 143
 RestartPreventExitStatus=SIGTERM
 RuntimeDirectory=sf
 RuntimeDirectoryPreserve=yes
+{% if item not in ["sentinel-first", "sentinel-last", "privexec", "nodelock"] %}
+# Arm the systemd watchdog for the non-trivial daemons. They emit WATCHDOG=1
+# from their main loop (Daemon.idle(), plus explicit pets in the cluster and
+# cleaner maintenance passes); if a loop wedges and stops petting, systemd
+# kills the daemon and Restart=on-failure brings it back. A watchdog kill is
+# SIGABRT, not SIGTERM, so RestartPreventExitStatus=SIGTERM does not block it.
+# For the elected sf-cluster this is what provides lock failover: a wedged
+# leader is killed, its lease refresher dies, the cluster lock expires, and a
+# standby takes over. The sentinels, privexec and nodelock are excluded: they
+# do not run the idle()-based loop that emits the keepalive, so arming the
+# watchdog on them would kill a perfectly healthy daemon.
+WatchdogSec=60s
+{% endif %}
 
 EnvironmentFile=/etc/sf/config
 ExecStartPre=/srv/shakenfist/venv/bin/sf-ctl verify-config
