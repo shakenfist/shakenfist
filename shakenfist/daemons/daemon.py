@@ -31,6 +31,12 @@ from shakenfist.util import libvirt as util_libvirt
 LOG, _ = logs.setup(__name__)
 
 
+# Seconds between systemd WATCHDOG=1 keepalive pets. Pets are rate-limited to
+# this cadence so a base-class daemon idling on its 0.2s tick does not emit a
+# notification on every tick.
+WATCHDOG_PET_INTERVAL = 10
+
+
 DAEMON_NAMES = {
     'api': 'sf-api',
     'checksums': 'sf-checksums',
@@ -188,6 +194,7 @@ class Daemon:
 
         self.last_stability = None
         self.last_stability_log = 0
+        self._last_watchdog = 0.0
 
     def _resolve_node_uuid(self):
         """Populate config.NODE_UUID if not already set.
@@ -319,10 +326,21 @@ class Daemon:
         n.add_event(EVENT_TYPE_AUDIT, f'{self.daemon_name} daemon stopped')
         send_systemd_status('Terminated')
 
+    def pet_watchdog(self):
+        # Emit a systemd WATCHDOG=1 liveness signal, rate-limited to
+        # WATCHDOG_PET_INTERVAL so the 0.2s idle() tick does not sendto() on
+        # every tick. The underlying helper is gated on NOTIFY_SOCKET, so this
+        # is a no-op outside systemd.
+        now = time.time()
+        if now - self._last_watchdog >= WATCHDOG_PET_INTERVAL:
+            send_systemd_watchdog()
+            self._last_watchdog = now
+
     def idle(self, seconds):
         for _ in range(int(seconds / 0.2)):
             time.sleep(0.2)
             self.check_daemon_state()
+            self.pet_watchdog()
             if os.path.exists(self.abort_path):
                 break
 
@@ -371,6 +389,10 @@ def send_systemd_stopping():
 
 def send_systemd_status(message):
     _send_systemd_notification(f'STATUS={message}'.encode('utf-8'))
+
+
+def send_systemd_watchdog():
+    _send_systemd_notification(b'WATCHDOG=1')
 
 
 class WorkerPoolDaemon(Daemon):
