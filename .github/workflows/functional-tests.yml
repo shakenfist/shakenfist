@@ -82,7 +82,7 @@ jobs:
       contents: read
       pull-requests: write
     runs-on: [self-hosted, vm, debian-12]
-    needs: [enqueue_pr_comment, check_paths]
+    needs: [check_paths]
     if: needs.check_paths.outputs.code_changed != 'false'
     outputs:
       flake8_failed: ${{ steps.flake8.outcome == 'failure' }}
@@ -203,28 +203,6 @@ jobs:
           if-no-files-found: error
           path: cover.zip
 
-      # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.1.1
-        if: failure()
-        with:
-          method: chat.update
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            ts: "${{ needs.enqueue_pr_comment.outputs.ts }}"
-            text: |
-              The PR test attempt job at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} failed.
-
-              PR title: ${{ github.event.pull_request.title }}
-              PR link: ${{ github.event.pull_request.html_url }}
-              PR author: ${{ github.event.pull_request.user.login }}
-            attachments:
-              - color: "ee9090"
-                fields:
-                  - title: "Status"
-                    short: true
-                    value: "Failure in sanity tests"
-
   # Runs if the "Lint with flake8" step in the sanity_checks job fails.
   # Uses always() so it runs even when sanity_checks fails.
   # Skip if the last commit was from the bot (checked by check_bot_commit job).
@@ -266,7 +244,7 @@ jobs:
       always() && github.event_name != 'merge_group'
       && needs.check_paths.outputs.code_changed != 'false'
     runs-on: [self-hosted, vm, debian-12]
-    needs: [enqueue_pr_comment, check_paths]
+    needs: [check_paths]
     outputs:
       # For matrix jobs, we use a JSON object keyed by job_name. Each matrix run
       # sets its own key, and the outputs get merged. The consuming job can then
@@ -662,41 +640,6 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
-      # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.1.1
-        if: failure()
-        with:
-          method: chat.update
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            ts: "${{ needs.enqueue_pr_comment.outputs.ts }}"
-            text: |
-              The PR test attempt job at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} failed.
-
-              PR title: ${{ github.event.pull_request.title }}
-              PR link: ${{ github.event.pull_request.html_url }}
-              PR author: ${{ github.event.pull_request.user.login }}
-            attachments:
-              - color: "ee9090"
-                fields:
-                  - title: "Status"
-                    short: true
-                    value: "Failure in functional matrix tests"
-
-      - uses: slackapi/slack-github-action@v2.1.1
-        if: failure()
-        with:
-          method: chat.postMessage
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            thread_ts: "${{ needs.enqueue_pr_comment.outputs.ts }}"
-            text: |
-              Failures are:
-
-              ${{ steps.failures.outputs.failures }}
-
   # Runs if exceptions are found on disk in any functional_matrix_pr matrix job.
   # Uses !cancelled() so it runs even when functional_matrix_pr fails.
   # The exceptions_found output is a JSON object with job_name keys and boolean
@@ -799,7 +742,7 @@ jobs:
     if: >-
       github.event_name == 'merge_group'
       && needs.check_paths.outputs.code_changed != 'false'
-    needs: [merge_pr_comment, check_paths]
+    needs: [check_paths]
     outputs:
       exceptions_found: ${{ toJSON(steps.set_exceptions_output.outputs) }}
     strategy:
@@ -1239,41 +1182,6 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
-      # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.1.1
-        if: failure()
-        with:
-          method: chat.update
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            ts: "${{ needs.merge_pr_comment.outputs.ts }}"
-            text: |
-              The PR merge attempt job at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} failed.
-
-              The PR commit message is:
-
-              ${{ needs.merge_pr_comment.outputs.commit }}
-            attachments:
-              - color: "ee9090"
-                fields:
-                  - title: "Status"
-                    short: true
-                    value: "Failure in functional matrix tests"
-
-      - uses: slackapi/slack-github-action@v2.1.1
-        if: failure()
-        with:
-          method: chat.postMessage
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            thread_ts: "${{ needs.merge_pr_comment.outputs.ts }}"
-            text:  |
-              Failures are:
-
-              ${{ steps.failures.outputs.failures }}
-
       # We do this instead of "fast-fail: true" because we want to cancel jobs
       # outside of the matrix as well.
       # - uses: andymckay/cancel-action@0.5
@@ -1434,7 +1342,7 @@ jobs:
       github.event_name == 'merge_group'
       && needs.check_paths.outputs.code_changed != 'false'
     runs-on: [self-hosted, vm, debian-12]
-    needs: [merge_pr_comment, check_paths]
+    needs: [check_paths]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-ansiblemodules
       cancel-in-progress: true
@@ -1652,28 +1560,6 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
-      # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.1.1
-        if: failure()
-        with:
-          method: chat.update
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            ts: "${{ needs.merge_pr_comment.outputs.ts }}"
-            text: |
-              The PR merge attempt job at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} failed.
-
-              The PR commit message is:
-
-              ${{ needs.merge_pr_comment.outputs.commit }}
-            attachments:
-              - color: "ee9090"
-                fields:
-                  - title: "Status"
-                    short: true
-                    value: "Failure in ansible-modules tests"
-
       # We do this instead of "fast-fail: true" because we want to cancel jobs
       # outside of the matrix as well.
       # - uses: andymckay/cancel-action@0.5
@@ -1685,7 +1571,7 @@ jobs:
     if: >-
       github.event_name == 'merge_group'
       && needs.check_paths.outputs.code_changed != 'false'
-    needs: [merge_pr_comment, check_paths]
+    needs: [check_paths]
     runs-on: [self-hosted, vm, debian-12]
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-nodelifecycle
@@ -1925,125 +1811,11 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
-      # Failures get announced here before we cancel stuff
-      - uses: slackapi/slack-github-action@v2.1.1
-        if: failure()
-        with:
-          method: chat.update
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            ts: "${{ needs.merge_pr_comment.outputs.ts }}"
-            text: |
-              The PR merge attempt job at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} failed.
-
-              The PR commit message is:
-
-              ${{ needs.merge_pr_comment.outputs.commit }}
-            attachments:
-              - color: "ee9090"
-                fields:
-                  - title: "Status"
-                    short: true
-                    value: "Failure in node-lifecycle tests"
-
       # We do this instead of "fast-fail: true" because we want to cancel jobs
       # outside of the matrix as well.
       # - uses: andymckay/cancel-action@0.5
       #   if: failure()
       #   name: Cancel entire workflow on failure
-
-  enqueue_pr_comment:
-    name: "Enqueue PR slack comment"
-    if: always() && github.event_name == 'pull_request'
-    runs-on: [self-hosted, static]
-    permissions:
-      pull-requests: write
-    outputs:
-      ts: "${{ steps.slack.outputs.ts }}"
-    steps:
-      - name: Log the github event
-        run: |
-          cat - <<EOF
-          ${{ toJSON(github.event.pull_request) }}"
-          EOF
-
-      - name: Tell people a PR test attempt is running
-        id: slack
-        uses: slackapi/slack-github-action@v2.1.1
-        with:
-          method: chat.postMessage
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            text: |
-              A PR test attempt is running at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} :rocket:
-
-              PR title: ${{ github.event.pull_request.title }}
-              PR link: ${{ github.event.pull_request.html_url }}
-              PR author: ${{ github.event.pull_request.user.login }}
-            attachments:
-              - color: "9090ee"
-                fields:
-                  - title: "Status"
-                    short: true
-                    value: "In Progress"
-
-  merge_pr_comment:
-    name: "Merge attempt slack comment"
-    if: always() && github.event_name == 'merge_group'
-    runs-on: [self-hosted, static]
-    permissions:
-      pull-requests: write
-    outputs:
-      ts: "${{ steps.slack.outputs.ts }}"
-      commit: "${{ steps.commit_message.outputs.commit }}"
-    steps:
-      - name: Log the github event
-        run: |
-          cat - <<EOF
-          ${{ toJSON(github.event.merge_group) }}"
-          EOF
-      - name: Reformat the commit message as a quoted block
-        id: commit_message
-        run: |
-          commit="${{ github.event.merge_group.head_commit.message }}"
-
-          echo "Commit message is:"
-          echo "${commit}"
-          echo
-
-          commit=$(echo ${commit} | sed 's/^/> /')
-          echo "Quoted message is:"
-          echo "${commit}"
-          echo
-
-          echo "commit<<EOF" >> ${GITHUB_OUTPUT}
-          echo "${commit}" >> ${GITHUB_OUTPUT}
-          echo "EOF" >> ${GITHUB_OUTPUT}
-          echo "GITHUB_OUTPUT is:"
-          cat ${GITHUB_OUTPUT}
-
-      - name: Tell people a merge attempt is running
-        id: slack
-        uses: slackapi/slack-github-action@v2.1.1
-        with:
-          method: chat.postMessage
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            text: |
-              A merge queue attempt is running at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} :rocket:
-
-              The PR commit message is:
-
-              ${{ steps.commit_message.outputs.commit }}
-            attachments:
-              - color: "9090ee"
-                fields:
-                  - title: "Status"
-                    short: true
-                    value: "In Progress"
 
   can_see_status:
     name: "Can see status"
@@ -2056,7 +1828,6 @@ jobs:
     name: "Can enqueue"
     needs:
       - functional_matrix_pr
-      - enqueue_pr_comment
       - sanity_checks
       - check_paths
     if: always() && github.event_name != 'merge_group'
@@ -2071,26 +1842,6 @@ jobs:
           echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq '. | to_entries | map([.value.result == "success", .value.result == "skipped"] | any) | all')" >>$GITHUB_ENV
       - name: Check outcomes
         run: "[ $ALL_SUCCESS == true ]"
-      - uses: slackapi/slack-github-action@v2.1.1
-        if: success()
-        with:
-          method: chat.update
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            ts: "${{ needs.enqueue_pr_comment.outputs.ts }}"
-            text: |
-              The PR test attempt job at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} succeeded.
-
-              PR title: ${{ github.event.pull_request.title }}
-              PR link: ${{ github.event.pull_request.html_url }}
-              PR author: ${{ github.event.pull_request.user.login }}
-            attachments:
-              - color: "90ee90"
-                fields:
-                  - title: "Status"
-                    short: true
-                    value: "Success"
 
   can_merge:
     name: "Can merge"
@@ -2098,7 +1849,6 @@ jobs:
       - functional_matrix_merge
       - ansible_modules
       - node_lifecycle
-      - merge_pr_comment
       - check_paths
     if: always() && github.event_name == 'merge_group'
     permissions:
@@ -2112,23 +1862,3 @@ jobs:
           echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq '. | to_entries | map([.value.result == "success", .value.result == "skipped"] | any) | all')" >>$GITHUB_ENV
       - name: Check outcomes
         run: "[ $ALL_SUCCESS == true ]"
-      - uses: slackapi/slack-github-action@v2.1.1
-        if: success()
-        with:
-          method: chat.update
-          token: "${{ secrets.SLACK_BOT_TOKEN }}"
-          payload: |
-            channel: ${{ secrets.SLACK_CHANNEL_SHAKENFIST_CI }}
-            ts: "${{ needs.merge_pr_comment.outputs.ts }}"
-            text: |
-              The merge attempt job at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} succeeded.
-
-              The PR commit message is:
-
-              ${{ needs.merge_pr_comment.outputs.commit }}
-            attachments:
-              - color: "90ee90"
-                fields:
-                  - title: "Status"
-                    short: true
-                    value: "Success"
