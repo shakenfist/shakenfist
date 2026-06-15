@@ -5,6 +5,7 @@
 from unittest import mock
 
 import sqlalchemy as sa
+from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
 from shakenfist.tests import base
@@ -136,7 +137,6 @@ class TestCheckReachable(base.ShakenFistTestCase):
 
     def test_never_raises_when_execute_raises_operational_error(self):
         """OperationalError (e.g. host unreachable) must not propagate."""
-        from sqlalchemy.exc import OperationalError
         exc = OperationalError('statement', {}, Exception('TCP error'))
         mock_engine, _conn = _make_mock_engine(execute_raises=exc)
         with self._patch_connection_url():

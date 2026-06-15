@@ -100,11 +100,17 @@ def post_worker_init(worker):
             if callable(orig):
                 orig(signum, frame)
             else:
-                # No usable original handler (SIG_DFL / SIG_IGN). Fall
-                # back to a clean exit so the worker still stops.
+                # No usable original handler (SIG_DFL / SIG_IGN). This path is
+                # unreachable under normal gunicorn -- init_signals always
+                # installs a callable handle_exit before post_worker_init runs.
+                # We cannot cleanly terminate from this timer thread anyway
+                # (signal.signal is main-thread-only, and re-raising SIGTERM
+                # would just re-enter this guarded handler), so we raise
+                # SystemExit to unwind the timer thread and rely on systemd's
+                # TimeoutStopSec as the backstop that actually stops the worker.
                 LOG.with_fields({'pid': worker.pid}).warning(
-                    'No callable original SIGTERM handler captured; '
-                    'raising SystemExit to stop the worker')
+                    'No callable original SIGTERM handler captured; relying on '
+                    'systemd TimeoutStopSec to stop the worker')
                 raise SystemExit(0)
 
         # Defer the actual shutdown so this handler returns immediately

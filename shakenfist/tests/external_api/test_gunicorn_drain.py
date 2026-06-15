@@ -118,7 +118,10 @@ class GunicornDrainTestCase(base.ShakenFistTestCase):
 
     def test_non_callable_orig_falls_back_to_systemexit(self):
         # If gunicorn left SIG_DFL / SIG_IGN installed (not callable), the
-        # deferred target falls back to SystemExit so the worker still stops.
+        # deferred target raises SystemExit to unwind the timer thread. This
+        # path is unreachable under normal gunicorn; it cannot itself stop the
+        # process from a non-main thread, so systemd's TimeoutStopSec is the
+        # real backstop.
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
 
         gunicorn_config.post_worker_init(_FakeWorker())

@@ -35,7 +35,7 @@ LOG, _ = logs.setup(__name__)
 
 # Seconds between readiness polls.
 READINESS_POLL = 5
-# Per-poll RPC deadline for the health Check call.
+# Per-poll RPC deadline, in seconds, for the health Check call.
 READINESS_RPC_TIMEOUT = 2
 # Number (K) of consecutive failed polls before ``ready`` flips False.
 READINESS_FAIL_THRESHOLD = 3

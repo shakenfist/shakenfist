@@ -5135,12 +5135,15 @@ class Monitor(daemon.WorkerPoolDaemon):
                       else health_pb2.HealthCheckResponse.NOT_SERVING)
 
             if status != self._last_health_status:
-                if reachable:
-                    LOG.info('sf-database health: MariaDB reachable again, '
-                             'reporting SERVING')
-                else:
+                if not reachable:
                     LOG.warning('sf-database health: MariaDB became '
                                 'unreachable, reporting NOT_SERVING')
+                elif self._last_health_status is None:
+                    LOG.info('sf-database health: MariaDB reachable, '
+                             'reporting SERVING')
+                else:
+                    LOG.info('sf-database health: MariaDB reachable again, '
+                             'reporting SERVING')
                 self._last_health_status = status
 
             self.health_servicer.set('', status)

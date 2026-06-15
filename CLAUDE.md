@@ -291,8 +291,9 @@ For long-held locks (anything held for more than a few seconds), the
 holder must poll `lock.lost_event` between iterations of its critical
 section and abort cleanly when it fires -- the refresher sets it on
 confirmed loss. The cluster maintainer's inner loop is the canonical
-example: it sleeps via `lock.lost_event.wait(60)` so it wakes
-immediately on confirmed loss.
+example: it sleeps via `lock.lost_event.wait(5)` so it wakes
+immediately on confirmed loss (and keeps the elected loop inside the
+systemd `TimeoutStopSec` and watchdog windows).
 
 `ClusterLock.release()` raises `shakenfist.exceptions.LockNotHeld` if
 the database has no record of the caller holding the lock. The
