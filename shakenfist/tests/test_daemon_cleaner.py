@@ -2,6 +2,7 @@ from unittest import mock
 
 from shakenfist import instance
 from shakenfist.config import BaseSettings
+from shakenfist.daemons.cleaner import main as cleaner_main
 from shakenfist.daemons.cleaner import scheduled_tasks as cleaner_st
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
@@ -142,3 +143,40 @@ class CleanerTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 state, inst_attrs.power_state['power_state'],
                 f'State for instance "{name}" does not match "{state}"')
+
+
+class CleanerWatchdogTestCase(base.ShakenFistTestCase):
+    """``_maintain_blobs`` globs the on-disk blob directory and does
+    per-blob work; on a large node it can run long before control returns
+    to idle(60). It must pet the systemd watchdog per blob so it survives
+    WatchdogSec once that is armed."""
+
+    @mock.patch('shakenfist.daemons.cleaner.main.config', fake_config)
+    @mock.patch('shakenfist.daemons.cleaner.main.os.makedirs')
+    @mock.patch('shakenfist.daemons.cleaner.main.os.listdir', return_value=[])
+    @mock.patch('shakenfist.daemons.cleaner.main.mariadb')
+    @mock.patch('shakenfist.daemons.cleaner.main.node')
+    def test_maintain_blobs_pets_per_blob(self, mock_node, mock_mariadb,
+                                          mock_listdir, mock_makedirs):
+        m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
+        m.pet_watchdog = mock.MagicMock()
+
+        mock_mariadb.get_active_blob_uuids.return_value = []
+        fake_node = mock.MagicMock()
+        fake_node.blobs = []
+        mock_node.Node.from_db.return_value = fake_node
+
+        # Two on-disk entries that are not regular files, so no destructive
+        # work happens; we only need to confirm the pet fires per entry.
+        # The code calls str(entpath), so plain strings are sufficient.
+        entries = ['/srv/shakenfist/blobs/aa/blob-a',
+                   '/srv/shakenfist/blobs/bb/blob-b']
+
+        with mock.patch('shakenfist.daemons.cleaner.main.pathlib.Path') \
+                as mock_path:
+            mock_path.return_value.glob.return_value = entries
+            with mock.patch('shakenfist.daemons.cleaner.main.os.path.isfile',
+                            return_value=False):
+                m._maintain_blobs()
+
+        self.assertGreaterEqual(m.pet_watchdog.call_count, 2)

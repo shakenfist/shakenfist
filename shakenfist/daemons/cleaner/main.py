@@ -40,6 +40,8 @@ class Monitor(daemon.Daemon):
         try:
             p = pathlib.Path(blob_path)
             for entpath in p.glob('**/*'):
+                self.pet_watchdog()
+
                 entpath = str(entpath)
                 if entpath.endswith('/_version'):
                     continue
@@ -81,6 +83,7 @@ class Monitor(daemon.Daemon):
 
         # Find transcoded blobs in the image cache which are no longer in use
         for ent in os.listdir(cache_path):
+            self.pet_watchdog()
             entpath = os.path.join(cache_path, ent)
 
             # Broken symlinks will report an error here that we have to catch
@@ -130,6 +133,7 @@ class Monitor(daemon.Daemon):
             return
 
         for blob_uuid in n.blobs:
+            self.pet_watchdog()
             if not os.path.exists(Blob.filepath(blob_uuid)):
                 b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
                 if b:
