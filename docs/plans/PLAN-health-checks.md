@@ -860,6 +860,27 @@ because the following statements will be true:
   toward, so this plan should not bake in an assumption that
   every hypervisor-resident daemon needs an HTTP health
   surface.
+- **Decompose `sf-cluster`'s `_cluster_wide_cleanup`.** Phase 3
+  added thirteen `pet_watchdog()` calls to this one method —
+  a good proxy for the fact that it is a ~335-line god-method
+  (`daemons/cluster/main.py`) doing at least eight unrelated
+  concerns: the lease bail-out, stale-transfer cleanup,
+  operation-history pruning, orphan-IPAM cleanup, floating-IP
+  reservation cleanup, artifact cleanup, the large blob-
+  replication reconciliation, and dead-node reaping. Splitting
+  it into one method per concern
+  (`_cleanup_orphan_ipams`, `_cleanup_floating_reservations`,
+  `_cleanup_artifacts`, `_reconcile_blob_replication`,
+  `_reap_dead_nodes`, …) would make each individually testable
+  (phase 3's tests had to mock heavily to exercise a single
+  loop), localise each watchdog pet, and make the maintenance
+  pass readable. Not health-check work — flagged here because
+  we hit it here. The natural owner is
+  [`PLAN-recurring-operations.md`](PLAN-recurring-operations.md),
+  which already aims to restructure cluster maintenance
+  (absorbing `scheduled_tasks.py` / `network/maintain.py`):
+  the decomposed cleanups are natural candidates to become
+  individually-scheduled recurring operations.
 
 ### Bugs fixed during this work
 
