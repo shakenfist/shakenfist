@@ -88,3 +88,43 @@ class DaemonWatchdogTestCase(base.ShakenFistTestCase):
         with mock.patch.dict('shakenfist.daemons.daemon.os.environ',
                              clear=True):
             daemon.send_systemd_watchdog()
+
+    @mock.patch('shakenfist.daemons.daemon.check_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.health_check_nodelock')
+    def test_wait_for_nodelock_pets_while_waiting(
+            self, mock_nodelock, mock_abort):
+        # nodelock reports unhealthy twice, then healthy. The wait loop must
+        # call idle() (which pets the watchdog) once per unhealthy poll and
+        # exit as soon as nodelock becomes healthy.
+        d = self._make_daemon()
+        mock_nodelock.side_effect = [False, False, True]
+        # check_abort_path returns True while NOT aborting.
+        mock_abort.return_value = True
+
+        idle_calls = []
+        d.idle = lambda seconds: idle_calls.append(seconds)
+
+        d.wait_for_nodelock()
+
+        # Two unhealthy polls -> two idle() pets, then exit on the healthy poll.
+        self.assertEqual([1, 1], idle_calls)
+        self.assertEqual(3, mock_nodelock.call_count)
+
+    @mock.patch('shakenfist.daemons.daemon.check_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.health_check_nodelock')
+    def test_wait_for_nodelock_exits_on_abort(
+            self, mock_nodelock, mock_abort):
+        # If the daemon is aborting (check_abort_path returns False) the wait
+        # must break out promptly even though nodelock is still unhealthy, so
+        # shutdown is not blocked.
+        d = self._make_daemon()
+        mock_nodelock.return_value = False
+        mock_abort.return_value = False
+
+        idle_calls = []
+        d.idle = lambda seconds: idle_calls.append(seconds)
+
+        d.wait_for_nodelock()
+
+        # The loop condition short-circuits on abort before any idle().
+        self.assertEqual([], idle_calls)

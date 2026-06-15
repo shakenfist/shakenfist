@@ -924,10 +924,7 @@ class Monitor(daemon.Daemon):
     def _run_inner(self):
         while daemon.check_abort_path(self.abort_path):
             try:
-                while not daemon.health_check_nodelock():
-                    LOG.info('Waiting for nodelock daemon to be healthy')
-                    time.sleep(1)
-                    continue
+                self.wait_for_nodelock()
 
                 self.reap_instance_monitors()
                 self.reap_instance_executors()

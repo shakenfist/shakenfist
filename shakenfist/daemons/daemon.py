@@ -344,6 +344,17 @@ class Daemon:
             if os.path.exists(self.abort_path):
                 break
 
+    def wait_for_nodelock(self):
+        # Block until the node-local nodelock daemon is healthy, petting the
+        # systemd watchdog (via idle) while we wait. nodelock can be briefly
+        # unhealthy during startup or node churn; without petting, a daemon
+        # whose unit has WatchdogSec armed and which is correctly waiting would
+        # trip the watchdog and be SIGABRT-killed. The abort check in the loop
+        # condition lets shutdown break out promptly.
+        while not health_check_nodelock() and check_abort_path(self.abort_path):
+            LOG.info('Waiting for nodelock daemon to be healthy')
+            self.idle(1)
+
 
 def force_clean_exit():
     # Skip the interpreter's normal teardown and exit immediately.

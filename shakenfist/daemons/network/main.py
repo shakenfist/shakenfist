@@ -35,10 +35,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         }
 
         while daemon.check_abort_path(self.abort_path):
-            while not daemon.health_check_nodelock():
-                LOG.info('Waiting for nodelock daemon to be healthy')
-                time.sleep(1)
-                continue
+            self.wait_for_nodelock()
 
             try:
                 self.reap_workers()

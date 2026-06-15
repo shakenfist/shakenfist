@@ -436,6 +436,7 @@ class Monitor(daemon.Daemon):
                 if time.time() - last_defer_message > 10:
                     LOG.info('Cluster not yet stable, deferring maintenance')
                     last_defer_message = time.time()
+                self.idle(60)
                 continue
 
             # Setup a schedule of things to do

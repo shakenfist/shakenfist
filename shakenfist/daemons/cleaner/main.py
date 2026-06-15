@@ -154,15 +154,13 @@ class Monitor(daemon.Daemon):
 
         n = node.Node.from_db(config.NODE_NAME)
         while daemon.check_abort_path(self.abort_path):
-            while not daemon.health_check_nodelock():
-                LOG.info('Waiting for nodelock daemon to be healthy')
-                time.sleep(1)
-                continue
+            self.wait_for_nodelock()
 
             if not self.cluster_stable():
                 if time.time() - last_defer_message > 10:
                     LOG.info('Cluster not yet stable, deferring maintenance')
                     last_defer_message = time.time()
+                self.idle(60)
                 continue
 
             try:
