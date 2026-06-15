@@ -149,6 +149,7 @@ nav:
                 - "instar rebase and commit subcommands": components/instar/plans/PLAN-rebase-commit.md
                 - "instar map subcommand": components/instar/plans/PLAN-map.md
                 - "instar snapshot subcommand": components/instar/plans/PLAN-snapshot.md
+                - "instar check --repair for QCOW2": components/instar/plans/PLAN-check-repair.md
                 - "Fuzzing bug backlog": components/instar/plans/PLAN-fuzzing-bugs.md
                 - "June 2026 fuzzer bug backlog": components/instar/plans/PLAN-bug-fixes.md
             - Prototypes:
