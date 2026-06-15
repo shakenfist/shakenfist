@@ -37,7 +37,13 @@ import threading
 
 from shakenfist_utilities import logs
 
-from shakenfist.config import config
+# NOTE: gunicorn loads this file as its --config module and scans the module's
+# globals for any name matching one of its own settings, applying them. A
+# module-level name `config` collides with gunicorn's own `config` setting and
+# makes gunicorn abort at startup with "Error: Not a string". So import the SF
+# config under an alias (`sf_config`) -- do NOT expose a bare `config` global
+# here, and avoid module-level globals named after gunicorn settings generally.
+from shakenfist.config import config as sf_config
 from shakenfist.external_api import health
 
 
@@ -87,7 +93,7 @@ def post_worker_init(worker):
 
         health.begin_drain()
         LOG.with_fields({
-            'grace_seconds': config.API_DRAIN_GRACE,
+            'grace_seconds': sf_config.API_DRAIN_GRACE,
             'pid': worker.pid,
         }).info(
             'SIGTERM received, draining sf-api worker: /readyz now reports '
@@ -117,7 +123,7 @@ def post_worker_init(worker):
         # and the worker keeps serving during the grace period. A daemon
         # timer thread does not block process exit if shutdown happens
         # another way first.
-        timer = threading.Timer(config.API_DRAIN_GRACE, _invoke_orig)
+        timer = threading.Timer(sf_config.API_DRAIN_GRACE, _invoke_orig)
         timer.daemon = True
         timer.start()
 

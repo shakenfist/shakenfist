@@ -8,10 +8,37 @@ leaking a drain handler across the rest of the suite.
 import signal
 from unittest import mock
 
+from gunicorn.config import KNOWN_SETTINGS
+
 from shakenfist.config import config
 from shakenfist.external_api import gunicorn_config
 from shakenfist.external_api import health
 from shakenfist.tests import base
+
+
+class GunicornConfigGlobalsTestCase(base.ShakenFistTestCase):
+    """Guard against the "Error: Not a string" gunicorn startup failure.
+
+    gunicorn loads gunicorn_config.py as its --config module and applies any
+    module-level global whose name matches one of its own settings. A stray
+    global named after a setting (notably `config`) makes gunicorn abort at
+    startup -- and unit tests that merely import the module never catch it,
+    because only gunicorn scans the globals. This test asserts that no
+    module global collides with a gunicorn setting except the hooks we
+    deliberately define.
+    """
+
+    def test_no_module_global_collides_with_gunicorn_setting(self):
+        setting_names = {s.name for s in KNOWN_SETTINGS}
+        module_globals = {
+            name for name in vars(gunicorn_config) if not name.startswith('_')}
+        allowed_hooks = {'post_fork', 'post_worker_init'}
+        collisions = (module_globals & setting_names) - allowed_hooks
+        self.assertEqual(
+            set(), collisions,
+            f'gunicorn_config exposes module globals that collide with '
+            f'gunicorn settings and will break sf-api startup: {collisions}. '
+            f'Rename or alias them (e.g. config -> sf_config).')
 
 
 class _FakeTimer:
