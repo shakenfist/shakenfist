@@ -513,6 +513,22 @@ jobs:
             echo "exceptions_found=false" >> $GITHUB_OUTPUT
           fi
 
+      # Prove the sf-api SIGTERM drain works on a live node: /readyz flips to
+      # 503 while the worker is still serving, then sf-api exits cleanly and is
+      # restarted. Run this BEFORE "Check logs" so the stop/restart has fully
+      # settled and the node is back in rotation before the log-failure greps
+      # run. A clean drain exits 143 (SuccessExitStatus=SIGTERM), so it does not
+      # produce the "Main process exited"/"stop-sigterm timed out"/"Failed with
+      # result" lines those greps reject. This is an assertion, not a
+      # diagnostic, so no "|| true" -- a broken drain fails the job.
+      - name: Check sf-api drain
+        id: check_drain
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} "sudo bash tools/ci_drain_check.sh"
+
       - name: Check logs
         id: check_logs
         if: always()
@@ -1068,6 +1084,22 @@ jobs:
           else
             echo "exceptions_found=false" >> $GITHUB_OUTPUT
           fi
+
+      # Prove the sf-api SIGTERM drain works on a live node: /readyz flips to
+      # 503 while the worker is still serving, then sf-api exits cleanly and is
+      # restarted. Run this BEFORE "Check logs" so the stop/restart has fully
+      # settled and the node is back in rotation before the log-failure greps
+      # run. A clean drain exits 143 (SuccessExitStatus=SIGTERM), so it does not
+      # produce the "Main process exited"/"stop-sigterm timed out"/"Failed with
+      # result" lines those greps reject. This is an assertion, not a
+      # diagnostic, so no "|| true" -- a broken drain fails the job.
+      - name: Check sf-api drain
+        id: check_drain
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} "sudo bash tools/ci_drain_check.sh"
 
       - name: Check logs
         id: check_logs
