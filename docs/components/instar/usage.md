@@ -95,6 +95,19 @@ qemu-img check --output json -f FORMAT <image>
   chain by discovering all backing images, loading them as separate
   virtio-block devices, and checking format consistency, virtual size
   validity, and QCOW2 header integrity for each backing image
+- **Instar extension**: `instar check --repair[=leaks|all]` repairs a qcow2
+  image in place (qcow2 only). The safe `leaks` tier (bare `--repair` or
+  `--repair=leaks`) frees clusters the integrity walk proved unreferenced —
+  crash-safe and lossless, mirroring `qemu-img check -r leaks`. The lossy
+  `--repair=all` tier additionally corrects wrong refcounts in both
+  directions and reconciles the refcount↔COPIED invariant under a crash-safe
+  `corrupt`-bit write ordering, mirroring `qemu-img check -r all`; back up
+  valuable images first. instar refuses rather than guessing: snapshotted
+  images are repaired by neither tier, and the lossy `all` tier declines its
+  rebuild on compressed, external-data, or already-`corrupt`-flagged images
+  (the safe leak reclamation still runs, and the result is reported
+  incomplete). `--repair` cannot be combined with `--chain`. See
+  [docs/qcow2/qcow2-refcount.md](/components/instar/qcow2/qcow2-refcount/#repairing-refcount-inconsistencies)
 
 #### measure
 ```bash

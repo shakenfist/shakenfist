@@ -222,6 +222,79 @@ To verify refcount consistency:
 qemu-img check image.qcow2
 ```
 
+## Repairing Refcount Inconsistencies
+
+`instar check --repair[=leaks|all]` repairs the refcount inconsistencies the
+consistency check above detects, in place, mirroring `qemu-img check -r
+leaks`/`-r all`. The read-only `instar check` is the safe default; `--repair`
+is opt-in and writes to the image. qcow2 only.
+
+### The two tiers
+
+**`leaks` (safe, lossless — the bare `--repair` default).** Frees every
+cluster the integrity walk proved allocated-but-unreferenced (refcount > 0 but
+no L2 entry references it) by setting its refcount to 0. It never lowers a
+*referenced* cluster's refcount, even when that cluster is over-counted —
+correcting an over-count requires a full recount and is the lossy tier's
+concern. Setting a leaked entry to 0 is a single monotonic write and is
+crash-safe on its own; no `corrupt`-bit dance is needed.
+
+**`all` (lossy).** Rebuilds the refcount structure against a computed
+reference count and reconciles the COPIED flags. For the supported scope —
+snapshot-free, uncompressed, single-file images with no other detected
+corruption — every cluster's correct refcount is exactly 0 or 1, so the
+detection bitmap *is* the computed refcount (no separate counting walk is
+needed). Per refcount block it raises under-counts, lowers over-counts, and
+frees zero-counts (so it subsumes the leaks tier), then reconciles each L1/L2
+entry's `OFLAG_COPIED` bit to match — set if and only if the referenced
+cluster's refcount is exactly 1.
+
+### Crash-safe write ordering
+
+The lossy tier rewrites refcounts and COPIED flags, so an interrupted run must
+never leave a silently-inconsistent image presenting as clean. It writes under
+the `INCOMPAT_CORRUPT` header bit (incompatible-features field, header offset
+72), in four fsync-separated steps:
+
+1. Set `INCOMPAT_CORRUPT`; fsync.
+2. Correct refcounts per refcount block; fsync.
+3. Reconcile `OFLAG_COPIED` over the active L1 table and its L2 tables; fsync.
+4. Clear `INCOMPAT_CORRUPT`; fsync.
+
+A failure at any point aborts and leaves the `corrupt` bit **set**: the image
+refuses read-write open until it is re-repaired, rather than presenting as
+clean while half-written. The leaks tier needs none of this — freeing an
+unreferenced cluster is a single monotonic refcount write.
+
+### Refuse rather than guess
+
+The lossy `all` tier declines its rebuild — reporting the result incomplete —
+when the correct fix is not mechanically determined by the rest of the
+metadata. The safe `leaks` reclamation is lossless, so it still runs in these
+cases (the image is only guaranteed byte-identical for snapshotted images,
+where both tiers refuse):
+
+- **Snapshotted images** (`nb_snapshots > 0`) — the detection walk does not
+  traverse snapshot L1/L2 tables, so a cluster referenced only by an internal
+  snapshot looks unreferenced; freeing it would corrupt the snapshot. This
+  guard refuses **both** tiers (it takes precedence over the `all` tier), so a
+  snapshotted image is left byte-identical.
+- **Compressed and external-data images** (zstd `INCOMPAT_COMPRESSION`,
+  `INCOMPAT_EXTERNAL_DATA`, or any `OFLAG_COMPRESSED` cluster) — shared
+  compressed host clusters and the COPIED-on-compressed rule fall outside the
+  bitmap-as-count model.
+- **Already-`corrupt`-flagged images** (any other detected corruption) — the
+  recount identity holds only when no corruption is present.
+- **Refcount-table exhaustion** — v1 does not grow the refcount table; an
+  out-of-space repair is reported, never worked around.
+- **Structural overlaps** (two L2 entries → one host cluster) — the leaks tier
+  reclaims any genuine leak but leaves the overlap in place: a safe *partial*
+  repair, reported incomplete.
+
+The safe (`leaks`) tier is deliberately narrower than `qemu-img check -r
+leaks`, which also trims over-counts; see
+[../quirks.md](/components/instar/quirks/#check---repairleaks-scope-vs-qemu-img-check--r-leaks).
+
 ## Refcount Metadata Sizing
 
 ```c

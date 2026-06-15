@@ -1847,6 +1847,37 @@ are the same uniform set as `-c` / `-d` above.
   images are **bit-for-bit identical** to instar's across every
   verified scenario, including diverged applies.
 
+## `check --repair=leaks` Scope vs `qemu-img check -r leaks`
+
+### Observed Behavior
+
+`qemu-img check -r leaks` repairs more than literal leaks: it also trims an
+*over-counted* but still-referenced cluster's refcount down to its true value
+(it treats, for example, `refcount=2 reference=1` as a repairable leak).
+`instar check --repair=leaks` does **not** — it only frees clusters that are
+unreferenced (refcount > 0 with no L2 reference), and never lowers a
+*referenced* cluster's refcount. So a refcount-too-high cluster stays flagged
+by `qemu-img check` after `instar --repair=leaks`, but is cleaned by `qemu-img
+-r leaks`.
+
+### instar Behavior
+
+This is intentional. instar's safe (`leaks`) tier is strictly lossless and
+monotonic: freeing an unreferenced cluster cannot lose live data, whereas
+lowering a referenced cluster's refcount is a metadata rewrite that belongs to
+the lossy tier. Over-count correction is therefore deferred to `instar check
+--repair=all`, which recounts every cluster and corrects in both directions
+under the crash-safe `corrupt`-bit ordering. Run `--repair=all` to match (and
+exceed) `qemu-img -r leaks`'s over-count trimming.
+
+Note that the leaks tier reports its own work as *complete* once it has freed
+every genuine leak — a residual over-count is simply outside its remit, not a
+failure, so it is not flagged as `repair-incomplete`; a subsequent read-only
+`instar check` still reports the over-count. The difference is surfaced by the
+differential fuzzer (`scripts/differential-fuzz.py`, the `repair` op), which
+gates its cleanliness-convergence check on the `all` tier precisely because
+the two tools' `leaks` tiers have deliberately different scope.
+
 ## Future Additions
 
 Additional quirks will be documented here as they are discovered during
