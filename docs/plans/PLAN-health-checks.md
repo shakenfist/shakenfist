@@ -33,9 +33,11 @@ the gRPC server bootstrap in `shakenfist/daemons/database/`,
 the Flask app in `shakenfist/external_api/app.py`, and the
 existing `node_daemon_states` writes in `shakenfist/mariadb.py`.
 
-This plan is **partial**. Phase 0 will resolve the open
-questions into a decisions document and the phase table below
-may be re-cut accordingly.
+**Status: complete.** All five phases (0–4) have landed on the
+`health-checks` branch. Phase 0 resolved the open questions into
+the Decisions section below; phases 1–4 implemented them. The
+text below is preserved as the plan of record; see the Decisions
+section and the per-phase plan files for what was built.
 
 When we get to detailed planning, I prefer a separate plan
 file per detailed phase, named with `-phase-NN-descriptive`
@@ -380,7 +382,7 @@ Decisions section above and is no longer provisional.
 | 1. sf-api `/livez` `/readyz` `/healthz` + readiness checker + SIGTERM drain | PLAN-health-checks-phase-01-sf-api.md | Complete |
 | 2. Dependency-aware `grpc.health.v1` on sf-database | PLAN-health-checks-phase-02-grpc-health.md | Complete |
 | 3. `WATCHDOG` liveness wiring (worker + elected daemons) | PLAN-health-checks-phase-03-watchdog.md | Complete |
-| 4. Operator documentation and LB-config examples | PLAN-health-checks-phase-04-operator-docs.md | Not started |
+| 4. Operator documentation and LB-config examples | PLAN-health-checks-phase-04-operator-docs.md | Complete |
 
 Notes on sequencing:
 
@@ -802,6 +804,20 @@ because the following statements will be true:
 
 ### Future work
 
+- **Live CI demonstration of watchdog / lock failover.** Phase
+  4's `ci_drain_check.sh` proves the sf-api *drain* end-to-end on
+  a real node (`/readyz`→503-before-exit, then recovery), and the
+  rolling-upgrade-with-drain procedure is documented. What is
+  *not* exercised live in CI is the phase-3 watchdog path: a
+  genuinely *wedged* (not cleanly stopped) elected `sf-cluster`
+  being SIGABRT-killed by systemd and a standby stealing the
+  lock. That has unit coverage for the pet logic
+  (`test_daemon_watchdog.py`) and the failover chain is
+  documented, but a live test would need to *stall* a daemon
+  (e.g. `SIGSTOP` the cluster leader) and observe the
+  ~120s-worst-case failover — more invasive than the clean
+  drain check. Worth adding as a scheduled/soak CI test rather
+  than per-PR.
 - **Kubernetes-style startup probe.** If first-boot
   bootstrap latencies start tripping operators' LBs that
   expect readiness within seconds, a dedicated startup
