@@ -167,12 +167,15 @@ sudo systemctl stop sf-api
 Systemd sends SIGTERM. On receipt, the `sf-api` worker immediately flips
 `/readyz` to return `503 Service Unavailable`. The load balancer detects this
 on its next health-check probe and stops sending new requests to this node.
-In-flight requests continue to be served for the drain grace period
-(`API_DRAIN_GRACE`, default 25 s), after which gunicorn's graceful-shutdown
-timer (`--graceful-timeout 30 s`) expires and any remaining connections are
-closed. The systemd `TimeoutStopSec` of 70 s caps the entire sequence. For
-most workloads the node is out of rotation and quiet well within 30 s of the
-`systemctl stop`.
+The worker keeps serving for the drain grace period (`API_DRAIN_GRACE`,
+default 25 s) and only then begins gunicorn's graceful shutdown. Note that
+gunicorn's `--graceful-timeout` countdown starts at the SIGTERM (not when the
+worker finally shuts down), so the two windows overlap rather than stack: with
+`--graceful-timeout 55 s` and a 25 s drain, in-flight requests have the
+remaining ~30 s to finish before gunicorn force-closes them. The systemd
+`TimeoutStopSec` of 70 s exceeds the graceful timeout and caps the whole
+sequence. For most workloads the node is out of rotation and quiet well within
+the grace period.
 
 **2. Upgrade the node's virtualenv.**
 

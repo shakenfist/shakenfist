@@ -102,6 +102,12 @@ def resolve_node_uuid():
     populated by _resolve_node_uuid(). We resolve it lazily on the first
     request instead.
     """
+    # Health probes must never touch the database. On a configured node
+    # NODE_UUID is already set so this is a no-op anyway, but short-circuit
+    # explicitly so the "a /readyz burst makes zero DB calls" guarantee holds
+    # unconditionally -- even on a worker whose NODE_UUID is not yet resolved.
+    if _is_health_probe():
+        return
     if config.NODE_UUID:
         return
     node_uuid = Node._load_persisted_uuid()

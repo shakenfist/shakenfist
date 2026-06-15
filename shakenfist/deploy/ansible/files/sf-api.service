@@ -11,11 +11,16 @@ ReloadPropagatedFrom=sf.target
 Type=simple
 User=root
 Group=root
-# On SIGTERM sf-api drains: it flips /readyz to 503, keeps serving for
-# API_DRAIN_GRACE (default 25s) so the load balancer drops this node, then
-# gunicorn finishes in-flight requests within --graceful-timeout (30s).
-# TimeoutStopSec must exceed API_DRAIN_GRACE + graceful_timeout + a margin,
-# or systemd would SIGKILL the worker mid-drain.
+# On SIGTERM sf-api drains: the worker flips /readyz to 503 immediately (so the
+# load balancer drops this node), then keeps serving for API_DRAIN_GRACE (25s)
+# before it calls gunicorn's graceful shutdown. Note the windows OVERLAP, they
+# do not stack: gunicorn's master starts its --graceful-timeout countdown at
+# SIGTERM (t=0), not when the worker finally shuts down, and SIGKILLs workers at
+# that deadline regardless. So in-flight requests get (graceful_timeout -
+# API_DRAIN_GRACE) to finish after the drain. graceful_timeout is therefore set
+# to API_DRAIN_GRACE + an in-flight completion budget (25 + 30 = 55s, below), and
+# TimeoutStopSec must exceed graceful_timeout so systemd does not SIGKILL the
+# master mid-shutdown.
 TimeoutStopSec=70s
 SuccessExitStatus=SIGTERM 143
 RestartPreventExitStatus=SIGTERM
@@ -25,7 +30,7 @@ RuntimeDirectoryPreserve=yes
 EnvironmentFile=/etc/sf/config
 ExecStartPre=/bin/sh -c '/srv/shakenfist/venv/bin/sf-ctl verify-config'
 ExecStartPre=/bin/sh -c 'rm -f /run/sf/gunicorn.pid'
-ExecStart=/bin/sh -c '/srv/shakenfist/venv/bin/gunicorn --workers 5 --bind 0.0.0.0:13000 --log-syslog --log-syslog-prefix sf --timeout 300 --graceful-timeout 30 --name "sf-api" --pid /run/sf/gunicorn.pid --config python:shakenfist.external_api.gunicorn_config --preload shakenfist.external_api.app:app'
+ExecStart=/bin/sh -c '/srv/shakenfist/venv/bin/gunicorn --workers 5 --bind 0.0.0.0:13000 --log-syslog --log-syslog-prefix sf --timeout 300 --graceful-timeout 55 --name "sf-api" --pid /run/sf/gunicorn.pid --config python:shakenfist.external_api.gunicorn_config --preload shakenfist.external_api.app:app'
 
 Restart=on-failure
 RestartSec=5

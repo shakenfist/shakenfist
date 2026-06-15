@@ -43,6 +43,17 @@ class HealthEndpointTestCase(base.ShakenFistTestCase):
         health.last_update = time.time()
         health.draining = False
 
+    def test_health_probe_makes_no_db_call_when_node_uuid_unset(self):
+        # The no-DB guarantee for health probes must hold even on a worker
+        # whose NODE_UUID is not yet resolved: resolve_node_uuid short-circuits
+        # for health-probe paths before its Node.from_db fallback.
+        config.NODE_UUID = None
+        self._set_ready()
+        with mock.patch.object(external_api.Node, 'from_db') as mock_from_db:
+            resp = self.client.get('/readyz')
+            self.assertEqual(200, resp.status_code)
+            mock_from_db.assert_not_called()
+
     def test_livez_always_ok(self):
         # Even with readiness state unset (not ready), liveness is 200.
         resp = self.client.get('/livez')

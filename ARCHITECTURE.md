@@ -152,6 +152,15 @@ must call `pet_watchdog()` explicitly:
 If a daemon's main loop wedges and stops petting, systemd delivers SIGABRT
 after `WatchdogSec` (60s) and restarts the process (`Restart=on-failure`).
 
+The watchdog tracks the **main (supervisor) loop only**. For the
+`WorkerPoolDaemon`-style daemons (net, queues, resources, transfers,
+sidechannel, database) the actual work runs in spawned worker / gRPC threads
+while the main loop dispatches and pets via `idle()`. A wedged *worker thread*
+under a healthy main loop will keep petting, so `WATCHDOG` detects a stuck
+supervisor loop but not a stuck worker. Deeper per-worker liveness (e.g. the
+"is dnsmasq actually serving DHCP" check in issue #730) is explicitly future
+work; do not over-trust `WATCHDOG` as a signal that every worker is healthy.
+
 For the **elected `sf-cluster`** this also acts as the cluster-lock
 failover trigger: when the wedged process is killed, its in-process lease
 refresher thread dies with it. The `cluster/` lease has a 60s lifetime
