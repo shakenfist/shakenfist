@@ -75,7 +75,7 @@ dependencies = [
     "grpcio-tools==1.81.0",               # apache2
     "googleapis-common-protos==1.75.0",   # apache2
 
-    "requests==2.33.1",                   # apache2
+    "requests==2.34.2",                   # apache2
     "requests-toolbelt==1.0.0",           # apache2
     "chardet==7.4.1",                     # lgpl
     "urllib3==2.7.0",                     # mit
