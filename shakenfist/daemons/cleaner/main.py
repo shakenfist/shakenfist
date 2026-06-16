@@ -163,6 +163,9 @@ class Monitor(daemon.Daemon):
                 self.idle(60)
                 continue
 
+            # Pet before the scheduled tasks below; they are not instrumented
+            # with their own pets and run before _maintain_blobs's per-loop pets.
+            self.pet_watchdog()
             try:
                 with util_general.RecordedOperation(
                         'scheduled node operations', None, threshold=10):

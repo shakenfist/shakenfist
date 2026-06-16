@@ -85,27 +85,29 @@ The systemd watchdog now closes that gap for the eight armed daemons
 sidechannel). Each daemon's main loop calls `Daemon.pet_watchdog()`
 from `idle()` and, for long maintenance passes, at explicit points
 inside the pass. If the loop stops petting, systemd delivers SIGABRT
-after `WatchdogSec` (60s). The refresher thread dies with the process,
-and the lease expires normally.
+after `WatchdogSec` (60s for most daemons; 300s for `sf-cluster`, whose
+elected maintenance pass legitimately runs longer than a minute). The
+refresher thread dies with the process, and the lease expires normally.
 
 For the elected `sf-cluster` the effect is the full lock failover
 chain:
 
 1. Wedged elected daemon stops petting the watchdog.
-2. Systemd kills the process after 60s and restarts it
-   (`Restart=on-failure`).
+2. Systemd kills the process after its `WatchdogSec` (300s) and restarts
+   it (`Restart=on-failure`).
 3. The killed process's refresher thread exits; the `cluster/` lease
    (60s lifetime) lapses.
 4. A standby `sf-cluster` steals the lock and takes over.
 
-Worst-case failover is approximately **120s** (60s watchdog timeout + 60s
-lease). No operator action is needed.
+Worst-case failover is approximately **360s** (the 300s `sf-cluster`
+watchdog timeout + 60s lease). No operator action is needed.
 
 A tighter option — having the wedged daemon shed the lease before being
 killed, via a signal handler that calls `ClusterLock.release()` — would
-reduce the worst case to one lease lifetime (60s). That optimisation is
-intentionally deferred: it adds process-signal complexity and the 120s
-window is acceptable for the current maintenance workload.
+reduce the worst case to one lease lifetime (60s) regardless of the
+watchdog timeout. That optimisation is intentionally deferred: it adds
+process-signal complexity and the current window is acceptable for the
+maintenance workload.
 
 ## Stale-lock cleanup on restart
 

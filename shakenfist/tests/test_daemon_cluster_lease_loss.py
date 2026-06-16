@@ -23,6 +23,9 @@ class ClusterCleanupLeaseLossTestCase(base.ShakenFistTestCase):
         if lost:
             m.lock.lost_event.set()
         m.is_elected = True
+        # _cluster_wide_cleanup now pets the watchdog in its preamble; the
+        # __init__ that would set this is bypassed by __new__.
+        m._last_watchdog = 0.0
         return m
 
     @mock.patch('shakenfist.daemons.cluster.main.mariadb')

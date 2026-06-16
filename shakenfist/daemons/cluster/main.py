@@ -78,6 +78,10 @@ class Monitor(daemon.Daemon):
             return
         LOG.info('Running cluster maintenance')
 
+        # Pet before the preamble below (stale-transfer cleanup + history
+        # prune) which runs before the first per-item loop's pet.
+        self.pet_watchdog()
+
         # NOTE: The per-node blob cache is now maintained by each node's
         # cleaner daemon calling observe() on local blobs. The cleaner also
         # handles hard-deleting blobs with no locations. This is more accurate
@@ -469,6 +473,12 @@ class Monitor(daemon.Daemon):
                             schedule.run_pending()
                     except Exception as e:
                         util_exceptions.ignore_exception('cluster', e)
+
+                    # run_pending() above and the cleanup below are unbounded
+                    # maintenance phases; pet between them so a slow scheduled
+                    # task does not eat the whole watchdog budget before the
+                    # cleanup's own per-loop pets start.
+                    self.pet_watchdog()
 
                     try:
                         with util_general.RecordedOperation(

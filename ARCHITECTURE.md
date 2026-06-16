@@ -150,7 +150,9 @@ must call `pet_watchdog()` explicitly:
   inner-loop iterations that may each take several seconds.
 
 If a daemon's main loop wedges and stops petting, systemd delivers SIGABRT
-after `WatchdogSec` (60s) and restarts the process (`Restart=on-failure`).
+after `WatchdogSec` (60s for most daemons; **300s for `sf-cluster`**, whose
+elected maintenance pass legitimately runs longer) and restarts the process
+(`Restart=on-failure`).
 
 The watchdog tracks the **main (supervisor) loop only**. For the
 `WorkerPoolDaemon`-style daemons (net, queues, resources, transfers,
@@ -166,9 +168,9 @@ failover trigger: when the wedged process is killed, its in-process lease
 refresher thread dies with it. The `cluster/` lease has a 60s lifetime
 (refreshed every ~20s). Once it lapses a standby `sf-cluster` node steals
 the lock via `UPDATE ... WHERE expires_at < NOW()` and resumes the
-maintenance loop. Worst-case failover time is approximately 120s (60s
-watchdog timeout + 60s lease expiry). No manual operator intervention is
-needed.
+maintenance loop. Worst-case failover time is approximately 360s (the 300s
+`sf-cluster` watchdog timeout + 60s lease expiry). No manual operator
+intervention is needed.
 
 See [`docs/operator_guide/locks.md`](docs/operator_guide/locks.md) for
 the full lease-expiry and lock-steal protocol.
