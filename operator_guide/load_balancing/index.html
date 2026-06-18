@@ -8775,6 +8775,89 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Health checks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-probe-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The probe endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tune-the-probe-to-beat-the-drain-grace-period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tune the probe to beat the drain grace period
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#route-only-to-sf-api-and-firewall-the-port" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Route only to sf-api, and firewall the port
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tls-and-the-probe-leg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS and the probe leg
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-haproxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: HAProxy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-nginx-open-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: nginx (open source)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-aws-application-load-balancer-alb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: AWS Application Load Balancer (ALB)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -9090,6 +9173,89 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Health checks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-probe-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The probe endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tune-the-probe-to-beat-the-drain-grace-period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tune the probe to beat the drain grace period
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#route-only-to-sf-api-and-firewall-the-port" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Route only to sf-api, and firewall the port
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tls-and-the-probe-leg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS and the probe leg
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-haproxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: HAProxy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-nginx-open-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: nginx (open source)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-aws-application-load-balancer-alb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: AWS Application Load Balancer (ALB)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -9269,11 +9435,185 @@ all, you can skip the load balancer entirely. Point <code>api_url</code> (and th
 <code>http://127.0.0.1:13000</code>, with <strong>no</strong> <code>/api</code> prefix. <code>sf-api</code> serves the API at
 <code>/</code> directly, so the prefix is neither added nor stripped in this mode.</p>
 <h2 id="health-checks">Health checks<a class="headerlink" href="#health-checks" title="Permanent link">&para;</a></h2>
-<p>Active backend health checking -- so the proxy stops sending traffic to a node
-whose <code>sf-api</code> is down -- pairs naturally with the readiness endpoints
-described in the <a href="../../plans/PLAN-health-checks/">health checks plan</a>. Once
-those endpoints land, point your proxy's health probes at them rather than at a
-generic API path.</p>
+<p>Your load balancer should actively health-check each <code>sf-api</code> backend so that
+it stops routing traffic to a worker that is draining or that has lost its
+connection to <code>sf-database</code>. <code>sf-api</code> exposes a dedicated readiness endpoint
+for exactly this purpose.</p>
+<h3 id="the-probe-endpoints">The probe endpoints<a class="headerlink" href="#the-probe-endpoints" title="Permanent link">&para;</a></h3>
+<p><code>sf-api</code> exposes three <strong>unauthenticated</strong> HTTP endpoints on port <code>13000</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Meaning</th>
+<th>Who probes it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /livez</code></td>
+<td>Liveness. Always returns <code>200 ok</code> while the worker process is serving.</td>
+<td>An orchestrator or <code>systemctl</code> -- <strong>not</strong> the load balancer.</td>
+</tr>
+<tr>
+<td><code>GET /readyz</code></td>
+<td>Readiness. Returns <code>200 ready</code> when the worker should receive traffic, or <code>503 not ready</code> when the worker is draining or when <code>sf-database</code> is unreachable.</td>
+<td><strong>The load balancer.</strong></td>
+</tr>
+<tr>
+<td><code>GET /healthz</code></td>
+<td>Alias of <code>/readyz</code>.</td>
+<td>The load balancer (use either).</td>
+</tr>
+</tbody>
+</table>
+<p>Point your load balancer's health probe at <strong><code>/readyz</code></strong> (or, equivalently,
+<code>/healthz</code>). Do not health-check <code>/livez</code> from the load balancer: a draining
+worker still answers <code>/livez</code> with <code>200</code>, so a <code>/livez</code>-based pool would keep
+sending it traffic right up until the process exits.</p>
+<p>The probe is cheap. Each worker evaluates readiness in a background checker
+thread and serves <code>/readyz</code> from a cached flag, so a probe never hits the
+database directly. Frequent probing is therefore fine -- and recommended,
+because of the drain timing described next.</p>
+<h3 id="tune-the-probe-to-beat-the-drain-grace-period">Tune the probe to beat the drain grace period<a class="headerlink" href="#tune-the-probe-to-beat-the-drain-grace-period" title="Permanent link">&para;</a></h3>
+<p>On <code>SIGTERM</code> (a normal stop or restart) the worker flips <code>/readyz</code> to <code>503</code>
+<strong>first</strong>, then keeps serving live requests for <code>API_DRAIN_GRACE</code> seconds
+(default <code>25</code>) before it actually shuts down. This ordering exists so the load
+balancer has a window in which to notice the <code>503</code> and drain the node before
+any request is dropped.</p>
+<p>For that to work, your probe must detect the <code>503</code> <strong>comfortably inside</strong> that
+~25 second window. The relevant figure is <code>interval x unhealthy-threshold</code>: if
+it approaches or exceeds 25 s, the worker will exit before the load balancer
+marks it unhealthy, and in-flight requests will fail.</p>
+<p>A safe, conservative starting point is a <strong>5 second interval with a 2-failure
+threshold</strong>: the load balancer sees the <code>503</code> within ~10 s, well inside the
+25 s grace. The cheap, cached probe makes this frequency painless.</p>
+<h3 id="route-only-to-sf-api-and-firewall-the-port">Route only to sf-api, and firewall the port<a class="headerlink" href="#route-only-to-sf-api-and-firewall-the-port" title="Permanent link">&para;</a></h3>
+<p>The load balancer pool contains <strong>only <code>sf-api</code> backends</strong> on <code>:13000</code>.
+<code>sf-database</code> is a separate, internal service; it is health-checked separately
+by your monitoring with <code>grpc-health-probe</code>, not by this load balancer -- see
+<a href="../database/#monitoring-sf-database-with-grpc-health-probe">Monitoring sf-database with grpc-health-probe</a>.
+Do not put <code>sf-database</code> in the API pool.</p>
+<p>The health endpoints are unauthenticated, like the rest of the <code>:13000</code>
+surface. Firewall port <code>13000</code> so it is reachable only from the load balancer
+subnet -- this is the same perimeter posture the API already requires.</p>
+<h3 id="tls-and-the-probe-leg">TLS and the probe leg<a class="headerlink" href="#tls-and-the-probe-leg" title="Permanent link">&para;</a></h3>
+<p>The load balancer terminates the edge (public) certificate. The leg from the
+load balancer back to <code>sf-api:13000</code> is plain HTTP, or you may re-encrypt to a
+backend CA -- that is your choice (see the proxy-to-backend note under
+<a href="#example-configurations">Example configurations</a>). The health probe rides
+that same backend leg, so configure the probe with whichever scheme (HTTP or
+HTTPS) you use for the backend traffic itself.</p>
+<h3 id="example-haproxy">Example: HAProxy<a class="headerlink" href="#example-haproxy" title="Permanent link">&para;</a></h3>
+<p>HAProxy has first-class active HTTP health checks. Use <code>option httpchk</code> to
+define the probe and <code>http-check expect status 200</code> to require a <code>200</code>, then
+enable per-server checking with <code>check inter 5s fall 2 rise 2</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>backend sfapi
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    option httpchk GET /readyz
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    http-check expect status 200
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    # check inter 5s fall 2 rise 2: probe every 5s, mark down after 2
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    # consecutive failures (~10s, well inside the 25s drain grace),
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    # restore after 2 successes.
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    server sfapi1 10.0.0.1:13000 check inter 5s fall 2 rise 2
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    server sfapi2 10.0.0.2:13000 check inter 5s fall 2 rise 2
+</code></pre></div>
+<p>A <code>503 not ready</code> from a draining or database-isolated worker fails the
+<code>expect status 200</code> check, and HAProxy drains it after two probes.</p>
+<h3 id="example-nginx-open-source">Example: nginx (open source)<a class="headerlink" href="#example-nginx-open-source" title="Permanent link">&para;</a></h3>
+<p>Open-source (FOSS) nginx does <strong>not</strong> have active health checks. The
+<code>health_check</code> directive exists only in NGINX Plus, the commercial product.
+FOSS nginx can only do <strong>passive</strong> health checking: it marks a backend down
+after real client requests to it fail, and it cannot actively poll <code>/readyz</code>
+on its own.</p>
+<p>The passive approach uses <code>max_fails</code> and <code>fail_timeout</code> on the <code>upstream</code>
+servers, plus <code>proxy_next_upstream</code> so a <code>503</code> is retried against another
+backend rather than returned to the client:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">upstream</span><span class="w"> </span><span class="s">sfapi</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="c1"># Passive health checking: after 2 failed requests, take the backend</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="c1"># out of rotation for 10s, then probe it again with live traffic.</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="kn">server</span><span class="w"> </span><span class="n">10.0.0.1</span><span class="p">:</span><span class="mi">13000</span><span class="w"> </span><span class="s">max_fails=2</span><span class="w"> </span><span class="s">fail_timeout=10s</span><span class="p">;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="kn">server</span><span class="w"> </span><span class="n">10.0.0.2</span><span class="p">:</span><span class="mi">13000</span><span class="w"> </span><span class="s">max_fails=2</span><span class="w"> </span><span class="s">fail_timeout=10s</span><span class="p">;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">}</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="k">location</span><span class="w"> </span><span class="s">/api/</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://sfapi/</span><span class="p">;</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="c1"># Treat a 503 (and connection errors/timeouts) as &quot;try the next</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="c1"># backend&quot; instead of returning it to the client.</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span><span class="kn">proxy_next_upstream</span><span class="w"> </span><span class="s">error</span><span class="w"> </span><span class="s">timeout</span><span class="w"> </span><span class="s">http_503</span><span class="p">;</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="p">}</span>
+</code></pre></div>
+<p>Be aware of the limitation: because this is passive, FOSS nginx only learns a
+worker is draining when a real request happens to hit it and fail. It will not
+pull a node out of rotation purely because <code>/readyz</code> returns <code>503</code>.</p>
+<p>If you need true active <code>/readyz</code> polling with nginx, you must either run
+<strong>NGINX Plus</strong> (which has the <code>health_check</code> directive), or run an <strong>external
+prober</strong> -- a small sidecar that polls each worker's <code>/readyz</code> and pulls a node
+out (for example by editing the upstream config and reloading, or via your
+deployment's API) when it sees a <code>503</code>.</p>
+<h3 id="example-aws-application-load-balancer-alb">Example: AWS Application Load Balancer (ALB)<a class="headerlink" href="#example-aws-application-load-balancer-alb" title="Permanent link">&para;</a></h3>
+<p>A cloud load balancer makes this straightforward, because active HTTP health
+checks are built in. Create a target group for the <code>sf-api</code> workers and
+configure its health check as:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Protocol</td>
+<td><code>HTTP</code></td>
+</tr>
+<tr>
+<td>Path</td>
+<td><code>/readyz</code></td>
+</tr>
+<tr>
+<td>Success codes</td>
+<td><code>200</code></td>
+</tr>
+<tr>
+<td>Healthy threshold</td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td>Unhealthy threshold</td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td>Interval</td>
+<td><code>5</code> seconds</td>
+</tr>
+<tr>
+<td>Timeout</td>
+<td><code>2</code> seconds</td>
+</tr>
+</tbody>
+</table>
+<p>The HTTPS listener terminates TLS with an ACM certificate and forwards to the
+targets on port <code>13000</code>. The unhealthy threshold of <code>2</code> at a <code>5</code> second
+interval means the ALB drains a worker ~10 s after it starts returning <code>503</code>,
+well inside the 25 s drain grace.</p>
+<p>In Terraform:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kr">resource</span><span class="w"> </span><span class="nc">&quot;aws_lb_target_group&quot;</span><span class="w"> </span><span class="nv">&quot;sfapi&quot;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;sfapi&quot;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="na">port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">13000</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;HTTP&quot;</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="na">vpc_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nb">health_check</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="na">protocol</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;HTTP&quot;</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">    </span><span class="na">path</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/readyz&quot;</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">    </span><span class="na">matcher</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;200&quot;</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">    </span><span class="na">interval</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="m">5</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">    </span><span class="na">timeout</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">    </span><span class="na">healthy_threshold</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">    </span><span class="na">unhealthy_threshold</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="p">}</span>
+</code></pre></div>
 
 
 

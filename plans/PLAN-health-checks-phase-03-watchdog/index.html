@@ -10,10 +10,8 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/operator_guide/upgrades/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-health-checks-phase-03-watchdog/">
       
-      
-        <link rel="prev" href="../threads/">
       
       
       
@@ -25,7 +23,7 @@
     
     
       
-        <title>Upgrades - Shaken Fist</title>
+        <title>Phase 3: WATCHDOG liveness wiring (worker + elected daemons) - Shaken Fist</title>
       
     
     
@@ -99,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#upgrades" class="md-skip">
+        <a href="#phase-3-watchdog-liveness-wiring-worker-elected-daemons" class="md-skip">
           Skip to content
         </a>
       
@@ -135,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Upgrades
+              Phase 3: WATCHDOG liveness wiring (worker + elected daemons)
             
           </span>
         </div>
@@ -8303,7 +8301,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -8331,7 +8329,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -8359,7 +8357,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -8391,20 +8389,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
         
           
           <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
@@ -8425,7 +8421,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
@@ -8443,7 +8439,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation/" class="md-nav__link">
+      <a href="../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -8471,7 +8467,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../artifacts/" class="md-nav__link">
+      <a href="../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -8499,7 +8495,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication/" class="md-nav__link">
+      <a href="../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -8527,7 +8523,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../database/" class="md-nav__link">
+      <a href="../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -8555,7 +8551,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../events/" class="md-nav__link">
+      <a href="../../operator_guide/events/" class="md-nav__link">
         
   
   
@@ -8583,7 +8579,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../exception_tracking/" class="md-nav__link">
+      <a href="../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -8611,7 +8607,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../load_balancing/" class="md-nav__link">
+      <a href="../../operator_guide/load_balancing/" class="md-nav__link">
         
   
   
@@ -8639,7 +8635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../locks/" class="md-nav__link">
+      <a href="../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -8667,7 +8663,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../networking/overview/" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -8695,7 +8691,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../power_states/" class="md-nav__link">
+      <a href="../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -8723,7 +8719,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../python_versions/" class="md-nav__link">
+      <a href="../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -8751,7 +8747,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../threads/" class="md-nav__link">
+      <a href="../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -8776,37 +8772,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Upgrades
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -8822,143 +8791,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#upgrade-process" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upgrade process
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mariadb-schema-migrations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MariaDB schema migrations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="MariaDB schema migrations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#manual-schema-verification" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Manual schema verification
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#known-migration-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Known migration notes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Known migration notes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cluster_operation_targets-v1-to-v2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        cluster_operation_targets v1 to v2
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#database-service-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Database service architecture
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rolling-upgrade-with-drain" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rolling upgrade with drain
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Rolling upgrade with drain">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#before-you-start-schema-migrations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before you start — schema migrations
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#per-node-procedure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Per-node procedure
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -8998,10 +8830,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#upgrade-process" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Upgrade process
+        Context
       
     </span>
   </a>
@@ -9009,108 +8841,79 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mariadb-schema-migrations" class="md-nav__link">
+  <a href="#key-references-in-the-existing-code" class="md-nav__link">
     <span class="md-ellipsis">
       
-        MariaDB schema migrations
+        Key references in the existing code
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="MariaDB schema migrations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#manual-schema-verification" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Manual schema verification
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#known-migration-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Known migration notes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Known migration notes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cluster_operation_targets-v1-to-v2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        cluster_operation_targets v1 to v2
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#database-service-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Database service architecture
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#rolling-upgrade-with-drain" class="md-nav__link">
+  <a href="#inherited-decisions-phase-0-d4-oq11" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rolling upgrade with drain
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Rolling upgrade with drain">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#before-you-start-schema-migrations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before you start — schema migrations
+        Inherited decisions (phase 0 D4 / OQ11)
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#per-node-procedure" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#step-level-guidance" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Per-node procedure
+        Step-level guidance
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#step-ordering-and-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step ordering and dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-checklist-for-the-management-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review checklist for the management session
+      
+    </span>
+  </a>
   
 </li>
       
@@ -9135,178 +8938,203 @@
   
 
 
-<h1 id="upgrades">Upgrades<a class="headerlink" href="#upgrades" title="Permanent link">&para;</a></h1>
-<p>Shaken Fist supports online upgrades natively -- when an object is read from
-MariaDB with an older version number, the object is upgraded silently to the
-newest version. If all nodes in your cluster are running a version of Shaken
-Fist which supports this newest version, the upgraded object is then written
-back to MariaDB. If not all nodes in the cluster support the new version, the
-new version is simply used in memory by the node which did the upgrade. This
-means it is safe to perform a rollout across a cluster without downtime,
-although you might see small transient failures such as single API requests
-failing as processes restart.</p>
-<p>You should note however that "all nodes" includes nodes in non-running states
-such as ERROR and MISSING. The only state which is excluded from the check is
-DELETED. Therefore, in order for online upgrades to work correctly, it is
-important that you delete nodes in an ERROR or MISSING state that you are
-confident will not return to the cluster. This is because nodes can return
-from ERROR or MISSING at the end of planned maintenance, and might be running
-and older version of Shaken Fist upon their return than other members of the
-cluster.</p>
-<h2 id="upgrade-process">Upgrade process<a class="headerlink" href="#upgrade-process" title="Permanent link">&para;</a></h2>
-<p>First off, upgrade the python packages in each node's virtualenv manually. This
-is explicitly a non-goal of our installer tooling as we believe different
-deployments will have different strategies for performing this step. Naively,
-a good first approach is simple to run this command on each node:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo /srv/shakenfist/venv/bin/pip install --upgrade shakenfist
-</code></pre></div>
-<p>Which will pull in all the relevant other python packages it requires.</p>
-<p>Then simply re-run <code>getsf</code> as you did when you first installed and the cluster
-will upgrade.</p>
-<h2 id="mariadb-schema-migrations">MariaDB schema migrations<a class="headerlink" href="#mariadb-schema-migrations" title="Permanent link">&para;</a></h2>
-<p>Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The
-MariaDB schema is versioned; migrations must be applied by an operator (or
-operator automation) before starting <code>sf-database</code>.</p>
-<p>Each MariaDB table has a version number tracked in the <code>schema_versions</code> table.
-When the cluster is deployed or upgraded, the <code>sf-ctl ensure-mariadb-schema</code>
-command must be run on a node with direct database access to:</p>
-<ol>
-<li>Perform a compatibility check against the server requirements (MariaDB
-   not MySQL, version &gt;= 10.6.0, InnoDB engine, utf8mb4 charset and
-   collation) — the command refuses to proceed if any check fails</li>
-<li>Create any missing tables</li>
-<li>Apply any pending schema migrations to bring tables up to the current
-   version</li>
-</ol>
-<p><code>sf-database</code> also performs the same compatibility check at startup and
-will refuse to start if the server is incompatible. Importantly, if
-<code>sf-ctl ensure-mariadb-schema</code> has not been run after an SF upgrade that
-includes schema changes, <code>sf-database</code> will refuse to start with a clear
-schema-version mismatch error that names the command to run. This replaces
-the old behaviour where migrations ran silently inside the daemon on
-startup.</p>
-<p>See <a href="../database/#mariadb-compatibility-requirements">MariaDB compatibility requirements</a>
-in the database reference for the full list of server requirements.</p>
-<h3 id="manual-schema-verification">Manual schema verification<a class="headerlink" href="#manual-schema-verification" title="Permanent link">&para;</a></h3>
-<p>You can manually check or apply schema migrations by running on a node
-with direct database access:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
-</code></pre></div>
-<p>This will output the current version of each table and whether any
-migrations were applied. For example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Table &#39;object_states&#39; is up to date (version 1)
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>MariaDB schema verified.
-</code></pre></div>
-<p>Or if a migration was needed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Migrated table &#39;object_states&#39; from version 1 to 2
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>MariaDB schema verified.
-</code></pre></div>
-<h3 id="known-migration-notes">Known migration notes<a class="headerlink" href="#known-migration-notes" title="Permanent link">&para;</a></h3>
-<h4 id="cluster_operation_targets-v1-to-v2">cluster_operation_targets v1 to v2<a class="headerlink" href="#cluster_operation_targets-v1-to-v2" title="Permanent link">&para;</a></h4>
-<p>The v1 schema declared <code>operation_uuid</code> as a column-level <code>UNIQUE</code>,
-which prevented multi-target operations (e.g. the hot-plug interface
-op, which targets an instance, a network, and an interface) from
-recording more than one target row. The v2 migration replaces that
-constraint with a composite <code>UNIQUE(operation_uuid, target_object_type,
-target_uuid)</code> and adds a non-unique index <code>idx_cot_operation</code> for
-single-column lookups.</p>
-<p>Operations already in flight at the moment the migration runs will
-have only their first declared target row in the table; their
-remaining target rows were silently dropped under v1 and cannot be
-reconstructed. The practical effect is that
-<code>Network.is_okay()</code>'s pending-operation gate may transiently miss
-one in-flight op per affected network during the upgrade window,
-and the network maintainer can race the queue worker once -- which
-manifests as the "Recreating not okay network on hypervisor" event
-firing in syslog for that network. The recreate is idempotent with
-the queued operation's own <code>create_on_hypervisor</code>, so there is no
-functional breakage; only the audit event.</p>
-<p>Operations enqueued after the migration completes record all of
-their targets correctly, so the gate behaves as designed once the
-in-flight v1 ops drain.</p>
-<h3 id="database-service-architecture">Database service architecture<a class="headerlink" href="#database-service-architecture" title="Permanent link">&para;</a></h3>
-<p>Only the database node has direct access to MariaDB credentials. All other
-nodes access MariaDB data through a gRPC database microservice that runs on
-the database node. This means:</p>
+<h1 id="phase-3-watchdog-liveness-wiring-worker-elected-daemons">Phase 3: WATCHDOG liveness wiring (worker + elected daemons)<a class="headerlink" href="#phase-3-watchdog-liveness-wiring-worker-elected-daemons" title="Permanent link">&para;</a></h1>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>This is phase 3 of <a href="../PLAN-health-checks/"><code>PLAN-health-checks.md</code></a>.
+It gives the non-sf-api daemons a <strong>liveness</strong> signal — systemd's
+<code>WATCHDOG</code> — so a daemon whose main loop wedges (deadlock, stuck
+I/O, infinite loop) is killed and restarted instead of sitting
+there alive-but-doing-nothing. This is also what <strong>closes the
+cluster-lock proof-of-life gap</strong> (open question 11): a wedged
+elected <code>sf-cluster</code> stops petting → systemd kills it → its
+in-process lease refresher dies → the <code>cluster_locks</code> lease
+expires → a standby steals the lock. No change to <code>locks.py</code>.</p>
+<p>The units already run <code>Type=notify</code> and already send <code>READY=1</code>
+(<code>send_systemd_ready</code>) / <code>STOPPING=1</code>; this phase adds the
+periodic <code>WATCHDOG=1</code> keepalive and the <code>WatchdogSec=</code> that arms
+it. The mechanism is the phase-0 D4 decision; this plan turns it
+into code.</p>
+<p><strong>Scope — which daemons (from the phase-0 D1 classification):</strong>
+the eight non-trivial base-class daemons get <code>WatchdogSec</code>:
+<code>database</code>, <code>cleaner</code>, <code>cluster</code>, <code>network</code>, <code>queues</code>,
+<code>resources</code>, <code>transfers</code>, <code>sidechannel</code>. The four others do
+<strong>not</strong>: <code>sentinel-first</code>/<code>sentinel-last</code> are trivial ordering
+units that sleep via bare <code>time.sleep(15)</code> (not <code>idle()</code>), and
+<code>nodelock</code>/<code>privexec</code> are event-driven socket-accept loops (not
+<code>idle()</code>); none of them go through the seam that emits
+<code>WATCHDOG=1</code>, so arming <code>WatchdogSec</code> on them would make systemd
+kill a perfectly healthy daemon. (sf-api is out of scope — it is
+gunicorn, not a base-class daemon, and has its own worker-timeout
+liveness.)</p>
+<p><strong>The crux (phase-0 D4):</strong> emitting <code>WATCHDOG=1</code> from the base
+<code>Daemon.idle()</code> covers each daemon's <em>sleep</em>, but a daemon must
+also pet during any <em>work phase</em> that can itself exceed
+<code>WatchdogSec</code>. Two daemons have such phases — <code>cleaner</code>
+(<code>_maintain_blobs</code> globbing a large blob dir) and <code>cluster</code>
+(<code>_cluster_wide_cleanup</code>, per-blob/artifact/node) — and
+<code>cluster</code>'s elected loop does not use <code>idle()</code> at all. Those need
+explicit pets. Getting this wrong means systemd kills a busy-
+but-healthy daemon, so the ordering below lands the pets
+<strong>before</strong> arming <code>WatchdogSec</code>.</p>
+<h2 id="key-references-in-the-existing-code">Key references in the existing code<a class="headerlink" href="#key-references-in-the-existing-code" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Schema migrations only need to run on the database node</li>
-<li>Other nodes do not require MariaDB credentials</li>
-<li><code>sf-ctl ensure-mariadb-schema</code> must be run (or re-run after an upgrade)
-  before starting <code>sf-database</code></li>
-<li>The database service must be running before other daemons can access
-  state data</li>
+<li><code>shakenfist/daemons/daemon.py</code>:</li>
+<li><code>_send_systemd_notification()</code> and <code>send_systemd_ready</code> /
+    <code>send_systemd_stopping</code> / <code>send_systemd_status</code> (around
+    <code>:354-373</code>) — the seam; add <code>send_systemd_watchdog()</code> here.
+    All are gated on <code>NOTIFY_SOCKET</code>, so they no-op outside
+    systemd (tests, dev).</li>
+<li><code>Daemon.__init__</code> (around <code>:172-190</code>) — initialise a
+    <code>self._last_watchdog</code> timestamp here.</li>
+<li><code>Daemon.idle(seconds)</code> (around <code>:322-327</code>) — already an
+    internal <code>for</code> loop ticking every 0.2s and calling
+    <code>check_daemon_state()</code>; the rate-limited pet goes inside
+    this tick so even a long <code>idle(60)</code> pets every ~10s.</li>
+<li><code>shakenfist/daemons/cluster/main.py</code>:</li>
+<li>the election-wait loop using <code>self.idle(5)</code> (<code>:67</code>) — covered
+    by the base pet.</li>
+<li>the <strong>elected</strong> loop <code>while self.is_elected and not
+    os.path.exists(self.abort_path):</code> (<code>:440</code>) whose only sleep
+    is <code>self.lock.lost_event.wait(5)</code> (<code>:468</code>) — <strong>not</strong> <code>idle()</code>,
+    needs an explicit pet each iteration.</li>
+<li><code>_cluster_wide_cleanup</code> and its inner per-blob / per-artifact
+    / per-node loops (heavy; a single pass on a large cluster can
+    exceed <code>WatchdogSec</code>) — need pets inside the inner loops.</li>
+<li><code>shakenfist/daemons/cleaner/main.py</code>: <code>_run_inner</code> (<code>:140</code>),
+  <code>self.idle(60)</code> (<code>:188</code>), and <code>_maintain_blobs</code> (the
+  blob-directory glob that can run long on a large node) — needs
+  a pet inside its iteration.</li>
+<li>The other workers — <code>network</code> (<code>idle(5)</code>, <code>:79</code>), <code>queues</code>
+  (<code>idle(0.2)</code>, <code>:141</code>), <code>resources</code> (<code>idle(1)</code>, <code>:513</code>),
+  <code>transfers</code> (<code>idle(0.2)</code>, <code>:132</code>), <code>sidechannel</code> (<code>idle(1)</code>,
+  <code>:994</code>), <code>database</code> (<code>idle(10)</code>) — all sleep via <code>idle()</code> each
+  iteration with short per-iteration work, so the base pet
+  suffices; audit confirms no single iteration's <em>work</em> phase
+  approaches <code>WatchdogSec</code>.</li>
+<li><code>shakenfist/deploy/ansible/files/sf.service</code>: shared
+  <code>[Service]</code> section (<code>:45-68</code>), <code>Type=notify</code> (<code>:46</code>),
+  <code>TimeoutStopSec=30s</code> (<code>:49</code>), <code>RestartPreventExitStatus=SIGTERM</code>
+  (<code>:51</code>), <code>Restart=on-failure</code> / <code>RestartSec=5</code> (<code>:62-63</code>). The
+  <code>{{ item }}</code> daemon name is available for a conditional
+  <code>WatchdogSec</code>.</li>
+<li><code>shakenfist/locks.py</code> (the refresher, ~20s <code>REFRESH_INTERVAL</code>)
+  and <code>shakenfist/constants.py:21</code>
+  (<code>CLUSTER_LOCK_LEASE_SECONDS = 60</code>) — the failover-time
+  arithmetic for the docs.</li>
 </ul>
-<h2 id="rolling-upgrade-with-drain">Rolling upgrade with drain<a class="headerlink" href="#rolling-upgrade-with-drain" title="Permanent link">&para;</a></h2>
-<p>The procedure below achieves zero-downtime upgrades for the <code>sf-api</code> tier
-by exploiting the readiness drain built into every <code>sf-api</code> worker. It
-assumes you have a load balancer probing <code>/readyz</code> on port <code>13000</code> as
-described in <a href="../load_balancing/">Load Balancing</a>. Without an LB watching
-<code>/readyz</code>, stopping <code>sf-api</code> is a hard cut rather than a graceful drain.</p>
-<h3 id="before-you-start-schema-migrations">Before you start — schema migrations<a class="headerlink" href="#before-you-start-schema-migrations" title="Permanent link">&para;</a></h3>
-<p>If the release you are installing includes schema changes, you must apply
-them <strong>before</strong> rolling any nodes to the new build. Run the following on a
-node with direct MariaDB access (i.e. <code>MARIADB_HOST</code> configured — typically
-a database-tier node):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>/srv/shakenfist/venv/bin/sf-ctl<span class="w"> </span>ensure-mariadb-schema
-</code></pre></div>
-<p><code>sf-database</code> refuses to start if the schema version does not match what
-its build expects, so applying migrations first lets you upgrade the
-database tier without downtime before touching the API or hypervisor nodes.
-See <a href="#mariadb-schema-migrations">MariaDB schema migrations</a> above and the
-<a href="../database/#administrative-commands">database reference</a> for full details.</p>
-<h3 id="per-node-procedure">Per-node procedure<a class="headerlink" href="#per-node-procedure" title="Permanent link">&para;</a></h3>
-<p>Upgrade <strong>one node at a time</strong>. Confirm that each node is healthy before
-moving to the next.</p>
-<p><strong>1. Stop <code>sf-api</code> on the node.</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>sf-api
-</code></pre></div>
-<p>Systemd sends SIGTERM. On receipt, the <code>sf-api</code> worker immediately flips
-<code>/readyz</code> to return <code>503 Service Unavailable</code>. The load balancer detects this
-on its next health-check probe and stops sending new requests to this node.
-The worker keeps serving for the drain grace period (<code>API_DRAIN_GRACE</code>,
-default 25 s) and only then begins gunicorn's graceful shutdown. Note that
-gunicorn's <code>--graceful-timeout</code> countdown starts at the SIGTERM (not when the
-worker finally shuts down), so the two windows overlap rather than stack: with
-<code>--graceful-timeout 55 s</code> and a 25 s drain, in-flight requests have the
-remaining ~30 s to finish before gunicorn force-closes them. The systemd
-<code>TimeoutStopSec</code> of 70 s exceeds the graceful timeout and caps the whole
-sequence. For most workloads the node is out of rotation and quiet well within
-the grace period.</p>
-<p><strong>2. Upgrade the node's virtualenv.</strong></p>
-<p>Follow the manual venv-upgrade procedure described in
-<a href="#upgrade-process">Upgrade process</a> above, for example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sudo<span class="w"> </span>/srv/shakenfist/venv/bin/pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>shakenfist
-</code></pre></div>
-<p><strong>3. Restart SF services on the node.</strong></p>
-<p>For hypervisor nodes restart all services:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-queues<span class="w"> </span>sf-net<span class="w"> </span>sf-resources<span class="w"> </span>sf-cleaner
-</code></pre></div>
-<p>For a database-tier node restart the database service first:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-database
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-queues<span class="w"> </span>sf-net<span class="w"> </span>sf-resources<span class="w"> </span>sf-cleaner
-</code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>If the <code>sf-cluster</code> elected leader is on the node you are rolling, its
-cluster lock lease will expire (within 60 s of the daemon stopping).
-A standby node will then win the election and take over cluster
-maintenance automatically. See <a href="../locks/">Locks</a> for the lease and
-failover details.</p>
-</div>
-<p><strong>4. Confirm the node is healthy before moving on.</strong></p>
-<p>Poll <code>/readyz</code> until it returns <code>200 OK</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://&lt;node-ip&gt;:13000/readyz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;ready&quot;</span>
-</code></pre></div>
-<p><code>/readyz</code> returns <code>200</code> once the worker has successfully contacted
-<code>sf-database</code>. The load balancer will return the node to rotation on its
-next successful probe.</p>
-<p>You can also probe the <code>sf-database</code> gRPC health endpoint directly:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>grpc-health-probe<span class="w"> </span>-addr<span class="o">=</span>&lt;sf-database-host&gt;:13005
-</code></pre></div>
-<p><code>SERVING</code> means <code>sf-database</code> can reach MariaDB and the node is ready for
-the next node upgrade. See the
-<a href="../database/#monitoring-sf-database-with-grpc-health-probe">database reference</a>
-for details.</p>
+<h2 id="inherited-decisions-phase-0-d4-oq11">Inherited decisions (phase 0 D4 / OQ11)<a class="headerlink" href="#inherited-decisions-phase-0-d4-oq11" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>WatchdogSec = 60s</code>; pet cadence ~10s (a comfortable 6×
+  margin; well under the <code>WatchdogSec/2</code> convention).</li>
+<li>A watchdog miss is a SIGABRT, which is <strong>not</strong> <code>SIGTERM</code>, so
+  <code>RestartPreventExitStatus=SIGTERM</code> does not block the restart;
+  <code>Restart=on-failure</code> brings it back.</li>
+<li>Lock proof-of-life is closed by the kill→refresher-death→
+  lease-expiry chain; <strong>no <code>locks.py</code> change</strong>. Worst-case
+  elected-daemon failover ≈ <code>WatchdogSec</code> + lease ≈ 60 + 60 =
+  <strong>~120s</strong>.</li>
+<li>The belt-and-suspenders option (refresher sheds the lease on a
+  stale heartbeat without waiting for the kill) is <strong>deferred</strong>
+  to its own future micro-plan with hysteresis tests; not in
+  this phase.</li>
+</ul>
+<h2 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h2>
+<p>Sequential, dependent; isolation <code>none</code>; one commit each. The
+pets (3a, 3b) land <strong>before</strong> <code>WatchdogSec</code> is armed (3c).</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3a — watchdog primitive + idle() coverage</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>In <code>shakenfist/daemons/daemon.py</code>: add <code>send_systemd_watchdog()</code> next to the other notify helpers (<code>:354-373</code>) as <code>_send_systemd_notification(b'WATCHDOG=1')</code>. Add a module constant <code>WATCHDOG_PET_INTERVAL = 10</code>. Initialise <code>self._last_watchdog = 0.0</code> in <code>Daemon.__init__</code> (<code>:172</code>). Add a <code>Daemon.pet_watchdog(self)</code> method that calls <code>send_systemd_watchdog()</code> only when <code>time.time() - self._last_watchdog &gt;= WATCHDOG_PET_INTERVAL</code>, updating <code>_last_watchdog</code> when it does (rate-limit so a 0.2s-tick <code>idle</code> does not sendto() every tick). Call <code>self.pet_watchdog()</code> inside <code>Daemon.idle()</code>'s internal 0.2s loop (<code>:322-327</code>) so the <em>sleep</em> portion of every base-class daemon pets. Unit test: with <code>_send_systemd_notification</code> mocked and <code>time.time</code> controlled/advanced, <code>pet_watchdog()</code> emits once per ~10s window regardless of call frequency; <code>idle()</code> over a simulated long sleep pets multiple times, not every tick; outside systemd (<code>NOTIFY_SOCKET</code> unset) it no-ops. Commit subject: <code>daemon: emit systemd WATCHDOG keepalive from idle().</code></td>
+</tr>
+<tr>
+<td>3b — pet the long work phases</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Add explicit <code>self.pet_watchdog()</code> calls where a single iteration's <em>work</em> (not sleep) can exceed <code>WatchdogSec</code>, so those daemons can be armed safely. (a) <code>cluster/main.py</code>: in the <strong>elected</strong> loop (<code>:440</code>, which sleeps on <code>lost_event.wait(5)</code> not <code>idle()</code>) pet once per iteration; and inside the per-blob / per-artifact / per-node inner loops of <code>_cluster_wide_cleanup</code> (read the function to place pets at the top of each long inner loop body). (b) <code>cleaner/main.py</code>: inside <code>_maintain_blobs</code>'s blob-directory iteration. <strong>Audit</strong> the other six workers (<code>network</code>, <code>queues</code>, <code>resources</code>, <code>transfers</code>, <code>sidechannel</code>, <code>database</code>): confirm each single-iteration work phase is comfortably under <code>WatchdogSec</code> (they sleep via <code>idle()</code> each loop, so the base pet covers them); if any one genuinely can approach 60s of uninterrupted work, add a top-of-<code>_run_inner</code> pet and note it. Where practical, add a focused test asserting the pet is reached on the elected/cleanup path (e.g. patch <code>pet_watchdog</code> and drive one iteration). Commit subject: <code>cluster, cleaner: pet watchdog during long maintenance passes.</code></td>
+</tr>
+<tr>
+<td>3c — arm WatchdogSec for the eight</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>In <code>shakenfist/deploy/ansible/files/sf.service</code> <code>[Service]</code> section, add a Jinja-conditional <code>WatchdogSec=60s</code> that applies to every daemon <strong>except</strong> the four that do not pet: <code>{% if item not in ["sentinel-first", "sentinel-last", "privexec", "nodelock"] %}WatchdogSec=60s{% endif %}</code>. Add a comment explaining that these four are excluded because they do not run the <code>idle()</code>-based loop that emits <code>WATCHDOG=1</code>, and that arming the watchdog without the keepalive would kill a healthy daemon. Confirm <code>Type=notify</code> is already set (it is) and leave <code>TimeoutStopSec</code>, <code>Restart=on-failure</code>, <code>RestartPreventExitStatus</code> unchanged. Do <strong>not</strong> touch <code>sf-api.service</code>. Commit subject: <code>deploy: arm systemd WatchdogSec for non-trivial daemons.</code></td>
+</tr>
+<tr>
+<td>3d — docs + lock-failover note</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Document the new liveness mechanism. <code>ARCHITECTURE.md</code>: a short note that the non-sf-api daemons emit a systemd <code>WATCHDOG</code> keepalive from their main loop and are restarted by systemd if it stops (with the per-daemon scope), and that for the elected <code>sf-cluster</code> this is what provides lock failover — a wedged leader is killed, its lease expires (<code>CLUSTER_LOCK_LEASE_SECONDS</code>), and a standby takes over (worst case ~120s). <code>AGENTS.md</code>: point at <code>pet_watchdog</code>/<code>idle()</code> in <code>daemon.py</code> and note any loop that does long work without <code>idle()</code> must pet. <code>docs/operator_guide/</code> (the locks page if one exists, else a brief note near the daemon/troubleshooting docs): the operator-facing version — what <code>WatchdogSec</code> does, which daemons have it, and that a crash-looping daemon in <code>systemctl status</code> may indicate a genuinely wedged loop. Mention the belt-and-suspenders lease-shedding is intentionally future work. Keep concise. Commit subject: <code>docs: systemd watchdog liveness and lock failover.</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="step-ordering-and-dependencies">Step ordering and dependencies<a class="headerlink" href="#step-ordering-and-dependencies" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>3a first</strong> — defines <code>pet_watchdog()</code> and covers sleep.</li>
+<li><strong>3b</strong> depends on 3a (calls <code>pet_watchdog</code>) and must land
+  <strong>before</strong> 3c — arming <code>WatchdogSec</code> before <code>cluster</code>'s
+  elected loop and the long maintenance passes pet would let
+  systemd kill a busy leader.</li>
+<li><strong>3c</strong> arms the watchdog only after 3a+3b guarantee every
+  armed daemon pets within <code>WatchdogSec</code> in every code path.</li>
+<li><strong>3d</strong> last (documents the assembled behaviour).</li>
+</ul>
+<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The eight non-trivial daemons emit <code>WATCHDOG=1</code> at least every
+  ~10s in every code path — idle sleep, the cluster elected
+  loop, and the long <code>cleaner</code>/<code>cluster</code> maintenance passes —
+  and <code>sf.service</code> arms <code>WatchdogSec=60s</code> for exactly those
+  eight (sentinels, <code>nodelock</code>, <code>privexec</code> excluded).</li>
+<li>No armed daemon can be killed by the watchdog while doing
+  legitimate work: every code path that can run longer than
+  ~10s reaches a pet.</li>
+<li>A wedged elected <code>sf-cluster</code> is killed by systemd and a
+  standby acquires the cluster lock (the OQ11 failover), with
+  <strong>no change to <code>locks.py</code></strong>.</li>
+<li>The pet is rate-limited (no sendto() per 0.2s tick) and
+  no-ops cleanly outside systemd.</li>
+<li><code>pre-commit run --all-files</code> passes; the pet/rate-limit logic
+  has unit coverage. (End-to-end watchdog-kill→restart→lease-
+  steal is a systemd-level behaviour; verify it in cluster_ci /
+  manually, or fold it into phase 4's rolling-upgrade test —
+  unit tests cover the pet logic, not systemd's reaction.)</li>
+</ul>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing, back-brief the operator: confirm the eight-vs-
+four daemon scope, the <code>WatchdogSec=60s</code> / ~10s pet values, the
+ordering (pets before arming), and the decision to keep the
+lock-failover purely watchdog-driven (deferring the lease-
+shedding belt-and-suspenders).</p>
+<h2 id="review-checklist-for-the-management-session">Review checklist for the management session<a class="headerlink" href="#review-checklist-for-the-management-session" title="Permanent link">&para;</a></h2>
+<p>Standard checklist from the master plan, plus:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>WatchdogSec</code> is armed <strong>only</strong> for daemons that provably
+      pet; sentinels/<code>nodelock</code>/<code>privexec</code> are excluded.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Every armed daemon pets within <code>WatchdogSec</code> on every
+      path: idle sleep (base), cluster elected loop, and the
+      <code>cleaner</code>/<code>cluster</code> long maintenance iterators.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The pet is rate-limited and gated on <code>NOTIFY_SOCKET</code>
+      (no behavioural change in tests / dev).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>locks.py</code> is untouched; the lease-shedding option remains
+      deferred.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>sf-api.service</code> and <code>sf.service</code>'s other settings are
+      unchanged apart from the conditional <code>WatchdogSec</code>.</li>
+</ul>
 
 
 
@@ -9327,7 +9155,7 @@ for details.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20operator_guide/upgrades.md&body=%2A%2ASource%20file%3A%2A%2A%20%60operator_guide/upgrades.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/operator_guide/upgrades/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-health-checks-phase-03-watchdog.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-health-checks-phase-03-watchdog.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-health-checks-phase-03-watchdog/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

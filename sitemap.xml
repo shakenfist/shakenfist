@@ -1961,6 +1961,26 @@
          <lastmod>2026-06-18</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-00-decisions/</loc>
+         <lastmod>2026-06-18</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-01-sf-api/</loc>
+         <lastmod>2026-06-18</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-02-grpc-health/</loc>
+         <lastmod>2026-06-18</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-03-watchdog/</loc>
+         <lastmod>2026-06-18</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-04-operator-docs/</loc>
+         <lastmod>2026-06-18</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/plans/PLAN-health-checks/</loc>
          <lastmod>2026-06-18</lastmod>
     </url>

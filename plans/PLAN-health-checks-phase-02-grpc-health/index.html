@@ -10,10 +10,8 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/operator_guide/upgrades/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-health-checks-phase-02-grpc-health/">
       
-      
-        <link rel="prev" href="../threads/">
       
       
       
@@ -25,7 +23,7 @@
     
     
       
-        <title>Upgrades - Shaken Fist</title>
+        <title>Phase 2: dependency-aware grpc.health.v1 on sf-database - Shaken Fist</title>
       
     
     
@@ -99,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#upgrades" class="md-skip">
+        <a href="#phase-2-dependency-aware-grpchealthv1-on-sf-database" class="md-skip">
           Skip to content
         </a>
       
@@ -135,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Upgrades
+              Phase 2: dependency-aware grpc.health.v1 on sf-database
             
           </span>
         </div>
@@ -8303,7 +8301,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -8331,7 +8329,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -8359,7 +8357,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -8391,20 +8389,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
         
           
           <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
@@ -8425,7 +8421,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
@@ -8443,7 +8439,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation/" class="md-nav__link">
+      <a href="../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -8471,7 +8467,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../artifacts/" class="md-nav__link">
+      <a href="../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -8499,7 +8495,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication/" class="md-nav__link">
+      <a href="../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -8527,7 +8523,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../database/" class="md-nav__link">
+      <a href="../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -8555,7 +8551,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../events/" class="md-nav__link">
+      <a href="../../operator_guide/events/" class="md-nav__link">
         
   
   
@@ -8583,7 +8579,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../exception_tracking/" class="md-nav__link">
+      <a href="../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -8611,7 +8607,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../load_balancing/" class="md-nav__link">
+      <a href="../../operator_guide/load_balancing/" class="md-nav__link">
         
   
   
@@ -8639,7 +8635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../locks/" class="md-nav__link">
+      <a href="../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -8667,7 +8663,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../networking/overview/" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -8695,7 +8691,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../power_states/" class="md-nav__link">
+      <a href="../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -8723,7 +8719,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../python_versions/" class="md-nav__link">
+      <a href="../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -8751,7 +8747,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../threads/" class="md-nav__link">
+      <a href="../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -8776,37 +8772,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Upgrades
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -8822,143 +8791,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#upgrade-process" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upgrade process
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mariadb-schema-migrations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MariaDB schema migrations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="MariaDB schema migrations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#manual-schema-verification" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Manual schema verification
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#known-migration-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Known migration notes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Known migration notes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cluster_operation_targets-v1-to-v2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        cluster_operation_targets v1 to v2
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#database-service-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Database service architecture
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rolling-upgrade-with-drain" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rolling upgrade with drain
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Rolling upgrade with drain">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#before-you-start-schema-migrations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before you start — schema migrations
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#per-node-procedure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Per-node procedure
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -8998,10 +8830,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#upgrade-process" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Upgrade process
+        Context
       
     </span>
   </a>
@@ -9009,108 +8841,79 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mariadb-schema-migrations" class="md-nav__link">
+  <a href="#key-references-in-the-existing-code" class="md-nav__link">
     <span class="md-ellipsis">
       
-        MariaDB schema migrations
+        Key references in the existing code
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="MariaDB schema migrations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#manual-schema-verification" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Manual schema verification
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#known-migration-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Known migration notes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Known migration notes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cluster_operation_targets-v1-to-v2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        cluster_operation_targets v1 to v2
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#database-service-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Database service architecture
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#rolling-upgrade-with-drain" class="md-nav__link">
+  <a href="#inherited-phase-decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rolling upgrade with drain
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Rolling upgrade with drain">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#before-you-start-schema-migrations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before you start — schema migrations
+        Inherited / phase decisions
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#per-node-procedure" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#step-level-guidance" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Per-node procedure
+        Step-level guidance
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#step-ordering-and-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step ordering and dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-checklist-for-the-management-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review checklist for the management session
+      
+    </span>
+  </a>
   
 </li>
       
@@ -9135,178 +8938,186 @@
   
 
 
-<h1 id="upgrades">Upgrades<a class="headerlink" href="#upgrades" title="Permanent link">&para;</a></h1>
-<p>Shaken Fist supports online upgrades natively -- when an object is read from
-MariaDB with an older version number, the object is upgraded silently to the
-newest version. If all nodes in your cluster are running a version of Shaken
-Fist which supports this newest version, the upgraded object is then written
-back to MariaDB. If not all nodes in the cluster support the new version, the
-new version is simply used in memory by the node which did the upgrade. This
-means it is safe to perform a rollout across a cluster without downtime,
-although you might see small transient failures such as single API requests
-failing as processes restart.</p>
-<p>You should note however that "all nodes" includes nodes in non-running states
-such as ERROR and MISSING. The only state which is excluded from the check is
-DELETED. Therefore, in order for online upgrades to work correctly, it is
-important that you delete nodes in an ERROR or MISSING state that you are
-confident will not return to the cluster. This is because nodes can return
-from ERROR or MISSING at the end of planned maintenance, and might be running
-and older version of Shaken Fist upon their return than other members of the
-cluster.</p>
-<h2 id="upgrade-process">Upgrade process<a class="headerlink" href="#upgrade-process" title="Permanent link">&para;</a></h2>
-<p>First off, upgrade the python packages in each node's virtualenv manually. This
-is explicitly a non-goal of our installer tooling as we believe different
-deployments will have different strategies for performing this step. Naively,
-a good first approach is simple to run this command on each node:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo /srv/shakenfist/venv/bin/pip install --upgrade shakenfist
-</code></pre></div>
-<p>Which will pull in all the relevant other python packages it requires.</p>
-<p>Then simply re-run <code>getsf</code> as you did when you first installed and the cluster
-will upgrade.</p>
-<h2 id="mariadb-schema-migrations">MariaDB schema migrations<a class="headerlink" href="#mariadb-schema-migrations" title="Permanent link">&para;</a></h2>
-<p>Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The
-MariaDB schema is versioned; migrations must be applied by an operator (or
-operator automation) before starting <code>sf-database</code>.</p>
-<p>Each MariaDB table has a version number tracked in the <code>schema_versions</code> table.
-When the cluster is deployed or upgraded, the <code>sf-ctl ensure-mariadb-schema</code>
-command must be run on a node with direct database access to:</p>
-<ol>
-<li>Perform a compatibility check against the server requirements (MariaDB
-   not MySQL, version &gt;= 10.6.0, InnoDB engine, utf8mb4 charset and
-   collation) — the command refuses to proceed if any check fails</li>
-<li>Create any missing tables</li>
-<li>Apply any pending schema migrations to bring tables up to the current
-   version</li>
-</ol>
-<p><code>sf-database</code> also performs the same compatibility check at startup and
-will refuse to start if the server is incompatible. Importantly, if
-<code>sf-ctl ensure-mariadb-schema</code> has not been run after an SF upgrade that
-includes schema changes, <code>sf-database</code> will refuse to start with a clear
-schema-version mismatch error that names the command to run. This replaces
-the old behaviour where migrations ran silently inside the daemon on
-startup.</p>
-<p>See <a href="../database/#mariadb-compatibility-requirements">MariaDB compatibility requirements</a>
-in the database reference for the full list of server requirements.</p>
-<h3 id="manual-schema-verification">Manual schema verification<a class="headerlink" href="#manual-schema-verification" title="Permanent link">&para;</a></h3>
-<p>You can manually check or apply schema migrations by running on a node
-with direct database access:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
-</code></pre></div>
-<p>This will output the current version of each table and whether any
-migrations were applied. For example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Table &#39;object_states&#39; is up to date (version 1)
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>MariaDB schema verified.
-</code></pre></div>
-<p>Or if a migration was needed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Migrated table &#39;object_states&#39; from version 1 to 2
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>MariaDB schema verified.
-</code></pre></div>
-<h3 id="known-migration-notes">Known migration notes<a class="headerlink" href="#known-migration-notes" title="Permanent link">&para;</a></h3>
-<h4 id="cluster_operation_targets-v1-to-v2">cluster_operation_targets v1 to v2<a class="headerlink" href="#cluster_operation_targets-v1-to-v2" title="Permanent link">&para;</a></h4>
-<p>The v1 schema declared <code>operation_uuid</code> as a column-level <code>UNIQUE</code>,
-which prevented multi-target operations (e.g. the hot-plug interface
-op, which targets an instance, a network, and an interface) from
-recording more than one target row. The v2 migration replaces that
-constraint with a composite <code>UNIQUE(operation_uuid, target_object_type,
-target_uuid)</code> and adds a non-unique index <code>idx_cot_operation</code> for
-single-column lookups.</p>
-<p>Operations already in flight at the moment the migration runs will
-have only their first declared target row in the table; their
-remaining target rows were silently dropped under v1 and cannot be
-reconstructed. The practical effect is that
-<code>Network.is_okay()</code>'s pending-operation gate may transiently miss
-one in-flight op per affected network during the upgrade window,
-and the network maintainer can race the queue worker once -- which
-manifests as the "Recreating not okay network on hypervisor" event
-firing in syslog for that network. The recreate is idempotent with
-the queued operation's own <code>create_on_hypervisor</code>, so there is no
-functional breakage; only the audit event.</p>
-<p>Operations enqueued after the migration completes record all of
-their targets correctly, so the gate behaves as designed once the
-in-flight v1 ops drain.</p>
-<h3 id="database-service-architecture">Database service architecture<a class="headerlink" href="#database-service-architecture" title="Permanent link">&para;</a></h3>
-<p>Only the database node has direct access to MariaDB credentials. All other
-nodes access MariaDB data through a gRPC database microservice that runs on
-the database node. This means:</p>
+<h1 id="phase-2-dependency-aware-grpchealthv1-on-sf-database">Phase 2: dependency-aware grpc.health.v1 on sf-database<a class="headerlink" href="#phase-2-dependency-aware-grpchealthv1-on-sf-database" title="Permanent link">&para;</a></h1>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>This is phase 2 of <a href="../PLAN-health-checks/"><code>PLAN-health-checks.md</code></a>.
+sf-database is the only daemon that runs a <code>grpc.server()</code>, and
+it already serves the standard <code>grpc.health.v1.Health</code> service
+(added by <code>PLAN-byo-mariadb.md</code> phase 3). Today that servicer
+is <strong>static</strong>: <code>set('', SERVING)</code> once at startup
+(<code>daemons/database/main.py:5232</code>) and <code>set('', NOT_SERVING)</code>
+once before the graceful stop (<code>:5259</code>). Between those it never
+changes, so a Check says SERVING even if MariaDB has become
+unreachable underneath.</p>
+<p>This phase makes the health status <strong>dependency-aware</strong>: while
+sf-database is running, its <code>grpc.health.v1</code> status reflects
+whether it can actually reach MariaDB. The payoff is automatic
+and already wired from phase 1 — sf-api's readiness checker
+calls this exact <code>Check('')</code>, so the moment sf-database reports
+NOT_SERVING, sf-api's <code>/readyz</code> goes 503 (after its own K=3
+debounce) and the LB drains the node. <code>grpc-health-probe</code> and
+any operator monitoring see the same signal.</p>
+<p>Two hard constraints carry over from byo-mariadb and <strong>must not
+be violated</strong>:</p>
 <ul>
-<li>Schema migrations only need to run on the database node</li>
-<li>Other nodes do not require MariaDB credentials</li>
-<li><code>sf-ctl ensure-mariadb-schema</code> must be run (or re-run after an upgrade)
-  before starting <code>sf-database</code></li>
-<li>The database service must be running before other daemons can access
-  state data</li>
+<li><strong>Do not reintroduce <code>Watch</code>.</strong> The synchronous <code>HealthServicer</code>
+  deadlocks against the server's single event-dispatch thread on
+  Watch streams. Only unary <code>Check</code> is supported. The comment at
+  <code>daemons/database/main.py:5218-5229</code> is the canonical
+  explanation.</li>
+<li><strong>Do not add <code>healthCheckConfig</code> to the client channel.</strong>
+  <code>shakenfist/util/grpc_channel.py</code> deliberately omits it; client
+  failover is by keepalive + connectivity state, not the health
+  protocol. This phase is <strong>server-side only</strong> — it changes what
+  value the servicer holds, not how clients consume it.</li>
 </ul>
-<h2 id="rolling-upgrade-with-drain">Rolling upgrade with drain<a class="headerlink" href="#rolling-upgrade-with-drain" title="Permanent link">&para;</a></h2>
-<p>The procedure below achieves zero-downtime upgrades for the <code>sf-api</code> tier
-by exploiting the readiness drain built into every <code>sf-api</code> worker. It
-assumes you have a load balancer probing <code>/readyz</code> on port <code>13000</code> as
-described in <a href="../load_balancing/">Load Balancing</a>. Without an LB watching
-<code>/readyz</code>, stopping <code>sf-api</code> is a hard cut rather than a graceful drain.</p>
-<h3 id="before-you-start-schema-migrations">Before you start — schema migrations<a class="headerlink" href="#before-you-start-schema-migrations" title="Permanent link">&para;</a></h3>
-<p>If the release you are installing includes schema changes, you must apply
-them <strong>before</strong> rolling any nodes to the new build. Run the following on a
-node with direct MariaDB access (i.e. <code>MARIADB_HOST</code> configured — typically
-a database-tier node):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>/srv/shakenfist/venv/bin/sf-ctl<span class="w"> </span>ensure-mariadb-schema
-</code></pre></div>
-<p><code>sf-database</code> refuses to start if the schema version does not match what
-its build expects, so applying migrations first lets you upgrade the
-database tier without downtime before touching the API or hypervisor nodes.
-See <a href="#mariadb-schema-migrations">MariaDB schema migrations</a> above and the
-<a href="../database/#administrative-commands">database reference</a> for full details.</p>
-<h3 id="per-node-procedure">Per-node procedure<a class="headerlink" href="#per-node-procedure" title="Permanent link">&para;</a></h3>
-<p>Upgrade <strong>one node at a time</strong>. Confirm that each node is healthy before
-moving to the next.</p>
-<p><strong>1. Stop <code>sf-api</code> on the node.</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>sf-api
-</code></pre></div>
-<p>Systemd sends SIGTERM. On receipt, the <code>sf-api</code> worker immediately flips
-<code>/readyz</code> to return <code>503 Service Unavailable</code>. The load balancer detects this
-on its next health-check probe and stops sending new requests to this node.
-The worker keeps serving for the drain grace period (<code>API_DRAIN_GRACE</code>,
-default 25 s) and only then begins gunicorn's graceful shutdown. Note that
-gunicorn's <code>--graceful-timeout</code> countdown starts at the SIGTERM (not when the
-worker finally shuts down), so the two windows overlap rather than stack: with
-<code>--graceful-timeout 55 s</code> and a 25 s drain, in-flight requests have the
-remaining ~30 s to finish before gunicorn force-closes them. The systemd
-<code>TimeoutStopSec</code> of 70 s exceeds the graceful timeout and caps the whole
-sequence. For most workloads the node is out of rotation and quiet well within
-the grace period.</p>
-<p><strong>2. Upgrade the node's virtualenv.</strong></p>
-<p>Follow the manual venv-upgrade procedure described in
-<a href="#upgrade-process">Upgrade process</a> above, for example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sudo<span class="w"> </span>/srv/shakenfist/venv/bin/pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>shakenfist
-</code></pre></div>
-<p><strong>3. Restart SF services on the node.</strong></p>
-<p>For hypervisor nodes restart all services:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-queues<span class="w"> </span>sf-net<span class="w"> </span>sf-resources<span class="w"> </span>sf-cleaner
-</code></pre></div>
-<p>For a database-tier node restart the database service first:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-database
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-queues<span class="w"> </span>sf-net<span class="w"> </span>sf-resources<span class="w"> </span>sf-cleaner
-</code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>If the <code>sf-cluster</code> elected leader is on the node you are rolling, its
-cluster lock lease will expire (within 60 s of the daemon stopping).
-A standby node will then win the election and take over cluster
-maintenance automatically. See <a href="../locks/">Locks</a> for the lease and
-failover details.</p>
-</div>
-<p><strong>4. Confirm the node is healthy before moving on.</strong></p>
-<p>Poll <code>/readyz</code> until it returns <code>200 OK</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://&lt;node-ip&gt;:13000/readyz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;ready&quot;</span>
-</code></pre></div>
-<p><code>/readyz</code> returns <code>200</code> once the worker has successfully contacted
-<code>sf-database</code>. The load balancer will return the node to rotation on its
-next successful probe.</p>
-<p>You can also probe the <code>sf-database</code> gRPC health endpoint directly:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>grpc-health-probe<span class="w"> </span>-addr<span class="o">=</span>&lt;sf-database-host&gt;:13005
-</code></pre></div>
-<p><code>SERVING</code> means <code>sf-database</code> can reach MariaDB and the node is ready for
-the next node upgrade. See the
-<a href="../database/#monitoring-sf-database-with-grpc-health-probe">database reference</a>
-for details.</p>
+<p>This phase touches no schema and no client code.</p>
+<h2 id="key-references-in-the-existing-code">Key references in the existing code<a class="headerlink" href="#key-references-in-the-existing-code" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>shakenfist/daemons/database/main.py</code>:</li>
+<li>the health servicer registration and startup <code>SERVING</code>
+    (<code>:5230-5232</code>), and the shutdown <code>NOT_SERVING</code> flip
+    (<code>:5255-5259</code>) — both stay.</li>
+<li><code>Monitor(daemon.WorkerPoolDaemon)</code> (<code>:4911</code>), its
+    <code>__init__(self, id)</code> (<code>:4919</code>), and the construction site
+    <code>m = Monitor('database')</code> (<code>:5244</code>) then <code>m.run()</code> (<code>:5253</code>).</li>
+<li><code>Monitor._run_inner()</code> (<code>:5116-5136</code>): the daemon's main
+    loop. It already ticks every 10s via <code>self.idle(10)</code>
+    (<code>:5132</code>) and refreshes the events-row gauge every ~60s
+    (<code>:5125-5131</code>) — the natural seam for a per-tick MariaDB
+    reachability check.</li>
+<li>the startup verify that already proves MariaDB is reachable
+    <em>and</em> schema-current before the server starts
+    (<code>:5161-5172</code>): <code>verify_mariadb_compat</code> then
+    <code>verify_schema_versions</code>, each <code>raise SystemExit(1)</code> on
+    failure (refuse-to-start).</li>
+<li><code>shakenfist/mariadb.py</code>: <code>_get_engine()</code> (<code>:502</code>) — note the
+  comment at <code>:516</code> explaining <code>pool_pre_ping</code> was removed to
+  avoid a per-checkout <code>SELECT 1</code>; a <em>periodic explicit</em> ping is
+  a different thing and is fine. <code>verify_mariadb_compat</code>
+  (<code>:663</code>) and <code>verify_schema_versions</code> (<code>:730</code>) are the place a
+  <code>check_reachable()</code> helper sits alongside.</li>
+<li><code>shakenfist/tests/test_database_health.py</code>: the existing
+  in-process smoke test of the servicer wiring — extend it.</li>
+<li><code>shakenfist/util/grpc_channel.py</code>: leave untouched (the
+  no-<code>healthCheckConfig</code> constraint).</li>
+</ul>
+<h2 id="inherited-phase-decisions">Inherited / phase decisions<a class="headerlink" href="#inherited-phase-decisions" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Runtime health = MariaDB reachability.</strong> Schema currency is
+  a <em>startup</em> precondition (refuse-to-start, <code>:5161-5172</code>), not
+  a runtime-varying signal, so the running daemon's health
+  reflects only "can I reach MariaDB right now." Schema is not
+  re-checked in the loop.</li>
+<li><strong>Server reflects reachability directly; the client
+  debounces.</strong> A single failed ping flips the status to
+  NOT_SERVING; a single success flips it back. Phase 0 D2
+  deliberately put the hysteresis on the <em>client</em> (sf-api's
+  checker, K=3 over 5s polls), so the server should be an honest
+  direct reflection rather than adding a second layer of
+  debounce. The ping uses a short timeout so a slow query cannot
+  stall the 10s tick. End-to-end latency for "MariaDB down →
+  sf-api 503" is ~one server tick (≤10s) + the client's K=3
+  (≤15s) ≈ 25s, which is fine for a total-MariaDB-outage signal.</li>
+<li><strong>Startup stays SERVING.</strong> The startup verify already proved
+  MariaDB reachable, so the existing <code>set('', SERVING)</code> at
+  <code>:5232</code> is correct and avoids a spurious initial NOT_SERVING
+  window. The loop only flips it <em>away</em> if MariaDB later becomes
+  unreachable.</li>
+<li><strong>Schema-stale state — decided: keep refuse-to-start, do not
+  build the waiting-state now.</strong> The master plan flagged (future
+  work) whether sf-database should, instead of refusing to
+  start on a schema mismatch, come up and report a distinct
+  "schema out of date, awaiting upgrade" NOT_SERVING reason.
+  Decision for this phase: <strong>no.</strong> Reversing byo-mariadb's
+  deliberate refuse-to-start is out of scope, and the
+  up-but-NOT_SERVING trap (clients still route to it via
+  round_robin, since the channel is not health-aware) is real.
+  Runtime health covers reachability only. The waiting-state and
+  the cheaper <code>sd_notify STATUS=</code> observability middle-ground
+  remain recorded in the master plan's future work for a later,
+  deliberate decision.</li>
+</ul>
+<h2 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h2>
+<p>Sequential, dependent steps; isolation <code>none</code>; one commit each.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2a — <code>mariadb.check_reachable()</code> helper</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Add <code>check_reachable() -&gt; bool</code> to <code>shakenfist/mariadb.py</code>, near <code>verify_mariadb_compat</code> (<code>:663</code>)/<code>verify_schema_versions</code> (<code>:730</code>). It opens a short-lived connection on <code>_get_engine()</code> and runs <code>SELECT 1</code> with a short timeout (a few seconds — use a SQLAlchemy <code>connect_args</code>/statement timeout consistent with how the codebase sets timeouts, or a <code>concurrent</code>-free <code>engine.connect()</code> guarded so it cannot hang the caller indefinitely; check how <code>verify_*</code> connect to match the idiom). Returns <code>True</code> on success, <code>False</code> on <strong>any</strong> exception (never raises — it is a health probe). Do not log on every call; debug-log failures. Unit test (mock <code>_get_engine</code>/connection): returns True when <code>SELECT 1</code> succeeds, False when the connection/execute raises. Commit subject: <code>mariadb: add check_reachable health helper.</code></td>
+</tr>
+<tr>
+<td>2b — drive the health servicer from the daemon loop</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Give the <code>Monitor</code> the health servicer and update it from <code>_run_inner</code>. (a) Add a <code>health_servicer=None</code> parameter to <code>Monitor.__init__</code> (<code>:4919</code>) and store <code>self.health_servicer = health_servicer</code>. (b) At the construction site (<code>:5244</code>), pass the already-created <code>health_servicer</code> (<code>:5230</code>) into <code>Monitor('database', health_servicer)</code>. (c) In <code>_run_inner</code> (<code>:5116</code>), on each tick (alongside the existing gauge refresh, before/after <code>self.idle(10)</code>), call <code>mariadb.check_reachable()</code> and, if <code>self.health_servicer</code> is set, <code>self.health_servicer.set('', health_pb2.HealthCheckResponse.SERVING if reachable else health_pb2.HealthCheckResponse.NOT_SERVING)</code>. Only log on a <em>transition</em> (SERVING↔NOT_SERVING), not every tick. Keep the startup <code>set('', SERVING)</code> (<code>:5232</code>) and the shutdown <code>set('', NOT_SERVING)</code> (<code>:5259</code>) exactly as they are — the loop sits between them. Do NOT touch the gRPC server options, the servicer registration, or add any Watch usage. Unit-test the transition logic by driving the reachability→set mapping with <code>check_reachable</code> mocked and a fake/mock servicer, asserting SERVING when reachable, NOT_SERVING when not, and that a transition is logged once. Commit subject: <code>database: drive grpc health from MariaDB reachability.</code></td>
+</tr>
+<tr>
+<td>2c — extend health test + docs</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>(a) Extend <code>shakenfist/tests/test_database_health.py</code> to cover the dependency-aware behaviour at the unit level (the servicer reports NOT_SERVING after a simulated unreachable poll and SERVING after a reachable one) — reuse the in-process channel smoke-test style already there. (b) <code>ARCHITECTURE.md</code>: update the sf-database <code>grpc.health.v1</code> paragraph (around the existing health discussion) to say the status is now dependency-aware — SERVING iff MariaDB is reachable, flipped by the daemon's 10s loop — and that schema currency remains a refuse-to-start precondition, not a runtime health signal. (c) <code>docs/operator_guide/database.md</code>: add a short note that <code>grpc-health-probe</code> against sf-database reflects live MariaDB reachability, and that sf-api's <code>/readyz</code> consumes it. Keep docs concise; full LB rolling-upgrade docs are phase 4. Commit subject: <code>tests, docs: dependency-aware sf-database health.</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="step-ordering-and-dependencies">Step ordering and dependencies<a class="headerlink" href="#step-ordering-and-dependencies" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>2a first</strong> — 2b calls <code>check_reachable()</code>.</li>
+<li><strong>2b</strong> depends on 2a.</li>
+<li><strong>2c</strong> depends on 2b (documents and tests the assembled
+  behaviour).</li>
+</ul>
+<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<ul>
+<li>While sf-database runs, its <code>grpc.health.v1</code> <code>Check('')</code>
+  returns SERVING when MariaDB is reachable and NOT_SERVING when
+  it is not, updated on the daemon's existing ~10s loop.</li>
+<li>The status is SERVING at startup (MariaDB already verified)
+  and NOT_SERVING before the graceful stop, exactly as today —
+  this phase only adds the in-between dynamics.</li>
+<li>No <code>Watch</code> is used anywhere, and <code>shakenfist/util/grpc_channel.py</code>
+  is unchanged (no <code>healthCheckConfig</code>).</li>
+<li>A MariaDB-reachability flip propagates to sf-api <code>/readyz</code>
+  (via the phase-1 checker) without any client change.</li>
+<li>The reachability ping cannot hang the daemon loop (short
+  timeout) and adds negligible load (one <code>SELECT 1</code> per tick).</li>
+<li><code>pre-commit run --all-files</code> passes; the new logic has unit
+  coverage.</li>
+</ul>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing, back-brief the operator: confirm the
+runtime-health-equals-reachability model, the
+direct-flip-server / debounce-client split (no server-side
+hysteresis), and the decision to keep refuse-to-start for
+schema mismatch (deferring the schema-stale waiting-state).</p>
+<h2 id="review-checklist-for-the-management-session">Review checklist for the management session<a class="headerlink" href="#review-checklist-for-the-management-session" title="Permanent link">&para;</a></h2>
+<p>Standard checklist from the master plan, plus:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No <code>Watch</code> added; the servicer remains Check-only.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>shakenfist/util/grpc_channel.py</code> untouched.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The startup <code>SERVING</code> and shutdown <code>NOT_SERVING</code> flips are
+      preserved; the loop only changes the in-between value.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>check_reachable()</code> never raises and cannot block the tick
+      (short timeout verified).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Health status is logged only on transition, not every
+      10s tick.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Schema is not re-verified in the loop (it stays a
+      startup-only refuse-to-start precondition).</li>
+</ul>
 
 
 
@@ -9327,7 +9138,7 @@ for details.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20operator_guide/upgrades.md&body=%2A%2ASource%20file%3A%2A%2A%20%60operator_guide/upgrades.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/operator_guide/upgrades/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-health-checks-phase-02-grpc-health.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-health-checks-phase-02-grpc-health.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-health-checks-phase-02-grpc-health/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

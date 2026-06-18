@@ -8992,7 +8992,7 @@
 <ol>
 <li><strong><a href="PLAN-network-facade/">Network operations facade</a></strong> — complete. Landed via the <code>network-facade</code> branch.</li>
 <li><strong>Retire etcd</strong> — <em>(absorbed into <a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a> phase 0; the standalone <code>PLAN-remove-etcd.md</code> has been removed.)</em> Inspection confirmed the etcd data drain is complete (the <code>DATA_MIGRATIONS</code> dict is empty), but the supporting machinery — <code>shakenfist/etcd.py</code>, <code>etcd3gw</code>, the etcd proto stubs, the drain test files, <code>is_etcd_master</code>, the migration-era <code>sf-ctl</code> aliases — is still in tree. Phase 0 of the BYO-MariaDB plan deletes it as a single sweep. The <code>etcd_master</code> ansible group name rename stays with <code>PLAN-remove-primary</code> phase 7 as a deploy-scope concern.</li>
-<li><strong><a href="PLAN-health-checks/">Health checks, readiness, and graceful drain</a></strong> — a precondition for the BYO load-balancer story in remove-primary being operationally honest. The plan is partial: a phase 0 decisions pass resolves the open questions before the implementation phases are re-cut.</li>
+<li><strong><a href="PLAN-health-checks/">Health checks, readiness, and graceful drain</a></strong> — <strong>complete.</strong> A precondition for the BYO load-balancer story in remove-primary being operationally honest. Delivered sf-api <code>/livez</code>/<code>/readyz</code>/<code>/healthz</code> with SIGTERM drain, dependency-aware <code>grpc.health.v1</code> on sf-database, systemd <code>WATCHDOG</code> liveness on the worker/elected daemons (which also closes the cluster-lock proof-of-life gap), and operator LB/upgrade docs. Landed on the <code>health-checks</code> branch.</li>
 <li><strong><a href="PLAN-remove-primary/">Remove the primary node</a></strong> — the BYO-infrastructure scope reduction. Phase 7 finishes the deployer-level <code>etcd_master</code> → <code>database_node</code> rename, by which point the drain code itself is long gone. Naturally followed by a wipe-and-redeploy of Mikal's production cluster against the new shape.</li>
 <li><strong><a href="PLAN-byo-mariadb/">BYO MariaDB and <code>sf-database</code> as a tier</a></strong> — lifted out of remove-primary because it grew into its own master plan. Removes MariaDB-server install from the deployer entirely, reshapes <code>sf-database</code> into a deployer-chosen tier of equal stateless instances reached via client-side gRPC load balancing (not leader election), and carves schema/migration execution out of daemon startup into an operator-run <code>sf-ctl ensure-mariadb-schema</code> command. Can land in parallel with remove-primary's remaining phases; its phase 1 also performs the scope-shift edit to remove-primary itself.</li>
 </ol>
@@ -9145,32 +9145,32 @@
 <tr>
 <td><a href="PLAN-health-checks/">Health checks</a></td>
 <td>Phase 0: Research and decisions</td>
-<td>Not started</td>
-<td>Resolve per-daemon vs per-node endpoints, HTTP vs gRPC, readiness dependency model, drain grace, auth, mTLS interaction</td>
+<td>Complete</td>
+<td>Routing principle (LB probes only sf-api) collapsed OQ1/2/4/9; decided readiness cache, drain-grace/timeout reconciliation, WATCHDOG liveness + lock proof-of-life, auth, daemon classification</td>
 </tr>
 <tr>
 <td><a href="PLAN-health-checks/">Health checks</a></td>
 <td>Phase 1: sf-api endpoints and drain</td>
-<td>Not started</td>
-<td><code>/livez</code>, <code>/readyz</code>, <code>/healthz</code> on sf-api with SIGTERM-driven drain semantics</td>
+<td>Complete</td>
+<td><code>/livez</code>, <code>/readyz</code>, <code>/healthz</code> on sf-api; per-worker readiness checker; SIGTERM-driven drain (<code>API_DRAIN_GRACE</code>, reconciled timeouts)</td>
 </tr>
 <tr>
 <td><a href="PLAN-health-checks/">Health checks</a></td>
-<td>Phase 2: gRPC health protocol</td>
-<td>Not started</td>
-<td><code>grpc.health.v1.Health</code> on sf-database with leader / standby readiness semantics</td>
+<td>Phase 2: gRPC health on sf-database</td>
+<td>Complete</td>
+<td><code>grpc.health.v1.Health</code> <code>Check</code> now tracks live MariaDB reachability via the daemon's ~10s loop; schema currency stays a startup refuse-to-start precondition; no Watch, no client <code>healthCheckConfig</code></td>
 </tr>
 <tr>
 <td><a href="PLAN-health-checks/">Health checks</a></td>
-<td>Phase 3: Remaining daemons</td>
-<td>Not started</td>
-<td>Extend the pattern to every other SF daemon</td>
+<td>Phase 3: WATCHDOG liveness wiring</td>
+<td>Complete</td>
+<td>Wired systemd <code>WATCHDOG</code> into the eight non-trivial daemons (<code>WatchdogSec=60s</code>, pet in <code>idle()</code> + cluster/cleaner heavy iterators); closes lock proof-of-life via watchdog-kill → lease-expiry failover</td>
 </tr>
 <tr>
 <td><a href="PLAN-health-checks/">Health checks</a></td>
 <td>Phase 4: Operator documentation</td>
-<td>Not started</td>
-<td>LB-config examples and the rolling-upgrade-with-drain procedure</td>
+<td>Complete</td>
+<td><code>load_balancing.md</code> HAProxy/nginx-FOSS/ALB probe configs; rolling-upgrade-with-drain in <code>upgrades.md</code>; live <code>ci_drain_check.sh</code> (in the actions repo) wired into functional-tests</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>

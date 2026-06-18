@@ -8745,6 +8745,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#watchdog-assisted-lock-failover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watchdog-assisted lock failover
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stale-lock-cleanup-on-restart" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8982,6 +8993,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#watchdog-assisted-lock-failover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watchdog-assisted lock failover
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stale-lock-cleanup-on-restart" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9070,6 +9092,39 @@ confirmed loss. As long as the database recovers within ~40s the
 holder keeps the lock without a re-election. The <code>RefreshLock</code> gRPC
 handler signals <code>UNAVAILABLE</code> on transient MariaDB errors so the
 client side's standard retry path applies.</p>
+<h2 id="watchdog-assisted-lock-failover">Watchdog-assisted lock failover<a class="headerlink" href="#watchdog-assisted-lock-failover" title="Permanent link">&para;</a></h2>
+<p>The lease mechanism above handles the case where a lock holder <strong>dies</strong>:
+the holder's refresher thread exits with the process, the lease lapses
+after at most 60s, and a candidate steals it. Until the watchdog was
+added there was a gap: a holder whose <strong>main loop wedged</strong> while the
+process remained alive would keep refreshing the lease forever via its
+still-running refresher thread, blocking any failover indefinitely.</p>
+<p>The systemd watchdog now closes that gap for the eight armed daemons
+(database, net, cleaner, cluster, queues, resources, transfers,
+sidechannel). Each daemon's main loop calls <code>Daemon.pet_watchdog()</code>
+from <code>idle()</code> and, for long maintenance passes, at explicit points
+inside the pass. If the loop stops petting, systemd delivers SIGABRT
+after <code>WatchdogSec</code> (60s for most daemons; 300s for <code>sf-cluster</code>, whose
+elected maintenance pass legitimately runs longer than a minute). The
+refresher thread dies with the process, and the lease expires normally.</p>
+<p>For the elected <code>sf-cluster</code> the effect is the full lock failover
+chain:</p>
+<ol>
+<li>Wedged elected daemon stops petting the watchdog.</li>
+<li>Systemd kills the process after its <code>WatchdogSec</code> (300s) and restarts
+   it (<code>Restart=on-failure</code>).</li>
+<li>The killed process's refresher thread exits; the <code>cluster/</code> lease
+   (60s lifetime) lapses.</li>
+<li>A standby <code>sf-cluster</code> steals the lock and takes over.</li>
+</ol>
+<p>Worst-case failover is approximately <strong>360s</strong> (the 300s <code>sf-cluster</code>
+watchdog timeout + 60s lease). No operator action is needed.</p>
+<p>A tighter option — having the wedged daemon shed the lease before being
+killed, via a signal handler that calls <code>ClusterLock.release()</code> — would
+reduce the worst case to one lease lifetime (60s) regardless of the
+watchdog timeout. That optimisation is intentionally deferred: it adds
+process-signal complexity and the current window is acceptable for the
+maintenance workload.</p>
 <h2 id="stale-lock-cleanup-on-restart">Stale-lock cleanup on restart<a class="headerlink" href="#stale-lock-cleanup-on-restart" title="Permanent link">&para;</a></h2>
 <p>When a daemon starts up, its <code>queues</code> startup task calls
 <code>locks.clear_stale_locks()</code> which deletes any rows still attributed
