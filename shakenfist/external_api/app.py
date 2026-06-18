@@ -35,6 +35,7 @@ from shakenfist.external_api import artifact as api_artifact
 from shakenfist.external_api import auth as api_auth
 from shakenfist.external_api import blob as api_blob
 from shakenfist.external_api import clusteroperation as api_clusteroperation
+from shakenfist.external_api import health
 from shakenfist.external_api import instance as api_instance
 from shakenfist.external_api import interface as api_interface
 from shakenfist.external_api import label as api_label
@@ -101,6 +102,12 @@ def resolve_node_uuid():
     populated by _resolve_node_uuid(). We resolve it lazily on the first
     request instead.
     """
+    # Health probes must never touch the database. On a configured node
+    # NODE_UUID is already set so this is a no-op anyway, but short-circuit
+    # explicitly so the "a /readyz burst makes zero DB calls" guarantee holds
+    # unconditionally -- even on a worker whose NODE_UUID is not yet resolved.
+    if _is_health_probe():
+        return
     if config.NODE_UUID:
         return
     node_uuid = Node._load_persisted_uuid()
@@ -123,7 +130,7 @@ def resolve_node_uuid():
 # server and channels every event through the event_dlq MariaDB
 # path -- see GH actions run 26612233454 for the full cascade.
 def _is_health_probe():
-    return flask.request.path == '/'
+    return flask.request.path in api_base.HEALTH_PROBE_PATHS
 
 
 @app.before_request
@@ -217,10 +224,35 @@ class Root(api_base.Resource):
         return resp
 
 
+class Livez(api_base.Resource):
+    # Unauthenticated: liveness means "this worker process is serving HTTP".
+    # It deliberately does not check any downstream dependency, so a healthy
+    # but not-yet-ready worker is not killed by an orchestrator liveness probe.
+    def get(self):
+        resp = flask.Response('ok', mimetype='text/plain')
+        resp.status_code = 200
+        return resp
+
+
+class Readyz(api_base.Resource):
+    # Unauthenticated: readiness reflects whether this worker should receive
+    # traffic. health.is_ready() already returns False when the worker is
+    # draining or its cached readiness state is stale.
+    def get(self):
+        if health.is_ready():
+            return flask.Response('ready', mimetype='text/plain', status=200)
+        return flask.Response('not ready', mimetype='text/plain', status=503)
+
+
 # TODO(mikal): we are inconsistent in this interface. Elsewhere the object type
 # is always singular, here its a mix. We should move all of these to the
 # singular form for consistency.
 api.add_resource(Root, '/')
+api.add_resource(Livez, '/livez')
+api.add_resource(Readyz, '/readyz')
+# Same Resource on a second path; flask-restful derives the endpoint name from
+# the class, so an explicit endpoint avoids a duplicate-endpoint collision.
+api.add_resource(Readyz, '/healthz', endpoint='healthz')
 
 api.add_resource(api_admin.AdminLocksEndpoint, '/admin/locks')
 api.add_resource(api_admin.AdminClusterCaCertificateEndpoint, '/admin/cacert')

@@ -291,8 +291,9 @@ For long-held locks (anything held for more than a few seconds), the
 holder must poll `lock.lost_event` between iterations of its critical
 section and abort cleanly when it fires -- the refresher sets it on
 confirmed loss. The cluster maintainer's inner loop is the canonical
-example: it sleeps via `lock.lost_event.wait(60)` so it wakes
-immediately on confirmed loss.
+example: it sleeps via `lock.lost_event.wait(5)` so it wakes
+immediately on confirmed loss (and keeps the elected loop inside the
+systemd `TimeoutStopSec` and watchdog windows).
 
 `ClusterLock.release()` raises `shakenfist.exceptions.LockNotHeld` if
 the database has no record of the caller holding the lock. The
@@ -461,9 +462,15 @@ performance. This is required for all deployments - MariaDB must be configured.
 
 ### Migrating Existing Deployments
 
-Object schema upgrade steps run automatically when the database daemon
-starts. Simply upgrade and restart the `sf-database` service. Migrations
-are idempotent and safe to re-run.
+Schema creation and migration are run **explicitly** via `sf-ctl
+ensure-mariadb-schema` (which requires `MARIADB_HOST` and runs on a
+database-tier node). As of `PLAN-byo-mariadb.md`, `sf-database` no longer
+migrates at startup: it runs `verify_mariadb_compat` and
+`verify_schema_versions` (`shakenfist/daemons/database/main.py`) and
+**refuses to start** if the schema is not at the version its build
+expects. After an upgrade that includes schema changes, run `sf-ctl
+ensure-mariadb-schema` against your MariaDB *before* rolling the daemons.
+Migrations are idempotent and safe to re-run.
 
 ### State Class
 

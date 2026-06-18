@@ -51,6 +51,28 @@ SuccessExitStatus=SIGTERM 143
 RestartPreventExitStatus=SIGTERM
 RuntimeDirectory=sf
 RuntimeDirectoryPreserve=yes
+{% if item == "cluster" %}
+# sf-cluster is the elected cluster maintainer. Its maintenance pass
+# (schedule.run_pending() plus _cluster_wide_cleanup) scales with cluster size
+# and makes many MariaDB / gRPC calls, so a single legitimate pass can run well
+# past 60s under load. It therefore gets a generous watchdog so a slow-but-
+# healthy pass is not killed; the pass still pets at the loop top and through
+# the maintenance loops, and a genuinely wedged leader is caught within ~5 min,
+# after which its lease lapses and the cluster lock fails over to a standby
+# (worst case ~360s). A watchdog kill is SIGABRT, not SIGTERM, so
+# RestartPreventExitStatus=SIGTERM does not block the restart.
+WatchdogSec=300s
+{% elif item not in ["sentinel-first", "sentinel-last", "privexec", "nodelock"] %}
+# Arm the systemd watchdog for the other non-trivial daemons. They emit
+# WATCHDOG=1 from their main loop (Daemon.idle(), plus explicit pets in the
+# cleaner maintenance pass); if a loop wedges and stops petting, systemd kills
+# the daemon and Restart=on-failure brings it back. A watchdog kill is SIGABRT,
+# not SIGTERM, so RestartPreventExitStatus=SIGTERM does not block it. The
+# sentinels, privexec and nodelock are excluded: they do not run the
+# idle()-based loop that emits the keepalive, so arming the watchdog on them
+# would kill a perfectly healthy daemon.
+WatchdogSec=60s
+{% endif %}
 
 EnvironmentFile=/etc/sf/config
 ExecStartPre=/srv/shakenfist/venv/bin/sf-ctl verify-config

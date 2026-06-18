@@ -761,6 +761,41 @@ def verify_schema_versions(engine: sa.Engine) -> None:
         raise exceptions.SchemaVersionMismatchError('\n'.join(lines))
 
 
+def check_reachable(timeout_seconds: int = 3) -> bool:
+    """Health probe: return True if MariaDB is reachable right now, else False.
+
+    This is a bounded, never-raising helper intended for use in the database
+    daemon's health loop.  It is deliberately isolated from the shared
+    thread-local pooled engine returned by ``_get_engine()``: that pooled
+    engine carries no ``connect_timeout``, so a ping against a dead server
+    would block indefinitely.  Here we build a short-lived, unpooled engine
+    with an explicit connect timeout, run ``SELECT 1``, and dispose the engine
+    before returning.
+
+    The function catches every exception (including those from
+    ``_get_connection_url()`` when ``MARIADB_HOST`` is unset) and returns
+    ``False`` rather than propagating.  Failures are logged at DEBUG so they
+    are visible in test/debug runs without polluting production syslog.
+    """
+    engine = None
+    try:
+        url = _get_connection_url()
+        engine = sa.create_engine(
+            url,
+            connect_args={'connect_timeout': timeout_seconds},
+            poolclass=sa.pool.NullPool,
+        )
+        with engine.connect() as conn:
+            conn.execute(sa.text('SELECT 1'))
+        return True
+    except Exception as e:
+        LOG.debug(f'check_reachable: MariaDB not reachable: {e}')
+        return False
+    finally:
+        if engine is not None:
+            engine.dispose()
+
+
 def _get_object_states_table() -> sa.Table:
     """Get or create the object_states table definition.
 

@@ -167,8 +167,165 @@ all, you can skip the load balancer entirely. Point `api_url` (and the
 
 ## Health checks
 
-Active backend health checking -- so the proxy stops sending traffic to a node
-whose `sf-api` is down -- pairs naturally with the readiness endpoints
-described in the [health checks plan](../plans/PLAN-health-checks.md). Once
-those endpoints land, point your proxy's health probes at them rather than at a
-generic API path.
+Your load balancer should actively health-check each `sf-api` backend so that
+it stops routing traffic to a worker that is draining or that has lost its
+connection to `sf-database`. `sf-api` exposes a dedicated readiness endpoint
+for exactly this purpose.
+
+### The probe endpoints
+
+`sf-api` exposes three **unauthenticated** HTTP endpoints on port `13000`:
+
+| Endpoint | Meaning | Who probes it |
+|----------|---------|---------------|
+| `GET /livez` | Liveness. Always returns `200 ok` while the worker process is serving. | An orchestrator or `systemctl` -- **not** the load balancer. |
+| `GET /readyz` | Readiness. Returns `200 ready` when the worker should receive traffic, or `503 not ready` when the worker is draining or when `sf-database` is unreachable. | **The load balancer.** |
+| `GET /healthz` | Alias of `/readyz`. | The load balancer (use either). |
+
+Point your load balancer's health probe at **`/readyz`** (or, equivalently,
+`/healthz`). Do not health-check `/livez` from the load balancer: a draining
+worker still answers `/livez` with `200`, so a `/livez`-based pool would keep
+sending it traffic right up until the process exits.
+
+The probe is cheap. Each worker evaluates readiness in a background checker
+thread and serves `/readyz` from a cached flag, so a probe never hits the
+database directly. Frequent probing is therefore fine -- and recommended,
+because of the drain timing described next.
+
+### Tune the probe to beat the drain grace period
+
+On `SIGTERM` (a normal stop or restart) the worker flips `/readyz` to `503`
+**first**, then keeps serving live requests for `API_DRAIN_GRACE` seconds
+(default `25`) before it actually shuts down. This ordering exists so the load
+balancer has a window in which to notice the `503` and drain the node before
+any request is dropped.
+
+For that to work, your probe must detect the `503` **comfortably inside** that
+~25 second window. The relevant figure is `interval x unhealthy-threshold`: if
+it approaches or exceeds 25 s, the worker will exit before the load balancer
+marks it unhealthy, and in-flight requests will fail.
+
+A safe, conservative starting point is a **5 second interval with a 2-failure
+threshold**: the load balancer sees the `503` within ~10 s, well inside the
+25 s grace. The cheap, cached probe makes this frequency painless.
+
+### Route only to sf-api, and firewall the port
+
+The load balancer pool contains **only `sf-api` backends** on `:13000`.
+`sf-database` is a separate, internal service; it is health-checked separately
+by your monitoring with `grpc-health-probe`, not by this load balancer -- see
+[Monitoring sf-database with grpc-health-probe](database.md#monitoring-sf-database-with-grpc-health-probe).
+Do not put `sf-database` in the API pool.
+
+The health endpoints are unauthenticated, like the rest of the `:13000`
+surface. Firewall port `13000` so it is reachable only from the load balancer
+subnet -- this is the same perimeter posture the API already requires.
+
+### TLS and the probe leg
+
+The load balancer terminates the edge (public) certificate. The leg from the
+load balancer back to `sf-api:13000` is plain HTTP, or you may re-encrypt to a
+backend CA -- that is your choice (see the proxy-to-backend note under
+[Example configurations](#example-configurations)). The health probe rides
+that same backend leg, so configure the probe with whichever scheme (HTTP or
+HTTPS) you use for the backend traffic itself.
+
+### Example: HAProxy
+
+HAProxy has first-class active HTTP health checks. Use `option httpchk` to
+define the probe and `http-check expect status 200` to require a `200`, then
+enable per-server checking with `check inter 5s fall 2 rise 2`:
+
+```haproxy
+backend sfapi
+    option httpchk GET /readyz
+    http-check expect status 200
+    # check inter 5s fall 2 rise 2: probe every 5s, mark down after 2
+    # consecutive failures (~10s, well inside the 25s drain grace),
+    # restore after 2 successes.
+    server sfapi1 10.0.0.1:13000 check inter 5s fall 2 rise 2
+    server sfapi2 10.0.0.2:13000 check inter 5s fall 2 rise 2
+```
+
+A `503 not ready` from a draining or database-isolated worker fails the
+`expect status 200` check, and HAProxy drains it after two probes.
+
+### Example: nginx (open source)
+
+Open-source (FOSS) nginx does **not** have active health checks. The
+`health_check` directive exists only in NGINX Plus, the commercial product.
+FOSS nginx can only do **passive** health checking: it marks a backend down
+after real client requests to it fail, and it cannot actively poll `/readyz`
+on its own.
+
+The passive approach uses `max_fails` and `fail_timeout` on the `upstream`
+servers, plus `proxy_next_upstream` so a `503` is retried against another
+backend rather than returned to the client:
+
+```nginx
+upstream sfapi {
+    # Passive health checking: after 2 failed requests, take the backend
+    # out of rotation for 10s, then probe it again with live traffic.
+    server 10.0.0.1:13000 max_fails=2 fail_timeout=10s;
+    server 10.0.0.2:13000 max_fails=2 fail_timeout=10s;
+}
+
+location /api/ {
+    proxy_pass http://sfapi/;
+    # Treat a 503 (and connection errors/timeouts) as "try the next
+    # backend" instead of returning it to the client.
+    proxy_next_upstream error timeout http_503;
+}
+```
+
+Be aware of the limitation: because this is passive, FOSS nginx only learns a
+worker is draining when a real request happens to hit it and fail. It will not
+pull a node out of rotation purely because `/readyz` returns `503`.
+
+If you need true active `/readyz` polling with nginx, you must either run
+**NGINX Plus** (which has the `health_check` directive), or run an **external
+prober** -- a small sidecar that polls each worker's `/readyz` and pulls a node
+out (for example by editing the upstream config and reloading, or via your
+deployment's API) when it sees a `503`.
+
+### Example: AWS Application Load Balancer (ALB)
+
+A cloud load balancer makes this straightforward, because active HTTP health
+checks are built in. Create a target group for the `sf-api` workers and
+configure its health check as:
+
+| Setting | Value |
+|---------|-------|
+| Protocol | `HTTP` |
+| Path | `/readyz` |
+| Success codes | `200` |
+| Healthy threshold | `2` |
+| Unhealthy threshold | `2` |
+| Interval | `5` seconds |
+| Timeout | `2` seconds |
+
+The HTTPS listener terminates TLS with an ACM certificate and forwards to the
+targets on port `13000`. The unhealthy threshold of `2` at a `5` second
+interval means the ALB drains a worker ~10 s after it starts returning `503`,
+well inside the 25 s drain grace.
+
+In Terraform:
+
+```hcl
+resource "aws_lb_target_group" "sfapi" {
+  name     = "sfapi"
+  port     = 13000
+  protocol = "HTTP"
+  vpc_id   = var.vpc_id
+
+  health_check {
+    protocol            = "HTTP"
+    path                = "/readyz"
+    matcher             = "200"
+    interval            = 5
+    timeout             = 2
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+```

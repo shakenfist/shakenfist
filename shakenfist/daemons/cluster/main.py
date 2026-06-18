@@ -78,6 +78,10 @@ class Monitor(daemon.Daemon):
             return
         LOG.info('Running cluster maintenance')
 
+        # Pet before the preamble below (stale-transfer cleanup + history
+        # prune) which runs before the first per-item loop's pet.
+        self.pet_watchdog()
+
         # NOTE: The per-node blob cache is now maintained by each node's
         # cleaner daemon calling observe() on local blobs. The cleaner also
         # handles hard-deleting blobs with no locations. This is more accurate
@@ -102,6 +106,7 @@ class Monitor(daemon.Daemon):
 
         # Cleanup IPAMs whose network is absent
         for ipm in ipam.IPAMs([], prefilter='active'):
+            self.pet_watchdog()
             if time.time() - ipm.state.update_time < 300:
                 continue
 
@@ -119,6 +124,7 @@ class Monitor(daemon.Daemon):
         fn = network.floating_network()
         if fn:
             for addr in fn.ipam.in_use:
+                self.pet_watchdog()
                 reservation = fn.ipam.get_reservation(addr)
                 if not reservation:
                     continue
@@ -154,6 +160,8 @@ class Monitor(daemon.Daemon):
         # by artifacts
         in_use_blobs = defaultdict(int)
         for a in artifact.Artifacts([]):
+            self.pet_watchdog()
+
             # If the artifact's namespace is deleted then we should remove the
             # artifact
             ns = namespace.Namespace.from_db(
@@ -185,6 +193,8 @@ class Monitor(daemon.Daemon):
         # We count fetches currently requested (or under way) as having completed
         # in order to stop over-replication for large blobs.
         for blob_uuid in mariadb.get_active_blob_uuids():
+            self.pet_watchdog()
+
             b = Blob.from_db(blob_uuid)
             if not b:
                 continue
@@ -265,12 +275,14 @@ class Monitor(daemon.Daemon):
 
         # Record blobs in use
         for blob_uuid in in_use_blobs:
+            self.pet_watchdog()
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 b.record_usage()
 
         # Find expired blobs (database-level filtering)
         for blob_uuid in mariadb.get_expired_blob_uuids():
+            self.pet_watchdog()
             b = Blob.from_db(blob_uuid)
             if b:
                 b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
@@ -278,6 +290,7 @@ class Monitor(daemon.Daemon):
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
+            self.pet_watchdog()
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 for node in overreplicated[blob_uuid]:
@@ -290,6 +303,7 @@ class Monitor(daemon.Daemon):
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
         for blob_uuid, excess in underreplicated:
+            self.pet_watchdog()
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 LOG.with_fields({
@@ -301,12 +315,15 @@ class Monitor(daemon.Daemon):
         # (database-level filtering)
         for blob_uuid in mariadb.get_stale_transcoded_blob_uuids(
                 config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME):
+            self.pet_watchdog()
             b = Blob.from_db(blob_uuid)
             if b:
                 b.remove_transcodes()
 
         # Node management
         for n in Nodes([]):
+            self.pet_watchdog()
+
             age = round(time.time() - n.last_seen, 2)
 
             LOG.with_fields(
@@ -348,6 +365,7 @@ class Monitor(daemon.Daemon):
 
                 # Cleanup any blob locations (use Node.blobs property)
                 for blob_uuid in n.blobs:
+                    self.pet_watchdog()
                     b = Blob.from_db(blob_uuid)
                     if not b:
                         continue
@@ -367,6 +385,7 @@ class Monitor(daemon.Daemon):
                 node_queues = list(get_all_node_queues(n.fqdn))
                 while items := mariadb.dequeue_work_items(
                         node_queues, limit=100):
+                    self.pet_watchdog()
                     for queue_name, jobname, workitem in items:
                         n.add_event(
                             EVENT_TYPE_AUDIT,
@@ -421,6 +440,7 @@ class Monitor(daemon.Daemon):
                 if time.time() - last_defer_message > 10:
                     LOG.info('Cluster not yet stable, deferring maintenance')
                     last_defer_message = time.time()
+                self.idle(60)
                 continue
 
             # Setup a schedule of things to do
@@ -438,6 +458,12 @@ class Monitor(daemon.Daemon):
 
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):
+                # This elected loop sleeps via lock.lost_event.wait() rather
+                # than idle(), so it must pet the systemd watchdog itself
+                # (rate-limited internally) to stay alive between maintenance
+                # passes and during the cleanup below.
+                self.pet_watchdog()
+
                 now = time.time()
                 if now - last_loop_run >= 60:
                     try:
@@ -447,6 +473,12 @@ class Monitor(daemon.Daemon):
                             schedule.run_pending()
                     except Exception as e:
                         util_exceptions.ignore_exception('cluster', e)
+
+                    # run_pending() above and the cleanup below are unbounded
+                    # maintenance phases; pet between them so a slow scheduled
+                    # task does not eat the whole watchdog budget before the
+                    # cleanup's own per-loop pets start.
+                    self.pet_watchdog()
 
                     try:
                         with util_general.RecordedOperation(

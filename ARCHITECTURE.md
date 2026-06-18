@@ -85,8 +85,95 @@ keepalives (10 s ping / 5 s timeout). `sf-database` also publishes the
 calls; Watch-based client-side health checking is deliberately not enabled
 because the synchronous health servicer can deadlock the gRPC server's
 event thread (see `shakenfist/util/grpc_channel.py`).
+The overall (`''`) service status is dependency-aware: while `sf-database`
+is running it reports `SERVING` only while it can reach MariaDB, and flips
+to `NOT_SERVING` (on the ~10 s background loop) when MariaDB becomes
+unreachable. Schema currency is a refuse-to-start precondition enforced at
+startup, not a runtime health signal.
 See [`docs/operator_guide/database.md`](docs/operator_guide/database.md) —
 "MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.
+
+#### sf-api HTTP health surface
+
+`sf-api` exposes three unauthenticated HTTP endpoints on port 13000 for load
+balancer probing:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /livez` | Liveness — always returns `200 ok`; indicates the worker process is alive |
+| `GET /readyz` | Readiness — returns `200 ready` when the worker can serve traffic, or `503 not ready` when draining or when sf-database is unreachable |
+| `GET /healthz` | Alias of `/readyz` |
+
+Readiness is evaluated by a per-worker background checker thread
+(`shakenfist/external_api/health.py`) that polls sf-database's
+`grpc.health.v1.Health/Check` every 5 seconds and caches the result. The
+cached flag flips to False only after three consecutive failures
+(`READINESS_FAIL_THRESHOLD`), debouncing transient blips. A staleness guard
+means a wedged checker is also treated as not-ready.
+
+On SIGTERM the worker latches a one-way draining flag (`begin_drain()`), which
+causes `/readyz` to return 503 immediately. The worker then continues serving
+live requests for `API_DRAIN_GRACE` seconds (default 25 s) before shutting
+down. This allows the load balancer to detect the draining node and stop
+routing new connections before the process exits.
+
+**Load balancer guidance**: probe `/readyz` (or `/healthz`) on port 13000 for
+the readiness signal. `sf-api` is the only LB-routable surface — all other
+daemons communicate internally via gRPC or the MariaDB-backed work queue.
+
+#### Daemon liveness (systemd watchdog)
+
+The eight non-trivial daemons — `sf-database`, `sf-net`, `sf-cleaner`,
+`sf-cluster`, `sf-queues`, `sf-resources`, `sf-transfers`, and
+`sf-sidechannel` — are armed with `WatchdogSec=60s` in `sf.service`.
+Four units are deliberately excluded: `sentinel-first`, `sentinel-last`,
+`sf-privexec`, and `sf-nodelock`. Those are short-lived or event-driven
+processes that do not run the `idle()`-based keepalive loop; arming them
+would kill a healthy daemon that is simply waiting for its trigger.
+`sf-api` is also excluded — Gunicorn has its own `--timeout` worker-liveness
+mechanism.
+
+The keepalive is emitted by `Daemon.pet_watchdog()` in
+`shakenfist/daemons/daemon.py`, which writes `sd_notify(WATCHDOG=1)` at
+most every ~10s. `Daemon.idle()` (the standard end-of-pass sleep) calls
+it automatically, so every daemon whose main loop reaches `idle()` pets the
+watchdog without additional instrumentation.
+
+Daemon passes that do substantial work **without** returning to `idle()`
+must call `pet_watchdog()` explicitly:
+
+- `sf-cluster` elected loop: this loop sleeps on
+  `lock.lost_event.wait(5)` rather than `idle()`, so it calls
+  `pet_watchdog()` explicitly at the top of each iteration.
+- `sf-cluster` `_cluster_wide_cleanup` and `sf-cleaner`
+  `_maintain_blobs` / `_find_missing_blobs`: call `pet_watchdog()` around
+  inner-loop iterations that may each take several seconds.
+
+If a daemon's main loop wedges and stops petting, systemd delivers SIGABRT
+after `WatchdogSec` (60s for most daemons; **300s for `sf-cluster`**, whose
+elected maintenance pass legitimately runs longer) and restarts the process
+(`Restart=on-failure`).
+
+The watchdog tracks the **main (supervisor) loop only**. For the
+`WorkerPoolDaemon`-style daemons (net, queues, resources, transfers,
+sidechannel, database) the actual work runs in spawned worker / gRPC threads
+while the main loop dispatches and pets via `idle()`. A wedged *worker thread*
+under a healthy main loop will keep petting, so `WATCHDOG` detects a stuck
+supervisor loop but not a stuck worker. Deeper per-worker liveness (e.g. the
+"is dnsmasq actually serving DHCP" check in issue #730) is explicitly future
+work; do not over-trust `WATCHDOG` as a signal that every worker is healthy.
+
+For the **elected `sf-cluster`** this also acts as the cluster-lock
+failover trigger: when the wedged process is killed, its in-process lease
+refresher thread dies with it. The `cluster/` lease has a 60s lifetime
+(refreshed every ~20s). Once it lapses a standby `sf-cluster` node steals
+the lock via `UPDATE ... WHERE expires_at < NOW()` and resumes the
+maintenance loop. Worst-case failover time is approximately 360s (the 300s
+`sf-cluster` watchdog timeout + 60s lease expiry). No manual operator
+intervention is needed.
+
+See [`docs/operator_guide/locks.md`](docs/operator_guide/locks.md) for
+the full lease-expiry and lock-steal protocol.
 
 #### SQL Filter-Pushdown Discipline
 
@@ -659,13 +746,16 @@ Client
    |
    v
 Operator-provided load balancer / reverse proxy (adds /api/ prefix)
-   |
+   |  (probes /readyz on port 13000 for readiness)
    v
 Gunicorn (port 13000)
    |
    v
 Flask app (external_api/app.py)
    |
+   +-> /livez    - Liveness probe (unauthenticated, always 200)
+   +-> /readyz   - Readiness probe (unauthenticated, 200/503)
+   +-> /healthz  - Alias of /readyz
    +-> /auth/* - Authentication endpoints
    +-> /instances/* - Instance management
    +-> /networks/* - Network management

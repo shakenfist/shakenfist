@@ -241,6 +241,32 @@ Watch-based client-side health checking (`healthCheckConfig`) is
 deliberately not enabled: the synchronous health servicer can deadlock the
 gRPC server's event thread when Watch streams open and close concurrently.
 
+### Monitoring sf-database with grpc-health-probe
+
+`sf-database` reports live MariaDB reachability through the standard
+`grpc.health.v1/Check` RPC on the empty-string (`""`) service name.
+Operators can probe this with `grpc-health-probe`:
+
+```bash
+grpc-health-probe -addr=<sf-database-host>:13005
+```
+
+The status reflects the outcome of the most recent ~10 s background poll:
+`SERVING` means `sf-database` can reach MariaDB; `NOT_SERVING` means the
+last poll failed. Schema currency (whether the schema is up to date) is
+only checked at startup and is not a runtime signal — a running
+`sf-database` instance always has an up-to-date schema.
+
+`sf-api` consumes this signal through its per-worker readiness checker
+(`shakenfist/external_api/health.py`). When `sf-database` reports
+`NOT_SERVING`, the checker flips the cached flag after three consecutive
+failures and `sf-api`'s `/readyz` endpoint begins returning `503`. A load
+balancer probing `/readyz` will then drain the `sf-api` worker before
+MariaDB connectivity is restored. Recovery is asymmetric: once
+`sf-database` recovers and the checker sees a single `SERVING` response,
+`/readyz` returns `200` and the worker is restored to rotation
+automatically.
+
 ## Administrative Commands
 
 The `sf-ctl` command provides several database-related administrative functions.

@@ -40,6 +40,8 @@ class Monitor(daemon.Daemon):
         try:
             p = pathlib.Path(blob_path)
             for entpath in p.glob('**/*'):
+                self.pet_watchdog()
+
                 entpath = str(entpath)
                 if entpath.endswith('/_version'):
                     continue
@@ -81,6 +83,7 @@ class Monitor(daemon.Daemon):
 
         # Find transcoded blobs in the image cache which are no longer in use
         for ent in os.listdir(cache_path):
+            self.pet_watchdog()
             entpath = os.path.join(cache_path, ent)
 
             # Broken symlinks will report an error here that we have to catch
@@ -130,6 +133,7 @@ class Monitor(daemon.Daemon):
             return
 
         for blob_uuid in n.blobs:
+            self.pet_watchdog()
             if not os.path.exists(Blob.filepath(blob_uuid)):
                 b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
                 if b:
@@ -150,17 +154,18 @@ class Monitor(daemon.Daemon):
 
         n = node.Node.from_db(config.NODE_NAME)
         while daemon.check_abort_path(self.abort_path):
-            while not daemon.health_check_nodelock():
-                LOG.info('Waiting for nodelock daemon to be healthy')
-                time.sleep(1)
-                continue
+            self.wait_for_nodelock()
 
             if not self.cluster_stable():
                 if time.time() - last_defer_message > 10:
                     LOG.info('Cluster not yet stable, deferring maintenance')
                     last_defer_message = time.time()
+                self.idle(60)
                 continue
 
+            # Pet before the scheduled tasks below; they are not instrumented
+            # with their own pets and run before _maintain_blobs's per-loop pets.
+            self.pet_watchdog()
             try:
                 with util_general.RecordedOperation(
                         'scheduled node operations', None, threshold=10):

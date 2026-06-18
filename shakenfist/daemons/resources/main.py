@@ -492,10 +492,7 @@ class Monitor(daemon.Daemon):
                     ...
 
         while daemon.check_abort_path(self.abort_path):
-            while not daemon.health_check_nodelock():
-                LOG.info('Waiting for nodelock daemon to be healthy')
-                time.sleep(1)
-                continue
+            self.wait_for_nodelock()
 
             try:
                 if time.time() - last_metrics > 60:
