@@ -559,6 +559,248 @@ rationale.
     which mode CI runs in, since it changes whether event lines
     appear in Loki.
 
+## Decisions (phase 0)
+
+Phase 0 resolved every open question against the code. The
+committed answers below bind phases 1–6. Each "Decision:" is
+grounded in files the executing agents actually read; key
+file:line anchors are retained.
+
+### Config surface (OQ1, OQ2, OQ4, OQ11)
+
+**Decision:** Four new Pydantic options in `config.py`, in the
+`Field(default, description=...)` style (e.g.
+`MARIADB_GATEWAY_PORT` at `config.py:372`). There is **no
+`SecretStr`** anywhere in `config.py` — `MARIADB_PASSWORD`
+(`config.py:540`) and `AUTH_SECRET_SEED` (`config.py:148`) are
+plain `str` — so `LOKI_AUTH_HEADER` is plain `str` with a
+"treat as secret / never log" prose note, matching existing
+practice. The `env_prefix = 'SHAKENFIST_'` (`config.py:549`)
+makes each overridable as `SHAKENFIST_LOKI_*`.
+
+| Option | Type | Default | Secret | Meaning |
+|--------|------|---------|--------|---------|
+| `LOKI_BASE_URL` | str | `''` | no | Loki base URL (e.g. `http://loki:3100`); empty disables the shipper |
+| `LOKI_TENANT` | str | `''` | no | `X-Scope-OrgID` value; empty omits the header |
+| `LOKI_AUTH_HEADER` | str | `''` | yes (by convention) | Opaque `Authorization` header; empty sends none; mTLS deferred to `PLAN-embrace-tls.md` |
+| `LOG_EVENTS_TO_LOKI` | bool | `True` | no | Whether the `'Added event'` line is emitted to the log stream; never touches the MariaDB event write |
+
+**Decision:** Spool/batch tunables are **module constants**, not
+config, mirroring `eventlog_spool.py` /`eventlog_drainer.py`
+exactly (`SPOOL_HIGH_WATER_MARK = 100_000` at
+`eventlog_spool.py:72`; `DRAIN_BATCH_SIZE = 100`,
+`BACKOFF_*`, `SHUTDOWN_DRAIN_TIMEOUT` at
+`eventlog_drainer.py:50,53-63`). The new modules carry the same
+names. `SPOOL_HIGH_WATER_MARK` may be promoted to config later
+if a concrete operator need appears.
+
+### Loki push wire format (OQ3, part A)
+
+**Decision:** Ship via `POST /loki/api/v1/push` (JSON body). A
+drained batch is grouped by identical label set into `streams`;
+each record is a `values` pair `["<nanosecond-unix-ts string>",
+"<JSON line>"]` where the line is the full pylogrus
+`JsonFormatter` output. The timestamp **must** be a
+nanosecond string (a number is rejected with HTTP 400). In
+practice a single process emits one label set, so a batch is
+usually one stream.
+
+**Decision:** **No structured metadata in v1.** The optional
+third per-value element (structured metadata) requires Loki
+chunk format V4 / schema **v13** / tsdb index — experimental in
+Loki 2.9, default-on only in **Loki 3.0**, and a 3.x server on
+an older schema actively *rejects* such pushes. Since SF is
+BYO-Loki and must work against whatever the operator runs, all
+high-cardinality identifiers live in the JSON line **body** in
+v1 (filterable with LogQL `| json | instance_uuid="..."` on any
+version). Moving the hottest filter keys into structured
+metadata behind a version/config check is recorded as future
+work.
+
+### Log-record field-name contract (OQ3, part B)
+
+**Decision — the label set is fixed, bounded, and the ONLY
+labels:** `{job="shakenfist", daemon=<daemon name>,
+host=config.NODE_NAME}` (`config.py:473`). Stream cardinality is
+therefore bounded by `daemons × nodes` (low hundreds). **No
+per-object UUID, `request_id`, IP, or other high-cardinality
+value is ever a label** — promoting any would make the Loki
+index grow with the number of objects/requests ever seen
+(cardinality explosion, per Grafana's labels guidance).
+
+**Decision — everything else is JSON body in v1.** The base
+JSON fields come from `JsonFormatter.enabled_fields`
+(`logs.py:209-222`): `logger_name`, `ts`, `level`,
+`thread_name`, `message`, `exception_class`, `stack_trace`,
+`module`, `function`. All `with_fields(...)` keys (lower-cased
+by `logs.py:80`; objects auto-unwrapped to `.uuid` strings by
+`logs.py:92-101`) are body. The high-value filter keys that are
+**candidates for promotion to structured metadata later** are:
+`instance_uuid`/`instance`, `network_uuid`/`network`,
+`interface_uuid`, `blob_uuid`/`blob`, `artifact_uuid`/`artifact`,
+`node_uuid`, `request_id`/`request-id`, and the
+`operation_uuid`/`object_uuid` family. The full key enumeration
+(~80 keys across `shakenfist/`) was produced during phase 0; the
+operative rule is "3 labels, everything else body in v1, the
+list above are the SM-later candidates."
+
+**Known wart (phase 1 cleanup):** `eventlog.py:82,105` sets
+`fqdn = config.NODE_NAME`, duplicating the `host` label value in
+the body. Phase 1 should drop the redundant `fqdn` from the
+producer rather than carry the node name twice.
+
+### Spool and handler module factoring (OQ5)
+
+**Decision — fork, do not generalise.** Three new
+`shakenfist/` modules, each a near line-for-line fork of its
+eventlog twin so the event path (under the preserve-event-logging
+priority) is untouched:
+
+- `logship_spool.py` — mirror of `eventlog_spool.py`; spool root
+  `/srv/shakenfist/spool/logship/<daemon>-<pid>.db`; same WAL
+  sqlite, high-water drop+counter, orphan recovery. Payload row
+  carries `{labels, ts_ns, line}`.
+- `logship_drainer.py` — mirror of `eventlog_drainer.py`; same
+  batch/poll/backoff constants and `atexit` drain. **Only
+  divergence is the sink:** replace `mariadb.record_event_batch`
+  (whose bool contract is documented at `mariadb.py:4565`) with
+  `_push_to_loki(streams) -> bool` (True on 2xx; False on
+  non-2xx/timeout/connection error). Failed batches stay spooled
+  and retry with backoff — identical durability contract.
+- `logship.py` — net-new (no eventlog twin): the
+  `logging.Handler` subclass plus the idempotent
+  `start(daemon_name)`. `emit()` formats via the library
+  `JsonFormatter`, builds the `{labels, ts_ns, line}` row, and
+  calls `logship_spool.enqueue()`; it is exception-safe
+  (`handleError`) so logging never raises into a caller.
+
+**Decision — metrics** on the process-wide default registry
+(like `eventlog_spool.py:45-56`): `logship_spool_depth` (gauge
+via `set_function`), `logship_spool_dropped_total` (counter),
+`logship_push_total{result=...}` (counter), and optional
+`logship_push_seconds` (histogram). Unifying the two spools is
+future work.
+
+### JSON-only logging, gunicorn, console (OQ8, OQ9)
+
+**Decision — JSON-only is a real change, not a tidy-up.** All
+**103** `logs.setup(...)` call sites in `shakenfist/` use the
+defaults today (`syslog=True, json=False`) → every daemon
+currently logs **text over `/dev/log`**, not JSON. Approach:
+keep the library default `json=False` (so independently-released
+non-SF consumers are unaffected on upgrade) and have **SF pass
+`json=True`** (via a thin SF wrapper or the daemon base /module
+template — phase 1 picks the spelling). Remove the SF-exercised
+`TextFormatter` branches (`logs.py:223-231`) **behind the next
+major library version** so no daemon path can emit non-JSON; the
+`json` parameter, the `SHAKENFIST_LOG_TO_STDOUT` test branch,
+and `setup_console()` survive.
+
+**Decision — handler attachment.** SF attaches its Loki handler
+to the **root** logger inside `logship.start()` (so the library
+never imports `shakenfist`), only when `LOKI_BASE_URL` is set,
+from the two confirmed seams beside the existing
+`eventlog_drainer.start(...)`: `daemon.py:112-113`
+(`write_pid_file`) and `gunicorn_config.py:55-56`
+(`post_fork`, the only fork-safe moment for the drainer thread).
+
+**Decision — gunicorn (the least pre-decided item).** gunicorn
+sets `propagate = False` on `gunicorn.error`/`gunicorn.access`
+in `Logger.__init__`, so propagation-to-root does **not** work
+out of the box. Use a custom **`logger_class`** subclass of
+`gunicorn.glogging.Logger` that re-enables propagation and
+clears gunicorn's own stream handlers, so both loggers flow to
+the root → JSON formatter → Loki handler. This makes dropping
+`--log-syslog` from `sf-api.service:33` (phase 5) lossless.
+(gunicorn access lines carry no `extra` fields, so access-log
+JSON is limited to the rendered message — richer access fields
+are future work.)
+
+**Decision — console.** `setup_console()` (`logs.py:237`) stays
+human-readable/colorized; JSON-only scopes strictly to the
+daemon `setup()` path.
+
+### Two-mode behaviour (OQ6)
+
+**Decision — exactly two modes, never silent, never a
+deliberate double-ship.**
+
+- **Loki configured (`LOKI_BASE_URL` set):** one handler — the
+  Loki spool handler. No deliberate second local handler. The
+  WAL spool is the local-durability buffer; a Loki outage loses
+  the Loki copy only past the high-water mark (counter + WARN).
+- **Loki unconfigured:** one local handler so the node is not
+  silent — `SysLogHandler('/dev/log')` with the JSON formatter
+  (preferred over stdout because it preserves syslog priority
+  for `journalctl -p`, is the existing default at `logs.py:203`,
+  and keeps stdout clean).
+
+**Decision — `/dev/log` survives rsyslog removal.** `/dev/log`
+is owned by `systemd-journald-dev-log.socket` (`Symlinks=/dev/log`),
+part of systemd, not the `rsyslog` package (which binds a
+separate `syslog.socket`). Uninstalling rsyslog (phase 5) leaves
+`/dev/log → /run/systemd/journal/dev-log` intact, so the
+unconfigured-mode handler still lands in journald. Residual:
+systemd captures service stdout/stderr to journald regardless
+(pre-logging tracebacks) — free, local-only, not a shipping
+pipeline.
+
+### Events relationship and echo toggle (OQ11)
+
+**Decision — events stay authoritative in MariaDB; the toggle
+gates only the echo.** In `add_event_multi()`, the echo
+(`eventlog.py:80-93`, `log.info('Added event')`) and the
+authoritative MariaDB enqueue (`eventlog.py:101-116`,
+`eventlog_spool.enqueue(payload)`) are cleanly separable — `log`
+is not referenced after line 93, and the payload uses only raw
+locals. `LOG_EVENTS_TO_LOKI=False` wraps **only** lines 80–93
+and must not touch anything from line 95 on, nor `event_uuid`
+(`:71`) or `request_id` (`:75-78`). The guard sits **after** the
+existing `suppress_event_logging` early-return (`:45-46`) so
+that flag keeps suppressing everything. `add_event()` (`:20-33`)
+delegates to `add_event_multi()` and needs no separate guard.
+Event storage and event-lookup REST APIs do **not** move to
+Loki (rejected alternative ratified).
+
+### CI Loki topology and dual-path coverage (OQ7, OQ10)
+
+**Decision — stand up Loki the way CI MariaDB is.** A
+single-binary Loki, installed by a new `tools/ci-install-loki.sh`
+`scp`'d and `sudo`-run on the inner-cluster `${primary}` node
+(co-located with the CI MariaDB, so the inner cluster already
+routes to it), listening on `0.0.0.0:3100`. This mirrors
+`tools/ci-install-mariadb.sh` (`functional-tests.yml:330-346`)
+exactly; placing it on the under-cloud is rejected for parity.
+
+**Decision — plumb as `LOKI_BASE_URL`** via a new
+`GETSF_LOKI_BASE_URL` (+ `GETSF_LOKI_TENANT` /
+`GETSF_LOKI_AUTH_HEADER`) env group on `getsf-wrapper`, mirroring
+the `GETSF_MARIADB_*` flow (`functional-tests.yml:356-361` →
+`getsf:534-612,979-983` → `deploy.py` → `roles/base/templates/
+config`). Unlike `MARIADB_HOST`, `SHAKENFIST_LOKI_BASE_URL` is
+rendered **unconditionally on every node** (like
+`MARIADB_GATEWAY_HOSTS`), not gated on the database group. A
+lower-effort phase-3 bootstrap is to set it through the existing
+`GETSF_EXTRA_CONFIG` JSON list (no getsf/template change); the
+dedicated group is the recommended end state.
+
+**Decision — keep the CI Loki AND collect local logs.** Keep
+Loki + an end-to-end "logs reached Loki" assertion (the only
+functional coverage of the push path); the central Loki also
+replaces the soon-removed primary syslog grep
+(`functional-tests.yml:540-554`), which phase 4 reworks into
+Loki queries. **Also** extend `ci-gather-logs.yml`
+(`functional-tests.yml:607-631`) to pull each node's local
+structured JSON into the clingwrap bundle, so a shipper failure
+stays debuggable. Add a cheap unit/local test that the
+disabled-shipper path emits local JSON.
+
+**Decision — CI echo mode.** The primary functional run sets
+`LOG_EVENTS_TO_LOKI=on` (the shipped default), so the phase-4
+Loki log-checks see `'Added event'` lines; the off-path is
+covered by the cheap disabled-shipper test (and optionally a
+scheduled-test variant).
+
 ## Execution
 
 The work breaks into phases that can each land independently and
@@ -573,7 +815,7 @@ Loki and CI already checks them there. Phase 6 documents.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | [PLAN-remove-syslog-forwarding-phase-00-decisions.md](PLAN-remove-syslog-forwarding-phase-00-decisions.md) | Not started |
+| 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | [PLAN-remove-syslog-forwarding-phase-00-decisions.md](PLAN-remove-syslog-forwarding-phase-00-decisions.md) | Complete (see Decisions section above) |
 | 1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump | PLAN-remove-syslog-forwarding-phase-01-json-logging.md | Not started |
 | 2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests | PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md | Not started |
 | 3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test | PLAN-remove-syslog-forwarding-phase-03-ci-loki.md | Not started |
