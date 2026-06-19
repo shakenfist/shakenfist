@@ -818,7 +818,7 @@ Loki and CI already checks them there. Phase 6 documents.
 | 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | [PLAN-remove-syslog-forwarding-phase-00-decisions.md](PLAN-remove-syslog-forwarding-phase-00-decisions.md) | Complete (see Decisions section above) |
 | 1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump | [PLAN-remove-syslog-forwarding-phase-01-json-logging.md](PLAN-remove-syslog-forwarding-phase-01-json-logging.md) | In progress (library 1a–1d done on branch `json-only-logging`; awaiting operator `v0.9.0` release then pin bump) |
 | 2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests | [PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md](PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md) | Complete (pending CI; local logs become JSON once the phase-1 `v0.9.0` pin lands) |
-| 3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test | PLAN-remove-syslog-forwarding-phase-03-ci-loki.md | Not started |
+| 3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test | [PLAN-remove-syslog-forwarding-phase-03-ci-loki.md](PLAN-remove-syslog-forwarding-phase-03-ci-loki.md) | Not started |
 | 4. Rework CI log-checks and clingwrap bundle for Loki + local logs (new versioned `shakenfist/actions`) | PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md | Not started |
 | 5. Remove rsyslog forwarding from the deployer (realises remove-primary phase 1) | PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md | Not started |
 | 6. Documentation: operator guide, field contract, ARCHITECTURE/README/AGENTS, index/order | PLAN-remove-syslog-forwarding-phase-06-docs.md | Not started |
@@ -937,10 +937,13 @@ Phase notes:
   bootstrap.yml`, the `syslog_target` variable
   (`deploy.yml:185`, `roles/base/defaults/main.yml:13`), and
   the `--log-syslog --log-syslog-prefix sf` flags in
-  `sf-api.service`. It renders the Loki endpoint config from an
-  inventory variable (the BYO endpoint) into the SF config, and
-  switches the main-repo workflows over to the new Loki-aware CI
-  checks from phase 4. Local journald stays (it is free systemd
+  `sf-api.service`. The `LOKI_BASE_URL` deploy plumbing (getsf →
+  deploy.py → the `SHAKENFIST_LOKI_BASE_URL` config-template line)
+  is already done in phase 3; phase 5 adds the remaining
+  `LOKI_TENANT` / `LOKI_AUTH_HEADER` operator plumbing (mind the
+  all-node secret rendering for the auth header) and switches the
+  main-repo workflows over to the new Loki-aware CI checks from
+  phase 4. Local journald stays (it is free systemd
   behaviour, not a second shipping pipeline — see Open Question
   6). This phase realises remove-primary phase 1; update that
   plan's status table and phase note to point here. Medium
