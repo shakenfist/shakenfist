@@ -77,20 +77,26 @@ def add_event_multi(
     except RuntimeError:
         request_id = None
 
-    log = LOG.with_fields({
-        'event_type': event_type,
-        'fqdn': config.NODE_NAME,
-        'duration': duration,
-        'message': message,
-        'extra': extra
-    })
-    for object_type, object_uuid in simpler_objects:
-        log = log.with_fields({object_type: object_uuid})
+    # The 'Added event' diagnostic line is what flows to the log stream
+    # (Loki). It is gated by LOG_EVENTS_TO_LOKI so an operator can mute
+    # the event echo without affecting the authoritative MariaDB write
+    # below. The 'fqdn' field is intentionally omitted here -- it would
+    # duplicate the host label on the log stream -- but is kept in the
+    # MariaDB payload below, which is the authoritative record.
+    if config.LOG_EVENTS_TO_LOKI:
+        log = LOG.with_fields({
+            'event_type': event_type,
+            'duration': duration,
+            'message': message,
+            'extra': extra
+        })
+        for object_type, object_uuid in simpler_objects:
+            log = log.with_fields({object_type: object_uuid})
 
-    if log_as_error:
-        log.error('Added event')
-    else:
-        log.info('Added event')
+        if log_as_error:
+            log.error('Added event')
+        else:
+            log.info('Added event')
 
     # Enqueue into the local per-daemon spool. The background drainer thread
     # (``shakenfist.eventlog_drainer``) picks the event up, batches it with

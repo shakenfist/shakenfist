@@ -112,6 +112,16 @@ def write_pid_file(daemon_name):
     from shakenfist import eventlog_drainer  # noqa: E402
     eventlog_drainer.start(daemon_name)
 
+    # Wire up Loki log shipping for this process. Like the eventlog
+    # drainer above this spawns a background thread (when
+    # LOKI_BASE_URL is set), so it belongs at the same per-process
+    # startup hook. The call is a no-op when LOKI_BASE_URL is empty.
+    # Same late-import rationale as eventlog_drainer: the
+    # logship -> logship_spool chain pulls in sqlite/prometheus
+    # bookkeeping we don't want at module-import time.
+    from shakenfist import logship  # noqa: E402
+    logship.start(daemon_name)
+
 
 def clear_abort_path(abort_path):
     if os.path.exists(abort_path):

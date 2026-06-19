@@ -59,6 +59,18 @@ def post_fork(server, worker):
             'Failed to start eventlog drainer in gunicorn worker; '
             'events will fall through to the direct gRPC + DLQ path')
 
+    # Wire up Loki log shipping per worker. Like the drainer above it
+    # spawns a thread (when LOKI_BASE_URL is set), so post_fork is the
+    # only correct moment to start it (threads don't survive the
+    # --preload fork). A no-op when LOKI_BASE_URL is empty.
+    try:
+        from shakenfist import logship
+        logship.start('sf-api')
+    except Exception as e:
+        LOG.with_fields({'error': str(e), 'pid': worker.pid}).warning(
+            'Failed to start Loki log shipper in gunicorn worker; '
+            'logs will fall through to the local per-module handlers')
+
     # Start the per-worker readiness checker. Like the drainer above it
     # spawns a thread, so post_fork is the only correct moment to start it
     # (threads don't survive the --preload fork).
