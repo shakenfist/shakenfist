@@ -573,7 +573,7 @@ Loki and CI already checks them there. Phase 6 documents.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | PLAN-remove-syslog-forwarding-phase-00-decisions.md | Not started |
+| 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | [PLAN-remove-syslog-forwarding-phase-00-decisions.md](PLAN-remove-syslog-forwarding-phase-00-decisions.md) | Not started |
 | 1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump | PLAN-remove-syslog-forwarding-phase-01-json-logging.md | Not started |
 | 2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests | PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md | Not started |
 | 3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test | PLAN-remove-syslog-forwarding-phase-03-ci-loki.md | Not started |
