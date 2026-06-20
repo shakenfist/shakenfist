@@ -345,6 +345,19 @@ jobs:
                    /tmp/mariadb-tuning.cnf \
                    citestpw'
 
+      - name: Install Loki on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-loki.sh \
+              ${{ matrix.pr.base_image_user }}@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.pr.base_image_user }}@${primary} \
+              'sudo bash /tmp/ci-install-loki.sh'
+
       - name: Run getsf installer on primary
         timeout-minutes: 45
         run: |
@@ -358,6 +371,7 @@ jobs:
                GETSF_MARIADB_USER=shakenfist \
                GETSF_MARIADB_PASSWORD=citestpw \
                GETSF_MARIADB_DATABASE=shakenfist \
+               GETSF_LOKI_BASE_URL=http://${{ matrix.pr.topology == 'localhost' && '127.0.0.1' || '10.0.1.10' }}:3100 \
                /tmp/getsf-wrapper"
 
       - name: Wait for the cluster to become schedulable
@@ -887,6 +901,19 @@ jobs:
                    /tmp/mariadb-tuning.cnf \
                    citestpw'
 
+      - name: Install Loki on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-loki.sh \
+              ${{ matrix.merge.base_image_user }}@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.merge.base_image_user }}@${primary} \
+              'sudo bash /tmp/ci-install-loki.sh'
+
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
@@ -900,6 +927,7 @@ jobs:
                GETSF_MARIADB_USER=shakenfist \
                GETSF_MARIADB_PASSWORD=citestpw \
                GETSF_MARIADB_DATABASE=shakenfist \
+               GETSF_LOKI_BASE_URL=http://${{ matrix.merge.topology == 'localhost' && '127.0.0.1' || '10.0.1.10' }}:3100 \
                /tmp/getsf-wrapper"
 
       - name: Wait for the cluster to become schedulable

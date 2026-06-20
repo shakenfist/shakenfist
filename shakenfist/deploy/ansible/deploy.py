@@ -172,6 +172,12 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
     update_if_specified('mariadb_password', '')
     update_if_specified('mariadb_database', 'shakenfist')
 
+    # Loki log shipping endpoint. Optional: when empty the shipper stays
+    # dormant (see shakenfist.config.LOKI_BASE_URL). Rendered into every
+    # node's config so all daemons push from startup. No required check --
+    # empty simply means log shipping is disabled.
+    update_if_specified('loki_base_url', '')
+
     if not variables['mariadb_host']:
         raise SystemExit(
             'mariadb_host is required. Set GETSF_MARIADB_HOST or '

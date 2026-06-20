@@ -45,3 +45,10 @@ SHAKENFIST_MARIADB_USER="{{ mariadb_user }}"
 SHAKENFIST_MARIADB_PASSWORD="{{ mariadb_password }}"
 SHAKENFIST_MARIADB_DATABASE="{{ mariadb_database }}"
 {% endif %}
+
+# Loki log shipping endpoint. Rendered on all nodes (every daemon ships
+# its own logs) and only when configured; an empty value leaves the
+# shipper dormant.
+{% if loki_base_url %}
+SHAKENFIST_LOKI_BASE_URL="{{ loki_base_url }}"
+{% endif %}
