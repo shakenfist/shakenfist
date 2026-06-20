@@ -147,6 +147,22 @@ threshold and the `"Cannot communicate with etcd…"` pattern, and
 etcd). Note this in the script and the PR so the dropped coverage
 is intentional, not lost.
 
+### System-origin patterns are out of scope for the Loki check
+
+Loki carries only SF's **Python application** logs (plus
+gunicorn's, after phase 5). Patterns that the old central syslog
+grep caught but which originate from the **kernel / systemd / a
+process's stderr** — `apparmor="DENIED"`, `segfault`,
+`*** Check failure stack trace: ***` (abseil/gRPC C++ fatal),
+and the systemd `State 'stop-sigterm' timed out` /
+`Main process exited` / `Failed with result 'exit-code'` lines —
+will **never** appear in Loki, so `ci_log_checks_loki.sh`
+deliberately does **not** gate on them (a check that can never
+fire is false confidence). Their gating moves to a **per-node
+`systemctl --failed` + journald check** added in phase 5 (these
+conditions now live only in each node's journald). The script
+documents this exclusion inline.
+
 ### Loki URL on the primary
 
 The checks run on the primary via `run_remote`, where Loki lives,

@@ -158,7 +158,9 @@ Apply the same edit to each job block in both workflows:
 - In the `systemctl --failed` + `journalctl` + "grep forwarded
   syslog" block: **drop** the "grep forwarded syslog from
   /var/log/syslog" part; **keep** `systemctl --failed` and
-  `journalctl -u "sf-*.service"` (both local, still valid).
+  `journalctl -u "sf-*.service"`. Additionally, **make the
+  system-level failure detection gating** (see the next decision)
+  — these conditions are no longer in Loki.
 - **Remove** the `ci_event_checks.sh` invocations (etcd is gone;
   no successor).
 - **Remove** the `tar czf … /var/log/syslog*` artifact steps.
@@ -167,6 +169,33 @@ Apply the same edit to each job block in both workflows:
   /var/log/syslog` lines (keep `/etc/sf/*`).
 Keep `ci_drain_check.sh` (unrelated to syslog). Must stay
 actionlint-clean.
+
+### System-level failures: a per-node gating check (not Loki)
+
+A coverage gap surfaced while implementing phase 4: the Loki
+shipper carries only SF's **Python application** logs (plus
+gunicorn's, after 5b). Several conditions the old central syslog
+grep gated on originate from the **kernel / systemd / a process's
+stderr**, not SF's logger, so they will **never** appear in Loki:
+- `apparmor="DENIED"` (kernel audit),
+- `segfault` (kernel),
+- `*** Check failure stack trace: ***` (abseil/gRPC C++ fatal on
+  stderr),
+- `State 'stop-sigterm' timed out. Killing.` /
+  `Main process exited, code=exited` /
+  `Failed with result 'exit-code'.` (systemd).
+
+The phase-4 `ci_log_checks_loki.sh` therefore does **not** gate on
+these (they would be dead checks). Phase 5 must restore that
+coverage with a **per-node gating check** — they now live only in
+each node's journald. Concretely: a gating `systemctl --failed`
+(any failed unit fails the run) plus a `journalctl` grep on every
+node for the patterns above, run across the inventory (the
+`ci-gather-logs` playbook already fans out per node, so this can
+ride a similar per-node step, or a new `tools/ci_node_checks.sh`
+invoked per node). Decide the exact home in 5d; the requirement
+is that a daemon crash / apparmor denial / abseil fatal on **any**
+node fails CI, as it did when syslog was centrally aggregated.
 
 ### Interaction with phase 4 (now folded into phase 4)
 
@@ -212,7 +241,7 @@ Add `GETSF_LOKI_TENANT` / `GETSF_LOKI_AUTH_HEADER` to getsf
 and the config template (unconditional, rendered when set), per
 the secret note. No required checks (empty = unset).
 
-### 5d — Switch the CI workflows
+### 5d — Switch the CI workflows + add the per-node system check
 
 Apply the workflow-switch edit (above) to every job block in
 `functional-tests.yml` and `scheduled-tests.yml`. This is
@@ -220,6 +249,16 @@ mechanical but recurs ~5×; apply consistently and keep
 actionlint green. Confirm `ci_log_checks_loki.sh` and
 `ci-gather-logs-loki.yml` names exactly match the phase-4
 artefacts on `actions@main`.
+
+Also add the **per-node, gating system-level check** (see the
+"System-level failures" decision): a `systemctl --failed` + a
+`journalctl` grep for apparmor/segfault/abseil/systemd-exit
+patterns, run on every node and failing the run on any hit —
+restoring the cluster-wide system-failure gating that Loki cannot
+provide. This is a `shakenfist/actions` addition (e.g.
+`tools/ci_node_checks.sh` fanned out per node, or a step in the
+gather playbook); coordinate it with phase 4's actions PR if it
+lands as a new actions artefact.
 
 ### 5e — Realize remove-primary phase 1
 
@@ -240,7 +279,7 @@ and unit-test the gunicorn logging.
 | 5a | medium | sonnet | none | Delete the rsyslog deployer surface (the files, the `deploy.yml` syslog play, the primary syslog tasks, `- rsyslog` from the apt + service lists, the `syslog_target` default). Grep to confirm nothing dangles. ansible-lint clean. |
 | 5b | high | opus | none | Add mode-aware gunicorn logging (a `logger_class` in `gunicorn_config.py`, or extend `logship.start`): Mode A → gunicorn loggers propagate to root (Loki) with their own handlers cleared; Mode B → keep stderr→journald. Then drop `--log-syslog --log-syslog-prefix sf` from `sf-api.service:33`. Add a test for both modes. |
 | 5c | medium | sonnet | none | Plumb `GETSF_LOKI_TENANT`/`GETSF_LOKI_AUTH_HEADER` through getsf → deploy.py (optional) → config template (unconditional, rendered when set); document the all-node auth-header exposure. |
-| 5d | high | sonnet | none | Switch every job block in `functional-tests.yml` and `scheduled-tests.yml`: `ci_log_checks.sh`→`ci_log_checks_loki.sh`; drop the inline `/var/log/syslog` greps (optionally one inline Loki dump), the `ci_event_checks.sh` calls, the syslog `tar` steps, and the `/var/log/syslog` chmod target; drop the "grep forwarded syslog" part while keeping `systemctl --failed`/`journalctl`; `ci-gather-logs.yml`→`ci-gather-logs-loki.yml`. actionlint clean; names must match the phase-4 actions artefacts. |
+| 5d | high | sonnet | none | Switch every job block in `functional-tests.yml` and `scheduled-tests.yml`: `ci_log_checks.sh`→`ci_log_checks_loki.sh`; drop the inline `/var/log/syslog` greps (optionally one inline Loki dump), the `ci_event_checks.sh` calls, the syslog `tar` steps, and the `/var/log/syslog` chmod target; drop the "grep forwarded syslog" part; `ci-gather-logs.yml`→`ci-gather-logs-loki.yml`. **Add the per-node gating system check** (`systemctl --failed` + a journald grep for apparmor/segfault/abseil/systemd-exit, failing on any node) since those are no longer in Loki. actionlint clean; names must match the phase-4 actions artefacts. |
 | 5e | low | sonnet | none | Mark `PLAN-remove-primary.md` phase 1 complete (pointer here) and update `docs/plans/index.md`. |
 
 ## Step ordering and dependencies
