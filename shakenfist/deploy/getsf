@@ -622,7 +622,10 @@ echo "stay local)."
 echo
 if [ -z "${GETSF_LOKI_BASE_URL}" ]; then
     echo -n "(a base URL, or blank for none) >> "
-    read GETSF_LOKI_BASE_URL
+    # Optional: tolerate a non-interactive/closed stdin (e.g. CI runs getsf
+    # over ssh with no tty) by defaulting to blank instead of aborting under
+    # `set -e` when read hits EOF.
+    read GETSF_LOKI_BASE_URL || true
     record_answer GETSF_LOKI_BASE_URL "${GETSF_LOKI_BASE_URL}"
 else
     echo "(a base URL, or blank for none) >> ${GETSF_LOKI_BASE_URL}"
@@ -636,7 +639,8 @@ echo "under? This is optional -- leave it blank to send no tenant header."
 echo
 if [ -z "${GETSF_LOKI_TENANT}" ]; then
     echo -n "(a tenant id, or blank for none) >> "
-    read GETSF_LOKI_TENANT
+    # Optional: tolerate a non-interactive/closed stdin (see LOKI_BASE_URL).
+    read GETSF_LOKI_TENANT || true
     record_answer GETSF_LOKI_TENANT "${GETSF_LOKI_TENANT}"
 else
     echo "(a tenant id, or blank for none) >> ${GETSF_LOKI_TENANT}"
@@ -653,7 +657,8 @@ echo "/etc/sf/config on every node."
 echo
 if [ -z "${GETSF_LOKI_AUTH_HEADER}" ]; then
     echo -n "(an Authorization header, or blank for none) >> "
-    read GETSF_LOKI_AUTH_HEADER
+    # Optional: tolerate a non-interactive/closed stdin (see LOKI_BASE_URL).
+    read GETSF_LOKI_AUTH_HEADER || true
     record_answer GETSF_LOKI_AUTH_HEADER "${GETSF_LOKI_AUTH_HEADER}"
 else
     echo "(an Authorization header, or blank for none) >> ${GETSF_LOKI_AUTH_HEADER}"
