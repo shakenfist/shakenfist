@@ -686,15 +686,15 @@ future work.
 **Decision — JSON-only is a real change, not a tidy-up.** All
 **103** `logs.setup(...)` call sites in `shakenfist/` use the
 defaults today (`syslog=True, json=False`) → every daemon
-currently logs **text over `/dev/log`**, not JSON. Approach:
-keep the library default `json=False` (so independently-released
-non-SF consumers are unaffected on upgrade) and have **SF pass
-`json=True`** (via a thin SF wrapper or the daemon base /module
-template — phase 1 picks the spelling). Remove the SF-exercised
-`TextFormatter` branches (`logs.py:223-231`) **behind the next
-major library version** so no daemon path can emit non-JSON; the
-`json` parameter, the `SHAKENFIST_LOG_TO_STDOUT` test branch,
-and `setup_console()` survive.
+currently logs **text over `/dev/log`**, not JSON. Approach (as
+implemented in `v0.8.5`): make `setup()` install the
+`JsonFormatter` **unconditionally** and remove the `TextFormatter`
+branches (`logs.py:223-231`), so every SF `logs.setup(__name__)`
+call gets JSON with no per-call-site edits; the `json` parameter
+(now a deprecated no-op), the `SHAKENFIST_LOG_TO_STDOUT` test
+branch, and `setup_console()` survive. This is a breaking change
+for non-SF text consumers, shipped pragmatically as a 0.8.x patch
+bump.
 
 **Decision — handler attachment.** SF attaches its Loki handler
 to the **root** logger inside `logship.start()` (so the library
@@ -816,8 +816,8 @@ Loki and CI already checks them there. Phase 6 documents.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth) | [PLAN-remove-syslog-forwarding-phase-00-decisions.md](PLAN-remove-syslog-forwarding-phase-00-decisions.md) | Complete (see Decisions section above) |
-| 1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump | [PLAN-remove-syslog-forwarding-phase-01-json-logging.md](PLAN-remove-syslog-forwarding-phase-01-json-logging.md) | In progress (library 1a–1d done on branch `json-only-logging`; awaiting operator `v0.9.0` release then pin bump) |
-| 2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests | [PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md](PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md) | Complete (pending CI; local logs become JSON once the phase-1 `v0.9.0` pin lands) |
+| 1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump | [PLAN-remove-syslog-forwarding-phase-01-json-logging.md](PLAN-remove-syslog-forwarding-phase-01-json-logging.md) | Complete (`shakenfist-utilities==0.8.5` released and pinned) |
+| 2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests | [PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md](PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md) | Complete (pending CI) |
 | 3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test | [PLAN-remove-syslog-forwarding-phase-03-ci-loki.md](PLAN-remove-syslog-forwarding-phase-03-ci-loki.md) | Not started |
 | 4. Rework CI log-checks and clingwrap bundle for Loki + local logs (new versioned `shakenfist/actions`) | [PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md](PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md) | Not started |
 | 5. Remove rsyslog forwarding from the deployer (realises remove-primary phase 1) | PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md | Not started |

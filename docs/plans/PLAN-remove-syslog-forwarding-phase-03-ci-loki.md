@@ -210,7 +210,7 @@ on every PR). The test:
 
 D7 also called for a cheap test that the disabled-shipper path
 emits *local JSON*. That asserts the JSON-only library behavior,
-which is only true once `shakenfist-utilities==0.9.0` is pinned
+which is only true once `shakenfist-utilities==0.8.5` is pinned
 (under the current `0.8.4`, local output is text). **Defer** this
 until the phase-1 pin bump lands; note it here so it is not lost.
 (Phase 2 already covers the Mode-B "no Loki handler" path in unit
@@ -269,7 +269,7 @@ placement; the config-template env path (vs `set-config`) and
 that it realizes phase 5's "render Loki endpoint config" line so
 phase 5 shrinks accordingly; the deferral of `LOKI_TENANT`/
 `LOKI_AUTH_HEADER` deploy plumbing and the disabled-shipper
-local-JSON test (the latter blocked on the `v0.9.0` pin); and that
+local-JSON test (the latter blocked on the `v0.8.5` pin); and that
 phase 3's true validation is a CI run, not local execution.
 
 ## Review checklist for the management session

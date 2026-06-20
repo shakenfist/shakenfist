@@ -91,8 +91,9 @@ library release now in scope, the **cleaner choice is to make
 JSON the daemon default in the new release**, so SF's 103 call
 sites need no edits:
 
-**Decision:** In the new library release (a breaking `0.8 → 0.9`
-bump), `setup()` installs the `JsonFormatter` on the
+**Decision:** In the new library release (shipped as `v0.8.5`, a
+breaking change carried pragmatically in a 0.8.x patch bump),
+`setup()` installs the `JsonFormatter` on the
 syslog/file/stdout handler **unconditionally** for the daemon
 path. The `TextFormatter` import and its branches (`:223-231`)
 are removed. The `json` parameter is retained in the signature
@@ -104,9 +105,9 @@ are untouched. Because JSON becomes unconditional, every SF
 `logs.setup(__name__)` call already gets JSON — **no SF logging
 call sites change in this phase** (only the pin bumps).
 
-Non-SF consumers who upgrade to `0.9` and relied on text output
-get JSON; that is the breaking change the `0.x` minor bump
-signals and the release notes call out. Consumers who need text
+Non-SF consumers who upgrade to `0.8.5` and relied on text output
+get JSON; that is a breaking change, shipped pragmatically as a
+0.8.x patch bump and called out in the release notes. Consumers who need text
 stay on `0.8`.
 
 ## Deliverables
@@ -133,10 +134,10 @@ Phase 1 is complete when:
 4. **(library) Draft superseded.**
    `library-utilities/docs/plans/PLAN-loki.md` replaced with a
    short superseded-by pointer to this master plan.
-5. **(release) `v0.9.0` published to PyPI** via `release.sh`
+5. **(release) `v0.8.5` published to PyPI** via `release.sh`
    (operator/management action).
 6. **(shakenfist) Pin bumped** `pyproject.toml:27` to
-   `shakenfist-utilities==0.9.0`, landed **after** the release
+   `shakenfist-utilities==0.8.5`, landed **after** the release
    is on PyPI so CI can install it.
 7. `pre-commit run --all-files` passes here; the library's `tox`
    (flake8 + stestr) passes in the library repo.
@@ -222,19 +223,19 @@ Keep the file as a breadcrumb rather than deleting it.
 
 Recommended effort **low** (haiku).
 
-### 1e — Release `v0.9.0` (operator/management action)
+### 1e — Release `v0.8.5` (operator/management action)
 
 After 1a–1d are reviewed and merged via an operator-created PR:
-run `library-utilities/release.sh`, choosing version `0.9.0`
-(tags+pushes `v0.9.0`, builds the wheel, `twine upload` to
+run `library-utilities/release.sh`, choosing version `0.8.5`
+(tags+pushes `v0.8.5`, builds the wheel, `twine upload` to
 PyPI). This needs PyPI/signing credentials and is **not** a
 sub-agent step. Include a one-line release note that JSON is now
 the only daemon format (breaking for text consumers).
 
 ### 1f — shakenfist: bump the pin (this repo)
 
-After `v0.9.0` is live on PyPI, change `pyproject.toml:27`
-`shakenfist-utilities==0.8.4` → `==0.9.0`, in a single small
+After `v0.8.5` is live on PyPI, change `pyproject.toml:27`
+`shakenfist-utilities==0.8.4` → `==0.8.5`, in a single small
 commit in this repo. CI then validates that SF still installs
 and that all daemons log JSON. **Ordering is load-bearing:**
 bumping before the release is on PyPI breaks CI's install.
@@ -262,8 +263,8 @@ a feature branch — *not* an `isolation: worktree` of this repo).
 | 1b | low–medium | sonnet | library branch | Add `docs/log-record-fields.md` enumerating emitted JSON fields + `with_fields` conventions (lower-case, `.uuid` unwrap, flask `request-id`); state that `{job,daemon,host}` labels are applied by the shakenfist shipper, not the library; link from `README.md`. |
 | 1c | medium | sonnet | library branch | Add `stestr` tests under `shakenfist_utilities/tests/`: JSON validity + base fields; clean message + pid field; `with_fields` lower-case/uuid-unwrap; `json=False` still JSON; `setup_console` is human-readable. Retire `test.py`. Make `tox` green. |
 | 1d | low | haiku | library branch | Replace `docs/plans/PLAN-loki.md` body with a superseded-by pointer to the shakenfist master plan (architecture lives in shakenfist; library is format-only). |
-| 1e | — | — | operator | Operator creates the library PR, merges, runs `release.sh` to publish `v0.9.0` to PyPI with a "JSON-only, breaking for text consumers" note. Not a sub-agent step. |
-| 1f | low | sonnet | this repo | After `v0.9.0` is on PyPI, bump `pyproject.toml:27` to `shakenfist-utilities==0.9.0`; commit. |
+| 1e | — | — | operator | Operator creates the library PR, merges, runs `release.sh` to publish `v0.8.5` to PyPI with a "JSON-only, breaking for text consumers" note. Not a sub-agent step. |
+| 1f | low | sonnet | this repo | After `v0.8.5` is on PyPI, bump `pyproject.toml:27` to `shakenfist-utilities==0.8.5`; commit. |
 
 ## Step ordering and dependencies
 
@@ -290,7 +291,7 @@ a feature branch — *not* an `isolation: worktree` of this repo).
 - `library-utilities/docs/plans/PLAN-loki.md` is superseded with
   a pointer to this master plan; the library gains **no**
   `requests` dependency and **no** `LokiHandler`.
-- `shakenfist-utilities==0.9.0` is on PyPI and the
+- `shakenfist-utilities==0.8.5` is on PyPI and the
   `shakenfist` pin is bumped to match; this repo's
   `pre-commit run --all-files` passes and CI installs cleanly.
 - No Loki transport code exists yet (that is phase 2).
@@ -299,7 +300,7 @@ a feature branch — *not* an `isolation: worktree` of this repo).
 
 Before executing, back-brief the operator: confirm the
 two-repo + credentialed-release shape, the refined JSON-only
-mechanism (flip to unconditional JSON in `v0.9.0` so SF's 103
+mechanism (flip to unconditional JSON in `v0.8.5` so SF's 103
 call sites are untouched, vs phase-0 D4's per-call-site option),
 the clean-message change to `SyslogAdapter.process()` (which
 alters the exact text of every daemon log line), and the
@@ -323,7 +324,7 @@ actions, not sub-agent steps.
       `LokiHandler`; `PLAN-loki.md` is superseded.
 - [ ] Tests exist under `shakenfist_utilities/tests/`, assert
       the above, and `tox` is green in the library repo.
-- [ ] The pin bump landed **after** `v0.9.0` hit PyPI; CI here
+- [ ] The pin bump landed **after** `v0.8.5` hit PyPI; CI here
       installs and all daemons log JSON.
 - [ ] Release notes call out the breaking JSON-only change for
       non-SF text consumers.

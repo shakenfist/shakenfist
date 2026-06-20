@@ -12,7 +12,7 @@ it, the config, the metrics, the per-process lifecycle wiring,
 and the unit tests.
 
 It depends on phase 1 (the library now emits structured JSON
-unconditionally, `v0.9.0`, pinned). It does **not** remove any
+unconditionally, `v0.8.5`, pinned). It does **not** remove any
 rsyslog wiring (phase 5) and does **not** rework CI (phases 3–4);
 when it lands, the shipper is dormant until an operator sets
 `LOKI_BASE_URL`.
