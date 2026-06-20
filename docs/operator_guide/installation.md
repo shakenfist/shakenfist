@@ -213,6 +213,9 @@ The installer will also enforce the following sanity checks:
 | FLOATING_IP_BLOCK | The IP range to use for the floating network |
 | KSM_ENABLED | Set to 1 to enable KSM, 0 to disable |
 | DEPLOY_NAME | The name of the deployment to use as an external label for prometheus |
+| LOKI_BASE_URL | Base URL of an operator-provided Loki to ship structured logs to (e.g. http://loki:3100). Leave blank to log only to the local systemd journal. See [Logging](logging.md). |
+| LOKI_TENANT | Optional Loki tenant (sent as the X-Scope-OrgID header) so Shaken Fist's logs do not co-mingle with other tenants' streams. |
+| LOKI_AUTH_HEADER | Optional opaque Authorization header value for the Loki endpoint (treat as a secret). |
 | TOPOLOGY | The topology of the cluster, as described above |
 | SSH_KEY_FILENAME | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${SSH_KEY_FILENAME}.pub```. |
 | SSH_USER | The username to ssh as. |

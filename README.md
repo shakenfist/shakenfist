@@ -15,6 +15,11 @@ bootstrap snippet. See
 [`docs/operator_guide/database.md`](docs/operator_guide/database.md) for the
 complete setup workflow.
 
+Shaken Fist emits structured JSON logs and can ship them to an
+operator-provided [Loki](https://grafana.com/oss/loki/), or log locally to the
+systemd journal if you prefer your own log agent. See
+[`docs/operator_guide/logging.md`](docs/operator_guide/logging.md).
+
 ## Claude Code Skills
 
 This repository includes Claude Code skills in `.claude/skills/` to assist with

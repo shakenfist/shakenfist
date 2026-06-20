@@ -689,6 +689,31 @@ The `last_active` column is updated whenever a reference is observed to still
 be valid (e.g., when a node's cleaner daemon calls `observe()` on local blobs).
 This enables detection of stale references for cleanup.
 
+### Logging and log shipping
+
+Daemons log structured JSON via `shakenfist_utilities.logs` (one JSON object
+per line; this is the only daemon log format). Shaken Fist does not aggregate
+logs onto a primary node. Instead, when a Loki endpoint is configured
+(`LOKI_BASE_URL`), each daemon ships its own logs to that operator-provided
+Loki through an in-process, on-disk-spooled, batched HTTP push modelled
+directly on the eventlog spool/drainer:
+
+- `shakenfist/logship_spool.py` — a per-daemon disk-backed sqlite spool under
+  `/srv/shakenfist/spool/logship/<daemon>-<pid>.db` (the durability boundary;
+  drop-and-count over a high-water mark; orphan recovery).
+- `shakenfist/logship_drainer.py` — a background thread that batches spooled
+  lines and POSTs them to Loki's `/loki/api/v1/push` with exponential backoff,
+  retaining failed batches for retry.
+- `shakenfist/logship.py` — a `logging.Handler` that JSON-formats each record
+  into the spool, plus `start()`, which (in Loki mode) attaches the handler to
+  the root logger and removes the library's per-module syslog handlers so logs
+  go to Loki only.
+
+When no Loki endpoint is configured the daemons log to the local systemd
+journal instead. Loki stream labels are bounded to `{job, daemon, host}`; all
+identifiers stay in the JSON body. See
+[`docs/operator_guide/logging.md`](docs/operator_guide/logging.md).
+
 ## State Machines
 
 Objects follow defined state machines. Key states:
