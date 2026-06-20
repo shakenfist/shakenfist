@@ -631,6 +631,37 @@ question_end
 echo
 
 question_start
+echo "What Loki tenant (X-Scope-OrgID) should Shaken Fist's logs be shipped"
+echo "under? This is optional -- leave it blank to send no tenant header."
+echo
+if [ -z "${GETSF_LOKI_TENANT}" ]; then
+    echo -n "(a tenant id, or blank for none) >> "
+    read GETSF_LOKI_TENANT
+    record_answer GETSF_LOKI_TENANT "${GETSF_LOKI_TENANT}"
+else
+    echo "(a tenant id, or blank for none) >> ${GETSF_LOKI_TENANT}"
+fi
+question_end
+echo
+
+question_start
+echo "What Authorization header value (if any) should Shaken Fist send to"
+echo "Loki? This is an opaque, operator-supplied secret (for example a"
+echo "bearer token). It is optional -- leave it blank to send no auth"
+echo "header. Note: this value is a secret and is rendered into"
+echo "/etc/sf/config on every node."
+echo
+if [ -z "${GETSF_LOKI_AUTH_HEADER}" ]; then
+    echo -n "(an Authorization header, or blank for none) >> "
+    read GETSF_LOKI_AUTH_HEADER
+    record_answer GETSF_LOKI_AUTH_HEADER "${GETSF_LOKI_AUTH_HEADER}"
+else
+    echo "(an Authorization header, or blank for none) >> ${GETSF_LOKI_AUTH_HEADER}"
+fi
+question_end
+echo
+
+question_start
 echo "Is there any additional cluster configuration you'd like applied"
 echo "before Shaken Fist starts? This is an advanced feature used to deploy"
 echo "pre-configured clusters without an additional restart."
@@ -998,6 +1029,8 @@ export MARIADB_USER="${GETSF_MARIADB_USER}"
 export MARIADB_PASSWORD='${GETSF_MARIADB_PASSWORD}'
 export MARIADB_DATABASE="${GETSF_MARIADB_DATABASE}"
 export LOKI_BASE_URL="${GETSF_LOKI_BASE_URL}"
+export LOKI_TENANT="${GETSF_LOKI_TENANT}"
+export LOKI_AUTH_HEADER='${GETSF_LOKI_AUTH_HEADER}'
 DEPLOYEOF
 
 if [ ${GETSF_RELEASE} == "local" ]; then

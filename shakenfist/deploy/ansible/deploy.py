@@ -177,6 +177,8 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
     # node's config so all daemons push from startup. No required check --
     # empty simply means log shipping is disabled.
     update_if_specified('loki_base_url', '')
+    update_if_specified('loki_tenant', '')
+    update_if_specified('loki_auth_header', '')
 
     if not variables['mariadb_host']:
         raise SystemExit(

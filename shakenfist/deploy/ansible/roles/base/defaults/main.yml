@@ -9,9 +9,6 @@ server_package: "shakenfist"
 client_package: "shakenfist-client"
 pip_extra: ""
 
-# syslog
-syslog_target: "unknown"
-
 # config
 sf_config_template_path: "unknown"
 

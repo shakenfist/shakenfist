@@ -263,7 +263,7 @@ care.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Remove rsyslog aggregation from deployer | PLAN-remove-primary-phase-01-remove-monitoring.md | Not started |
+| 1. Remove rsyslog aggregation from deployer | _(realised by [PLAN-remove-syslog-forwarding.md](PLAN-remove-syslog-forwarding.md) phase 5)_ | Complete (pending CI confirmation) |
 | 2. `bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster` | PLAN-remove-primary-phase-02-bootstrap-cli.md | Not started |
 | 3. Remove Apache reverse proxy from deployer | _(realised by [PLAN-remove-apache-lb.md](PLAN-remove-apache-lb.md))_ | Complete (pending CI confirmation) |
 | 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | _(see byo-mariadb)_ |
@@ -284,7 +284,15 @@ Phase notes:
   side, on the assumption operators going to Loki / Elastic
   / Splunk want structured logs), and documents the SF
   log-record field-name contract so the operator's log
-  pipeline can index it.
+  pipeline can index it. **Realised by
+  [`PLAN-remove-syslog-forwarding.md`](PLAN-remove-syslog-forwarding.md)
+  phase 5**, which delivers the Loki-shipper story this phase
+  was gated on and then deletes the rsyslog deployer surface
+  (`roles/base/tasks/syslog.yml`, the client/server
+  `rsyslog-*.conf` templates, the `syslog_target` variable, the
+  `rsyslog` package + service enablement, and the
+  `--log-syslog` gunicorn flag), in the same way phase 3 was
+  realised by `PLAN-remove-apache-lb.md`.
 - **Phase 2** introduces the `bootstrap_operations` table
   in `mariadb.py`, the `sf-ctl bootstrap-cluster` subcommand,
   and replaces every `set-config` / `ensure-mariadb-schema` /

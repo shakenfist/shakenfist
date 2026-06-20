@@ -52,3 +52,12 @@ SHAKENFIST_MARIADB_DATABASE="{{ mariadb_database }}"
 {% if loki_base_url %}
 SHAKENFIST_LOKI_BASE_URL="{{ loki_base_url }}"
 {% endif %}
+{% if loki_tenant %}
+SHAKENFIST_LOKI_TENANT="{{ loki_tenant }}"
+{% endif %}
+{# The auth header is a secret. Unlike MARIADB_PASSWORD (rendered only on
+   database-tier nodes), it is rendered on every node because every daemon
+   pushes its own logs to Loki, so it lands in each node's /etc/sf/config. #}
+{% if loki_auth_header %}
+SHAKENFIST_LOKI_AUTH_HEADER="{{ loki_auth_header }}"
+{% endif %}
