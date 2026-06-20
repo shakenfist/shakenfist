@@ -250,11 +250,15 @@ class NetworksEndpoint(api_base.Resource):
     @api_base.log_token_use
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
              namespace=None, provide_dns=None):
-        if not provide_dhcp:
+        # NOTE(mikal): these defaults must distinguish "the caller omitted
+        # the field" (None) from "the caller explicitly asked for False".
+        # Using `if not provide_nat` collapses both cases and silently
+        # re-enables NAT (and DHCP) when --no-nat / --no-dhcp was requested.
+        if provide_dhcp is None:
             provide_dhcp = True
-        if not provide_nat:
+        if provide_nat is None:
             provide_nat = True
-        if not provide_dns:
+        if provide_dns is None:
             provide_dns = False
 
         try:

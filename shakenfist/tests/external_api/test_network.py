@@ -325,6 +325,103 @@ class NetworkDeleteAlreadyDeletedTestCase(base.ShakenFistTestCase):
         self.assertIn('error', body)
 
 
+class NetworkCreateBooleanDefaultsTestCase(base.ShakenFistTestCase):
+    """Regression tests for the POST /networks boolean flag defaults.
+
+    The create handler must distinguish "the caller omitted the field"
+    (None -> apply the default) from "the caller explicitly asked for
+    False". A previous `if not provide_nat: provide_nat = True` idiom
+    collapsed both cases, so --no-nat / --no-dhcp silently created a
+    network with NAT / DHCP still enabled.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        # We need to pretend to be the network node
+        fake_config = SFConfig(
+            NODE_NAME='seriously',
+            NODE_EGRESS_IP='127.0.0.1',
+            NETWORK_NODE_IP='127.0.0.1',
+            NODE_EGRESS_NIC='eth0',
+            NODE_MESH_NIC='eth1',
+            NODE_IS_NETWORK_NODE=True,
+        )
+        self.config = mock.patch(
+            'shakenfist.external_api.base.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        self.client = external_api.app.test_client()
+
+        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+    def _create_network(self, body):
+        body.setdefault('name', 'boolnet')
+        body.setdefault('netblock', '10.0.2.0/24')
+        body.setdefault('namespace', 'system')
+        return self.client.post(
+            '/networks',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps(body))
+
+    @mock.patch('shakenfist.network.network.net_create_and_enqueue')
+    def test_explicit_false_is_honoured(self, _mock_enqueue):
+        """--no-dhcp / --no-nat / --no-dns send explicit False and must be
+        stored as False, not coerced back to the default."""
+        resp = self._create_network({
+            'provide_dhcp': False,
+            'provide_nat': False,
+            'provide_dns': False,
+        })
+        self.assertEqual(200, resp.status_code)
+        n = resp.get_json()
+        self.assertFalse(n['provide_dhcp'])
+        self.assertFalse(n['provide_nat'])
+        self.assertFalse(n['provide_dns'])
+
+    @mock.patch('shakenfist.network.network.net_create_and_enqueue')
+    def test_omitted_fields_use_defaults(self, _mock_enqueue):
+        """When the flags are omitted, DHCP and NAT default to enabled and
+        DNS defaults to disabled."""
+        resp = self._create_network({})
+        self.assertEqual(200, resp.status_code)
+        n = resp.get_json()
+        self.assertTrue(n['provide_dhcp'])
+        self.assertTrue(n['provide_nat'])
+        self.assertFalse(n['provide_dns'])
+
+    @mock.patch('shakenfist.network.network.net_create_and_enqueue')
+    def test_explicit_true_is_honoured(self, _mock_enqueue):
+        """Explicitly requesting the non-default (DNS on) must also work."""
+        resp = self._create_network({
+            'provide_dhcp': True,
+            'provide_nat': True,
+            'provide_dns': True,
+        })
+        self.assertEqual(200, resp.status_code)
+        n = resp.get_json()
+        self.assertTrue(n['provide_dhcp'])
+        self.assertTrue(n['provide_nat'])
+        self.assertTrue(n['provide_dns'])
+
+
 class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
     """Regression tests for step 4f: REST handlers call raise_for_error()
     after update_dns_entry / remove_dns_entry."""
