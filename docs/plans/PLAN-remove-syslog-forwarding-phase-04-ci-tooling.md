@@ -14,7 +14,8 @@ delete rsyslog without leaving CI blind:
    per node.
 
 Both are reworked to read from the Loki stood up in phase 3 (and,
-for the bundle, from each node's local journald), and both ship as
+for the bundle, from each node's local logs — the logship spool
+plus journald), and both ship as
 **new versioned artifacts** so existing `@main` consumers of the
 `shakenfist/actions` repo are not broken.
 
@@ -154,7 +155,7 @@ so they default to `http://localhost:3100` (overridable via a
 
 ### clingwrap bundle: actions-hosted `.cwd`, no clingwrap release
 
-To add the Loki dump + per-node journald without a clingwrap
+To add the Loki dump + per-node local logs without a clingwrap
 release, ship a **new `.cwd` config in the actions repo** and
 point `clingwrap gather --target <path-to-actions/.cwd>` at it
 (clingwrap accepts a file-path target). clingwrap itself is
@@ -162,12 +163,23 @@ untouched. The new `.cwd`:
 - **keeps** the per-node jobs (the `sf-*` unit-file emitter,
   `/etc/sf`, `/srv/shakenfist/{instances,events,exceptions}`,
   libvirtd journal);
+- **adds the logship spool** — a `directory` job for
+  `/srv/shakenfist/spool/logship/` (the `*.db` SQLite spools).
+  This is the **primary** local-debug artifact: in Mode A (Loki
+  configured, which CI runs) the per-module `SysLogHandler`s are
+  removed, so SF's structured logs go *only* to the spool → Loki,
+  **not** to journald. When the Loki push is what failed, the
+  undelivered lines live in the spool, so collecting it is what
+  makes a shipper failure debuggable. (The sqlite files are
+  small — bounded by the 100k-row high-water mark.)
 - **replaces** the `/var/log/syslog` `file` jobs (`:219-227`,
   which won't exist once rsyslog is gone) with a `journalctl`
-  **shell** job capturing the node's local SF logs, e.g.
-  `journalctl -u "sf-*.service" --no-pager` (+ keep
-  `sf.target`) — so each node's *local* JSON logs are in the
-  bundle even when the Loki push is what failed;
+  **shell** job (e.g. `journalctl -u "sf-*.service" --no-pager`,
+  + keep `sf.target`). Note: in Mode A this journal holds only
+  the systemd stdout/stderr **residual** (uncaught tracebacks,
+  pre-logging output) — useful, but *not* the routine structured
+  logs (those are in the spool, above). It is the full local log
+  only in Mode B (no Loki configured);
 - **drops** the `journalctl -u etcd` job (etcd gone).
 
 ### Loki dump: primary-only, in the gather playbook
@@ -206,11 +218,15 @@ Leave `ci_log_checks.sh` and `ci_event_checks.sh` untouched.
 ### 4b — Loki-aware clingwrap config + gather playbook (new, in actions)
 
 - Add `ansible/files/shakenfist-ci-failure-loki.cwd` (or similar)
-  — a copy of clingwrap's `shakenfist-ci-failure.cwd` with the
-  `/var/log/syslog` `file` jobs replaced by a `journalctl -u
-  "sf-*.service"`/`sf.target` shell job, and the etcd journal job
-  dropped. (Confirm the exact path clingwrap reads a file target
-  from.)
+  — a copy of clingwrap's `shakenfist-ci-failure.cwd` that **adds
+  a `directory` job for the logship spool**
+  (`/srv/shakenfist/spool/logship/`, the undelivered Loki-bound
+  lines — the primary local-debug artifact in Mode A), **replaces**
+  the `/var/log/syslog` `file` jobs with a `journalctl -u
+  "sf-*.service"`/`sf.target` shell job (the stdout residual in
+  Mode A; the full local log in Mode B), and **drops** the etcd
+  journal job. (Confirm the exact path clingwrap reads a file
+  target from.)
 - Add `ansible/ci-gather-logs-loki.yml` — a copy of
   `ci-gather-logs.yml` that (a) runs clingwrap per node with
   `--target <the new .cwd>` and (b) adds a **primary-only** task
@@ -241,7 +257,7 @@ repo). Sub-agents prepare the branch; the operator opens the PR.
 | Step | Effort | Model | Where | Brief for sub-agent |
 |------|--------|-------|-------|---------------------|
 | 4a | high | opus | actions branch | Write `tools/ci_log_checks_loki.sh`: query Loki (`| json` LogQL) for the forbidden/required pattern set from `ci_log_checks.sh`, translating each pattern to the JSON structure (restructure level+message-spanning ones like "ERROR gunicorn"), preserving the branch/job gating, the counted thresholds, the warning (non-fatal) set, and a time-anchored replacement for the "once stable after line 1000" rule. Omit etcd checks. Default `LOKI_BASE_URL=http://localhost:3100`. shellcheck-clean. Leave the old scripts intact. |
-| 4b | medium–high | opus | actions branch | Add a Loki-aware clingwrap config (`.cwd` in actions) that swaps the `/var/log/syslog` file jobs for a `journalctl -u "sf-*.service"`/`sf.target` shell job and drops the etcd journal; add `ci-gather-logs-loki.yml` that runs clingwrap per node with the new `.cwd` and adds a primary-only Loki `query_range` dump into the bundle. Leave originals untouched; ansible-lint clean. |
+| 4b | medium–high | opus | actions branch | Add a Loki-aware clingwrap config (`.cwd` in actions) that adds a `directory` job for the logship spool (`/srv/shakenfist/spool/logship/` — the primary Mode-A local-debug artifact), swaps the `/var/log/syslog` file jobs for a `journalctl -u "sf-*.service"`/`sf.target` shell job, and drops the etcd journal; add `ci-gather-logs-loki.yml` that runs clingwrap per node with the new `.cwd` and adds a primary-only Loki `query_range` dump into the bundle. Leave originals untouched; ansible-lint clean. |
 | 4c | low–medium | sonnet | actions branch | Lint everything (shellcheck/ansible-lint/yaml), and smoke `ci_log_checks_loki.sh` against a throwaway local Loki seeded with sample SF JSON lines; document the manual test. |
 
 ## Step ordering and dependencies
@@ -264,10 +280,12 @@ repo). Sub-agents prepare the branch; the operator opens the PR.
   "once stable" boundary; shellcheck-clean. The old scripts are
   untouched.
 - A new Loki-aware clingwrap `.cwd` collects each node's **local**
-  SF journald logs (replacing the syslog file jobs), and a new
-  `ci-gather-logs-loki.yml` adds a primary-only **Loki dump** to
-  the bundle — so a bundle is useful even when the shipper itself
-  failed. Originals untouched.
+  logs — the **logship spool** (`/srv/shakenfist/spool/logship/`,
+  the Mode-A artifact holding undelivered lines) plus journald
+  (the stdout residual) — replacing the syslog file jobs, and a
+  new `ci-gather-logs-loki.yml` adds a primary-only **Loki dump**
+  to the bundle — so a bundle is useful even when the shipper
+  itself failed. Originals untouched.
 - etcd checks are intentionally dropped (documented), and
   `ci_event_checks.sh` has no successor.
 - Lint passes (shellcheck, ansible-lint, yaml); the new tooling is
@@ -300,7 +318,8 @@ to confirm the cross-repo shape (actions branch, operator PR).
       actually appears) and documented.
 - [ ] etcd checks are dropped deliberately and noted; the old
       scripts and the built-in clingwrap `.cwd` are untouched.
-- [ ] The new `.cwd` collects local SF journald per node and no
+- [ ] The new `.cwd` collects the **logship spool** per node (the
+      Mode-A artifact for a shipper failure) plus journald, no
       longer depends on `/var/log/syslog`; the new playbook's Loki
       dump is primary-only and lands in the aggregated bundle.
 - [ ] shellcheck/ansible-lint/yaml all pass; the smoke test (if

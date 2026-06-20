@@ -168,18 +168,18 @@ Apply the same edit to each job block in both workflows:
 Keep `ci_drain_check.sh` (unrelated to syslog). Must stay
 actionlint-clean.
 
-### Interaction with phase 4 (a correction to fold in there)
+### Interaction with phase 4 (now folded into phase 4)
 
 In **Mode A**, SF's structured logs go *only* to the logship
 spool → Loki; they are **not** in journald (the per-module
 `SysLogHandler`s were removed). So for "the shipper failed"
 debugging, the clingwrap bundle must collect the **logship spool**
 (`/srv/shakenfist/spool/logship/*.db`), not just journald —
-journald only has the stdout/stderr residual. Phase 4's clingwrap
-`.cwd` must therefore add a `directory`/`file` job for the spool
-dir. Flagged here because it only becomes load-bearing once
-phase 5 makes Mode A the CI default with no syslog fallback; fold
-this into the phase-4 work.
+journald only has the stdout/stderr residual. This is **now part
+of the phase-4 plan** (its clingwrap `.cwd` adds a `directory` job
+for the spool dir); it becomes load-bearing here, once phase 5
+makes Mode A the CI default with no syslog fallback. Verify the
+phase-4 work actually collected the spool before relying on it.
 
 ## Step items
 
