@@ -141,22 +141,48 @@ class StartModeTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
         # No drainer thread started.
         drainer_start.assert_not_called()
 
-    def test_mode_a_removes_syslog_and_attaches_loki_to_root(self):
+    def test_mode_a_attaches_loki_to_root_at_info_keeps_local(self):
         with mock.patch.object(
                 logship.config, 'LOKI_BASE_URL', 'http://loki:3100'), \
                 mock.patch(
                     'shakenfist.logship_drainer.start') as drainer_start:
             logship.start('test-daemon')
 
-        # The per-module SysLogHandler is removed.
-        self.assertNotIn(self._syslog, self.module_logger.handlers)
+        # The per-module SysLogHandler is LEFT in place, so DEBUG and
+        # everything else still logs locally to journald.
+        self.assertIn(self._syslog, self.module_logger.handlers)
         # Exactly one Loki handler is attached to root.
         loki_handlers = self._root_loki_handlers()
         self.assertEqual(1, len(loki_handlers))
         # Its formatter is a JsonFormatter (reuse or fallback).
         self.assertIsInstance(loki_handlers[0].formatter, JsonFormatter)
+        # It only ships INFO and above; DEBUG stays local.
+        self.assertEqual(logging.INFO, loki_handlers[0].level)
         # The drainer was started.
         drainer_start.assert_called_once_with('test-daemon')
+
+    def test_debug_records_are_not_shipped_to_loki(self):
+        # With the Loki handler at INFO level, a DEBUG record that
+        # propagates to root must not reach the spool, while an INFO
+        # record must.
+        with mock.patch.object(
+                logship.config, 'LOKI_BASE_URL', 'http://loki:3100'), \
+                mock.patch('shakenfist.logship_drainer.start'):
+            logship.start('test-daemon')
+
+        enqueued = []
+        with mock.patch(
+                'shakenfist.logship_spool.enqueue',
+                side_effect=lambda ts, line: enqueued.append((ts, line))):
+            # A logger that propagates to root (where the Loki handler is).
+            log = logging.getLogger('shakenfist.test.levels')
+            log.setLevel(logging.DEBUG)
+            log.debug('a debug line')
+            log.info('an info line')
+
+        shipped = ' '.join(line for _, line in enqueued)
+        self.assertNotIn('a debug line', shipped)
+        self.assertIn('an info line', shipped)
 
     def test_mode_a_is_idempotent(self):
         with mock.patch.object(

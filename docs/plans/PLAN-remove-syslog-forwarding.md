@@ -1154,6 +1154,21 @@ the following statements will be true:
   rely on their own ingress.
 * **OpenTelemetry / tracing** instrumentation is a separate
   thread; align the field-name contract with it when it lands.
+* **Revisit shipping DEBUG centrally (with OpenTelemetry).** v1
+  ships only `INFO`+ to Loki and keeps `DEBUG` local to each
+  node's journald — matching the old rsyslog `*.!=debug`
+  forwarder and keeping the high-volume DEBUG stream off the
+  spool/push path (a measured performance win: shipping every
+  DEBUG line via the per-daemon sqlite spool slowed the
+  multi-node CI cluster ~2x). The cost is that deep diagnosis of
+  a past incident on a now-recycled/disposable node loses its
+  DEBUG detail. Once SF has OpenTelemetry-based tracing — a
+  better-suited transport for high-volume, sampleable diagnostic
+  detail — reconsider centrally capturing DEBUG/trace-level data
+  so on-node access is not required. The level cut lives in
+  `shakenfist/logship.py` (`start()` sets the Loki handler to
+  `INFO`); revisiting it means changing that level and re-checking
+  the volume/perf impact.
 * **A first-class clingwrap `HttpJob`** (instead of a `shell`
   job shelling out to `curl`) if the Loki-dump collector proves
   worth making reusable across other HTTP-fetched diagnostics.

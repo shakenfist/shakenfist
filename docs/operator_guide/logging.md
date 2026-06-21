@@ -31,12 +31,28 @@ identical in both; only the **destination** differs.
 
 ### Loki configured (the preferred path)
 
-With a Loki endpoint set, each daemon buffers its JSON log lines
-in a local on-disk spool and a background drainer ships them to
-Loki, with retry and backpressure. It does **not** also write
-them to a local syslog/file sink — there is no deliberate second
-pipeline. The spool is the local-durability buffer that covers
-transient Loki outages.
+With a Loki endpoint set, each daemon buffers its `INFO`-and-above
+JSON log lines in a local on-disk spool and a background drainer
+ships them to Loki, with retry and backpressure. The spool is the
+local-durability buffer that covers transient Loki outages. All
+levels (including `DEBUG`) continue to be written to the node's
+local journal as well, so on-box `journalctl` debugging is
+unaffected.
+
+### Log levels: what ships to Loki
+
+**Only `INFO` and above is shipped to Loki. `DEBUG` stays local
+(journald only).** This matches the previous rsyslog deployment,
+whose forwarder shipped `*.*;*.!=debug` — DEBUG was never
+centrally aggregated, only kept on each node. It also keeps the
+highest-volume log level (DEBUG; e.g. every privileged command is
+logged at DEBUG) off the spool/push path, which matters for
+performance on busy nodes. When you need DEBUG to diagnose a
+problem, read it on the node with `journalctl`.
+
+A future iteration may revisit shipping deeper detail centrally
+once Shaken Fist has OpenTelemetry-based tracing (see the
+development plans).
 
 ### Loki not configured (the fallback)
 

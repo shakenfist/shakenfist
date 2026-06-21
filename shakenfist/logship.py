@@ -12,26 +12,33 @@ process from the same lifecycle seams as the eventlog drainer
 two modes:
 
 * **Mode B** (``LOKI_BASE_URL`` empty): a no-op. The library's
-  per-module ``SysLogHandler``s stay in place and logs go to
+  per-module ``SysLogHandler``s stay in place and all logs go to
   ``/dev/log`` / journald locally.
-* **Mode A** (``LOKI_BASE_URL`` set, Loki-only): the library's
-  per-module ``SysLogHandler``s are removed from every logger and
-  a single Loki handler is attached to the **root** logger.
-  Records propagate from per-module loggers up to root, so they
-  reach Loki only -- there is no second local shipping pipeline
-  (the on-disk spool is the local-durability buffer; journald
-  still gets the systemd stdout/stderr residual for free).
+* **Mode A** (``LOKI_BASE_URL`` set): the library's per-module
+  ``SysLogHandler``s are left in place (so every level still logs
+  locally to journald, cheaply, as before) and an additional Loki
+  handler is attached to the **root** logger at **INFO** level.
+  Records propagate from per-module loggers up to root, so INFO and
+  above are also shipped to Loki.
 
-Known residual (accepted for v1): a module that calls
-``logs.setup(__name__)`` *after* ``start()`` re-adds a per-module
-``SysLogHandler`` whose lines also reach ``/dev/log`` until
-re-pointed. This is the same limitation ``set_syslog_ident``
-already lives with, and such lines still reach Loki via root
-propagation. The clean fix -- having the library configure the
-root logger once -- is future work.
+**Only INFO and above is shipped to Loki; DEBUG stays local.** This
+matches the previous rsyslog deployment, whose forwarder shipped
+``*.*;*.!=debug`` -- DEBUG was never centrally aggregated, only kept
+in each node's local syslog. It is also the performance fix for the
+multi-node cluster: DEBUG is by far the highest-volume level (e.g.
+privexec logs every command at DEBUG), and keeping it off the
+spool/push path -- which costs a JSON format plus a sqlite insert
+per line -- restores throughput while leaving DEBUG available on
+the node via ``journalctl`` for diagnosis.
+
+Future work (revisit with OpenTelemetry): once SF has OTel-based
+tracing/diagnostics, reconsider shipping DEBUG (or trace-level
+detail) to a central store so deep diagnosis does not require
+on-node access. Tracked in
+``docs/plans/PLAN-remove-syslog-forwarding.md`` (Future work) and
+the OpenTelemetry thread.
 """
 import logging
-from logging.handlers import SysLogHandler
 
 from pylogrus import JsonFormatter
 from shakenfist_utilities import logs
@@ -43,11 +50,11 @@ LOG, _ = logs.setup(__name__)
 
 
 # The library installs a ``JsonFormatter`` on each per-module
-# logger when running with structured logging (v0.9.0+). We reuse
+# logger when running with structured logging (v0.8.5+). We reuse
 # that instance so the field list is a single source of truth.
-# Under v0.8.4 the per-module handlers carry a ``TextFormatter``
-# instead, so no ``JsonFormatter`` exists to lift; this fallback
-# list reconstructs the library's field list.
+# Under older library versions the per-module handlers carry a
+# ``TextFormatter`` instead, so no ``JsonFormatter`` exists to
+# lift; this fallback list reconstructs the library's field list.
 #
 # IMPORTANT: keep this list in sync with
 # ``shakenfist_utilities/logs.py`` ``setup()`` ``enabled_fields``
@@ -105,9 +112,9 @@ def _find_library_json_formatter() -> 'JsonFormatter | None':
 
     Walks every logger's handlers (the ``set_syslog_ident``
     pattern) and returns the first ``JsonFormatter`` found. Under
-    v0.9.0+ the library installs one on each per-module handler;
-    under v0.8.4 the handlers carry a ``TextFormatter`` and this
-    returns None so the caller uses the fallback field list.
+    v0.8.5+ the library installs one on each per-module handler;
+    under older versions the handlers carry a ``TextFormatter`` and
+    this returns None so the caller uses the fallback field list.
     """
     for name in list(logging.root.manager.loggerDict.keys()) + ['']:
         for handler in logging.getLogger(name).handlers:
@@ -132,28 +139,14 @@ def _build_formatter() -> JsonFormatter:
         datefmt='Z', enabled_fields=_FALLBACK_ENABLED_FIELDS)
 
 
-def _remove_library_syslog_handlers() -> None:
-    """Remove every library-installed ``SysLogHandler``.
-
-    Walks every logger (the ``set_syslog_ident`` ``loggerDict`` +
-    root walk) so that, with the Loki handler on root, records
-    reach Loki only and no longer go to ``/dev/log``.
-    """
-    for name in list(logging.root.manager.loggerDict.keys()) + ['']:
-        target = logging.getLogger(name)
-        for handler in list(target.handlers):
-            if isinstance(handler, SysLogHandler):
-                target.removeHandler(handler)
-
-
 def start(daemon_name: str) -> None:
     """Wire up Loki log shipping for this process.
 
     No-op when ``LOKI_BASE_URL`` is empty (Mode B). When set
-    (Mode A), initialises the spool, removes the library's
-    per-module ``SysLogHandler``s, attaches a single Loki handler
-    to the root logger, starts the drainer, and registers a
-    bounded ``atexit`` drain. Idempotent.
+    (Mode A), initialises the spool and attaches a Loki handler to
+    the root logger at INFO level (so only INFO+ is shipped; DEBUG
+    stays in local journald via the library's per-module handlers,
+    which are left untouched), then starts the drainer. Idempotent.
     """
     global _handler, _started
 
@@ -173,16 +166,14 @@ def start(daemon_name: str) -> None:
 
     logship_spool.initialise(daemon_name)
 
-    # Build the Loki handler. The formatter must be lifted (or
-    # reconstructed) before we remove the library handlers, since
-    # removal drops the formatters we want to reuse.
     handler = LokiHandler()
     handler.setFormatter(_build_formatter())
-
-    # Re-point logging to Loki-only: drop the per-module syslog
-    # handlers and attach the single Loki handler to root. Records
-    # propagate from per-module loggers up to root -> Loki only.
-    _remove_library_syslog_handlers()
+    # Ship INFO and above only. DEBUG is the highest-volume level and
+    # stays local (journald) -- matching the old rsyslog forwarder's
+    # ``*.!=debug`` and keeping the high-volume DEBUG stream off the
+    # spool/push path. The library's per-module SysLogHandlers are
+    # left in place, so every level still reaches journald locally.
+    handler.setLevel(logging.INFO)
     logging.getLogger('').addHandler(handler)
     _handler = handler
 
