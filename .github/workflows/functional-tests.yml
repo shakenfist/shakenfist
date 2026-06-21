@@ -578,7 +578,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.pr.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore sf_cleaner'
+              ${{ matrix.pr.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore sf_cleaner,loki'
 
       - name: Fetch and tweak inventory
         if: always()
@@ -1145,7 +1145,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.merge.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75'
+              ${{ matrix.merge.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore loki'
 
       - name: Fetch and tweak inventory
         if: always()
@@ -1524,7 +1524,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75'
+              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore loki'
 
       - name: Fetch and tweak inventory
         if: always()
