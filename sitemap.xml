@@ -113,6 +113,10 @@
          <lastmod>2026-06-21</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/amend/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/chain-config/</loc>
          <lastmod>2026-06-21</lastmod>
     </url>
@@ -230,6 +234,46 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-01-abi/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-02-qcow2-planner/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-03-guest/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-04-host-cli/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-05-rust-tests/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-06-integration/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-07-baselines/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-08-fuzz/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-09-docs/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-amend/</loc>
          <lastmod>2026-06-21</lastmod>
     </url>
     <url>
@@ -842,6 +886,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test/</loc>
+         <lastmod>2026-06-21</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/</loc>
          <lastmod>2026-06-21</lastmod>
     </url>
     <url>
