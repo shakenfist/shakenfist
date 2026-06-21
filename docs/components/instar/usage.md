@@ -966,3 +966,16 @@ is byte-identical to `qemu-img snapshot -l`; mutating modes
 produce bit-for-bit identical images given identical inputs
 (modulo documented freed-cluster / file-tail notes). See
 [docs/snapshot.md](/components/instar/snapshot/) for the full reference.
+
+### amend
+
+```
+instar amend -o compat=VERSION [,-o lazy_refcounts=on|off] IMAGE
+```
+
+Change a qcow2 image's compatibility version (`compat=0.10` for
+qcow2 v2, `compat=1.1` for v3) and/or its `lazy_refcounts` flag
+in place — the sandboxed equivalent of `qemu-img amend`. oVirt's
+VDSM uses `qemu-img amend -o compat=VERSION` to upgrade images to
+v3 after creation (see the oVirt section above). qcow2-only. See
+[docs/amend.md](/components/instar/amend/) for the full reference.
