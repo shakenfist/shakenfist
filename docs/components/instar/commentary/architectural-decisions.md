@@ -59,8 +59,8 @@ who compromises the parser. By loading only the operation binary that is
 needed, the guest contains the minimum code required for the current task.
 
 **The mechanism:** The VMM loads `core.bin` at `0x10000` and the
-operation binary at `0x20000`. Core initialises devices, writes a call
-table to `0x80000`, and then does a function call to `0x20000`. The
+operation binary at `0x22000`. Core initialises devices, writes a call
+table to `0x80000`, and then does a function call to `0x22000`. The
 operation reads the call table and uses it for all I/O. The two binaries
 share no Rust-level linking; their only contract is the `#[repr(C)]`
 structs defined in the `shared` crate.

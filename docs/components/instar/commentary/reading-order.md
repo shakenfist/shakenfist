@@ -488,12 +488,12 @@ To trace a single `instar info image.qcow2` from start to finish:
 1. **VMM `main()`** parses CLI args, opens `image.qcow2`
 2. **VMM** creates a KVM VM, allocates 32MB guest memory
 3. **VMM** writes page tables and GDT into guest memory
-4. **VMM** loads `core.bin` at `0x10000`, `info.bin` at `0x20000`
+4. **VMM** loads `core.bin` at `0x10000`, `info.bin` at `0x22000`
 5. **VMM** writes `InfoConfig` to `0x81000` in guest memory
 6. **VMM** creates virtio-block device backed by `image.qcow2`
 7. **VMM** configures vCPU (long mode, stack, entry point) and runs it
 8. **Core `_start()`** initialises virtio devices, sets up call table
-9. **Core** jumps to `info.bin` at `0x20000`
+9. **Core** jumps to `info.bin` at `0x22000`
 10. **Info `_start()`** reads sector 0 via call table, detects QCOW2 magic
 11. **Info** parses QCOW2 header, extracts virtual size, backing file, etc.
 12. **Info** calls `send_info_result()` via call table

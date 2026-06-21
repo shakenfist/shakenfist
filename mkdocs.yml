@@ -102,6 +102,7 @@ nav:
                 - "Title for the plan": components/development/plans/PLAN-consistency-audits-v2.md
         - Instar:
             - "Introduction": components/instar/index.md
+            - "`instar amend` — change qcow2 image options in place": components/instar/amend.md
             - "`instar commit` — merge an overlay's data into its backing": components/instar/commit.md
             - "`instar create` — create a new empty disk image": components/instar/create.md
             - "`instar map` — emit the allocation map of a disk image": components/instar/map.md
@@ -152,6 +153,7 @@ nav:
                 - "instar check --repair for QCOW2": components/instar/plans/PLAN-check-repair.md
                 - "Fuzzing bug backlog": components/instar/plans/PLAN-fuzzing-bugs.md
                 - "June 2026 fuzzer bug backlog": components/instar/plans/PLAN-bug-fixes.md
+                - "instar amend subcommand": components/instar/plans/PLAN-amend.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
@@ -207,6 +209,7 @@ nav:
                 - "Phase 5: Direct-qemu CI workflow": components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci.md
                 - "Phase 6: Ryll Cargo feature work + digest decoding + restore keypress-to-screen latency": components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding.md
                 - "Phase 7: First Sextant scenario tempest test": components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test.md
+                - "Phase 8: OpenStack CI lane disposition + oVirt provisioning flake": components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md
