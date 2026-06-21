@@ -150,11 +150,9 @@ limits_config:
   reject_old_samples: false
   allow_structured_metadata: true
 
-ruler:
-  storage:
-    type: local
-    local:
-      directory: /var/lib/loki/rules
+# No ruler is configured: CI evaluates no alerting/recording rules, and a
+# ruler block makes Loki run a periodic evaluation loop for nothing. Leaving
+# it out keeps the single-binary Loki closer to idle.
 
 analytics:
   reporting_enabled: false
@@ -172,6 +170,18 @@ ExecStart=${LOKI_BIN} -config.file=${LOKI_CONFIG}
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
+
+# Run Loki at low priority so it cannot starve the Shaken Fist daemons or
+# the nested guest VMs sharing this CI node. The first end-to-end run showed
+# Loki burning ~1.5 cores for a trivial (~17 lines/s) log volume, which
+# slowed the whole nested cluster ~2x. Rather than a hard CPU quota (which
+# risks delaying ingest so the logs-reach-Loki test times out), make Loki
+# yield under contention but still use spare capacity: low CPU/IO niceness
+# and cgroup weights, plus a generous memory ceiling as a backstop.
+Nice=19
+CPUWeight=10
+IOWeight=10
+MemoryMax=1G
 
 [Install]
 WantedBy=multi-user.target
