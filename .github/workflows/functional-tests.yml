@@ -1793,7 +1793,7 @@ jobs:
           cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
           chown -R debian.debian /home/debian/.ssh
           ansible-playbook -i /srv/github/inventory.yaml \
-              --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              --extra-vars "base_image_user=debian node_checks_job_name=node-lifecycle ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
               ${GITHUB_WORKSPACE}/actions/ansible/ci-node-checks.yml
 
       - name: Gather logs
