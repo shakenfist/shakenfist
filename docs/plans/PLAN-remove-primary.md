@@ -27,9 +27,9 @@ topology-JSON to ansible-groups translator that will be
 retired), `shakenfist/deploy/ansible/roles/primary/` (the
 role to be removed), `shakenfist/deploy/ansible/roles/base/`
 (daemon installation, which becomes the heart of the new
-galaxy role), `shakenfist/mariadb.py` (database access and
-the `DATA_MIGRATIONS` machinery that the bootstrap_operations
-table will sit alongside), and `shakenfist/daemons/database/`
+galaxy role), `shakenfist/mariadb.py` (database access, in
+particular `set_cluster_config`'s idempotent upsert that the
+role's config tasks rely on), and `shakenfist/daemons/database/`
 (the gRPC service that becomes a deployer-chosen tier of
 equal stateless instances — see
 [`PLAN-byo-mariadb.md`](PLAN-byo-mariadb.md) for that work).
@@ -122,16 +122,25 @@ infrastructure**. Concretely:
   variables. The current single-node and CI deployments
   become *example consumers* of the collection, not the
   product.
-- Cluster-wide bootstrap (`AUTH_SECRET_SEED`, admin
-  namespace, cluster_config defaults) is exposed as a
-  single idempotent `sf-ctl bootstrap-cluster` command that
-  records completion in a new `bootstrap_operations` table,
-  with each operation and its completion record written in
-  the same transaction so partial-bootstrap states are
-  impossible. Schema initialisation and migration are
-  *not* part of this command — they are handled by the
-  separate `sf-ctl ensure-mariadb-schema` command
-  introduced in `PLAN-byo-mariadb.md`.
+- Cluster-wide bootstrap stays a handful of small,
+  idempotent steps rather than a new orchestrating command.
+  Cluster config (including per-node defaults the role
+  computes from gathered facts via `set_fact`) is applied
+  idempotently by the role on every run via `sf-ctl
+  set-config` (`set_cluster_config` is an upsert).
+  `AUTH_SECRET_SEED` remains caller-supplied — SF never
+  generates it, so it stays stable even if a prior cluster
+  goes undetected. The `system` namespace and its initial
+  operator-supplied key are established by the existing
+  idempotent `sf-ctl bootstrap-system-key`. Schema
+  initialisation and migration are handled by the separate
+  `sf-ctl ensure-mariadb-schema` command introduced in
+  `PLAN-byo-mariadb.md`. Because every step is idempotent, a
+  partially-applied bootstrap self-heals on the next role
+  run — no `bootstrap_operations` table or transaction
+  bracketing is required. (This reverses an earlier design
+  that added a `bootstrap_operations` table and a single
+  `sf-ctl bootstrap-cluster` command; see the phase 2 note.)
 - Stale `etcd_master` naming throughout the deployer is
   renamed to `database_node`. (The `shakenfist/etcd.py`
   drain code itself remains, as already documented in
@@ -246,44 +255,41 @@ separately in `PLAN-sticky-transfers.md`.
    `.github/workflows/release.yml` alongside the existing
    PyPI job; if it ships inside the pip package, no
    `release.yml` change is needed.
-2. **`bootstrap_operations` granularity.** Is the
-   granularity per-config-key (one row per
-   `AUTH_SECRET_SEED`, `RAM_SYSTEM_RESERVATION`, etc.) or
-   per-logical-step (one row per "set initial cluster
-   config")? Per-key gives finer recovery; per-step gives
-   a cleaner audit trail. Phase 2 should resolve this with
-   a concrete schema proposal.
-3. **Dev/test convenience preservation.** The single-node /
+2. **Dev/test convenience preservation.** The single-node /
    "I just want a working SF on my laptop" experience needs
    to survive. Options: ship a separate `examples/single-
    node/` playbook that exercises every convenience together,
    or document a quickstart that wires the new galaxy role
    together with the documented BYO-MariaDB single-box flow
    from `PLAN-byo-mariadb.md`. Decide before phase 6.
-4. **CI rig migration.** `shakenfist/deploy/shakenfist_ci`
+3. **CI rig migration.** `shakenfist/deploy/shakenfist_ci`
    currently exercises the deployer end-to-end. As the
    deployer changes shape, the CI rig becomes one of the
    first consumers of the new galaxy role. Sequencing this
    so CI never goes dark for more than one phase needs care
    — every phase must leave CI green.
-5. **Topology.json migration.** Existing operators with
+4. **Topology.json migration.** Existing operators with
    `topology.json` files need either a shim that translates
    them to ansible inventory, or a clear "here's how to
    rewrite this by hand" doc. Phase 7 should decide which.
+
+The `bootstrap_operations` granularity question that used
+to sit here is resolved: the table is gone (see the phase 2
+note), so there is no granularity to decide.
 
 ## Execution
 
 The work breaks into phases that can each land
 independently, leaving CI green at every step. The early
 phases are pure deletion / rename and carry low risk; the
-later phases introduce new mechanism (bootstrap CLI,
-elected `sf-database`, galaxy-role packaging) and need more
+remaining new mechanism lives almost entirely in the
+galaxy-collection packaging (phase 6) and needs the most
 care.
 
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Remove rsyslog aggregation from deployer | _(realised by [PLAN-remove-syslog-forwarding.md](PLAN-remove-syslog-forwarding.md) phase 5)_ | Complete (pending CI confirmation) |
-| 2. `bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster` | PLAN-remove-primary-phase-02-bootstrap-cli.md | Not started |
+| 2. ~~`bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster`~~ | _(dissolved — see phase notes; the role-config-idempotency remainder folds into phase 6)_ | Dissolved |
 | 3. Remove Apache reverse proxy from deployer | _(realised by [PLAN-remove-apache-lb.md](PLAN-remove-apache-lb.md))_ | Complete (pending CI confirmation) |
 | 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | _(see byo-mariadb)_ |
 | 6. Repackage deployer as the `shakenfist.shakenfist` galaxy collection; delete the getsf installer chain; example consumers | PLAN-remove-primary-phase-06-galaxy-role.md | Not started |
@@ -312,22 +318,39 @@ Phase notes:
   `rsyslog` package + service enablement, and the
   `--log-syslog` gunicorn flag), in the same way phase 3 was
   realised by `PLAN-remove-apache-lb.md`.
-- **Phase 2** introduces the `bootstrap_operations` table
-  in `mariadb.py`, the `sf-ctl bootstrap-cluster` subcommand,
-  and replaces every `set-config` / `ensure-mariadb-schema` /
-  admin-namespace task in `cluster_config.yml` and
-  `register.yml` with a single call to the new command. The
-  one-transaction-per-op invariant is the schema's central
-  claim and must be enforced in the code, not just the docs.
-  Phase 2 also records the cluster's SF version on first
-  bootstrap (either as a `bootstrap_operations` row or as a
-  dedicated `cluster_version` table — phase 2's design
-  decision) and adds a startup check in every SF daemon
-  that compares its own version against the recorded
-  cluster version and refuses to start if outside the
-  supported window. The compatibility policy (the proposal
-  is "N-to-N+1 always supported; N-to-N+2 not assumed") is
-  decided as part of phase 2 and documented for operators.
+- **Phase 2 (dissolved).** This phase originally introduced
+  a `bootstrap_operations` table and an idempotent
+  `sf-ctl bootstrap-cluster` command that subsumed every
+  `set-config` / admin-namespace bootstrap task, plus a
+  recorded cluster version and a per-daemon version-compat
+  startup check. Detailed planning reassessed the scope to
+  nothing:
+  - **Config stays in the role.** Several current
+    `set-config` values (`MAX_HYPERVISOR_MTU`, `DNS_SERVER`,
+    `HTTP_PROXY`) are recomputed by ansible on every deploy,
+    so folding them into a one-time bootstrap would stop
+    those updates propagating. Config — including per-node
+    defaults computed via `set_fact` from gathered facts —
+    is applied idempotently by the role each run. The
+    role-config idempotency tidy-up folds into phase 6.
+  - **No new bootstrap command or table.** `AUTH_SECRET_SEED`
+    is a caller-supplied `set-config`; the `system` namespace
+    and its operator-supplied key are the existing idempotent
+    `bootstrap-system-key` (`Namespace.new` is idempotent and
+    `add_key` is keyed by name, so a re-run overwrites rather
+    than duplicates). Idempotency already makes a partial
+    bootstrap self-healing on the next run, which was the
+    only thing the one-transaction `bootstrap_operations`
+    table existed to guarantee.
+  - **No cluster-version table or per-daemon version check.**
+    byo-mariadb's `verify_schema_versions` already refuses to
+    start a daemon whose build disagrees with the DB schema,
+    covering the real compatibility hazard. A statically
+    bootstrap-recorded version would only catch
+    schema-invariant skew and would go stale on the first
+    rolling upgrade; if that protection is ever wanted it can
+    be derived from the per-node `installed_version` already
+    stored in node attributes, with no new schema. Dropped.
 - **Phase 3** deletes `roles/primary/tasks/apache2.yml` and
   `files/apache-site-primary.conf`. Documents the
   load-balancing requirement for production operators and
@@ -367,6 +390,30 @@ Phase notes:
   phase 7's remaining scope is only the residual
   `etcd_master` mentions in surviving roles, templates, CI,
   and comments.
+
+  Phase 6 also folds in the ansible integration. The SF
+  ansible modules (`sf_instance` / `sf_network` /
+  `sf_namespace` / `sf_snapshot`) move into the collection as
+  native `AnsibleModule`s under `plugins/modules/`,
+  auto-discovered as `shakenfist.shakenfist.sf_*`. This
+  retires the bash shims, the `sf-client ansible …`
+  subcommand they shell out to, and the awkward
+  `postinstall.yml` install dance
+  (`sf-client admin ansible_module_path` introspection plus a
+  manual copy into `/usr/share/ansible/plugins/modules/` with
+  hardcoded fallback paths). The modules call
+  `shakenfist_client` as their API SDK — the same pattern as
+  `community.aws` over `boto3` — so the REST/API logic stays
+  in the client-python repo and only the ansible glue lives
+  in the collection. The collection declares a compatible
+  `shakenfist_client` version range as a Python requirement;
+  an ansible control node needs `ansible-galaxy collection
+  install shakenfist.shakenfist` plus `pip install
+  shakenfist_client`, never the server package. Note the
+  cross-repo coupling: the current module source lives in
+  client-python, so this step either vendors the modules into
+  the collection or is coordinated with a client-python
+  change.
 - **Phase 7** is mostly mechanical: rename `etcd_master` →
   `database_node` across the surviving collection roles,
   example playbooks, templates, CI, and comments (the
@@ -427,6 +474,15 @@ rationale:
   variables — the same pattern Kubespray and ceph-ansible
   use, where the playbook plus inventory decides which hosts
   run which role.
+- **Ansible modules ship as collection content.** The SF
+  ansible modules become native `AnsibleModule`s under the
+  collection's `plugins/modules/`, replacing the bash-shim +
+  `postinstall.yml` copy install. Bundling roles and modules
+  in one collection is exactly what the collection format is
+  for; operators get them via `ansible-galaxy collection
+  install`, with `shakenfist_client` as the only Python
+  dependency on the control node. See the phase 6 note for
+  the cross-repo coupling with client-python.
 
 Precedent: ceph-ansible and Kubespray both split into
 multiple roles, but they split by *functional component /
@@ -473,11 +529,11 @@ that the management session should do the implementation
 itself.
 
 Use `isolation: "worktree"` for sub-agents when the change is
-risky or experimental. Phases 2, 4 and 5 in particular touch
-bootstrap correctness, the MariaDB access path, and
-cross-daemon discovery — those should default to worktree
-isolation. Phases 1, 3, and 7 are deletions / renames and
-can work directly in the main tree.
+risky or experimental. Phase 6 in particular reshapes the
+deployer into a galaxy collection and rewrites the ansible
+modules — its more invasive steps should default to worktree
+isolation. Phase 7 is a rename / cleanup and can work
+directly in the main tree.
 
 ### Planning effort
 
@@ -487,12 +543,14 @@ cross-referencing multiple source files, and making judgment
 calls about scope and sequencing.
 
 Each phase plan should specify the recommended effort level
-for planning that phase. Phases involving schema design
-(phase 2), cross-daemon coordination (phase 5), or migration
-safety (phase 4) should be planned at high effort. Phases
-that are largely deletion / rename (phases 1, 3, 7) can be
-planned at medium effort. Phase 6 (galaxy-role packaging) is
-high effort because it changes the operator-facing API.
+for planning that phase. Phase 6 (galaxy-collection
+packaging, including the native ansible modules) is high
+effort because it changes the operator-facing API. Phase 7
+(the `etcd_master` → `database_node` rename and final
+cleanup) is largely mechanical and can be planned at medium
+effort. (Phases 1 and 3 are already realised by other plans;
+phase 2 is dissolved; phases 4-5 moved to
+`PLAN-byo-mariadb.md`.)
 
 ### Step-level guidance
 
@@ -570,16 +628,21 @@ because the following statements will be true:
   removal is handled by
   [`PLAN-byo-mariadb.md`](PLAN-byo-mariadb.md) and is
   outside this plan's scope.)
-* `sf-ctl bootstrap-cluster` exists, is idempotent, and is
-  the only path through which a cluster's initial auth
-  secret, admin namespace, and default config are
-  established. Re-running it on a bootstrapped cluster is
-  a no-op. (Schema initialisation is handled by the
-  separate `sf-ctl ensure-mariadb-schema` command
-  introduced in `PLAN-byo-mariadb.md`.)
-* The `bootstrap_operations` table exists and is populated
-  by every bootstrap step in the same transaction as that
-  step's artefact.
+* Cluster bootstrap is a set of idempotent steps with no
+  dedicated orchestrating command or table: cluster config
+  (including per-node defaults) is applied by the role on
+  every run via `set-config`, `AUTH_SECRET_SEED` is
+  caller-supplied, and the `system` namespace plus its
+  initial operator-supplied key are established by the
+  existing idempotent `sf-ctl bootstrap-system-key`.
+  Re-running the deploy on a bootstrapped cluster is a no-op.
+  (Schema initialisation is handled by the separate
+  `sf-ctl ensure-mariadb-schema` command introduced in
+  `PLAN-byo-mariadb.md`.)
+* The SF ansible modules are native collection content under
+  `plugins/modules/` (`shakenfist.shakenfist.sf_*`), with no
+  shim / copy-into-`/usr/share/ansible` install step, and
+  depend only on `shakenfist_client` on the control node.
 * The deployer is consumable as an ansible-galaxy
   **collection** (`shakenfist.shakenfist`): an operator can
   write a one-page playbook that assigns hosts to the
