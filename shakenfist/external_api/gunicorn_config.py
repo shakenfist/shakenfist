@@ -35,6 +35,7 @@ SIGQUIT/SIGINT, which systemd does not send on stop.
 import signal
 import threading
 
+import gunicorn.glogging
 from shakenfist_utilities import logs
 
 # NOTE: gunicorn loads this file as its --config module and scans the module's
@@ -50,6 +51,49 @@ from shakenfist.external_api import health
 LOG, _ = logs.setup(__name__)
 
 
+class SFGunicornLogger(gunicorn.glogging.Logger):
+    """Mode-aware gunicorn logger so dropping ``--log-syslog`` is lossless.
+
+    gunicorn names its own loggers ``gunicorn.error`` /
+    ``gunicorn.access`` and, in ``Logger.__init__``, sets
+    ``propagate = False`` on both and attaches its own stream handlers.
+    That means ``logship.start``'s root-logger re-pointing (which runs in
+    ``post_fork``) does NOT reach them. To make removing ``--log-syslog``
+    lossless we adjust them here, based on whether a Loki endpoint is
+    configured:
+
+    - **Mode A** (``LOKI_BASE_URL`` set): re-enable propagation and clear
+      gunicorn's own handlers so the access/error records propagate to the
+      root logger -- where ``logship`` attaches the Loki handler in
+      ``post_fork`` -- and reach Loki only (no stderr duplicate).
+    - **Mode B** (``LOKI_BASE_URL`` empty): leave gunicorn's default
+      handlers (stderr -> journald) untouched so the logs are not orphaned.
+
+    gunicorn instantiates ``logger_class`` as ``logger_class(cfg)`` (see
+    ``gunicorn.arbiter.Arbiter``: ``self.log = self.cfg.logger_class(...)``),
+    and ``Logger.__init__`` takes a single ``cfg`` argument, so this
+    subclass simply forwards it to ``super().__init__``.
+    """
+
+    def __init__(self, cfg):
+        super().__init__(cfg)
+
+        if sf_config.LOKI_BASE_URL:
+            # Mode A: let the records flow to the root logger's Loki handler
+            # only. Clear gunicorn's own stream handlers so the lines are not
+            # also written to stderr.
+            self.error_log.propagate = True
+            self.access_log.propagate = True
+            self.error_log.handlers = []
+            self.access_log.handlers = []
+
+
+# gunicorn reads ``logger_class`` from the --config module's globals and loads
+# the dotted path via ``validate_class`` -> ``util.load_class``, then
+# instantiates it with the cfg. Point it at the mode-aware subclass above.
+logger_class = 'shakenfist.external_api.gunicorn_config.SFGunicornLogger'
+
+
 def post_fork(server, worker):
     try:
         from shakenfist import eventlog_drainer
@@ -58,6 +102,18 @@ def post_fork(server, worker):
         LOG.with_fields({'error': str(e), 'pid': worker.pid}).warning(
             'Failed to start eventlog drainer in gunicorn worker; '
             'events will fall through to the direct gRPC + DLQ path')
+
+    # Wire up Loki log shipping per worker. Like the drainer above it
+    # spawns a thread (when LOKI_BASE_URL is set), so post_fork is the
+    # only correct moment to start it (threads don't survive the
+    # --preload fork). A no-op when LOKI_BASE_URL is empty.
+    try:
+        from shakenfist import logship
+        logship.start('sf-api')
+    except Exception as e:
+        LOG.with_fields({'error': str(e), 'pid': worker.pid}).warning(
+            'Failed to start Loki log shipper in gunicorn worker; '
+            'logs will fall through to the local per-module handlers')
 
     # Start the per-worker readiness checker. Like the drainer above it
     # spawns a thread, so post_fork is the only correct moment to start it

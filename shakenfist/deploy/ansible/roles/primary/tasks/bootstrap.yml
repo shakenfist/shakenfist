@@ -14,17 +14,3 @@
 - name: Find lowest MTU
   set_fact:
     lowest_mtu: "{{ hostvars[lowest_mtu_hypervisor]['node_mtu'] }}"
-
-- name: Write syslog file
-  template:
-    src: templates/rsyslog-server-01-sf.conf
-    dest: /etc/rsyslog.d/01-sf.conf
-    owner: root
-    group: sudo
-    mode: u=r,g=r,o=
-
-- name: Restart syslog
-  service:
-    name: rsyslog
-    enabled: yes
-    state: restarted

@@ -345,6 +345,19 @@ jobs:
                    /tmp/mariadb-tuning.cnf \
                    citestpw'
 
+      - name: Install Loki on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-loki.sh \
+              ${{ matrix.pr.base_image_user }}@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.pr.base_image_user }}@${primary} \
+              'sudo bash /tmp/ci-install-loki.sh'
+
       - name: Run getsf installer on primary
         timeout-minutes: 45
         run: |
@@ -358,6 +371,7 @@ jobs:
                GETSF_MARIADB_USER=shakenfist \
                GETSF_MARIADB_PASSWORD=citestpw \
                GETSF_MARIADB_DATABASE=shakenfist \
+               GETSF_LOKI_BASE_URL=http://${{ matrix.pr.topology == 'localhost' && '127.0.0.1' || '10.0.1.10' }}:3100 \
                /tmp/getsf-wrapper"
 
       - name: Wait for the cluster to become schedulable
@@ -366,7 +380,7 @@ jobs:
 
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.pr.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+              ${{ matrix.pr.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/*'
 
           count=0
           while [ $count -lt 60 ]
@@ -535,23 +549,14 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.pr.job_name }}"
-
-      - name: Dump matching forbidden log lines from primary
-        if: always() && steps.check_logs.outcome == 'failure'
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'sudo grep -nHE -A 50 "Traceback \(most recent call last\)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -600 || true'
-          echo
-          tools/run_remote ${primary} 'sudo grep -nHE "Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks_loki.sh develop ${{ matrix.pr.job_name }}"
 
       - name: Dump systemd state and journals
         if: always() && steps.check_logs.outcome == 'failure'
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager' || true
 
       - name: Set check_logs output for matrix aggregation
         id: set_output
@@ -573,15 +578,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.pr.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore sf_cleaner'
-
-      - name: Check for reasonable data rates
-        timeout-minutes: 5
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
+              ${{ matrix.pr.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore sf_cleaner,loki'
 
       - name: Fetch and tweak inventory
         if: always()
@@ -595,14 +592,21 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
-      - name: Snapshot primary syslog
+      # Gating per-node system check. Loki only carries SF's application
+      # logs, so kernel/systemd-level failures (apparmor denials, segfaults,
+      # abseil/gRPC C++ fatals, systemd unit exits) live only in each node's
+      # journald. This fans out across the inventory and fails the run on any
+      # node's system-level failure -- coverage Loki cannot provide.
+      - name: Per-node system-level checks
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          mkdir -p /srv/github/bundle
-          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          ssh ${SSH_OPTS} ${{ matrix.pr.base_image_user }}@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
-          scp ${SSH_OPTS} ${{ matrix.pr.base_image_user }}@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "base_image_user=${{ matrix.pr.base_image_user }} \
+              ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-node-checks.yml
 
       - name: Gather logs
         if: always()
@@ -628,7 +632,7 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=${{ matrix.pr.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs-loki.yml
 
       - name: Capture py-spy thread dumps
         if: always()
@@ -887,6 +891,19 @@ jobs:
                    /tmp/mariadb-tuning.cnf \
                    citestpw'
 
+      - name: Install Loki on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-loki.sh \
+              ${{ matrix.merge.base_image_user }}@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.merge.base_image_user }}@${primary} \
+              'sudo bash /tmp/ci-install-loki.sh'
+
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
@@ -900,6 +917,7 @@ jobs:
                GETSF_MARIADB_USER=shakenfist \
                GETSF_MARIADB_PASSWORD=citestpw \
                GETSF_MARIADB_DATABASE=shakenfist \
+               GETSF_LOKI_BASE_URL=http://${{ matrix.merge.topology == 'localhost' && '127.0.0.1' || '10.0.1.10' }}:3100 \
                /tmp/getsf-wrapper"
 
       - name: Wait for the cluster to become schedulable
@@ -908,7 +926,7 @@ jobs:
 
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.merge.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+              ${{ matrix.merge.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/*'
 
           count=0
           while [ $count -lt 60 ]
@@ -1107,23 +1125,14 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ${{ matrix.merge.job_name }}"
-
-      - name: Dump matching forbidden log lines from primary
-        if: always() && steps.check_logs.outcome == 'failure'
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'sudo grep -nHE -A 50 "Traceback \(most recent call last\)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -600 || true'
-          echo
-          tools/run_remote ${primary} 'sudo grep -nHE "Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks_loki.sh develop ${{ matrix.merge.job_name }}"
 
       - name: Dump systemd state and journals
         if: always() && steps.check_logs.outcome == 'failure'
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager' || true
 
       - name: Set exceptions output for matrix aggregation
         id: set_exceptions_output
@@ -1136,15 +1145,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.merge.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75'
-
-      - name: Check for reasonable data rates
-        timeout-minutes: 5
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
+              ${{ matrix.merge.base_image_user }}@${primary} '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore loki'
 
       - name: Fetch and tweak inventory
         if: always()
@@ -1157,14 +1158,21 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
-      - name: Snapshot primary syslog
+      # Gating per-node system check. Loki only carries SF's application
+      # logs, so kernel/systemd-level failures (apparmor denials, segfaults,
+      # abseil/gRPC C++ fatals, systemd unit exits) live only in each node's
+      # journald. This fans out across the inventory and fails the run on any
+      # node's system-level failure -- coverage Loki cannot provide.
+      - name: Per-node system-level checks
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          mkdir -p /srv/github/bundle
-          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          ssh ${SSH_OPTS} ${{ matrix.merge.base_image_user }}@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
-          scp ${SSH_OPTS} ${{ matrix.merge.base_image_user }}@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "base_image_user=${{ matrix.merge.base_image_user }} \
+              ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-node-checks.yml
 
       - name: Gather logs
         if: always()
@@ -1186,7 +1194,7 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=${{ matrix.merge.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs-loki.yml
 
       - name: Capture py-spy thread dumps
         if: always()
@@ -1452,7 +1460,7 @@ jobs:
 
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+              debian@$primary 'sudo chmod ugo+r /etc/sf/*'
 
           count=0
           while [ $count -lt 60 ]
@@ -1502,36 +1510,21 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop ansible-modules"
-
-      - name: Dump matching forbidden log lines from primary
-        if: always() && steps.check_logs.outcome == 'failure'
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks_loki.sh develop ansible-modules"
 
       - name: Dump systemd state and journals
         if: always() && steps.check_logs.outcome == 'failure'
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager' || true
 
       - name: Check process CPU usage
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75'
-
-      - name: Check for reasonable data rates
-        timeout-minutes: 5
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
+              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/sf-client node cpuhogs -t 1.75 --ignore loki'
 
       - name: Fetch and tweak inventory
         if: always()
@@ -1544,14 +1537,21 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
-      - name: Snapshot primary syslog
+      # Gating per-node system check. Loki only carries SF's application
+      # logs, so kernel/systemd-level failures (apparmor denials, segfaults,
+      # abseil/gRPC C++ fatals, systemd unit exits) live only in each node's
+      # journald. This fans out across the inventory and fails the run on any
+      # node's system-level failure -- coverage Loki cannot provide.
+      - name: Per-node system-level checks
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          mkdir -p /srv/github/bundle
-          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          ssh ${SSH_OPTS} debian@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
-          scp ${SSH_OPTS} debian@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
+          chown -R debian.debian /home/debian/.ssh
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-node-checks.yml
 
       - name: Gather logs
         if: always()
@@ -1564,7 +1564,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs-loki.yml
 
       - name: Capture py-spy thread dumps
         if: always()
@@ -1682,7 +1682,7 @@ jobs:
 
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+              debian@$primary 'sudo chmod ugo+r /etc/sf/*'
 
           count=0
           while [ $count -lt 60 ]
@@ -1740,21 +1740,14 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh develop node-lifecycle"
-
-      - name: Dump matching forbidden log lines from primary
-        if: always() && steps.check_logs.outcome == 'failure'
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks_loki.sh develop node-lifecycle"
 
       - name: Dump systemd state and journals
         if: always() && steps.check_logs.outcome == 'failure'
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager' || true
 
       - name: Restart Shaken Fist nodes so we can collect logs
         if: always()
@@ -1776,14 +1769,6 @@ jobs:
           done
           sleep 90
 
-      - name: Check for reasonable data rates
-        timeout-minutes: 5
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh develop"
-
       - name: Fetch and tweak inventory
         if: always()
         run: |
@@ -1795,14 +1780,21 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
-      - name: Snapshot primary syslog
+      # Gating per-node system check. Loki only carries SF's application
+      # logs, so kernel/systemd-level failures (apparmor denials, segfaults,
+      # abseil/gRPC C++ fatals, systemd unit exits) live only in each node's
+      # journald. This fans out across the inventory and fails the run on any
+      # node's system-level failure -- coverage Loki cannot provide.
+      - name: Per-node system-level checks
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          mkdir -p /srv/github/bundle
-          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          ssh ${SSH_OPTS} debian@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
-          scp ${SSH_OPTS} debian@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
+          chown -R debian.debian /home/debian/.ssh
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "base_image_user=debian node_checks_job_name=node-lifecycle ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-node-checks.yml
 
       - name: Gather logs
         if: always()
@@ -1815,7 +1807,7 @@ jobs:
 
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs-loki.yml
 
       - name: Capture py-spy thread dumps
         if: always()

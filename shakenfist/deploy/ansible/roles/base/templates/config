@@ -45,3 +45,19 @@ SHAKENFIST_MARIADB_USER="{{ mariadb_user }}"
 SHAKENFIST_MARIADB_PASSWORD="{{ mariadb_password }}"
 SHAKENFIST_MARIADB_DATABASE="{{ mariadb_database }}"
 {% endif %}
+
+# Loki log shipping endpoint. Rendered on all nodes (every daemon ships
+# its own logs) and only when configured; an empty value leaves the
+# shipper dormant.
+{% if loki_base_url %}
+SHAKENFIST_LOKI_BASE_URL="{{ loki_base_url }}"
+{% endif %}
+{% if loki_tenant %}
+SHAKENFIST_LOKI_TENANT="{{ loki_tenant }}"
+{% endif %}
+{# The auth header is a secret. Unlike MARIADB_PASSWORD (rendered only on
+   database-tier nodes), it is rendered on every node because every daemon
+   pushes its own logs to Loki, so it lands in each node's /etc/sf/config. #}
+{% if loki_auth_header %}
+SHAKENFIST_LOKI_AUTH_HEADER="{{ loki_auth_header }}"
+{% endif %}

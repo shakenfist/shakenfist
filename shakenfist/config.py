@@ -377,6 +377,43 @@ class SFConfig(BaseSettings):
         13006,
         description='Prometheus metrics port for the sf-database daemon.'
     )
+
+    # Loki log shipping options
+    LOKI_BASE_URL: str = Field(
+        '',
+        description=(
+            'Base URL of the Loki instance log lines are shipped to (for '
+            'example "http://loki.example.com:3100"). When empty, log '
+            'shipping is dormant and the library\'s per-module syslog '
+            'handlers remain in place (logs go to /dev/log locally).'
+        )
+    )
+    LOKI_TENANT: str = Field(
+        '',
+        description=(
+            'Loki tenant id sent as the X-Scope-OrgID header. Only sent '
+            'when non-empty (single-tenant Loki deployments leave this '
+            'blank).'
+        )
+    )
+    LOKI_AUTH_HEADER: str = Field(
+        '',
+        description=(
+            'Opaque value sent verbatim as the Authorization header on '
+            'every Loki push (for example "Bearer <token>" or a Basic '
+            'credential). Only sent when non-empty. Treat as a secret: '
+            'this value is never logged.'
+        )
+    )
+    LOG_EVENTS_TO_LOKI: bool = Field(
+        True,
+        description=(
+            'When True, the "Added event" diagnostic log line is emitted '
+            'so events also flow to the log stream. The authoritative '
+            'event record is always written to MariaDB regardless of this '
+            'setting.'
+        )
+    )
     USAGE_EVENT_FREQUENCY: int = Field(
         60,
         description='How frequently to collect usage events.'

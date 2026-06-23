@@ -156,6 +156,19 @@ jobs:
                    /tmp/mariadb-tuning.cnf \
                    citestpw'
 
+      - name: Install Loki on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-loki.sh \
+              ${{ matrix.os.base_image_user }}@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ matrix.os.base_image_user }}@${primary} \
+              'sudo bash /tmp/ci-install-loki.sh'
+
       - name: Run getsf installer on primary
         timeout-minutes: 30
         run: |
@@ -169,6 +182,7 @@ jobs:
                GETSF_MARIADB_USER=shakenfist \
                GETSF_MARIADB_PASSWORD=citestpw \
                GETSF_MARIADB_DATABASE=shakenfist \
+               GETSF_LOKI_BASE_URL=http://${{ matrix.os.topology == 'localhost' && '127.0.0.1' || '10.0.1.10' }}:3100 \
                /tmp/getsf-wrapper"
 
       - name: Wait for API to start answering
@@ -177,7 +191,7 @@ jobs:
 
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              ${{ matrix.os.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/* /var/log/syslog'
+              ${{ matrix.os.base_image_user }}@${primary} 'sudo chmod ugo+r /etc/sf/*'
 
           count=0
           while [ $count -lt 60 ]
@@ -287,21 +301,14 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks.sh ${{ matrix.os.branch }}"
-
-      - name: Dump matching forbidden log lines from primary
-        if: always() && steps.check_logs.outcome == 'failure'
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'sudo grep -nHE "Traceback \(most recent call last\)|Failed with result|Failed to send event with gRPC|Main process exited|stop-sigterm.* timed out|apparmor=.DENIED|ERROR sf|Unhandled gRPC call failure" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -300 || true'
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks_loki.sh ${{ matrix.os.branch }}"
 
       - name: Dump systemd state and journals
         if: always() && steps.check_logs.outcome == 'failure'
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager; echo "=== cluster-wide systemd events (from forwarded syslog) ==="; sudo grep -hE "systemd\[[0-9]+\]:.*(Failed|sf-[a-z]+\.service)" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200' || true
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager' || true
 
       # On Ubuntu 22.04 the cleaner is rated a CPU hog because of etcd cleanup
       # cost. That's not really something we can control, so just ignore the CPU
@@ -315,19 +322,11 @@ jobs:
           echo
               # Older versions of Shaken Fist can't ignore some processes
               ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 0.99'
+                  ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 0.99 --ignore loki'
           else
               ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 0.99 --ignore sf_cleaner'
+                  ${{ matrix.os.base_image_user }}@${primary} '. /etc/sf/sfrc; sf-client node cpuhogs -t 0.99 --ignore sf_cleaner,loki'
           fi
-
-      - name: Check for reasonable data rates
-        timeout-minutes: 5
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_event_checks.sh ${{ matrix.os.branch }}"
 
       - name: Fetch and tweak inventory
         if: always()
@@ -340,14 +339,21 @@ jobs:
           echo "====="
           cat /srv/github/inventory.yaml
 
-      - name: Snapshot primary syslog
+      # Gating per-node system check. Loki only carries SF's application
+      # logs, so kernel/systemd-level failures (apparmor denials, segfaults,
+      # abseil/gRPC C++ fatals, systemd unit exits) live only in each node's
+      # journald. This fans out across the inventory and fails the run on any
+      # node's system-level failure -- coverage Loki cannot provide.
+      - name: Per-node system-level checks
         if: always()
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          mkdir -p /srv/github/bundle
-          SSH_OPTS="-i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          ssh ${SSH_OPTS} ${{ matrix.os.base_image_user }}@${primary} 'sudo tar czf /tmp/syslog-primary.tar.gz /var/log/syslog* && sudo chmod ugo+r /tmp/syslog-primary.tar.gz' || true
-          scp ${SSH_OPTS} ${{ matrix.os.base_image_user }}@${primary}:/tmp/syslog-primary.tar.gz /srv/github/bundle/ || true
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
+          ansible-playbook -i /srv/github/inventory.yaml \
+              --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
+              ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-node-checks.yml
 
       - name: Gather logs
         if: always()
@@ -362,7 +368,7 @@ jobs:
           ansible-playbook -i /srv/github/inventory.yaml \
               --extra-vars "base_image_user=${{ matrix.os.base_image_user }} \
               ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs.yml
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs-loki.yml
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7

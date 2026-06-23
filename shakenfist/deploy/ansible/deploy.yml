@@ -172,18 +172,6 @@
       vars:
         role_action: "bootstrap"
 
-- hosts: allsf
-  become: yes
-  become_method: sudo
-  tags: bootstrap
-  gather_facts: yes
-  connection: ssh
-  roles:
-    - role: base
-      vars:
-        role_action: "syslog"
-        syslog_target: "{{ hostvars[groups['primary_node'][0]]['node_mesh_ip'] }}"
-
 ### Write config and configure client
 
 - hosts: allsf

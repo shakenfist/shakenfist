@@ -116,7 +116,6 @@
       - python3-wheel
       - pwgen
       - qemu-utils
-      - rsyslog
       - unzip
       - xxhash
     state: latest
@@ -132,5 +131,4 @@
   with_items:
     - apparmor
     - libvirtd
-    - rsyslog
   notify: Reload systemd

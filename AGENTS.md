@@ -92,6 +92,28 @@ Authorized users can trigger automation by commenting on PRs:
 - Trim trailing whitespace
 - See [CLAUDE.md](CLAUDE.md) for detailed style guide
 
+### Events vs logs
+
+Shaken Fist has two structured-record streams; choose the right
+one when emitting a message:
+
+- **If the message relates to one or more Shaken Fist objects**
+  (instance, network, blob, artifact, …), emit an **event** via
+  `eventlog.add_event()` / `add_event_multi()`. Events are the
+  authoritative per-object record (stored in MariaDB, read back
+  through the REST API) and also emit an `Added event` log line,
+  so they appear in the log stream too.
+- **If the message has no directly-associated object** (daemon
+  lifecycle, scheduler decisions, node-level conditions), emit a
+  **log** line via the module `LOG`.
+
+Events stay authoritative in MariaDB — they are never moved to
+Loki; logs ship to Loki (or the local journal). The `Added event`
+echo into the log stream is controlled by `LOG_EVENTS_TO_LOKI`
+(default on). See
+[`docs/operator_guide/logging.md`](docs/operator_guide/logging.md)
+and [`docs/operator_guide/events.md`](docs/operator_guide/events.md).
+
 ### Testing
 
 ```bash
