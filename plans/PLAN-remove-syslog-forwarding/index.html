@@ -10,13 +10,9 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/operator_guide/installation/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-remove-syslog-forwarding/">
       
       
-        <link rel="prev" href="../../plans/blob-storage-roadmap/">
-      
-      
-        <link rel="next" href="../artifacts/">
       
       
         
@@ -27,7 +23,7 @@
     
     
       
-        <title>Installation - Shaken Fist</title>
+        <title>Remove syslog forwarding and ship logs to Loki - Shaken Fist</title>
       
     
     
@@ -101,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installing-shaken-fist" class="md-skip">
+        <a href="#remove-syslog-forwarding-and-ship-logs-to-loki" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Remove syslog forwarding and ship logs to Loki
             
           </span>
         </div>
@@ -8389,7 +8385,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -8417,7 +8413,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -8445,7 +8441,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -8477,20 +8473,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
         
           
           <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
@@ -8511,7 +8505,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
@@ -8526,37 +8520,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Installation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -8572,76 +8539,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#notes-for-multi-node-installations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Notes for multi-node installations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#your-first-instance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your first instance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Your first instance">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#other-caveats" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Other caveats
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#deployment-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Deployment variables
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -8654,7 +8551,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../artifacts/" class="md-nav__link">
+      <a href="../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -8682,7 +8579,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication/" class="md-nav__link">
+      <a href="../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -8710,7 +8607,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../database/" class="md-nav__link">
+      <a href="../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -8738,7 +8635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../events/" class="md-nav__link">
+      <a href="../../operator_guide/events/" class="md-nav__link">
         
   
   
@@ -8766,7 +8663,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../exception_tracking/" class="md-nav__link">
+      <a href="../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -8794,7 +8691,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../load_balancing/" class="md-nav__link">
+      <a href="../../operator_guide/load_balancing/" class="md-nav__link">
         
   
   
@@ -8822,7 +8719,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../locks/" class="md-nav__link">
+      <a href="../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -8850,7 +8747,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../networking/overview/" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -8878,7 +8775,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../power_states/" class="md-nav__link">
+      <a href="../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -8906,7 +8803,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../python_versions/" class="md-nav__link">
+      <a href="../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -8934,7 +8831,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../threads/" class="md-nav__link">
+      <a href="../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -8962,7 +8859,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../upgrades/" class="md-nav__link">
+      <a href="../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -9017,10 +8914,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#notes-for-multi-node-installations" class="md-nav__link">
+  <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Notes for multi-node installations
+        Prompt
       
     </span>
   </a>
@@ -9028,22 +8925,55 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#your-first-instance" class="md-nav__link">
+  <a href="#situation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Your first instance
+        Situation
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Your first instance">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission and problem statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relationship-to-the-eventlog-events-vs-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to the eventlog (events vs logs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternatives considered
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alternatives considered">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#other-caveats" class="md-nav__link">
+  <a href="#move-events-into-loki-and-retire-mariadb-event-storage" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Other caveats
+        Move events into Loki and retire MariaDB event storage
       
     </span>
   </a>
@@ -9051,10 +8981,292 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#deployment-variables" class="md-nav__link">
+  <a href="#node-local-log-agent-promtail-grafana-alloy-vector" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Deployment variables
+        Node-local log agent (promtail / Grafana Alloy / vector)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#put-the-shipper-in-the-shakenfist_utilities-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Put the shipper in the shakenfist_utilities library
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#push-from-a-single-central-collector-instead-of-per-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push from a single central collector instead of per-node
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisions-phase-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions (phase 0)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decisions (phase 0)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#config-surface-oq1-oq2-oq4-oq11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config surface (OQ1, OQ2, OQ4, OQ11)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loki-push-wire-format-oq3-part-a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loki push wire format (OQ3, part A)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-record-field-name-contract-oq3-part-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log-record field-name contract (OQ3, part B)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spool-and-handler-module-factoring-oq5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spool and handler module factoring (OQ5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#json-only-logging-gunicorn-console-oq8-oq9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON-only logging, gunicorn, console (OQ8, OQ9)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-mode-behaviour-oq6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two-mode behaviour (OQ6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#events-relationship-and-echo-toggle-oq11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events relationship and echo toggle (OQ11)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ci-loki-topology-and-dual-path-coverage-oq7-oq10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Loki topology and dual-path coverage (OQ7, OQ10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent guidance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execution-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#planning-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Planning effort
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-level-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-level guidance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#management-session-review-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Management session review checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration-and-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation-index-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation index maintenance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
       
     </span>
   </a>
@@ -9087,246 +9299,1239 @@
   
 
 
-<h1 id="installing-shaken-fist">Installing Shaken Fist<a class="headerlink" href="#installing-shaken-fist" title="Permanent link">&para;</a></h1>
-<p>The purpose of this guide is to walk you through a Shaken Fist installation. Shaken Fist will work just fine on a single machine, although its also happy to run on clusters of machines. We'll discuss the general guidance for install options as we go.</p>
-<p>Shaken Fist only supports Ubuntu 24.04, and Debian 12, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. Bug reports are welcome if you have any issues, and may be filed at <a href="https://github.com/shakenfist/shakenfist/issues">https://github.com/shakenfist/shakenfist/issues</a></p>
-<details class="note" open="open">
-<summary>Note</summary>
-<p>Debian 10, Debian 11 and Ubuntu 22.04 support were dropped in v0.8, as supporting
-older versions of ansible became burdensome. Debian 12 support was added
-in v0.8.</p>
-<p>This means the minimum supported Python version for Shaken Fist is now 3.11.</p>
-</details>
-<p>Each machine in the cluster should match this description:</p>
+<h1 id="remove-syslog-forwarding-and-ship-logs-to-loki">Remove syslog forwarding and ship logs to Loki<a class="headerlink" href="#remove-syslog-forwarding-and-ship-logs-to-loki" title="Permanent link">&para;</a></h1>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before responding to questions or discussion points in this
+document, explore the shakenfist codebase thoroughly. Read the
+existing log-shipping prior art — the local eventlog spool
+(<code>shakenfist/eventlog_spool.py</code>), its batched drainer thread
+(<code>shakenfist/eventlog_drainer.py</code>), how the drainer is started
+from <code>shakenfist/daemons/daemon.py</code> and
+<code>shakenfist/external_api/gunicorn_config.py</code>, and how
+<code>mariadb.record_event_batch()</code> handles batch success/failure —
+because the Loki shipper in this plan is modelled directly on
+that machinery. Read the logging setup helper in the sibling
+<code>shakenfist_utilities</code> library
+(<code>library-utilities/shakenfist_utilities/logs.py</code>, the
+<code>setup()</code> function and its <code>JsonFormatter</code> path). Read the
+ansible deployer's syslog wiring
+(<code>shakenfist/deploy/ansible/roles/base/tasks/syslog.yml</code>,
+<code>roles/base/templates/rsyslog-client-01-sf.conf</code>,
+<code>roles/primary/templates/rsyslog-server-01-sf.conf</code>,
+<code>deploy.yml</code>, and the <code>sf-api.service</code> unit). Ground your
+answers in what the code actually does today rather than
+guessing.</p>
+<p>Where a question touches on external concepts (the Loki HTTP
+push API and its <code>/loki/api/v1/push</code> payload shape, Loki
+labels vs structured metadata, multi-tenancy via the
+<code>X-Scope-OrgID</code> header, journald/rsyslog behaviour, node-local
+log agents such as Grafana Alloy / promtail / vector), research
+as needed to give a confident answer. Flag any uncertainty
+explicitly rather than guessing.</p>
+<p>All planning documents go into <code>docs/plans/</code>.</p>
+<p>Consult <code>ARCHITECTURE.md</code> for the system architecture overview
+and the event logging subsystem. Consult <code>CLAUDE.md</code> for build
+commands, project conventions, the BYO-infrastructure direction
+(<code>MARIADB_GATEWAY_HOSTS</code> is the pattern to mirror for the Loki
+endpoint), the systemd service ordering, and the
+preserve-event-logging priority. This plan is the "Loki-shipper
+story" that <a href="../PLAN-remove-primary/"><code>PLAN-remove-primary.md</code></a>
+phase 1 is explicitly gated on (see its phase notes), and it
+follows the same BYO-infrastructure philosophy as
+<a href="../PLAN-byo-mariadb/"><code>PLAN-byo-mariadb.md</code></a>.</p>
+<p>When we get to detailed planning, I prefer a separate plan file
+per detailed phase, named for the master plan with
+<code>-phase-NN-descriptive</code> appended before the <code>.md</code> extension.
+Tracking of these sub-phases is done via the table in the
+Execution section below.</p>
+<p>I prefer one commit per logical change, and at minimum one
+commit per phase. Do not batch unrelated changes into a single
+commit. Each commit should be self-contained: it should build,
+pass tests, and have a clear commit message explaining what
+changed and why.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>Shaken Fist daemons emit logs through a shared helper:
+<code>from shakenfist_utilities import logs; LOG, _ =
+logs.setup(__name__)</code>. Today <code>logs.setup()</code>
+(<code>library-utilities/shakenfist_utilities/logs.py:178</code>) defaults
+to a <code>SysLogHandler('/dev/log')</code>, so every daemon's log lines
+land in the node's local syslog/journald as plain text
+(<code>'%(levelname)s %(message)s'</code>). The API daemon additionally
+passes <code>--log-syslog --log-syslog-prefix sf</code> to gunicorn
+(<code>deploy/ansible/files/sf-api.service:33</code>). The library already
+contains a <code>json=True</code> code path that emits structured JSON via
+pylogrus <code>JsonFormatter</code> (<code>logs.py:209-222</code>), but nothing turns
+it on, and <code>.with_fields(...)</code> structured context is therefore
+flattened into the text message rather than carried as fields.</p>
+<p>The deployer then aggregates those local logs onto the primary
+node via rsyslog. Non-primary nodes get a forwarder config
+(<code>roles/base/templates/rsyslog-client-01-sf.conf</code>) that ships
+<code>*.*;*.!=debug</code> over TCP to the primary's mesh IP on port 514,
+with a 10,000-entry linked-list queue and 100 retries. The
+primary runs an rsyslog server (<code>roles/primary/templates/
+rsyslog-server-01-sf.conf</code>) loading <code>imudp</code>/<code>imtcp</code> on port
+514, dropping aggregated logs into its default
+<code>/var/log/syslog</code>. The wiring is:</p>
 <ul>
-<li>Have virtualization extensions enabled in the BIOS.</li>
-<li>Have jumbo frames enabled on the switch for the "mesh interface" for installations of more than one machine. Shaken Fist can optionally run internal traffic such as etcd and virtual network meshes on a separate interface to traffic egressing the cluster. Whichever interface you specify as being used for virtual network mesh traffic must have jumbo frames enabled for the virtual networks to function correctly.</li>
-<li>Have at least 1 gigabit connectivity on the "mesh interface". This is a requirement of etcd.</li>
-<li>Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the SSH_USER variable.</li>
+<li><code>roles/base/tasks/bootstrap.yml</code> installs the <code>rsyslog</code>
+  package on every node and enables the service.</li>
+<li><code>roles/base/tasks/syslog.yml</code> deploys the client config to
+  every node whose mesh IP differs from <code>syslog_target</code>.</li>
+<li><code>roles/primary/tasks/bootstrap.yml</code> (lines 18-30) deploys
+  the server config to the primary.</li>
+<li><code>deploy.yml:185</code> sets <code>syslog_target</code> to the primary node's
+  mesh IP; <code>roles/base/defaults/main.yml:13</code> defaults it to
+  <code>"unknown"</code>.</li>
 </ul>
-<p>We now have a fancy helper to help you install your first cluster, so let's give that a go:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>https://raw.githubusercontent.com/shakenfist/shakenfist/develop/deploy/getsf<span class="w"> </span>-o<span class="w"> </span>getsf
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>chmod<span class="w"> </span>ugo+rx<span class="w"> </span>getsf
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>sudo<span class="w"> </span>./getsf
-</code></pre></div>
-<p>This script will then walk you through the installation steps, asking questions as you go. The script leaves you with an installer configuration at <code>/root/sf-deploy</code>, which is the basis for later upgrades and cluster expansions.</p>
-<p>You can script the answers to <code>getsf</code> by setting environment variables. For example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_FLOATING_BLOCK</span><span class="o">=</span><span class="m">192</span>.168.10.0/24
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_DEPLOY_NAME</span><span class="o">=</span>bonkerslab
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_RELEASE</span><span class="o">=</span>pre-release
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_NODES</span><span class="o">=</span>localhost
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GETSF_WARNING</span><span class="o">=</span>yes
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>sudo<span class="w"> </span>--preserve-env<span class="w"> </span>./getsf
-</code></pre></div>
-<h2 id="notes-for-multi-node-installations">Notes for multi-node installations<a class="headerlink" href="#notes-for-multi-node-installations" title="Permanent link">&para;</a></h2>
-<p>Not every node needs to be an etcd_master. I'd select three in most situations. One node must be marked as the primary node, and one must be marked as the network node. It is not currently supported having more than one of each of those node types.</p>
+<p>There is <strong>no</strong> existing Loki, promtail, grafana-agent, vector,
+or any other remote-shipping configuration anywhere in the
+tree. The library has no HTTP, queue, buffer, or remote log
+handler — only syslog, file, and stdout handlers.</p>
+<p>Crucially, Shaken Fist <em>already has</em> a mature, on-disk,
+crash-safe log-shipping pattern in the eventlog subsystem, and
+it was explicitly built with this future use in mind:</p>
 <ul>
-<li>Shaken Fist does not install a load balancer. You must place your own reverse proxy or load balancer in front of the cluster's <code>sf-api</code> daemons, which listen on port 13000. See <a href="../load_balancing/">Load Balancing</a> for details.</li>
-<li>The network node is the ingress and egress point for all virtual networks, and is where floating IPs live, so it needs to be setup as the gateway fro your floating IP block.</li>
+<li><code>shakenfist/eventlog_spool.py</code> is a per-daemon disk-backed
+  SQLite spool (WAL mode) under <code>/srv/shakenfist/spool/
+  eventlog/&lt;daemon&gt;-&lt;pid&gt;.db</code>. The spool is the durability
+  boundary: <code>enqueue()</code> is a sub-millisecond insert that
+  returns immediately. It enforces a high-water mark
+  (<code>SPOOL_HIGH_WATER_MARK = 100_000</code>, ~50 MiB) and <em>drops with
+  a counter increment + WARN</em> rather than blocking when full.
+  On startup it scans for orphan spool files left by dead PIDs
+  and migrates their rows into the live spool. Its own comment
+  (<code>eventlog_spool.py:59-62</code>) anticipates "a future loki-style
+  log-spool peer" growing under a sibling spool root.</li>
+<li><code>shakenfist/eventlog_drainer.py</code> is a per-process daemon
+  thread (<code>eventlog-drainer</code>) that reads batches of up to 100
+  (<code>DRAIN_BATCH_SIZE</code>), polls every 100 ms, applies exponential
+  backoff on failure (0.5 s → 30 s, ×2), leaves failed batches
+  in the spool for retry, drops poison rows, and on
+  <code>atexit</code> synchronously drains for up to 20 s.</li>
+<li>It is started once per daemon from
+  <code>daemons/daemon.py:113</code> (<code>write_pid_file</code>) and once per
+  gunicorn worker from
+  <code>external_api/gunicorn_config.py:56</code> (<code>post_fork</code>), giving
+  each process its own spool file and drainer thread.</li>
+<li>Spool depth and drop metrics are exposed on the existing
+  Prometheus endpoint with no per-daemon bootstrap because
+  <code>prometheus_client</code> uses one process-wide registry.</li>
 </ul>
-<p>Some of the considerations here can be subtle. Please reach out if you need a hand.</p>
-<p><code>getsf</code> writes a configuration file called <code>sf-deploy</code>. For a more complicated installation, <code>sf-deploy</code> might like this. Note that the <code>api_url</code> in the topology below is the address of your own load balancer, which must proxy to the cluster's <code>sf-api</code> daemons as described on the <a href="../load_balancing/">Load Balancing</a> page:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>#!/bin/bash
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>export ADMIN_PASSWORD=engeeF1o
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>export FLOATING_IP_BLOCK=&quot;192.168.10.0/24&quot;
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>export DEPLOY_NAME=&quot;bonkerslab&quot;
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>export SSH_USER=&quot;cloudadmin&quot;
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>export SSH_KEY_FILENAME=&quot;/root/.ssh/id_rsa&quot;
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>export KSM_ENABLED=1
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a># Topology is in JSON (the || true handles read&#39;s exit code with heredocs)
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>read -r -d &#39;&#39; TOPOLOGY &lt;&lt;&#39;EOF&#39; || true
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>[
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>  {
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    &quot;name&quot;: &quot;sf-primary&quot;,
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    &quot;node_egress_ip&quot;: &quot;192.168.1.50&quot;,
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    &quot;node_egress_nic&quot;: &quot;enp0s31f6&quot;,
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    &quot;node_mesh_ip&quot;: &quot;192.168.21.50&quot;,
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    &quot;node_mesh_nic&quot;: &quot;enp0s31f6:1&quot;,
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>    &quot;primary_node&quot;: true,
-<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>    &quot;api_url&quot;: &quot;https://...your...install...here.com/api&quot;
-<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>  },
-<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>  {
-<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>    &quot;name&quot;: &quot;sf-1&quot;,
-<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>    &quot;node_egress_ip&quot;: &quot;192.168.1.51&quot;,
-<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
-<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>    &quot;node_mesh_ip&quot;: &quot;192.168.21.51&quot;,
-<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
-<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>    &quot;etcd_master&quot;: true,
-<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>    &quot;network_node&quot;: true,
-<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>    &quot;hypervisor&quot;: true
-<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>  },
-<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>  {
-<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>    &quot;name&quot;: &quot;sf-2&quot;,
-<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>    &quot;node_egress_ip&quot;: &quot;192.168.1.52&quot;,
-<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
-<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>    &quot;node_mesh_ip&quot;: &quot;192.168.21.52&quot;,
-<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
-<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>    &quot;etcd_master&quot;: true,
-<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>    &quot;hypervisor&quot;: true
-<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>  },
-<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>  {
-<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>    &quot;name&quot;: &quot;sf-3&quot;,
-<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a>    &quot;node_egress_ip&quot;: &quot;192.168.1.53&quot;,
-<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>    &quot;node_egress_nic&quot;: &quot;enp5s0&quot;,
-<a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a>    &quot;node_mesh_ip&quot;: &quot;192.168.21.53&quot;,
-<a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a>    &quot;node_mesh_nic&quot;: &quot;eno1&quot;,
-<a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a>    &quot;etcd_master&quot;: true,
-<a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a>    &quot;hypervisor&quot;: true
-<a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a>  },
-<a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a>]
-<a id="__codelineno-2-52" name="__codelineno-2-52" href="#__codelineno-2-52"></a>EOF
-<a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a>export TOPOLOGY
-<a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a>
-<a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a>/srv/shakenfist/venv/share/shakenfist/installer/install
-</code></pre></div>
-<h2 id="your-first-instance">Your first instance<a class="headerlink" href="#your-first-instance" title="Permanent link">&para;</a></h2>
-<p>Before you can start your first instance you'll need to authenticate to Shaken Fist, and create a network. Shaken Fist's python api client (as used by the command line client) looks for authentication details in the following locations:</p>
+<p>The <code>shakenfist_utilities</code> library (repo
+<code>github.com/shakenfist/library-utilities</code>, local checkout at
+<code>library-utilities/</code>, also referred to informally as
+"library-python") is pinned in <code>shakenfist/pyproject.toml</code> as
+<code>shakenfist-utilities==0.8.4</code> and consumed from PyPI, not a
+local path. The library's <code>logs</code> module has effectively no unit
+tests today (only an ad-hoc <code>test.py</code> smoke script).</p>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Remove syslog forwarding to the primary node entirely and
+replace it with shipping Shaken Fist's structured logs to a
+<strong>Loki</strong> log store. This is the logging half of the
+BYO-infrastructure direction: in production the operator brings
+their own Loki and tells SF its endpoint; in CI we stand up a
+Loki the same way we stand up MariaDB for the functional test
+cluster.</p>
+<p>Concretely, when this plan is done:</p>
 <ul>
-<li>Command line flags</li>
-<li>Environment variables (prefixed with <strong>SHAKENFIST_</strong>)</li>
-<li><strong>~/.shakenfist</strong>, a JSON formatted configuration file</li>
-<li><strong>/etc/sf/shakenfist.json</strong>, the same file as above, but global</li>
+<li>SF daemons emit <strong>structured JSON for every log line</strong> — JSON
+  becomes the <em>only</em> log format on the daemon side, not merely
+  the default. The plain-text formatter paths used for daemon
+  output are removed, so there is no mixed text/JSON output for
+  an operator's pipeline to special-case. Every line carries the
+  <code>.with_fields(...)</code> context as real fields, against a
+  documented, stable log-record field-name contract that an
+  operator's log pipeline can index. (The interactive
+  <code>setup_console(...)</code> formatter used by human-facing CLI tools
+  such as <code>sf-ctl</code> is a separate concern — phase 0 decides
+  whether it too becomes JSON or stays human-readable; "all log
+  lines" here means all <em>daemon/service</em> log emission.)</li>
+<li>SF ships those logs directly to Loki via an <strong>in-process,
+  on-disk-spooled, batched push</strong> modelled on the eventlog
+  spool/drainer, living in the <code>shakenfist</code> package (not the
+  library — see Alternatives). The shipper is <strong>off unless an
+  operator configures a Loki endpoint</strong>; when off, logs remain
+  on local stdout/journald exactly as a node-local default.</li>
+<li>The deployer <strong>no longer installs rsyslog</strong>, no longer
+  configures client forwarders or a primary-node rsyslog
+  server, and no longer passes <code>--log-syslog</code> to gunicorn. The
+  <code>syslog_target</code> variable and the primary's rsyslog role
+  content are removed.</li>
+<li>CI stands up a Loki instance for the functional cluster and a
+  functional test asserts that SF log lines actually arrive in
+  Loki end-to-end (this is the coverage of the new, risky push
+  path). The "no Loki configured → structured JSON locally"
+  path is also exercised so a minimal/dev deployment is covered.</li>
+<li>CI's log assertions and debugging bundle are reworked to read
+  structured logs from Loki (and from each node's <em>local</em>
+  structured logs as a fallback for when the shipper itself is
+  what failed) rather than grepping the primary node's
+  aggregated <code>/var/log/syslog</code>. The reworked log-checking
+  scripts ship as <strong>new versioned entries</strong> in the
+  <code>shakenfist/actions</code> repo so existing external consumers
+  pinned to the old behaviour are not broken.</li>
+<li>The operator documentation explains the BYO-Loki contract:
+  what endpoint/tenant config to set, what labels SF applies,
+  the field-name contract, buffering/backpressure behaviour,
+  and what is lost (centralised plain-syslog on the primary) vs
+  gained (structured, queryable logs).</li>
 </ul>
-<p>By default the installer creates <strong>/etc/sf/sfrc</strong>, which sets the required environment variables to authenticate.
-It is customized per installation, setting the following variables:</p>
+<p>The guiding principle matches the rest of SF's BYO turn: SF
+emits well-structured logs and, if you tell it where your Loki
+is, ships them there reliably; otherwise it logs locally and
+stays out of your way. SF does not run a log store, and after
+this plan it does not run a log <em>aggregator</em> either.</p>
+<p>Concretely there are exactly two operating modes, and the log
+<em>format</em> (structured JSON) is identical in both — only the
+<em>destination</em> differs:</p>
 <ul>
-<li><strong>SHAKENFIST_NAMESPACE</strong>, the namespace to create resources in</li>
-<li><strong>SHAKENFIST_KEY</strong>, an authentication key for that namespace</li>
-<li><strong>SHAKENFIST_API_URL</strong>, a URL to the Shaken Fist API server</li>
+<li><strong>Preferred / first-class path — Loki configured.</strong> With a
+  Loki endpoint (and a configurable <code>X-Scope-OrgID</code> tenant) set,
+  each daemon buffers its JSON log lines in a local SQLite spool
+  and ships them to Loki, with retry and backpressure. It does
+  <strong>not</strong> additionally write them to a local syslog/file sink —
+  there is no deliberate second pipeline. The spool is the local
+  durability buffer that covers transient Loki outages.</li>
+<li><strong>Fallback path — Loki not configured.</strong> For operators who
+  would rather run their own shipper (or run no central log
+  store at all), leaving the endpoint unset means SF simply
+  emits the same JSON to the node's local journal (journald) and
+  ships nothing. A node-local agent such as promtail/Alloy can
+  then scrape that journal if the operator wants central logs on
+  their own terms.</li>
 </ul>
-<p>Before interacting with Shaken Fist, we need to source the rc file.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>.<span class="w"> </span>/etc/sf/sfrc
-</code></pre></div>
-<p>Instances must be launched attached to a network.</p>
-<p>Create your first network:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
-</code></pre></div></p>
-<p>You can get help for the command line client by running <code>`sf-client --help</code>. The above command creates a new network called "mynet", with the IP block 192.168.42.0/24. You will receive some descriptive output back:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>$<span class="w"> </span>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>uuid<span class="w">            </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>name<span class="w">            </span>:<span class="w"> </span>mynet
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>vxlan<span class="w"> </span>id<span class="w">        </span>:<span class="w"> </span><span class="m">2</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>netblock<span class="w">        </span>:<span class="w"> </span><span class="m">192</span>.168.42.0/24
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>provide<span class="w"> </span>dhcp<span class="w">    </span>:<span class="w"> </span>True
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>provide<span class="w"> </span>nat<span class="w">     </span>:<span class="w"> </span>True
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>floating<span class="w"> </span>gateway:<span class="w"> </span>None
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>namespace<span class="w">       </span>:<span class="w"> </span>system
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>state<span class="w">           </span>:<span class="w"> </span>initial
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>Metadata:
-</code></pre></div>
-<p>The UUID is important, as that is how we will refer to the network elsewhere. Let's now create a simple first instance (you'll need to change this to use your actual network UUID):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>$<span class="w"> </span>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myvm<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">1024</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span>-n<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>uuid<span class="w">        </span>:<span class="w"> </span>c6c4ba94-ed34-497d-8964-c223489dee3e
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>name<span class="w">        </span>:<span class="w"> </span>myvm
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>namespace<span class="w">   </span>:<span class="w"> </span>system
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>cpus<span class="w">        </span>:<span class="w"> </span><span class="m">1</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>memory<span class="w">      </span>:<span class="w"> </span><span class="m">1024</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>disk<span class="w"> </span>spec<span class="w">   </span>:<span class="w"> </span><span class="nv">type</span><span class="o">=</span>disk<span class="w">   </span><span class="nv">bus</span><span class="o">=</span>None<span class="w">  </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span><span class="w">   </span><span class="nv">base</span><span class="o">=</span>cirros
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>video<span class="w">       </span>:<span class="w"> </span><span class="nv">model</span><span class="o">=</span>cirrus<span class="w">  </span><span class="nv">memory</span><span class="o">=</span><span class="m">16384</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>node<span class="w">        </span>:<span class="w"> </span>marvin
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>power<span class="w"> </span>state<span class="w"> </span>:<span class="w"> </span>on
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>state<span class="w">       </span>:<span class="w"> </span>created
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>console<span class="w"> </span>port:<span class="w"> </span><span class="m">31839</span>
-<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>vdi<span class="w"> </span>port<span class="w">    </span>:<span class="w"> </span><span class="m">34442</span>
-<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
-<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>ssh<span class="w"> </span>key<span class="w">     </span>:<span class="w"> </span>None
-<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>user<span class="w"> </span>data<span class="w">   </span>:<span class="w"> </span>None
-<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
-<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>Metadata:
-<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>
-<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>Interfaces:
-<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>
-<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="w">    </span>uuid<span class="w">    </span>:<span class="w"> </span>e56b3c7b-8056-4645-b5b5-1779721ff21d
-<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="w">    </span>network<span class="w"> </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
-<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="w">    </span>macaddr<span class="w"> </span>:<span class="w"> </span>ae:15:4d:9c:d8:c0
-<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="w">    </span>order<span class="w">   </span>:<span class="w"> </span><span class="m">0</span>
-<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="w">    </span>ipv4<span class="w">    </span>:<span class="w"> </span><span class="m">192</span>.168.42.76
-<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a><span class="w">    </span>floating:<span class="w"> </span>None
-<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="w">    </span>model<span class="w">   </span>:<span class="w"> </span>virtio
-</code></pre></div>
-<p>Probably the easiest way to interact with this instance is to connect to its console port, which is the serial console of the instance over telnet. In the case above, that is available on port 31829 on localhost (my laptop is called marvin).</p>
-<h3 id="other-caveats">Other caveats<a class="headerlink" href="#other-caveats" title="Permanent link">&para;</a></h3>
-<p>The installer will also enforce the following sanity checks:</p>
+<p>(In both modes, systemd still captures a service's stdout/stderr
+into journald — uncaught tracebacks and any output before
+logging is configured — which is free, local-only, and not a
+deliberate shipping pipeline.)</p>
+<p>This plan delivers the "Loki-shipper story" that
+<a href="../PLAN-remove-primary/"><code>PLAN-remove-primary.md</code></a> phase 1 is
+waiting on. The actual deletion of the rsyslog deployer wiring
+(remove-primary's phase 1 deliverable) is performed here in
+phase 5, in the same way that
+<a href="../PLAN-remove-apache-lb/"><code>PLAN-remove-apache-lb.md</code></a> realised
+remove-primary's phase 3. When phase 5 lands, remove-primary
+phase 1 should be marked complete with a pointer to this plan.</p>
+<p>TLS to the Loki endpoint (operator-provided CA, client certs
+for mutual auth) is <strong>out of scope</strong> here and belongs with
+<a href="../PLAN-embrace-tls/"><code>PLAN-embrace-tls.md</code></a>, which establishes
+the BYO-PKI surface. This plan supports a plain-HTTP or
+operator-terminated-HTTPS endpoint and a bearer/basic auth
+header, and leaves a clean seam for mTLS later. OpenTelemetry /
+tracing instrumentation is a separate, not-yet-drafted thread
+and is not part of this plan; the field-name contract defined
+here should be chosen to not actively conflict with it.</p>
+<h2 id="relationship-to-the-eventlog-events-vs-logs">Relationship to the eventlog (events vs logs)<a class="headerlink" href="#relationship-to-the-eventlog-events-vs-logs" title="Permanent link">&para;</a></h2>
+<p>Shaken Fist deliberately has <em>two</em> structured-record streams, and
+this plan only owns one of them. Making the division explicit
+matters because it determines what actually flows to Loki.</p>
+<p>The authoring convention in the code (which this plan makes
+explicit and which the docs should state) is:</p>
 <ul>
-<li>That KVM will operate on your machines. This is generally fine unless you're using virtual machines at which point nested virtualization needs to be enabled.</li>
-<li>That your network interface MTU is greater than 2,000 bytes. This is required because the VXLAN mesh our virtual networks use add overhead to packets and a standard MTU of 1500 bytes for the physical network will result in packets being fragmented too frequently on the virtual networks. You can set a higher MTU if you desire, I generally select 9,000 bytes.</li>
+<li><strong>If a message relates to one or more Shaken Fist objects</strong>
+  (instance, network, blob, artifact, …), emit an <strong>event</strong> via
+  <code>eventlog.add_event(...)</code> / <code>add_event_multi(...)</code>, so the
+  operator and the object's owner get the fully-structured,
+  per-object record.</li>
+<li><strong>If a message has no directly-associated object</strong> (daemon
+  lifecycle, scheduler decisions, node-level conditions), emit a
+  <strong>log</strong> line.</li>
 </ul>
-<h3 id="deployment-variables">Deployment variables<a class="headerlink" href="#deployment-variables" title="Permanent link">&para;</a></h3>
+<p>Crucially, events are <em>already</em> dual-destination today.
+<code>eventlog.add_event_multi()</code> (<code>eventlog.py:80-116</code>) emits a
+structured log line (<code>log.info('Added event')</code>, carrying
+<code>event_type</code>, <code>duration</code>, <code>message</code>, <code>extra</code>, and each
+<code>object_type→uuid</code> as fields) <strong>and</strong> enqueues the row into the
+MariaDB eventlog spool. So every event already lands in two
+places; this plan merely redirects the log-line copy from the
+primary node's syslog to Loki. No new mechanism is needed to get
+events into Loki — they ride the normal log stream as
+<code>'Added event'</code> lines.</p>
+<p>The two destinations serve different masters and have different
+lifecycles, and that is the point — it is <strong>not</strong> redundant
+double-storage of a system of record:</p>
+<ul>
+<li><strong>MariaDB eventlog = the authoritative, per-object system of
+  record.</strong> Its consumers are billing (must never drop, exact
+  per-object aggregation over unbounded time), audit surfaced to
+  owners/admins (per-object, namespace-access-controlled,
+  retained), and progress information for a future dynamic UI
+  (per-object, low-latency point reads). These are exactly the
+  workloads MariaDB's <code>(object_type, object_uuid)</code> index serves
+  and that the <code>eventlog-direct-mariadb</code> plan was built for.</li>
+<li><strong>Loki = an ephemeral, operational, interleaved-with-logs
+  view</strong> for debugging "what was this node doing at 14:03",
+  where having events and logs in one time-ordered stream is
+  valuable.</li>
+</ul>
+<p>The duplicated copy therefore lands only in the cheap, droppable
+store, never twice in the authoritative one. The legitimate cost
+is Loki <em>volume</em> — progress events in particular can be chatty —
+so the event→Loki echo should be <strong>deliberate and
+configurable</strong> (see Open Question 11), letting a volume- or
+cost-sensitive operator keep authoritative events in MariaDB
+while suppressing their echo into Loki and recovering the
+interleaved view at the dashboard layer instead.</p>
+<p>What this plan explicitly does <strong>not</strong> do is move event storage
+or the event-lookup REST APIs onto Loki — see the rejected
+alternative below.</p>
+<h2 id="alternatives-considered">Alternatives considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<h3 id="move-events-into-loki-and-retire-mariadb-event-storage">Move events into Loki and retire MariaDB event storage<a class="headerlink" href="#move-events-into-loki-and-retire-mariadb-event-storage" title="Permanent link">&para;</a></h3>
+<p>A tempting consolidation: since events already emit a log line,
+stop writing the MariaDB eventlog, point the event-lookup REST
+APIs at Loki's <code>query_range</code>, and store everything once. We
+reject this decisively. Events back billing, owner/admin audit,
+and per-object progress UI — workloads that need durability (no
+drops), unbounded-time per-object aggregation, multi-month/year
+retention, and namespace-scoped access control. Loki is a
+log store: it is retention-windowed and lossy under pressure,
+its label model makes per-object (<code>instance_uuid</code>) lookups
+either a cardinality explosion or a full time-window scan, it has
+no authz aligned to SF namespaces, and routing REST reads through
+it would couple API availability to Loki being up. The
+<code>eventlog-direct-mariadb</code> plan just placed these workloads on a
+correctly-indexed store; moving them to Loki would regress every
+axis that matters for them. Events stay in MariaDB; Loki receives
+only the operational echo.</p>
+<h3 id="node-local-log-agent-promtail-grafana-alloy-vector">Node-local log agent (promtail / Grafana Alloy / vector)<a class="headerlink" href="#node-local-log-agent-promtail-grafana-alloy-vector" title="Permanent link">&para;</a></h3>
+<p>The prevailing industry pattern is to log to stdout/journald
+and let a node-local agent tail the journal and ship to Loki.
+The deployer would install and configure that agent per node;
+SF itself would gain only the JSON-default change. This keeps
+all buffering, batching, backpressure, retry, and multi-tenancy
+inside a mature, well-tested agent, and is arguably the most
+"normal" choice.</p>
+<p>We nonetheless <strong>reject it as the primary mechanism</strong>, for
+reasons specific to SF:</p>
+<ul>
+<li>It reintroduces exactly the kind of deployer-managed
+  supporting daemon that the BYO turn is trying to <em>remove</em>. We
+  would be deleting rsyslog only to install Alloy/promtail in
+  its place, and now own its config, its version, its failure
+  modes, and its upgrade story. "SF installs things nobody
+  asked for" is the problem remove-primary is solving.</li>
+<li>SF already owns a crash-safe spool/drainer abstraction
+  (eventlog) that solves the identical problem — durable
+  on-disk buffering with backpressure and retry — and its
+  authors explicitly anticipated a "loki-style log-spool peer"
+  (<code>eventlog_spool.py:59-62</code>). Reusing that machinery is less
+  net new code than configuring and shipping an agent, and it
+  keeps the operational surface to "set a config value".</li>
+<li>Direct push lets SF carry its structured fields as Loki
+  labels / structured metadata deterministically, rather than
+  re-parsing them back out of journald text on the agent side.</li>
+</ul>
+<p>We keep the agent path available to operators as a <em>documented
+alternative</em>: an operator who already runs Alloy/promtail can
+simply leave SF's Loki shipper disabled and point their agent
+at journald. The chosen direction is what the deployer does by
+default, not the only thing that can work.</p>
+<h3 id="put-the-shipper-in-the-shakenfist_utilities-library">Put the shipper in the <code>shakenfist_utilities</code> library<a class="headerlink" href="#put-the-shipper-in-the-shakenfist_utilities-library" title="Permanent link">&para;</a></h3>
+<p>The logging helper lives in the library, so the natural instinct
+is to add the Loki handler there too. We reject this for the
+<em>buffering</em> component specifically. The durable spool/drainer is
+non-trivial (SQLite WAL, high-water drop, orphan recovery,
+atexit drain, Prometheus wiring, per-process lifecycle started
+from both <code>daemon.py</code> and gunicorn <code>post_fork</code>), it depends on
+SF conventions (the <code>/srv/shakenfist/spool</code> root, the SF config
+system, the SF Prometheus registry), and the library cannot
+depend on <code>shakenfist</code>. Forcing that machinery into a
+general-purpose utility library would either bloat the library
+with SF-specific assumptions or require an awkward inversion of
+control. The operator explicitly accepted that this code can
+live in <code>shakenfist</code> if buffering in a library is too hard — it
+is, so it does.</p>
+<p>The split we adopt: the <strong>library</strong> owns the <em>format</em> (flip JSON
+on by default, define and document the field-name contract, and
+gain the unit tests it currently lacks); <strong>shakenfist</strong> owns the
+<em>transport</em> (spool, drainer, HTTP push, config, lifecycle). SF
+attaches its own <code>logging.Handler</code> to the root logger after
+calling <code>logs.setup()</code>, so the library never needs to know Loki
+exists.</p>
+<h3 id="push-from-a-single-central-collector-instead-of-per-node">Push from a single central collector instead of per-node<a class="headerlink" href="#push-from-a-single-central-collector-instead-of-per-node" title="Permanent link">&para;</a></h3>
+<p>We could ship all nodes' logs to one SF node which then pushes
+to Loki. This rebuilds the primary-node aggregator we are
+deleting and reintroduces the SPOF. Rejected for the same
+reasons remove-primary is removing the primary. Each node pushes
+to Loki independently; Loki (operator-run, possibly HA) is the
+aggregation point.</p>
+<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<p>These should be resolved in phase 0 (the decisions phase) before
+implementation begins. Each has a recommended answer; phase 0
+either confirms it or records a different decision with
+rationale.</p>
+<ol>
+<li>
+<p><strong>Endpoint configuration shape.</strong> Mirror the MariaDB pattern
+   with <code>LOKI_GATEWAY_HOSTS</code> (a list, for future client-side
+   fan-out) plus <code>LOKI_GATEWAY_PORT</code>, or a single
+   <code>LOKI_PUSH_URL</code>? <em>Recommendation:</em> a single base URL
+   (<code>LOKI_BASE_URL</code>, empty = disabled) for v1 — Loki is
+   operator-run and typically already fronted by the operator's
+   own LB/ingress, so SF does not need to fan out across Loki
+   replicas itself. Keep the config name generic enough that a
+   future host-list does not require a rename.</p>
+</li>
+<li>
+<p><strong>Multi-tenancy.</strong> Loki uses <code>X-Scope-OrgID</code> for tenant
+   separation. Do we expose <code>LOKI_TENANT</code> (single tenant for
+   the whole cluster), or derive tenant per-namespace?
+   <em>Recommendation (operator-confirmed):</em> a single cluster-wide
+   <code>LOKI_TENANT</code> (optional <code>X-Scope-OrgID</code> header) for v1.
+   Making the tenant configurable is a deliberate requirement,
+   not just a nicety: an operator running SF against a shared
+   homelab/production Loki does not want SF's (potentially
+   high-volume) logs co-mingled with everything else's, both for
+   query hygiene and because per-tenant volume limits and
+   retention can then be set independently. Per-namespace log
+   tenancy is a much larger design touching authz and is
+   deferred to future work.</p>
+</li>
+<li>
+<p><strong>Labels vs structured metadata.</strong> Loki best practice is a
+   <em>small, bounded</em> label set (host, job/daemon, maybe node
+   role) and everything else as structured metadata or log-line
+   JSON. What is the exact label set, and which <code>with_fields</code>
+   keys (e.g. <code>instance_uuid</code>, <code>network_uuid</code>, <code>request_id</code>)
+   become structured metadata vs stay in the JSON body?
+   <em>Recommendation:</em> labels = <code>{job="shakenfist",
+   daemon=&lt;daemon&gt;, host=&lt;node&gt;}</code>; high-cardinality identifiers
+   stay in the JSON body and/or structured metadata, never
+   labels. Phase 0 fixes the precise mapping and writes it down
+   as the field contract.</p>
+</li>
+<li>
+<p><strong>Auth to Loki.</strong> Bearer token, basic auth, or none (rely on
+   operator network perimeter)? <em>Recommendation:</em> support an
+   optional <code>LOKI_AUTH_HEADER</code> (opaque, operator-supplied) and
+   otherwise send nothing; leave mTLS to
+   <code>PLAN-embrace-tls.md</code>.</p>
+</li>
+<li>
+<p><strong>Spool sharing vs separation from eventlog.</strong> Do we
+   generalise <code>eventlog_spool.py</code> into a reusable spool
+   primitive that both eventlog and logship use, or fork a
+   second <code>logship_spool.py</code> that mirrors it? <em>Recommendation:</em>
+   fork a sibling <code>logship_spool.py</code> / <code>logship_drainer.py</code> for
+   v1 (lower risk to the event path, which is under the
+   preserve-event-logging priority), and note "unify the two
+   spools behind one primitive" as future work. Phase 0 makes
+   the final call.</p>
+</li>
+<li>
+<p><strong>Local copy vs Loki-only.</strong> When a Loki endpoint <em>is</em>
+   configured, does SF <em>also</em> write its structured log stream to
+   a local handler (syslog/file) as a fallback, or push to Loki
+   only? <em>Recommendation (operator-leaning, and I agree): push
+   to Loki only — no deliberate second local pipeline.</em> The
+   reasoning:</p>
+</li>
+<li>An operator who already collects the node's syslog/journald
+     with their own promtail (the common homelab case) would
+     otherwise get <strong>two copies of every line in Loki</strong> — one
+     from SF's push and one from their promtail scrape of the
+     local copy.</li>
+<li>A deliberate local handler doubles logging I/O on every
+     node for a copy that, under the disposable-hypervisor
+     direction, we are trying <em>not</em> to depend on.</li>
+<li>The on-disk spool already <em>is</em> the local-durability safety
+     net: a line that returns from <code>enqueue()</code> is on disk and
+     survives a process crash (orphan recovery re-drains it), so
+     a brief Loki outage does not lose logs even with no
+     separate local handler. Only an outage long enough to
+     exceed the spool high-water mark drops the Loki copy (with
+     a counter + WARN), which is the acceptable failure mode for
+     a disposable node.</li>
+</ol>
+<p>Two residual nuances phase 0 must nail down rather than gloss
+   over: (a) systemd still captures a service's stdout/stderr
+   into journald regardless of our handlers — uncaught
+   tracebacks and any output emitted before logging is
+   configured — which is essentially free and <em>local-only</em>
+   unless the operator points their own agent at journald; we do
+   not try to suppress it, but it is not a deliberate "second
+   shipping pipeline". (b) When <strong>no</strong> Loki endpoint is
+   configured (shipper disabled), SF must still log <em>somewhere</em>
+   locally (stdout→journald) so a single-box/dev deployment is
+   not silent — Loki-only applies to the configured case, not
+   the disabled case. An optional explicit local-fallback
+   handler can exist but is <strong>off by default</strong>.</p>
+<ol>
+<li>
+<p><strong>CI Loki topology.</strong> Single-binary Loki container on the
+   under-cloud, or on an inner-cluster node? How is its address
+   plumbed to <code>LOKI_BASE_URL</code> for the inner cluster? <em>See the
+   memory note that CI runs two layers of SF.</em> Phase 0 sketches
+   this; phase 3 implements it, mirroring how MariaDB is stood
+   up for <code>cluster_ci</code>.</p>
+</li>
+<li>
+<p><strong>Gunicorn/sf-api specifics.</strong> gunicorn's own access/error
+   logs currently go via <code>--log-syslog</code>. Once that flag is
+   removed, do gunicorn's logs route through the same Python
+   logging root (and therefore the Loki handler), or do they
+   need separate handling? Phase 0 verifies gunicorn logging
+   integration so phase 5 can safely drop the flag without
+   losing API access logs. Note that gunicorn's own log records
+   must also come out as JSON if we are committing to
+   JSON-only daemon output.</p>
+</li>
+<li>
+<p><strong>CLI console formatter.</strong> <code>logs.setup_console(...)</code>
+   (<code>logs.py:237</code>) produces colorised, human-readable output for
+   interactive CLI tools such as <code>sf-ctl</code>. The "all daemon log
+   lines are JSON" commitment is about <em>daemon/service</em> output;
+   does the interactive CLI path also become JSON, or stay
+   human-readable? <em>Recommendation:</em> keep <code>setup_console</code>
+   human-readable — it is terminal UI for an operator, not a log
+   stream that ships to Loki — and scope the JSON-only rule to
+   the daemon <code>setup(...)</code> path. Phase 0 confirms.</p>
+</li>
+<li>
+<p><strong>Does CI need a Loki at all, or just local structured
+    logs?</strong> A tempting simplification: in CI, leave Loki
+    unconfigured, let SF emit structured JSON locally on each
+    node (the disabled-shipper path from question 6), and have
+    the CI tooling collect and assert on those per-node local
+    logs — losing central aggregation but avoiding standing up a
+    Loki. <em>Recommendation: do both, for different reasons, and
+    do not drop the CI Loki.</em></p>
+<ul>
+<li>We <strong>keep a CI Loki</strong> because the push path (spool →
+  drainer → HTTP push → backpressure) is the single most
+  important, newest, and riskiest thing this plan adds, and
+  the project prefers functional coverage. A CI that never
+  pushes to Loki never exercises the feature. The end-to-end
+  "logs reached Loki" assertion is the proof the shipper
+  works, and querying one central Loki also preserves the
+  ergonomics of today's single-point <code>/var/log/syslog</code> grep
+  for the routine forbidden-string checks.</li>
+<li>We <strong>also collect each node's local structured logs into
+  the debug bundle</strong> (and add a small test that the
+  disabled-shipper path produces local JSON), precisely
+  because the failure we most need to debug — "the shipper
+  is broken" — is exactly the case where a Loki dump would
+  be empty. Local per-node logs are the belt-and-braces that
+  makes a shipper failure debuggable. clingwrap already
+  fetches a per-node bundle, so this is a natural fit.
+So CI exercises both paths: the push path is what we <em>test</em>,
+the local path is what we <em>fall back to</em> for debugging. Phase
+0 confirms; phases 3–4 implement.</li>
+</ul>
+</li>
+<li>
+<p><strong>Event→Loki echo: configurable, and on by default?</strong> Every
+    event already emits an <code>'Added event'</code> log line that will
+    flow to Loki (<code>eventlog.py:80-116</code>); MariaDB remains the
+    authoritative event store either way (see "Relationship to
+    the eventlog"). Should that echo be suppressible so a
+    volume-sensitive operator can keep authoritative events in
+    MariaDB without paying for them again in Loki?
+    <em>Recommendation:</em> yes — a config toggle (e.g.
+    <code>LOG_EVENTS_TO_LOKI</code>), <strong>on by default</strong> for the
+    single-pane operational view, off for operators who care
+    about Loki volume/cost and are happy to query events from
+    MariaDB (or interleave at the Grafana dashboard layer). This
+    is a small change to whether the <code>'Added event'</code> line is
+    emitted; it does <strong>not</strong> touch the MariaDB write path. Phase
+    0 decides the toggle name and default; the implementation
+    can ride phase 2. Note the CI log-checks (phase 4) must know
+    which mode CI runs in, since it changes whether event lines
+    appear in Loki.</p>
+</li>
+</ol>
+<h2 id="decisions-phase-0">Decisions (phase 0)<a class="headerlink" href="#decisions-phase-0" title="Permanent link">&para;</a></h2>
+<p>Phase 0 resolved every open question against the code. The
+committed answers below bind phases 1–6. Each "Decision:" is
+grounded in files the executing agents actually read; key
+file:line anchors are retained.</p>
+<h3 id="config-surface-oq1-oq2-oq4-oq11">Config surface (OQ1, OQ2, OQ4, OQ11)<a class="headerlink" href="#config-surface-oq1-oq2-oq4-oq11" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> Four new Pydantic options in <code>config.py</code>, in the
+<code>Field(default, description=...)</code> style (e.g.
+<code>MARIADB_GATEWAY_PORT</code> at <code>config.py:372</code>). There is <strong>no
+<code>SecretStr</code></strong> anywhere in <code>config.py</code> — <code>MARIADB_PASSWORD</code>
+(<code>config.py:540</code>) and <code>AUTH_SECRET_SEED</code> (<code>config.py:148</code>) are
+plain <code>str</code> — so <code>LOKI_AUTH_HEADER</code> is plain <code>str</code> with a
+"treat as secret / never log" prose note, matching existing
+practice. The <code>env_prefix = 'SHAKENFIST_'</code> (<code>config.py:549</code>)
+makes each overridable as <code>SHAKENFIST_LOKI_*</code>.</p>
 <table>
 <thead>
 <tr>
 <th>Option</th>
-<th>Description</th>
+<th>Type</th>
+<th>Default</th>
+<th>Secret</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>ADMIN_PASSWORD</td>
-<td>The admin password for the cloud once installed</td>
+<td><code>LOKI_BASE_URL</code></td>
+<td>str</td>
+<td><code>''</code></td>
+<td>no</td>
+<td>Loki base URL (e.g. <code>http://loki:3100</code>); empty disables the shipper</td>
 </tr>
 <tr>
-<td>DNS_SERVER</td>
-<td>The DNS server to configure instances with via DHCP. Defaults to 8.8.8.8</td>
+<td><code>LOKI_TENANT</code></td>
+<td>str</td>
+<td><code>''</code></td>
+<td>no</td>
+<td><code>X-Scope-OrgID</code> value; empty omits the header</td>
 </tr>
 <tr>
-<td>HTTP_PROXY</td>
-<td>A URL for a HTTP proxy to use for image downloads. For example <a href="http://localhost:3128">http://localhost:3128</a></td>
+<td><code>LOKI_AUTH_HEADER</code></td>
+<td>str</td>
+<td><code>''</code></td>
+<td>yes (by convention)</td>
+<td>Opaque <code>Authorization</code> header; empty sends none; mTLS deferred to <code>PLAN-embrace-tls.md</code></td>
 </tr>
 <tr>
-<td>INCLUDE_TRACEBACKS</td>
-<td>Whether to include tracebacks in server 500 errors. Never set this to true in production!</td>
-</tr>
-<tr>
-<td>FLOATING_IP_BLOCK</td>
-<td>The IP range to use for the floating network</td>
-</tr>
-<tr>
-<td>KSM_ENABLED</td>
-<td>Set to 1 to enable KSM, 0 to disable</td>
-</tr>
-<tr>
-<td>DEPLOY_NAME</td>
-<td>The name of the deployment to use as an external label for prometheus</td>
-</tr>
-<tr>
-<td>LOKI_BASE_URL</td>
-<td>Base URL of an operator-provided Loki to ship structured logs to (e.g. <a href="http://loki:3100">http://loki:3100</a>). Leave blank to log only to the local systemd journal. See <a href="../logging/">Logging</a>.</td>
-</tr>
-<tr>
-<td>LOKI_TENANT</td>
-<td>Optional Loki tenant (sent as the X-Scope-OrgID header) so Shaken Fist's logs do not co-mingle with other tenants' streams.</td>
-</tr>
-<tr>
-<td>LOKI_AUTH_HEADER</td>
-<td>Optional opaque Authorization header value for the Loki endpoint (treat as a secret).</td>
-</tr>
-<tr>
-<td>TOPOLOGY</td>
-<td>The topology of the cluster, as described above</td>
-</tr>
-<tr>
-<td>SSH_KEY_FILENAME</td>
-<td>The path to a ssh private key file to use for authentication. It is assumed that the public key is at <code>${SSH_KEY_FILENAME}.pub</code>.</td>
-</tr>
-<tr>
-<td>SSH_USER</td>
-<td>The username to ssh as.</td>
+<td><code>LOG_EVENTS_TO_LOKI</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>no</td>
+<td>Whether the <code>'Added event'</code> line is emitted to the log stream; never touches the MariaDB event write</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Decision:</strong> Spool/batch tunables are <strong>module constants</strong>, not
+config, mirroring <code>eventlog_spool.py</code> /<code>eventlog_drainer.py</code>
+exactly (<code>SPOOL_HIGH_WATER_MARK = 100_000</code> at
+<code>eventlog_spool.py:72</code>; <code>DRAIN_BATCH_SIZE = 100</code>,
+<code>BACKOFF_*</code>, <code>SHUTDOWN_DRAIN_TIMEOUT</code> at
+<code>eventlog_drainer.py:50,53-63</code>). The new modules carry the same
+names. <code>SPOOL_HIGH_WATER_MARK</code> may be promoted to config later
+if a concrete operator need appears.</p>
+<h3 id="loki-push-wire-format-oq3-part-a">Loki push wire format (OQ3, part A)<a class="headerlink" href="#loki-push-wire-format-oq3-part-a" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> Ship via <code>POST /loki/api/v1/push</code> (JSON body). A
+drained batch is grouped by identical label set into <code>streams</code>;
+each record is a <code>values</code> pair <code>["&lt;nanosecond-unix-ts string&gt;",
+"&lt;JSON line&gt;"]</code> where the line is the full pylogrus
+<code>JsonFormatter</code> output. The timestamp <strong>must</strong> be a
+nanosecond string (a number is rejected with HTTP 400). In
+practice a single process emits one label set, so a batch is
+usually one stream.</p>
+<p><strong>Decision:</strong> <strong>No structured metadata in v1.</strong> The optional
+third per-value element (structured metadata) requires Loki
+chunk format V4 / schema <strong>v13</strong> / tsdb index — experimental in
+Loki 2.9, default-on only in <strong>Loki 3.0</strong>, and a 3.x server on
+an older schema actively <em>rejects</em> such pushes. Since SF is
+BYO-Loki and must work against whatever the operator runs, all
+high-cardinality identifiers live in the JSON line <strong>body</strong> in
+v1 (filterable with LogQL <code>| json | instance_uuid="..."</code> on any
+version). Moving the hottest filter keys into structured
+metadata behind a version/config check is recorded as future
+work.</p>
+<h3 id="log-record-field-name-contract-oq3-part-b">Log-record field-name contract (OQ3, part B)<a class="headerlink" href="#log-record-field-name-contract-oq3-part-b" title="Permanent link">&para;</a></h3>
+<p><strong>Decision — the label set is fixed, bounded, and the ONLY
+labels:</strong> <code>{job="shakenfist", daemon=&lt;daemon name&gt;,
+host=config.NODE_NAME}</code> (<code>config.py:473</code>). Stream cardinality is
+therefore bounded by <code>daemons × nodes</code> (low hundreds). <strong>No
+per-object UUID, <code>request_id</code>, IP, or other high-cardinality
+value is ever a label</strong> — promoting any would make the Loki
+index grow with the number of objects/requests ever seen
+(cardinality explosion, per Grafana's labels guidance).</p>
+<p><strong>Decision — everything else is JSON body in v1.</strong> The base
+JSON fields come from <code>JsonFormatter.enabled_fields</code>
+(<code>logs.py:209-222</code>): <code>logger_name</code>, <code>ts</code>, <code>level</code>,
+<code>thread_name</code>, <code>message</code>, <code>exception_class</code>, <code>stack_trace</code>,
+<code>module</code>, <code>function</code>. All <code>with_fields(...)</code> keys (lower-cased
+by <code>logs.py:80</code>; objects auto-unwrapped to <code>.uuid</code> strings by
+<code>logs.py:92-101</code>) are body. The high-value filter keys that are
+<strong>candidates for promotion to structured metadata later</strong> are:
+<code>instance_uuid</code>/<code>instance</code>, <code>network_uuid</code>/<code>network</code>,
+<code>interface_uuid</code>, <code>blob_uuid</code>/<code>blob</code>, <code>artifact_uuid</code>/<code>artifact</code>,
+<code>node_uuid</code>, <code>request_id</code>/<code>request-id</code>, and the
+<code>operation_uuid</code>/<code>object_uuid</code> family. The full key enumeration
+(~80 keys across <code>shakenfist/</code>) was produced during phase 0; the
+operative rule is "3 labels, everything else body in v1, the
+list above are the SM-later candidates."</p>
+<p><strong>Known wart (phase 1 cleanup):</strong> <code>eventlog.py:82,105</code> sets
+<code>fqdn = config.NODE_NAME</code>, duplicating the <code>host</code> label value in
+the body. Phase 1 should drop the redundant <code>fqdn</code> from the
+producer rather than carry the node name twice.</p>
+<h3 id="spool-and-handler-module-factoring-oq5">Spool and handler module factoring (OQ5)<a class="headerlink" href="#spool-and-handler-module-factoring-oq5" title="Permanent link">&para;</a></h3>
+<p><strong>Decision — fork, do not generalise.</strong> Three new
+<code>shakenfist/</code> modules, each a near line-for-line fork of its
+eventlog twin so the event path (under the preserve-event-logging
+priority) is untouched:</p>
+<ul>
+<li><code>logship_spool.py</code> — mirror of <code>eventlog_spool.py</code>; spool root
+  <code>/srv/shakenfist/spool/logship/&lt;daemon&gt;-&lt;pid&gt;.db</code>; same WAL
+  sqlite, high-water drop+counter, orphan recovery. Payload row
+  carries <code>{labels, ts_ns, line}</code>.</li>
+<li><code>logship_drainer.py</code> — mirror of <code>eventlog_drainer.py</code>; same
+  batch/poll/backoff constants and <code>atexit</code> drain. <strong>Only
+  divergence is the sink:</strong> replace <code>mariadb.record_event_batch</code>
+  (whose bool contract is documented at <code>mariadb.py:4565</code>) with
+  <code>_push_to_loki(streams) -&gt; bool</code> (True on 2xx; False on
+  non-2xx/timeout/connection error). Failed batches stay spooled
+  and retry with backoff — identical durability contract.</li>
+<li><code>logship.py</code> — net-new (no eventlog twin): the
+  <code>logging.Handler</code> subclass plus the idempotent
+  <code>start(daemon_name)</code>. <code>emit()</code> formats via the library
+  <code>JsonFormatter</code>, builds the <code>{labels, ts_ns, line}</code> row, and
+  calls <code>logship_spool.enqueue()</code>; it is exception-safe
+  (<code>handleError</code>) so logging never raises into a caller.</li>
+</ul>
+<p><strong>Decision — metrics</strong> on the process-wide default registry
+(like <code>eventlog_spool.py:45-56</code>): <code>logship_spool_depth</code> (gauge
+via <code>set_function</code>), <code>logship_spool_dropped_total</code> (counter),
+<code>logship_push_total{result=...}</code> (counter), and optional
+<code>logship_push_seconds</code> (histogram). Unifying the two spools is
+future work.</p>
+<h3 id="json-only-logging-gunicorn-console-oq8-oq9">JSON-only logging, gunicorn, console (OQ8, OQ9)<a class="headerlink" href="#json-only-logging-gunicorn-console-oq8-oq9" title="Permanent link">&para;</a></h3>
+<p><strong>Decision — JSON-only is a real change, not a tidy-up.</strong> All
+<strong>103</strong> <code>logs.setup(...)</code> call sites in <code>shakenfist/</code> use the
+defaults today (<code>syslog=True, json=False</code>) → every daemon
+currently logs <strong>text over <code>/dev/log</code></strong>, not JSON. Approach (as
+implemented in <code>v0.8.5</code>): make <code>setup()</code> install the
+<code>JsonFormatter</code> <strong>unconditionally</strong> and remove the <code>TextFormatter</code>
+branches (<code>logs.py:223-231</code>), so every SF <code>logs.setup(__name__)</code>
+call gets JSON with no per-call-site edits; the <code>json</code> parameter
+(now a deprecated no-op), the <code>SHAKENFIST_LOG_TO_STDOUT</code> test
+branch, and <code>setup_console()</code> survive. This is a breaking change
+for non-SF text consumers, shipped pragmatically as a 0.8.x patch
+bump.</p>
+<p><strong>Decision — handler attachment.</strong> SF attaches its Loki handler
+to the <strong>root</strong> logger inside <code>logship.start()</code> (so the library
+never imports <code>shakenfist</code>), only when <code>LOKI_BASE_URL</code> is set,
+from the two confirmed seams beside the existing
+<code>eventlog_drainer.start(...)</code>: <code>daemon.py:112-113</code>
+(<code>write_pid_file</code>) and <code>gunicorn_config.py:55-56</code>
+(<code>post_fork</code>, the only fork-safe moment for the drainer thread).</p>
+<p><strong>Decision — gunicorn (the least pre-decided item).</strong> gunicorn
+sets <code>propagate = False</code> on <code>gunicorn.error</code>/<code>gunicorn.access</code>
+in <code>Logger.__init__</code>, so propagation-to-root does <strong>not</strong> work
+out of the box. Use a custom <strong><code>logger_class</code></strong> subclass of
+<code>gunicorn.glogging.Logger</code> that re-enables propagation and
+clears gunicorn's own stream handlers, so both loggers flow to
+the root → JSON formatter → Loki handler. This makes dropping
+<code>--log-syslog</code> from <code>sf-api.service:33</code> (phase 5) lossless.
+(gunicorn access lines carry no <code>extra</code> fields, so access-log
+JSON is limited to the rendered message — richer access fields
+are future work.)</p>
+<p><strong>Decision — console.</strong> <code>setup_console()</code> (<code>logs.py:237</code>) stays
+human-readable/colorized; JSON-only scopes strictly to the
+daemon <code>setup()</code> path.</p>
+<h3 id="two-mode-behaviour-oq6">Two-mode behaviour (OQ6)<a class="headerlink" href="#two-mode-behaviour-oq6" title="Permanent link">&para;</a></h3>
+<p><strong>Decision — exactly two modes, never silent, never a
+deliberate double-ship.</strong></p>
+<ul>
+<li><strong>Loki configured (<code>LOKI_BASE_URL</code> set):</strong> one handler — the
+  Loki spool handler. No deliberate second local handler. The
+  WAL spool is the local-durability buffer; a Loki outage loses
+  the Loki copy only past the high-water mark (counter + WARN).</li>
+<li><strong>Loki unconfigured:</strong> one local handler so the node is not
+  silent — <code>SysLogHandler('/dev/log')</code> with the JSON formatter
+  (preferred over stdout because it preserves syslog priority
+  for <code>journalctl -p</code>, is the existing default at <code>logs.py:203</code>,
+  and keeps stdout clean).</li>
+</ul>
+<p><strong>Decision — <code>/dev/log</code> survives rsyslog removal.</strong> <code>/dev/log</code>
+is owned by <code>systemd-journald-dev-log.socket</code> (<code>Symlinks=/dev/log</code>),
+part of systemd, not the <code>rsyslog</code> package (which binds a
+separate <code>syslog.socket</code>). Uninstalling rsyslog (phase 5) leaves
+<code>/dev/log → /run/systemd/journal/dev-log</code> intact, so the
+unconfigured-mode handler still lands in journald. Residual:
+systemd captures service stdout/stderr to journald regardless
+(pre-logging tracebacks) — free, local-only, not a shipping
+pipeline.</p>
+<h3 id="events-relationship-and-echo-toggle-oq11">Events relationship and echo toggle (OQ11)<a class="headerlink" href="#events-relationship-and-echo-toggle-oq11" title="Permanent link">&para;</a></h3>
+<p><strong>Decision — events stay authoritative in MariaDB; the toggle
+gates only the echo.</strong> In <code>add_event_multi()</code>, the echo
+(<code>eventlog.py:80-93</code>, <code>log.info('Added event')</code>) and the
+authoritative MariaDB enqueue (<code>eventlog.py:101-116</code>,
+<code>eventlog_spool.enqueue(payload)</code>) are cleanly separable — <code>log</code>
+is not referenced after line 93, and the payload uses only raw
+locals. <code>LOG_EVENTS_TO_LOKI=False</code> wraps <strong>only</strong> lines 80–93
+and must not touch anything from line 95 on, nor <code>event_uuid</code>
+(<code>:71</code>) or <code>request_id</code> (<code>:75-78</code>). The guard sits <strong>after</strong> the
+existing <code>suppress_event_logging</code> early-return (<code>:45-46</code>) so
+that flag keeps suppressing everything. <code>add_event()</code> (<code>:20-33</code>)
+delegates to <code>add_event_multi()</code> and needs no separate guard.
+Event storage and event-lookup REST APIs do <strong>not</strong> move to
+Loki (rejected alternative ratified).</p>
+<h3 id="ci-loki-topology-and-dual-path-coverage-oq7-oq10">CI Loki topology and dual-path coverage (OQ7, OQ10)<a class="headerlink" href="#ci-loki-topology-and-dual-path-coverage-oq7-oq10" title="Permanent link">&para;</a></h3>
+<p><strong>Decision — stand up Loki the way CI MariaDB is.</strong> A
+single-binary Loki, installed by a new <code>tools/ci-install-loki.sh</code>
+<code>scp</code>'d and <code>sudo</code>-run on the inner-cluster <code>${primary}</code> node
+(co-located with the CI MariaDB, so the inner cluster already
+routes to it), listening on <code>0.0.0.0:3100</code>. This mirrors
+<code>tools/ci-install-mariadb.sh</code> (<code>functional-tests.yml:330-346</code>)
+exactly; placing it on the under-cloud is rejected for parity.</p>
+<p><strong>Decision — plumb as <code>LOKI_BASE_URL</code></strong> via a new
+<code>GETSF_LOKI_BASE_URL</code> (+ <code>GETSF_LOKI_TENANT</code> /
+<code>GETSF_LOKI_AUTH_HEADER</code>) env group on <code>getsf-wrapper</code>, mirroring
+the <code>GETSF_MARIADB_*</code> flow (<code>functional-tests.yml:356-361</code> →
+<code>getsf:534-612,979-983</code> → <code>deploy.py</code> → <code>roles/base/templates/
+config</code>). Unlike <code>MARIADB_HOST</code>, <code>SHAKENFIST_LOKI_BASE_URL</code> is
+rendered <strong>unconditionally on every node</strong> (like
+<code>MARIADB_GATEWAY_HOSTS</code>), not gated on the database group. A
+lower-effort phase-3 bootstrap is to set it through the existing
+<code>GETSF_EXTRA_CONFIG</code> JSON list (no getsf/template change); the
+dedicated group is the recommended end state.</p>
+<p><strong>Decision — keep the CI Loki AND collect local logs.</strong> Keep
+Loki + an end-to-end "logs reached Loki" assertion (the only
+functional coverage of the push path); the central Loki also
+replaces the soon-removed primary syslog grep
+(<code>functional-tests.yml:540-554</code>), which phase 4 reworks into
+Loki queries. <strong>Also</strong> extend <code>ci-gather-logs.yml</code>
+(<code>functional-tests.yml:607-631</code>) to pull each node's local
+structured JSON into the clingwrap bundle, so a shipper failure
+stays debuggable. Add a cheap unit/local test that the
+disabled-shipper path emits local JSON.</p>
+<p><strong>Decision — CI echo mode.</strong> The primary functional run sets
+<code>LOG_EVENTS_TO_LOKI=on</code> (the shipped default), so the phase-4
+Loki log-checks see <code>'Added event'</code> lines; the off-path is
+covered by the cheap disabled-shipper test (and optionally a
+scheduled-test variant).</p>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>The work breaks into phases that can each land independently and
+leave CI green at every step. Phases 0–2 add the new mechanism
+(structured logs + Loki shipper) while syslog forwarding is
+still in place, so nothing is lost mid-flight. Phase 3 proves
+the push path end-to-end in CI. Phase 4 reworks the CI log
+assertions and debug bundle to read from Loki (and local logs)
+so that phase 5 can delete the rsyslog wiring without leaving CI
+blind. By the time phase 5 removes rsyslog, logs already flow to
+Loki and CI already checks them there. Phase 6 documents.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Plan</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0. Decisions and design (config surface, label/field contract, spool factoring, CI Loki topology, auth)</td>
+<td><a href="../PLAN-remove-syslog-forwarding-phase-00-decisions/">PLAN-remove-syslog-forwarding-phase-00-decisions.md</a></td>
+<td>Complete (see Decisions section above)</td>
+</tr>
+<tr>
+<td>1. Library: default structured JSON logging + field-name contract + logs-module tests + release and pin bump</td>
+<td><a href="../PLAN-remove-syslog-forwarding-phase-01-json-logging/">PLAN-remove-syslog-forwarding-phase-01-json-logging.md</a></td>
+<td>Complete (<code>shakenfist-utilities==0.8.5</code> released and pinned)</td>
+</tr>
+<tr>
+<td>2. Loki shipper in shakenfist: spool, drainer, HTTP push handler, config, lifecycle wiring, metrics, unit tests</td>
+<td><a href="../PLAN-remove-syslog-forwarding-phase-02-loki-shipper/">PLAN-remove-syslog-forwarding-phase-02-loki-shipper.md</a></td>
+<td>Complete (pending CI)</td>
+</tr>
+<tr>
+<td>3. CI Loki: stand up Loki for the functional cluster and add an end-to-end "logs reach Loki" functional test</td>
+<td><a href="../PLAN-remove-syslog-forwarding-phase-03-ci-loki/">PLAN-remove-syslog-forwarding-phase-03-ci-loki.md</a></td>
+<td>Complete (pending CI)</td>
+</tr>
+<tr>
+<td>4. Rework CI log-checks and clingwrap bundle for Loki + local logs (new versioned <code>shakenfist/actions</code>)</td>
+<td><a href="../PLAN-remove-syslog-forwarding-phase-04-ci-tooling/">PLAN-remove-syslog-forwarding-phase-04-ci-tooling.md</a></td>
+<td>Complete (<code>loki-ci-tooling</code> merged to actions@main; pending CI)</td>
+</tr>
+<tr>
+<td>5. Remove rsyslog forwarding from the deployer (realises remove-primary phase 1)</td>
+<td><a href="../PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog/">PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog.md</a></td>
+<td>Complete (pending CI; needs actions <code>loki-node-checks</code> merged)</td>
+</tr>
+<tr>
+<td>6. Documentation: operator guide, field contract, ARCHITECTURE/README/AGENTS, index/order</td>
+<td><a href="../PLAN-remove-syslog-forwarding-phase-06-docs/">PLAN-remove-syslog-forwarding-phase-06-docs.md</a></td>
+<td>Complete</td>
+</tr>
+</tbody>
+</table>
+<p>Phase notes:</p>
+<ul>
+<li>
+<p><strong>Phase 0</strong> is a decisions phase in the style of
+  <code>PLAN-health-checks-phase-00-decisions.md</code>. It resolves every
+  Open Question above and commits concrete values: the config
+  option names and defaults, the exact Loki label set, the
+  full field-name contract (which <code>with_fields</code> keys map to
+  labels, structured metadata, or JSON body), the auth model,
+  whether the spool is forked or shared, the Loki-only vs
+  local-fallback decision, the CI Loki-vs-local approach, and a
+  sketch of the CI Loki topology. Its output is
+  a short design doc plus updated Open Questions answers in this
+  master plan. High effort, opus: it is pure judgment and
+  cross-system design.</p>
+</li>
+<li>
+<p><strong>Phase 1</strong> works mostly in the sibling <code>library-utilities</code>
+  repo and makes JSON the <em>only</em> daemon log format, not just the
+  default. Flip <code>logs.setup()</code> so SF daemon logging is JSON
+  (either by changing the default of the <code>json</code> parameter or by
+  having SF pass <code>json=True</code> explicitly — phase 0 decides which
+  keeps non-SF library consumers safe) and <strong>remove the
+  plain-text formatter paths used for daemon output</strong> (the
+  syslog/file <code>TextFormatter</code> branches at <code>logs.py:223-231</code>), so
+  no daemon can emit non-JSON lines. Ensure <code>.with_fields(...)</code>
+  context is emitted as real JSON fields. Define the documented
+  field-name contract in the library (this is the producer side
+  of the contract phase 0 specified). Decide and implement the
+  <code>setup_console(...)</code> question from phase 0 (human-readable vs
+  JSON for CLI tools). Add the unit tests the <code>logs</code> module
+  currently lacks, including a test asserting daemon output is
+  always valid JSON. Cut a <code>shakenfist-utilities</code> release and
+  bump the pin in <code>shakenfist/pyproject.toml</code>. Note: changes to
+  a separately released library plus a pin bump — the management
+  session must coordinate the release. Medium–high effort.</p>
+</li>
+<li>
+<p><strong>Phase 2</strong> is the core implementation and lives entirely in
+  <code>shakenfist</code>. Build <code>shakenfist/logship_spool.py</code> and
+  <code>shakenfist/logship_drainer.py</code> modelled directly on
+  <code>eventlog_spool.py</code> / <code>eventlog_drainer.py</code>: a per-daemon
+  SQLite WAL spool under <code>/srv/shakenfist/spool/logship/</code>, a
+  daemon thread that batches records and POSTs them to Loki's
+  <code>/loki/api/v1/push</code> endpoint, exponential backoff on failure,
+  high-water-mark drop with a counter, orphan recovery, atexit
+  drain, and Prometheus depth/drop/push metrics on the existing
+  registry. Add a <code>logging.Handler</code> subclass that formats each
+  record into a Loki stream entry (labels from phase 0, body =
+  the JSON record) and enqueues it into the spool. Add the
+  config options (<code>LOKI_BASE_URL</code> etc., disabled when empty).
+  Wire <code>logship.start(daemon_name)</code> into
+  <code>daemons/daemon.py:write_pid_file</code> and
+  <code>external_api/gunicorn_config.py:post_fork</code>, alongside the
+  existing <code>eventlog_drainer.start(...)</code> calls. The handler is
+  attached only when a Loki endpoint is configured. Unit tests
+  for spool, drainer batching/backoff, high-water drop, and the
+  push payload shape (mock the HTTP endpoint). High effort,
+  opus: crash-safety, backpressure, and per-process lifecycle
+  are subtle and the prior art must be matched faithfully.</p>
+</li>
+<li>
+<p><strong>Phase 3</strong> stands up Loki for the functional CI cluster the
+  same way MariaDB is provisioned (see <code>shakenfist/deploy/
+  cluster_ci</code> and how <code>MARIADB_*</code> is plumbed). A single-binary
+  Loki is sufficient. Plumb its address into <code>LOKI_BASE_URL</code>
+  for the inner cluster (mind the two-layer CI topology — see
+  the project memory). Add a functional test that runs an
+  operation generating known log lines and then queries Loki to
+  assert they arrived with the expected labels/fields. We
+  prefer functional coverage to unit coverage where we can only
+  have one, and this is the end-to-end proof that the shipper
+  works. High effort: CI rig plumbing across the two SF layers.</p>
+</li>
+<li>
+<p><strong>Phase 4</strong> reworks the CI tooling that today depends on a
+  central, syslog-aggregated <code>/var/log/syslog</code> on the primary,
+  so that phase 5 can delete rsyslog without leaving CI blind.
+  Two strands, both done as <em>new versioned</em> artefacts so other
+  consumers of <code>shakenfist/actions</code> are not broken (its actions
+  are consumed as <code>shakenfist/actions/&lt;name&gt;@main</code> / <code>@ref</code>, and
+  the <code>tools/ci_*.sh</code> scripts are run on the primary via
+  <code>tools/run_remote</code>):</p>
+</li>
+<li><strong>Log-check scripts.</strong> <code>actions/tools/ci_log_checks.sh</code>
+    (greps <code>/var/log/syslog</code> + <code>/var/log/syslog.1</code> for forbidden
+    strings) and the inline syslog greps in the main repo's
+    <code>functional-tests.yml</code> / <code>scheduled-tests.yml</code> are replaced
+    by new versions that query Loki's <code>query_range</code> for the same
+    forbidden/required patterns over the run window. Ship them as
+    new files / a new ref rather than mutating the existing ones
+    in place. (<code>ci_event_checks.sh</code> is etcd-centric and is being
+    overtaken by the BYO-MariaDB etcd removal; coordinate, don't
+    duplicate dead checks.)</li>
+<li>
+<p><strong>Debug bundle (clingwrap).</strong> clingwrap is YAML-driven
+    (<code>.cwd</code> job configs; job types <code>directory</code>/<code>file</code>/<code>shell</code>/
+    <code>shell_emitter</code> in <code>clingwrap/main.py</code>'s <code>JOB_MAP</code>); the
+    <code>shakenfist-ci-failure.cwd</code> config currently collects
+    <code>/var/log/syslog</code> as a <code>file</code> job. Add a Loki dump — simplest
+    is a <code>shell</code> job that <code>curl</code>s <code>query_range</code> for the cluster's
+    logs into the bundle (no clingwrap code change), or a small
+    new <code>HttpJob</code> type if we want it first-class. <strong>Also</strong> keep
+    collecting each node's <em>local</em> structured logs (journald for
+    the <code>sf*</code> units, and/or the on-disk spool) so a bundle is
+    still useful when the Loki push itself is the failure. Note:
+    once rsyslog is gone (phase 5) the <code>/var/log/syslog</code> <code>file</code>
+    job mostly stops being useful — repoint it at journald.
+  Decide whether the new <code>.cwd</code> config and Loki-query logic live
+  in the clingwrap repo (released) or are shipped from
+  <code>shakenfist</code>/<code>actions</code> as a custom target. Medium–high effort:
+  spans two external repos and the main repo's workflows.</p>
+</li>
+<li>
+<p><strong>Phase 5</strong> deletes the rsyslog deployer surface enumerated in
+  the Situation: <code>roles/base/tasks/syslog.yml</code>, the client and
+  server <code>rsyslog-*.conf</code> templates, the rsyslog package
+  install and service enablement in <code>roles/base/tasks/
+  bootstrap.yml</code>, the server setup in <code>roles/primary/tasks/
+  bootstrap.yml</code>, the <code>syslog_target</code> variable
+  (<code>deploy.yml:185</code>, <code>roles/base/defaults/main.yml:13</code>), and
+  the <code>--log-syslog --log-syslog-prefix sf</code> flags in
+  <code>sf-api.service</code>. The <code>LOKI_BASE_URL</code> deploy plumbing (getsf →
+  deploy.py → the <code>SHAKENFIST_LOKI_BASE_URL</code> config-template line)
+  is already done in phase 3; phase 5 adds the remaining
+  <code>LOKI_TENANT</code> / <code>LOKI_AUTH_HEADER</code> operator plumbing (mind the
+  all-node secret rendering for the auth header) and switches the
+  main-repo workflows over to the new Loki-aware CI checks from
+  phase 4. Local journald stays (it is free systemd
+  behaviour, not a second shipping pipeline — see Open Question
+  6). This phase realises remove-primary phase 1; update that
+  plan's status table and phase note to point here. Medium
+  effort: deletion plus config-rendering, with the new mechanism
+  already proven in phases 2–4.</p>
+</li>
+<li>
+<p><strong>Phase 6</strong> writes <code>docs/operator_guide/logging.md</code> (BYO-Loki
+  contract: config options, labels, tenancy, field-name
+  contract, buffering/backpressure/drop semantics, the Loki-only
+  vs local-fallback decision, the documented node-agent
+  alternative, and what changed vs the old primary-node syslog
+  sink). It also documents the <strong>events-vs-logs authoring
+  convention</strong> (objects → event, no object → log) and the
+  dual-destination reality (MariaDB authoritative eventlog +
+  optional Loki echo via <code>LOG_EVENTS_TO_LOKI</code>) — primarily in
+  <code>AGENTS.md</code> / the developer guide for the convention, and in
+  <code>docs/operator_guide/logging.md</code> for the operator-facing
+  "where do my events vs logs live, and how do I interleave
+  them" story. Updates <code>installation.md</code>, <code>ARCHITECTURE.md</code>,
+  <code>README.md</code>, <code>AGENTS.md</code>, this plan's status,
+  <code>docs/plans/index.md</code>, and <code>docs/plans/order.yml</code>.
+  Cross-links from <code>PLAN-remove-primary.md</code>. Low–medium effort.</p>
+</li>
+</ul>
+<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
+<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
+<p>All implementation work is done by sub-agents, never in the
+management session. The management session (this conversation)
+is reserved for planning, review, and decision-making. This
+keeps the management context lean and avoids drowning it in
+implementation diffs.</p>
+<p>The workflow is:</p>
+<ol>
+<li><strong>Plan</strong> at high effort in the management session.</li>
+<li><strong>Spawn a sub-agent</strong> for each implementation step with the
+   brief from the plan, at the recommended effort level and
+   model.</li>
+<li><strong>Review</strong> the sub-agent's output in the management session.
+   Check the actual files — the sub-agent's summary describes
+   what it intended, not necessarily what it did.</li>
+<li><strong>Fix or retry</strong> if the output is wrong. Diagnose whether the
+   brief was insufficient (improve it) or the model was too
+   light (upgrade it), then re-run.</li>
+<li><strong>Commit</strong> once the management session is satisfied with the
+   result.</li>
+</ol>
+<p>This applies to all steps, including high-effort ones. If a
+sub-agent can't succeed even with a detailed brief and the right
+model, that's a signal the brief needs improving, not that the
+management session should do the implementation itself.</p>
+<p>Use <code>isolation: "worktree"</code> for sub-agents when the change is
+risky or experimental. Note that phase 1 touches the <em>sibling</em>
+<code>library-utilities</code> repo, not this one — that work cannot share
+a worktree of this repo and must be coordinated as a separate
+checkout/release.</p>
+<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
+<p>The master plan itself is created at <strong>high effort</strong>. Per-phase
+recommended planning effort:</p>
+<ul>
+<li><strong>Phase 0</strong> — high (opus): pure cross-system design and
+  judgment.</li>
+<li><strong>Phase 1</strong> — medium–high: library code is small but the
+  field contract and the JSON-default switch have
+  backward-compatibility implications for non-SF consumers.</li>
+<li><strong>Phase 2</strong> — high (opus): crash-safe buffering, backpressure,
+  per-process lifecycle, faithful reuse of the eventlog
+  pattern.</li>
+<li><strong>Phase 3</strong> — high: CI rig plumbing across the two-layer SF
+  topology.</li>
+<li><strong>Phase 4</strong> — medium–high: spans <code>shakenfist/actions</code> and
+  clingwrap plus the main-repo workflows; new versioned
+  artefacts and Loki query logic.</li>
+<li><strong>Phase 5</strong> — medium: mostly deletion plus config rendering
+  and switching CI over to the phase 4 checks.</li>
+<li><strong>Phase 6</strong> — low–medium: documentation.</li>
+</ul>
+<h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
+<p>Each phase plan should include a step table:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>| Step | Effort | Model | Isolation | Brief for sub-agent |
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|------|--------|-------|-----------|---------------------|
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>| 2a   | high   | opus   | worktree | Build logship_spool.py mirroring eventlog_spool.py: ... |
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>| 2b   | medium | sonnet | none     | Wire logship.start() into daemon.py and gunicorn_config.py: ... |
+</code></pre></div>
+<p><strong>Effort levels:</strong>
+- <strong>high</strong> — Requires reading multiple files, judgment calls,
+  non-obvious invariants (crash-safety, backpressure,
+  per-process lifecycle), or external research (Loki push API).
+- <strong>medium</strong> — The plan provides enough context to follow a
+  clear brief; may need to read a few files.
+- <strong>low</strong> — Purely mechanical (delete a template, remove a
+  flag, add a config option, regenerate stubs).</p>
+<p><strong>Model choice:</strong>
+- <strong>opus</strong> — phase 0 design, the phase 2 spool/drainer/handler,
+  CI plumbing in phase 3.
+- <strong>sonnet</strong> — well-briefed wiring, deletion, and
+  config-rendering steps.
+- <strong>haiku</strong> — pure mechanical deletions/renames with a complete
+  instruction.</p>
+<p><strong>When in doubt, skew to the more capable model.</strong> A failed
+implementation wastes more time than a heavier model costs. Only
+recommend a lighter model when the brief is detailed enough for
+it to succeed.</p>
+<p>A good brief front-loads the research the planner already did.
+For phase 2, that means: "mirror <code>eventlog_spool.py</code> — SQLite
+WAL spool under <code>/srv/shakenfist/spool/logship/&lt;daemon&gt;-&lt;pid&gt;.db</code>,
+<code>SPOOL_HIGH_WATER_MARK</code> drop-with-counter, orphan recovery on
+startup; mirror <code>eventlog_drainer.py:161-319</code> for the daemon
+thread, <code>DRAIN_BATCH_SIZE</code>/poll/backoff constants, and the
+<code>atexit</code> drain; expose Prometheus <code>logship_spool_depth</code> /
+<code>logship_spool_dropped_total</code> / <code>logship_push_*</code> on the default
+registry as <code>eventlog_spool.py:50-56</code> does; start it from
+<code>daemons/daemon.py:113</code> and <code>external_api/gunicorn_config.py:56</code>
+next to <code>eventlog_drainer.start(...)</code>."</p>
+<h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
+<p>After a sub-agent completes, verify:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The files that were supposed to change actually changed
+      (read them, don't trust the summary).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No unrelated files were modified.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The code passes <code>pre-commit run --all-files</code> (flake8,
+      stestr unit tests, mypy).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> For phase 1, the <code>shakenfist-utilities</code> release was cut
+      and the pin in <code>shakenfist/pyproject.toml</code> was bumped to
+      match.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The changes match the intent of the brief — semantically
+      right, not just syntactically correct. In particular the
+      logship spool must preserve the eventlog spool's
+      crash-safety and drop-don't-block posture.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Commit message follows project conventions (including the
+      Co-Authored-By line with model, context window, effort
+      level, and other settings).</li>
+</ul>
+<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
+<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<p>We will know this plan has been successfully implemented because
+the following statements will be true:</p>
+<ul>
+<li>The code passes <code>pre-commit run --all-files</code> (flake8, stestr
+  unit tests, and mypy type checking).</li>
+<li>SF daemons emit structured JSON for <em>every</em> log line — JSON is
+  the only daemon log format, the plain-text formatter paths are
+  gone, and <code>.with_fields(...)</code> context is carried as real
+  fields against a documented field-name contract.</li>
+<li>SF ships logs to Loki via an in-process, on-disk-spooled,
+  batched push that is crash-safe, applies backpressure by
+  dropping at a high-water mark (with a counter + WARN), retries
+  with exponential backoff, recovers orphaned spools, and drains
+  on shutdown — matching the eventlog spool/drainer guarantees.</li>
+<li>When a Loki endpoint is configured the shipper is the sink
+  (no deliberate second local pipeline); the on-disk spool is
+  the local-durability buffer across transient outages. The
+  tenant (<code>X-Scope-OrgID</code>) is operator-configurable so SF logs
+  do not co-mingle with other tenants' logs.</li>
+<li>The Loki shipper is disabled when no endpoint is configured,
+  enabling it is a single operator config value, and with it
+  disabled SF still emits structured JSON locally (a dev/single
+  box is never silent).</li>
+<li>CI exercises both paths: a Loki standup plus a functional test
+  asserting SF log lines arrive in Loki end-to-end (the push
+  path), and coverage that the disabled-shipper path emits local
+  JSON. The CI log-checks and clingwrap debug bundle read from
+  Loki and from each node's local logs, shipped as new versioned
+  <code>shakenfist/actions</code> artefacts that do not break existing
+  consumers.</li>
+<li>New code follows existing patterns: the spool/drainer mirrors
+  the eventlog prior art; config options follow the BYO pattern
+  in <code>config.py</code>; Prometheus metrics use the process-wide
+  registry.</li>
+<li>The deployer no longer installs or configures rsyslog and no
+  longer passes <code>--log-syslog</code> to gunicorn; <code>syslog_target</code> and
+  the primary's rsyslog role content are gone.</li>
+<li>Lines are wrapped at 120 characters, single quotes for
+  strings, double quotes for docstrings.</li>
+<li>Documentation in <code>docs/</code> describes the new BYO-Loki logging
+  contract (<code>docs/operator_guide/logging.md</code>), and
+  <code>ARCHITECTURE.md</code>, <code>README.md</code>, and <code>AGENTS.md</code> are updated.</li>
+<li><code>PLAN-remove-primary.md</code> phase 1 is marked complete with a
+  pointer here.</li>
+</ul>
+<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Unify the eventlog and logship spools</strong> behind one reusable
+  durable-spool primitive (phase 0 deliberately forks them for
+  lower risk).</li>
+<li><strong>mTLS / TLS to the Loki endpoint</strong>, consuming the BYO-PKI
+  surface from <code>PLAN-embrace-tls.md</code>.</li>
+<li><strong>Per-namespace log tenancy</strong> (per-tenant <code>X-Scope-OrgID</code>),
+  which intersects authz and is much larger than the
+  cluster-wide tenant shipped here.</li>
+<li><strong>Client-side fan-out across multiple Loki endpoints</strong> if
+  operators want SF to balance across Loki replicas rather than
+  rely on their own ingress.</li>
+<li><strong>OpenTelemetry / tracing</strong> instrumentation is a separate
+  thread; align the field-name contract with it when it lands.</li>
+<li><strong>Revisit shipping DEBUG centrally (with OpenTelemetry).</strong> v1
+  ships only <code>INFO</code>+ to Loki and keeps <code>DEBUG</code> local to each
+  node's journald — matching the old rsyslog <code>*.!=debug</code>
+  forwarder and keeping the high-volume DEBUG stream off the
+  spool/push path (a measured performance win: shipping every
+  DEBUG line via the per-daemon sqlite spool slowed the
+  multi-node CI cluster ~2x). The cost is that deep diagnosis of
+  a past incident on a now-recycled/disposable node loses its
+  DEBUG detail. Once SF has OpenTelemetry-based tracing — a
+  better-suited transport for high-volume, sampleable diagnostic
+  detail — reconsider centrally capturing DEBUG/trace-level data
+  so on-node access is not required. The level cut lives in
+  <code>shakenfist/logship.py</code> (<code>start()</code> sets the Loki handler to
+  <code>INFO</code>); revisiting it means changing that level and re-checking
+  the volume/perf impact.</li>
+<li><strong>A first-class clingwrap <code>HttpJob</code></strong> (instead of a <code>shell</code>
+  job shelling out to <code>curl</code>) if the Loki-dump collector proves
+  worth making reusable across other HTTP-fetched diagnostics.</li>
+<li><strong>A Grafana dashboard that interleaves events and logs</strong> by
+  putting a MariaDB-datasource events panel alongside a Loki
+  logs panel, time-aligned — the way to recover a single-pane
+  operational view <em>without</em> echoing events into Loki, for
+  operators who run with <code>LOG_EVENTS_TO_LOKI</code> off.</li>
+<li><strong>Metrics shipping</strong> is explicitly <em>not</em> in scope — SF already
+  exposes Prometheus endpoints for the operator to scrape; this
+  plan is logs only.</li>
+</ul>
+<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<p>To be filled in as we go. At the start of each phase, scan the
+<code>shakenfist/shakenfist</code> GitHub issue tracker for open issues
+related to logging, syslog, or log forwarding and either resolve
+them as part of the relevant phase or note them here.</p>
+<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
+<p>When this master plan is created from the template:</p>
+<ul>
+<li><strong><code>docs/plans/index.md</code></strong> — add rows to the <em>Plan Status</em>
+  table for this plan and its phases, with links, status, and
+  one-line descriptions, grouped under this master plan. Add a
+  line to the <em>Plan sequencing</em> section noting that this plan
+  delivers the Loki-shipper story remove-primary phase 1 depends
+  on, and that it can land in parallel with the other BYO work.</li>
+<li><strong><code>docs/plans/order.yml</code></strong> — add an entry for this master
+  plan so it appears in the documentation navigation. Phase
+  files are <em>not</em> added to <code>order.yml</code>; they are linked from the
+  Execution table and <code>index.md</code> only.</li>
+</ul>
+<p>The site navigation in <code>mkdocs.yml</code> is produced from
+<code>mkdocs.yml.tmpl</code> by the docs-sync workflow, which consumes
+<code>order.yml</code>. Do not edit <code>mkdocs.yml</code> by hand.</p>
+<p>When all phases are complete, update the status column in
+<code>docs/plans/index.md</code> and mark <code>PLAN-remove-primary.md</code> phase 1
+complete.</p>
+<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<p>Before executing any step of this plan, please back brief the
+operator as to your understanding of the plan and how the work
+you intend to do aligns with that plan.
+</content>
+</invoke></p>
 
 
 
 
 
 
-
-  
-  
 
 
 
@@ -9341,7 +10546,7 @@ It is customized per installation, setting the following variables:</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20operator_guide/installation.md&body=%2A%2ASource%20file%3A%2A%2A%20%60operator_guide/installation.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/operator_guide/installation/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-remove-syslog-forwarding.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-remove-syslog-forwarding.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-remove-syslog-forwarding/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
