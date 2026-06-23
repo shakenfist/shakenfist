@@ -1,0 +1,40 @@
+---
+# Copy the CA certificate and this host's key/certificate (generated on the
+# control node by host_certificate.yml) onto {{ hostname }} for libvirt's SPICE
+# TLS to use.
+
+- name: Create /etc/pki/CA
+  ansible.builtin.file:
+    path: /etc/pki/CA
+    state: directory
+    mode: '0755'
+
+- name: Create /etc/pki/libvirt-spice
+  ansible.builtin.file:
+    path: /etc/pki/libvirt-spice
+    state: directory
+    mode: '0755'
+
+- name: Copy CA certificate to host
+  ansible.builtin.copy:
+    src: "{{ ca_cert_path }}"
+    dest: /etc/pki/libvirt-spice/ca-cert.pem
+    owner: root
+    group: root
+    mode: '0444'
+
+- name: Copy host key to host
+  ansible.builtin.copy:
+    src: "{{ host_key_path }}"
+    dest: /etc/pki/libvirt-spice/server-key.pem
+    owner: root
+    group: root
+    mode: '0444'
+
+- name: Copy host certificate to host
+  ansible.builtin.copy:
+    src: "{{ host_cert_path }}"
+    dest: /etc/pki/libvirt-spice/server-cert.pem
+    owner: root
+    group: root
+    mode: '0444'

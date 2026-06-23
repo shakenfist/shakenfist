@@ -1,0 +1,216 @@
+---
+# Prepare a host to act as a Shaken Fist hypervisor. This role assumes it is
+# only applied to hosts that should be hypervisors (the consuming playbook
+# gates it on node_is_hypervisor), so the role body reads no inventory groups.
+#
+# Architecture detection derived from
+# https://github.com/redhat-openstack/ansible-role-tripleo-parts
+
+- name: Check whether we have Intel CPUs
+  ansible.builtin.command: grep -q Intel /proc/cpuinfo
+  changed_when: false
+  failed_when: false
+  register: is_intel
+
+- name: Check whether we have AMD CPUs
+  ansible.builtin.command: grep -q AMD /proc/cpuinfo
+  changed_when: false
+  failed_when: false
+  register: is_amd
+
+- name: Enable nested virtualization now (AMD)
+  ansible.builtin.shell: |
+    modprobe -r kvm_intel || true
+    modprobe kvm_amd nested=1
+  changed_when: true
+  when: is_amd.rc == 0
+
+- name: Enable nested virtualization now (Intel)
+  ansible.builtin.shell: |
+    modprobe -r kvm_amd
+    modprobe kvm_intel nested=1
+  changed_when: true
+  when: is_intel.rc == 0
+
+- name: Enable nested virtualization on boot (AMD)
+  ansible.builtin.copy:
+    content: |
+      options kvm_amd nested=1
+    dest: /etc/modprobe.d/sf-kvm.conf
+    owner: root
+    mode: ugo+r
+  when: is_amd.rc == 0
+
+- name: Enable nested virtualization on boot (Intel)
+  ansible.builtin.copy:
+    content: |
+      options kvm_intel nested=1
+    dest: /etc/modprobe.d/sf-kvm.conf
+    owner: root
+    mode: ugo+r
+  when: is_intel.rc == 0
+
+- name: Configure kernel samepage merging
+  ansible.builtin.include_tasks: ksm.yml
+
+# Load vhost_vsock kernel module for vsock communication with guest agents.
+# This module is required for the sf-agent2 side channel to work. On some
+# distributions (notably Ubuntu 24.04), this module is not automatically
+# loaded when vsock sockets are created.
+- name: Load vhost_vsock kernel module
+  community.general.modprobe:
+    name: vhost_vsock
+    state: present
+
+- name: Ensure vhost_vsock is loaded on boot
+  ansible.builtin.copy:
+    content: vhost_vsock
+    dest: /etc/modules-load.d/sf-vhost-vsock.conf
+    owner: root
+    mode: '0644'
+
+- name: Enable SPICE TLS
+  ansible.builtin.lineinfile:
+    path: /etc/libvirt/qemu.conf
+    regexp: "#spice_tls = "
+    line: 'spice_tls = 1'
+
+- name: Configure SPICE TLS PKI directory
+  ansible.builtin.lineinfile:
+    path: /etc/libvirt/qemu.conf
+    regexp: "#spice_tls_x509_cert_dir = "
+    line: 'spice_tls_x509_cert_dir = "/etc/pki/libvirt-spice"'
+
+# Ensure libvirt has BPF and perfmon capabilities (see the Debian bug
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=979964 for details).
+- name: Let libvirt use BPF
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/usr.sbin.libvirtd
+    regexp: "  capability bpf,"
+    line: '  capability bpf,'
+
+- name: Let libvirt use perfmon
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/usr.sbin.libvirtd
+    regexp: "  capability perfmon,"
+    line: '  capability perfmon,'
+
+- name: Let libvirt use sys_rawio
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/usr.sbin.libvirtd
+    regexp: "  capability sys_rawio,"
+    line: '  capability sys_rawio,'
+
+- name: Check whether /etc/apparmor.d/local/abstractions/libvirt-qemu exists
+  ansible.builtin.stat:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+  register: stat_result
+
+# NOTE(mikal): this wont work if the user has configured a different
+# path for the instance path. We should fix that.
+- name: Add an apparmor rule for NVMe disks (modern Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/srv/shakenfist/instances.*nvme.*"
+    line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
+  when: stat_result.stat.exists
+
+# NOTE(mikal): and fix it here too.
+- name: Add an apparmor rule for NVMe disks (older Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/srv/shakenfist/instances.*nvme.*"
+    line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
+  when: not stat_result.stat.exists
+
+# Let libvirt read the SSL configuration for its SPICE connections (see the
+# Debian bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1030684 for
+# details).
+- name: Let libvirt read our openssl config (modern Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/etc/ssl/openssl.cnf r,"
+    line: '/etc/ssl/openssl.cnf r,'
+  when: stat_result.stat.exists
+
+- name: Let libvirt read our openssl config (older Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/etc/ssl/openssl.cnf r,"
+    line: '/etc/ssl/openssl.cnf r,'
+  when: not stat_result.stat.exists
+
+# For instances which are started with no network interface, but then hotplug
+# one later, we need to ensure that we always have access to /dev/vhost-net.
+# See https://bugs.launchpad.net/ubuntu/+source/libvirt/+bug/1815910 for
+# details.
+- name: Add an apparmor rule to always allow vhost-net access (modern Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/dev/vhost-net rw,"
+    line: '/dev/vhost-net rw,'
+  when: stat_result.stat.exists
+
+- name: Add an apparmor rule to always allow vhost-net access (older Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/dev/vhost-net rw,"
+    line: '/dev/vhost-net rw,'
+  when: not stat_result.stat.exists
+
+# For vsock communication with guest agents (sf-agent2 side channel), we need
+# access to /dev/vhost-vsock and /dev/vsock. This is similar to vhost-net above.
+- name: Add an apparmor rule to always allow vhost-vsock access (modern Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/dev/vhost-vsock rw,"
+    line: '/dev/vhost-vsock rw,'
+  when: stat_result.stat.exists
+
+- name: Add an apparmor rule to always allow vhost-vsock access (older Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/dev/vhost-vsock rw,"
+    line: '/dev/vhost-vsock rw,'
+  when: not stat_result.stat.exists
+
+- name: Add an apparmor rule to always allow vsock access (modern Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    regexp: "/dev/vsock rw,"
+    line: '/dev/vsock rw,'
+  when: stat_result.stat.exists
+
+- name: Add an apparmor rule to always allow vsock access (older Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "/dev/vsock rw,"
+    line: '/dev/vsock rw,'
+  when: not stat_result.stat.exists
+
+- name: Restart apparmor
+  ansible.builtin.service:
+    name: apparmor
+    enabled: true
+    state: restarted
+
+- name: Restart libvirt
+  ansible.builtin.service:
+    name: libvirtd
+    state: restarted
+
+# The libvirt domain template ships with this role; ansible resolves the
+# relative src against the role's files/ directory.
+- name: Copy libvirt template
+  ansible.builtin.copy:
+    src: libvirt.tmpl
+    dest: /srv/shakenfist/libvirt.tmpl
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Turn off default libvirt networking
+  ansible.builtin.command: virsh net-destroy default
+  register: virsh_net_destroy
+  changed_when: virsh_net_destroy.rc == 0
+  failed_when: false

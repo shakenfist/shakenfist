@@ -1,0 +1,37 @@
+---
+# Determine and validate the MTU of this host's mesh network interface. This
+# computes node_mtu locally via `ip link` (no cross-host reads); the consuming
+# playbook collects each host's node_mtu to derive the cluster-wide
+# max_hypervisor_mtu. Invoke via include_role with tasks_from set to
+# validate_mtus.
+
+- name: Show network interfaces
+  ansible.builtin.command: ip link show
+  register: ip_links
+  changed_when: false
+
+- name: Log network interfaces
+  ansible.builtin.debug:
+    msg: "{{ ip_links.stdout }}"
+
+- name: Determine the mesh network interface MTU
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    ip link show {{ node_mesh_nic }} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
+  args:
+    executable: /bin/bash
+  register: node_mtu_complex
+  changed_when: false
+
+- name: Extract mesh interface MTU
+  ansible.builtin.set_fact:
+    node_mtu: "{{ node_mtu_complex.stdout }}"
+
+- name: Log node MTU
+  ansible.builtin.debug:
+    msg: "Node MTU is {{ node_mtu }}"
+
+- name: Abort if the mesh interface MTU is too low
+  ansible.builtin.fail:
+    msg: "Node MTU is too low."
+  when: ignore_mtu != "1" and node_mtu | int < 2000

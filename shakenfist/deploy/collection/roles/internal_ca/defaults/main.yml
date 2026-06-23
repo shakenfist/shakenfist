@@ -1,0 +1,18 @@
+---
+# Friendly name for this deployment's CA. Used in the CA subject and file names.
+deploy_name: "sf"
+
+# The host whose certificate is being managed. Set by the consuming playbook to
+# inventory_hostname when issuing/distributing a per-host certificate.
+hostname: "undefined"
+
+# Where the CA and per-host material live on the control node.
+ca_path: "/srv/shakenfist/pki/CA"
+
+ca_cert_path: "{{ ca_path }}/{{ deploy_name }}-ca-cert.pem"
+ca_key_path: "{{ ca_path }}/{{ deploy_name }}-ca-key.pem"
+ca_template_path: "{{ ca_path }}/{{ deploy_name }}-ca-template.info"
+
+host_cert_path: "{{ ca_path }}/{{ hostname }}-server-cert.pem"
+host_key_path: "{{ ca_path }}/{{ hostname }}-server-key.pem"
+host_template_path: "{{ ca_path }}/{{ hostname }}-server-template.pem"

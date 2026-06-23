@@ -1,0 +1,76 @@
+---
+argument_specs:
+  main:
+    short_description: Bootstrap the CA, issue, and distribute a host certificate.
+    description:
+      - >-
+        Runs bootstrap, host_certificate, and distribute_certificates in order.
+        This is the correct entry point for a single-host deployment where the
+        control node is also the target host. Multi-host playbooks invoke the
+        individual entry points as separate plays instead.
+    options: &ca_options
+      deploy_name:
+        type: str
+        default: "sf"
+        description:
+          - Friendly name for this deployment's CA, used in the subject and file names.
+      hostname:
+        type: str
+        default: "undefined"
+        description:
+          - >-
+            The host whose certificate is being managed. Set to
+            inventory_hostname by the consuming playbook.
+      ca_path:
+        type: str
+        default: "/srv/shakenfist/pki/CA"
+        description:
+          - Directory on the control node holding the CA and per-host material.
+      ca_cert_path:
+        type: str
+        description:
+          - Path to the CA certificate. Defaults to a value derived from ca_path and deploy_name.
+      ca_key_path:
+        type: str
+        description:
+          - Path to the CA private key. Defaults to a value derived from ca_path and deploy_name.
+      ca_template_path:
+        type: str
+        description:
+          - Path to the CA certtool template. Defaults to a value derived from ca_path and deploy_name.
+      host_cert_path:
+        type: str
+        description:
+          - Path to the host certificate on the control node. Defaults to a value derived from ca_path and hostname.
+      host_key_path:
+        type: str
+        description:
+          - Path to the host private key on the control node. Defaults to a value derived from ca_path and hostname.
+      host_template_path:
+        type: str
+        description:
+          - Path to the host certtool template. Defaults to a value derived from ca_path and hostname.
+  bootstrap:
+    short_description: Create the deployment's internal certificate authority.
+    description:
+      - >-
+        Idempotently generates the CA private key and self-signed CA
+        certificate on the control node. Run once. Invoke via include_role with
+        tasks_from set to bootstrap.
+    options: *ca_options
+  host_certificate:
+    short_description: Issue or renew a host's SPICE TLS certificate.
+    description:
+      - >-
+        Generates the per-host key and certificate on the control node against
+        the CA. Invoke per host via include_role with tasks_from set to
+        host_certificate.
+    options: *ca_options
+  distribute_certificates:
+    short_description: Distribute the CA and host certificate onto a host.
+    description:
+      - >-
+        Copies the CA certificate and the host's key/certificate from the
+        control node into /etc/pki/libvirt-spice on the host. Invoke per host
+        via include_role with tasks_from set to distribute_certificates.
+    options: *ca_options

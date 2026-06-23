@@ -1,0 +1,26 @@
+# Ansible-lint configuration for the shakenfist.shakenfist collection.
+#
+# Run manually: ansible-lint shakenfist/deploy/collection/
+#
+# This mirrors the legacy deployer's permissive basic profile. The skip_list
+# below documents each disabled check and why; the goal is to enable them
+# incrementally as the collection matures.
+
+profile: basic
+
+skip_list:
+  # The canonical role variables are intentionally NOT role-prefixed. The
+  # consuming example playbook passes the same variable (for example
+  # node_mesh_nic, ksm_enabled) to several roles, and the phase plan defines
+  # these unprefixed names as the cross-role contract. Prefixing them per role
+  # would break that contract, so this check is disabled for the collection.
+  - var-naming[no-role-prefix]
+
+  # The apt installs deliberately use state: latest to track security updates,
+  # matching the legacy deployer's behaviour. Pinning packages is out of scope
+  # for this refactor.
+  - package-latest
+
+  # A galaxy changelog is not yet maintained for the collection. It will be
+  # added when the release/publish job lands (step 5).
+  - galaxy[no-changelog]

@@ -1,0 +1,227 @@
+<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+  <name>sf:{{uuid}}</name>
+  <uuid>{{uuid}}</uuid>
+  <memory unit='KiB'>{{memory}}</memory>
+  <currentMemory unit='KiB'>{{memory}}</currentMemory>
+  <vcpu placement='static'>{{vcpus}}</vcpu>
+  <os>
+    <type arch='x86_64' machine='{{machine_type}}'>hvm</type>
+    <boot dev='hd'/>
+    <boot dev='cdrom'/>
+    <bootmenu enable='no' timeout='3000'/>
+
+    {%- if uefi -%}
+    {%- if secure_boot -%}
+    <loader readonly='yes' secure='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.secboot.fd</loader>
+    {%- else -%}
+    <loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.fd</loader>
+    {%- endif -%}
+    <nvram {{nvram_template_attribute}}>{{instance_path}}/nvram</nvram>
+    {%- endif -%}
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+    {%- if secure_boot -%}
+    <smm state='on'>
+      <tseg unit='MiB'>48</tseg>
+    </smm>
+    {%- endif -%}
+  </features>
+  <cpu mode='host-passthrough'>
+  </cpu>
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+  <pm>
+    <suspend-to-mem enabled='no'/>
+    <suspend-to-disk enabled='no'/>
+  </pm>
+  <devices>
+    <emulator>/usr/bin/kvm</emulator>
+
+    {%- for disk in disks %}
+    {%- if disk.bus != 'nvme' %}
+    <disk type='{{disk.source_type}}' device='{{disk.present_as}}'>
+      <driver name='qemu' type='{{disk.type}}' cache='{{disk.cache_mode}}'/>
+      {{disk.source}}
+      {{disk.backing}}
+      <target dev='{{disk.device}}' bus='{{disk.bus}}'/>
+    </disk>
+    {%- endif %}
+    {%- endfor %}
+
+    {%- if machine_type == 'q35' -%}
+    <!-- NOTE(mikal): q35 is pcie -->
+    <controller type='pci' index='0' model='pcie-root'/>
+    <controller type='pci' index='1' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='1' port='0x10'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='pci' index='2' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='2' port='0x11'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x1'/>
+    </controller>
+    <controller type='pci' index='3' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='3' port='0x12'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x2'/>
+    </controller>
+    <controller type='pci' index='4' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='4' port='0x13'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x3'/>
+    </controller>
+    <controller type='pci' index='5' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='5' port='0x14'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x4'/>
+    </controller>
+    <controller type='pci' index='6' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='6' port='0x15'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x5'/>
+    </controller>
+    <controller type='pci' index='7' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='7' port='0x16'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x6'/>
+    </controller>
+    <controller type='usb' index='0' model='qemu-xhci' ports='15'>
+      <address type='pci' domain='0x0000' bus='0x03' slot='0x00' function='0x0'/>
+    </controller>
+    <controller type='sata' index='0'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x1f' function='0x2'/>
+    </controller>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+      <address type='pci' domain='0x0000' bus='0x06' slot='0x00' function='0x0'/>
+    </rng>
+    {%- else -%}
+    <!-- NOTE(mikal): i440fx is pci -->
+    <controller type='usb' index='0' model='ich9-ehci1'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x7'/>
+    </controller>
+    <controller type='usb' index='0' model='ich9-uhci1'>
+      <master startport='0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='usb' index='0' model='ich9-uhci2'>
+      <master startport='2'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x1'/>
+    </controller>
+    <controller type='usb' index='0' model='ich9-uhci3'>
+      <master startport='4'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x2'/>
+    </controller>
+    <controller type='pci' index='0' model='pci-root'/>
+    <controller type='ide' index='0'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x1'/>
+    </controller>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+      <address type='pci' domain='0x0000' bus='0x06' slot='0x01' function='0x0'/>
+    </rng>
+    {%- endif -%}
+
+    {% for net in networks %}
+    <interface type='bridge'>
+      <mac address='{{net.macaddr}}'/>
+      <source bridge='{{net.bridge}}'/>
+      <model type='{{net.model}}'/>
+      <mtu size='{{net.mtu}}'/>
+    </interface>
+    {% endfor %}
+
+    <!-- NOTE(mikal): we use "console" here not "serial" because on Ubuntu 20.04
+         we had issues with qemu using incorrect ports and not binding to them
+         without significant retries. We wrote a test case for that at
+         https://github.com/shakenfist/reproducables/tree/master/sniffles
+         if you're interested. -->
+    <console type='tcp'>
+      <source mode='bind' host='0.0.0.0' service='{{console_port}}'/>
+      <log file='{{instance_path}}/console.log' append='on'/>
+      <protocol type='telnet'/>
+      <target port='1'/>
+    </console>
+
+    {%- if vdi_type == 'vnc' -%}
+    <graphics type='vnc' port='{{vdi_port}}' listen='0.0.0.0'>
+      <listen type='address' address='0.0.0.0'/>
+    </graphics>
+    {%- else -%}
+    <!-- NOTE(mikal): this is required for the SPICE in guest agent to work -->
+    <channel type='spicevmc'>
+      <target type='virtio' name='com.redhat.spice.0' state='disconnected'/>
+      <alias name='channel2'/>
+      <address type='virtio-serial' controller='0' bus='0' port='3'/>
+    </channel>
+
+    <!-- NOTE(mikal): this is required for the SPICE USB3 redirection to work -->
+    <controller type='usb' index='1' model='nec-xhci'/>
+    <redirdev bus='usb' type='spicevmc'/>
+    <redirdev bus='usb' type='spicevmc'/>
+    <redirdev bus='usb' type='spicevmc'/>
+
+    <graphics type='spice' port='{{vdi_port}}' tlsPort='{{vdi_tls_port}}' listen='0.0.0.0'>
+      <listen type='address' address='0.0.0.0'/>
+      <channel name='main' mode='secure'/>
+      <channel name='display' mode='secure'/>
+      <channel name='inputs' mode='secure'/>
+      <channel name='cursor' mode='secure'/>
+      <channel name='playback' mode='secure'/>
+      <channel name='record' mode='secure'/>
+      <channel name='smartcard' mode='secure'/>
+      <channel name='usbredir' mode='secure'/>
+
+      <image compression="auto_glz"/>
+      <jpeg compression="always"/>
+      <zlib compression="always"/>
+      <playback compression="on"/>
+      <streaming mode="all"/>
+    </graphics>
+    {%- endif %}
+
+    <!-- NOTE(mikal): we use this sound device because the default resulted in
+         very poor performance on Windows 10. -->
+    <sound model='ich6'/>
+
+    <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
+    <video>
+      <model type='{{video_model}}' vram='{{video_memory}}' heads='1' primary='yes'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
+    </video>
+    <memballoon model='virtio'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
+    </memballoon>
+
+    <!-- NOTE(mikal): this is how side channels are implemented. -->
+    {%- for extra in extradevices %}
+    {{extra}}
+    {%- endfor %}
+  </devices>
+
+  <!-- NOTE(mikal): this is required to support things like NVME disks. -->
+  <qemu:commandline>
+  {%- if secure_boot -%}
+    <qemu:arg value='-global'/><qemu:arg value='ICH9-LPC.disable_s3=1'/>
+  {%- endif -%}
+  {%- if spice_concurrent -%}
+    <qemu:env name='SPICE_DEBUG_ALLOW_MC' value='1'/>
+  {%- endif -%}
+  {%- if spice_debug -%}
+    <qemu:env name='G_MESSAGES_DEBUG' value='all'/>
+  {%- endif -%}
+  {%- for extra in extracommands %}
+    <qemu:arg value='{{extra}}'/>
+  {%- endfor %}
+  </qemu:commandline>
+</domain>

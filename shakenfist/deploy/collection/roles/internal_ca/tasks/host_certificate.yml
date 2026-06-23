@@ -1,0 +1,78 @@
+---
+# Issue (or renew) a SPICE TLS certificate for {{ hostname }}. The certificate
+# material is generated on the control node (delegated to localhost) against
+# the CA created by bootstrap.yml.
+
+- name: Check if the host certificate is already installed
+  ansible.builtin.stat:
+    path: /etc/pki/libvirt-spice/server_cert.pem
+  register: host_cert
+
+- name: Check certificate lifetime
+  ansible.builtin.shell: >-
+    openssl x509 -checkend $(( 3600 * 24 * 30 )) -noout
+      -in /etc/pki/libvirt-spice/server_cert.pem || true
+  register: host_cert_expires
+  changed_when: false
+  when: host_cert.stat.exists
+
+- name: Log certificate expiry result
+  ansible.builtin.debug:
+    msg: "{{ host_cert_expires }}"
+  when: host_cert.stat.exists
+
+- name: Move aside old certificate
+  ansible.builtin.command: mv "{{ host_cert_path }}" "{{ host_key_path }}".$(date +%Y%m%d)".pem"
+  changed_when: true
+  delegate_to: localhost
+  delegate_facts: true
+  when: host_cert.stat.exists and not host_cert_expires.meta.stdout == "Certificate will expire"
+
+- name: Check if the host certificate still exists
+  ansible.builtin.stat:
+    path: "{{ host_cert_path }}"
+  delegate_to: localhost
+  delegate_facts: true
+  register: host_cert
+
+- name: Check if the host key exists
+  ansible.builtin.stat:
+    path: "{{ host_key_path }}"
+  delegate_to: localhost
+  delegate_facts: true
+  register: host_key
+
+- name: Write host certificate template
+  ansible.builtin.copy:
+    content: |
+      organization = Shaken Fist CA for {{ deploy_name }}
+      cn = {{ hostname }}
+      tls_www_server
+      encryption_key
+      signing_key
+    dest: "{{ host_template_path }}"
+    owner: root
+    mode: u=r
+  delegate_to: localhost
+  delegate_facts: true
+  when: not host_cert.stat.exists
+
+- name: Create host key
+  ansible.builtin.shell: umask 277 && certtool --generate-privkey > "{{ host_key_path }}"
+  changed_when: true
+  delegate_to: localhost
+  delegate_facts: true
+  when: not host_key.stat.exists
+
+- name: Create host certificate
+  ansible.builtin.command: >-
+    certtool --generate-certificate
+      --template "{{ host_template_path }}"
+      --load-privkey "{{ host_key_path }}"
+      --load-ca-certificate "{{ ca_cert_path }}"
+      --load-ca-privkey "{{ ca_key_path }}"
+      --outfile "{{ host_cert_path }}"
+  changed_when: true
+  delegate_to: localhost
+  delegate_facts: true
+  when: not host_cert.stat.exists

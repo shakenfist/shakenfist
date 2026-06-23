@@ -1,0 +1,5 @@
+---
+# Whether kernel samepage merging (KSM) should be enabled on this hypervisor.
+# A string "1" enables KSM; any other value disables it. Matches the legacy
+# deployer's ksm_enabled flag.
+ksm_enabled: "1"

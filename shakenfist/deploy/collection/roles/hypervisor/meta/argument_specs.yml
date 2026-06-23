@@ -1,0 +1,28 @@
+---
+argument_specs:
+  main:
+    short_description: Prepare a host to act as a Shaken Fist hypervisor.
+    description:
+      - >-
+        Configures nested KVM (Intel or AMD), kernel samepage merging (KSM),
+        the vhost_vsock kernel module, SPICE TLS in libvirt, and the libvirt
+        AppArmor and qemu.conf tweaks required by Shaken Fist instances.
+      - >-
+        Apply this role only to hosts that are hypervisors. The consuming
+        playbook gates the role on the node_is_hypervisor capability flag; the
+        role body itself reads no inventory groups.
+    options:
+      ksm_enabled:
+        type: str
+        default: "1"
+        description:
+          - >-
+            Whether kernel samepage merging (KSM) should be enabled. The string
+            "1" enables KSM; any other value disables it.
+  validate_kvm:
+    short_description: Confirm the host can run KVM.
+    description:
+      - >-
+        Runs kvm-ok and fails if KVM is unavailable. Invoke as a preflight
+        check via include_role with tasks_from set to validate_kvm.
+    options: {}
