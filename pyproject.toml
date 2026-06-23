@@ -82,7 +82,7 @@ dependencies = [
 
     # These must move as a set
     "pydantic==2.13.3",                   # mit
-    "pydantic-settings==2.14.0",           # mit
+    "pydantic-settings==2.14.2",           # mit
     "pydantic-core==2.46.3",              # (indirect dependency)
     "pydantic-extra-types==2.11.1",       # (indirect dependency)
 
