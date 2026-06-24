@@ -1,0 +1,227 @@
+---
+argument_specs:
+  main:
+    short_description: Core per-node Shaken Fist setup.
+    description:
+      - >-
+        Runs the bootstrap, config and register entry points in order: installs
+        OS packages and base services, writes /etc/sf/config and the systemd
+        units, and registers the node and its daemons. Folds in the database
+        capability when node_is_database_node is true.
+      - >-
+        Every value is a plain role variable. The role reads no inventory group
+        names and no other host's facts; the consuming playbook maps its
+        inventory onto these variables and orders database-tier hosts first.
+    options: &node_options
+      node_name:
+        type: str
+        default: "localhost"
+        description:
+          - This node's Shaken Fist name. Becomes SHAKENFIST_NODE_NAME and the
+            node identity used by sf-ctl initialise-node and register-daemon.
+      node_egress_ip:
+        type: str
+        default: "127.0.0.1"
+        description:
+          - This node's egress (north/south) IP address. Becomes
+            SHAKENFIST_NODE_EGRESS_IP.
+      node_egress_nic:
+        type: str
+        default: "eth0"
+        description:
+          - This node's egress network interface. Becomes
+            SHAKENFIST_NODE_EGRESS_NIC.
+      node_mesh_ip:
+        type: str
+        default: "127.0.0.1"
+        description:
+          - This node's mesh (east/west) IP address. Becomes
+            SHAKENFIST_NODE_MESH_IP and the mesh IP passed to
+            sf-ctl initialise-node.
+      node_mesh_nic:
+        type: str
+        default: "eth0"
+        description:
+          - This node's mesh network interface. Becomes
+            SHAKENFIST_NODE_MESH_NIC.
+      node_is_hypervisor:
+        type: bool
+        default: false
+        description:
+          - Whether this node runs instances. Becomes
+            SHAKENFIST_NODE_IS_HYPERVISOR.
+      node_is_network_node:
+        type: bool
+        default: false
+        description:
+          - Whether this node is the network node. Becomes
+            SHAKENFIST_NODE_IS_NETWORK_NODE.
+      node_is_database_node:
+        type: bool
+        default: false
+        description:
+          - >-
+            Whether this node runs sf-database. When true the role renders
+            SHAKENFIST_NODE_IS_DATABASE_NODE=True and the direct-MariaDB block,
+            writes and registers the sf-database systemd unit, and starts the
+            database daemon. This is the folded-in "database" capability.
+      network_node_ip:
+        type: str
+        default: "127.0.0.1"
+        description:
+          - The mesh IP of the cluster's network node. Same value on every host.
+            Becomes SHAKENFIST_NETWORK_NODE_IP. The example playbook computes it
+            from the network_node inventory group.
+      mariadb_gateway_hosts:
+        type: list
+        elements: str
+        default: []
+        description:
+          - >-
+            The mesh IPs of every database-tier host, as a list. Same value on
+            every host. Rendered comma-joined into
+            SHAKENFIST_MARIADB_GATEWAY_HOSTS. The example playbook computes it
+            from the database inventory group.
+      all_mesh_hosts:
+        type: dict
+        default: {}
+        description:
+          - >-
+            A map of node name to mesh IP for every host in the cluster, used to
+            render /etc/hosts. Same value on every host. The example playbook
+            builds it from inventory.
+      deploy_name:
+        type: str
+        default: "sf"
+        description:
+          - The deployment/zone name. Becomes SHAKENFIST_ZONE.
+      api_url:
+        type: str
+        default: "http://localhost:13000"
+        description:
+          - The cluster's API URL, written into sfrc and the global auth file so
+            sf-client on this node can reach the API.
+      floating_network_ipblock:
+        type: str
+        default: "10.10.0.0/24"
+        description:
+          - The floating IP network block. Becomes SHAKENFIST_FLOATING_NETWORK.
+      system_key:
+        type: str
+        default: "unknown"
+        description:
+          - The "system" namespace key, written into sfrc and the global auth
+            file. Supply a real secret; the default is deliberately
+            non-functional.
+      vault_system_key_path:
+        type: str
+        required: false
+        description:
+          - >-
+            Optional Hashicorp Vault path. When defined, system_key is looked up
+            from Vault via the hashivault lookup plugin instead of being passed
+            in directly.
+      mariadb_host:
+        type: str
+        default: "localhost"
+        description:
+          - Direct MariaDB host. Rendered into SHAKENFIST_MARIADB_HOST only when
+            node_is_database_node is true.
+      mariadb_port:
+        type: int
+        default: 3306
+        description:
+          - Direct MariaDB port. Rendered only when node_is_database_node.
+      mariadb_user:
+        type: str
+        default: "shakenfist"
+        description:
+          - Direct MariaDB user. Rendered only when node_is_database_node.
+      mariadb_password:
+        type: str
+        default: "unknown"
+        description:
+          - Direct MariaDB password. Rendered only when node_is_database_node;
+            supply a real secret.
+      mariadb_database:
+        type: str
+        default: "sf"
+        description:
+          - Direct MariaDB database name. Rendered only when
+            node_is_database_node.
+      loki_base_url:
+        type: str
+        default: ""
+        description:
+          - Loki log shipping endpoint. Empty leaves the shipper dormant.
+            Rendered into SHAKENFIST_LOKI_BASE_URL when set.
+      loki_tenant:
+        type: str
+        default: ""
+        description:
+          - Loki tenant. Rendered into SHAKENFIST_LOKI_TENANT when set.
+      loki_auth_header:
+        type: str
+        default: ""
+        description:
+          - Loki auth header (a secret). Rendered into
+            SHAKENFIST_LOKI_AUTH_HEADER on every node when set, because every
+            daemon ships its own logs.
+      server_package:
+        type: str
+        default: "shakenfist"
+        description:
+          - >-
+            The Shaken Fist server package installed into /srv/shakenfist's
+            virtualenv. Either a PyPI name (the default) or a local wheel path
+            such as /tmp/shakenfist-0.8.x.whl for local/CI installs. Building
+            and distributing the wheel is the consuming playbook's / CI's
+            responsibility.
+      client_package:
+        type: str
+        default: "shakenfist-client"
+        description:
+          - >-
+            The Shaken Fist client package installed into /srv/shakenfist's
+            virtualenv. Either a PyPI name (the default) or a local wheel path
+            for local/CI installs, paralleling server_package.
+      pip_extra:
+        type: str
+        default: ""
+        description:
+          - >-
+            Extra arguments passed to uv pip install when installing the
+            server and client packages, for example --index-url or proxy
+            flags for local/CI installs. May be empty or expand to several
+            arguments.
+  bootstrap:
+    short_description: Install OS packages and base services for a node.
+    description:
+      - >-
+        Writes /etc/hosts, the systemd presets, disables IPv6 and system
+        suspend, bounds journald disk use, upgrades packages, installs qemu
+        and the shared dependencies (libvirt is installed even on
+        non-hypervisors for CPU topology tracking), and creates the
+        /srv/shakenfist virtualenv with the shakenfist server and client
+        packages. Reads no inventory groups.
+    options: *node_options
+  config:
+    short_description: Write a node's config and systemd units.
+    description:
+      - >-
+        Writes /etc/sf/config, sfrc, the global auth file and all of the sf-*
+        systemd units. The sf-database.service unit is written when
+        node_is_database_node is true. The direct-MariaDB block in
+        /etc/sf/config is rendered only on database nodes.
+    options: *node_options
+  register:
+    short_description: Register a node and start its daemons.
+    description:
+      - >-
+        Runs sf-ctl initialise-node and register-daemon locally for this node,
+        then starts the daemons. The database daemon is registered and started
+        only when node_is_database_node is true. sf-ctl auto-routes to direct
+        MariaDB on database nodes and to the gRPC gateway elsewhere, so the
+        ordering of database-tier hosts first is the consuming playbook's
+        responsibility.
+    options: *node_options

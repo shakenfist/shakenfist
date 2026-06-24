@@ -1,0 +1,199 @@
+---
+# Per-node OS preparation for a Shaken Fist node: host file, systemd presets,
+# IPv6 disable, journald limits, package installation, the /srv/shakenfist
+# virtualenv with the shakenfist server/client packages, and the base services
+# every node needs. This is entirely local to the host and reads no inventory
+# groups.
+
+- name: Setup /etc/hosts
+  ansible.builtin.template:
+    src: etc_hosts.tmpl
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: ugo+r
+
+- name: Make /etc/systemd/system-preset/
+  ansible.builtin.file:
+    path: /etc/systemd/system-preset
+    state: directory
+    mode: u+rwx,go+rx
+
+- name: Disable auto-starting of dnsmasq on installation
+  ansible.builtin.template:
+    src: 00-sf-disable-dnsmasq.tmpl
+    dest: /etc/systemd/system-preset/00-sf-disable-dnsmasq.preset
+    owner: root
+    group: root
+    mode: ugo+r
+  notify: Reload systemd
+
+- name: Disable system suspend
+  ansible.builtin.template:
+    src: sleep.tmpl
+    dest: /etc/systemd/sleep.conf
+    owner: root
+    mode: ugo+r
+  notify: Restart logind
+
+- name: Configure IPv6 to be disabled on boot
+  ansible.builtin.template:
+    src: 10-sf-ipv6.tmpl
+    dest: /etc/sysctl.d/10-sf-ipv6.conf
+    owner: root
+    mode: ugo+r
+
+- name: Configure IPv6 to be disabled now
+  ansible.builtin.shell: |
+    sysctl -w net.ipv6.conf.all.disable_ipv6=1
+    sysctl -w net.ipv6.conf.default.disable_ipv6=1
+  changed_when: true
+  failed_when: false
+
+- name: Configure journald to not consume heaps of disk
+  ansible.builtin.template:
+    src: journald.tmpl
+    dest: /etc/systemd/journald.conf
+    owner: root
+    mode: ugo+r
+  notify: Restart journald
+
+# As recommended on the ansible apt module documentation...
+- name: Upgrade packages
+  ansible.builtin.apt:
+    upgrade: dist
+    update_cache: true
+    autoremove: true
+  register: apt_action
+  retries: 100
+  until: >-
+    apt_action is success or
+    ('Failed to lock apt for exclusive operation' not in apt_action.msg and
+     '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Install qemu
+  block:
+    - name: Attempt to install qemu-kvm
+      ansible.builtin.apt:
+        name: qemu-kvm
+      register: apt_action
+      retries: 100
+      until: >-
+        apt_action is success or
+        ('Failed to lock apt for exclusive operation' not in apt_action.msg and
+         '/var/lib/dpkg/lock' not in apt_action.msg)
+  rescue:
+    - name: Attempt to install qemu-system-x86 instead
+      ansible.builtin.apt:
+        name: qemu-system-x86
+      register: apt_action
+      retries: 100
+      until: >-
+        apt_action is success or
+        ('Failed to lock apt for exclusive operation' not in apt_action.msg and
+         '/var/lib/dpkg/lock' not in apt_action.msg)
+
+# Ubuntu 24.04 requires qemu-system-modules-spice for SPICE support, otherwise
+# instances fail to start.
+- name: Install SPICE modules for Ubuntu 24.04
+  ansible.builtin.apt:
+    name: qemu-system-modules-spice
+    state: latest
+  register: apt_action
+  retries: 100
+  until: >-
+    apt_action is success or
+    ('Failed to lock apt for exclusive operation' not in apt_action.msg and
+     '/var/lib/dpkg/lock' not in apt_action.msg)
+  when: ansible_distribution | lower == "ubuntu" and ansible_distribution_version == "24.04"
+
+# We install libvirt, even on non-hypervisors, because we use it to track
+# the CPU topology and load of the node.
+- name: Install shared dependencies
+  ansible.builtin.apt:
+    name:
+      - apparmor
+      - arping
+      - bridge-utils
+      - build-essential
+      - cpu-checker
+      - git
+      - libmagic-dev
+      - libmariadb-dev
+      - libssl-dev
+      - python3-mysqldb
+      - libvirt-daemon-system
+      - libvirt-dev
+      - lm-sensors
+      - net-tools
+      - ovmf
+      - python3-cffi
+      - python3-dev
+      - python3-libvirt
+      - python3-pip
+      - python3-venv
+      - python3-wheel
+      - pwgen
+      - qemu-utils
+      - unzip
+      - xxhash
+    state: latest
+  register: apt_action
+  retries: 100
+  until: >-
+    apt_action is success or
+    ('Failed to lock apt for exclusive operation' not in apt_action.msg and
+     '/var/lib/dpkg/lock' not in apt_action.msg)
+
+# Create the /srv/shakenfist virtualenv and install the Shaken Fist server and
+# client packages into it. This replicates the per-node work the legacy
+# deploy/getsf script used to do (getsf lines ~895-940).
+#
+# server_package/client_package are EITHER PyPI names ("shakenfist" /
+# "shakenfist-client", the default/release mode) OR local wheel paths like
+# /tmp/shakenfist-0.8.x.whl (the local/CI mode that tests the current commit).
+# In local/CI mode, BUILDING the wheels, DISTRIBUTING them to each node's /tmp,
+# and overriding server_package/client_package (and pip_extra with any
+# index/proxy flags) is the consuming playbook's / CI's responsibility
+# (phase-6 steps 3 and 5), NOT this role's. This role only installs whatever
+# package references it is handed.
+#
+# --system-site-packages is required so the venv can see apt-installed modules
+# such as python3-libvirt. --reinstall is required so a re-deploy picks up a
+# freshly-built wheel with the same version string.
+- name: Ensure /srv/shakenfist exists
+  ansible.builtin.file:
+    path: /srv/shakenfist
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the Shaken Fist virtualenv
+  ansible.builtin.command: python3 -m venv --system-site-packages /srv/shakenfist/venv
+  args:
+    creates: /srv/shakenfist/venv/bin/activate
+
+- name: Upgrade pip and install uv in the virtualenv
+  ansible.builtin.command: /srv/shakenfist/venv/bin/pip install -U pip uv
+  changed_when: true
+
+- name: Install the Shaken Fist server and client packages
+  # noqa: command-instead-of-shell -- shell word-splitting is required because
+  # pip_extra may be empty or expand to several whitespace-separated arguments.
+  ansible.builtin.shell: >-
+    /srv/shakenfist/venv/bin/uv pip install --reinstall
+    {{ pip_extra }} {{ server_package }} {{ client_package }}
+  environment:
+    VIRTUAL_ENV: /srv/shakenfist/venv
+  changed_when: true
+
+- name: Enable desired services
+  ansible.builtin.service:
+    name: "{{ item }}.service"
+    enabled: true
+    state: started
+  with_items:
+    - apparmor
+    - libvirtd
+  notify: Reload systemd

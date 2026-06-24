@@ -1,0 +1,63 @@
+# It is recommended that you set the following options:
+# API_ADVERTISED_HOST="shakenfist.mycompany.com"
+# API_ADVERTISED_BASE_PATH="/api"
+# API_ADVERTISED_HTTP_SCHEMES="https"
+
+SHAKENFIST_NODE_EGRESS_IP="{{ node_egress_ip }}"
+SHAKENFIST_NODE_EGRESS_NIC="{{ node_egress_nic }}"
+SHAKENFIST_NODE_MESH_IP="{{ node_mesh_ip }}"
+SHAKENFIST_NODE_MESH_NIC="{{ node_mesh_nic }}"
+SHAKENFIST_NODE_NAME="{{ node_name }}"
+SHAKENFIST_ZONE="{{ deploy_name }}"
+
+{% if node_is_hypervisor %}
+SHAKENFIST_NODE_IS_HYPERVISOR=True
+{% else %}
+SHAKENFIST_NODE_IS_HYPERVISOR=False
+{% endif %}
+
+{% if node_is_network_node %}
+SHAKENFIST_NODE_IS_NETWORK_NODE=True
+{% else %}
+SHAKENFIST_NODE_IS_NETWORK_NODE=False
+{% endif %}
+
+SHAKENFIST_FLOATING_NETWORK="{{ floating_network_ipblock }}"
+SHAKENFIST_NETWORK_NODE_IP="{{ network_node_ip }}"
+
+# Database service configuration
+{% if node_is_database_node %}
+SHAKENFIST_NODE_IS_DATABASE_NODE=True
+{% else %}
+SHAKENFIST_NODE_IS_DATABASE_NODE=False
+{% endif %}
+SHAKENFIST_MARIADB_GATEWAY_HOSTS="{{ mariadb_gateway_hosts | join(',') }}"
+SHAKENFIST_MARIADB_GATEWAY_PORT=13005
+SHAKENFIST_MARIADB_GATEWAY_METRICS_PORT=13006
+
+# MariaDB configuration - only rendered on database nodes for security.
+# Only the database service daemon needs direct MariaDB access; all other
+# daemons access MariaDB through the database service's gRPC interface.
+{% if node_is_database_node %}
+SHAKENFIST_MARIADB_HOST="{{ mariadb_host }}"
+SHAKENFIST_MARIADB_PORT={{ mariadb_port }}
+SHAKENFIST_MARIADB_USER="{{ mariadb_user }}"
+SHAKENFIST_MARIADB_PASSWORD="{{ mariadb_password }}"
+SHAKENFIST_MARIADB_DATABASE="{{ mariadb_database }}"
+{% endif %}
+
+# Loki log shipping endpoint. Rendered on all nodes (every daemon ships
+# its own logs) and only when configured; an empty value leaves the
+# shipper dormant.
+{% if loki_base_url %}
+SHAKENFIST_LOKI_BASE_URL="{{ loki_base_url }}"
+{% endif %}
+{% if loki_tenant %}
+SHAKENFIST_LOKI_TENANT="{{ loki_tenant }}"
+{% endif %}
+{# The auth header is a secret. Unlike MARIADB_PASSWORD (rendered only on
+   database-tier nodes), it is rendered on every node because every daemon
+   pushes its own logs to Loki, so it lands in each node's /etc/sf/config. #}
+{% if loki_auth_header %}
+SHAKENFIST_LOKI_AUTH_HEADER="{{ loki_auth_header }}"
+{% endif %}

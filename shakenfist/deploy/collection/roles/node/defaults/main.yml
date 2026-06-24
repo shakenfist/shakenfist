@@ -1,0 +1,52 @@
+---
+# Defaults for the node role. The consuming playbook is expected to override
+# the per-node identity, capability and cluster-wide values from its inventory;
+# the values here are only safe single-host fallbacks. Secrets
+# (mariadb_password, system_key) have deliberately non-functional defaults so a
+# misconfigured deploy fails loudly rather than shipping a known key.
+
+# Per-node identity.
+node_name: "localhost"
+node_egress_ip: "127.0.0.1"
+node_egress_nic: "eth0"
+node_mesh_ip: "127.0.0.1"
+node_mesh_nic: "eth0"
+
+# Capability flags. A single-host deploy sets all three true.
+node_is_hypervisor: false
+node_is_network_node: false
+node_is_database_node: false
+
+# Cluster-wide values (the same on every host). The example playbook computes
+# these from inventory group membership.
+network_node_ip: "127.0.0.1"
+mariadb_gateway_hosts: []
+all_mesh_hosts: {}
+
+# Cluster identity and client configuration.
+deploy_name: "sf"
+api_url: "http://localhost:13000"
+floating_network_ipblock: "10.10.0.0/24"
+system_key: "unknown"
+
+# Direct MariaDB access, rendered into /etc/sf/config only on database nodes.
+mariadb_host: "localhost"
+mariadb_port: 3306
+mariadb_user: "shakenfist"
+mariadb_password: "unknown"
+mariadb_database: "sf"
+
+# Loki log shipping. Empty leaves the shipper dormant.
+loki_base_url: ""
+loki_tenant: ""
+loki_auth_header: ""
+
+# Shaken Fist server/client package references installed into /srv/shakenfist's
+# virtualenv. The defaults install the released packages from PyPI. For
+# local/CI installs these may be overridden to local wheel paths (for example
+# /tmp/shakenfist-0.8.x.whl), and pip_extra may carry extra uv pip flags such
+# as --index-url or proxy options. pip_extra may be empty or expand to several
+# arguments.
+server_package: "shakenfist"
+client_package: "shakenfist-client"
+pip_extra: ""

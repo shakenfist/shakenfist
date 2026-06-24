@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  author: Michael Still and contributors
+  description: >-
+    Core per-node Shaken Fist setup: OS packages, /etc/sf/config, the sfrc and
+    auth files, all of the sf-* systemd units, and registration of the node and
+    its daemons. Folds in the database capability: when node_is_database_node is
+    true the role also writes, registers and starts sf-database. Reads only role
+    variables, never an inventory group name or another host's facts.
+  license: Apache-2.0
+  min_ansible_version: '2.15'
+dependencies:
+  - role: shakenfist.shakenfist.common

@@ -15,14 +15,14 @@ another host's facts, so the roles compose cleanly with any inventory layout.
 
 | Role | Purpose |
 |------|---------|
-| `shakenfist.shakenfist.node` | Core node setup: packages, virtualenv, `/etc/sf/config`, systemd units, node registration. Folds in the database capability. **Arrives in a later step.** |
+| `shakenfist.shakenfist.node` | Core per-node setup: OS packages, `/etc/sf/config`, `sfrc`, the global auth file, all `sf-*` systemd units, and registration of the node and its daemons. Folds in the database capability: when `node_is_database_node` is true it also writes, registers and starts `sf-database`. Has `bootstrap`, `config` and `register` entry points (run them as separate plays to order database-tier hosts first). The `bootstrap` entry point creates the `/srv/shakenfist` virtualenv and installs the `shakenfist` server and client packages (override `server_package`/`client_package`/`pip_extra` to install local wheels for local/CI). |
 | `shakenfist.shakenfist.hypervisor` | Hypervisor host preparation: nested KVM detection/enable, KSM, `vhost_vsock`, SPICE TLS, and the libvirt AppArmor/config tweaks. Apply only to hosts where `node_is_hypervisor` is true. |
 | `shakenfist.shakenfist.network` | Network node preparation: removes the distro `dnsmasq` unit, installs the DHCP/DNS templates, enables IPv4 forwarding, and validates the mesh interface MTU. Apply only to hosts where `node_is_network_node` is true. |
 | `shakenfist.shakenfist.internal_ca` | Internal certificate authority: generates a CA on the control node, issues a per-host SPICE TLS certificate, and distributes the certificates to each host. |
 
-The `node` role and the native Ansible modules (`sf_namespace`, `sf_network`,
-`sf_instance`, `sf_snapshot`) arrive in later steps of the collection build-out
-and are not yet present.
+The native Ansible modules (`sf_namespace`, `sf_network`, `sf_instance`,
+`sf_snapshot`) arrive in a later step of the collection build-out and are not
+yet present.
 
 ## Consuming the collection
 
@@ -36,6 +36,11 @@ Then reference the roles by their fully-qualified collection name (FQCN) from
 your own playbook, gating the capability roles on the relevant variables:
 
 ```yaml
+- hosts: all
+  become: true
+  roles:
+    - role: shakenfist.shakenfist.node
+
 - hosts: hypervisors
   become: true
   roles:
