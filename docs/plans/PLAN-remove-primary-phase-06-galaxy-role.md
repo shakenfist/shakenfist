@@ -214,11 +214,18 @@ Further phase-local decisions:
    control node needs only `pip install shakenfist_client`
    plus the collection — never the server package.
 
-9. **`/etc/sf/inventory.yaml` is presumed vestigial and
-   dies with the `primary` role**, unless step 2/3's
-   investigation finds a runtime consumer. If something reads
-   it, the `node` role reproduces it from an
-   `all_mesh_hosts` variable instead. (See Risks.)
+9. **`/etc/sf/inventory.yaml` is dropped (resolved).** The
+   step-2 investigation found one consumer: not any shakenfist
+   or client-python *code*, but the downstream CI workflows,
+   which scp the file off the (now-removed) primary node and
+   use it as the inventory for a post-test log-gather step.
+   That is a drifted copy-paste-CI convenience, not a real
+   dependency, so step 3 does **not** write it. Log-gathering
+   should use the same inventory the deploy ran from (the
+   example inventory already enumerates every host); folding
+   that into a reusable CI workflow is **phase 8** of the
+   master plan. The `node` role therefore owns no
+   cluster-topology file.
 
 10. **Greenfields only.** No `topology.json` → inventory
     shim (master-plan open question 5 / phase 7). The
@@ -305,11 +312,11 @@ adds the new CI path beside the old. Step 6 deletes the old.
   → clients can't reach the DB tier). Mitigation: the brief
   requires eyeballing the computed values for a multi-node
   inventory before relying on CI.
-- **`/etc/sf/inventory.yaml` consumer (decision 9).** If a
-  runtime path reads it and step 2 misses it, deploys break
-  after the `primary` role is deleted in step 6. Mitigation:
-  step 2's explicit repo-wide grep across server + client
-  for `inventory.yaml` consumers, recorded in the commit.
+- **`/etc/sf/inventory.yaml` consumer (decision 9 — resolved).**
+  The step-2 grep found only a downstream-CI log-gather
+  consumer, not a code dependency, so the file is dropped
+  (decision 9) and the log-gather inventory becomes a phase-8
+  concern. No remaining risk for this phase.
 - **The `node` role config template (step 2).** A single
   bad Jinja conditional malforms `/etc/sf/config` and every
   daemon fails to start. Mitigation: render the template
