@@ -20,9 +20,38 @@ another host's facts, so the roles compose cleanly with any inventory layout.
 | `shakenfist.shakenfist.network` | Network node preparation: removes the distro `dnsmasq` unit, installs the DHCP/DNS templates, enables IPv4 forwarding, and validates the mesh interface MTU. Apply only to hosts where `node_is_network_node` is true. |
 | `shakenfist.shakenfist.internal_ca` | Internal certificate authority: generates a CA on the control node, issues a per-host SPICE TLS certificate, and distributes the certificates to each host. |
 
-The native Ansible modules (`sf_namespace`, `sf_network`, `sf_instance`,
-`sf_snapshot`) arrive in a later step of the collection build-out and are not
-yet present.
+## Modules
+
+The collection ships four native Ansible modules (under
+`plugins/modules/`) for managing Shaken Fist resources from a playbook. They
+import the `shakenfist_client` SDK and call the Shaken Fist REST API directly
+— they do **not** shell out to `sf-client`.
+
+| Module | Purpose |
+|--------|---------|
+| `shakenfist.shakenfist.sf_namespace` | Idempotently create or delete a namespace (`name`, `state`). |
+| `shakenfist.shakenfist.sf_network` | Idempotently create or delete a network (`name`/`uuid`, `netblock`, `nat`, `dhcp`, `dns`, `state`). A changed specification deletes and recreates the network. |
+| `shakenfist.shakenfist.sf_instance` | Idempotently create, replace or delete an instance (`name`/`uuid`, `cpu`, `ram`, `disks`/`diskspecs`, `networks`/`networkspecs`, `metadata`, `await`, `state`). A changed specification deletes and recreates the instance. |
+| `shakenfist.shakenfist.sf_snapshot` | Snapshot an instance's disks (optionally updating a label) or delete a snapshot artifact (`instance_uuid`/`uuid`, `all`, `label`, `state`). |
+
+Every module accepts optional `api_url`, `namespace` and `key` connection
+parameters. When all three are supplied they are used verbatim; when omitted,
+the module auto-discovers credentials from the environment and
+`sfrc`/`~/.shakenfist`/`/etc/sf/shakenfist.json` exactly like the `sf-client`
+CLI. Each module returns `changed`, `failed`, a `meta` object describing the
+resource, and a `log` list of progress messages for debugging.
+
+## Requirements
+
+The modules require the Shaken Fist client SDK on the Ansible control node:
+
+```bash
+pip install shakenfist-client
+```
+
+(or `pip install -r requirements.txt` from the collection root). The control
+node never needs the Shaken Fist server package. The roles additionally
+require `ansible >= 2.15` (see `meta/runtime.yml`).
 
 ## Consuming the collection
 

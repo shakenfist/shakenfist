@@ -2,6 +2,8 @@
 
 - hosts: localhost
   gather_facts: no
+  collections:
+    - shakenfist.shakenfist
 
   tasks:
     - name: Create a unique namespace name
