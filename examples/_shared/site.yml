@@ -12,7 +12,7 @@
 #   * hypervisors   -- hosts that run instances (node_is_hypervisor)
 #   * network_node  -- the single network node    (node_is_network_node)
 #   * etcd_master   -- the database tier           (node_is_database_node)
-#   * storage       -- optional, recorded in /etc/sf/inventory.yaml only
+#   * storage       -- optional, reserved for future use (no role flag yet)
 #   * allsf         -- every Shaken Fist host
 #
 # Per-host identity (node_name/node_egress_*/node_mesh_*) comes from host_vars.
@@ -180,16 +180,6 @@
       ansible.builtin.set_fact:
         ram_system_reservation: "{{ [2048, (ansible_memtotal_mb * 0.1) | int] | max }}"
       when: ram_system_reservation is not defined
-
-    # Expose the per-capability host-name lists for the inventory template
-    # (rendered later). Only the playbook may read groups, so we snapshot them
-    # here as plain variables.
-    - name: Snapshot the group membership lists for the inventory template
-      ansible.builtin.set_fact:
-        inventory_hypervisors: "{{ groups.get('hypervisors', []) }}"
-        inventory_network_nodes: "{{ groups.get('network_node', []) }}"
-        inventory_database_nodes: "{{ groups.get('etcd_master', []) }}"
-        inventory_storage_nodes: "{{ groups.get('storage', []) }}"
 
 
 # ---------------------------------------------------------------------------
@@ -442,35 +432,7 @@
 
 
 # ---------------------------------------------------------------------------
-# Play 7: write /etc/sf/inventory.yaml ONCE. The client-python functional-tests
-# CI scp's this file off a node and uses it as the ansible inventory for the
-# native-module tests, so it must still be produced now that the primary role
-# is gone. Sourced from all_mesh_hosts and the group-membership snapshots, not
-# from groups[...] inside a role.
-# ---------------------------------------------------------------------------
-- name: Write the cluster topology to /etc/sf/inventory.yaml (once)
-  hosts: allsf
-  become: true
-  gather_facts: false
-  run_once: true
-  tasks:
-    - name: Ensure /etc/sf exists
-      ansible.builtin.file:
-        path: /etc/sf
-        state: directory
-        mode: "0755"
-
-    - name: Render /etc/sf/inventory.yaml from the computed topology
-      ansible.builtin.template:
-        src: "{{ playbook_dir }}/../_shared/templates/inventory.yaml.j2"
-        dest: /etc/sf/inventory.yaml
-        owner: root
-        group: sudo
-        mode: u=r,g=r,o=
-
-
-# ---------------------------------------------------------------------------
-# Play 8: final sanity checks, reproducing legacy roles/primary/postinstall.yml
+# Play 7: final sanity checks, reproducing legacy roles/primary/postinstall.yml
 # (minus the ansible-module copy, which dies with the native modules in step 4):
 # sf-api and sf-queues active, and the API returns 401 unauthenticated. Runs on
 # every host that runs the API (allsf).

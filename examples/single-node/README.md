@@ -100,8 +100,7 @@ The shared playbook runs, in order:
    `MAX_HYPERVISOR_MTU`, `DNS_SERVER`, ...) and the system namespace key
    **before** registering, so `sf-database`'s `verify-config` gate passes;
 8. register the node and start the daemons;
-9. write `/etc/sf/inventory.yaml`;
-10. run the sanity checks (sf-api/sf-queues active, API returns 401).
+9. run the sanity checks (sf-api/sf-queues active, API returns 401).
 
 After it finishes, `sf-client` on the box is configured against the cluster's
 own API and you can start creating instances.

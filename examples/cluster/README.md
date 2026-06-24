@@ -99,11 +99,12 @@ all_mesh_hosts        = {'sf-1': '10.0.0.1', 'sf-2': '10.0.0.2', 'sf-3': '10.0.0
 max_hypervisor_mtu    = min(node_mtu of sf-2, sf-3)
 ```
 
-## /etc/sf/inventory.yaml
+## Log gathering and the cluster inventory
 
-The playbook writes `/etc/sf/inventory.yaml` once, rendered from the computed
-topology (`all_mesh_hosts` plus the group-membership snapshots) via
-`../_shared/templates/inventory.yaml.j2`. The client-python functional-tests CI
-scp's this file off a node and uses it as the ansible inventory for the
-native-module tests, so it must keep being produced even though the primary
-role that used to write it is gone.
+CI used to lean on a `/etc/sf/inventory.yaml` file that the old primary role
+wrote on one node, scp it back, and use it as the ansible inventory for the
+post-test log-gather step. That round-trip was a drifted convenience; the
+playbook here does not write that file. CI (and operators) should point
+log-gathering at the same inventory they deployed with — the one in this
+directory — which already enumerates every host. Folding that into a shared,
+reusable CI workflow is tracked as its own phase of the remove-primary plan.

@@ -25,10 +25,10 @@ skip_list:
   # --- Example-playbook-specific skips ---
 
   # The cluster-wide, once-per-deploy operations (ensure-mariadb-schema, the
-  # cluster_config set-config calls, bootstrap-system-key, and the
-  # /etc/sf/inventory.yaml write) are intentionally run_once and delegated to a
-  # single database-tier host. They must run exactly once for the whole
-  # cluster, reproducing the legacy primary role's once-per-cluster behaviour.
+  # cluster_config set-config calls, and bootstrap-system-key) are
+  # intentionally run_once and delegated to a single database-tier host. They
+  # must run exactly once for the whole cluster, reproducing the legacy primary
+  # role's once-per-cluster behaviour.
   # These playbooks use the default (linear) strategy, so run_once is correct.
   - run-once[task]
 
