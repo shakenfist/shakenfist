@@ -294,7 +294,7 @@ care.
 | 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | _(see byo-mariadb)_ |
 | 6. Repackage deployer as the `shakenfist.shakenfist` galaxy collection; delete the getsf installer chain; example consumers | PLAN-remove-primary-phase-06-galaxy-role.md | Not started |
 | 7. Rename `etcd_master` → `database_node`; final cleanup | PLAN-remove-primary-phase-07-rename-cleanup.md | Not started |
-| 8. Shared reusable smoke-cluster CI workflow (depends on phase 6) | PLAN-remove-primary-phase-08-shared-ci.md | Not started |
+| 8. Roll the reusable smoke-cluster CI workflow out to the downstream repos (the workflow itself is authored in phase 6 step 5) | PLAN-remove-primary-phase-08-shared-ci.md | Not started |
 
 Phase notes:
 
@@ -427,33 +427,28 @@ Phase notes:
   comments — the ansible group rename and the residual
   `etcd_master` mentions in the example playbooks and role
   comments.
-- **Phase 8** replaces the copy-pasted, drift-prone
-  cluster-build CI across the SF ecosystem repos
-  (`client-python`, `library-python`, `kerbside`, …) with a
-  single reusable GitHub Actions workflow (`workflow_call`)
-  hosted in the `shakenfist/actions` repo, built on the
-  galaxy collection and example playbooks delivered in
-  phase 6. The historical pattern was to cut-and-paste
-  shakenfist's cluster-build CI into each downstream repo,
-  which drifts (the `/etc/sf/inventory.yaml` log-gather step
-  is one symptom — see the dropped write in phase 6); the
+- **Phase 8** rolls the reusable smoke-cluster CI workflow
+  out to the downstream SF ecosystem repos (`client-python`,
+  `library-python`, `kerbside`, …). The historical pattern
+  was to cut-and-paste shakenfist's cluster-build CI into
+  each downstream repo, which drifts (the
+  `/etc/sf/inventory.yaml` log-gather step is one symptom —
+  see the dropped write in phase 6) and over-pays: the
   downstream repos only need the cheap smoke tier, not the
-  full merge CI. Depends on phase 6 (the collection + example
-  playbooks are the deploy mechanism the reusable workflow
-  invokes); independent of phase 7. Incremental rollout:
-  (1) author `smoke-cluster.yml` in `shakenfist/actions`,
-  parameterised by component, ref/wheel, and tier (smoke vs
-  full), deploying via `examples/single-node` (smoke) or
-  `examples/cluster` and installing the component-under-test's
-  wheel through the collection's `server_package` /
-  `client_package` / `pip_extra` overrides; (2) repoint
-  shakenfist's own functional/scheduled workflows to call it;
-  (3) roll the downstream repos onto it one at a time,
-  replacing each copy-pasted workflow with a few-line `uses:`
-  call. This also retires the `/etc/sf/inventory.yaml`
-  scp-from-primary log-gather dance (log-gather uses the
-  example inventory the deploy ran from). The
-  `shakenfist/actions` and downstream-repo changes are
+  full merge CI. **The reusable workflow itself is authored
+  in phase 6 step 5, not here** — to avoid writing any
+  throwaway intermediate CI, the `smoke-cluster.yml`
+  (`workflow_call`) in `shakenfist/actions` and shakenfist's
+  own cutover onto it are pulled forward into phase 6 (the
+  decision: don't build a getsf-shaped stopgap and then
+  replace it). Phase 8 is therefore *only* the rollout:
+  replace each downstream repo's copy-pasted cluster-build
+  workflow with a few-line `uses:
+  shakenfist/actions/.github/workflows/smoke-cluster.yml@…`
+  call, one repo at a time, passing the component/ref/tier
+  inputs. Depends on phase 6 step 5 (the reusable workflow
+  must exist and be proven on shakenfist's own CI first);
+  independent of phase 7. The downstream-repo changes are
   committed to `main` and pushed by the operator — the agent
   prepares the diffs but cannot push them. If it grows, this
   phase can graduate to its own master plan, the way the old
