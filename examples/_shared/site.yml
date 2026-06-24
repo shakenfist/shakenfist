@@ -1,0 +1,518 @@
+---
+# Shared Shaken Fist deploy playbook, imported by both
+# examples/single-node/site.yml and examples/cluster/site.yml.
+#
+# THIS PLAYBOOK IS THE ONLY PLACE THAT READS INVENTORY GROUP NAMES (groups[...])
+# AND CROSS-HOST FACTS (hostvars[...]). The shakenfist.shakenfist roles read
+# only plain variables; this playbook maps the operator's inventory groups onto
+# those variables and performs the cluster-wide reductions, then invokes the
+# roles per host.
+#
+# Expected inventory groups (the legacy etcd_master name is kept until phase 7):
+#   * hypervisors   -- hosts that run instances (node_is_hypervisor)
+#   * network_node  -- the single network node    (node_is_network_node)
+#   * etcd_master   -- the database tier           (node_is_database_node)
+#   * storage       -- optional, recorded in /etc/sf/inventory.yaml only
+#   * allsf         -- every Shaken Fist host
+#
+# Per-host identity (node_name/node_egress_*/node_mesh_*) comes from host_vars.
+#
+# Operator-supplied cluster variables (set in group_vars/all or on the command
+# line) include: auth_secret, system_key, deploy_name, dns_server, http_proxy,
+# extra_config, floating_network_ipblock, mariadb_* (for the database tier),
+# and the optional sf_build_local_wheels / repo_path / client_repo_path for a
+# git-checkout deploy.
+
+
+# ---------------------------------------------------------------------------
+# Play 0 (optional, gated): build the server and client wheels from local git
+# checkouts and distribute them to every host's /tmp, then point
+# server_package / client_package at the distributed wheels. Operators
+# deploying released packages skip this entirely (sf_build_local_wheels is
+# false by default and server_package / client_package default to the PyPI
+# names). This mirrors the legacy deploy/ansible/tasks/build-wheel.yml +
+# getsf wheel-copy mechanism, and is what the step-5 CI path uses to deploy
+# the current commit.
+# ---------------------------------------------------------------------------
+- name: Build Shaken Fist wheels from local checkouts
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    sf_build_local_wheels: false
+  tasks:
+    - name: Build and locate the local wheels
+      when: sf_build_local_wheels | bool
+      block:
+        - name: Fail if repo_path / client_repo_path are not set
+          ansible.builtin.assert:
+            that:
+              - repo_path is defined
+              - client_repo_path is defined
+            fail_msg: >-
+              sf_build_local_wheels is true but repo_path and/or
+              client_repo_path are not set. Point them at the local
+              shakenfist (server) and client-python checkouts.
+
+        - name: Build the server and client wheels
+          ansible.builtin.shell:
+            cmd: rm -rf build dist *.egg-info && python3 -m build --wheel .
+            chdir: "{{ item }}"
+          changed_when: true
+          loop:
+            - "{{ repo_path }}"
+            - "{{ client_repo_path }}"
+
+        - name: Find the freshly built server wheel
+          ansible.builtin.shell:
+            cmd: set -o pipefail; ls -rt {{ repo_path }}/dist/shakenfist-*.whl | tail -1
+            executable: /bin/bash
+          register: server_wheel
+          changed_when: false
+
+        - name: Find the freshly built client wheel
+          ansible.builtin.shell:
+            cmd: set -o pipefail; ls -rt {{ client_repo_path }}/dist/shakenfist_client-*.whl | tail -1
+            executable: /bin/bash
+          register: client_wheel
+          changed_when: false
+
+        - name: Record the local wheel paths for later plays
+          ansible.builtin.set_fact:
+            local_server_wheel: "{{ server_wheel.stdout }}"
+            local_client_wheel: "{{ client_wheel.stdout }}"
+
+- name: Distribute local wheels and override the package references
+  hosts: allsf
+  gather_facts: false
+  become: true
+  vars:
+    sf_build_local_wheels: false
+  tasks:
+    - name: Distribute the local wheels and repoint the package variables
+      when: sf_build_local_wheels | bool
+      block:
+        - name: Copy the server wheel to this host's /tmp
+          ansible.builtin.copy:
+            src: "{{ hostvars['localhost']['local_server_wheel'] }}"
+            dest: "/tmp/{{ hostvars['localhost']['local_server_wheel'] | basename }}"
+            mode: "0644"
+
+        - name: Copy the client wheel to this host's /tmp
+          ansible.builtin.copy:
+            src: "{{ hostvars['localhost']['local_client_wheel'] }}"
+            dest: "/tmp/{{ hostvars['localhost']['local_client_wheel'] | basename }}"
+            mode: "0644"
+
+        - name: Point server_package / client_package at the distributed wheels
+          ansible.builtin.set_fact:
+            server_package: "/tmp/{{ hostvars['localhost']['local_server_wheel'] | basename }}"
+            client_package: "/tmp/{{ hostvars['localhost']['local_client_wheel'] | basename }}"
+
+
+# ---------------------------------------------------------------------------
+# Play 1: compute the capability flags and cluster-wide reductions. This is the
+# fact-computation stage and the only place groups[...] / hostvars[...] are
+# read. It runs against allsf (and gathers facts so ansible_memtotal_mb is
+# available). validate_mtus runs FIRST (below) so node_mtu is populated before
+# we reduce max_hypervisor_mtu.
+# ---------------------------------------------------------------------------
+
+# Determine each host's mesh-interface MTU on the network + hypervisor hosts so
+# the reduction below can take the minimum. This is also part of preflight
+# validation (it aborts on an MTU that is too low).
+- name: Validate mesh MTUs (network + hypervisor hosts)
+  hosts: network_node:hypervisors
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Run the network role's validate_mtus entry point
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.network
+        tasks_from: validate_mtus
+
+- name: Compute capability flags and cluster-wide values
+  hosts: allsf
+  become: false
+  gather_facts: true
+  tasks:
+    # Per-host capability flags from group membership.
+    - name: Set per-host capability flags
+      ansible.builtin.set_fact:
+        node_is_hypervisor: "{{ inventory_hostname in groups.get('hypervisors', []) }}"
+        node_is_network_node: "{{ inventory_hostname in groups.get('network_node', []) }}"
+        node_is_database_node: "{{ inventory_hostname in groups.get('etcd_master', []) }}"
+
+    # Cluster-wide values -- identical on every host. Computed once from the
+    # group lists, then assigned to every host.
+    - name: Compute the network node mesh IP
+      ansible.builtin.set_fact:
+        network_node_ip: "{{ hostvars[groups['network_node'][0]]['node_mesh_ip'] }}"
+
+    - name: Compute the MariaDB gateway host list (every database node's mesh IP)
+      ansible.builtin.set_fact:
+        mariadb_gateway_hosts: >-
+          {{ groups['etcd_master']
+             | map('extract', hostvars, 'node_mesh_ip')
+             | list }}
+
+    - name: Compute the name->mesh-IP map for every host
+      ansible.builtin.set_fact:
+        all_mesh_hosts: >-
+          {{ dict(groups['allsf']
+                  | zip(groups['allsf']
+                        | map('extract', hostvars, 'node_mesh_ip')
+                        | list)) }}
+
+    - name: Compute the lowest MTU across all hypervisors
+      ansible.builtin.set_fact:
+        max_hypervisor_mtu: >-
+          {{ groups['hypervisors']
+             | map('extract', hostvars, 'node_mtu')
+             | map('int')
+             | min }}
+
+    # Per-host RAM reservation default: 10% of system RAM, floored at 2048 MB.
+    # The operator may override ram_system_reservation in group_vars; this only
+    # fills in a sensible per-host default when it is not set.
+    - name: Default the RAM system reservation from this host's memory
+      ansible.builtin.set_fact:
+        ram_system_reservation: "{{ [2048, (ansible_memtotal_mb * 0.1) | int] | max }}"
+      when: ram_system_reservation is not defined
+
+    # Expose the per-capability host-name lists for the inventory template
+    # (rendered later). Only the playbook may read groups, so we snapshot them
+    # here as plain variables.
+    - name: Snapshot the group membership lists for the inventory template
+      ansible.builtin.set_fact:
+        inventory_hypervisors: "{{ groups.get('hypervisors', []) }}"
+        inventory_network_nodes: "{{ groups.get('network_node', []) }}"
+        inventory_database_nodes: "{{ groups.get('etcd_master', []) }}"
+        inventory_storage_nodes: "{{ groups.get('storage', []) }}"
+
+
+# ---------------------------------------------------------------------------
+# Play 2: remaining preflight validation -- confirm KVM works on hypervisors.
+# (validate_mtus already ran above.)
+# ---------------------------------------------------------------------------
+- name: Validate KVM on hypervisors
+  hosts: hypervisors
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run the hypervisor role's validate_kvm entry point
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.hypervisor
+        tasks_from: validate_kvm
+
+
+# ---------------------------------------------------------------------------
+# Play 3: internal CA. Bootstrap the CA once on the control node, then issue
+# and distribute a per-host SPICE TLS certificate to every host. Mirrors the
+# legacy pki ordering (bootstrap on localhost, then host_certificate +
+# distribute_certificates per host).
+# ---------------------------------------------------------------------------
+- name: Bootstrap the internal certificate authority
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Create the deployment CA
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.internal_ca
+        tasks_from: bootstrap
+
+- name: Issue and distribute per-host certificates
+  hosts: allsf
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Issue this host's certificate (generated on the control node)
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.internal_ca
+        tasks_from: host_certificate
+      vars:
+        hostname: "{{ inventory_hostname }}"
+
+    - name: Distribute this host's certificate
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.internal_ca
+        tasks_from: distribute_certificates
+      vars:
+        hostname: "{{ inventory_hostname }}"
+
+
+# ---------------------------------------------------------------------------
+# Play 4: install + configure every node (bootstrap + config), database tier
+# first so sf-database / the gRPC gateway is configured before the rest.
+# Component roles (hypervisor, network) are applied here too, gated by the
+# capability flags. We split bootstrap/config from register (play 6) so the
+# schema (play 5) can be ensured between them, and so the database tier can
+# register before the rest.
+# ---------------------------------------------------------------------------
+- name: Bootstrap and configure the database tier
+  hosts: etcd_master
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Bootstrap the database-tier node
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.node
+        tasks_from: bootstrap
+
+    - name: Configure the database-tier node
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.node
+        tasks_from: config
+
+- name: Bootstrap and configure the remaining nodes
+  hosts: allsf:!etcd_master
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Bootstrap the node
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.node
+        tasks_from: bootstrap
+
+    - name: Apply the network role on the network node
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.network
+      when: node_is_network_node | bool
+
+    - name: Apply the hypervisor role on hypervisors
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.hypervisor
+      when: node_is_hypervisor | bool
+
+    - name: Configure the node
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.node
+        tasks_from: config
+
+# The network and hypervisor roles also apply to database-tier hosts that
+# happen to carry those capabilities (for example the single-node deploy where
+# localhost is everything). Applied after the database tier is configured.
+- name: Apply component roles to database-tier hosts that also carry them
+  hosts: etcd_master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Apply the network role if this database node is also the network node
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.network
+      when: node_is_network_node | bool
+
+    - name: Apply the hypervisor role if this database node is also a hypervisor
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.hypervisor
+      when: node_is_hypervisor | bool
+
+
+# ---------------------------------------------------------------------------
+# Play 5: ensure the MariaDB schema exists, ONCE, delegated to a database-tier
+# host (which has direct MARIADB_HOST in /etc/sf/config from play 4's config).
+# This is the byo-mariadb command, and it must run before any node registers.
+# ---------------------------------------------------------------------------
+- name: Ensure the MariaDB schema exists (once)
+  hosts: etcd_master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run sf-ctl ensure-mariadb-schema on the first database host
+      ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
+      delegate_to: "{{ groups['etcd_master'][0] }}"
+      run_once: true
+      changed_when: true
+
+
+# ---------------------------------------------------------------------------
+# Play 6a: write the cluster config and the system namespace key BEFORE any
+# node registers. register starts sf-database, whose ExecStartPre=verify-config
+# requires AUTH_SECRET_SEED to already be in the cluster_config table. These
+# sf-ctl calls are delegated to the first database-tier host, which has direct
+# MariaDB access (SHAKENFIST_MARIADB_HOST in /etc/sf/config); byo-mariadb
+# removed the localhost escape hatch, so direct access relies on that config.
+# Reproduces legacy roles/primary/cluster_config.yml and
+# roles/base/create_admin_namespace.yml.
+# ---------------------------------------------------------------------------
+- name: Write the cluster configuration (once, before register)
+  hosts: etcd_master
+  become: true
+  gather_facts: false
+  run_once: true
+  vars:
+    http_proxy: ""
+    extra_config: "[]"
+    cluster_db_host: "{{ groups['etcd_master'][0] }}"
+  tasks:
+    - name: Set the auth secret seed
+      ansible.builtin.command: >-
+        /srv/shakenfist/venv/bin/sf-ctl set-config AUTH_SECRET_SEED {{ auth_secret }}
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: true
+
+    - name: Set the RAM system reservation
+      ansible.builtin.command: >-
+        /srv/shakenfist/venv/bin/sf-ctl set-config
+        RAM_SYSTEM_RESERVATION {{ hostvars[cluster_db_host]['ram_system_reservation'] }}
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: true
+
+    - name: Set the maximum hypervisor MTU
+      ansible.builtin.command: >-
+        /srv/shakenfist/venv/bin/sf-ctl set-config
+        MAX_HYPERVISOR_MTU {{ hostvars[cluster_db_host]['max_hypervisor_mtu'] }}
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: true
+
+    - name: Set the DNS server
+      ansible.builtin.command: >-
+        /srv/shakenfist/venv/bin/sf-ctl set-config DNS_SERVER {{ dns_server }}
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: true
+
+    - name: Set the HTTP proxy (only when one is configured)
+      ansible.builtin.command: >-
+        /srv/shakenfist/venv/bin/sf-ctl set-config HTTP_PROXY {{ http_proxy }}
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: true
+      when: http_proxy | length != 0
+
+    - name: Apply any extra cluster config
+      ansible.builtin.command: >-
+        /srv/shakenfist/venv/bin/sf-ctl set-config
+        {{ item['name'] }} {{ item['value'] }}
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: true
+      loop: "{{ extra_config | from_json }}"
+
+    - name: Verify the cluster configuration
+      ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl verify-config
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: false
+
+    - name: Show the cluster configuration
+      ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl show-config
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: false
+      register: cluster_config
+
+    - name: Log the cluster configuration
+      ansible.builtin.debug:
+        msg: "{{ cluster_config.stdout }}"
+
+    # Reproduces legacy create_admin_namespace.yml. The legacy keyname was
+    # 'deploy'; preserved here.
+    - name: Bootstrap the system namespace key
+      ansible.builtin.command: >-
+        /srv/shakenfist/venv/bin/sf-ctl bootstrap-system-key deploy {{ system_key }}
+      environment:
+        SHAKENFIST_NODE_MESH_IP: "{{ hostvars[cluster_db_host]['node_mesh_ip'] }}"
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: true
+
+
+# ---------------------------------------------------------------------------
+# Play 6b: register the database tier (starts sf-database and the gRPC gateway)
+# BEFORE the remaining nodes register over that gateway. The ordering contract
+# in the node role's register.yml requires this.
+# ---------------------------------------------------------------------------
+- name: Register the database tier and start its daemons
+  hosts: etcd_master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Register the database-tier node
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.node
+        tasks_from: register
+
+- name: Register the remaining nodes and start their daemons
+  hosts: allsf:!etcd_master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Register the node
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.node
+        tasks_from: register
+
+
+# ---------------------------------------------------------------------------
+# Play 7: write /etc/sf/inventory.yaml ONCE. The client-python functional-tests
+# CI scp's this file off a node and uses it as the ansible inventory for the
+# native-module tests, so it must still be produced now that the primary role
+# is gone. Sourced from all_mesh_hosts and the group-membership snapshots, not
+# from groups[...] inside a role.
+# ---------------------------------------------------------------------------
+- name: Write the cluster topology to /etc/sf/inventory.yaml (once)
+  hosts: allsf
+  become: true
+  gather_facts: false
+  run_once: true
+  tasks:
+    - name: Ensure /etc/sf exists
+      ansible.builtin.file:
+        path: /etc/sf
+        state: directory
+        mode: "0755"
+
+    - name: Render /etc/sf/inventory.yaml from the computed topology
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../_shared/templates/inventory.yaml.j2"
+        dest: /etc/sf/inventory.yaml
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+
+
+# ---------------------------------------------------------------------------
+# Play 8: final sanity checks, reproducing legacy roles/primary/postinstall.yml
+# (minus the ansible-module copy, which dies with the native modules in step 4):
+# sf-api and sf-queues active, and the API returns 401 unauthenticated. Runs on
+# every host that runs the API (allsf).
+# ---------------------------------------------------------------------------
+- name: Final deployment sanity checks
+  hosts: allsf
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Rotate and vacuum logs
+      ansible.builtin.shell: |
+        journalctl --rotate
+        journalctl --vacuum-time=2d
+        /usr/sbin/logrotate -f /etc/logrotate.conf
+      changed_when: true
+      failed_when: false
+
+    - name: Verify sf-api is active
+      ansible.builtin.command: systemctl is-active sf-api
+      register: sf_api_status
+      changed_when: false
+      failed_when: sf_api_status.stdout != "active"
+
+    - name: Verify sf-queues is active
+      ansible.builtin.command: systemctl is-active sf-queues
+      register: sf_queues_status
+      changed_when: false
+      failed_when: sf_queues_status.stdout != "active"
+
+    - name: Verify the API responds 401 unauthenticated
+      ansible.builtin.command: >-
+        curl -s -o /dev/null -w "%{http_code}" http://localhost:13000/auth/namespaces
+      register: api_response
+      changed_when: false
+      failed_when: api_response.stdout != "401"
+      retries: 5
+      delay: 2
+      until: api_response.stdout == "401"
+
+    - name: Log the sanity-check results
+      ansible.builtin.debug:
+        msg: >-
+          Sanity checks passed: sf-api={{ sf_api_status.stdout }},
+          sf-queues={{ sf_queues_status.stdout }},
+          API HTTP {{ api_response.stdout }} (expected 401).

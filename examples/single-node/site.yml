@@ -1,0 +1,8 @@
+---
+# Single-node Shaken Fist deploy. localhost is a member of every group
+# (hypervisor + network node + database tier), so every capability flag is
+# true. All the deploy logic lives in the shared playbook; this file just
+# imports it. Cluster-wide variables come from group_vars/all.yml beside the
+# inventory.
+- name: Deploy Shaken Fist (single node)
+  ansible.builtin.import_playbook: ../_shared/site.yml

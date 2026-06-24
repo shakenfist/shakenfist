@@ -1,0 +1,33 @@
+---
+# Single-node Shaken Fist inventory: localhost is in every capability group, so
+# it runs the hypervisor, network node and database tier all at once. The
+# legacy etcd_master group name is the database tier (renamed to database_node
+# in phase 7).
+#
+# Per-host identity (node_name / node_egress_* / node_mesh_*) is set in
+# host_vars below. For a single box the mesh and egress IP are the same
+# loopback-ish local address; adjust node_mesh_ip / node_egress_ip to this
+# host's real address if you are not deploying onto 127.0.0.1.
+all:
+  children:
+    allsf:
+      hosts:
+        localhost:
+          ansible_connection: local
+          node_name: localhost
+          node_egress_ip: 127.0.0.1
+          node_egress_nic: eth0
+          node_mesh_ip: 127.0.0.1
+          node_mesh_nic: eth0
+
+    hypervisors:
+      hosts:
+        localhost:
+
+    network_node:
+      hosts:
+        localhost:
+
+    etcd_master:
+      hosts:
+        localhost:

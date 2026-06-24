@@ -1,0 +1,37 @@
+---
+# Cluster-wide variables for the single-node example. Replace the secrets with
+# real values before deploying anything you care about.
+
+# The deployment / zone name.
+deploy_name: sf
+
+# The cluster API URL (this box, talking to its own gunicorn).
+api_url: "http://localhost:13000"
+
+# Secrets. CHANGE THESE. auth_secret seeds AUTH_SECRET_SEED (JWT signing);
+# system_key is the "system" namespace key written into sfrc and used by
+# sf-client on this node.
+auth_secret: "change-me-auth-secret-change-me-auth-secret-change"
+system_key: "change-me-system-key"
+
+# Cluster config seeds.
+dns_server: "8.8.8.8"
+http_proxy: ""
+extra_config: "[]"
+floating_network_ipblock: "10.10.0.0/24"
+
+# Direct MariaDB access for the (single) database-tier node. These must match
+# the local mariadb-server you provisioned with tools/bootstrap-mariadb.sql.
+mariadb_host: "localhost"
+mariadb_port: 3306
+mariadb_user: "shakenfist"
+mariadb_password: "change-me-mariadb-password"
+mariadb_database: "sf"
+
+# Install released packages from PyPI by default. To deploy the current git
+# checkout instead, set sf_build_local_wheels: true and supply repo_path /
+# client_repo_path (see the README).
+sf_build_local_wheels: false
+server_package: "shakenfist"
+client_package: "shakenfist-client"
+pip_extra: ""
