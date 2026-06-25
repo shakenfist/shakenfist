@@ -2061,6 +2061,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#ci-job-layout-and-the-partition-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI job layout and the partition guard
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -9605,6 +9616,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#ci-job-layout-and-the-partition-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI job layout and the partition guard
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -10168,17 +10190,79 @@ must always be placed in <code>instar-testdata</code>, never in the public <code
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># List available tests</span>
 <a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>stestr<span class="w"> </span>list
 </code></pre></div>
+<h3 id="ci-job-layout-and-the-partition-guard">CI job layout and the partition guard<a class="headerlink" href="#ci-job-layout-and-the-partition-guard" title="Permanent link">&para;</a></h3>
+<p>On a pull request the integration suite is split across several jobs
+(in <code>.github/workflows/functional-tests.yml</code>) so the long-running
+convert tests can run in parallel with everything else. Each job
+selects a subset with stestr regex filters defined in the Makefile:</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Make target</th>
+<th>Selection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>integration-core</code></td>
+<td><code>test-container-core</code></td>
+<td>everything <strong>except</strong> <code>test_convert.</code>, <code>test_compare.</code>, <code>test_info_malicious.</code> (the catch-all)</td>
+</tr>
+<tr>
+<td><code>integration-convert-qcow2</code></td>
+<td><code>test-container-convert-qcow2</code></td>
+<td><code>test_convert.</code>/<code>test_compare.</code> minus <code>Vhd</code></td>
+</tr>
+<tr>
+<td><code>integration-convert-vhd</code></td>
+<td><code>test-container-convert-vhd</code></td>
+<td><code>test_convert.TestConvert.*Vhd</code></td>
+</tr>
+<tr>
+<td><code>oslo-crossval-master</code></td>
+<td>(inline)</td>
+<td><code>test_oslo_crossval</code> re-run against <code>oslo.utils</code> master</td>
+</tr>
+</tbody>
+</table>
+<p><code>test_info_malicious.py</code> is intentionally excluded from every PR job
+and runs only via <code>make test-malicious</code>.</p>
+<p>Because <code>integration-core</code> is <strong>exclude-based</strong>, it silently absorbs
+any new <code>test_*.py</code> module — convenient, but it means a future
+refactor (e.g. turning it into an include-list like the convert jobs)
+could drop a whole module from CI with no test failure. The
+class-level convert split has a subtler gap: a <code>test_convert</code> class
+containing <code>Vhd</code> but not matching <code>TestConvert.*Vhd</code> would be excluded
+by the qcow2 job and missed by the vhd job.</p>
+<p>The <strong><code>test-partition</code> CI job</strong> guards against both. It runs
+<code>tools/ci/check-test-partition.sh</code>, which enumerates the suite with
+<code>stestr list</code>, reads the <em>actual</em> job selectors from the Makefile and
+workflow (no duplicated copy to drift), and fails if any test is run
+by zero jobs. The only hand-maintained input is the allowlist of
+intentional exclusions in <code>tools/ci/check-test-partition.py</code>
+(currently just the malicious suite); each entry carries a documented
+reason. Run it locally with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tools/ci/check-test-partition.sh
+</code></pre></div>
+<p>Its own logic is unit-tested (stdlib only, no venv) via:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tools/ci<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;test_*.py&#39;</span>
+</code></pre></div>
+<p>When you add a new integration job or change a test-container
+selector, the guard validates the new partition automatically; if it
+reports an orphan, either add the test to a job or (rarely) to the
+documented allowlist.</p>
 <h2 id="test-image-manifest">Test Image Manifest<a class="headerlink" href="#test-image-manifest" title="Permanent link">&para;</a></h2>
 <p>Test images are defined in <code>tests/manifest.json</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cirros-qcow2&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;downloaded/cirros/cirros-0.6.3-x86_64-disk.img&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">&quot;safety&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;safe&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">&quot;run_in_ci&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CirrOS minimal cloud image&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;cloud-image&quot;</span><span class="p">]</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cirros-qcow2&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;downloaded/cirros/cirros-0.6.3-x86_64-disk.img&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">&quot;safety&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;safe&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">&quot;run_in_ci&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CirrOS minimal cloud image&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;qcow2&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;cloud-image&quot;</span><span class="p">]</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="manifest-fields">Manifest Fields<a class="headerlink" href="#manifest-fields" title="Permanent link">&para;</a></h3>
 <table>
@@ -10232,13 +10316,13 @@ must always be placed in <code>instar-testdata</code>, never in the public <code
 headers or partition tables. In default (secure) mode, instar rejects these
 files as "unknown format" rather than accepting them as raw images.</p>
 <p>To test qemu-img compatibility for these images, use <code>--unsafe-quirks</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Default mode: rejects files without valid structure</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>instar<span class="w"> </span>info<span class="w"> </span>random-garbage.raw
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># Error: Unknown format (no valid disk image header or partition table)</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># Unsafe quirks mode: matches qemu-img behavior</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>instar<span class="w"> </span>info<span class="w"> </span>--unsafe-quirks<span class="w"> </span>random-garbage.raw
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># file format: raw</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Default mode: rejects files without valid structure</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>instar<span class="w"> </span>info<span class="w"> </span>random-garbage.raw
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Error: Unknown format (no valid disk image header or partition table)</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># Unsafe quirks mode: matches qemu-img behavior</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>instar<span class="w"> </span>info<span class="w"> </span>--unsafe-quirks<span class="w"> </span>random-garbage.raw
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># file format: raw</span>
 </code></pre></div>
 <p>See <a href="/components/instar/configuration/">configuration.md</a> and <a href="/components/instar/quirks/">quirks.md</a> for details
 on safe vs unsafe quirks.</p>
@@ -10252,14 +10336,14 @@ the main repository small. The location is resolved in order:</p>
 <h2 id="expected-output-overrides">Expected Output Overrides<a class="headerlink" href="#expected-output-overrides" title="Permanent link">&para;</a></h2>
 <p>For malicious images where running <code>qemu-img</code> would be dangerous, store the
 expected output in <code>tests/expected_outputs/</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tests/expected_outputs/
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>└── qcow2_backing_etc_passwd.txt
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tests/expected_outputs/
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>└── qcow2_backing_etc_passwd.txt
 </code></pre></div>
 <p>Reference this file in the manifest:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2-backing-passwd&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">&quot;expected_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;expected_outputs/qcow2_backing_etc_passwd.txt&quot;</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;qcow2-backing-passwd&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">&quot;expected_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;expected_outputs/qcow2_backing_etc_passwd.txt&quot;</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="image-notes">Image Notes<a class="headerlink" href="#image-notes" title="Permanent link">&para;</a></h2>
 <p>The <code>docs/image_notes/</code> directory documents which test images exposed
@@ -10374,11 +10458,11 @@ for <code>check</code> validation (qemu-img check only supports QCOW2), and
 provides a third independent opinion for QCOW2. libyal tools are
 optional — the fuzzer degrades gracefully when they are unavailable.</p>
 <h3 id="running-locally">Running locally<a class="headerlink" href="#running-locally" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span>--log-dir<span class="w"> </span>./fuzz-logs
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span>--log-dir<span class="w"> </span>./fuzz-logs
 </code></pre></div>
 <h3 id="ci-integration">CI integration<a class="headerlink" href="#ci-integration" title="Permanent link">&para;</a></h3>
 <p>The fuzzer runs automatically via <code>.github/workflows/differential-fuzz.yml</code>
@@ -10420,11 +10504,11 @@ image attributes, and a reproduction command.</p>
 <h3 id="reproducing-a-divergence">Reproducing a divergence<a class="headerlink" href="#reproducing-a-divergence" title="Permanent link">&para;</a></h3>
 <p>Each divergence report includes the seed and iteration number. To
 reproduce:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span>--iterations<span class="w"> </span>&lt;ITERATION<span class="w"> </span>+<span class="w"> </span><span class="m">1</span>&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span>--seed<span class="w"> </span>&lt;SEED&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span>--fail-fast
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>--iterations<span class="w"> </span>&lt;ITERATION<span class="w"> </span>+<span class="w"> </span><span class="m">1</span>&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span>--seed<span class="w"> </span>&lt;SEED&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span>--fail-fast
 </code></pre></div>
 <h2 id="phase-6-coverage-guided-fuzzing">Phase 6: Coverage-Guided Fuzzing<a class="headerlink" href="#phase-6-coverage-guided-fuzzing" title="Permanent link">&para;</a></h2>
 <p>Coverage-guided fuzzing uses <code>cargo-fuzz</code> (libFuzzer) to exercise the
@@ -10585,24 +10669,24 @@ and bounds→<code>MisalignedAccess</code> error classifications, idempotence,
 and the "correct generalises reclaim" cross-check. The COPIED
 walker's deep invariants are delegated to <code>fuzz_snapshot_refcount</code>.</p>
 <h3 id="running-locally_1">Running locally<a class="headerlink" href="#running-locally_1" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Inside the instar-build container:</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Run a single target for 60 seconds</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Run with specific corpus</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>corpus/fuzz_qcow2_header/
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># Minimize a crash</span>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>tmin<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>artifacts/fuzz_qcow2_header/&lt;crash&gt;
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="c1"># Generate coverage report</span>
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>coverage<span class="w"> </span>fuzz_qcow2_header
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Inside the instar-build container:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Run a single target for 60 seconds</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Run with specific corpus</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>corpus/fuzz_qcow2_header/
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="c1"># Minimize a crash</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>tmin<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>artifacts/fuzz_qcow2_header/&lt;crash&gt;
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="c1"># Generate coverage report</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>coverage<span class="w"> </span>fuzz_qcow2_header
 </code></pre></div>
 <h3 id="corpus-seeding">Corpus seeding<a class="headerlink" href="#corpus-seeding" title="Permanent link">&para;</a></h3>
 <p>The seed corpus is extracted from <code>instar-testdata</code> using:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
 </code></pre></div>
 <p>This copies test images into per-target corpus directories under
 <code>src/fuzz/corpus/</code>, filtered by format. Header-only targets receive
