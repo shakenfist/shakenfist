@@ -333,6 +333,55 @@ stestr run --serial -- --verbose
 stestr list
 ```
 
+### CI job layout and the partition guard
+
+On a pull request the integration suite is split across several jobs
+(in `.github/workflows/functional-tests.yml`) so the long-running
+convert tests can run in parallel with everything else. Each job
+selects a subset with stestr regex filters defined in the Makefile:
+
+| Job | Make target | Selection |
+|-----|-------------|-----------|
+| `integration-core` | `test-container-core` | everything **except** `test_convert.`, `test_compare.`, `test_info_malicious.` (the catch-all) |
+| `integration-convert-qcow2` | `test-container-convert-qcow2` | `test_convert.`/`test_compare.` minus `Vhd` |
+| `integration-convert-vhd` | `test-container-convert-vhd` | `test_convert.TestConvert.*Vhd` |
+| `oslo-crossval-master` | (inline) | `test_oslo_crossval` re-run against `oslo.utils` master |
+
+`test_info_malicious.py` is intentionally excluded from every PR job
+and runs only via `make test-malicious`.
+
+Because `integration-core` is **exclude-based**, it silently absorbs
+any new `test_*.py` module — convenient, but it means a future
+refactor (e.g. turning it into an include-list like the convert jobs)
+could drop a whole module from CI with no test failure. The
+class-level convert split has a subtler gap: a `test_convert` class
+containing `Vhd` but not matching `TestConvert.*Vhd` would be excluded
+by the qcow2 job and missed by the vhd job.
+
+The **`test-partition` CI job** guards against both. It runs
+`tools/ci/check-test-partition.sh`, which enumerates the suite with
+`stestr list`, reads the *actual* job selectors from the Makefile and
+workflow (no duplicated copy to drift), and fails if any test is run
+by zero jobs. The only hand-maintained input is the allowlist of
+intentional exclusions in `tools/ci/check-test-partition.py`
+(currently just the malicious suite); each entry carries a documented
+reason. Run it locally with:
+
+```bash
+tools/ci/check-test-partition.sh
+```
+
+Its own logic is unit-tested (stdlib only, no venv) via:
+
+```bash
+python3 -m unittest discover -s tools/ci -p 'test_*.py'
+```
+
+When you add a new integration job or change a test-container
+selector, the guard validates the new partition automatically; if it
+reports an orphan, either add the test to a job or (rarely) to the
+documented allowlist.
+
 ## Test Image Manifest
 
 Test images are defined in `tests/manifest.json`:
