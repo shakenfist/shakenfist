@@ -105,6 +105,7 @@ nav:
             - "`instar amend` — change qcow2 image options in place": components/instar/amend.md
             - "`instar commit` — merge an overlay's data into its backing": components/instar/commit.md
             - "`instar create` — create a new empty disk image": components/instar/create.md
+            - "`instar dd` — windowed block copy": components/instar/dd.md
             - "`instar map` — emit the allocation map of a disk image": components/instar/map.md
             - "`instar measure` — predict file size for a target format": components/instar/measure.md
             - "`instar rebase` — change an overlay's backing-file reference": components/instar/rebase.md
@@ -154,6 +155,7 @@ nav:
                 - "Fuzzing bug backlog": components/instar/plans/PLAN-fuzzing-bugs.md
                 - "June 2026 fuzzer bug backlog": components/instar/plans/PLAN-bug-fixes.md
                 - "instar amend subcommand": components/instar/plans/PLAN-amend.md
+                - "instar dd subcommand": components/instar/plans/PLAN-dd.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
