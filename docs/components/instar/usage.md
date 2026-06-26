@@ -979,3 +979,22 @@ in place — the sandboxed equivalent of `qemu-img amend`. oVirt's
 VDSM uses `qemu-img amend -o compat=VERSION` to upgrade images to
 v3 after creation (see the oVirt section above). qcow2-only. See
 [docs/amend.md](/components/instar/amend/) for the full reference.
+
+### dd
+
+```
+instar dd [-f FMT] [-O OUTPUT_FMT] if=INPUT of=OUTPUT [bs=N] [count=N] [skip=N]
+```
+
+Windowed block copy — the sandboxed equivalent of `qemu-img dd`.
+`if=`/`of=` are mandatory `name=value` operands; `-O` defaults to
+**raw** (not the input format). Proxmox's `qemu-server` uses
+`qemu-img dd` for EFI disk cloning (see the Proxmox section
+above), passing `bs=`, `osize=`, `if=`, `of=` operands with a
+1 MB block size for Ceph performance. instar implements the
+upstream `qemu-img dd` operand set (`bs`, `count`, `skip`,
+`if=`, `of=`); the PVE-specific extensions (`osize=`, `isize=`,
+`-n`, `-l`, stdin/stdout) are out of scope for v1. Output is
+byte- and size-identical to `qemu-img dd` for all five output
+formats (raw, qcow2, vmdk, vpc, vhdx). See
+[docs/dd.md](/components/instar/dd/) for the full reference.

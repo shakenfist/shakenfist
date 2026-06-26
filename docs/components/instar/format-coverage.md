@@ -201,6 +201,33 @@ subcommand quirks" section of
 
 ---
 
+## DD Format Support
+
+The `instar dd` operation performs a windowed block copy, writing
+dense output. Per-format output support:
+
+| Output Format | Status | Size rounding | qemu-img parity |
+|---------------|--------|---------------|-----------------|
+| raw           | Supported | `round_up(window, 512)` | Byte- and size-identical |
+| qcow2         | Supported | `round_up(window, 512)` | Byte- and size-identical |
+| vmdk          | Supported | `round_up(window, 512)` | Byte- and size-identical |
+| vpc (VHD)     | Supported | CHS geometry rounding (may be larger; e.g. 3000-byte window ⇒ 34816) | Byte- and size-identical |
+| vhdx          | Supported | `round_up(window, 512)` | Data/virtual-size identical; block-size metadata differs (instar 32 MiB, qemu 8 MiB for small images) |
+
+All input formats supported by `instar convert` are also accepted
+as `dd` input. `-O` defaults to **raw** (not the input format).
+Window semantics: `bs` (default 512), `count` (clamps down;
+`count=0` ⇒ empty), `skip` (subtracts from front; skip-past-EOF
+⇒ empty, exit 0). Output is always dense.
+
+Known divergences from `qemu-img dd`: vhdx default block size
+(data and virtual size still match); `count=0 -O vmdk` (qemu-img
+itself exits 1); `count=0 -O vhdx` (instar's empty vhdx is
+rejected by `qemu-img info`). See [docs/dd.md](/components/instar/dd/) for the
+full reference.
+
+---
+
 ## Safety Check Comparison
 
 ### QCOW2 Safety Checks

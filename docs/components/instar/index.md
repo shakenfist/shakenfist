@@ -51,6 +51,7 @@ Features unique to instar that do not exist in qemu-img.
 | [Map](/components/instar/map/) | `instar map` - emit the allocation map of a disk image |
 | [Snapshot](/components/instar/snapshot/) | `instar snapshot` - manage internal qcow2 snapshots |
 | [Amend](/components/instar/amend/) | `instar amend` - change qcow2 image options (compat version, lazy_refcounts) |
+| [Dd](/components/instar/dd/) | `instar dd` — windowed block copy (qemu-img dd compatible) |
 
 ## Compatibility
 
