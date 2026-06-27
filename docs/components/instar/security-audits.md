@@ -491,7 +491,8 @@ hand-crafted minimal valid inputs for each format.
 ### Infrastructure
 
 - CI workflow: `.github/workflows/coverage-fuzz.yml`
-- Nightly runs: 1 hour per target at 04:00 UTC
+- Nightly runs: all targets at 04:00 UTC, per-target durations tiered
+  against a 450-min budget (`tools/ci/fuzz-tier.sh`)
 - Corpus seeding: `scripts/extract-fuzz-corpus.py`
 - Corpus storage: `instar-testdata/custom/fuzz-corpus/`
 - Crash reporting: automatic GitHub Issue filing with `security-audit` label
