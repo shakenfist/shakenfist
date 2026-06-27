@@ -23,13 +23,28 @@
     group: root
     mode: '0444'
 
-- name: Copy host key to host
-  ansible.builtin.copy:
+# The host key is generated on the control node as root, mode 0400 (umask 277
+# in host_certificate.yml), so a controller-side `copy: src:` read fails when
+# ansible runs as a non-root user -- i.e. whenever the control node is separate
+# from the target (the collection model), rather than the legacy
+# getsf-on-the-node-as-root model. Read it with a privileged slurp on the
+# control node and install it via content, so the key stays 0400 in staging.
+- name: Read this host's key from the control node
+  ansible.builtin.slurp:
     src: "{{ host_key_path }}"
+  delegate_to: localhost
+  become: true
+  register: host_key_material
+  no_log: true
+
+- name: Install host key on host
+  ansible.builtin.copy:
+    content: "{{ host_key_material.content | b64decode }}"
     dest: /etc/pki/libvirt-spice/server-key.pem
     owner: root
     group: root
     mode: '0444'
+  no_log: true
 
 - name: Copy host certificate to host
   ansible.builtin.copy:
