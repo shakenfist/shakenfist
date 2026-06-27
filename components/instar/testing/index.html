@@ -2336,6 +2336,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="CI integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tiered-nightly-durations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tiered nightly durations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -9919,6 +9936,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="CI integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tiered-nightly-durations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tiered nightly durations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -10573,7 +10607,7 @@ mock <code>CallTable</code> backed by fuzzer input provides the I/O layer,
 allowing libFuzzer to explore malformed input space that differential
 fuzzing (Phase 3) cannot reach.</p>
 <h3 id="fuzz-targets">Fuzz targets<a class="headerlink" href="#fuzz-targets" title="Permanent link">&para;</a></h3>
-<p>23 targets across the parser and planner crates, organized in
+<p>27 targets across the parser and planner crates, organized in
 <code>src/fuzz/</code>:</p>
 <table>
 <thead>
@@ -10680,6 +10714,11 @@ fuzzing (Phase 3) cannot reach.</p>
 <td>Buffer-based</td>
 </tr>
 <tr>
+<td><code>fuzz_amend_planners</code></td>
+<td>amend</td>
+<td>Buffer-based</td>
+</tr>
+<tr>
 <td><code>fuzz_map_iter</code></td>
 <td>all parsers</td>
 <td>CallTable</td>
@@ -10698,6 +10737,21 @@ fuzzing (Phase 3) cannot reach.</p>
 <td><code>fuzz_check_repair</code></td>
 <td>check</td>
 <td>Buffer-based</td>
+</tr>
+<tr>
+<td><code>fuzz_dd_window</code></td>
+<td>dd</td>
+<td>Buffer-based</td>
+</tr>
+<tr>
+<td><code>fuzz_chs_rounded_size</code></td>
+<td>dd</td>
+<td>Buffer-based</td>
+</tr>
+<tr>
+<td><code>fuzz_dd_read</code></td>
+<td>dd</td>
+<td>CallTable</td>
 </tr>
 </tbody>
 </table>
@@ -10748,15 +10802,46 @@ walker's deep invariants are delegated to <code>fuzz_snapshot_refcount</code>.</
 <code>src/fuzz/corpus/</code>, filtered by format. Header-only targets receive
 truncated copies. Hand-crafted minimal valid inputs are also generated
 for each format.</p>
+<p>It additionally <strong>restores the accumulated corpus</strong> pushed by prior
+nightly runs. Each nightly run pushes coverage-increasing inputs to
+<code>instar-testdata/custom/fuzz-corpus/&lt;target&gt;/</code>; on the next run those
+entries are copied straight back into <code>corpus/&lt;target&gt;/</code> <em>by target
+name</em> (<code>restore_pushed_corpus()</code>), so coverage compounds across runs.
+This matters most for the targets whose inputs are not recognizable
+image formats — the window-math, CHS-geometry and planner fuzzers —
+which would otherwise re-seed cold every night because format-based
+routing cannot place their entries. Entries are content-addressed, so
+restoration is idempotent.</p>
 <h3 id="ci-integration_1">CI integration<a class="headerlink" href="#ci-integration_1" title="Permanent link">&para;</a></h3>
 <p>The CI workflow (<code>.github/workflows/coverage-fuzz.yml</code>) runs:
-- <strong>Nightly:</strong> 1 hour per target at 04:00 UTC
-- <strong>PR validation:</strong> 60-second smoke test when fuzz/parser code changes
-- <strong>Manual dispatch:</strong> configurable duration and target selection</p>
+- <strong>Nightly</strong> at 04:00 UTC, all targets, with <strong>tiered per-target
+  durations</strong> (see below).
+- <strong>PR validation:</strong> single-target smoke test when fuzz/parser code
+  changes.
+- <strong>Post-merge</strong> (push to <code>develop</code>): 15s per target.
+- <strong>Manual dispatch:</strong> configurable duration and target selection.</p>
+<h4 id="tiered-nightly-durations">Tiered nightly durations<a class="headerlink" href="#tiered-nightly-durations" title="Permanent link">&para;</a></h4>
+<p>The nightly run has a fixed wall-clock budget (450 min, inside the
+480 min job timeout). Rather than splitting it evenly, the run plan is
+computed by <code>tools/ci/fuzz-tier.sh</code>: the fast-saturating targets (pure
+window math, CHS rounding, and the planner/emitter crates) take a short
+fixed slice (300s — they reach steady coverage in well under a minute),
+and the deep parser/format targets split the remainder. With the
+current 27 targets that gives the 17 deep targets ~24 min each versus
+~17 min under an even split.</p>
+<p>This is one of two levers for keeping per-target time useful as the
+target count grows; the other is corpus persistence (see <em>Corpus
+seeding</em>). <strong>When the deep-tier share computed by <code>fuzz-tier.sh</code> falls
+to the fast-tier floor (~300s), stop cutting time and shard the targets
+across multiple CI jobs instead.</strong> Sharding only adds real throughput
+if the self-hosted runner pool has spare physical cores during the
+nightly window, since each libFuzzer target pins a core — confirm core
+availability before adding jobs.</p>
 <p>Crashes are minimized with <code>cargo fuzz tmin</code> and filed as GitHub
 Issues with the <code>security-audit</code> label immediately when found. New
 corpus entries are pushed to <code>instar-testdata/custom/fuzz-corpus/</code>
-after nightly runs.</p>
+after nightly runs, and restored by target name on the next run so
+coverage compounds.</p>
 <h3 id="automated-bug-fixes">Automated bug fixes<a class="headerlink" href="#automated-bug-fixes" title="Permanent link">&para;</a></h3>
 <p>The CI workflow (<code>.github/workflows/fuzz-autofix.yml</code>) runs daily
 at 06:00 UTC and picks up open <code>security-audit</code> issues. It invokes

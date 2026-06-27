@@ -11031,7 +11031,8 @@ hand-crafted minimal valid inputs for each format.</p>
 <h3 id="infrastructure">Infrastructure<a class="headerlink" href="#infrastructure" title="Permanent link">&para;</a></h3>
 <ul>
 <li>CI workflow: <code>.github/workflows/coverage-fuzz.yml</code></li>
-<li>Nightly runs: 1 hour per target at 04:00 UTC</li>
+<li>Nightly runs: all targets at 04:00 UTC, per-target durations tiered
+  against a 450-min budget (<code>tools/ci/fuzz-tier.sh</code>)</li>
 <li>Corpus seeding: <code>scripts/extract-fuzz-corpus.py</code></li>
 <li>Corpus storage: <code>instar-testdata/custom/fuzz-corpus/</code></li>
 <li>Crash reporting: automatic GitHub Issue filing with <code>security-audit</code> label</li>
