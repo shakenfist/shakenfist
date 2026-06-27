@@ -620,7 +620,7 @@ fuzzing (Phase 3) cannot reach.
 
 ### Fuzz targets
 
-23 targets across the parser and planner crates, organized in
+27 targets across the parser and planner crates, organized in
 `src/fuzz/`:
 
 | Target | Crate | Type |
@@ -644,10 +644,14 @@ fuzzing (Phase 3) cannot reach.
 | `fuzz_resize_planners` | resize | Buffer-based |
 | `fuzz_rebase_planners` | rebase | Buffer-based |
 | `fuzz_commit_planners` | commit | Buffer-based |
+| `fuzz_amend_planners` | amend | Buffer-based |
 | `fuzz_map_iter` | all parsers | CallTable |
 | `fuzz_snapshot_parse` | qcow2 | CallTable |
 | `fuzz_snapshot_refcount` | snapshot | Buffer-based |
 | `fuzz_check_repair` | check | Buffer-based |
+| `fuzz_dd_window` | dd | Buffer-based |
+| `fuzz_chs_rounded_size` | dd | Buffer-based |
+| `fuzz_dd_read` | dd | CallTable |
 
 **Buffer-based** targets call parser functions that take `&[u8]`
 directly (e.g. `QcowHeader::parse(data)`). **CallTable** targets
@@ -707,17 +711,52 @@ This copies test images into per-target corpus directories under
 truncated copies. Hand-crafted minimal valid inputs are also generated
 for each format.
 
+It additionally **restores the accumulated corpus** pushed by prior
+nightly runs. Each nightly run pushes coverage-increasing inputs to
+`instar-testdata/custom/fuzz-corpus/<target>/`; on the next run those
+entries are copied straight back into `corpus/<target>/` *by target
+name* (`restore_pushed_corpus()`), so coverage compounds across runs.
+This matters most for the targets whose inputs are not recognizable
+image formats — the window-math, CHS-geometry and planner fuzzers —
+which would otherwise re-seed cold every night because format-based
+routing cannot place their entries. Entries are content-addressed, so
+restoration is idempotent.
+
 ### CI integration
 
 The CI workflow (`.github/workflows/coverage-fuzz.yml`) runs:
-- **Nightly:** 1 hour per target at 04:00 UTC
-- **PR validation:** 60-second smoke test when fuzz/parser code changes
-- **Manual dispatch:** configurable duration and target selection
+- **Nightly** at 04:00 UTC, all targets, with **tiered per-target
+  durations** (see below).
+- **PR validation:** single-target smoke test when fuzz/parser code
+  changes.
+- **Post-merge** (push to `develop`): 15s per target.
+- **Manual dispatch:** configurable duration and target selection.
+
+#### Tiered nightly durations
+
+The nightly run has a fixed wall-clock budget (450 min, inside the
+480 min job timeout). Rather than splitting it evenly, the run plan is
+computed by `tools/ci/fuzz-tier.sh`: the fast-saturating targets (pure
+window math, CHS rounding, and the planner/emitter crates) take a short
+fixed slice (300s — they reach steady coverage in well under a minute),
+and the deep parser/format targets split the remainder. With the
+current 27 targets that gives the 17 deep targets ~24 min each versus
+~17 min under an even split.
+
+This is one of two levers for keeping per-target time useful as the
+target count grows; the other is corpus persistence (see *Corpus
+seeding*). **When the deep-tier share computed by `fuzz-tier.sh` falls
+to the fast-tier floor (~300s), stop cutting time and shard the targets
+across multiple CI jobs instead.** Sharding only adds real throughput
+if the self-hosted runner pool has spare physical cores during the
+nightly window, since each libFuzzer target pins a core — confirm core
+availability before adding jobs.
 
 Crashes are minimized with `cargo fuzz tmin` and filed as GitHub
 Issues with the `security-audit` label immediately when found. New
 corpus entries are pushed to `instar-testdata/custom/fuzz-corpus/`
-after nightly runs.
+after nightly runs, and restored by target name on the next run so
+coverage compounds.
 
 ### Automated bug fixes
 
