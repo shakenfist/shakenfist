@@ -660,6 +660,19 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
+  smoke_collection:
+    name: "Smoke tests (collection)"
+    if: >-
+      always() && github.event_name != 'merge_group'
+      && needs.check_paths.outputs.code_changed != 'false'
+    needs: [check_paths]
+    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    secrets: inherit
+    with:
+      component: shakenfist
+      component_ref: ${{ github.sha }}
+      tier: smoke
+
   # Runs if exceptions are found on disk in any functional_matrix_pr matrix job.
   # Uses !cancelled() so it runs even when functional_matrix_pr fails.
   # The exceptions_found output is a JSON object with job_name keys and boolean
