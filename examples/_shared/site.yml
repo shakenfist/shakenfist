@@ -345,6 +345,7 @@
         /srv/shakenfist/venv/bin/sf-ctl set-config AUTH_SECRET_SEED {{ auth_secret }}
       delegate_to: "{{ cluster_db_host }}"
       changed_when: true
+      no_log: true
 
     - name: Set the RAM system reservation
       ansible.builtin.command: >-
@@ -405,6 +406,7 @@
         SHAKENFIST_NODE_MESH_IP: "{{ hostvars[cluster_db_host]['node_mesh_ip'] }}"
       delegate_to: "{{ cluster_db_host }}"
       changed_when: true
+      no_log: true
 
 
 # ---------------------------------------------------------------------------
