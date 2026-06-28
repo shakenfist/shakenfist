@@ -58,9 +58,8 @@
 # distributions (notably Ubuntu 24.04), this module is not automatically
 # loaded when vsock sockets are created.
 - name: Load vhost_vsock kernel module
-  community.general.modprobe:
-    name: vhost_vsock
-    state: present
+  ansible.builtin.command: modprobe vhost_vsock
+  changed_when: true
 
 - name: Ensure vhost_vsock is loaded on boot
   ansible.builtin.copy:
