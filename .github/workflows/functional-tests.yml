@@ -1241,6 +1241,66 @@ jobs:
       #   if: failure()
       #   name: Cancel entire workflow on failure
 
+  # Multi-node collection-based equivalents of functional_matrix_merge. These
+  # deploy via the shakenfist.shakenfist ansible collection (the reusable
+  # smoke-cluster workflow) instead of getsf, with the topology's add_host
+  # capability groups driving node roles. They are expensive multi-node deploys,
+  # so for now they only run on workflow_dispatch (manual validation) and in the
+  # merge queue -- NOT on pull_request. Step 4 of the remove-primary phase-6
+  # step-6 plan repoints the required-status gates onto these jobs and retires
+  # the getsf functional_matrix_merge job above.
+  functional_matrix_merge_collection:
+    name: "${{ matrix.merge.name }} (collection)"
+    if: github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        merge: [
+          {
+            name: 'Debian 12 cluster',
+            base_image: 'sf://label/ci-images/debian-12',
+            base_image_user: 'debian',
+            topology: 'slim-primary',
+            concurrency: 5,
+            stestr_config: 'cluster-ci.conf'
+          },
+          {
+            name: 'Ubuntu 24.04 cluster',
+            base_image: 'sf://label/ci-images/ubuntu-2404',
+            base_image_user: 'ubuntu',
+            topology: 'slim-primary',
+            concurrency: 5,
+            stestr_config: 'cluster-ci.conf'
+          },
+          {
+            name: 'Guests',
+            base_image: 'sf://label/ci-images/debian-12',
+            base_image_user: 'debian',
+            topology: 'slim-primary',
+            concurrency: 5,
+            stestr_config: 'guest-ci.conf'
+          },
+          {
+            name: 'Debian 12 tier',
+            base_image: 'sf://label/ci-images/debian-12',
+            base_image_user: 'debian',
+            topology: 'slim-tier',
+            concurrency: 5,
+            stestr_config: 'cluster-ci.conf'
+          }
+        ]
+    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    secrets: inherit
+    with:
+      component: shakenfist
+      component_ref: ${{ github.sha }}
+      tier: full
+      topology: ${{ matrix.merge.topology }}
+      base_image: ${{ matrix.merge.base_image }}
+      base_image_user: ${{ matrix.merge.base_image_user }}
+      stestr_config: ${{ matrix.merge.stestr_config }}
+      test_concurrency: ${{ matrix.merge.concurrency }}
+
   # Display the most common exception found in merge queue tests.
   # This job does NOT attempt to fix the exception - it only displays it for
   # visibility. Fixes should be made in the PR stage, not the merge queue.

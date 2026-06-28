@@ -379,3 +379,54 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
+  # Collection-based equivalents of functional_matrix. These deploy via the
+  # shakenfist.shakenfist ansible collection (the reusable smoke-cluster
+  # workflow) instead of getsf, with the topology's add_host capability groups
+  # driving node roles. They run alongside the getsf job on the same triggers
+  # (schedule / workflow_dispatch).
+  functional_matrix_collection:
+    name: "${{ matrix.os.description }} (collection)"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [
+          {
+            description: 'develop branch on debian 12 single machine',
+            base_image: 'sf://label/ci-images/debian-12',
+            base_image_user: 'debian',
+            topology: 'localhost',
+            tier: 'smoke',
+            concurrency: 3,
+            stestr_config: 'cluster-ci.conf'
+          },
+          {
+            description: 'develop branch on debian 12 cluster',
+            base_image: 'sf://label/ci-images/debian-12',
+            base_image_user: 'debian',
+            topology: 'slim-primary',
+            tier: 'full',
+            concurrency: 5,
+            stestr_config: 'cluster-ci.conf'
+          },
+          {
+            description: 'develop branch on ubuntu 24.04 cluster',
+            base_image: 'sf://label/ci-images/ubuntu-2404',
+            base_image_user: 'ubuntu',
+            topology: 'slim-primary',
+            tier: 'full',
+            concurrency: 5,
+            stestr_config: 'cluster-ci.conf'
+          }
+        ]
+    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    secrets: inherit
+    with:
+      component: shakenfist
+      component_ref: ${{ github.sha }}
+      tier: ${{ matrix.os.tier }}
+      topology: ${{ matrix.os.topology }}
+      base_image: ${{ matrix.os.base_image }}
+      base_image_user: ${{ matrix.os.base_image_user }}
+      stestr_config: ${{ matrix.os.stestr_config }}
+      test_concurrency: ${{ matrix.os.concurrency }}
+
