@@ -392,6 +392,7 @@ jobs:
         os: [
           {
             description: 'develop branch on debian 12 single machine',
+            job_name: 'develop-debian-12-localhost',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
             topology: 'localhost',
@@ -401,6 +402,7 @@ jobs:
           },
           {
             description: 'develop branch on debian 12 cluster',
+            job_name: 'develop-debian-12-slim-primary',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
             topology: 'slim-primary',
@@ -410,6 +412,7 @@ jobs:
           },
           {
             description: 'develop branch on ubuntu 24.04 cluster',
+            job_name: 'develop-ubuntu-2404-slim-primary',
             base_image: 'sf://label/ci-images/ubuntu-2404',
             base_image_user: 'ubuntu',
             topology: 'slim-primary',
@@ -429,4 +432,5 @@ jobs:
       base_image_user: ${{ matrix.os.base_image_user }}
       stestr_config: ${{ matrix.os.stestr_config }}
       test_concurrency: ${{ matrix.os.concurrency }}
+      concurrency_key: ${{ matrix.os.job_name }}
 

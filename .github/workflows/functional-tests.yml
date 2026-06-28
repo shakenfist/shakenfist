@@ -1258,6 +1258,7 @@ jobs:
         merge: [
           {
             name: 'Debian 12 cluster',
+            job_name: 'debian-12-slim-primary',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
             topology: 'slim-primary',
@@ -1266,6 +1267,7 @@ jobs:
           },
           {
             name: 'Ubuntu 24.04 cluster',
+            job_name: 'ubuntu-2404-slim-primary',
             base_image: 'sf://label/ci-images/ubuntu-2404',
             base_image_user: 'ubuntu',
             topology: 'slim-primary',
@@ -1274,6 +1276,7 @@ jobs:
           },
           {
             name: 'Guests',
+            job_name: 'guests',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
             topology: 'slim-primary',
@@ -1282,6 +1285,7 @@ jobs:
           },
           {
             name: 'Debian 12 tier',
+            job_name: 'debian-12-slim-tier',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
             topology: 'slim-tier',
@@ -1300,6 +1304,7 @@ jobs:
       base_image_user: ${{ matrix.merge.base_image_user }}
       stestr_config: ${{ matrix.merge.stestr_config }}
       test_concurrency: ${{ matrix.merge.concurrency }}
+      concurrency_key: ${{ matrix.merge.job_name }}
 
   # Display the most common exception found in merge queue tests.
   # This job does NOT attempt to fix the exception - it only displays it for
