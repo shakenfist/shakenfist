@@ -173,12 +173,14 @@
              | map('int')
              | min }}
 
-    # Per-host RAM reservation default: 10% of system RAM, floored at 2048 MB.
+    # Per-host RAM reservation default: 10% of system RAM, floored at 2 GB.
+    # RAM_SYSTEM_RESERVATION is in GB (the scheduler multiplies it by 1024 to
+    # get MB), so this must be computed in GB -- ansible_memtotal_mb is in MB.
     # The operator may override ram_system_reservation in group_vars; this only
     # fills in a sensible per-host default when it is not set.
     - name: Default the RAM system reservation from this host's memory
       ansible.builtin.set_fact:
-        ram_system_reservation: "{{ [2048, (ansible_memtotal_mb * 0.1) | int] | max }}"
+        ram_system_reservation: "{{ [2.0, (ansible_memtotal_mb / 1024.0 * 0.1) | round(2)] | max }}"
       when: ram_system_reservation is not defined
 
 
