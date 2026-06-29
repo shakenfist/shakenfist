@@ -220,6 +220,7 @@
   {%- if spice_debug -%}
     <qemu:env name='G_MESSAGES_DEBUG' value='all'/>
   {%- endif -%}
+  <qemu:env name='GST_REGISTRY_FORK' value='no'/>
   {%- for extra in extracommands %}
     <qemu:arg value='{{extra}}'/>
   {%- endfor %}
