@@ -8998,6 +8998,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-completed-eframe-035-bump-pr-131" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: COMPLETED (eframe 0.35 bump, PR #131)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9168,6 +9179,27 @@
 
 
 <h1 id="egui-eframe-034-follow-up-cleanup">egui / eframe 0.34 follow-up cleanup<a class="headerlink" href="#egui-eframe-034-follow-up-cleanup" title="Permanent link">&para;</a></h1>
+<h2 id="status-completed-eframe-035-bump-pr-131">Status: COMPLETED (eframe 0.35 bump, PR #131)<a class="headerlink" href="#status-completed-eframe-035-bump-pr-131" title="Permanent link">&para;</a></h2>
+<p>The deprecated-API cleanup this plan describes was carried out as
+part of the eframe 0.34 → 0.35 upgrade, because 0.35 <em>removed</em> the
+APIs that 0.34 only deprecated. Done in <code>ryll/src/app.rs</code>:</p>
+<ul>
+<li><code>TopBottomPanel</code>/<code>SidePanel</code> → unified <code>Panel</code> (<code>Panel::top</code> /
+  <code>::bottom</code> / <code>::left</code> / <code>::right</code>); <code>default_width</code> → <code>default_size</code>.</li>
+<li>Every panel <code>show(ctx, …)</code> → <code>show(ui, …)</code>, fed by the root <code>&amp;mut Ui</code>
+  from <code>App::ui</code>; <code>ctx</code> is now a borrow of a cloned (Arc-backed)
+  <code>Context</code> so the remaining <code>Window::show(ctx, …)</code> and <code>ctx.method()</code>
+  sites are unchanged. <code>Window</code>s still take <code>&amp;Context</code>.</li>
+<li><code>show_animated(ctx, bool, …)</code> → <code>show_collapsible(ui, &amp;mut bool, …)</code>.</li>
+<li><code>Frame::none()</code> → <code>Frame::NONE</code>; <code>ctx.style()</code> →
+  <code>ctx.style_of(ctx.theme())</code>; <code>InputState::screen_rect()</code> →
+  <code>viewport_rect()</code>; <code>Context::wants_pointer_input()</code> →
+  <code>egui_wants_pointer_input()</code>; <code>menu::menu_button(ui, …)</code> →
+  <code>ui.menu_button(…)</code>; <code>Ui::close_menu()</code> → <code>Ui::close()</code>.</li>
+<li>The module-wide <code>#![allow(deprecated)]</code> shim was removed; clippy
+  passes under <code>-D warnings</code> with no remaining deprecated usage.</li>
+</ul>
+<p>The historical analysis below is retained for context.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the ryll codebase thoroughly. Read relevant
