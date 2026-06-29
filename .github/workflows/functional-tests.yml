@@ -1306,6 +1306,28 @@ jobs:
       test_concurrency: ${{ matrix.merge.concurrency }}
       concurrency_key: ${{ matrix.merge.job_name }}
 
+  # Collection-based equivalent of the getsf `ansible_modules` job below. It
+  # deploys via the reusable smoke-cluster workflow (slim-primary) and runs the
+  # native-module lifecycle suite (ansiblemoduletests.sh) against the installed
+  # shakenfist.shakenfist collection. Runs alongside the getsf ansible_modules
+  # job under the strangler-fig migration; it is NOT yet in the can_merge gate.
+  # Step 4 of the remove-primary phase-6 step-6 plan retires the getsf job and
+  # the operator repoints the required-status gate onto this one.
+  ansible_modules_collection:
+    name: "Ansible modules (collection)"
+    if: github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
+    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    secrets: inherit
+    with:
+      component: shakenfist
+      component_ref: ${{ github.sha }}
+      tier: full
+      topology: slim-primary
+      base_image: 'sf://label/ci-images/debian-12'
+      base_image_user: debian
+      test_kind: ansible-modules
+      concurrency_key: ansible-modules
+
   # Display the most common exception found in merge queue tests.
   # This job does NOT attempt to fix the exception - it only displays it for
   # visibility. Fixes should be made in the PR stage, not the merge queue.
