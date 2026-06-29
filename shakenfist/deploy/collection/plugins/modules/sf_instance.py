@@ -382,10 +382,16 @@ def _check_instance(client, existing, params, log):
             kwarg = 'force_placement' if key == 'placement' else key
             instance_kwargs[kwarg] = params[key]
 
-    # Optional list-of-strings values.
+    # Optional list-of-strings values. Normalise both sides through `or []` so
+    # an instance with no side channels (the API reports the field as None)
+    # compares equal to an unset request (which defaults to []). Without this
+    # the comparison is perpetually dirty, which forces a needless
+    # delete-and-recreate on every "ensure present" -- breaking idempotency and,
+    # for an instance with a static address, failing the recreate with a 409
+    # because the address is still reserved by the instance being replaced.
     for key in ['side_channels']:
         values = params.get(key) or []
-        if existing.get(key) != values:
+        if (existing.get(key) or []) != values:
             log.append('Instance dirty: %s has changed' % key)
             dirty = True
         instance_kwargs[key] = values
