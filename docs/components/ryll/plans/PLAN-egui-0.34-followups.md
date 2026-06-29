@@ -1,5 +1,28 @@
 # egui / eframe 0.34 follow-up cleanup
 
+## Status: COMPLETED (eframe 0.35 bump, PR #131)
+
+The deprecated-API cleanup this plan describes was carried out as
+part of the eframe 0.34 → 0.35 upgrade, because 0.35 *removed* the
+APIs that 0.34 only deprecated. Done in `ryll/src/app.rs`:
+
+- `TopBottomPanel`/`SidePanel` → unified `Panel` (`Panel::top` /
+  `::bottom` / `::left` / `::right`); `default_width` → `default_size`.
+- Every panel `show(ctx, …)` → `show(ui, …)`, fed by the root `&mut Ui`
+  from `App::ui`; `ctx` is now a borrow of a cloned (Arc-backed)
+  `Context` so the remaining `Window::show(ctx, …)` and `ctx.method()`
+  sites are unchanged. `Window`s still take `&Context`.
+- `show_animated(ctx, bool, …)` → `show_collapsible(ui, &mut bool, …)`.
+- `Frame::none()` → `Frame::NONE`; `ctx.style()` →
+  `ctx.style_of(ctx.theme())`; `InputState::screen_rect()` →
+  `viewport_rect()`; `Context::wants_pointer_input()` →
+  `egui_wants_pointer_input()`; `menu::menu_button(ui, …)` →
+  `ui.menu_button(…)`; `Ui::close_menu()` → `Ui::close()`.
+- The module-wide `#![allow(deprecated)]` shim was removed; clippy
+  passes under `-D warnings` with no remaining deprecated usage.
+
+The historical analysis below is retained for context.
+
 ## Prompt
 
 Before responding to questions or discussion points in this
