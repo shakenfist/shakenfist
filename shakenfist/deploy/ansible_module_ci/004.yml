@@ -136,7 +136,7 @@
 
     - name: Assert we have instance details
       assert:
-        that: ci_instance['meta']
+        that: ci_instance['meta'] | default({}, true) | length > 0
         fail_msg: "meta should be populated in {{ ci_instance }}"
 
     # NOTE(mikal): we need to change the IP address here as well, otherwise we
