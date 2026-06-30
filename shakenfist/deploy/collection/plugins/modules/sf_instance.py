@@ -265,7 +265,9 @@ def _check_instance(client, existing, params, log):
                 raise InstanceCreationException(
                     'network specification should be key=value not %s' % elem)
             if s[0] == 'float':
-                s[1] = bool(s[1])
+                # The value arrives as a string; bool('False') is truthy, so
+                # parse the common boolean spellings explicitly.
+                s[1] = str(s[1]).strip().lower() in ('true', '1', 'yes')
             defn[s[0]] = s[1]
         requested_networks.append(defn)
 
@@ -278,7 +280,11 @@ def _check_instance(client, existing, params, log):
             'macaddress': iface['macaddr'],
             'address': iface['ipv4'],
             'model': iface['model'],
-            'float': iface['floating']
+            # The API reports 'floating' as the allocated floating address (a
+            # string) or None, but a networkspec requests float as a boolean.
+            # Normalise to a bool so "has a floating IP" compares equal to a
+            # requested float=True, rather than being perpetually dirty.
+            'float': bool(iface['floating'])
         })
     if len(existing_interfaces) != len(requested_networks):
         log.append('Instance dirty: the number of interfaces changed')
