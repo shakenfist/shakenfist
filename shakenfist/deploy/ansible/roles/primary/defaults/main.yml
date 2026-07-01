@@ -1,9 +1,0 @@
-# cluster_config
-mariadb_gateway_hosts:
-  - "127.0.0.1"
-auth_secret: "unknown"
-ram_system_reservation: 5
-lowest_mtu: 1500
-dns_server: "8.8.8.8"
-http_proxy: ""
-extra_config: "{{ extra_config }}"

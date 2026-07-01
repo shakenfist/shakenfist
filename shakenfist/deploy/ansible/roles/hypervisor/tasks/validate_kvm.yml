@@ -1,3 +1,0 @@
----
-- name: Check that we can run KVM
-  shell: kvm-ok

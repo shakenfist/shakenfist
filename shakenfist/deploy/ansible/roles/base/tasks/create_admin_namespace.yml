@@ -1,8 +1,0 @@
----
-- name: Create an admin namespace called "system" with one key configured
-  shell: |
-    /srv/shakenfist/venv/bin/sf-ctl \
-        bootstrap-system-key deploy {{ system_key }}
-  environment:
-    SHAKENFIST_NODE_MESH_IP: "{{ node_mesh_ip }}"
-  run_once: true
