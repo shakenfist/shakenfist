@@ -1941,6 +1941,278 @@ jobs:
       #   if: failure()
       #   name: Cancel entire workflow on failure
 
+  # Collection-based equivalent of the getsf node_lifecycle job above. The node
+  # lifecycle suite (nodelifecycletests.sh) only needs a deployed cluster and
+  # the sf-client in /srv/shakenfist/venv, so this reuses node_lifecycle's
+  # bespoke teardown (it powers nodes off, hence the under-cloud restart,
+  # ServerAlive ssh and node-lifecycle log tag) and swaps only the deploy from
+  # getsf to the collection. It does not fit the reusable smoke-cluster workflow
+  # because that workflow's standard teardown assumes every node stays up.
+  # Runs alongside the getsf node_lifecycle job under the strangler-fig
+  # migration and is NOT yet in the can_merge gate; step 4 of the remove-primary
+  # phase-6 step-6 plan retires the getsf job and repoints the gate here.
+  node_lifecycle_collection:
+    name: "Node lifecycle (collection)"
+    if: >-
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
+      && needs.check_paths.outputs.code_changed != 'false'
+    needs: [check_paths]
+    runs-on: [self-hosted, vm, debian-12]
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-nodelifecycle-collection
+      cancel-in-progress: true
+
+    steps:
+      - name: Setup test environment
+        uses: shakenfist/actions/setup-test-environment@main
+
+      - name: Build infrastructure
+        run: |
+          cd ${GITHUB_WORKSPACE}/actions
+          ansible-playbook -i /home/debian/ansible-hosts \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
+              base_image=sf://label/ci-images/debian-12 base_image_user=debian" \
+              ansible/ci-topology-slim-primary.yml
+
+          nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
+          random_index=$(( RANDOM % 5 ))
+          echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
+
+      - name: Log environmental configuration
+        run: |
+          echo "## ci-environment.sh"
+          cat ${GITHUB_WORKSPACE}/ci-environment.sh
+          echo
+          echo "## Environment variables"
+          echo "SF_HEAD_SHA = ${SF_HEAD_SHA}"
+          echo "SHAKENFIST_NAMESPACE = ${SHAKENFIST_NAMESPACE}"
+          echo "UPLOAD_TARGET = ${UPLOAD_TARGET}"
+
+      - name: Copy CI tools to primary
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null -rp tools \
+              debian@$primary:.
+
+      - name: Install BYO MariaDB on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/bootstrap-mariadb.sql \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-mariadb.sh \
+              ${GITHUB_WORKSPACE}/shakenfist/examples/mariadb-tuning.cnf \
+              debian@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@${primary} \
+              'sudo bash /tmp/ci-install-mariadb.sh \
+                   /tmp/bootstrap-mariadb.sql \
+                   /tmp/mariadb-tuning.cnf \
+                   citestpw'
+
+      - name: Install Loki on primary
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-loki.sh \
+              debian@${primary}:/tmp/
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@${primary} \
+              'sudo bash /tmp/ci-install-loki.sh'
+
+      - name: Generate the deploy inventory
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          # OpenSSH refuses to use a private key with group/other permissions,
+          # so copy the shared key to a private-perms path for the inventory.
+          install -m 600 /srv/github/id_ci /tmp/ci_id_key
+
+          python3 ${GITHUB_WORKSPACE}/actions/tools/ci-make-inventory.py \
+              --facts-file /srv/github/ci-topology-facts.json \
+              --ssh-user debian \
+              --ssh-key /tmp/ci_id_key \
+              --output /srv/github/ci-inventory.yaml
+
+          echo "====="
+          cat /srv/github/ci-inventory.yaml
+
+      - name: Deploy Shaken Fist via the collection
+        timeout-minutes: 45
+        env:
+          http_proxy: http://192.168.1.15:3128
+          https_proxy: http://192.168.1.15:3128
+          no_proxy: localhost,127.0.0.1,10.0.0.0/8
+          PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+
+          # MariaDB and Loki run only on the primary; multi-node nodes must
+          # reach them on the primary's mesh IP (read from the topology facts),
+          # since 127.0.0.1 would point every node at its own absent services.
+          primary_mesh=$(python3 -c "import json; d = json.load(open('/srv/github/ci-topology-facts.json')); print([n['mesh_ip'] for n in d['nodes'] if n['name'] == 'primary'][0])")
+
+          ${GITHUB_WORKSPACE}/actions/tools/deploy-collection.sh \
+              /srv/github/ci-inventory.yaml \
+              citestpw \
+              ci-auth-secret-do-not-use-in-production-ci-auth-secret \
+              ci-system-key-do-not-use-in-production-ci-system-key \
+              "http://${primary_mesh}:3100" \
+              "${primary_mesh}"
+
+      - name: Wait for the cluster to become schedulable
+        run: |
+          set +e
+
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary 'sudo chmod ugo+r /etc/sf/*'
+
+          count=0
+          while [ $count -lt 60 ]
+          do
+            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/python3 -' \
+              < ${GITHUB_WORKSPACE}/shakenfist/tools/ci_wait_schedulable.py
+            if [ $? == 0 ]; then
+              exit 0
+            fi
+
+            count=$(( $count + 1 ))
+            sleep 5
+          done
+
+          exit 1
+
+      - name: Import cached images
+        run: |
+          set -e
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
+          setup="${setup} . /etc/sf/sfrc;"
+          setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
+          setup="${setup} /srv/shakenfist/venv/bin/sf-client artifact upload"
+
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@${UPLOAD_TARGET} \
+              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
+
+      - name: Run node lifecycle tests
+        timeout-minutes: 60
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/shakenfist \
+              debian@$primary:shakenfist
+          # ServerAliveInterval/ServerAliveCountMax: if the remote host
+          # goes down (e.g. the lifecycle test does `poweroff --force
+          # --force` on a victim that turns out to be the script's own
+          # host), the TCP connection can sit half-open until the default
+          # TCP keepalive eventually times out -- hours later, well past
+          # the GitHub step budget. With these options ssh notices a dead
+          # connection in roughly 30 s and the step fails fast instead.
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ServerAliveInterval=10 -o ServerAliveCountMax=3 \
+              debian@$primary "cd shakenfist/shakenfist/deploy; . /etc/sf/sfrc; bash nodelifecycletests.sh"
+
+      - name: Check logs
+        id: check_logs
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} "sudo bash tools/ci_log_checks_loki.sh develop node-lifecycle"
+
+      - name: Dump systemd state and journals
+        if: always() && steps.check_logs.outcome == 'failure'
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/actions
+          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager' || true
+
+      - name: Restart Shaken Fist nodes so we can collect logs
+        if: always()
+        run: |
+          set -x
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          # The sf{N}_uuid values are under-cloud instance UUIDs, so the
+          # reboot has to be issued against the under-cloud's API. The
+          # GitHub runner already has under-cloud sf-client credentials
+          # (the topology playbooks use sf_instance from here). Don't
+          # let one failed reboot abort the rest of the loop -- we want
+          # all five attempted before log collection. The lifecycle test
+          # powers its maintainer victim off entirely (`poweroff --force
+          # --force` exits the QEMU domain), and reboot is not valid for
+          # a powered-off instance, so fall back to poweron.
+          for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
+              sf-client instance reboot --hard ${node} || \
+                  sf-client instance poweron ${node} || true
+          done
+          sleep 90
+
+      - name: Per-node system-level checks
+        if: always()
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
+          chown -R debian.debian /home/debian/.ssh
+          ansible-playbook -i /srv/github/ci-inventory.yaml \
+              --extra-vars "base_image_user=debian node_checks_job_name=node-lifecycle ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-node-checks.yml
+
+      - name: Gather logs
+        if: always()
+        run: |
+          # We need the ssh key in the place ansible expects it to be, which isn't
+          # true on the CI worker node.
+          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
+          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
+          chown -R debian.debian /home/debian/.ssh
+
+          ansible-playbook -i /srv/github/ci-inventory.yaml \
+              --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs-loki.yml
+
+      - name: Capture py-spy thread dumps
+        if: always()
+        continue-on-error: true
+        run: |
+          ansible-playbook -i /srv/github/ci-inventory.yaml \
+              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
+              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
+
+      - name: Bundle artifacts
+        if: always()
+        run: |
+          cd /srv/github
+          sudo chown -R debian:debian /srv/github
+          sudo find . -ls
+          echo
+          mkdir -p /srv/github/artifacts /srv/github/bundle
+          zip -rq artifacts/bundle.zip bundle/* || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bundle-functional-node-lifecycle-collection
+          retention-days: 90
+          if-no-files-found: error
+          path: /srv/github/artifacts/bundle.zip
+
   can_see_status:
     name: "Can see status"
     runs-on: [self-hosted, static]
