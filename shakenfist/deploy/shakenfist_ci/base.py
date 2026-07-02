@@ -23,14 +23,6 @@ TRACE_PATH = '/srv/ci/traces'
 
 CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
 
-# The client defaults agent-command awaits to 120s. On a busy multi-node
-# under-cloud (the slim-primary / slim-tier CI topologies) the per-instance
-# agent operation queue can take longer than that to drain, which surfaced as
-# an intermittent AgentAwaitTimeout with the operation still 'queued' while the
-# agent reported 'ready'. Give the CI awaits generous headroom so under-cloud
-# contention does not read as a test failure.
-AGENT_COMMAND_TIMEOUT = 300
-
 
 class TimeoutException(Exception):
     pass
@@ -162,7 +154,7 @@ class BaseTestCase(testtools.TestCase):
     def _cloud_init_health_check_json(self, instance_uuid):
         exit_code, data = self.system_client.await_agent_command(
             instance_uuid, 'cloud-init status --wait --format json',
-            exit_codes=[0, 1, 2], timeout=AGENT_COMMAND_TIMEOUT)
+            exit_codes=[0, 1, 2])
 
         j = json.loads(data)
 
@@ -209,7 +201,7 @@ class BaseTestCase(testtools.TestCase):
     def _cloud_init_health_check_older(self, instance_uuid):
         exit_code, data = self.system_client.await_agent_command(
             instance_uuid, 'cloud-init status --wait --long',
-            exit_codes=[0, 1, 2], timeout=AGENT_COMMAND_TIMEOUT)
+            exit_codes=[0, 1, 2])
         if exit_code == 0:
             self._emit_tracing_event({
                 'msg': 'Instance ready (cloud-init status)',
@@ -241,7 +233,7 @@ class BaseTestCase(testtools.TestCase):
         # Probe to determine if cloud-init supports JSON output...
         exit_code, data = self.system_client.await_agent_command(
             instance_uuid, 'cloud-init status --format json 2> /dev/null',
-            exit_codes=[0, 1, 2], timeout=AGENT_COMMAND_TIMEOUT)
+            exit_codes=[0, 1, 2])
         has_json = exit_code == 0
         self._emit_tracing_event({
             'msg': 'cloud-init JSON support probe',
@@ -285,8 +277,7 @@ class BaseTestCase(testtools.TestCase):
                          '/var/log/syslog']:
             try:
                 _, data = self.system_client.await_agent_command(
-                    instance_uuid, f'tail -50 {log_file}',
-                    timeout=AGENT_COMMAND_TIMEOUT)
+                    instance_uuid, f'tail -50 {log_file}')
                 self._emit_tracing_event({
                     'msg': f'Debug data from {log_file}',
                     'data': data
