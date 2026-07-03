@@ -293,7 +293,8 @@ jobs:
             base_image_user: 'debian',
             topology: 'slim-primary',
             concurrency: 5,
-            stestr_config: 'cluster-ci.conf'
+            stestr_config: 'cluster-ci.conf',
+            timeout_minutes: 45
           },
           {
             name: 'Ubuntu 24.04 cluster',
@@ -302,7 +303,8 @@ jobs:
             base_image_user: 'ubuntu',
             topology: 'slim-primary',
             concurrency: 5,
-            stestr_config: 'cluster-ci.conf'
+            stestr_config: 'cluster-ci.conf',
+            timeout_minutes: 45
           },
           {
             name: 'Guests',
@@ -311,16 +313,22 @@ jobs:
             base_image_user: 'debian',
             topology: 'slim-primary',
             concurrency: 5,
-            stestr_config: 'guest-ci.conf'
+            stestr_config: 'guest-ci.conf',
+            timeout_minutes: 45
           },
           {
+            # slim-tier runs the same cluster suite on roughly half
+            # slim-primary's hypervisor capacity, so it needs more wall-clock
+            # headroom under under-cloud contention: the suite passes, it
+            # just runs slower (observed 30-50 minutes depending on load).
             name: 'Debian 12 tier',
             job_name: 'debian-12-slim-tier',
             base_image: 'sf://label/ci-images/debian-12',
             base_image_user: 'debian',
             topology: 'slim-tier',
             concurrency: 5,
-            stestr_config: 'cluster-ci.conf'
+            stestr_config: 'cluster-ci.conf',
+            timeout_minutes: 70
           }
         ]
     uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
@@ -334,6 +342,7 @@ jobs:
       base_image_user: ${{ matrix.merge.base_image_user }}
       stestr_config: ${{ matrix.merge.stestr_config }}
       test_concurrency: ${{ matrix.merge.concurrency }}
+      test_timeout_minutes: ${{ matrix.merge.timeout_minutes }}
       concurrency_key: ${{ matrix.merge.job_name }}
 
   # Native-module lifecycle CI: deploys via the reusable smoke-cluster workflow
