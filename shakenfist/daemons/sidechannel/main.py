@@ -943,13 +943,86 @@ class Monitor(daemon.Daemon):
                 EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                 'side channel monitor finished')
 
+    def _dispatch_loop(self):
+        """Dispatch queued agent operations to instances with ready agents.
+
+        This deliberately runs in its own thread, separate from the monitor
+        management loop in _run_inner(). Both loops make calls that can stall
+        for a long time without raising -- libvirt domain audits, and gRPC
+        database reads whose deadline-and-retry cascade can silently consume
+        ~90 seconds per call when a channel subchannel wedges (the gRPC
+        channel is thread-local, so a wedge affects exactly one thread).
+        When dispatch shared the monitor loop's thread, any such stall
+        starved agent operation dispatch for every instance on the node,
+        which presented as an operation stuck in the queued state while the
+        instance's agent was ready. In its own thread (and therefore with
+        its own gRPC channel), dispatch is isolated from monitor management
+        stalls, and vice versa.
+        """
+        util_concurrency.set_thread_name('dispatcher')
+        LOG.info('Dispatcher starting')
+
+        while daemon.check_abort_path(self.abort_path):
+            try:
+                self.reap_instance_executors()
+
+                # Run jobs for healthy instances. For now we only support
+                # running one job at once per instance.
+                for instance_uuid in list(self.monitors.keys()):
+                    if instance_uuid in self.executors:
+                        continue
+
+                    # Rate limit executor starts per instance. A failed
+                    # dispatch (the executor couldn't connect, or the
+                    # agent never welcomed us) leaves the operation at
+                    # the head of the queue, so we would otherwise retry
+                    # every loop iteration.
+                    last_attempt = self.executor_attempts.get(
+                        instance_uuid, 0)
+                    if time.time() - last_attempt < 5:
+                        continue
+
+                    # The monitor management loop can remove entries while
+                    # we iterate our snapshot, so fetch defensively.
+                    monitor = self.monitors.get(instance_uuid)
+                    if not monitor:
+                        continue
+                    ready = monitor['object'].instance_ready
+                    if ready not in [constants.AGENT_READY,
+                                     constants.AGENT_READY_DEGRADED]:
+                        continue
+
+                    inst = instance.Instance.from_db(instance_uuid)
+                    if not inst:
+                        continue
+
+                    agentop = inst.agent_operation_next()
+                    if agentop:
+                        inst.add_event(
+                            EVENT_TYPE_AUDIT, 'dispatching agent operation',
+                            extra={'agentoperation': agentop.uuid})
+
+                        self.start_instance_executor(
+                            instance_uuid, agentop)
+
+                time.sleep(1)
+
+            except Exception as e:
+                util_exceptions.ignore_exception('side channel dispatcher', e)
+                time.sleep(1)
+
+        LOG.info('Dispatcher stopping')
+
     def _run_inner(self):
+        dispatcher = threading.Thread(
+            target=self._dispatch_loop, daemon=True, name='dispatcher')
+        dispatcher.start()
+
         while daemon.check_abort_path(self.abort_path):
             try:
                 self.wait_for_nodelock()
 
                 self.reap_instance_monitors()
-                self.reap_instance_executors()
 
                 if not os.path.exists(self.abort_path):
                     # Audit desired self.monitors
@@ -985,40 +1058,6 @@ class Monitor(daemon.Daemon):
                     for instance_uuid in extra_instances:
                         self._request_thread_exit(
                             instance_uuid, self.monitors[instance_uuid])
-
-                    # Run jobs for healthy instances. For now we only support
-                    # running one job at once.
-                    for instance_uuid in list(self.monitors.keys()):
-                        if instance_uuid in self.executors:
-                            continue
-
-                        # Rate limit executor starts per instance. A failed
-                        # dispatch (the executor couldn't connect, or the
-                        # agent never welcomed us) leaves the operation at
-                        # the head of the queue, so we would otherwise retry
-                        # every loop iteration.
-                        last_attempt = self.executor_attempts.get(
-                            instance_uuid, 0)
-                        if time.time() - last_attempt < 5:
-                            continue
-
-                        inst = instance.Instance.from_db(instance_uuid)
-                        if not inst:
-                            continue
-
-                        ready = self.monitors[instance_uuid]['object'].instance_ready
-                        if ready not in [constants.AGENT_READY,
-                                         constants.AGENT_READY_DEGRADED]:
-                            continue
-
-                        agentop = inst.agent_operation_next()
-                        if agentop:
-                            inst.add_event(
-                                EVENT_TYPE_AUDIT, 'dispatching agent operation',
-                                extra={'agentoperation': agentop.uuid})
-
-                            self.start_instance_executor(
-                                instance_uuid, agentop)
 
                     self.idle(1)
 
