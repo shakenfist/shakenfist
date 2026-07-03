@@ -13,6 +13,7 @@ from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.config import SFConfig
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
@@ -503,3 +504,113 @@ class InstancesTestCase(base.ShakenFistTestCase):
             uuids.append(str(i.uuid))
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
+
+
+class AgentOperationQueueTestCase(base.ShakenFistTestCase):
+    """Regression tests for the crash-safe agent operation dispatch queue.
+
+    agent_operation_next() must never lose an operation: a queued head is
+    returned but left on the queue (the entry is only retired once the
+    operation has provably left the queued state), and finished or invalid
+    heads must not wedge the queue.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_instance('cirros', self.instance_uuid)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+    def _make_agentop(self, state=None):
+        op = AgentOperation.new(
+            str(uuid.uuid4()), 'unittest', self.instance_uuid,
+            [{'command': 'execute', 'commandline': 'true'}])
+        if state:
+            op.state = state
+        self.inst.agent_operation_enqueue(op.uuid)
+        return op
+
+    def _queue(self):
+        return self.inst.agent_operations.get('queue', [])
+
+    def test_next_empty_queue(self):
+        self.assertIsNone(self.inst.agent_operation_next())
+
+    def test_next_returns_queued_head_without_popping(self):
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        # The head is returned, but stays at the head of the queue: if the
+        # dispatcher dies before delivering it, a later call must be able to
+        # return it again.
+        self.assertEqual(
+            str(op1.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual([str(op1.uuid), str(op2.uuid)], self._queue())
+        self.assertEqual(
+            str(op1.uuid), str(self.inst.agent_operation_next().uuid))
+
+    def test_next_retires_finished_head(self):
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        # Once the head has left the queued state it is lazily popped and
+        # the next operation dispatched.
+        op1.state = AgentOperation.STATE_EXECUTING
+        op1.state = AgentOperation.STATE_COMPLETE
+
+        self.assertEqual(
+            str(op2.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual([str(op2.uuid)], self._queue())
+
+    def test_next_retires_errored_head(self):
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        # An errored head must not block the queue forever.
+        op1.state = baseobject.DatabaseBackedObject.STATE_ERROR
+
+        self.assertEqual(
+            str(op2.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual([str(op2.uuid)], self._queue())
+
+    def test_next_waits_for_initial_head(self):
+        op1 = self._make_agentop()
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        # The head is still being enqueued by the API (state initial), so
+        # nothing is dispatchable yet -- order is preserved.
+        self.assertIsNone(self.inst.agent_operation_next())
+        self.assertEqual([str(op1.uuid), str(op2.uuid)], self._queue())
+
+        # Once the API finishes, the head dispatches.
+        op1.state = AgentOperation.STATE_QUEUED
+        self.assertEqual(
+            str(op1.uuid), str(self.inst.agent_operation_next().uuid))
+
+    def test_next_retires_invalid_head(self):
+        self.inst.agent_operation_enqueue(str(uuid.uuid4()))
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        # A queue entry with no backing operation is retired, not returned.
+        self.assertEqual(
+            str(op2.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual([str(op2.uuid)], self._queue())

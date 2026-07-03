@@ -309,6 +309,7 @@ class SideChannelExecutorJob(SideChannelJob):
         self.chunk_iterator = None
 
         self.ready = False
+        self.welcomed = False
         self.log = LOG.with_fields({
             'instance': self.instance.uuid,
             'agent_operation': self.agentop.uuid
@@ -329,6 +330,7 @@ class SideChannelExecutorJob(SideChannelJob):
             'outstanding_messages': self.outstanding_message_count
         }).debug('...agent welcome')
         self.ready = True
+        self.welcomed = True
 
     def _dispatch_execute(self, command_id, cmd):
         request = agent_pb2.HypervisorToAgentCommand(
@@ -636,9 +638,22 @@ class SideChannelExecutorJob(SideChannelJob):
             ]
         )
         self.last_data = time.time()
+        connected_at = time.time()
 
         buffered = bytearray()
         while daemon.check_abort_path(self.abort_path):
+            # If the agent never welcomes us the connection is not going to
+            # become useful -- without this deadline we would spin here
+            # forever, holding the executor slot for this instance and so
+            # blocking every later operation. Exiting is safe: the operation
+            # is still at the head of the instance's queue and dispatch will
+            # be retried on a fresh connection.
+            if not self.welcomed and time.time() - connected_at > 30:
+                self.log.info(
+                    'Agent did not welcome us within 30 seconds, aborting '
+                    'executor for later retry')
+                return
+
             if time.time() - self.last_data > 2:
                 self._send_ping(vsock.sock)
                 self.last_data = time.time()
@@ -813,6 +828,7 @@ class Monitor(daemon.Daemon):
         self.monitors = {}
         self.monitor_attempts = {}
         self.executors = {}
+        self.executor_attempts = {}
 
     def start_instance_monitor(self, instance_uuid):
         # Rate limit how often we try to connect
@@ -855,6 +871,12 @@ class Monitor(daemon.Daemon):
                 del self.monitors[instance_uuid]
 
     def start_instance_executor(self, instance_uuid, agentop):
+        self.executor_attempts[instance_uuid] = time.time()
+
+        # Note that returning early here (or indeed failing anywhere between
+        # the operation being selected and the executor moving it to the
+        # executing state) is safe: the operation remains at the head of the
+        # instance's queue and will simply be dispatched again later.
         inst = instance.Instance.from_db(instance_uuid)
         if not inst:
             return
@@ -970,6 +992,16 @@ class Monitor(daemon.Daemon):
                         if instance_uuid in self.executors:
                             continue
 
+                        # Rate limit executor starts per instance. A failed
+                        # dispatch (the executor couldn't connect, or the
+                        # agent never welcomed us) leaves the operation at
+                        # the head of the queue, so we would otherwise retry
+                        # every loop iteration.
+                        last_attempt = self.executor_attempts.get(
+                            instance_uuid, 0)
+                        if time.time() - last_attempt < 5:
+                            continue
+
                         inst = instance.Instance.from_db(instance_uuid)
                         if not inst:
                             continue
@@ -979,10 +1011,10 @@ class Monitor(daemon.Daemon):
                                          constants.AGENT_READY_DEGRADED]:
                             continue
 
-                        agentop = inst.agent_operation_dequeue()
+                        agentop = inst.agent_operation_next()
                         if agentop:
                             inst.add_event(
-                                EVENT_TYPE_AUDIT, 'dequeued agent operation',
+                                EVENT_TYPE_AUDIT, 'dispatching agent operation',
                                 extra={'agentoperation': agentop.uuid})
 
                             self.start_instance_executor(

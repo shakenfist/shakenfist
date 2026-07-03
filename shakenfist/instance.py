@@ -1951,39 +1951,73 @@ class Instance(dbowo):
     def agent_operations(self):
         return self._db_get_attribute('agent_operations')
 
-    def agent_operation_dequeue(self):
+    def agent_operation_next(self):
+        """Return the next dispatchable agent operation, leaving it queued.
+
+        The queue entry is the unit of durability: an operation stays at
+        the head of the queue until it has provably left the QUEUED state
+        (the executor moved it to EXECUTING or beyond), at which point a
+        later call lazily pops it. This makes dispatch crash safe -- if
+        the sidechannel daemon or its executor thread dies between
+        selecting an operation and delivering it to the agent, the
+        operation is simply returned again by a later call, instead of
+        being orphaned in QUEUED with no queue entry (the failure mode
+        this replaces, which presented as an agent operation stuck in the
+        queued state while the instance's agent was ready).
+
+        The caller must ensure only one executor runs per instance at a
+        time -- instances are placed on exactly one hypervisor and the
+        sidechannel daemon there skips instances with a live executor, so
+        the operation being visible at the head during execution cannot
+        double dispatch.
+        """
         # First check cheaply if there are any agent operations queued. This is
         # likely to be the case 99% of the time.
         if not self._db_get_attribute('agent_operations', {}).get('queue', []):
             return None
 
         # Now do it safely with the lock held
-        with self.get_lock_attr('agent_operations', 'Dequeue agent operation'):
+        with self.get_lock_attr('agent_operations', 'Next agent operation'):
             db_data = self._db_get_attribute('agent_operations')
-            if 'queue' not in db_data:
-                db_data['queue'] = []
+            queue = db_data.get('queue', [])
 
-            if len(db_data['queue']) == 0:
-                return None
+            changed = False
+            result = None
+            while queue:
+                agentop = AgentOperation.from_db(queue[0])
+                if not agentop:
+                    # AgentOp is invalid, remove from queue and consider the
+                    # next entry.
+                    queue.pop(0)
+                    changed = True
+                    continue
 
-            agentop_uuid = db_data['queue'][0]
-            agentop = AgentOperation.from_db(agentop_uuid)
-            if not agentop:
-                # AgentOp is invalid, remove from queue and say we have nothing
-                # to do.
-                db_data['queue'] = db_data['queue'][1:]
+                state = agentop.state.value
+                if state == AgentOperation.STATE_QUEUED:
+                    # Dispatchable. Leave it on the queue -- it is retired
+                    # by a later call once it has left the QUEUED state.
+                    result = agentop
+                    break
+
+                if state in (dbo.STATE_INITIAL, AgentOperation.STATE_PREFLIGHT):
+                    # Not yet dispatchable (the API is mid-enqueue, or a
+                    # preflight task has yet to promote it). We like
+                    # maintaining order, so claim we have no work to do
+                    # right now.
+                    break
+
+                # EXECUTING, COMPLETE, ERROR or DELETED: this operation is
+                # finished with the queue. Retire the entry and consider
+                # the next one. This also unwedges a queue whose head
+                # errored or was deleted, which previously blocked the
+                # instance's queue forever.
+                queue.pop(0)
+                changed = True
+
+            if changed:
+                db_data['queue'] = queue
                 self._db_set_attribute('agent_operations', db_data)
-                return None
-
-            if agentop.state.value != AgentOperation.STATE_QUEUED:
-                # The AgentOp isn't ready, but we like maintaining this order,
-                # so claim we have no work to do right now.
-                return None
-
-            # Otherwise, we're good to go
-            db_data['queue'] = db_data['queue'][1:]
-            self._db_set_attribute('agent_operations', db_data)
-            return agentop
+            return result
 
     def agent_operation_enqueue(self, agentop_uuid):
         with self.get_lock_attr('agent_operations', 'Enqueue agent operation'):
