@@ -830,6 +830,16 @@ class Monitor(daemon.Daemon):
         self.executors = {}
         self.executor_attempts = {}
 
+        # Dispatcher liveness. The dispatch thread records the completion
+        # time of each pass; the monitor management loop supervises it and
+        # starts a replacement thread (a new generation) if passes stop
+        # completing. The generation counter lets a wedged-then-recovered
+        # old thread notice it has been replaced and exit without side
+        # effects, preserving the one-executor-per-instance invariant.
+        self.dispatcher_generation = 0
+        self.dispatcher_last_pass = time.time()
+        self.dispatcher_thread = None
+
     def start_instance_monitor(self, instance_uuid):
         # Rate limit how often we try to connect
         last_attempt = self.monitor_attempts.get(instance_uuid, 0)
@@ -943,7 +953,7 @@ class Monitor(daemon.Daemon):
                 EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                 'side channel monitor finished')
 
-    def _dispatch_loop(self):
+    def _dispatch_loop(self, generation):
         """Dispatch queued agent operations to instances with ready agents.
 
         This deliberately runs in its own thread, separate from the monitor
@@ -959,10 +969,22 @@ class Monitor(daemon.Daemon):
         its own gRPC channel), dispatch is isolated from monitor management
         stalls, and vice versa.
         """
-        util_concurrency.set_thread_name('dispatcher')
-        LOG.info('Dispatcher starting')
+        util_concurrency.set_thread_name(f'dispatcher-{generation}')
+        log = LOG.with_fields({'dispatcher_generation': generation})
+        log.info('Dispatcher starting')
 
+        last_heartbeat = time.time()
         while daemon.check_abort_path(self.abort_path):
+            # If the supervisor has replaced us (because we stopped
+            # completing passes, usually a wedged thread-local gRPC channel
+            # that swallowed a call without ever firing its deadline), exit
+            # without further side effects so we can never race the
+            # replacement into a double dispatch.
+            if generation != self.dispatcher_generation:
+                log.warning(
+                    'Dispatcher replaced by a newer generation, exiting')
+                return
+
             try:
                 self.reap_instance_executors()
 
@@ -998,12 +1020,36 @@ class Monitor(daemon.Daemon):
 
                     agentop = inst.agent_operation_next()
                     if agentop:
+                        if generation != self.dispatcher_generation:
+                            # Replaced mid-pass (see above); the operation
+                            # stays at the head of the queue for the new
+                            # generation to dispatch.
+                            log.warning(
+                                'Dispatcher replaced by a newer generation, '
+                                'exiting without dispatching')
+                            return
+
                         inst.add_event(
                             EVENT_TYPE_AUDIT, 'dispatching agent operation',
                             extra={'agentoperation': agentop.uuid})
+                        log.with_fields({
+                            'instance': instance_uuid,
+                            'agentoperation': agentop.uuid
+                        }).info('Dispatching agent operation')
 
                         self.start_instance_executor(
                             instance_uuid, agentop)
+
+                # Record pass completion for the supervisor in _run_inner,
+                # and emit a periodic positive liveness signal so a silent
+                # dispatcher is diagnosable from logs alone.
+                self.dispatcher_last_pass = time.time()
+                if time.time() - last_heartbeat > 300:
+                    last_heartbeat = time.time()
+                    log.with_fields({
+                        'monitors': len(self.monitors),
+                        'executors': len(self.executors)
+                    }).info('Dispatcher heartbeat')
 
                 time.sleep(1)
 
@@ -1011,17 +1057,54 @@ class Monitor(daemon.Daemon):
                 util_exceptions.ignore_exception('side channel dispatcher', e)
                 time.sleep(1)
 
-        LOG.info('Dispatcher stopping')
+        log.info('Dispatcher stopping')
+
+    def start_dispatcher(self):
+        """Start a new dispatcher thread generation."""
+        self.dispatcher_generation += 1
+        generation = self.dispatcher_generation
+        self.dispatcher_last_pass = time.time()
+        self.dispatcher_thread = threading.Thread(
+            target=self._dispatch_loop, args=(generation,), daemon=True,
+            name=f'dispatcher-{generation}')
+        self.dispatcher_thread.start()
+
+    def supervise_dispatcher(self):
+        """Replace the dispatcher if it has stopped completing passes.
+
+        A dispatch pass normally completes in a few seconds. The known way
+        for it to stop entirely without logging anything is a wedged
+        thread-local gRPC channel where the completion queue no longer
+        fires deadlines, so the blocked call never returns and never
+        raises (observed taking ~21 minutes to self-recover at the TCP
+        layer). A replacement thread gets a fresh thread-local channel,
+        which recovers dispatch in bounded time; the generation counter
+        stops the old thread acting further if it later unwedges.
+        """
+        if self.dispatcher_thread and not self.dispatcher_thread.is_alive():
+            LOG.error('Dispatcher thread died, starting a replacement')
+            self.start_dispatcher()
+            return
+
+        stalled = time.time() - self.dispatcher_last_pass
+        if stalled > 120:
+            LOG.with_fields({
+                'stalled_seconds': int(stalled),
+                'old_generation': self.dispatcher_generation
+            }).error(
+                'Dispatcher has not completed a pass in too long '
+                '(wedged thread-local gRPC channel is the usual cause), '
+                'starting a replacement thread with a fresh channel')
+            self.start_dispatcher()
 
     def _run_inner(self):
-        dispatcher = threading.Thread(
-            target=self._dispatch_loop, daemon=True, name='dispatcher')
-        dispatcher.start()
+        self.start_dispatcher()
 
         while daemon.check_abort_path(self.abort_path):
             try:
                 self.wait_for_nodelock()
 
+                self.supervise_dispatcher()
                 self.reap_instance_monitors()
 
                 if not os.path.exists(self.abort_path):
