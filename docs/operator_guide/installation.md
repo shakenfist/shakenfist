@@ -3,11 +3,27 @@ title: Installation
 ---
 # Installing Shaken Fist
 
-The purpose of this guide is to walk you through a Shaken Fist installation. Shaken Fist will work just fine on a single machine, although its also happy to run on clusters of machines. We'll discuss the general guidance for install options as we go.
+The purpose of this guide is to walk you through a Shaken Fist installation.
+Shaken Fist will work just fine on a single machine, although it is also happy
+to run on clusters of machines. We'll discuss the general guidance for install
+options as we go.
+
+Shaken Fist is deployed with the `shakenfist.shakenfist` Ansible collection:
+you write an inventory describing your machines, set a handful of variables,
+and run a playbook. Ready-to-use example inventories and playbooks ship in the
+[`examples/`](https://github.com/shakenfist/shakenfist/tree/develop/examples)
+directory of the repository — `examples/single-node/` is the recommended
+quickstart for a single box, and `examples/cluster/` shows a multi-node
+cluster.
 
 [//]: # (Note that if you change the list of supported operating systems you must also update python_verison.md in this directory)
 
-Shaken Fist only supports Ubuntu 24.04, and Debian 12, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. Bug reports are welcome if you have any issues, and may be filed at https://github.com/shakenfist/shakenfist/issues
+Shaken Fist only supports Ubuntu 24.04, and Debian 12, so if you're running on
+localhost that implies that you must be running a recent Ubuntu or Debian on
+your development machine. Note as well that the deployer installs software and
+changes the configuration of your networking, so be careful when running it on
+machines you are fond of. Bug reports are welcome if you have any issues, and
+may be filed at https://github.com/shakenfist/shakenfist/issues
 
 ???+ note
     Debian 10, Debian 11 and Ubuntu 22.04 support were dropped in v0.8, as supporting
@@ -16,102 +32,201 @@ Shaken Fist only supports Ubuntu 24.04, and Debian 12, so if you're running on l
 
     This means the minimum supported Python version for Shaken Fist is now 3.11.
 
+## Prerequisites
+
 Each machine in the cluster should match this description:
 
-* Have virtualization extensions enabled in the BIOS.
-* Have jumbo frames enabled on the switch for the "mesh interface" for installations of more than one machine. Shaken Fist can optionally run internal traffic such as etcd and virtual network meshes on a separate interface to traffic egressing the cluster. Whichever interface you specify as being used for virtual network mesh traffic must have jumbo frames enabled for the virtual networks to function correctly.
-* Have at least 1 gigabit connectivity on the "mesh interface". This is a requirement of etcd.
-* Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the SSH_USER variable.
+* Runs a supported operating system (see above) and is reachable over ssh as
+  a user that can `become` root. This is an ansible requirement; the exact
+  username is up to you and is configured in your inventory like any other
+  ansible deployment.
+* Has virtualization extensions enabled in the BIOS.
+* Has jumbo frames enabled on the switch for the "mesh interface" for
+  installations of more than one machine. Shaken Fist can optionally run
+  internal traffic such as database access and virtual network meshes on a
+  separate interface to traffic egressing the cluster. Whichever interface you
+  specify as being used for virtual network mesh traffic must have jumbo
+  frames enabled for the virtual networks to function correctly. The deploy
+  validates that the mesh interface MTU is greater than 2,000 bytes, because
+  the VXLAN mesh our virtual networks use adds overhead to packets and a
+  standard MTU of 1,500 bytes would result in fragmentation. I generally
+  select 9,000 bytes.
+* Has at least 1 gigabit connectivity on the "mesh interface".
 
-We now have a fancy helper to help you install your first cluster, so let's give that a go:
+Your ansible control node needs `ansible-core >= 2.15`.
+
+## Deploying against your own infrastructure
+
+Shaken Fist deploys its daemons onto the hosts you tell it about, against
+infrastructure whose addresses you tell it. It deliberately does not install
+or manage that infrastructure for you:
+
+* **MariaDB**: Shaken Fist does not install or manage its database server.
+  Provision a MariaDB 10.6.0+ instance reachable from the database-tier
+  nodes before deploying. The repository ships
+  `tools/bootstrap-mariadb.sql` to create the user, database and grants, and
+  `examples/mariadb-tuning.cnf` as optional starting-point tuning. See
+  [Database](database.md) for the complete setup workflow and compatibility
+  requirements.
+* **A load balancer** (multi-node installations): Shaken Fist does not
+  install a load balancer. You must place your own reverse proxy or load
+  balancer in front of the cluster's `sf-api` daemons, which listen on port
+  13000. See [Load Balancing](load_balancing.md) for details.
+* **(Optional) Loki**: structured logs can be shipped to an
+  operator-provided Loki. See [Logging](logging.md).
+
+## Install the collection
+
+Install the published collection on your ansible control node:
 
 ```bash
-curl https://raw.githubusercontent.com/shakenfist/shakenfist/develop/deploy/getsf -o getsf
-chmod ugo+rx getsf
-sudo ./getsf
+ansible-galaxy collection install shakenfist.shakenfist
 ```
 
-This script will then walk you through the installation steps, asking questions as you go. The script leaves you with an installer configuration at `/root/sf-deploy`, which is the basis for later upgrades and cluster expansions.
-
-You can script the answers to `getsf` by setting environment variables. For example:
+To work from a git checkout of the repository instead, install the collection
+from source:
 
 ```bash
-export GETSF_FLOATING_BLOCK=192.168.10.0/24
-export GETSF_DEPLOY_NAME=bonkerslab
-export GETSF_RELEASE=pre-release
-export GETSF_NODES=localhost
-export GETSF_WARNING=yes
-sudo --preserve-env ./getsf
+ansible-galaxy collection install ./shakenfist/deploy/collection
 ```
 
-## Notes for multi-node installations
+(`tools/build-collection.py` builds a distributable collection tarball from
+the same source, which is how the published collection is made.)
 
-Not every node needs to be an etcd_master. I'd select three in most situations. One node must be marked as the primary node, and one must be marked as the network node. It is not currently supported having more than one of each of those node types.
+## Write an inventory
 
-* Shaken Fist does not install a load balancer. You must place your own reverse proxy or load balancer in front of the cluster's `sf-api` daemons, which listen on port 13000. See [Load Balancing](load_balancing.md) for details.
-* The network node is the ingress and egress point for all virtual networks, and is where floating IPs live, so it needs to be setup as the gateway fro your floating IP block.
+The example playbooks map inventory groups onto the collection's role
+variables. The groups are:
 
-Some of the considerations here can be subtle. Please reach out if you need a hand.
+* `allsf` — every Shaken Fist host;
+* `hypervisors` — hosts that run instances;
+* `network_node` — the single network node, which is the ingress and egress
+  point for all virtual networks, and is where floating IPs live — so it
+  needs to be set up as the gateway for your floating IP block;
+* `etcd_master` — the database tier: hosts that run `sf-database`, the gRPC
+  gateway between the cluster and your MariaDB. The group keeps its legacy
+  name for now; it will be renamed `database_node` in a future release.
 
-`getsf` writes a configuration file called `sf-deploy`. For a more complicated installation, `sf-deploy` might like this. Note that the `api_url` in the topology below is the address of your own load balancer, which must proxy to the cluster's `sf-api` daemons as described on the [Load Balancing](load_balancing.md) page:
+A host may belong to several capability groups. Not every node needs to be in
+the database tier — one is fine for small clusters, and you can add more
+hosts to the group later for higher availability. It is not currently
+supported to have more than one network node.
 
+Per-host identity lives on each host entry: `node_name`, `node_egress_ip`,
+`node_egress_nic`, `node_mesh_ip` and `node_mesh_nic`. A three node example
+(from `examples/cluster/inventory.yaml`) looks like this:
+
+```yaml
+all:
+  children:
+    allsf:
+      hosts:
+        sf-1:
+          ansible_host: 10.0.0.1
+          node_name: sf-1
+          node_egress_ip: 192.168.1.1
+          node_egress_nic: eth0
+          node_mesh_ip: 10.0.0.1
+          node_mesh_nic: eth1
+        sf-2:
+          ansible_host: 10.0.0.2
+          node_name: sf-2
+          node_egress_ip: 192.168.1.2
+          node_egress_nic: eth0
+          node_mesh_ip: 10.0.0.2
+          node_mesh_nic: eth1
+        sf-3:
+          ansible_host: 10.0.0.3
+          node_name: sf-3
+          node_egress_ip: 192.168.1.3
+          node_egress_nic: eth0
+          node_mesh_ip: 10.0.0.3
+          node_mesh_nic: eth1
+
+    network_node:
+      hosts:
+        sf-1:
+
+    etcd_master:
+      hosts:
+        sf-1:
+
+    hypervisors:
+      hosts:
+        sf-2:
+        sf-3:
 ```
-#!/bin/bash
 
-export ADMIN_PASSWORD=engeeF1o
-export FLOATING_IP_BLOCK="192.168.10.0/24"
-export DEPLOY_NAME="bonkerslab"
-export SSH_USER="cloudadmin"
-export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+For a single machine, put `localhost` in every group — see
+`examples/single-node/inventory.yaml` for exactly that.
 
-export KSM_ENABLED=1
+## Set the deployment variables
 
-# Topology is in JSON (the || true handles read's exit code with heredocs)
-read -r -d '' TOPOLOGY <<'EOF' || true
-[
-  {
-    "name": "sf-primary",
-    "node_egress_ip": "192.168.1.50",
-    "node_egress_nic": "enp0s31f6",
-    "node_mesh_ip": "192.168.21.50",
-    "node_mesh_nic": "enp0s31f6:1",
-    "primary_node": true,
-    "api_url": "https://...your...install...here.com/api"
-  },
-  {
-    "name": "sf-1",
-    "node_egress_ip": "192.168.1.51",
-    "node_egress_nic": "enp5s0",
-    "node_mesh_ip": "192.168.21.51",
-    "node_mesh_nic": "eno1",
-    "etcd_master": true,
-    "network_node": true,
-    "hypervisor": true
-  },
-  {
-    "name": "sf-2",
-    "node_egress_ip": "192.168.1.52",
-    "node_egress_nic": "enp5s0",
-    "node_mesh_ip": "192.168.21.52",
-    "node_mesh_nic": "eno1",
-    "etcd_master": true,
-    "hypervisor": true
-  },
-  {
-    "name": "sf-3",
-    "node_egress_ip": "192.168.1.53",
-    "node_egress_nic": "enp5s0",
-    "node_mesh_ip": "192.168.21.53",
-    "node_mesh_nic": "eno1",
-    "etcd_master": true,
-    "hypervisor": true
-  },
-]
-EOF
-export TOPOLOGY
+Cluster-wide variables and secrets live in `group_vars/all.yml` beside your
+inventory. The examples ship a commented template; the important variables
+are:
 
-/srv/shakenfist/venv/share/shakenfist/installer/install
+| Variable | Description |
+|----------|-------------|
+| `deploy_name` | The name of the deployment, used as an external label for prometheus. |
+| `api_url` | The URL clients should use to reach the API. For a multi-node cluster this is the address of your own load balancer, which must proxy to the cluster's `sf-api` daemons as described on the [Load Balancing](load_balancing.md) page. |
+| `auth_secret` | Seeds `AUTH_SECRET_SEED`, which signs JWT authentication tokens. Treat as a secret and change it from the example value. |
+| `system_key` | The authentication key for the "system" namespace, written into `sfrc` on each node. Treat as a secret. |
+| `floating_network_ipblock` | The IP range to use for the floating network. |
+| `dns_server` | The DNS server to configure instances with via DHCP. Defaults to 8.8.8.8. |
+| `http_proxy` | A URL for a HTTP proxy to use for image downloads, for example `http://localhost:3128`. Optional. |
+| `mariadb_host`, `mariadb_port`, `mariadb_user`, `mariadb_password`, `mariadb_database` | Connection details for your MariaDB server. Only database-tier nodes render these into `/etc/sf/config`. They must match what you provisioned with `tools/bootstrap-mariadb.sql`. |
+| `server_package`, `client_package` | The pip package references to install; default to the released `shakenfist` and `shakenfist-client` on PyPI. |
+| `loki_base_url`, `loki_tenant`, `loki_auth_header` | Optional log shipping to an operator-provided Loki. See [Logging](logging.md). |
+| `extra_config` | A JSON list of additional cluster configuration settings, for example `[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]`. Optional. |
+
+## Run the playbook
+
+The examples share a single playbook, `examples/_shared/site.yml`, which maps
+your inventory groups onto the collection's roles, computes the cluster-wide
+values, runs `sf-ctl ensure-mariadb-schema` against your MariaDB, seeds the
+cluster configuration, and starts the daemons in the correct order. Each
+example's `site.yml` is a one-line wrapper importing it. Run it as a user
+that can `become` root on the targets:
+
+```bash
+ansible-playbook -i examples/single-node/inventory.yaml examples/single-node/site.yml
 ```
+
+or for the multi-node example:
+
+```bash
+ansible-playbook -i examples/cluster/inventory.yaml examples/cluster/site.yml
+```
+
+You can copy the example directory and edit it, or write your own playbook
+against the collection's roles — the roles read only plain variables, so
+they compose with any inventory layout. See the
+[collection README](https://github.com/shakenfist/shakenfist/tree/develop/shakenfist/deploy/collection)
+and each role's `meta/argument_specs.yml` for the full variable set.
+
+To deploy from a local git checkout instead of released PyPI packages (for
+development or CI), add:
+
+```bash
+ansible-playbook -i examples/single-node/inventory.yaml examples/single-node/site.yml \
+  -e sf_build_local_wheels=true \
+  -e repo_path=/path/to/shakenfist \
+  -e client_repo_path=/path/to/client-python
+```
+
+## Post-deploy checks
+
+The playbook finishes with its own sanity checks (`sf-api` and `sf-queues`
+active, the API answering). To confirm the cluster is healthy yourself,
+source the authentication file the deploy wrote and list the nodes:
+
+```bash
+. /etc/sf/sfrc
+sf-client node list
+```
+
+Every node you deployed should be listed, in the `created` state.
 
 ## Your first instance
 
@@ -122,7 +237,7 @@ Before you can start your first instance you'll need to authenticate to Shaken F
 * **~/.shakenfist**, a JSON formatted configuration file
 * **/etc/sf/shakenfist.json**, the same file as above, but global
 
-By default the installer creates **/etc/sf/sfrc**, which sets the required environment variables to authenticate.
+The deploy creates **/etc/sf/sfrc** on each node, which sets the required environment variables to authenticate.
 It is customized per installation, setting the following variables:
 
 * **SHAKENFIST_NAMESPACE**, the namespace to create resources in
@@ -193,29 +308,3 @@ Interfaces:
 ```
 
 Probably the easiest way to interact with this instance is to connect to its console port, which is the serial console of the instance over telnet. In the case above, that is available on port 31829 on localhost (my laptop is called marvin).
-
-
-### Other caveats
-
-The installer will also enforce the following sanity checks:
-
-* That KVM will operate on your machines. This is generally fine unless you're using virtual machines at which point nested virtualization needs to be enabled.
-* That your network interface MTU is greater than 2,000 bytes. This is required because the VXLAN mesh our virtual networks use add overhead to packets and a standard MTU of 1500 bytes for the physical network will result in packets being fragmented too frequently on the virtual networks. You can set a higher MTU if you desire, I generally select 9,000 bytes.
-
-### Deployment variables
-
-| Option | Description |
-|--------|-------------|
-| ADMIN_PASSWORD | The admin password for the cloud once installed |
-| DNS_SERVER | The DNS server to configure instances with via DHCP. Defaults to 8.8.8.8 |
-| HTTP_PROXY | A URL for a HTTP proxy to use for image downloads. For example http://localhost:3128 |
-| INCLUDE_TRACEBACKS | Whether to include tracebacks in server 500 errors. Never set this to true in production! |
-| FLOATING_IP_BLOCK | The IP range to use for the floating network |
-| KSM_ENABLED | Set to 1 to enable KSM, 0 to disable |
-| DEPLOY_NAME | The name of the deployment to use as an external label for prometheus |
-| LOKI_BASE_URL | Base URL of an operator-provided Loki to ship structured logs to (e.g. http://loki:3100). Leave blank to log only to the local systemd journal. See [Logging](logging.md). |
-| LOKI_TENANT | Optional Loki tenant (sent as the X-Scope-OrgID header) so Shaken Fist's logs do not co-mingle with other tenants' streams. |
-| LOKI_AUTH_HEADER | Optional opaque Authorization header value for the Loki endpoint (treat as a secret). |
-| TOPOLOGY | The topology of the cluster, as described above |
-| SSH_KEY_FILENAME | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${SSH_KEY_FILENAME}.pub```. |
-| SSH_USER | The username to ssh as. |

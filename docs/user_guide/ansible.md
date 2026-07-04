@@ -1,27 +1,33 @@
-# Ansible module
+# Ansible modules
 
-The Shaken Fist Ansible modules were re-written in v0.8. This documentation
-covers that newer version.
+Shaken Fist ships native Ansible modules for orchestration of cloud
+resources as part of the `shakenfist.shakenfist` collection:
+`sf_namespace`, `sf_network`, `sf_instance` and `sf_snapshot`. Earlier
+releases shipped the modules as bash shims that redirected to the command
+line client; those shims have been removed, and this documentation covers
+the native collection modules.
 
 ## Installation
 
-The Shaken Fist command line client also ships with an Ansible module for
-orchestration of cloud resources. `getsf` installs this in the right place on the
-primary node, but its likely that you'll need to hand install the module code
-on other client machines.
+Install the collection and the Shaken Fist client SDK on your Ansible
+control node:
 
 ```bash
-$ sudo pip3 install shakenfist-client
-$ sudo cp venv/share/shakenfist/ansible/* /usr/share/ansible/plugins/modules/
-$ sudo chmod 0644 /usr/share/ansible/plugins/modules/sf_*
+ansible-galaxy collection install shakenfist.shakenfist
+pip3 install shakenfist-client
 ```
+
+The modules import the `shakenfist_client` python SDK and call the Shaken
+Fist REST API directly — they do not shell out to `sf-client`, and the
+control node never needs the Shaken Fist server package installed.
 
 ???+ note
     This example installs the Shaken Fist client in the system pip so that it
     is globally available to all Ansible users. The system pip is protected on
     modern Linux distributions, and you may need to include the
     `--break-system-packages` flag if your chosen Linux distribution does not
-    package the Shaken Fist client.
+    package the Shaken Fist client, or install into a virtual environment and
+    point `ansible_python_interpreter` at it.
 
     You'll know you need to do this if you see an error like this:
 
@@ -52,17 +58,19 @@ $ sudo chmod 0644 /usr/share/ansible/plugins/modules/sf_*
     hint: See PEP 668 for the detailed specification.
     ```
 
-## Implementation
+## Referencing the modules
 
-Ansible modules can be written in any language, although they are normally in
-python. In order to centralize the code for our Ansible module, the module files
-you install are simple `bash` redirects to the Shaken Fist command line client.
-The client then does the right things to make the module work correctly.
+Reference the modules from your playbooks by their fully-qualified
+collection name (FQCN), for example `shakenfist.shakenfist.sf_network`.
 
-???+ note
-    Specifically, the command line `sf-client ansible ...` is what the bash
-    redirect scripts use. The ansible command line module appears in help output
-    for the command line client, but is not intended for direct user use.
+## Authentication
+
+Every module accepts optional `api_url`, `namespace` and `key` connection
+parameters. When all three are supplied they are used verbatim; when
+omitted, the module auto-discovers credentials from the environment and
+`sfrc` / `~/.shakenfist` / `/etc/sf/shakenfist.json` exactly like the
+`sf-client` command line client does (see
+[Authentication and Namespaces](../developer_guide/authentication.md)).
 
 ## Namespaces
 
@@ -105,7 +113,7 @@ Create a namespace:
 
 ```yaml
 - name: Create a namespace
-    sf_namespace:
+    shakenfist.shakenfist.sf_namespace:
     name: "{{ namespace_name }}"
     state: present
 ```
@@ -114,7 +122,7 @@ Delete a network:
 
 ```yaml
 - name: Delete the namespace
-    sf_namespace:
+    shakenfist.shakenfist.sf_namespace:
     uuid: "{{ namespace_name }}"
     state: absent
 ```
@@ -129,6 +137,7 @@ Delete a network:
 | dns<br/>*boolean* | Whether to provide DNS services on the network. Defaults to `false`. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network. |
 | name<br/>*string* | The name of the network. Either `name` or `uuid` must be included in all requests. When both `name` and `uuid` are specified, `uuid` is used for existing resource lookups. If a network is identified by its `uuid`, then the network will be recreated if you specify a `name` which does not match the network in the Shaken Fist cluster. |
 | nat<br/>*boolean* | Whether to provide NAT services on the network. Defaults to `true`. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network. |
+| netblock<br/>*string* | The IP block for the network, for example `10.0.0.0/24`. Required when creating a network. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
 | uuid<br/>*string* | The UUID for the network. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the network does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
 
@@ -166,7 +175,7 @@ Create a network:
 
 ```yaml
 - name: Create a network for CI infrastructure
-    sf_network:
+    shakenfist.shakenfist.sf_network:
     netblock: "10.0.0.0/24"
     name: "ci"
   register: ci_network
@@ -176,7 +185,7 @@ Delete a network:
 
 ```yaml
 - name: Delete the CI network
-    sf_network:
+    shakenfist.shakenfist.sf_network:
     uuid: "{{ ci_network['meta']['uuid'] }}"
     state: absent
 ```
@@ -191,8 +200,73 @@ Delete a network:
 | disks<br/>*list of strings* | A simpler format for specifying what disks an instance has that follows the same behaviour as the `-d` flag in the command line client. Specifications are of the form: `size@base` where base is optional and size is in GB. That is, `100@debian:11` is valid, but so is `100` for an empty 100gb disk. |
 | diskspecs<br/>*list of strings* | A more verbose format for specifying what disks an instance has that models the `-D` flag in the command line client. Specifications are of the form: `size=20,base=debian:11,bus=sata;type=cdrom` where all elements are optional except for `size`. A more complete definition of this format is in the [developer reference documentation](/developer_guide/api_reference/instances/#diskspec). |
 | name<br/>*string* | The name of the instance. Either `name` or `uuid` must be included in all requests. When both `name` and `uuid` are specified, `uuid` is used for existing resource lookups. If a instance is identified by its `uuid`, then the instance will be recreated if you specify a `name` which does not match the instance in the Shaken Fist cluster. |
+| networks<br/>*list of strings* | A simpler format for specifying the networks an instance is attached to, following the same behaviour as the `-n` flag in the command line client: a list of network UUIDs. |
+| networkspecs<br/>*list of strings* | A more verbose format for specifying the networks an instance is attached to that models the `-N` flag in the command line client, for example `network_uuid=...,address=10.0.0.5`. |
 | ram<br/>*integer* | The amount of RAM the instance should have, in MB. |
+| ssh_key<br/>*string* | An ssh public key to place into the instance's config drive. |
+| user_data<br/>*string* | Base64-encoded user data to place into the instance's config drive. |
+| placement<br/>*string* | Force placement of the instance onto a named node. |
+| video<br/>*string* | The video model to use. |
+| nvram_template<br/>*string* | The NVRAM template to use (for UEFI / secure boot). |
+| configdrive<br/>*string* | The config drive style to use. |
+| side_channels<br/>*list of strings* | A list of side channel names to expose to the instance. |
+| uefi<br/>*boolean* | Whether to boot the instance with UEFI firmware. |
+| secureboot<br/>*boolean* | Whether to enable UEFI secure boot for the instance (implies UEFI). |
+| metadata<br/>*dictionary* | Metadata key-value pairs to set on the instance. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
 | uuid<br/>*string* | The UUID for the instance. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the instance does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
 | await<br/>*boolean* | Whether to wait for the instance to be created. Only works for when state is `present`. Default is `false`. |
 | await_timeout<br/>*integer* | How many seconds to wait in an `await`. Defaults to 600. |
+
+### Examples
+
+Create an instance attached to a network:
+
+```yaml
+- name: Create an instance
+    shakenfist.shakenfist.sf_instance:
+    name: "ci-worker"
+    cpu: 2
+    ram: 2048
+    disks:
+      - "20@debian:12"
+    networks:
+      - "{{ ci_network['meta']['uuid'] }}"
+    await: true
+  register: ci_worker
+```
+
+Delete an instance:
+
+```yaml
+- name: Delete the instance
+    shakenfist.shakenfist.sf_instance:
+    uuid: "{{ ci_worker['meta']['uuid'] }}"
+    state: absent
+```
+
+## Snapshots
+
+### Parameters
+
+| **Parameter** | **Comments** |
+|---|---|
+| instance_uuid<br/>*string* | The UUID of the instance to snapshot. Required when `state` is `present`. |
+| uuid<br/>*string* | The UUID of the snapshot artifact to delete. Required when `state` is `absent`. |
+| all<br/>*boolean* | Whether to snapshot all of the instance's disks rather than only the first. Defaults to `false`. |
+| label<br/>*string* | An artifact label name to point at the new snapshot. |
+| delete_after_label<br/>*boolean* | Whether to delete the snapshot artifact after applying the label. Defaults to `false`. |
+| async<br/>*boolean* | When `true`, do not block waiting for the snapshot to be created (ignored when `label` is set, which always blocks). Defaults to `false`. |
+| state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
+
+### Examples
+
+Snapshot an instance and update a label:
+
+```yaml
+- name: Snapshot and update the "ciimage" label
+    shakenfist.shakenfist.sf_snapshot:
+    instance_uuid: "{{ ci_worker['meta']['uuid'] }}"
+    label: ciimage
+    state: present
+```

@@ -7,11 +7,22 @@
 **Documentation:** https://shakenfist.com/
 **Source Code:** https://github.com/shakenfist/shakenfist
 
+## Deployment
+
+Shaken Fist is deployed with the `shakenfist.shakenfist` Ansible collection
+(which lives in [`shakenfist/deploy/collection/`](shakenfist/deploy/collection/)
+in this repository and is published to Ansible Galaxy). You write an inventory
+describing your machines, set a handful of variables, and run a playbook.
+Ready-to-use examples ship in [`examples/`](examples/) —
+`examples/single-node/` is the recommended quickstart. See
+[`docs/operator_guide/installation.md`](docs/operator_guide/installation.md)
+for the full walkthrough.
+
 ## Prerequisites
 
 Shaken Fist requires an operator-provided MariaDB 10.6.0+ server. Before
-running the installer (`getsf`), provision a MariaDB instance and apply the
-bootstrap snippet. See
+deploying, provision a MariaDB instance and apply the bootstrap snippet
+(`tools/bootstrap-mariadb.sql`). See
 [`docs/operator_guide/database.md`](docs/operator_guide/database.md) for the
 complete setup workflow.
 

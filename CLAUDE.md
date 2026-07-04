@@ -17,7 +17,7 @@ items are documented in `docs/plans/*.md`. However, we should always:
 * Ensure objects are correctly cleaned up in `hard_delete()` when appropriate.
 * Seek to improve mypy coverage, especially for code we've added.
 * Ensure there is unit test coverage, and preferably functional test coverage
-  as well (see `shakenfist/deploy/cluster_ci` for functional coverage). We
+  as well (see `shakenfist/deploy/shakenfist_ci` for functional coverage). We
   prefer functional tests to unit tests if we can only have one.
 * Preserve event logging -- the exact logging can change if required, but we
   like having good coverage of events for audit and debugging.
@@ -191,7 +191,9 @@ shakenfist/
 │   ├── client/              # CLI tools
 │   └── tests/               # Test suite
 ├── docs/                    # MkDocs documentation
-└── deploy/                  # Deployment configurations
+└── deploy/                  # Ansible collection deployer and functional CI
+                             # (lives at shakenfist/deploy/; the collection
+                             # is shakenfist/deploy/collection/)
 ```
 
 ### Core Components
@@ -250,7 +252,8 @@ service's gRPC interface.
 ### Systemd Service Ordering
 
 Shaken Fist daemons are managed via systemd with careful ordering defined in
-`deploy/ansible/files/sf.service`. The startup order is:
+`shakenfist/deploy/collection/roles/node/templates/sf.service`. The startup
+order is:
 
 1. `database` - Starts first (after multi-user.target), provides gRPC access
    to MariaDB for all other daemons

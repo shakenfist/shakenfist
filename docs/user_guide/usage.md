@@ -12,10 +12,10 @@ of Shaken Fist, but there is no guarantee that minor releases are done in sync.
 However, the Shaken Fist client knows how to probe the server for capabilities,
 so it is recommended that you keep the client as up to date as possible.
 
-The client is installed on the primary node as part of the operation of the
-Ansible based installer. Authentication details are also provided on the primary
-node. That means that you can just get started on the primary node without any
-further configuration.
+The client is installed on every node as part of the operation of the Ansible
+based deployer, and authentication details are also provided on each node (at
+`/etc/sf/sfrc`). That means that you can just get started on a cluster node
+without any further configuration.
 
 The `shakenfist-client` package contains two clients at the time of writing:
 a REST API client that can be imported at `shakenfist_client.apiclient`; and a

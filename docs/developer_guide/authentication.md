@@ -24,7 +24,7 @@ you can access it.
 
 All requests to Shaken Fist have a namespace context. The namespace "system" is
 reserved and is used for administrative actions. Please note that the
-authentication configuration created by the `getsf` installer is for the system
+authentication configuration created by the deployer is for the system
 namespace, and if used directly will result in instances and other objects
 being created in that namespace. While this is supported and will function as
 expected, it is probably undesirable for anything other than a single user
@@ -41,8 +41,8 @@ choose to trust additional namespaces, and this is done via the
 
 ## Authentication
 
-When the `getsf` installer ran, it created two authentication artifacts on the
-primary node which are useful to get started with Shaken Fist. First off, there
+When the deploy playbook ran, it created two authentication artifacts on each
+node which are useful to get started with Shaken Fist. First off, there
 is `/etc/sf/sfrc`, which is a file you can source in your shell to provide
 authentication environment variables. These environment variables can be used
 by Shaken Fist command line clients, Ansible modules, and the Python API client
@@ -66,7 +66,7 @@ shell. The last three lines are the important authentication details:
 * the URL the API exists at is "https://shakenfist/api"
 
 `sfrc` is only useful to users of Unix-like shells, so there is also a JSON form
-of this configuration information, which is written by `getsf` at
+of this configuration information, which is written by the deployer at
 `/etc/sf/shakenfist.json`. Here's an example:
 
 ```

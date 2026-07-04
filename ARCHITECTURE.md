@@ -795,7 +795,10 @@ Flask app (external_api/app.py)
 
 - **functional-tests.yml**: Main CI workflow with merge queue support.
   Includes automated reviewer (via shared action), delinter, and
-  exception fixer jobs.
+  exception fixer jobs. Functional jobs deploy nested test clusters via
+  the `shakenfist.shakenfist` Ansible collection
+  (`shakenfist/deploy/collection/`), driven by the reusable
+  `smoke-cluster` workflow in the `shakenfist/actions` repository.
 - **export-repo-config.yml**: Exports GitHub settings for version
   control (uses shared reusable workflow from `actions/` repo).
 - **pr-re-review.yml**: Bot-triggered PR re-review.
@@ -817,7 +820,8 @@ traffic through local caches:
 
 CI VMs provisioned by the `shakenfist/actions` Ansible playbooks also
 get system-level config files (`/etc/apt/apt.conf.d/01proxy` and
-`/etc/pip.conf`) so that getsf and other tools use the caches.
+`/etc/pip.conf`) so that the collection deploy and other tools use the
+caches.
 - **Proxy bypass**: `no_proxy`/`NO_PROXY` set to
   `localhost,127.0.0.1,10.0.0.0/8` to prevent local service traffic from
   being routed through the proxy.

@@ -300,7 +300,7 @@ nav:
     - User Guide:
         - "Usage": user_guide/usage.md
         - "Authentication": user_guide/authentication.md
-        - "Ansible module": user_guide/ansible.md
+        - "Ansible modules": user_guide/ansible.md
         - "Artifacts": user_guide/artifacts.md
         - "Affinity": user_guide/affinity.md
         - "Consoles": user_guide/consoles.md

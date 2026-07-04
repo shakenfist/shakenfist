@@ -22,7 +22,7 @@ cluster.
 ## Upgrade process
 
 First off, upgrade the python packages in each node's virtualenv manually. This
-is explicitly a non-goal of our installer tooling as we believe different
+is explicitly a non-goal of our deploy tooling as we believe different
 deployments will have different strategies for performing this step. Naively,
 a good first approach is simple to run this command on each node:
 
@@ -32,8 +32,8 @@ sudo /srv/shakenfist/venv/bin/pip install --upgrade shakenfist
 
 Which will pull in all the relevant other python packages it requires.
 
-Then simply re-run `getsf` as you did when you first installed and the cluster
-will upgrade.
+Then simply re-run your deployment playbook as you did when you first
+installed (see [Installation](installation.md)) and the cluster will upgrade.
 
 ## MariaDB schema migrations
 

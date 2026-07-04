@@ -8,7 +8,7 @@ the administrative commands, the table inventory, and the schema system.
 ## Bring-your-own MariaDB setup
 
 Shaken Fist does not bundle or install MariaDB. The operator provisions the
-database server before running `getsf`.
+database server before deploying the cluster.
 
 ### Provisioning checklist
 
@@ -40,13 +40,16 @@ database server before running `getsf`.
     The values are starting points, not prescriptions — adjust them to match
     your hardware and workload.
 
-4. **Run `getsf`.** The installer will prompt for the MariaDB host, port, user,
-   password, and database name. The defaults match what `bootstrap-mariadb.sql`
-   creates: port `3306`, user `shakenfist`, database `shakenfist`.
+4. **Deploy Shaken Fist.** Set the `mariadb_host`, `mariadb_port`,
+   `mariadb_user`, `mariadb_password` and `mariadb_database` variables in your
+   deployment's `group_vars/all.yml` to match what you provisioned, then run
+   the deploy playbook (see [Installation](installation.md)). Only
+   database-tier nodes render these values into `/etc/sf/config`.
 
-5. **Schema initialisation.** After the deploy completes,
-   `sf-ctl ensure-mariadb-schema` runs automatically on a database-tier node
-   and creates all SF tables. You can also run it manually at any time from a
+5. **Schema initialisation.** The example playbooks run
+   `sf-ctl ensure-mariadb-schema` themselves (once, delegated to a
+   database-tier node) before any node registers, so no manual step is
+   needed on first deploy. You can also run it manually at any time from a
    node that has `MARIADB_HOST` configured (see
    [Administrative Commands](#administrative-commands)).
 
@@ -59,8 +62,12 @@ sudo apt install mariadb-server
 sed 's/__REPLACE_ME__/mypassword/' tools/bootstrap-mariadb.sql | sudo mysql -u root
 sudo cp examples/mariadb-tuning.cnf /etc/mysql/mariadb.conf.d/   # optional
 sudo systemctl restart mariadb
-sudo ./getsf                                                      # answers the new prompts
+ansible-playbook -i examples/single-node/inventory.yaml examples/single-node/site.yml
 ```
+
+(having first set the `mariadb_*` variables in
+`examples/single-node/group_vars/all.yml` to match — see
+[Installation](installation.md)).
 
 ## MariaDB compatibility requirements
 

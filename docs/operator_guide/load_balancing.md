@@ -32,7 +32,7 @@ the `/api` prefix and forwards the request to a backend `sf-api` worker on
 exception -- the Swagger UI fetches them from the server root, so they are
 passed through unchanged rather than living under `/api`.
 
-This is why the `api_url` you give the installer ends in `/api`: that prefix is
+This is why the `api_url` you give the deployer ends in `/api`: that prefix is
 what the proxy expects and strips.
 
 | External path | Backend path | Notes |
