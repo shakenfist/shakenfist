@@ -98,12 +98,6 @@ jobs:
             fetch-depth: 0
 
         - name: Checkout the shakenfist repository
-          uses: actions/checkout@v6
-          with:
-            path: shakenfist
-            fetch-depth: 1
-
-        - name: Checkout the shakenfist repository
           # No explicit repository: an explicit one pins the checkout to that
           # repo's default branch, but this job tests the proposed change, so
           # it must check out the triggering sha.
