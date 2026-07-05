@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: Michael Still and contributors
+  description: >-
+    Manage Shaken Fist's internal certificate authority: generate the CA on the
+    control node, issue per-host SPICE TLS certificates, and distribute them to
+    the hosts.
+  license: Apache-2.0
+  min_ansible_version: '2.15'
+dependencies: []

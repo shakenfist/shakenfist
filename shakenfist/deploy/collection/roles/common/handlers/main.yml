@@ -1,0 +1,19 @@
+---
+# Shared handlers used across the Shaken Fist collection roles. Roles that need
+# any of these depend on this role via meta/main.yml, so that an operator never
+# has to install a separate handlers-only role.
+
+- name: Reload systemd
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart journald
+  ansible.builtin.service:
+    name: systemd-journald
+    state: restarted
+
+- name: Restart logind
+  ansible.builtin.service:
+    name: systemd-logind
+    state: restarted

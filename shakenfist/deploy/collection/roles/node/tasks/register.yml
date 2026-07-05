@@ -1,0 +1,124 @@
+---
+# Register THIS node and its daemons in the database, then start the daemons.
+#
+# Each host runs sf-ctl locally for itself. sf-ctl reads NODE_NAME and
+# NODE_MESH_IP from /etc/sf/config (written by config.yml) and auto-routes its
+# database access: on a database node (SHAKENFIST_MARIADB_HOST set) it talks to
+# MariaDB directly; on every other node it talks to the database gRPC gateway.
+# The role body is therefore identical on every host and reads no inventory
+# groups and no other host's facts.
+#
+# ORDERING CONTRACT (the example playbook's responsibility, step 3):
+#   1. The cluster-wide MariaDB schema must already exist. The once-per-cluster
+#      `sf-ctl ensure-mariadb-schema` is NOT run here -- it is run by the
+#      example playbook against a database-tier host before any node registers.
+#   2. The database-tier hosts must run this role (and therefore start
+#      sf-database, providing the gRPC gateway) BEFORE non-database hosts run
+#      it, because non-database hosts register over that gRPC gateway. The
+#      example playbook orders its plays so database hosts converge first.
+
+# Initialise this node in the database.
+- name: Ensure the node exists in the database
+  ansible.builtin.shell: |
+    /srv/shakenfist/venv/bin/sf-ctl initialise-node \
+        --node-name "{{ node_name }}" \
+        --node-mesh-ip "{{ node_mesh_ip }}"
+  changed_when: true
+
+- name: Register the database daemon if it runs on this node
+  ansible.builtin.shell: |
+    /srv/shakenfist/venv/bin/sf-ctl register-daemon database
+  changed_when: true
+  when: node_is_database_node
+
+- name: Register the other SF daemons
+  ansible.builtin.shell: |
+    /srv/shakenfist/venv/bin/sf-ctl register-daemon \
+        sentinel-first sentinel-last privexec nodelock net resources \
+        sidechannel queues api cleaner cluster transfers
+  changed_when: true
+
+# Start the database daemon on database nodes. This must happen after the node
+# and its daemons are registered, so the database daemon can find its own
+# registration. It provides the gRPC gateway the remaining daemons rely on.
+- name: Start the database daemon on database nodes
+  ansible.builtin.service:
+    name: sf-database
+    enabled: true
+    state: restarted
+    daemon_reload: false
+  when: node_is_database_node
+
+# Start the remaining daemons. The ordering here matches the order they must
+# start in, not alphabetical order.
+- name: Base daemons everywhere
+  ansible.builtin.service:
+    name: "sf-{{ item }}"
+    enabled: true
+    state: restarted
+    daemon_reload: false
+  with_items:
+    - sentinel-first
+    - privexec
+    - nodelock
+
+# TODO(mikal): this is a bit wrong. Some of these should only come up
+# on nodes which are either a network node, hypervisor, or storage
+# node...
+- name: Restart the other SF daemons
+  ansible.builtin.service:
+    name: "sf-{{ item }}"
+    enabled: true
+    state: restarted
+    daemon_reload: false
+  with_items:
+    - net
+    - resources
+    - sidechannel
+    - queues
+    - api
+    - cleaner
+    - cluster
+    - transfers
+    - sentinel-last
+
+- name: Make sure sf.target unit is active
+  vars:
+    cmd_check: systemctl status sf.target
+    cmd_set: systemctl isolate sf.target
+  ansible.builtin.shell:
+    cmd: '{{ cmd_check }} && exit 0; {{ cmd_set }}; {{ cmd_check }} && exit 1; exit 2'
+  register: target_active_result
+  changed_when: target_active_result.rc == 1
+  failed_when: target_active_result.rc == 2
+
+- name: Capture the list of running SF processes
+  ansible.builtin.shell: |
+    ps -ef | grep -E "^root.*sf-"
+  register: sf_processes
+  changed_when: false
+  failed_when: false
+
+- name: Log SF processes
+  ansible.builtin.debug:
+    msg: "{{ sf_processes.stdout.split('\n') }}"
+
+- name: Capture the status of the SF target
+  ansible.builtin.command: systemctl status sf.target
+  register: sf_systemd_status
+  changed_when: false
+  failed_when: false
+
+- name: Log SF target status
+  ansible.builtin.debug:
+    msg: "{{ sf_systemd_status.stdout.split('\n') }}"
+
+- name: Capture the SF target journal
+  ansible.builtin.command: journalctl -u sf.target
+  register: sf_systemd_journal
+  changed_when: false
+  failed_when: false
+
+- name: Log SF target journal
+  ansible.builtin.debug:
+    msg: "{{ sf_systemd_journal.stdout.split('\n') }}"

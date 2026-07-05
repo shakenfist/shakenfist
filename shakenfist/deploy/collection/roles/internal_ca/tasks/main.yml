@@ -1,0 +1,21 @@
+---
+# The internal CA role has three entry points, run as separate plays by the
+# consuming playbook:
+#
+#   * bootstrap               (run once, on the control node) creates the CA.
+#   * host_certificate        (per host) issues a SPICE TLS certificate on the
+#                             control node for that host.
+#   * distribute_certificates (per host) copies the CA cert and the host's
+#                             key/cert onto the host.
+#
+# Invoke each via include_role with tasks_from set to the entry point name. The
+# default main entry point runs all three in order, which is correct for a
+# single-host deployment where the control node is also the target host.
+- name: Bootstrap the internal certificate authority
+  ansible.builtin.include_tasks: bootstrap.yml
+
+- name: Issue this host's certificate
+  ansible.builtin.include_tasks: host_certificate.yml
+
+- name: Distribute this host's certificate
+  ansible.builtin.include_tasks: distribute_certificates.yml

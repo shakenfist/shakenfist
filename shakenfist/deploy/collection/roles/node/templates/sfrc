@@ -1,0 +1,7 @@
+# Command line hinting
+eval "$(_SF_CLIENT_COMPLETE=bash_source /srv/shakenfist/venv/bin/sf-client)"
+
+# Client auth
+export SHAKENFIST_NAMESPACE="system"
+export SHAKENFIST_KEY="{{ system_key }}"
+export SHAKENFIST_API_URL="{{ api_url }}"

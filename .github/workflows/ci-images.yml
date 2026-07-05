@@ -141,6 +141,12 @@ jobs:
         - name: Build image
           run: |
             cd ${GITHUB_WORKSPACE}/actions
+
+            # The image build playbooks create their builder instances with
+            # the collection's native sf_* modules, so the collection must
+            # be resolvable on this runner before they run.
+            tools/install-collection.sh
+
             ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
                 base_image=${{ matrix.os.baseimage }} base_image_user=${{ matrix.os.baseuser }} label=${{ matrix.os.outputlabel }} extras=${{ matrix.os.extras || '' }}" \

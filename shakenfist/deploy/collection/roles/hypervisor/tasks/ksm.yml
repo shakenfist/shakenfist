@@ -1,0 +1,68 @@
+---
+# Configure kernel samepage merging (KSM), driven by the ksm_enabled variable.
+
+- name: Check if KSM advisor mode is supported
+  ansible.builtin.stat:
+    path: /sys/kernel/mm/ksm/advisor_mode
+  register: ksm_advisor_mode
+
+- name: Configure KSM to run on boot (with advisor)
+  ansible.builtin.copy:
+    content: |
+      w /sys/kernel/mm/ksm/run - - - - 1
+      w /sys/kernel/mm/ksm/advisor_mode - - - - scan-time
+      w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
+      w /sys/kernel/mm/ksm/advisor_target_scan_time - - - - 60
+    dest: /etc/tmpfiles.d/sf-ksm.conf
+    owner: root
+    mode: ugo+r
+  when: ksm_enabled == "1" and ksm_advisor_mode.stat.exists
+
+- name: Configure KSM to run on boot (without advisor)
+  ansible.builtin.copy:
+    content: |
+      w /sys/kernel/mm/ksm/run - - - - 1
+      w /sys/kernel/mm/ksm/pages_to_scan - - - - 1000000
+      w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
+    dest: /etc/tmpfiles.d/sf-ksm.conf
+    owner: root
+    mode: ugo+r
+  when: ksm_enabled == "1" and not ksm_advisor_mode.stat.exists
+
+# merge_across_nodes requires a reboot, so is skipped below
+- name: Configure KSM to run now (with advisor)
+  ansible.builtin.shell: |
+    echo "1" > /sys/kernel/mm/ksm/run
+    echo "scan-time" > /sys/kernel/mm/ksm/advisor_mode
+    echo 60 > /sys/kernel/mm/ksm/advisor_target_scan_time
+  changed_when: true
+  failed_when: false
+  when: ksm_enabled == "1" and ksm_advisor_mode.stat.exists
+
+- name: Configure KSM to run now (without advisor)
+  ansible.builtin.shell: |
+    echo "1" > /sys/kernel/mm/ksm/run
+    echo "1000000" > /sys/kernel/mm/ksm/pages_to_scan
+  changed_when: true
+  failed_when: false
+  when: ksm_enabled == "1" and not ksm_advisor_mode.stat.exists
+
+- name: Configure KSM to not run on boot
+  ansible.builtin.copy:
+    content: |
+      w /sys/kernel/mm/ksm/run - - - - 0
+      w /sys/kernel/mm/ksm/advisor_mode - - - - none
+      w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
+    dest: /etc/tmpfiles.d/sf-ksm.conf
+    owner: root
+    mode: ugo+r
+  when: ksm_enabled != "1"
+
+# merge_across_nodes requires a reboot, so is skipped below
+- name: Configure KSM to not run now
+  ansible.builtin.shell: |
+    echo "0" > /sys/kernel/mm/ksm/run
+    echo "none" > /sys/kernel/mm/ksm/advisor_mode
+  changed_when: true
+  failed_when: false
+  when: ksm_enabled != "1"

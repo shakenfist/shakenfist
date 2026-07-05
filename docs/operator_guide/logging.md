@@ -70,8 +70,9 @@ and not a deliberate shipping pipeline.
 
 ## Configuration
 
-Set these via the deployer (`getsf` prompts / `GETSF_LOKI_*`
-environment variables) or directly as `SHAKENFIST_*` config:
+Set these via the deployer (the `loki_base_url`, `loki_tenant` and
+`loki_auth_header` variables of the `shakenfist.shakenfist`
+collection) or directly as `SHAKENFIST_*` config:
 
 | Option | Default | Meaning |
 |--------|---------|---------|

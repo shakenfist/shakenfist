@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: Michael Still and contributors
+  description: >-
+    Internal handlers-only role shared by the Shaken Fist collection roles
+    (reload systemd, restart journald, restart logind). Not intended to be
+    consumed directly by operators.
+  license: Apache-2.0
+  min_ansible_version: '2.15'
+dependencies: []

@@ -1,0 +1,25 @@
+---
+# The node role is the core per-node Shaken Fist setup. It has three entry
+# points, which the consuming playbook normally runs as separate plays so it
+# can interleave the component roles (network, hypervisor, internal_ca) and
+# order the database-tier hosts first:
+#
+#   * bootstrap (per host) installs OS packages, systemd presets and the base
+#     services every node needs.
+#   * config    (per host) writes /etc/sf/config, sfrc, the auth file and all
+#     of the systemd units (including sf-database.service when this is a
+#     database node).
+#   * register  (per host) registers this node and its daemons in the database
+#     and starts the daemons.
+#
+# Invoke each via include_role with tasks_from set to the entry point name. The
+# default main entry point runs all three in order, which is correct for a
+# single-host deployment.
+- name: Bootstrap the node
+  ansible.builtin.include_tasks: bootstrap.yml
+
+- name: Write the node configuration
+  ansible.builtin.include_tasks: config.yml
+
+- name: Register the node and start its daemons
+  ansible.builtin.include_tasks: register.yml

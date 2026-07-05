@@ -1,0 +1,35 @@
+---
+# Cluster-wide variables for the multi-node example. Replace the secrets with
+# real values before deploying.
+
+deploy_name: sf
+
+# The cluster API URL (point at your load balancer in front of the API nodes).
+api_url: "http://10.0.0.1:13000"
+
+# Secrets. CHANGE THESE.
+auth_secret: "change-me-auth-secret-change-me-auth-secret-change"
+system_key: "change-me-system-key"
+
+# Cluster config seeds.
+dns_server: "8.8.8.8"
+http_proxy: ""
+extra_config: "[]"
+floating_network_ipblock: "10.10.0.0/24"
+
+# Direct MariaDB access for the database tier (sf-1). These must match the
+# MariaDB server you provisioned (see PLAN-byo-mariadb / tools/
+# bootstrap-mariadb.sql). Only database-tier nodes render these into
+# /etc/sf/config.
+mariadb_host: "10.0.0.1"
+mariadb_port: 3306
+mariadb_user: "shakenfist"
+mariadb_password: "change-me-mariadb-password"
+mariadb_database: "sf"
+
+# Install released packages from PyPI by default. Set sf_build_local_wheels:
+# true with repo_path / client_repo_path to deploy a local git checkout.
+sf_build_local_wheels: false
+server_package: "shakenfist"
+client_package: "shakenfist-client"
+pip_extra: ""

@@ -136,7 +136,8 @@ pre-commit run --all-files       # Run all hooks manually
 
 Current hooks:
 - `actionlint` - Validates GitHub Actions workflow files
-- `ansible-lint` - Validates Ansible playbooks in the deployer
+- `ansible-lint` - Validates the `shakenfist.shakenfist` Ansible collection
+  (`shakenfist/deploy/collection/`)
 - `mypy` - Type checking via tox (incremental rollout)
 
 ### sf-net daemon topology

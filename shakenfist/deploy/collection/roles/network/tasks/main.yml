@@ -1,0 +1,70 @@
+---
+# Prepare a host to act as a Shaken Fist network node. This role assumes it is
+# only applied to hosts that should be network nodes (the consuming playbook
+# gates it on node_is_network_node), so the role body reads no inventory groups.
+
+- name: Install network node dependencies
+  ansible.builtin.apt:
+    name:
+      - dnsmasq
+      - dnsmasq-utils
+    state: latest
+  register: apt_action
+  retries: 100
+  until: >-
+    apt_action is success or
+    ('Failed to lock apt for exclusive operation' not in apt_action.msg and
+     '/var/lib/dpkg/lock' not in apt_action.msg)
+
+# Shaken Fist runs dnsmasq itself per-network, so the distro service must not
+# claim port 53 or start at boot.
+- name: Disable dnsmasq
+  ansible.builtin.service:
+    name: dnsmasq
+    enabled: false
+    state: stopped
+
+- name: Remove dnsmasq unit
+  ansible.builtin.file:
+    path: /usr/lib/systemd/system/dnsmasq.service
+    state: absent
+  notify: Reload systemd
+
+# The DHCP and DNS templates ship with this role; ansible resolves the relative
+# src against the role's files/ directory.
+- name: Copy dhcp config template
+  ansible.builtin.copy:
+    src: dhcp.tmpl
+    dest: /srv/shakenfist/dhcp.tmpl
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy dhcp hosts template
+  ansible.builtin.copy:
+    src: dhcphosts.tmpl
+    dest: /srv/shakenfist/dhcphosts.tmpl
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy DNS hosts template
+  ansible.builtin.copy:
+    src: dnshosts.tmpl
+    dest: /srv/shakenfist/dnshosts.tmpl
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Configure ipforwarding to be enabled on boot
+  ansible.builtin.copy:
+    content: |
+      net.ipv4.ip_forward = 1
+    dest: /etc/sysctl.d/10-sf-ipforwarding.conf
+    owner: root
+    mode: ugo+r
+
+- name: Configure ipforwarding to be enabled now
+  ansible.builtin.command: sysctl -w net.ipv4.ip_forward=1
+  changed_when: true
+  failed_when: false

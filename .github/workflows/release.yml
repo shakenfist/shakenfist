@@ -57,6 +57,33 @@ jobs:
           name: dist
           path: dist/
 
+  build-collection:
+    name: Build ansible collection
+    runs-on: [self-hosted, static]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Full history needed for setuptools_scm
+
+      - name: Install build dependencies
+        run: |
+          rm -rf collection-venv
+          python3 -m venv collection-venv
+          collection-venv/bin/pip3 install --upgrade pip
+          collection-venv/bin/pip3 install ansible-core setuptools_scm packaging
+
+      - name: Build collection
+        run: |
+          collection-venv/bin/python3 tools/build-collection.py
+
+      - name: Upload collection artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: collection
+          path: dist-collection/
+
   sign-tag:
     name: Sign release tag with Sigstore
     needs: build
@@ -124,6 +151,32 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-collection:
+    name: Publish ansible collection to Galaxy
+    needs: [build-collection, sign-tag]
+    runs-on: [self-hosted, static]
+    environment: release
+
+    steps:
+      - name: Download collection artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: collection
+          path: dist-collection/
+
+      - name: Install ansible-core
+        run: |
+          rm -rf publish-venv
+          python3 -m venv publish-venv
+          publish-venv/bin/pip3 install --upgrade pip
+          publish-venv/bin/pip3 install ansible-core
+
+      - name: Publish to Ansible Galaxy
+        run: |
+          publish-venv/bin/ansible-galaxy collection publish \
+              dist-collection/*.tar.gz \
+              --api-key "${{ secrets.ANSIBLE_GALAXY_TOKEN }}"
 
   github-release:
     name: Create GitHub Release

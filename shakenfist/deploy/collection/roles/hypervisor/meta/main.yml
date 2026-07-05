@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: Michael Still and contributors
+  description: >-
+    Prepare a host to act as a Shaken Fist hypervisor: nested KVM, KSM,
+    vhost_vsock, SPICE TLS, and libvirt AppArmor/config tweaks.
+  license: Apache-2.0
+  min_ansible_version: '2.15'
+dependencies:
+  - role: shakenfist.shakenfist.common

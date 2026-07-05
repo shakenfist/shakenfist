@@ -1,0 +1,38 @@
+---
+argument_specs:
+  main:
+    short_description: Prepare a host to act as a Shaken Fist network node.
+    description:
+      - >-
+        Installs dnsmasq (used per-network by Shaken Fist, not as a host
+        service), removes the distro dnsmasq systemd unit, installs the DHCP
+        and DNS templates into /srv/shakenfist, and enables IPv4 forwarding
+        both immediately and on boot.
+      - >-
+        Apply this role only to hosts that are network nodes. The consuming
+        playbook gates the role on the node_is_network_node capability flag;
+        the role body itself reads no inventory groups.
+    options: {}
+  validate_mtus:
+    short_description: Determine and validate the mesh interface MTU.
+    description:
+      - >-
+        Reads the MTU of the mesh interface via `ip link`, exposes it as the
+        node_mtu fact, and fails if it is below 2000 (unless ignore_mtu is
+        "1"). The computation is entirely local to the host; the consuming
+        playbook collects node_mtu across hosts to derive the cluster-wide
+        max_hypervisor_mtu. Invoke via include_role with tasks_from set to
+        validate_mtus.
+    options:
+      node_mesh_nic:
+        type: str
+        required: true
+        description:
+          - The name of this host's mesh network interface (for example mesh0).
+      ignore_mtu:
+        type: str
+        default: "0"
+        description:
+          - >-
+            When "1", skip the minimum-MTU check. Any other value enforces a
+            minimum mesh MTU of 2000.

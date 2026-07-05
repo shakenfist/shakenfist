@@ -309,6 +309,7 @@ class SideChannelExecutorJob(SideChannelJob):
         self.chunk_iterator = None
 
         self.ready = False
+        self.welcomed = False
         self.log = LOG.with_fields({
             'instance': self.instance.uuid,
             'agent_operation': self.agentop.uuid
@@ -329,6 +330,7 @@ class SideChannelExecutorJob(SideChannelJob):
             'outstanding_messages': self.outstanding_message_count
         }).debug('...agent welcome')
         self.ready = True
+        self.welcomed = True
 
     def _dispatch_execute(self, command_id, cmd):
         request = agent_pb2.HypervisorToAgentCommand(
@@ -636,9 +638,22 @@ class SideChannelExecutorJob(SideChannelJob):
             ]
         )
         self.last_data = time.time()
+        connected_at = time.time()
 
         buffered = bytearray()
         while daemon.check_abort_path(self.abort_path):
+            # If the agent never welcomes us the connection is not going to
+            # become useful -- without this deadline we would spin here
+            # forever, holding the executor slot for this instance and so
+            # blocking every later operation. Exiting is safe: the operation
+            # is still at the head of the instance's queue and dispatch will
+            # be retried on a fresh connection.
+            if not self.welcomed and time.time() - connected_at > 30:
+                self.log.info(
+                    'Agent did not welcome us within 30 seconds, aborting '
+                    'executor for later retry')
+                return
+
             if time.time() - self.last_data > 2:
                 self._send_ping(vsock.sock)
                 self.last_data = time.time()
@@ -813,6 +828,17 @@ class Monitor(daemon.Daemon):
         self.monitors = {}
         self.monitor_attempts = {}
         self.executors = {}
+        self.executor_attempts = {}
+
+        # Dispatcher liveness. The dispatch thread records the completion
+        # time of each pass; the monitor management loop supervises it and
+        # starts a replacement thread (a new generation) if passes stop
+        # completing. The generation counter lets a wedged-then-recovered
+        # old thread notice it has been replaced and exit without side
+        # effects, preserving the one-executor-per-instance invariant.
+        self.dispatcher_generation = 0
+        self.dispatcher_last_pass = time.time()
+        self.dispatcher_thread = None
 
     def start_instance_monitor(self, instance_uuid):
         # Rate limit how often we try to connect
@@ -855,6 +881,12 @@ class Monitor(daemon.Daemon):
                 del self.monitors[instance_uuid]
 
     def start_instance_executor(self, instance_uuid, agentop):
+        self.executor_attempts[instance_uuid] = time.time()
+
+        # Note that returning early here (or indeed failing anywhere between
+        # the operation being selected and the executor moving it to the
+        # executing state) is safe: the operation remains at the head of the
+        # instance's queue and will simply be dispatched again later.
         inst = instance.Instance.from_db(instance_uuid)
         if not inst:
             return
@@ -921,13 +953,159 @@ class Monitor(daemon.Daemon):
                 EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                 'side channel monitor finished')
 
+    def _dispatch_loop(self, generation):
+        """Dispatch queued agent operations to instances with ready agents.
+
+        This deliberately runs in its own thread, separate from the monitor
+        management loop in _run_inner(). Both loops make calls that can stall
+        for a long time without raising -- libvirt domain audits, and gRPC
+        database reads whose deadline-and-retry cascade can silently consume
+        ~90 seconds per call when a channel subchannel wedges (the gRPC
+        channel is thread-local, so a wedge affects exactly one thread).
+        When dispatch shared the monitor loop's thread, any such stall
+        starved agent operation dispatch for every instance on the node,
+        which presented as an operation stuck in the queued state while the
+        instance's agent was ready. In its own thread (and therefore with
+        its own gRPC channel), dispatch is isolated from monitor management
+        stalls, and vice versa.
+        """
+        util_concurrency.set_thread_name(f'dispatcher-{generation}')
+        log = LOG.with_fields({'dispatcher_generation': generation})
+        log.info('Dispatcher starting')
+
+        last_heartbeat = time.time()
+        while daemon.check_abort_path(self.abort_path):
+            # If the supervisor has replaced us (because we stopped
+            # completing passes, usually a wedged thread-local gRPC channel
+            # that swallowed a call without ever firing its deadline), exit
+            # without further side effects so we can never race the
+            # replacement into a double dispatch.
+            if generation != self.dispatcher_generation:
+                log.warning(
+                    'Dispatcher replaced by a newer generation, exiting')
+                return
+
+            try:
+                self.reap_instance_executors()
+
+                # Run jobs for healthy instances. For now we only support
+                # running one job at once per instance.
+                for instance_uuid in list(self.monitors.keys()):
+                    if instance_uuid in self.executors:
+                        continue
+
+                    # Rate limit executor starts per instance. A failed
+                    # dispatch (the executor couldn't connect, or the
+                    # agent never welcomed us) leaves the operation at
+                    # the head of the queue, so we would otherwise retry
+                    # every loop iteration.
+                    last_attempt = self.executor_attempts.get(
+                        instance_uuid, 0)
+                    if time.time() - last_attempt < 5:
+                        continue
+
+                    # The monitor management loop can remove entries while
+                    # we iterate our snapshot, so fetch defensively.
+                    monitor = self.monitors.get(instance_uuid)
+                    if not monitor:
+                        continue
+                    ready = monitor['object'].instance_ready
+                    if ready not in [constants.AGENT_READY,
+                                     constants.AGENT_READY_DEGRADED]:
+                        continue
+
+                    inst = instance.Instance.from_db(instance_uuid)
+                    if not inst:
+                        continue
+
+                    agentop = inst.agent_operation_next()
+                    if agentop:
+                        if generation != self.dispatcher_generation:
+                            # Replaced mid-pass (see above); the operation
+                            # stays at the head of the queue for the new
+                            # generation to dispatch.
+                            log.warning(
+                                'Dispatcher replaced by a newer generation, '
+                                'exiting without dispatching')
+                            return
+
+                        inst.add_event(
+                            EVENT_TYPE_AUDIT, 'dispatching agent operation',
+                            extra={'agentoperation': agentop.uuid})
+                        log.with_fields({
+                            'instance': instance_uuid,
+                            'agentoperation': agentop.uuid
+                        }).info('Dispatching agent operation')
+
+                        self.start_instance_executor(
+                            instance_uuid, agentop)
+
+                # Record pass completion for the supervisor in _run_inner,
+                # and emit a periodic positive liveness signal so a silent
+                # dispatcher is diagnosable from logs alone.
+                self.dispatcher_last_pass = time.time()
+                if time.time() - last_heartbeat > 300:
+                    last_heartbeat = time.time()
+                    log.with_fields({
+                        'monitors': len(self.monitors),
+                        'executors': len(self.executors)
+                    }).info('Dispatcher heartbeat')
+
+                time.sleep(1)
+
+            except Exception as e:
+                util_exceptions.ignore_exception('side channel dispatcher', e)
+                time.sleep(1)
+
+        log.info('Dispatcher stopping')
+
+    def start_dispatcher(self):
+        """Start a new dispatcher thread generation."""
+        self.dispatcher_generation += 1
+        generation = self.dispatcher_generation
+        self.dispatcher_last_pass = time.time()
+        self.dispatcher_thread = threading.Thread(
+            target=self._dispatch_loop, args=(generation,), daemon=True,
+            name=f'dispatcher-{generation}')
+        self.dispatcher_thread.start()
+
+    def supervise_dispatcher(self):
+        """Replace the dispatcher if it has stopped completing passes.
+
+        A dispatch pass normally completes in a few seconds. The known way
+        for it to stop entirely without logging anything is a wedged
+        thread-local gRPC channel where the completion queue no longer
+        fires deadlines, so the blocked call never returns and never
+        raises (observed taking ~21 minutes to self-recover at the TCP
+        layer). A replacement thread gets a fresh thread-local channel,
+        which recovers dispatch in bounded time; the generation counter
+        stops the old thread acting further if it later unwedges.
+        """
+        if self.dispatcher_thread and not self.dispatcher_thread.is_alive():
+            LOG.error('Dispatcher thread died, starting a replacement')
+            self.start_dispatcher()
+            return
+
+        stalled = time.time() - self.dispatcher_last_pass
+        if stalled > 120:
+            LOG.with_fields({
+                'stalled_seconds': int(stalled),
+                'old_generation': self.dispatcher_generation
+            }).error(
+                'Dispatcher has not completed a pass in too long '
+                '(wedged thread-local gRPC channel is the usual cause), '
+                'starting a replacement thread with a fresh channel')
+            self.start_dispatcher()
+
     def _run_inner(self):
+        self.start_dispatcher()
+
         while daemon.check_abort_path(self.abort_path):
             try:
                 self.wait_for_nodelock()
 
+                self.supervise_dispatcher()
                 self.reap_instance_monitors()
-                self.reap_instance_executors()
 
                 if not os.path.exists(self.abort_path):
                     # Audit desired self.monitors
@@ -963,30 +1141,6 @@ class Monitor(daemon.Daemon):
                     for instance_uuid in extra_instances:
                         self._request_thread_exit(
                             instance_uuid, self.monitors[instance_uuid])
-
-                    # Run jobs for healthy instances. For now we only support
-                    # running one job at once.
-                    for instance_uuid in list(self.monitors.keys()):
-                        if instance_uuid in self.executors:
-                            continue
-
-                        inst = instance.Instance.from_db(instance_uuid)
-                        if not inst:
-                            continue
-
-                        ready = self.monitors[instance_uuid]['object'].instance_ready
-                        if ready not in [constants.AGENT_READY,
-                                         constants.AGENT_READY_DEGRADED]:
-                            continue
-
-                        agentop = inst.agent_operation_dequeue()
-                        if agentop:
-                            inst.add_event(
-                                EVENT_TYPE_AUDIT, 'dequeued agent operation',
-                                extra={'agentoperation': agentop.uuid})
-
-                            self.start_instance_executor(
-                                instance_uuid, agentop)
 
                     self.idle(1)
 

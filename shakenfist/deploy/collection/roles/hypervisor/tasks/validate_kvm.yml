@@ -1,0 +1,7 @@
+---
+# Preflight check: confirm this host can actually run KVM. The consuming
+# playbook runs this via:
+#   include_role: { name: shakenfist.shakenfist.hypervisor, tasks_from: validate_kvm }
+- name: Check that we can run KVM
+  ansible.builtin.command: kvm-ok
+  changed_when: false

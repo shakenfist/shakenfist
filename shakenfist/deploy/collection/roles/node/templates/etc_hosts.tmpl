@@ -1,0 +1,21 @@
+127.0.0.1 localhost
+
+# The following lines are desirable for IPv6 capable hosts
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
+
+{% for name, mesh_ip in all_mesh_hosts.items() %}
+{{ mesh_ip }}  {{ name }}
+{% endfor %}
+{# The legacy template appended an "sf-primary" alias pointing at the
+   primary node's mesh IP (read from the primary_node inventory group). The
+   primary node has been removed from Shaken Fist, so that alias is gone.
+   Nothing in the server or client reads an "sf-primary" host alias at
+   runtime. If a future need for a stable cluster-wide alias appears, the
+   example playbook (which may read inventory groups) should synthesise it
+   and pass it in via all_mesh_hosts -- the node role itself must not embed a
+   group name. #}

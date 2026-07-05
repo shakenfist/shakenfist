@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  author: Michael Still and contributors
+  description: >-
+    Prepare a host to act as a Shaken Fist network node: remove the distro
+    dnsmasq unit, install the DHCP/DNS templates, enable IPv4 forwarding, and
+    validate the mesh interface MTU.
+  license: Apache-2.0
+  min_ansible_version: '2.15'
+dependencies:
+  - role: shakenfist.shakenfist.common

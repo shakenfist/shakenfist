@@ -1,0 +1,6 @@
+---
+# Multi-node Shaken Fist deploy. All the deploy logic lives in the shared
+# playbook; this file just imports it. The inventory maps hosts to capability
+# groups and the cluster-wide variables come from group_vars/all.yml.
+- name: Deploy Shaken Fist (cluster)
+  ansible.builtin.import_playbook: ../_shared/site.yml

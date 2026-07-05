@@ -399,6 +399,17 @@ def _grpc_call(method: Any, request: Any) -> Any:
             if e.code() not in retryable_codes:
                 raise
             if attempt < GRPC_RETRIES - 1:
+                # This retry cascade can silently consume up to
+                # GRPC_RETRIES * GRPC_TIMEOUT seconds of the caller's time
+                # (a DEADLINE_EXCEEDED attempt blocks for the full deadline
+                # before we get here), which has previously made wedged
+                # channels invisible in the logs while starving
+                # latency-sensitive callers. Always log each retry so a
+                # cascade is observable.
+                LOG.warning(
+                    f'gRPC {method_name or "call"} failed with '
+                    f'{e.code().name}, retrying with a fresh channel '
+                    f'(attempt {attempt + 1} of {GRPC_RETRIES})')
                 time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
                 _reset_database_stub()
         except ValueError as e:
@@ -406,9 +417,15 @@ def _grpc_call(method: Any, request: Any) -> Any:
                 raise
             last_error = e
             if attempt < GRPC_RETRIES - 1:
+                LOG.warning(
+                    f'gRPC {method_name or "call"} invoked on a channel '
+                    f'closed by a concurrent retry, retrying with a fresh '
+                    f'channel (attempt {attempt + 1} of {GRPC_RETRIES})')
                 time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
                 _reset_database_stub()
 
+    LOG.error(
+        f'gRPC {method_name or "call"} failed after {GRPC_RETRIES} attempts')
     raise last_error
 
 

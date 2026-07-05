@@ -1,0 +1,556 @@
+# Copyright 2019 Michael Still and contributors
+#
+# A native Shaken Fist ansible module for managing instances. This replaces
+# the legacy bash shim that shelled out to `sf-client ansible instance`; the
+# arg -> API mapping (including the dirtiness comparison) is ported from
+# client-python's shakenfist_client/commandline/ansible.py.
+from __future__ import annotations
+
+import json
+import time
+
+from ansible.module_utils.basic import AnsibleModule
+
+from shakenfist_client import apiclient
+
+
+DOCUMENTATION = r'''
+---
+module: sf_instance
+short_description: Create, replace and delete Shaken Fist instances.
+description:
+  - Idempotently ensure a Shaken Fist instance is present or absent.
+  - Shaken Fist instances are immutable. When the requested specification
+    differs from the existing instance, the instance is deleted and recreated.
+  - Imports the C(shakenfist_client) SDK and talks to the Shaken Fist REST
+    API directly; the control node only needs
+    C(pip install shakenfist-client).
+options:
+  name:
+    description: The name of the instance. One of O(name) or O(uuid) is required.
+    required: false
+    type: str
+  uuid:
+    description: The UUID of the instance. One of O(name) or O(uuid) is required.
+    required: false
+    type: str
+  cpu:
+    description: The number of vCPUs. Required when creating an instance.
+    required: false
+    type: int
+  ram:
+    description: The amount of RAM in megabytes. Required when creating.
+    required: false
+    type: int
+  disks:
+    description:
+      - A list of simple disk specifications, each either a size in GB
+        (for example C("10")) or C(size@base) (for example C(10@debian:11)).
+    required: false
+    type: list
+    elements: str
+  diskspecs:
+    description:
+      - A list of full comma separated disk key=value specifications (for
+        example C(size=20,type=cdrom)).
+    required: false
+    type: list
+    elements: str
+  networks:
+    description: A list of network UUIDs to attach with default settings.
+    required: false
+    type: list
+    elements: str
+  networkspecs:
+    description:
+      - A list of comma separated network key=value specifications (for
+        example C(network_uuid=...,address=10.0.0.5,float=True)).
+    required: false
+    type: list
+    elements: str
+  ssh_key:
+    description: An SSH public key to inject via the config drive.
+    required: false
+    type: str
+  user_data:
+    description: Base64 encoded cloud-init user data.
+    required: false
+    type: str
+  placement:
+    description: Force placement onto a named node.
+    required: false
+    type: str
+  video:
+    description: The video model to use.
+    required: false
+    type: str
+  nvram_template:
+    description: The NVRAM template to use (for UEFI / secure boot).
+    required: false
+    type: str
+  configdrive:
+    description: The config drive style to use.
+    required: false
+    type: str
+  side_channels:
+    description: A list of side channel names to expose to the instance.
+    required: false
+    type: list
+    elements: str
+  uefi:
+    description: Whether to boot the instance with UEFI.
+    required: false
+    type: bool
+  secureboot:
+    description: Whether to enable secure boot (implies UEFI).
+    required: false
+    type: bool
+  metadata:
+    description: A dictionary of metadata to set on the instance.
+    required: false
+    type: dict
+  await:
+    description: Whether to block until the instance has finished creating.
+    required: false
+    default: false
+    type: bool
+  await_timeout:
+    description: How long to wait, in seconds, when O(await) is true.
+    required: false
+    default: 600
+    type: int
+  state:
+    description: Whether the instance should be present or absent.
+    required: false
+    default: present
+    choices: [present, absent]
+    type: str
+  api_url:
+    description:
+      - Base URL of the Shaken Fist API. When omitted (with O(namespace)
+        and O(key)) credentials are auto-discovered from the environment and
+        C(sfrc) config exactly like the C(sf-client) CLI.
+    required: false
+    type: str
+  namespace:
+    description: The namespace the instance belongs to / authenticate as.
+    required: false
+    type: str
+  key:
+    description: The authentication key for O(namespace).
+    required: false
+    type: str
+    no_log: true
+author:
+  - Michael Still and contributors
+'''
+
+EXAMPLES = r'''
+- name: Create an instance
+  shakenfist.shakenfist.sf_instance:
+    name: myvm
+    cpu: 2
+    ram: 2048
+    disks:
+      - 10@debian:11
+    networks:
+      - "{{ mynet_uuid }}"
+    state: present
+  register: result
+
+- name: Delete an instance by uuid
+  shakenfist.shakenfist.sf_instance:
+    uuid: "{{ result['meta']['uuid'] }}"
+    state: absent
+'''
+
+RETURN = r'''
+changed:
+  description: Whether the module created or replaced the instance.
+  returned: always
+  type: bool
+failed:
+  description: Whether the module failed.
+  returned: always
+  type: bool
+meta:
+  description: The instance object as returned by the API, when available.
+  returned: success
+  type: dict
+log:
+  description: A list of human readable progress messages, for debugging.
+  returned: always
+  type: list
+  elements: str
+'''
+
+
+class InstanceCreationException(Exception):
+    ...
+
+
+def _make_client(module):
+    # Build a quiet, patient, blocking client. When all three connection
+    # parameters are supplied we suppress configuration lookup and use them
+    # verbatim; otherwise we auto-discover from the environment / sfrc config
+    # exactly like the sf-client CLI.
+    api_url = module.params.get('api_url')
+    namespace = module.params.get('namespace')
+    key = module.params.get('key')
+
+    kwargs = {
+        'verbose': False,
+        'sync_request_timeout': 1800,
+        'async_strategy': apiclient.ASYNC_BLOCK,
+    }
+    if api_url and namespace and key:
+        kwargs.update({
+            'base_url': api_url,
+            'namespace': namespace,
+            'key': key,
+            'suppress_configuration_lookup': True,
+        })
+    try:
+        return apiclient.Client(**kwargs)
+    except apiclient.UnconfiguredException as e:
+        module.fail_json(
+            msg='Could not configure the Shaken Fist client: %s' % e, meta=None, log=[])
+
+
+def _check_instance(client, existing, params, log):
+    # Faithful port of client-python's commandline/ansible.py _check_instance.
+    # Builds the create_instance() args and kwargs and determines whether the
+    # existing instance (if any) differs from the requested specification.
+    dirty = False
+    instance_args = []
+    instance_kwargs = {}
+
+    # Required parameters. Note the names differ between the ansible params and
+    # the existing instance object for historical reasons.
+    for param_name, existing_name in [('name', 'name'), ('cpu', 'cpus'),
+                                      ('ram', 'memory')]:
+        if params.get(param_name) is None:
+            raise InstanceCreationException('You must specify %s' % param_name)
+
+        if param_name == 'name':
+            if existing.get('name') != params['name']:
+                log.append('Instance dirty: name has changed from %s to %s'
+                           % (existing.get('name'), params['name']))
+                dirty = True
+            instance_args.append(params['name'])
+            continue
+
+        value = int(params[param_name])
+        instance_args.append(value)
+        if existing.get(existing_name) != value:
+            log.append('Instance dirty: %s has changed from %s to %s'
+                       % (param_name, existing.get(existing_name), value))
+            dirty = True
+
+    # Networks. Networks in the REST API are represented by interfaces, so we
+    # represent everything as a networkspec for the purposes of creation.
+    requested_networks = []
+    for n in params.get('networks') or []:
+        requested_networks.append({
+            'network_uuid': n,
+            'model': 'virtio',
+            'float': False
+        })
+
+    for n in params.get('networkspecs') or []:
+        defn = {}
+        for elem in n.split(','):
+            s = elem.split('=')
+            if len(s) != 2:
+                raise InstanceCreationException(
+                    'network specification should be key=value not %s' % elem)
+            if s[0] == 'float':
+                # The value arrives as a string; bool('False') is truthy, so
+                # parse the common boolean spellings explicitly.
+                s[1] = str(s[1]).strip().lower() in ('true', '1', 'yes')
+            defn[s[0]] = s[1]
+        requested_networks.append(defn)
+
+    # Painful dirtiness comparison of the interfaces.
+    existing_interfaces = []
+    for interface in existing.get('interfaces', []):
+        iface = client.get_interface(interface['uuid'])
+        existing_interfaces.append({
+            'network_uuid': iface['network_uuid'],
+            'macaddress': iface['macaddr'],
+            'address': iface['ipv4'],
+            'model': iface['model'],
+            # The API reports 'floating' as the allocated floating address (a
+            # string) or None, but a networkspec requests float as a boolean.
+            # Normalise to a bool so "has a floating IP" compares equal to a
+            # requested float=True, rather than being perpetually dirty.
+            'float': bool(iface['floating'])
+        })
+    if len(existing_interfaces) != len(requested_networks):
+        log.append('Instance dirty: the number of interfaces changed')
+        dirty = True
+    else:
+        for idx in range(len(existing_interfaces)):
+            existing_iface = existing_interfaces[idx]
+            requested_iface = requested_networks[idx]
+
+            if existing_iface['network_uuid'] != requested_iface['network_uuid']:
+                log.append('Instance dirty: interface %d changed network' % idx)
+                dirty = True
+                break
+
+            for attr in ['macaddress', 'address', 'model', 'float']:
+                if (attr in requested_iface and
+                        existing_iface[attr] != requested_iface[attr]):
+                    log.append('Instance dirty: interface %d changed %s' % (idx, attr))
+                    dirty = True
+                    break
+
+    instance_args.append(requested_networks)
+
+    # Disks. Convert everything to a disk spec because that's what's returned
+    # by the REST API.
+    requested_disks = []
+    for d in params.get('disks') or []:
+        base = None
+        if '@' not in d:
+            size = int(d)
+        else:
+            size, base = d.split('@')
+            try:
+                size = int(size)
+            except ValueError:
+                raise InstanceCreationException('disk size must be an integer')
+
+        requested_disks.append({
+            'base': base,
+            'bus': None,
+            'size': size,
+            'type': 'disk'
+        })
+
+    for d in params.get('diskspecs') or []:
+        defn = {
+            'base': None,
+            'bus': None,
+            'size': None,
+            'type': 'disk'
+        }
+        for elem in d.split(','):
+            s = elem.split('=')
+            if len(s) != 2:
+                raise InstanceCreationException(
+                    'disk specification should be key=value not %s' % elem)
+
+            if s[0] == 'size':
+                try:
+                    s[1] = int(s[1])
+                except ValueError:
+                    raise InstanceCreationException('disk size must be an integer')
+
+            defn[s[0]] = s[1]
+        requested_disks.append(defn)
+
+    # Clean up existing disk specifications. disk_base is an internal
+    # representation of a cleaned up disk's base.
+    cleaned_existing_disks = []
+    for e in existing.get('disk_spec', []):
+        if 'disk_base' in e:
+            del e['disk_base']
+        cleaned_existing_disks.append(e)
+
+    json_requested = json.dumps(requested_disks, sort_keys=True)
+    json_existing = json.dumps(cleaned_existing_disks, sort_keys=True)
+    if json_requested != json_existing:
+        log.append('Instance dirty: disk specification has changed')
+        log.append('    Requested: %s' % json_requested)
+        log.append('    Existing: %s' % json_existing)
+        dirty = True
+
+    instance_args.append(requested_disks)
+
+    # Single string values (passed positionally to create_instance).
+    for key in ['ssh_key', 'user_data']:
+        if params.get(key) is not None:
+            if existing.get(key) != params[key]:
+                log.append('Instance dirty: %s has changed' % key)
+                dirty = True
+            instance_args.append(params[key])
+        else:
+            instance_args.append(None)
+
+    # Optional single string keyword values.
+    for key in ['placement', 'video', 'nvram_template', 'configdrive', 'namespace']:
+        if params.get(key) is not None:
+            if existing.get(key) != params[key]:
+                log.append('Instance dirty: %s has changed' % key)
+                dirty = True
+            kwarg = 'force_placement' if key == 'placement' else key
+            instance_kwargs[kwarg] = params[key]
+
+    # Optional list-of-strings values. Normalise both sides through `or []` so
+    # an instance with no side channels (the API reports the field as None)
+    # compares equal to an unset request (which defaults to []). Without this
+    # the comparison is perpetually dirty, which forces a needless
+    # delete-and-recreate on every "ensure present" -- breaking idempotency and,
+    # for an instance with a static address, failing the recreate with a 409
+    # because the address is still reserved by the instance being replaced.
+    for key in ['side_channels']:
+        values = params.get(key) or []
+        if (existing.get(key) or []) != values:
+            log.append('Instance dirty: %s has changed' % key)
+            dirty = True
+        instance_kwargs[key] = values
+
+    # Optional boolean values.
+    for key in ['uefi', 'secureboot']:
+        if params.get(key) is not None:
+            value = bool(params[key])
+            if existing.get(key) != value:
+                log.append('Instance dirty: %s has changed' % key)
+                dirty = True
+            kwarg = 'secure_boot' if key == 'secureboot' else key
+            instance_kwargs[kwarg] = value
+
+    # Metadata is a dict.
+    metadata = {}
+    for k, v in (params.get('metadata') or {}).items():
+        metadata[k] = v
+    if metadata:
+        instance_kwargs['metadata'] = metadata
+
+    if dirty:
+        return True, instance_args, instance_kwargs
+
+    return False, None, None
+
+
+def _delete_and_wait(client, log, identifier, namespace):
+    start_time = time.time()
+    while time.time() - start_time < 180:
+        try:
+            log.append('Attempt deletion...')
+            client.delete_instance(identifier, namespace=namespace)
+            time.sleep(1)
+            i = client.get_instance(identifier, namespace=namespace)
+            if not i or i['state'] == 'deleted':
+                return None
+        except apiclient.ResourceNotFoundException:
+            return None
+    return client.get_instance(identifier, namespace=namespace)
+
+
+def run_module():
+    argument_spec = {
+        'name': {'required': False, 'type': 'str'},
+        'uuid': {'required': False, 'type': 'str'},
+        'cpu': {'required': False, 'type': 'int'},
+        'ram': {'required': False, 'type': 'int'},
+        'disks': {'required': False, 'type': 'list', 'elements': 'str'},
+        'diskspecs': {'required': False, 'type': 'list', 'elements': 'str'},
+        'networks': {'required': False, 'type': 'list', 'elements': 'str'},
+        'networkspecs': {'required': False, 'type': 'list', 'elements': 'str'},
+        'ssh_key': {'required': False, 'type': 'str'},
+        'user_data': {'required': False, 'type': 'str'},
+        'placement': {'required': False, 'type': 'str'},
+        'video': {'required': False, 'type': 'str'},
+        'nvram_template': {'required': False, 'type': 'str'},
+        'configdrive': {'required': False, 'type': 'str'},
+        'side_channels': {'required': False, 'type': 'list', 'elements': 'str'},
+        'uefi': {'required': False, 'type': 'bool'},
+        'secureboot': {'required': False, 'type': 'bool'},
+        'metadata': {'required': False, 'type': 'dict'},
+        'await': {'required': False, 'type': 'bool', 'default': False},
+        'await_timeout': {'required': False, 'type': 'int', 'default': 600},
+        'state': {
+            'default': 'present',
+            'choices': ['present', 'absent'],
+            'type': 'str',
+        },
+        'api_url': {'required': False, 'type': 'str'},
+        'namespace': {'required': False, 'type': 'str'},
+        'key': {'required': False, 'type': 'str', 'no_log': True},
+    }
+
+    module = AnsibleModule(
+        argument_spec=argument_spec, supports_check_mode=True)
+
+    log = []
+    state = module.params['state']
+    namespace = module.params.get('namespace')
+
+    identifier = module.params.get('uuid') or module.params.get('name')
+    log.append('Will use identifier %s' % identifier)
+    if not identifier:
+        module.fail_json(
+            msg='You must specify one of name or uuid', meta=None, log=log)
+
+    client = _make_client(module)
+
+    if state == 'present':
+        try:
+            i = client.get_instance(identifier, namespace=namespace)
+        except apiclient.ResourceNotFoundException:
+            i = {}
+
+        try:
+            needs_replacement, instance_args, instance_kwargs = \
+                _check_instance(client, i, module.params, log)
+        except InstanceCreationException as e:
+            module.fail_json(msg=str(e), meta=None, log=log)
+
+        if module.check_mode:
+            module.exit_json(
+                changed=needs_replacement, meta=(i or None), log=log)
+
+        if needs_replacement:
+            if i:
+                remaining = _delete_and_wait(client, log, identifier, namespace)
+                if remaining and remaining.get('state') != 'deleted':
+                    log.append('Repeated attempts at deletion failed')
+                    module.fail_json(
+                        msg='Deletion of instance for update failed.',
+                        meta=None, log=log)
+
+            i = client.create_instance(*instance_args, **instance_kwargs)
+
+        if not module.params.get('await'):
+            log.append('Not awaiting instance')
+        else:
+            log.append('Awaiting instance %s' % i['uuid'])
+            try:
+                client.await_instance_create(
+                    i['uuid'], timeout=module.params.get('await_timeout'))
+            except Exception as e:
+                log.append('Waiting for instance failed: %s' % e)
+                module.fail_json(
+                    msg='Waiting for instance failed: %s' % e, meta=None, log=log)
+
+        module.exit_json(
+            changed=needs_replacement, meta=client.get_instance(i['uuid']), log=log)
+
+    # state == 'absent'
+    try:
+        client.get_instance(identifier, namespace=namespace)
+    except apiclient.ResourceNotFoundException:
+        log.append('Instance not found')
+        module.exit_json(changed=False, meta=None, log=log)
+
+    if module.check_mode:
+        module.exit_json(changed=True, meta=None, log=log)
+
+    remaining = _delete_and_wait(client, log, identifier, namespace)
+    if remaining is None:
+        log.append('Deleted')
+        module.exit_json(changed=True, meta=None, log=log)
+
+    log.append('Repeated attempts at deletion failed')
+    module.fail_json(msg='Deletion of instance failed', meta=remaining, log=log)
+
+
+def main():
+    run_module()
+
+
+if __name__ == '__main__':
+    main()

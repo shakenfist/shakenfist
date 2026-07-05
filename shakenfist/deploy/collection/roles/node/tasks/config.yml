@@ -1,0 +1,141 @@
+---
+# Write the per-node Shaken Fist configuration: /etc/sf/config (the daemon
+# EnvironmentFile), the sfrc shell helper and the global auth file, and all of
+# the systemd units. Every value comes from a role variable; this task reads no
+# inventory groups and no other host's facts. The sf-database.service unit is
+# written on every node where node_is_database_node is true.
+
+- name: Use Hashicorp Vault for "system" namespace key (if enabled)
+  block:
+    - name: Look up the system namespace key from Vault
+      ansible.builtin.set_fact:
+        system_key: "{{ lookup('hashivault', vault_system_key_path, 'key') }}"
+      when: vault_system_key_path is defined
+
+  rescue:
+    - name: Fail if the hashivault lookup plugin is missing
+      ansible.builtin.fail:
+        msg: >-
+          Ensure that you have installed ansible-modules-hashivault ie.
+          pip install ansible-modules-hashivault
+
+- name: Create config directory
+  ansible.builtin.file:
+    path: /etc/sf
+    state: directory
+    mode: u+rwx,go+rx
+
+- name: Write sfrc file
+  ansible.builtin.template:
+    src: sfrc
+    dest: /etc/sf/sfrc
+    owner: root
+    group: sudo
+    mode: u=r,g=r,o=
+
+- name: Install sfrc for root user
+  ansible.builtin.lineinfile:
+    path: /root/.bashrc
+    create: true
+    regexp: ". /etc/sf/sfrc"
+    line: ". /etc/sf/sfrc"
+    mode: u=rw,go=r
+
+- name: Write a global auth file
+  ansible.builtin.template:
+    src: shakenfist.json
+    dest: /etc/sf/shakenfist.json
+    owner: root
+    group: sudo
+    mode: u=r,g=r,o=
+
+# The config template ships with this role, so it is rendered directly on the
+# target host. The legacy deployer fetched a control-node-rendered config back
+# and re-templated it; that round trip is unnecessary now that the template is
+# role-local and reads only role variables.
+- name: Check if we have an existing config
+  ansible.builtin.stat:
+    path: /etc/sf/config
+  register: config_stat_result
+
+- name: Write config file on remote host
+  ansible.builtin.template:
+    src: config
+    dest: /etc/sf/config
+    owner: root
+    group: root
+    mode: ugo+r
+  when: not config_stat_result.stat.exists
+  notify: Reload systemd
+
+- name: Remove obsolete systemd units
+  ansible.builtin.file:
+    dest: /etc/systemd/system/{{ item }}
+    state: absent
+  with_items:
+    - sf.service
+    - sf-checksums.service
+  notify: Reload systemd
+
+- name: Write systemd target unit on remote host
+  ansible.builtin.template:
+    src: sf.target
+    dest: /etc/systemd/system/sf.target
+    owner: root
+    group: root
+    mode: ugo+r
+  notify: Reload systemd
+
+- name: Write systemd units on remote host
+  ansible.builtin.template:
+    src: sf.service
+    dest: /etc/systemd/system/sf-{{ item }}.service
+    owner: root
+    group: root
+    mode: ugo+r
+  with_items:
+    - sentinel-first
+    - sentinel-last
+    - privexec
+    - nodelock
+    - cleaner
+    - cluster
+    - net
+    - queues
+    - resources
+    - sidechannel
+    - transfers
+  notify: Reload systemd
+
+- name: Write systemd unit for API daemon
+  ansible.builtin.template:
+    src: sf-api.service
+    dest: /etc/systemd/system/sf-api.service
+    owner: root
+    group: root
+    mode: ugo+r
+  notify: Reload systemd
+
+- name: Write systemd unit for database daemon
+  ansible.builtin.template:
+    src: sf.service
+    dest: /etc/systemd/system/sf-database.service
+    owner: root
+    group: root
+    mode: ugo+r
+  vars:
+    item: database
+  when: node_is_database_node
+  notify: Reload systemd
+
+# https://stackoverflow.com/questions/64701241/how-do-i-write-ansible-task-for-systemctl-set-default-graphical-target-without
+- name: Make sure sf.target unit is the default
+  vars:
+    cmd_check: systemctl get-default | grep -q ^sf.target$
+    cmd_set: systemctl set-default sf.target
+  ansible.builtin.shell:
+    cmd: '{{ cmd_check }} && exit 0; {{ cmd_set }}; {{ cmd_check }} && exit 1; exit 2'
+  register: set_default_result
+  changed_when: set_default_result.rc == 1
+  failed_when: set_default_result.rc == 2
+  notify: Reload systemd

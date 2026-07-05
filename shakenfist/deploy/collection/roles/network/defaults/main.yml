@@ -1,0 +1,8 @@
+---
+# The mesh network interface whose MTU is validated by validate_mtus. Set by
+# the consuming playbook from each host's per-node identity.
+node_mesh_nic: "undefined"
+
+# When "1", skip the minimum-MTU check in validate_mtus. Any other value
+# enforces a minimum mesh MTU of 2000.
+ignore_mtu: "0"

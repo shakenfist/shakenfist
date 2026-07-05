@@ -2,6 +2,8 @@
 
 - hosts: localhost
   gather_facts: no
+  collections:
+    - shakenfist.shakenfist
 
   tasks:
     - name: Create a test instance with metadata
@@ -56,7 +58,7 @@
 
     - name: Assert we have instance details
       assert:
-        that: ci_instance_one['meta']
+        that: ci_instance_one['meta'] | default({}, true) | length > 0
         fail_msg: "meta should be populated in {{ ci_instance_one }}"
 
     - name: Create a second instance using affinity via metadata

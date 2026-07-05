@@ -1,0 +1,11 @@
+# Control-node Python requirements for the shakenfist.shakenfist collection.
+#
+# The native modules under plugins/modules/ (sf_namespace, sf_network,
+# sf_instance, sf_snapshot) import the shakenfist_client SDK to talk to the
+# Shaken Fist REST API. Install this on the Ansible control node with:
+#
+#     pip install -r requirements.txt
+#
+# The control node only needs the client package -- never the Shaken Fist
+# server package.
+shakenfist-client

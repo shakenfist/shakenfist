@@ -1,0 +1,39 @@
+# Ansible-lint configuration for the Shaken Fist example consumer playbooks.
+#
+# Run manually (with the collection on the path):
+#   ANSIBLE_COLLECTIONS_PATH=... ansible-lint examples/
+#
+# This mirrors the collection's own permissive basic profile (the shared
+# playbook necessarily references the collection roles, so ansible-lint also
+# evaluates them and we keep the same skips), plus a few example-specific
+# skips documented below.
+
+profile: basic
+
+exclude_paths:
+  # Transient ansible-lint / ansible cache, never committed.
+  - .ansible/
+
+skip_list:
+  # --- Inherited from the collection's .ansible-lint (the example playbook
+  # passes the same unprefixed variables to several roles; that unprefixed
+  # naming is the deliberate cross-role contract). ---
+  - var-naming[no-role-prefix]
+  - package-latest
+  - galaxy[no-changelog]
+
+  # --- Example-playbook-specific skips ---
+
+  # The cluster-wide, once-per-deploy operations (ensure-mariadb-schema, the
+  # cluster_config set-config calls, and bootstrap-system-key) are
+  # intentionally run_once and delegated to a single database-tier host. They
+  # must run exactly once for the whole cluster, reproducing the legacy primary
+  # role's once-per-cluster behaviour.
+  # These playbooks use the default (linear) strategy, so run_once is correct.
+  - run-once[task]
+
+  # The final sanity-check play deliberately shells out to systemctl and curl
+  # rather than the systemd/uri modules: it reproduces the legacy
+  # roles/primary/postinstall.yml checks verbatim (sf-api/sf-queues active, the
+  # API returns 401), and those exact commands are the documented contract.
+  - command-instead-of-module

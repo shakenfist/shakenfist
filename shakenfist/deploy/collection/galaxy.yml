@@ -1,0 +1,28 @@
+---
+# Ansible Galaxy collection metadata for shakenfist.shakenfist.
+#
+# NOTE: the version below is a placeholder. The release.yml "build-collection"
+# job injects the real Shaken Fist version (from setuptools_scm, the same
+# source as util_general.get_version()) into this file at build time so the
+# collection and the server package never drift.
+namespace: shakenfist
+name: shakenfist
+version: 0.0.0
+readme: README.md
+authors:
+  - Michael Still and contributors
+description: >-
+  Ansible roles for deploying Shaken Fist, an opinionated, minimal cloud
+  orchestration platform for VM and network management.
+license:
+  - Apache-2.0
+tags:
+  - cloud
+  - infrastructure
+  - shakenfist
+  - virtualization
+  - kvm
+dependencies: {}
+repository: https://github.com/shakenfist/shakenfist
+homepage: https://shakenfist.com/
+issues: https://github.com/shakenfist/shakenfist/issues

@@ -1,5 +1,0 @@
-{
-    "namespace": "system",
-    "key": "{{system_key}}",
-    "apiurl": "{{hostvars['localhost']['api_url']}}"
-}
