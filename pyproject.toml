@@ -48,7 +48,7 @@ dependencies = [
     "semver==3.0.4",                      # bsd
     "SQLAlchemy==2.0.50",                 # mit
 
-    "greenlet==3.5.1",                    # mit
+    "greenlet==3.5.3",                    # mit
     "gevent==26.5.0",                     # mit
     "gunicorn[gevent]==25.3.0",           # mit
 
