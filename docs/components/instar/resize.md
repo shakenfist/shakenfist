@@ -170,6 +170,21 @@ entire data region. This is a deliberate divergence — see
   under `## create subcommand quirks`). The divergence persists
   through resize — the resize planner preserves whatever the create
   writer chose.
+- **qcow2 images carrying persistent dirty bitmaps**. instar
+  **refuses** to resize them, because resizing rebuilds the header
+  cluster and would drop the qcow2 bitmaps extension (and its
+  bitmaps). `qemu-img resize` instead resizes the image,
+  dropping/invalidating the bitmaps. instar fails with:
+
+  ```
+  refusing to resize an image with persistent dirty bitmaps (would
+  discard them); remove the bitmaps first with `instar bitmap
+  --remove` or qemu-img
+  ```
+
+  The refusal prevents silent bitmap-data loss; remove the bitmaps
+  first with `instar bitmap --remove` (see
+  [docs/bitmap.md](/components/instar/bitmap/)).
 
 The canonical resize-side divergence whitelist is
 `KNOWN_RESIZE_DIVERGENCES` at the top of `tests/test_resize.py`.

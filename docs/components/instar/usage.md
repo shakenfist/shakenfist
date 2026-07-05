@@ -998,3 +998,17 @@ upstream `qemu-img dd` operand set (`bs`, `count`, `skip`,
 byte- and size-identical to `qemu-img dd` for all five output
 formats (raw, qcow2, vmdk, vpc, vhdx). See
 [docs/dd.md](/components/instar/dd/) for the full reference.
+
+### bitmap
+
+```
+instar bitmap (--add | --remove | --clear | --enable | --disable | --merge SOURCE)... [-g GRANULARITY] [-f FMT] [--output {human,json}] FILENAME BITMAP
+```
+
+Create, delete, clear, enable, disable, and merge qcow2 **persistent
+dirty bitmaps** in place — the sandboxed equivalent of `qemu-img
+bitmap`. Actions are applied in command-line order and the tool is
+silent on success. oVirt's VDSM / ovirt-imageio drive `qemu-img
+bitmap` to manage the checkpoint bitmaps that back incremental
+backup (see the oVirt section above). qcow2 v3-only. See
+[docs/bitmap.md](/components/instar/bitmap/) for the full reference.

@@ -103,6 +103,7 @@ nav:
         - Instar:
             - "Introduction": components/instar/index.md
             - "`instar amend` — change qcow2 image options in place": components/instar/amend.md
+            - "`instar bitmap` — manage qcow2 persistent dirty bitmaps": components/instar/bitmap.md
             - "`instar commit` — merge an overlay's data into its backing": components/instar/commit.md
             - "`instar create` — create a new empty disk image": components/instar/create.md
             - "`instar dd` — windowed block copy": components/instar/dd.md
@@ -156,6 +157,7 @@ nav:
                 - "June 2026 fuzzer bug backlog": components/instar/plans/PLAN-bug-fixes.md
                 - "instar amend subcommand": components/instar/plans/PLAN-amend.md
                 - "instar dd subcommand": components/instar/plans/PLAN-dd.md
+                - "instar bitmap subcommand": components/instar/plans/PLAN-bitmap.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
@@ -302,7 +304,7 @@ nav:
     - User Guide:
         - "Usage": user_guide/usage.md
         - "Authentication": user_guide/authentication.md
-        - "Ansible modules": user_guide/ansible.md
+        - "Ansible module": user_guide/ansible.md
         - "Artifacts": user_guide/artifacts.md
         - "Affinity": user_guide/affinity.md
         - "Consoles": user_guide/consoles.md
