@@ -190,7 +190,7 @@ def verify_config() -> None:
 def ensure_mariadb_schema() -> None:
     """Ensure the MariaDB schema exists and is up to date.
 
-    This command should be run on a database node (etcd_master) before
+    This command should be run on a database node before
     initializing any nodes. It creates the required MariaDB tables if
     they don't already exist, and applies any pending schema migrations.
     Only nodes with direct MariaDB access (MARIADB_HOST configured) can
@@ -199,7 +199,7 @@ def ensure_mariadb_schema() -> None:
     if not config.MARIADB_HOST:
         raise click.ClickException(
             'This command requires MARIADB_HOST to be configured. '
-            'It should only be run on database nodes (etcd_master).')
+            'It should only be run on database nodes.')
 
     engine = mariadb._get_engine()
     try:
@@ -235,7 +235,7 @@ def initialise_node(node_name: Optional[str], node_mesh_ip: Optional[str]) -> No
     When run without arguments, initializes the local node using NODE_NAME
     and NODE_MESH_IP from the configuration. When run with --node-name and
     --node-mesh-ip, can initialize any node (useful for bootstrapping from
-    the etcd_master with direct database access).
+    a database node with direct database access).
     """
     node_name = node_name or config.NODE_NAME
     node_mesh_ip = node_mesh_ip or config.NODE_MESH_IP
@@ -255,7 +255,7 @@ def register_daemon(daemon: tuple[str, ...], node_name: Optional[str]) -> None:
 
     When run without --node-name, registers daemons on the local node.
     When run with --node-name, can register daemons on any node (useful
-    for bootstrapping from the etcd_master with direct database access).
+    for bootstrapping from a database node with direct database access).
     """
     node_name = node_name or config.NODE_NAME
     n = Node.from_db(node_name)

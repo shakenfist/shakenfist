@@ -5,13 +5,13 @@ has three hosts:
 
 | Host | Roles | Mesh IP |
 |------|-------|---------|
-| `sf-1` | network node **and** database tier (`etcd_master`) | `10.0.0.1` |
+| `sf-1` | network node **and** database tier (`database_node`) | `10.0.0.1` |
 | `sf-2` | hypervisor | `10.0.0.2` |
 | `sf-3` | hypervisor | `10.0.0.3` |
 
 A host may belong to several capability groups (here `sf-1` is both the network
 node and the database tier). To scale the database tier for high availability,
-add more hosts to the `etcd_master` group — the playbook computes
+add more hosts to the `database_node` group — the playbook computes
 `mariadb_gateway_hosts` from every member, and clients load-balance across them.
 
 ## What this example contains
@@ -34,11 +34,11 @@ The example inventory uses these groups:
 * `allsf` — every Shaken Fist host;
 * `hypervisors` — hosts that run instances (`node_is_hypervisor`);
 * `network_node` — the single network node (`node_is_network_node`);
-* `etcd_master` — the database tier (`node_is_database_node`).
+* `database_node` — the database tier (`node_is_database_node`).
 
-`etcd_master` keeps its legacy name until the phase-7 rename to
-`database_node`. No role reads any group name — only this playbook does, and it
-maps the groups onto the role variables.
+The legacy `etcd_master` group name is still accepted, with a deprecation
+warning, and is removed in the next release. No role reads any group name —
+only this playbook does, and it maps the groups onto the role variables.
 
 ## Prerequisites
 

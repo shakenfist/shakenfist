@@ -1,14 +1,14 @@
 ---
 # Example multi-node Shaken Fist cluster:
-#   * sf-1 -- the network node AND the database tier (etcd_master)
+#   * sf-1 -- the network node AND the database tier (database_node)
 #   * sf-2 -- a hypervisor
 #   * sf-3 -- a hypervisor
 #
-# The legacy etcd_master group name is the database tier (renamed to
-# database_node in phase 7). A host may belong to several capability groups;
-# here sf-1 is both the network node and the database tier. To scale the
-# database tier, add more hosts to etcd_master -- the playbook computes
-# mariadb_gateway_hosts from every member.
+# A host may belong to several capability groups; here sf-1 is both the
+# network node and the database tier. To scale the database tier, add more
+# hosts to database_node -- the playbook computes mariadb_gateway_hosts from
+# every member. (The legacy etcd_master group name is still accepted, with a
+# deprecation warning, and is removed in the next release.)
 #
 # Per-host identity (node_name / node_egress_* / node_mesh_*) lives in
 # host_vars. ansible_host is the address ansible connects to (here the mesh IP).
@@ -44,7 +44,7 @@ all:
         sf-1:
 
     # sf-1 is the (single) database tier. Add hosts here to scale it.
-    etcd_master:
+    database_node:
       hosts:
         sf-1:
 

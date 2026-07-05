@@ -3,7 +3,7 @@
 """Database microservice daemon.
 
 This daemon provides a gRPC interface to etcd, allowing all cluster nodes to
-access the database through a single service running on the etcd_master node.
+access the database through the sf-database service on the database tier.
 This is the first step in decoupling etcd from the rest of the codebase to
 enable future migration to other database backends.
 """
