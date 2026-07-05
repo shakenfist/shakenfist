@@ -8,10 +8,12 @@
 # those variables and performs the cluster-wide reductions, then invokes the
 # roles per host.
 #
-# Expected inventory groups (the legacy etcd_master name is kept until phase 7):
+# Expected inventory groups:
 #   * hypervisors   -- hosts that run instances (node_is_hypervisor)
 #   * network_node  -- the single network node    (node_is_network_node)
-#   * etcd_master   -- the database tier           (node_is_database_node)
+#   * database_node -- the database tier           (node_is_database_node);
+#                      the legacy etcd_master name is still accepted, with a
+#                      deprecation warning, and is removed in the next release
 #   * storage       -- optional, reserved for future use (no role flag yet)
 #   * allsf         -- every Shaken Fist host
 #
@@ -137,12 +139,29 @@
   become: false
   gather_facts: true
   tasks:
+    # The database tier is the database_node group. The legacy etcd_master
+    # name is accepted for one release so existing inventories keep working.
+    - name: Compute the database tier host list
+      ansible.builtin.set_fact:
+        database_tier_hosts: >-
+          {{ (groups.get('database_node', []) + groups.get('etcd_master', []))
+             | unique }}
+
+    - name: Warn about the legacy etcd_master group name
+      ansible.builtin.debug:
+        msg: >-
+          DEPRECATION: the etcd_master inventory group has been renamed to
+          database_node. Support for the legacy name will be removed in the
+          next release; please rename the group in your inventory.
+      when: groups.get('etcd_master', []) | length > 0
+      run_once: true
+
     # Per-host capability flags from group membership.
     - name: Set per-host capability flags
       ansible.builtin.set_fact:
         node_is_hypervisor: "{{ inventory_hostname in groups.get('hypervisors', []) }}"
         node_is_network_node: "{{ inventory_hostname in groups.get('network_node', []) }}"
-        node_is_database_node: "{{ inventory_hostname in groups.get('etcd_master', []) }}"
+        node_is_database_node: "{{ inventory_hostname in database_tier_hosts }}"
 
     # Cluster-wide values -- identical on every host. Computed once from the
     # group lists, then assigned to every host.
@@ -153,7 +172,7 @@
     - name: Compute the MariaDB gateway host list (every database node's mesh IP)
       ansible.builtin.set_fact:
         mariadb_gateway_hosts: >-
-          {{ groups['etcd_master']
+          {{ database_tier_hosts
              | map('extract', hostvars, 'node_mesh_ip')
              | list }}
 
@@ -245,7 +264,7 @@
 # register before the rest.
 # ---------------------------------------------------------------------------
 - name: Bootstrap and configure the database tier
-  hosts: etcd_master
+  hosts: database_node:etcd_master
   become: true
   gather_facts: true
   tasks:
@@ -260,7 +279,7 @@
         tasks_from: config
 
 - name: Bootstrap and configure the remaining nodes
-  hosts: allsf:!etcd_master
+  hosts: allsf:!database_node:!etcd_master
   become: true
   gather_facts: true
   tasks:
@@ -288,7 +307,7 @@
 # happen to carry those capabilities (for example the single-node deploy where
 # localhost is everything). Applied after the database tier is configured.
 - name: Apply component roles to database-tier hosts that also carry them
-  hosts: etcd_master
+  hosts: database_node:etcd_master
   become: true
   gather_facts: false
   tasks:
@@ -309,13 +328,13 @@
 # This is the byo-mariadb command, and it must run before any node registers.
 # ---------------------------------------------------------------------------
 - name: Ensure the MariaDB schema exists (once)
-  hosts: etcd_master
+  hosts: database_node:etcd_master
   become: true
   gather_facts: false
   tasks:
     - name: Run sf-ctl ensure-mariadb-schema on the first database host
       ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
-      delegate_to: "{{ groups['etcd_master'][0] }}"
+      delegate_to: "{{ database_tier_hosts[0] }}"
       run_once: true
       changed_when: true
 
@@ -331,14 +350,14 @@
 # roles/base/create_admin_namespace.yml.
 # ---------------------------------------------------------------------------
 - name: Write the cluster configuration (once, before register)
-  hosts: etcd_master
+  hosts: database_node:etcd_master
   become: true
   gather_facts: false
   run_once: true
   vars:
     http_proxy: ""
     extra_config: "[]"
-    cluster_db_host: "{{ groups['etcd_master'][0] }}"
+    cluster_db_host: "{{ database_tier_hosts[0] }}"
   tasks:
     - name: Set the auth secret seed
       ansible.builtin.command: >-
@@ -415,7 +434,7 @@
 # in the node role's register.yml requires this.
 # ---------------------------------------------------------------------------
 - name: Register the database tier and start its daemons
-  hosts: etcd_master
+  hosts: database_node:etcd_master
   become: true
   gather_facts: false
   tasks:
@@ -425,7 +444,7 @@
         tasks_from: register
 
 - name: Register the remaining nodes and start their daemons
-  hosts: allsf:!etcd_master
+  hosts: allsf:!database_node:!etcd_master
   become: true
   gather_facts: false
   tasks:
