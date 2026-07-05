@@ -78,11 +78,14 @@ its assertions finally run.
   adds the `is_database_node` column (idempotent, default `False`);
   operators run `sf-ctl ensure-mariadb-schema` before rolling daemons,
   as with every schema change since PLAN-byo-mariadb.
-- **CI ordering keeps CI green at every step.** The union-targeting in
-  `site.yml` means the actions repo's topologies can flip group names
-  before or after the collection change lands; we still sequence them
-  (server first, actions second, docs last) so any single revert is
-  clean.
+- **CI ordering keeps CI green at every step.** actions/main is
+  consumed at runtime by every shakenfist branch, so the generated
+  deploy inventory emits the database tier into BOTH `database_node`
+  and the legacy `etcd_master` group for one release cycle --
+  pre-phase-7 `site.yml` copies (develop until this merges, and any
+  in-flight PR branch) keep deploying, and every CI run exercises the
+  compatibility union and its deprecation warning. The dual emission is
+  removed with the rest of the fallback next release.
 
 ## Steps
 
@@ -105,6 +108,11 @@ its assertions finally run.
   collection. Nothing gates on the flag at runtime yet (only the tier
   test and operator visibility), so a mixed cluster degrades to
   "the flag is False on stale nodes", which is the pre-phase status quo.
+  One skew is worth naming: a NEW node writing through an OLD
+  sf-database gateway loses proto field 22 in the old gateway's
+  converter, so an upgraded tier node reads False until the gateway is
+  upgraded and the node re-observes (self-healing on the observe
+  cadence).
 - **Operator inventories using `etcd_master`.** Covered by the union
   targeting and warning for one release; the removal next cycle is a
   documented breaking change in the release notes.
@@ -135,10 +143,12 @@ its assertions finally run.
 
 Recorded here so it is not lost: drop the `is_etcd_master` and
 `is_eventlog_node` columns (migration), remove the schema fields, API
-keys and client display fallbacks, reserve proto field numbers 5 and 7
-(verify numbers at removal time), and remove `site.yml`'s
-`etcd_master` union targeting and warning. One small PR, gated on one
-released version carrying the deprecations.
+keys and client display fallbacks, reserve proto field numbers 5
+(`is_etcd_master`) and 8 (`is_eventlog_node`), remove `site.yml`'s
+`etcd_master` union targeting and warning, and stop the CI inventory
+generator emitting the legacy `etcd_master` group alongside
+`database_node`. One small PR, gated on one released version carrying
+the deprecations.
 
 ## Out of scope
 

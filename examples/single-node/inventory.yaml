@@ -1,7 +1,6 @@
 ---
 # Single-node Shaken Fist inventory: localhost is in every capability group, so
-# it runs the hypervisor, network node and database tier all at once. The
-# in phase 7).
+# it runs the hypervisor, network node and database tier all at once.
 #
 # Per-host identity (node_name / node_egress_* / node_mesh_*) is set in
 # host_vars below. For a single box the mesh and egress IP are the same

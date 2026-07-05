@@ -147,6 +147,16 @@
           {{ (groups.get('database_node', []) + groups.get('etcd_master', []))
              | unique }}
 
+    - name: Fail if the inventory has no database tier
+      ansible.builtin.assert:
+        that: database_tier_hosts | length > 0
+        fail_msg: >-
+          No database tier found in the inventory. Put your database-tier
+          hosts (which must also be in allsf) in a database_node group; the
+          old groups['...'] hard index failed loudly on a missing or
+          misspelled group, and this assertion preserves that behaviour.
+      run_once: true
+
     - name: Warn about the legacy etcd_master group name
       ansible.builtin.debug:
         msg: >-

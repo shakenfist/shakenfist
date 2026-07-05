@@ -55,6 +55,10 @@ class Monitor(daemon.Daemon):
         with util_libvirt.LibvirtConnection() as lc:
             # What's special about this node?
             retval = {
+                # is_etcd_master and is_eventlog_node are vestigial
+                # (pinned False, removed next release); node_attributes is
+                # the authoritative store for role flags, this metrics copy
+                # is informational only.
                 'is_etcd_master': False,
                 'is_hypervisor': config.NODE_IS_HYPERVISOR,
                 'is_network_node': config.NODE_IS_NETWORK_NODE,

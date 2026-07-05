@@ -2766,6 +2766,7 @@ class MockEtcd():
         for n in self.nodes:
             node_uuid = self.node_uuids[n[0]]
             metrics['is_hypervisor'] = 'hypervisor' in n[2]
+            metrics['is_database_node'] = 'database' in n[2]
             self.node_metrics_store[node_uuid] = {
                 'node_uuid': node_uuid,
                 'fqdn': n[0],
