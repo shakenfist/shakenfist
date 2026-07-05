@@ -59,6 +59,7 @@ class Monitor(daemon.Daemon):
                 'is_hypervisor': config.NODE_IS_HYPERVISOR,
                 'is_network_node': config.NODE_IS_NETWORK_NODE,
                 'is_eventlog_node': False,
+                'is_database_node': config.NODE_IS_DATABASE_NODE,
             }
 
             # CPU info

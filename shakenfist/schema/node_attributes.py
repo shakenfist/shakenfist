@@ -46,7 +46,8 @@ class NodeAttributesData(BaseModel):
         uuid: The node's unique identifier (references nodes.uuid).
         last_seen: Unix timestamp when the node was last observed.
         installed_version: The Shaken Fist release version installed.
-        is_etcd_master: Whether this node is an etcd master.
+        is_etcd_master: Vestigial etcd-era flag, always False.
+        is_database_node: Whether this node is part of the database tier.
         is_hypervisor: Whether this node runs instances.
         is_network_node: Whether this node handles networking.
         is_eventlog_node: Whether this node runs eventlog.
@@ -71,11 +72,14 @@ class NodeAttributesData(BaseModel):
     last_seen: Annotated[float, SQLIndex()] = 0.0
     installed_version: Optional[str] = None
 
-    # Role flags
+    # Role flags. is_etcd_master and is_eventlog_node are vestigial (their
+    # only writer hardcodes False) and are retained for one release before
+    # removal; is_database_node is the live database-tier flag.
     is_etcd_master: bool = False
     is_hypervisor: bool = False
     is_network_node: bool = False
     is_eventlog_node: bool = False
+    is_database_node: bool = False
 
     # Instance tracking (list of instance UUID strings)
     instances: list[str] = Field(default_factory=list)

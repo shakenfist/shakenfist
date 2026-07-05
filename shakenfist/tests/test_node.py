@@ -103,6 +103,7 @@ class NodeAttributesDataTestCase(base.ShakenFistTestCase):
         self.assertFalse(data.is_hypervisor)
         self.assertFalse(data.is_network_node)
         self.assertFalse(data.is_eventlog_node)
+        self.assertFalse(data.is_database_node)
         self.assertEqual(data.instances, [])
         self.assertEqual(data.daemons, [])
         self.assertEqual(data.daemon_states, {})
@@ -113,6 +114,18 @@ class NodeAttributesDataTestCase(base.ShakenFistTestCase):
         data = NodeAttributesData(uuid=TEST_UUID)
         data.last_seen = 9999.0
         self.assertEqual(data.last_seen, 9999.0)
+
+    def test_database_node_flag_round_trip(self):
+        """The live database-tier flag round-trips through the model."""
+        data = NodeAttributesData(uuid=TEST_UUID)
+        data.is_database_node = True
+        self.assertTrue(data.is_database_node)
+        dumped = data.model_dump()
+        self.assertTrue(dumped['is_database_node'])
+        # The vestigial flags stay present (and default False) until
+        # their scheduled removal.
+        self.assertIn('is_etcd_master', dumped)
+        self.assertIn('is_eventlog_node', dumped)
 
     def test_daemon_states_dict(self):
         """Test daemon_states as a nested dict."""

@@ -311,10 +311,14 @@ class Node(dbo):
         attrs = n._ensure_attributes()
         attrs.last_seen = time.time()
         attrs.installed_version = util_general.get_version()
+        # is_etcd_master and is_eventlog_node are vestigial (etcd is gone
+        # and the eventlog is not a node role); they are pinned False for
+        # one release before the columns are removed.
         attrs.is_etcd_master = False
         attrs.is_hypervisor = config.NODE_IS_HYPERVISOR
         attrs.is_network_node = config.NODE_IS_NETWORK_NODE
         attrs.is_eventlog_node = False
+        attrs.is_database_node = config.NODE_IS_DATABASE_NODE
         n._save_attributes()
 
     def external_view(self):
@@ -335,6 +339,7 @@ class Node(dbo):
             retval['is_hypervisor'] = attrs.is_hypervisor
             retval['is_network_node'] = attrs.is_network_node
             retval['is_eventlog_node'] = attrs.is_eventlog_node
+            retval['is_database_node'] = attrs.is_database_node
 
         # Add daemon states (single round trip rather than one per daemon)
         rows = mariadb.get_all_node_daemon_states(self.uuid) or []  # nopushdown: per-node scope, ~12 rows

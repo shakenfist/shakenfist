@@ -19,6 +19,7 @@ from shakenfist.node import Nodes
 node_get_example = """{
     "ip": "192.168.21.51",
     "is_cluster_maintainer": true,
+    "is_database_node": true,
     "is_etcd_master": false,
     "is_eventlog_node": true,
     "is_hypervisor": true,
@@ -48,6 +49,7 @@ node_get_example = """{
 node_delete_example = """{
     "ip": "192.168.21.51",
     "is_cluster_maintainer": true,
+    "is_database_node": true,
     "is_etcd_master": false,
     "is_eventlog_node": true,
     "is_hypervisor": true,
@@ -99,6 +101,7 @@ node_list_example = """[
     {
         "ip": "192.168.21.51",
         "is_cluster_maintainer": true,
+        "is_database_node": true,
         "is_etcd_master": false,
         "is_eventlog_node": true,
         "is_hypervisor": true,

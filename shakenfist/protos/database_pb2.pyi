@@ -3331,6 +3331,7 @@ class NodeAttributesProto(_message.Message):
     HAS_PYTHON_IMPLEMENTATION_FIELD_NUMBER: _builtins.int
     DEPENDENCY_VERSIONS_JSON_FIELD_NUMBER: _builtins.int
     PROCESS_METRICS_JSON_FIELD_NUMBER: _builtins.int
+    IS_DATABASE_NODE_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     last_seen: _builtins.float
     """Observation data"""
@@ -3357,6 +3358,10 @@ class NodeAttributesProto(_message.Message):
     dependency_versions_json: _builtins.str
     """Complex dicts (JSON-encoded)"""
     process_metrics_json: _builtins.str
+    is_database_node: _builtins.bool
+    """The live database-tier role flag. is_etcd_master (5) and
+    is_eventlog_node (8) above are vestigial and scheduled for removal.
+    """
     def __init__(
         self,
         *,
@@ -3381,10 +3386,11 @@ class NodeAttributesProto(_message.Message):
         has_python_implementation: _builtins.bool = ...,
         dependency_versions_json: _builtins.str = ...,
         process_metrics_json: _builtins.str = ...,
+        is_database_node: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["daemon_states_json", b"daemon_states_json", "daemons_json", b"daemons_json", "dependency_versions_json", b"dependency_versions_json", "has_installed_version", b"has_installed_version", "has_libvirt_version", b"has_libvirt_version", "has_python_implementation", b"has_python_implementation", "has_python_version", b"has_python_version", "has_qemu_version", b"has_qemu_version", "installed_version", b"installed_version", "instances_json", b"instances_json", "is_etcd_master", b"is_etcd_master", "is_eventlog_node", b"is_eventlog_node", "is_hypervisor", b"is_hypervisor", "is_network_node", b"is_network_node", "last_seen", b"last_seen", "libvirt_version_json", b"libvirt_version_json", "process_metrics_json", b"process_metrics_json", "python_implementation", b"python_implementation", "python_version_json", b"python_version_json", "qemu_version_json", b"qemu_version_json", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["daemon_states_json", b"daemon_states_json", "daemons_json", b"daemons_json", "dependency_versions_json", b"dependency_versions_json", "has_installed_version", b"has_installed_version", "has_libvirt_version", b"has_libvirt_version", "has_python_implementation", b"has_python_implementation", "has_python_version", b"has_python_version", "has_qemu_version", b"has_qemu_version", "installed_version", b"installed_version", "instances_json", b"instances_json", "is_database_node", b"is_database_node", "is_etcd_master", b"is_etcd_master", "is_eventlog_node", b"is_eventlog_node", "is_hypervisor", b"is_hypervisor", "is_network_node", b"is_network_node", "last_seen", b"last_seen", "libvirt_version_json", b"libvirt_version_json", "process_metrics_json", b"process_metrics_json", "python_implementation", b"python_implementation", "python_version_json", b"python_version_json", "qemu_version_json", b"qemu_version_json", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
