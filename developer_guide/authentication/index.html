@@ -7449,7 +7449,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -9268,7 +9268,7 @@ namespaces. It is assumed that knowing the UUID of a given blob implies that
 you can access it.</p>
 <p>All requests to Shaken Fist have a namespace context. The namespace "system" is
 reserved and is used for administrative actions. Please note that the
-authentication configuration created by the <code>getsf</code> installer is for the system
+authentication configuration created by the deployer is for the system
 namespace, and if used directly will result in instances and other objects
 being created in that namespace. While this is supported and will function as
 expected, it is probably undesirable for anything other than a single user
@@ -9282,8 +9282,8 @@ remove the trust of the system namespace from your namespaces. However, you can
 choose to trust additional namespaces, and this is done via the
 <code>sf-client namespace trust ...</code> series of commands and associated API calls.</p>
 <h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
-<p>When the <code>getsf</code> installer ran, it created two authentication artifacts on the
-primary node which are useful to get started with Shaken Fist. First off, there
+<p>When the deploy playbook ran, it created two authentication artifacts on each
+node which are useful to get started with Shaken Fist. First off, there
 is <code>/etc/sf/sfrc</code>, which is a file you can source in your shell to provide
 authentication environment variables. These environment variables can be used
 by Shaken Fist command line clients, Ansible modules, and the Python API client
@@ -9304,7 +9304,7 @@ shell. The last three lines are the important authentication details:</p>
 <li>the URL the API exists at is "<a href="https://shakenfist/api">https://shakenfist/api</a>"</li>
 </ul>
 <p><code>sfrc</code> is only useful to users of Unix-like shells, so there is also a JSON form
-of this configuration information, which is written by <code>getsf</code> at
+of this configuration information, which is written by the deployer at
 <code>/etc/sf/shakenfist.json</code>. Here's an example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>{
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    &quot;namespace&quot;: &quot;system&quot;,

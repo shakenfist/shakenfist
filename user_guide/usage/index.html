@@ -7614,7 +7614,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -9313,10 +9313,10 @@ package from pypi. This client is released at the same time as any major release
 of Shaken Fist, but there is no guarantee that minor releases are done in sync.
 However, the Shaken Fist client knows how to probe the server for capabilities,
 so it is recommended that you keep the client as up to date as possible.</p>
-<p>The client is installed on the primary node as part of the operation of the
-Ansible based installer. Authentication details are also provided on the primary
-node. That means that you can just get started on the primary node without any
-further configuration.</p>
+<p>The client is installed on every node as part of the operation of the Ansible
+based deployer, and authentication details are also provided on each node (at
+<code>/etc/sf/sfrc</code>). That means that you can just get started on a cluster node
+without any further configuration.</p>
 <p>The <code>shakenfist-client</code> package contains two clients at the time of writing:
 a REST API client that can be imported at <code>shakenfist_client.apiclient</code>; and a
 command line client implemented with this REST API client. The command line

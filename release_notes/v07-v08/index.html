@@ -7730,7 +7730,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -9631,6 +9631,11 @@
 </ul>
 <h3 id="deployment">Deployment<a class="headerlink" href="#deployment" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The <code>getsf</code> installer and the legacy Ansible deployer have been removed.
+  Shaken Fist is now deployed with the <code>shakenfist.shakenfist</code> Ansible
+  collection: you write an inventory, set your variables, and run a playbook
+  (example inventories and playbooks ship in <code>examples/</code>). See the rewritten
+  <a href="/operator_guide/installation">installation guide</a> for the new workflow.</li>
 <li>We no longer reset the authentication secret used to generate authentication
   tokens on upgrade. This means tokens from before an upgrade will continue to work
   for their normal lifetime.</li>
@@ -9699,13 +9704,12 @@ existing deployments must be rebuilt against the new shape.</p>
   <code>/etc/mysql/mariadb.conf.d/</code> if you want SF's recommended baseline.</p>
 </li>
 <li>
-<p><strong><code>getsf</code> prompts for connection details.</strong> The installer now asks for
-  <code>GETSF_MARIADB_HOST</code>, <code>GETSF_MARIADB_PORT</code> (default <code>3306</code>),
-  <code>GETSF_MARIADB_USER</code> (default <code>shakenfist</code>),
-  <code>GETSF_MARIADB_PASSWORD</code>, and <code>GETSF_MARIADB_DATABASE</code> (default
-  <code>shakenfist</code>). All five can be passed as environment variables for
-  non-interactive deploys. The deployer no longer generates a password —
-  operators choose it when they apply <code>tools/bootstrap-mariadb.sql</code>.</p>
+<p><strong>The deployer takes connection details as variables.</strong> Set
+  <code>mariadb_host</code>, <code>mariadb_port</code> (default <code>3306</code>), <code>mariadb_user</code> (default
+  <code>shakenfist</code>), <code>mariadb_password</code>, and <code>mariadb_database</code> in your
+  deployment's <code>group_vars/all.yml</code>. The deployer no longer generates a
+  password — operators choose it when they apply
+  <code>tools/bootstrap-mariadb.sql</code>.</p>
 </li>
 <li>
 <p><strong><code>sf-ctl ensure-mariadb-schema</code> is the only path for schema work.</strong>

@@ -7449,7 +7449,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -9416,8 +9416,9 @@ stdout/stderr into journald (uncaught tracebacks and any output
 emitted before logging is configured). That is free, local-only,
 and not a deliberate shipping pipeline.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<p>Set these via the deployer (<code>getsf</code> prompts / <code>GETSF_LOKI_*</code>
-environment variables) or directly as <code>SHAKENFIST_*</code> config:</p>
+<p>Set these via the deployer (the <code>loki_base_url</code>, <code>loki_tenant</code> and
+<code>loki_auth_header</code> variables of the <code>shakenfist.shakenfist</code>
+collection) or directly as <code>SHAKENFIST_*</code> config:</p>
 <table>
 <thead>
 <tr>

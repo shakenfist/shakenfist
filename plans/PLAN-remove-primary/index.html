@@ -7445,7 +7445,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -9111,6 +9111,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#galaxy-collection-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Galaxy collection structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -9292,9 +9309,9 @@ topology-JSON to ansible-groups translator that will be
 retired), <code>shakenfist/deploy/ansible/roles/primary/</code> (the
 role to be removed), <code>shakenfist/deploy/ansible/roles/base/</code>
 (daemon installation, which becomes the heart of the new
-galaxy role), <code>shakenfist/mariadb.py</code> (database access and
-the <code>DATA_MIGRATIONS</code> machinery that the bootstrap_operations
-table will sit alongside), and <code>shakenfist/daemons/database/</code>
+galaxy role), <code>shakenfist/mariadb.py</code> (database access, in
+particular <code>set_cluster_config</code>'s idempotent upsert that the
+role's config tasks rely on), and <code>shakenfist/daemons/database/</code>
 (the gRPC service that becomes a deployer-chosen tier of
 equal stateless instances — see
 <a href="../PLAN-byo-mariadb/"><code>PLAN-byo-mariadb.md</code></a> for that work).</p>
@@ -9362,24 +9379,41 @@ infrastructure</strong>. Concretely:</p>
   MariaDB operator-provided infrastructure and reshapes
   <code>sf-database</code> into a deployer-chosen tier of equal
   instances.)</li>
-<li>The deployer is repackaged as an ansible-galaxy role that
-  configures one SF node — installing packages, writing
-  config, managing systemd — parameterised by which daemons
-  that node should run.</li>
-<li>Operators consume the role from their own playbook,
-  expressing topology in ansible inventory directly. The
-  current single-node and CI deployments become <em>example
-  consumers</em> of the role, not the product.</li>
-<li>Cluster-wide bootstrap (<code>AUTH_SECRET_SEED</code>, admin
-  namespace, cluster_config defaults) is exposed as a
-  single idempotent <code>sf-ctl bootstrap-cluster</code> command that
-  records completion in a new <code>bootstrap_operations</code> table,
-  with each operation and its completion record written in
-  the same transaction so partial-bootstrap states are
-  impossible. Schema initialisation and migration are
-  <em>not</em> part of this command — they are handled by the
-  separate <code>sf-ctl ensure-mariadb-schema</code> command
-  introduced in <code>PLAN-byo-mariadb.md</code>.</li>
+<li>The deployer is repackaged as an ansible-galaxy
+  <strong>collection</strong> (<code>shakenfist.shakenfist</code>): a parameterised
+  core <code>node</code> role that installs the daemon swarm, writes
+  config, and manages systemd on one SF node, plus a small
+  number of component roles (<code>hypervisor</code>, <code>network</code>,
+  <code>internal_ca</code>) for the genuinely divergent package/config
+  concerns. Which daemons and capabilities a node runs are
+  expressed as <strong>role variables</strong>, not by the role reading
+  inventory group names. The database tier is a capability
+  flag, not a separate role. See "Galaxy collection
+  structure" under the phase notes for the full rationale.</li>
+<li>Operators consume the collection from their own playbook,
+  mapping their inventory groups to role invocations and
+  variables. The current single-node and CI deployments
+  become <em>example consumers</em> of the collection, not the
+  product.</li>
+<li>Cluster-wide bootstrap stays a handful of small,
+  idempotent steps rather than a new orchestrating command.
+  Cluster config (including per-node defaults the role
+  computes from gathered facts via <code>set_fact</code>) is applied
+  idempotently by the role on every run via <code>sf-ctl
+  set-config</code> (<code>set_cluster_config</code> is an upsert).
+  <code>AUTH_SECRET_SEED</code> remains caller-supplied — SF never
+  generates it, so it stays stable even if a prior cluster
+  goes undetected. The <code>system</code> namespace and its initial
+  operator-supplied key are established by the existing
+  idempotent <code>sf-ctl bootstrap-system-key</code>. Schema
+  initialisation and migration are handled by the separate
+  <code>sf-ctl ensure-mariadb-schema</code> command introduced in
+  <code>PLAN-byo-mariadb.md</code>. Because every step is idempotent, a
+  partially-applied bootstrap self-heals on the next role
+  run — no <code>bootstrap_operations</code> table or transaction
+  bracketing is required. (This reverses an earlier design
+  that added a <code>bootstrap_operations</code> table and a single
+  <code>sf-ctl bootstrap-cluster</code> command; see the phase 2 note.)</li>
 <li>Stale <code>etcd_master</code> naming throughout the deployer is
   renamed to <code>database_node</code>. (The <code>shakenfist/etcd.py</code>
   drain code itself remains, as already documented in
@@ -9466,19 +9500,23 @@ with content-addressable placement — and is tracked
 separately in <code>PLAN-sticky-transfers.md</code>.</p>
 <h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>Galaxy-role packaging mechanics.</strong> Does the SF project
-   publish to ansible-galaxy proper, or distribute the role
-   via the existing python package and document how to wire
-   it into an operator's playbook? The latter is simpler
-   and avoids a second release artefact; the former is more
-   discoverable. Decide before phase 6.</li>
-<li><strong><code>bootstrap_operations</code> granularity.</strong> Is the
-   granularity per-config-key (one row per
-   <code>AUTH_SECRET_SEED</code>, <code>RAM_SYSTEM_RESERVATION</code>, etc.) or
-   per-logical-step (one row per "set initial cluster
-   config")? Per-key gives finer recovery; per-step gives
-   a cleaner audit trail. Phase 2 should resolve this with
-   a concrete schema proposal.</li>
+<li><strong>Galaxy collection publishing channel.</strong> The collection
+   <em>shape</em> is now decided (see "Galaxy collection structure"
+   below): one <code>shakenfist.shakenfist</code> collection with a
+   parameterised core <code>node</code> role plus <code>hypervisor</code> /
+   <code>network</code> / <code>internal_ca</code> component roles. What remains
+   open is the <em>publishing channel</em>: does SF publish the
+   collection to ansible-galaxy / Automation Hub proper, or
+   ship it inside the existing python package and document
+   how operators wire it into their playbook? The latter is
+   simpler and avoids a second release artefact; the former
+   is more discoverable. Decide before phase 6. This choice
+   also drives the release pipeline: if the collection is
+   published to galaxy proper, phase 6 must add a
+   collection-build-and-publish job to
+   <code>.github/workflows/release.yml</code> alongside the existing
+   PyPI job; if it ships inside the pip package, no
+   <code>release.yml</code> change is needed.</li>
 <li><strong>Dev/test convenience preservation.</strong> The single-node /
    "I just want a working SF on my laptop" experience needs
    to survive. Options: ship a separate <code>examples/single-
@@ -9497,12 +9535,15 @@ separately in <code>PLAN-sticky-transfers.md</code>.</p>
    them to ansible inventory, or a clear "here's how to
    rewrite this by hand" doc. Phase 7 should decide which.</li>
 </ol>
+<p>The <code>bootstrap_operations</code> granularity question that used
+to sit here is resolved: the table is gone (see the phase 2
+note), so there is no granularity to decide.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <p>The work breaks into phases that can each land
 independently, leaving CI green at every step. The early
 phases are pure deletion / rename and carry low risk; the
-later phases introduce new mechanism (bootstrap CLI,
-elected <code>sf-database</code>, galaxy-role packaging) and need more
+remaining new mechanism lives almost entirely in the
+galaxy-collection packaging (phase 6) and needs the most
 care.</p>
 <table>
 <thead>
@@ -9519,9 +9560,9 @@ care.</p>
 <td>Complete (pending CI confirmation)</td>
 </tr>
 <tr>
-<td>2. <code>bootstrap_operations</code> table and idempotent <code>sf-ctl bootstrap-cluster</code></td>
-<td>PLAN-remove-primary-phase-02-bootstrap-cli.md</td>
-<td>Not started</td>
+<td>2. ~~<code>bootstrap_operations</code> table and idempotent <code>sf-ctl bootstrap-cluster</code>~~</td>
+<td><em>(dissolved — see phase notes; the role-config-idempotency remainder folds into phase 6)</em></td>
+<td>Dissolved</td>
 </tr>
 <tr>
 <td>3. Remove Apache reverse proxy from deployer</td>
@@ -9534,13 +9575,18 @@ care.</p>
 <td><em>(see byo-mariadb)</em></td>
 </tr>
 <tr>
-<td>6. Repackage deployer as a galaxy-style role; example consumers</td>
+<td>6. Repackage deployer as the <code>shakenfist.shakenfist</code> galaxy collection; delete the getsf installer chain; example consumers</td>
 <td>PLAN-remove-primary-phase-06-galaxy-role.md</td>
 <td>Not started</td>
 </tr>
 <tr>
 <td>7. Rename <code>etcd_master</code> → <code>database_node</code>; final cleanup</td>
 <td>PLAN-remove-primary-phase-07-rename-cleanup.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>8. Roll the reusable smoke-cluster CI workflow out to the downstream repos (the workflow itself is authored in phase 6 step 5)</td>
+<td>PLAN-remove-primary-phase-08-shared-ci.md</td>
 <td>Not started</td>
 </tr>
 </tbody>
@@ -9568,22 +9614,39 @@ care.</p>
   <code>rsyslog</code> package + service enablement, and the
   <code>--log-syslog</code> gunicorn flag), in the same way phase 3 was
   realised by <code>PLAN-remove-apache-lb.md</code>.</li>
-<li><strong>Phase 2</strong> introduces the <code>bootstrap_operations</code> table
-  in <code>mariadb.py</code>, the <code>sf-ctl bootstrap-cluster</code> subcommand,
-  and replaces every <code>set-config</code> / <code>ensure-mariadb-schema</code> /
-  admin-namespace task in <code>cluster_config.yml</code> and
-  <code>register.yml</code> with a single call to the new command. The
-  one-transaction-per-op invariant is the schema's central
-  claim and must be enforced in the code, not just the docs.
-  Phase 2 also records the cluster's SF version on first
-  bootstrap (either as a <code>bootstrap_operations</code> row or as a
-  dedicated <code>cluster_version</code> table — phase 2's design
-  decision) and adds a startup check in every SF daemon
-  that compares its own version against the recorded
-  cluster version and refuses to start if outside the
-  supported window. The compatibility policy (the proposal
-  is "N-to-N+1 always supported; N-to-N+2 not assumed") is
-  decided as part of phase 2 and documented for operators.</li>
+<li><strong>Phase 2 (dissolved).</strong> This phase originally introduced
+  a <code>bootstrap_operations</code> table and an idempotent
+  <code>sf-ctl bootstrap-cluster</code> command that subsumed every
+  <code>set-config</code> / admin-namespace bootstrap task, plus a
+  recorded cluster version and a per-daemon version-compat
+  startup check. Detailed planning reassessed the scope to
+  nothing:</li>
+<li><strong>Config stays in the role.</strong> Several current
+    <code>set-config</code> values (<code>MAX_HYPERVISOR_MTU</code>, <code>DNS_SERVER</code>,
+    <code>HTTP_PROXY</code>) are recomputed by ansible on every deploy,
+    so folding them into a one-time bootstrap would stop
+    those updates propagating. Config — including per-node
+    defaults computed via <code>set_fact</code> from gathered facts —
+    is applied idempotently by the role each run. The
+    role-config idempotency tidy-up folds into phase 6.</li>
+<li><strong>No new bootstrap command or table.</strong> <code>AUTH_SECRET_SEED</code>
+    is a caller-supplied <code>set-config</code>; the <code>system</code> namespace
+    and its operator-supplied key are the existing idempotent
+    <code>bootstrap-system-key</code> (<code>Namespace.new</code> is idempotent and
+    <code>add_key</code> is keyed by name, so a re-run overwrites rather
+    than duplicates). Idempotency already makes a partial
+    bootstrap self-healing on the next run, which was the
+    only thing the one-transaction <code>bootstrap_operations</code>
+    table existed to guarantee.</li>
+<li><strong>No cluster-version table or per-daemon version check.</strong>
+    byo-mariadb's <code>verify_schema_versions</code> already refuses to
+    start a daemon whose build disagrees with the DB schema,
+    covering the real compatibility hazard. A statically
+    bootstrap-recorded version would only catch
+    schema-invariant skew and would go stale on the first
+    rolling upgrade; if that protection is ever wanted it can
+    be derived from the per-node <code>installed_version</code> already
+    stored in node attributes, with no new schema. Dropped.</li>
 <li><strong>Phase 3</strong> deletes <code>roles/primary/tasks/apache2.yml</code> and
   <code>files/apache-site-primary.conf</code>. Documents the
   load-balancing requirement for production operators and
@@ -9603,22 +9666,155 @@ care.</p>
   single-box deploy points at byo-mariadb's
   <code>tools/bootstrap-mariadb.sql</code> and <code>apt install
   mariadb-server</code> flow).</li>
-<li><strong>Phase 6</strong> moves <code>roles/base</code> and its dependents into a
-  galaxy-shaped layout, replaces <code>deploy.py</code>'s topology JSON
-  translation with direct ansible inventory consumption, and
+<li><strong>Phase 6</strong> moves <code>roles/base</code> and its dependents into the
+  <code>shakenfist.shakenfist</code> collection described under "Galaxy
+  collection structure" below: a parameterised core <code>node</code>
+  role plus the divergent <code>hypervisor</code> / <code>network</code> /
+  <code>internal_ca</code> component roles. It replaces <code>deploy.py</code>'s
+  topology-JSON translation with direct ansible inventory
+  consumption, converts the role's capability selection so it
+  no longer reads <code>groups['hypervisors']</code> /
+  <code>groups['network_node']</code> / <code>groups['etcd_master']</code>
+  internally (host membership becomes role variables), and
   recasts the single-node and CI playbooks as example
-  consumers.</li>
-<li><strong>Phase 7</strong> is mostly mechanical: rename <code>etcd_master</code> →
-  <code>database_node</code> across <code>deploy.py</code>, <code>deploy.yml</code>, all
-  roles, and comments. By the time phase 7 runs,
+  consumers. The legacy installer chain — <code>getsf</code>, its
+  generated <code>/root/sf-deploy</code>, the topology JSON, <code>deploy.py</code>,
+  and the monolithic <code>deploy.yml</code> — is <strong>deleted</strong> in this
+  phase, not slimmed; the example playbooks replace it. This
+  removes the <code>deploy.py</code> / <code>deploy.yml</code> files that phase 7
+  was originally scoped to rename <code>etcd_master</code> in, so
+  phase 7's remaining scope is only the residual
+  <code>etcd_master</code> mentions in surviving roles, templates, CI,
+  and comments.</li>
+</ul>
+<p>Phase 6 also folds in the ansible integration. The SF
+  ansible modules (<code>sf_instance</code> / <code>sf_network</code> /
+  <code>sf_namespace</code> / <code>sf_snapshot</code>) move into the collection as
+  native <code>AnsibleModule</code>s under <code>plugins/modules/</code>,
+  auto-discovered as <code>shakenfist.shakenfist.sf_*</code>. This
+  retires the bash shims, the <code>sf-client ansible …</code>
+  subcommand they shell out to, and the awkward
+  <code>postinstall.yml</code> install dance
+  (<code>sf-client admin ansible_module_path</code> introspection plus a
+  manual copy into <code>/usr/share/ansible/plugins/modules/</code> with
+  hardcoded fallback paths). The modules call
+  <code>shakenfist_client</code> as their API SDK — the same pattern as
+  <code>community.aws</code> over <code>boto3</code> — so the REST/API logic stays
+  in the client-python repo and only the ansible glue lives
+  in the collection. The collection declares a compatible
+  <code>shakenfist_client</code> version range as a Python requirement;
+  an ansible control node needs <code>ansible-galaxy collection
+  install shakenfist.shakenfist</code> plus <code>pip install
+  shakenfist_client</code>, never the server package. Note the
+  cross-repo coupling: the current module source lives in
+  client-python, so this step either vendors the modules into
+  the collection or is coordinated with a client-python
+  change.
+- <strong>Phase 7</strong> is mostly mechanical: rename <code>etcd_master</code> →
+  <code>database_node</code> across the surviving collection roles,
+  example playbooks, templates, CI, and comments (the
+  <code>deploy.py</code> / <code>deploy.yml</code> occurrences are gone with those
+  files in phase 6). By the time phase 7 runs,
   <code>PLAN-remove-etcd.md</code> will already have landed and the
   drain code, <code>etcd_host</code> default, <code>ETCDCTL_API=3</code> line in
   <code>sfrc</code>, and <code>etcd3gw</code> dependency will be gone. Phase 7's
   scope is therefore <em>only</em> the deployer-level naming and
-  comments — the ansible group rename, the inventory.yaml
-  <code>etcd:</code> children-group rename, and the residual
-  <code>etcd_master</code> mentions in role comments.</li>
+  comments — the ansible group rename and the residual
+  <code>etcd_master</code> mentions in the example playbooks and role
+  comments.
+- <strong>Phase 8</strong> rolls the reusable smoke-cluster CI workflow
+  out to the downstream SF ecosystem repos (<code>client-python</code>,
+  <code>library-python</code>, <code>kerbside</code>, …). The historical pattern
+  was to cut-and-paste shakenfist's cluster-build CI into
+  each downstream repo, which drifts (the
+  <code>/etc/sf/inventory.yaml</code> log-gather step is one symptom —
+  see the dropped write in phase 6) and over-pays: the
+  downstream repos only need the cheap smoke tier, not the
+  full merge CI. <strong>The reusable workflow itself is authored
+  in phase 6 step 5, not here</strong> — to avoid writing any
+  throwaway intermediate CI, the <code>smoke-cluster.yml</code>
+  (<code>workflow_call</code>) in <code>shakenfist/actions</code> and shakenfist's
+  own cutover onto it are pulled forward into phase 6 (the
+  decision: don't build a getsf-shaped stopgap and then
+  replace it). Phase 8 is therefore <em>only</em> the rollout:
+  replace each downstream repo's copy-pasted cluster-build
+  workflow with a few-line <code>uses:
+  shakenfist/actions/.github/workflows/smoke-cluster.yml@…</code>
+  call, one repo at a time, passing the component/ref/tier
+  inputs. Depends on phase 6 step 5 (the reusable workflow
+  must exist and be proven on shakenfist's own CI first);
+  independent of phase 7. The downstream-repo changes are
+  committed to <code>main</code> and pushed by the operator — the agent
+  prepares the diffs but cannot push them. If it grows, this
+  phase can graduate to its own master plan, the way the old
+  phases 4-5 became <code>PLAN-byo-mariadb.md</code>.</p>
+<h3 id="galaxy-collection-structure">Galaxy collection structure<a class="headerlink" href="#galaxy-collection-structure" title="Permanent link">&para;</a></h3>
+<p>The deployer becomes a single ansible-galaxy <strong>collection</strong>,
+<code>shakenfist.shakenfist</code>, rather than a constellation of
+independently-published roles. The structure and its
+rationale:</p>
+<ul>
+<li><strong>One collection as the distribution unit.</strong> Ansible's
+  community good-practice bundles related roles at the
+  "type or landscape level" into a namespaced, versioned
+  collection that can share plugins — which matches SF
+  wanting one cohesive, versioned deployment artefact.</li>
+<li><strong>A core <code>node</code> role, parameterised.</strong> Every SF node runs
+  the same daemon swarm today (<code>roles/base</code> writes identical
+  systemd units on every host; only <code>sf-database</code> is
+  conditional). Differentiation is three capability flags
+  (<code>NODE_IS_HYPERVISOR</code>, <code>NODE_IS_NETWORK_NODE</code>,
+  <code>NODE_IS_DATABASE_NODE</code>) plus a few package sets. Because
+  the daemon set is uniform, the bulk of the deployer is one
+  parameterised role, not one role per node type — splitting
+  by node type would mostly produce roles that install the
+  same thing, which the good-practice guide warns against
+  ("don't create multiple roles if one parameterised role
+  suffices").</li>
+<li><strong>Component roles only where work genuinely diverges.</strong>
+  <code>hypervisor</code> (libvirt/KVM), <code>network</code> (VXLAN), and
+  <code>internal_ca</code> (PKI) install materially different packages
+  and config, so they stay as separate roles within the
+  collection — the "promote a component to its own role when
+  it diverges" rule. The database tier is <em>not</em> a separate
+  role: <code>PLAN-byo-mariadb.md</code> already made <code>sf-database</code> a
+  stateless daemon, so "database node" is just a capability
+  flag that enables that daemon.</li>
+<li><strong>No inventory group names inside roles.</strong> Today the
+  config template reads <code>groups['hypervisors']</code>,
+  <code>groups['network_node']</code>, and <code>groups['etcd_master']</code>
+  directly. Ansible good-practice is explicit that roles
+  should not embed host-group names — host membership is
+  passed as variables. Phase 6 converts these to role
+  variables; the operator's playbook is what maps their
+  inventory groups to those variables.</li>
+<li><strong>Example playbooks map groups → roles.</strong> The single-node
+  and cluster_ci playbooks become example consumers that
+  assign hosts to the collection's roles with the right
+  variables — the same pattern Kubespray and ceph-ansible
+  use, where the playbook plus inventory decides which hosts
+  run which role.</li>
+<li><strong>Ansible modules ship as collection content.</strong> The SF
+  ansible modules become native <code>AnsibleModule</code>s under the
+  collection's <code>plugins/modules/</code>, replacing the bash-shim +
+  <code>postinstall.yml</code> copy install. Bundling roles and modules
+  in one collection is exactly what the collection format is
+  for; operators get them via <code>ansible-galaxy collection
+  install</code>, with <code>shakenfist_client</code> as the only Python
+  dependency on the control node. See the phase 6 note for
+  the cross-repo coupling with client-python.</li>
 </ul>
+<p>Precedent: ceph-ansible and Kubespray both split into
+multiple roles, but they split by <em>functional component /
+software</em> (etcd, container-engine, mon, osd) and let the
+playbook map inventory groups to those roles — they do not
+embed group names in role internals. SF differs in that its
+per-node software is near-uniform, so the split is lighter:
+one core role plus a few divergent component roles.</p>
+<p>References: Red Hat "Good Practices for Ansible"
+(<code>redhat-cop.github.io/automation-good-practices</code>),
+ceph-ansible (<code>github.com/ceph/ceph-ansible</code>), Kubespray
+(<code>github.com/kubernetes-sigs/kubespray</code>).</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the
@@ -9647,23 +9843,27 @@ right model, that's a signal the brief needs improving, not
 that the management session should do the implementation
 itself.</p>
 <p>Use <code>isolation: "worktree"</code> for sub-agents when the change is
-risky or experimental. Phases 2, 4 and 5 in particular touch
-bootstrap correctness, the MariaDB access path, and
-cross-daemon discovery — those should default to worktree
-isolation. Phases 1, 3, and 7 are deletions / renames and
-can work directly in the main tree.</p>
+risky or experimental. Phase 6 in particular reshapes the
+deployer into a galaxy collection and rewrites the ansible
+modules — its more invasive steps should default to worktree
+isolation. Phase 7 is a rename / cleanup and can work
+directly in the main tree.</p>
 <h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
 <p>The master plan itself should always be created at <strong>high
 effort</strong> — it requires broad codebase understanding,
 cross-referencing multiple source files, and making judgment
 calls about scope and sequencing.</p>
 <p>Each phase plan should specify the recommended effort level
-for planning that phase. Phases involving schema design
-(phase 2), cross-daemon coordination (phase 5), or migration
-safety (phase 4) should be planned at high effort. Phases
-that are largely deletion / rename (phases 1, 3, 7) can be
-planned at medium effort. Phase 6 (galaxy-role packaging) is
-high effort because it changes the operator-facing API.</p>
+for planning that phase. Phase 6 (galaxy-collection
+packaging, including the native ansible modules) is high
+effort because it changes the operator-facing API. Phase 7
+(the <code>etcd_master</code> → <code>database_node</code> rename and final
+cleanup) is largely mechanical and can be planned at medium
+effort. Phase 8 (the shared reusable CI workflow) is high
+effort because it designs a cross-repo CI contract consumed
+by several ecosystem repos. (Phases 1 and 3 are already
+realised by other plans; phase 2 is dissolved; phases 4-5
+moved to <code>PLAN-byo-mariadb.md</code>.)</p>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <p>Each phase plan should include a table like this:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>| Step | Effort | Model | Isolation | Brief for sub-agent |
@@ -9731,25 +9931,48 @@ because the following statements will be true:</p>
   removal is handled by
   <a href="../PLAN-byo-mariadb/"><code>PLAN-byo-mariadb.md</code></a> and is
   outside this plan's scope.)</li>
-<li><code>sf-ctl bootstrap-cluster</code> exists, is idempotent, and is
-  the only path through which a cluster's initial auth
-  secret, admin namespace, and default config are
-  established. Re-running it on a bootstrapped cluster is
-  a no-op. (Schema initialisation is handled by the
-  separate <code>sf-ctl ensure-mariadb-schema</code> command
-  introduced in <code>PLAN-byo-mariadb.md</code>.)</li>
-<li>The <code>bootstrap_operations</code> table exists and is populated
-  by every bootstrap step in the same transaction as that
-  step's artefact.</li>
-<li>The deployer is consumable as an ansible-galaxy role: an
-  operator can write a one-page playbook that calls the
-  role with a daemon mix and arrive at a working node
-  configuration.</li>
+<li>Cluster bootstrap is a set of idempotent steps with no
+  dedicated orchestrating command or table: cluster config
+  (including per-node defaults) is applied by the role on
+  every run via <code>set-config</code>, <code>AUTH_SECRET_SEED</code> is
+  caller-supplied, and the <code>system</code> namespace plus its
+  initial operator-supplied key are established by the
+  existing idempotent <code>sf-ctl bootstrap-system-key</code>.
+  Re-running the deploy on a bootstrapped cluster is a no-op.
+  (Schema initialisation is handled by the separate
+  <code>sf-ctl ensure-mariadb-schema</code> command introduced in
+  <code>PLAN-byo-mariadb.md</code>.)</li>
+<li>The SF ansible modules are native collection content under
+  <code>plugins/modules/</code> (<code>shakenfist.shakenfist.sf_*</code>), with no
+  shim / copy-into-<code>/usr/share/ansible</code> install step, and
+  depend only on <code>shakenfist_client</code> on the control node.</li>
+<li>The deployer is consumable as an ansible-galaxy
+  <strong>collection</strong> (<code>shakenfist.shakenfist</code>): an operator can
+  write a one-page playbook that assigns hosts to the
+  collection's <code>node</code> role (plus <code>hypervisor</code> / <code>network</code> /
+  <code>internal_ca</code> component roles as needed), passing the
+  daemon/capability mix as role variables, and arrive at a
+  working node configuration. No role reads inventory group
+  names internally.</li>
 <li>The single-node and cluster_ci deployments are example
-  consumers of the role, not the role itself.</li>
+  consumers of the collection, not the collection itself.</li>
+<li>The legacy interactive installer and its topology
+  machinery are gone: <code>shakenfist/deploy/getsf</code>, the
+  <code>/root/sf-deploy</code> script it generated, the topology-JSON
+  input that drove it, <code>deploy.py</code> (the topology → inventory
+  translator), and the monolithic <code>deploy.yml</code> no longer
+  exist. Deployment is driven entirely by operator-authored
+  (or example) playbooks consuming the collection.</li>
 <li>The <code>etcd_master</code> group name is gone from the deployer
   (excluding the <code>shakenfist/etcd.py</code> drain code, which is
   out of scope).</li>
+<li>The SF ecosystem repos that stand up a cluster in CI
+  (<code>client-python</code>, <code>library-python</code>, <code>kerbside</code>, …) consume
+  a single reusable smoke-cluster workflow from
+  <code>shakenfist/actions</code> instead of copy-pasting shakenfist's
+  CI, and shakenfist's own CI is the first caller of that
+  workflow. No downstream repo carries a forked copy of the
+  cluster-build CI.</li>
 <li>Documentation in <code>docs/</code> is updated:
   <code>docs/operator_guide/</code> gains a "deploying SF against your
   own infrastructure" section; <code>ARCHITECTURE.md</code> loses the

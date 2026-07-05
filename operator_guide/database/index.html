@@ -7449,7 +7449,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -10268,7 +10268,7 @@ configuration keys that control how cluster nodes reach the database tier,
 the administrative commands, the table inventory, and the schema system.</p>
 <h2 id="bring-your-own-mariadb-setup">Bring-your-own MariaDB setup<a class="headerlink" href="#bring-your-own-mariadb-setup" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist does not bundle or install MariaDB. The operator provisions the
-database server before running <code>getsf</code>.</p>
+database server before deploying the cluster.</p>
 <h3 id="provisioning-checklist">Provisioning checklist<a class="headerlink" href="#provisioning-checklist" title="Permanent link">&para;</a></h3>
 <ol>
 <li>
@@ -10297,14 +10297,17 @@ database server before running <code>getsf</code>.</p>
 your hardware and workload.</p>
 </li>
 <li>
-<p><strong>Run <code>getsf</code>.</strong> The installer will prompt for the MariaDB host, port, user,
-   password, and database name. The defaults match what <code>bootstrap-mariadb.sql</code>
-   creates: port <code>3306</code>, user <code>shakenfist</code>, database <code>shakenfist</code>.</p>
+<p><strong>Deploy Shaken Fist.</strong> Set the <code>mariadb_host</code>, <code>mariadb_port</code>,
+   <code>mariadb_user</code>, <code>mariadb_password</code> and <code>mariadb_database</code> variables in your
+   deployment's <code>group_vars/all.yml</code> to match what you provisioned, then run
+   the deploy playbook (see <a href="../installation/">Installation</a>). Only
+   database-tier nodes render these values into <code>/etc/sf/config</code>.</p>
 </li>
 <li>
-<p><strong>Schema initialisation.</strong> After the deploy completes,
-   <code>sf-ctl ensure-mariadb-schema</code> runs automatically on a database-tier node
-   and creates all SF tables. You can also run it manually at any time from a
+<p><strong>Schema initialisation.</strong> The example playbooks run
+   <code>sf-ctl ensure-mariadb-schema</code> themselves (once, delegated to a
+   database-tier node) before any node registers, so no manual step is
+   needed on first deploy. You can also run it manually at any time from a
    node that has <code>MARIADB_HOST</code> configured (see
    <a href="#administrative-commands">Administrative Commands</a>).</p>
 </li>
@@ -10315,8 +10318,11 @@ your hardware and workload.</p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>sed<span class="w"> </span><span class="s1">&#39;s/__REPLACE_ME__/mypassword/&#39;</span><span class="w"> </span>tools/bootstrap-mariadb.sql<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>mysql<span class="w"> </span>-u<span class="w"> </span>root
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>sudo<span class="w"> </span>cp<span class="w"> </span>examples/mariadb-tuning.cnf<span class="w"> </span>/etc/mysql/mariadb.conf.d/<span class="w">   </span><span class="c1"># optional</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>mariadb
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>sudo<span class="w"> </span>./getsf<span class="w">                                                      </span><span class="c1"># answers the new prompts</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>ansible-playbook<span class="w"> </span>-i<span class="w"> </span>examples/single-node/inventory.yaml<span class="w"> </span>examples/single-node/site.yml
 </code></pre></div>
+<p>(having first set the <code>mariadb_*</code> variables in
+<code>examples/single-node/group_vars/all.yml</code> to match — see
+<a href="../installation/">Installation</a>).</p>
 <h2 id="mariadb-compatibility-requirements">MariaDB compatibility requirements<a class="headerlink" href="#mariadb-compatibility-requirements" title="Permanent link">&para;</a></h2>
 <p>Before <code>sf-database</code> starts, and before <code>sf-ctl ensure-mariadb-schema</code> applies
 any schema work, the server is checked against these requirements:</p>

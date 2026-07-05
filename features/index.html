@@ -7459,7 +7459,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -9040,7 +9040,7 @@
 <p>The normal way to get your first artifact is to download something from the internet. So for example, you might start an instance with a standard Ubuntu cloud image from <a href="https://cloud-images.ubuntu.com/">https://cloud-images.ubuntu.com/</a>. This would be done by specifying the URL of the image in the disk specification of the image: Shaken Fist will then download the image and store it as an artifact, and then start your instance. A second instance using the same image will then check the image at the URL hasn't changed, and if it hasn't use the same artifact as the first instance, skipping the repeated download.</p>
 <p>However, if the image has changed, a second version would be downloaded. Depending on the settings for the artifact, both versions are retained. By default Shaken Fist keeps the last three versions of each artifact, although this is configurable.</p>
 <p>Now let's assume that you have a nightly CI job which starts an instance from the latest Ubuntu cloud image, and performs some tests to ensure that it works for your software stack. You want to somehow mark for your other workloads what versions of the Ubuntu image are trusted, and you do this with a label. So, your CI job would specify the upstream URL for the cloud image, perform its tests, and then label the image if it passed those tests. Other Ubuntu users in your cloud could then specify that they wanted the most recent version which passed testing by specifying the label for their disk specification, instead of the upstream URL.</p>
-<p>Shaken Fist's CI does exactly this. Each night we download a set of cloud images, customize them to make the CI runs a bit faster (pre-installing packages and so forth), and then test that they work. At the end of that run we take a snapshot of the instance we customized, and label it with a label along the lines of "sfci-ubuntu-2004". CI jobs then use that label for their base disk. You can see the ansible we use to do this at <a href="https://github.com/shakenfist/shakenfist/blob/develop/deploy/ansible/ci-image.yml">https://github.com/shakenfist/shakenfist/blob/develop/deploy/ansible/ci-image.yml</a> if you're interested.</p>
+<p>Shaken Fist's CI does exactly this. Each night we download a set of cloud images, customize them to make the CI runs a bit faster (pre-installing packages and so forth), and then test that they work. At the end of that run we take a snapshot of the instance we customized, and label it with a label along the lines of "sfci-ubuntu-2004". CI jobs then use that label for their base disk. You can see the ansible we use to do this at <a href="https://github.com/shakenfist/actions/blob/main/ansible/ci-image.yml">https://github.com/shakenfist/actions/blob/main/ansible/ci-image.yml</a> if you're interested.</p>
 <p>The following operations are exposed on artifacts by the REST API:</p>
 <table>
 <thead>

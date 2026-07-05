@@ -27,7 +27,7 @@
     
     
       
-        <title>Ansible module - Shaken Fist</title>
+        <title>Ansible modules - Shaken Fist</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#ansible-module" class="md-skip">
+        <a href="#ansible-modules" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Ansible module
+              Ansible modules
             
           </span>
         </div>
@@ -7460,7 +7460,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -7478,7 +7478,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -7515,10 +7515,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#implementation" class="md-nav__link">
+  <a href="#referencing-the-modules" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation
+        Referencing the modules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication
       
     </span>
   </a>
@@ -7642,6 +7653,56 @@
     <span class="md-ellipsis">
       
         Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshots
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Snapshots">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
       
     </span>
   </a>
@@ -9212,10 +9273,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#implementation" class="md-nav__link">
+  <a href="#referencing-the-modules" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation
+        Referencing the modules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication
       
     </span>
   </a>
@@ -9345,6 +9417,56 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#examples_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshots
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Snapshots">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -9371,25 +9493,30 @@
   
 
 
-<h1 id="ansible-module">Ansible module<a class="headerlink" href="#ansible-module" title="Permanent link">&para;</a></h1>
-<p>The Shaken Fist Ansible modules were re-written in v0.8. This documentation
-covers that newer version.</p>
+<h1 id="ansible-modules">Ansible modules<a class="headerlink" href="#ansible-modules" title="Permanent link">&para;</a></h1>
+<p>Shaken Fist ships native Ansible modules for orchestration of cloud
+resources as part of the <code>shakenfist.shakenfist</code> collection:
+<code>sf_namespace</code>, <code>sf_network</code>, <code>sf_instance</code> and <code>sf_snapshot</code>. Earlier
+releases shipped the modules as bash shims that redirected to the command
+line client; those shims have been removed, and this documentation covers
+the native collection modules.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
-<p>The Shaken Fist command line client also ships with an Ansible module for
-orchestration of cloud resources. <code>getsf</code> installs this in the right place on the
-primary node, but its likely that you'll need to hand install the module code
-on other client machines.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$<span class="w"> </span>sudo<span class="w"> </span>pip3<span class="w"> </span>install<span class="w"> </span>shakenfist-client
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>$<span class="w"> </span>sudo<span class="w"> </span>cp<span class="w"> </span>venv/share/shakenfist/ansible/*<span class="w"> </span>/usr/share/ansible/plugins/modules/
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>$<span class="w"> </span>sudo<span class="w"> </span>chmod<span class="w"> </span><span class="m">0644</span><span class="w"> </span>/usr/share/ansible/plugins/modules/sf_*
+<p>Install the collection and the Shaken Fist client SDK on your Ansible
+control node:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ansible-galaxy<span class="w"> </span>collection<span class="w"> </span>install<span class="w"> </span>shakenfist.shakenfist
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip3<span class="w"> </span>install<span class="w"> </span>shakenfist-client
 </code></pre></div>
+<p>The modules import the <code>shakenfist_client</code> python SDK and call the Shaken
+Fist REST API directly — they do not shell out to <code>sf-client</code>, and the
+control node never needs the Shaken Fist server package installed.</p>
 <details class="note" open="open">
 <summary>Note</summary>
 <p>This example installs the Shaken Fist client in the system pip so that it
 is globally available to all Ansible users. The system pip is protected on
 modern Linux distributions, and you may need to include the
 <code>--break-system-packages</code> flag if your chosen Linux distribution does not
-package the Shaken Fist client.</p>
+package the Shaken Fist client, or install into a virtual environment and
+point <code>ansible_python_interpreter</code> at it.</p>
 <p>You'll know you need to do this if you see an error like this:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$<span class="w"> </span>sudo<span class="w"> </span>pip3<span class="w"> </span>install<span class="w"> </span>shakenfist-client
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>error:<span class="w"> </span>externally-managed-environment
@@ -9417,17 +9544,16 @@ package the Shaken Fist client.</p>
 <a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>hint:<span class="w"> </span>See<span class="w"> </span>PEP<span class="w"> </span><span class="m">668</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span>detailed<span class="w"> </span>specification.
 </code></pre></div>
 </details>
-<h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
-<p>Ansible modules can be written in any language, although they are normally in
-python. In order to centralize the code for our Ansible module, the module files
-you install are simple <code>bash</code> redirects to the Shaken Fist command line client.
-The client then does the right things to make the module work correctly.</p>
-<details class="note" open="open">
-<summary>Note</summary>
-<p>Specifically, the command line <code>sf-client ansible ...</code> is what the bash
-redirect scripts use. The ansible command line module appears in help output
-for the command line client, but is not intended for direct user use.</p>
-</details>
+<h2 id="referencing-the-modules">Referencing the modules<a class="headerlink" href="#referencing-the-modules" title="Permanent link">&para;</a></h2>
+<p>Reference the modules from your playbooks by their fully-qualified
+collection name (FQCN), for example <code>shakenfist.shakenfist.sf_network</code>.</p>
+<h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
+<p>Every module accepts optional <code>api_url</code>, <code>namespace</code> and <code>key</code> connection
+parameters. When all three are supplied they are used verbatim; when
+omitted, the module auto-discovers credentials from the environment and
+<code>sfrc</code> / <code>~/.shakenfist</code> / <code>/etc/sf/shakenfist.json</code> exactly like the
+<code>sf-client</code> command line client does (see
+<a href="../../developer_guide/authentication/">Authentication and Namespaces</a>).</p>
 <h2 id="namespaces">Namespaces<a class="headerlink" href="#namespaces" title="Permanent link">&para;</a></h2>
 <h3 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h3>
 <table>
@@ -9473,13 +9599,13 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
 <p>Create a namespace:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create a namespace</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">sf_namespace</span><span class="p p-Indicator">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">shakenfist.shakenfist.sf_namespace</span><span class="p p-Indicator">:</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">namespace_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">present</span>
 </code></pre></div>
 <p>Delete a network:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Delete the namespace</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">sf_namespace</span><span class="p p-Indicator">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">shakenfist.shakenfist.sf_namespace</span><span class="p p-Indicator">:</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">uuid</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">namespace_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">absent</span>
 </code></pre></div>
@@ -9508,6 +9634,10 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <tr>
 <td>nat<br/><em>boolean</em></td>
 <td>Whether to provide NAT services on the network. Defaults to <code>true</code>. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network.</td>
+</tr>
+<tr>
+<td>netblock<br/><em>string</em></td>
+<td>The IP block for the network, for example <code>10.0.0.0/24</code>. Required when creating a network. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network.</td>
 </tr>
 <tr>
 <td>state<br/><em>string</em></td>
@@ -9546,14 +9676,14 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <h3 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h3>
 <p>Create a network:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create a network for CI infrastructure</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">sf_network</span><span class="p p-Indicator">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">shakenfist.shakenfist.sf_network</span><span class="p p-Indicator">:</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">netblock</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10.0.0.0/24&quot;</span>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ci&quot;</span>
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">register</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ci_network</span>
 </code></pre></div>
 <p>Delete a network:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Delete the CI network</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">sf_network</span><span class="p p-Indicator">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">shakenfist.shakenfist.sf_network</span><span class="p p-Indicator">:</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">uuid</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">ci_network[&#39;meta&#39;][&#39;uuid&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">absent</span>
 </code></pre></div>
@@ -9584,8 +9714,56 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <td>The name of the instance. Either <code>name</code> or <code>uuid</code> must be included in all requests. When both <code>name</code> and <code>uuid</code> are specified, <code>uuid</code> is used for existing resource lookups. If a instance is identified by its <code>uuid</code>, then the instance will be recreated if you specify a <code>name</code> which does not match the instance in the Shaken Fist cluster.</td>
 </tr>
 <tr>
+<td>networks<br/><em>list of strings</em></td>
+<td>A simpler format for specifying the networks an instance is attached to, following the same behaviour as the <code>-n</code> flag in the command line client: a list of network UUIDs.</td>
+</tr>
+<tr>
+<td>networkspecs<br/><em>list of strings</em></td>
+<td>A more verbose format for specifying the networks an instance is attached to that models the <code>-N</code> flag in the command line client, for example <code>network_uuid=...,address=10.0.0.5</code>.</td>
+</tr>
+<tr>
 <td>ram<br/><em>integer</em></td>
 <td>The amount of RAM the instance should have, in MB.</td>
+</tr>
+<tr>
+<td>ssh_key<br/><em>string</em></td>
+<td>An ssh public key to place into the instance's config drive.</td>
+</tr>
+<tr>
+<td>user_data<br/><em>string</em></td>
+<td>Base64-encoded user data to place into the instance's config drive.</td>
+</tr>
+<tr>
+<td>placement<br/><em>string</em></td>
+<td>Force placement of the instance onto a named node.</td>
+</tr>
+<tr>
+<td>video<br/><em>string</em></td>
+<td>The video model to use.</td>
+</tr>
+<tr>
+<td>nvram_template<br/><em>string</em></td>
+<td>The NVRAM template to use (for UEFI / secure boot).</td>
+</tr>
+<tr>
+<td>configdrive<br/><em>string</em></td>
+<td>The config drive style to use.</td>
+</tr>
+<tr>
+<td>side_channels<br/><em>list of strings</em></td>
+<td>A list of side channel names to expose to the instance.</td>
+</tr>
+<tr>
+<td>uefi<br/><em>boolean</em></td>
+<td>Whether to boot the instance with UEFI firmware.</td>
+</tr>
+<tr>
+<td>secureboot<br/><em>boolean</em></td>
+<td>Whether to enable UEFI secure boot for the instance (implies UEFI).</td>
+</tr>
+<tr>
+<td>metadata<br/><em>dictionary</em></td>
+<td>Metadata key-value pairs to set on the instance.</td>
 </tr>
 <tr>
 <td>state<br/><em>string</em></td>
@@ -9605,6 +9783,74 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 </tr>
 </tbody>
 </table>
+<h3 id="examples_2">Examples<a class="headerlink" href="#examples_2" title="Permanent link">&para;</a></h3>
+<p>Create an instance attached to a network:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create an instance</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">shakenfist.shakenfist.sf_instance</span><span class="p p-Indicator">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ci-worker&quot;</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">ram</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="nt">disks</span><span class="p">:</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;20@debian:12&quot;</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">networks</span><span class="p">:</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">ci_network[&#39;meta&#39;][&#39;uuid&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="nt">await</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">register</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ci_worker</span>
+</code></pre></div>
+<p>Delete an instance:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Delete the instance</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">shakenfist.shakenfist.sf_instance</span><span class="p p-Indicator">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">uuid</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">ci_worker[&#39;meta&#39;][&#39;uuid&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">absent</span>
+</code></pre></div>
+<h2 id="snapshots">Snapshots<a class="headerlink" href="#snapshots" title="Permanent link">&para;</a></h2>
+<h3 id="parameters_3">Parameters<a class="headerlink" href="#parameters_3" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>instance_uuid<br/><em>string</em></td>
+<td>The UUID of the instance to snapshot. Required when <code>state</code> is <code>present</code>.</td>
+</tr>
+<tr>
+<td>uuid<br/><em>string</em></td>
+<td>The UUID of the snapshot artifact to delete. Required when <code>state</code> is <code>absent</code>.</td>
+</tr>
+<tr>
+<td>all<br/><em>boolean</em></td>
+<td>Whether to snapshot all of the instance's disks rather than only the first. Defaults to <code>false</code>.</td>
+</tr>
+<tr>
+<td>label<br/><em>string</em></td>
+<td>An artifact label name to point at the new snapshot.</td>
+</tr>
+<tr>
+<td>delete_after_label<br/><em>boolean</em></td>
+<td>Whether to delete the snapshot artifact after applying the label. Defaults to <code>false</code>.</td>
+</tr>
+<tr>
+<td>async<br/><em>boolean</em></td>
+<td>When <code>true</code>, do not block waiting for the snapshot to be created (ignored when <code>label</code> is set, which always blocks). Defaults to <code>false</code>.</td>
+</tr>
+<tr>
+<td>state<br/><em>string</em></td>
+<td>The state of the resource. Valid states are <code>present</code> or <code>absent</code>, defaults to <code>present</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="examples_3">Examples<a class="headerlink" href="#examples_3" title="Permanent link">&para;</a></h3>
+<p>Snapshot an instance and update a label:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Snapshot and update the &quot;ciimage&quot; label</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">shakenfist.shakenfist.sf_snapshot</span><span class="p p-Indicator">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">instance_uuid</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">ci_worker[&#39;meta&#39;][&#39;uuid&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ciimage</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">present</span>
+</code></pre></div>
 
 
 

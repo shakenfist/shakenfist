@@ -7449,7 +7449,7 @@
   <span class="md-ellipsis">
     
   
-    Ansible module
+    Ansible modules
   
 
     
@@ -9349,9 +9349,9 @@
 </tr>
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td>Phase 2: Bootstrap CLI</td>
-<td>Not started</td>
-<td>Idempotent <code>sf-ctl bootstrap-cluster</code> + <code>bootstrap_operations</code> table</td>
+<td>Phase 2: ~~Bootstrap CLI~~</td>
+<td>Dissolved</td>
+<td>Reassessed to nothing — config stays in the idempotent role, <code>AUTH_SECRET_SEED</code> caller-supplied, <code>system</code> namespace via the existing <code>bootstrap-system-key</code>; no <code>bootstrap_operations</code> table or <code>bootstrap-cluster</code> command. The role-config remainder folds into phase 6</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
@@ -9367,15 +9367,21 @@
 </tr>
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td>Phase 6: Galaxy role</td>
-<td>Not started</td>
-<td>Repackage deployer as a per-node ansible-galaxy-style role</td>
+<td><a href="PLAN-remove-primary-phase-06-galaxy-role/">Phase 6: Galaxy collection</a></td>
+<td>In progress (steps 1-5 authored; 5b awaiting green CI, step 6 remains)</td>
+<td>Repackage deployer as the <code>shakenfist.shakenfist</code> collection (parameterised <code>node</code> role + component roles); native ansible modules under <code>plugins/modules/</code>; delete the getsf/topology installer chain. Step 5a (the <code>release.yml</code> collection build/publish jobs) is done and locally validated. Step 5b is authored: the reusable <code>smoke-cluster.yml</code> + <code>tools/</code> live on <code>shakenfist/actions</code> <code>main</code>, and <code>functional-tests.yml</code> calls it beside the getsf job — pending an operator push and a green CI run before the getsf job and legacy chain (step 6) are removed</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
 <td>Phase 7: Rename and cleanup</td>
 <td>Not started</td>
 <td><code>etcd_master</code> → <code>database_node</code>; final dead-code sweep</td>
+</tr>
+<tr>
+<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
+<td>Phase 8: Roll out shared smoke-cluster CI</td>
+<td>Not started</td>
+<td>Roll the reusable <code>smoke-cluster.yml</code> (authored in phase 6 step 5) out to <code>client-python</code>/<code>library-python</code>/<code>kerbside</code>, replacing each repo's copy-pasted cluster-build CI with a few-line <code>uses:</code> call</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-apache-lb/">Remove the Apache load balancer</a></td>
