@@ -83,11 +83,14 @@ multi-entry run produces indistinguishable artifacts.
   facility existing is this phase's deliverable, the kerbside test
   content is kerbside's.
 - **Artifact names become `bundle-<component>-<tier>[-<key>]`.**
-- **Delete the getsf-era dead topologies** (`ci-topology-localhost-
-  released.yml`, `-upgrade.yml`, `slim-primary-released.yml`):
-  referenced by no workflow in any org repo, and they write wrappers
-  for an installer deleted in phase 6. Released-version testing, if
-  wanted later, is a fresh design against the collection.
+- **The released/upgrade topologies stay, for now.** Code review of
+  this phase found the "dead" `ci-topology-*-released.yml` /
+  `-upgrade.yml` playbooks are consumed from actions@main by nine
+  workflows on shakenfist's v0.6-releases and v0.7-releases branches
+  (backport pushes and PRs run them). They are retained until those
+  release branches' CI is formally retired; the lesson recorded here is
+  that actions-repo grep gates must include release branches, not just
+  default-branch checkouts.
 - **Document the recipe.** A short "adding SF smoke CI to your repo"
   section in the actions README covering both modes, so the next repo
   is a copy of six lines rather than six hundred.
@@ -100,7 +103,7 @@ multi-entry run produces indistinguishable artifacts.
 | 2 | actions | **Extract `build-smoke-cluster`.** New composite action containing the deploy sequence currently inlined in `smoke-cluster.yml`; the workflow consumes it. Outputs: primary address, inventory path, under-cloud namespace. Artifact-name parameterisation and the component-selection documentation fix ride along. Validated by a shakenfist workflow_dispatch run (behaviourally unchanged, distinct artifact names). |
 | 3 | client-python | **Adopt the workflow.** Replace the broken `functional_matrix` body with a `uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main` caller: `component: client-python`, `component_ref: ${{ github.sha }}`, smoke defaults otherwise, `secrets: inherit`. Un-breaks the repo's CI. Prepared as a branch; operator pushes, PRs, and updates the required status check (new context: "functional_matrix / Smoke tests (collection)"). |
 | 4 | actions | **Kerbside-mode worked example.** Add the README recipe for both modes, including a concrete build-smoke-cluster example job (deploy, then run-your-own-tests against the outputs). Coordinate with kerbside on an actual SF-integration smoke leg as a follow-on kerbside PR (out of this phase's gate). |
-| 5 | actions | **Delete the dead getsf-era topologies** after a grep gate across all org checkouts. |
+| 5 | actions | ~~Delete the dead getsf-era topologies~~ **Retained**: the review's release-branch grep found live consumers on v0.6/v0.7-releases (see Decisions). Deletion is deferred to whenever those branches' CI is retired. |
 | 6 | this | **Bookkeeping.** Flip the phase 8 row in `PLAN-remove-primary.md` and correct its stale repo list; code review of the phase and address findings. |
 
 ## Risks
@@ -130,8 +133,8 @@ multi-entry run produces indistinguishable artifacts.
   smoke suite) via the reusable workflow.
 - The README recipe's example job deploys and reaches the cluster in a
   scratch run.
-- Grep gates: no getsf reference in actions outside git history; no org
-  repo references the deleted topologies.
+- Grep gates: no getsf reference in live (non-release-branch) CI paths;
+  gates over the actions repo must sweep release branches too.
 
 ## Out of scope
 
