@@ -10,13 +10,9 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/release_notes/v07-v08/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-remove-primary-phase-07-rename-cleanup/">
       
       
-        <link rel="prev" href="../../features/">
-      
-      
-        <link rel="next" href="../../community/">
       
       
         
@@ -27,7 +23,7 @@
     
     
       
-        <title>v0.7 to v0.8 (unreleased) - Shaken Fist</title>
+        <title>Phase 7: rename etcd_master to database_node, and cleanup - Shaken Fist</title>
       
     
     
@@ -101,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#v07-to-v08-release-notes" class="md-skip">
+        <a href="#phase-7-rename-etcd_master-to-database_node-and-cleanup" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              v0.7 to v0.8 (unreleased)
+              Phase 7: rename etcd_master to database_node, and cleanup
             
           </span>
         </div>
@@ -7367,20 +7363,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
@@ -7401,7 +7395,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -7416,37 +7410,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    v0.7 to v0.8 (unreleased)
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -7462,258 +7429,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#major-changes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Major changes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rest-api" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        REST API
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#supported-distributions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Supported distributions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Logging">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#containers-and-kubernetes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Containers and Kubernetes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#networking" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Networking
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#instances" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Instances
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#artifacts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Artifacts
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#database" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Database
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bring-your-own-mariadb" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bring your own MariaDB
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#performance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Performance
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#minor-changes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Minor changes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#event-logging-migrated-to-mariadb" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Event logging migrated to MariaDB
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Event logging migrated to MariaDB">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#history-loss-on-upgrade" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        History loss on upgrade
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ansible-inventory-change" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Ansible inventory change
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuration-key-removals" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration key removals
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rest-events-response-shape-change" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        REST /events response shape change
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#new-prometheus-metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Prometheus metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#strict-namespace-scoping-on-_ref-lookups" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Strict namespace scoping on *_ref lookups
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -8866,7 +8581,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -8894,7 +8609,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -8922,7 +8637,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -9423,10 +9138,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#major-changes" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Major changes
+        Context
       
     </span>
   </a>
@@ -9434,10 +9149,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rest-api" class="md-nav__link">
+  <a href="#decisions-phase-local" class="md-nav__link">
     <span class="md-ellipsis">
       
-        REST API
+        Decisions (phase-local)
       
     </span>
   </a>
@@ -9445,10 +9160,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#supported-distributions" class="md-nav__link">
+  <a href="#steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Supported distributions
+        Steps
       
     </span>
   </a>
@@ -9456,82 +9171,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
+  <a href="#risks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Logging
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Logging">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#containers-and-kubernetes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Containers and Kubernetes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#networking" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Networking
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#instances" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Instances
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#artifacts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Artifacts
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#database" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Database
+        Risks
       
     </span>
   </a>
@@ -9539,10 +9182,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#bring-your-own-mariadb" class="md-nav__link">
+  <a href="#validation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bring your own MariaDB
+        Validation
       
     </span>
   </a>
@@ -9550,10 +9193,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#performance" class="md-nav__link">
+  <a href="#deferred-to-the-next-release-cycle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Performance
+        Deferred to the next release cycle
       
     </span>
   </a>
@@ -9561,10 +9204,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#minor-changes" class="md-nav__link">
+  <a href="#out-of-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Minor changes
+        Out of scope
       
     </span>
   </a>
@@ -9572,82 +9215,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#event-logging-migrated-to-mariadb" class="md-nav__link">
+  <a href="#cross-repo-operator-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Event logging migrated to MariaDB
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Event logging migrated to MariaDB">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#history-loss-on-upgrade" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        History loss on upgrade
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ansible-inventory-change" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Ansible inventory change
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuration-key-removals" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration key removals
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rest-events-response-shape-change" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        REST /events response shape change
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#new-prometheus-metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Prometheus metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#strict-namespace-scoping-on-_ref-lookups" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Strict namespace scoping on *_ref lookups
+        Cross-repo / operator actions
       
     </span>
   </a>
@@ -9675,414 +9246,215 @@
   
 
 
-<h1 id="v07-to-v08-release-notes">v0.7 to v0.8 release notes<a class="headerlink" href="#v07-to-v08-release-notes" title="Permanent link">&para;</a></h1>
-<h2 id="major-changes">Major changes<a class="headerlink" href="#major-changes" title="Permanent link">&para;</a></h2>
-<ul>
-<li>You can now hot plug (add) a network interface to a running instance. This is
-  exposed by a POST to the <code>/instance/...instanceref.../interfaces</code> endpoint, passing
-  a network specification like you would at boot time. More details are available
-  in the</li>
-<li>The Shaken Fist client now has a plugin system, which allows additional commands
-  that may not be of interest to all users to be added without cluttering the
-  main codebase. Orchestration of k3s clusters via the <code>shakenfist-client-k3s</code>
-  plugin is the first example of one of these plugins.</li>
-<li>You can now optionally have DNS entries for the instances in a virtual network
-  provided to the instances on that network via the <code>provide_dns</code> argument on
-  network creation. This included a re-write of DHCP server options in the
-  configuration file.</li>
-<li>We now use threads for most concurrency requirements. See
-  <a href="/operator_guide/threads/">the operator page on threading</a> for further details.</li>
-<li>Disk utilization is now a factor in scheduling decisions. This might produce
-  unexpected results if you have many very active filesystems mounted on a single
-  hypervisor.</li>
-</ul>
-<h2 id="rest-api">REST API<a class="headerlink" href="#rest-api" title="Permanent link">&para;</a></h2>
-<ul>
-<li>There is now an API call (<code>GET /admin/resources</code>) which exposes the resource
-  utilization of the cluster to admin users.</li>
-<li>You can now POST to <code>/instance/...instanceref.../interfaces</code> as described
-  above to hot plug new network interfaces into an existing instance.</li>
-</ul>
-<h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Debian 12 is now supported as a host OS. Support for Debian 11 as a host OS
-  has been dropped.</li>
-<li>Ubuntu 22.04 is now supported as a host OS.</li>
-<li>Fedora 34, 38, and 29, as well as Ubuntu 22.04 now have canned guest images.</li>
-<li>Rocky 8 and 9 now have canned guest images.</li>
-</ul>
-<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
-<ul>
-<li>REST API request traces are now logged via the event logging mechanism with
-  the object type "api-requests" and the UUID being the request id.</li>
-<li>Effort is now taken to report an event against all objects it affects, not
-  just an arbitrary single object. This should ease debugging.</li>
-</ul>
-<h3 id="containers-and-kubernetes">Containers and Kubernetes<a class="headerlink" href="#containers-and-kubernetes" title="Permanent link">&para;</a></h3>
-<ul>
-<li>The Shaken Fist client can now orchestrate k3s Kubernetes clusters for you. The
-  lifecycle support is relatively simple at the moment, with cluster creation and
-  deletion supported, as well as fetching the kubectl configuration from the
-  cluster. This will be expanded over time. This support is implemented entirely
-  in the Shaken Fist python client, and heavily utilizes the in guest agent
-  added in v0.7. The client side nature of the orchestration makes it easy for you
-  to customize the orchestration if desired without having to alter the main
-  server code.</li>
-</ul>
-<h3 id="networking">Networking<a class="headerlink" href="#networking" title="Permanent link">&para;</a></h3>
-<ul>
-<li>IP address management has moved to a new baseobject called IPAM. Events are
-  therefore recorded for address management as you would expect.</li>
-<li>Addresses released on any network (including the floating network) are now
-  quarantined for <code>IP_DELETION_HALO_DURATION</code> seconds after deletion before they
-  can be reused. The only exception to this is if a network is heavily congested
-  and an allocation attempt will fail. In that case the halo is temporarily
-  reduced to 30 seconds and a warning log message is emitted.</li>
-<li>You can now list the addresses in use for a given network with the
-  <code>sf-client network addresses ...uuid...</code> command.</li>
-<li>In order to support the K3S Kubernetes orchestration, the concept of <em>routed
-  IPs</em> was introduced. A routed IP is an address from the floating address pool
-  which uses routing to deliver traffic to the relevant virtual network. An
-  interface on the virtual network must then have been configured by the user to
-  answer ARP requests for that address. This works well with metallb, which our
-  K3S orchestration uses to expose services.</li>
-<li>Network orchestration now waits for <code>iptables</code> locks, instead of failing
-  commands in high load situations.</li>
-</ul>
-<h3 id="instances">Instances<a class="headerlink" href="#instances" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Shaken Fist can now capture screenshots of instance consoles.</li>
-<li>Pause and unpause are now retried several times on failure, as sometimes libvirt
-  does not respond correctly.</li>
-<li>Specifying an incorrect disk bus now returns a more helpful error.</li>
-<li>Power on now implies creation of a config drive is one is specified for the
-  instance. That is, you can force re-creation of the config drive by powering
-  an instance off and then on again.</li>
-<li>Deletion of an instance will now cause most outstanding cluster operations for
-  that instance to be cancelled. This is so these operations do not block the
-  delete operation. The one exception at this time is snapshots, which will
-  complete before the deletion occurs.</li>
-</ul>
-<h3 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link">&para;</a></h3>
-<ul>
-<li>When you refer to an artifact by name, and there is more than one match then
-  the match in your local namespace (if any) is now preferred instead of returning
-  an error.</li>
-</ul>
-<h3 id="deployment">Deployment<a class="headerlink" href="#deployment" title="Permanent link">&para;</a></h3>
-<ul>
-<li>The <code>getsf</code> installer and the legacy Ansible deployer have been removed.
-  Shaken Fist is now deployed with the <code>shakenfist.shakenfist</code> Ansible
-  collection: you write an inventory, set your variables, and run a playbook
-  (example inventories and playbooks ship in <code>examples/</code>). See the rewritten
-  <a href="/operator_guide/installation">installation guide</a> for the new workflow.</li>
-<li>We no longer reset the authentication secret used to generate authentication
-  tokens on upgrade. This means tokens from before an upgrade will continue to work
-  for their normal lifetime.</li>
-<li>We now lock versions of upstream Ansible Galaxy dependencies.</li>
-<li>We now lock versions of all of our indirect python dependencies.</li>
-<li>Nodes can now transition directly from the missing state to the stopping state.</li>
-<li>The Ansible modules have been re-written to skip resources that are already in
-  existence and ask described by your request. The Ansible module is also <a href="/user_guide/ansible">now
-  documented at the user guide</a>.</li>
-<li>TLS certificates on hypervisors which are within 30 days of expiry are now
-  automatically replaced.</li>
-</ul>
-<h2 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Object state (created, deleted, error, etc.) is now stored in MariaDB instead
-  of etcd. This improves query performance for state-based lookups and reduces
-  etcd load. MariaDB is now required for all deployments.</li>
-<li>A new database microservice runs on database-tier nodes and provides gRPC access
-  to MariaDB for all other nodes. This centralizes database access and means only
-  database-tier nodes require direct MariaDB credentials.</li>
-<li>MariaDB schema versioning is now tracked in a <code>schema_versions</code> table. This
-  enables automatic schema migrations when upgrading Shaken Fist. The
-  <code>sf-ctl ensure-mariadb-schema</code> command can be used to manually verify or apply
-  schema migrations.</li>
-<li>Existing deployments upgrading to v0.8 must run <code>sf-ctl migrate-state-to-mariadb</code>
-  after stopping services and before starting the new version. Use <code>--dry-run</code>
-  to preview what will be migrated.</li>
-<li>Cluster operation headers and the per-node work queues have been moved from
-  etcd to the new <code>cluster_operations</code> and <code>work_queue</code> MariaDB tables.
-  Create and enqueue is now a single MariaDB transaction (header + state +
-  queue row), and dequeue uses <code>SELECT ... FOR UPDATE SKIP LOCKED</code> for
-  race-safe claims. Residual <code>/sf/queue/</code>, <code>/sf/processing/</code> and
-  <code>/sf/{op_type}/</code> etcd keys left behind by older clusters are drained
-  automatically by a one-shot data migration on database daemon startup.</li>
-<li>A new stuck-job reaper in the cluster daemon reclaims work queue rows
-  whose claim has exceeded <code>CLUSTER_OP_STUCK_THRESHOLD</code> seconds (default
-  1800) and rejects jobs that have been claimed more than
-  <code>CLUSTER_OP_MAX_ATTEMPTS</code> times (default 5). Reaper activity is exposed
-  via <code>cluster_op_reaper_requeued_total</code> and
-  <code>cluster_op_reaper_rejected_total</code> on <code>CLUSTER_METRICS_PORT</code> (default
-  13007).</li>
-<li>The floating network now uses a well-known UUID (<code>f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f</code>)
-  instead of the invalid string "floating". Existing deployments must run
-  <code>sf-ctl migrate-floating-network-uuid</code> after stopping services to migrate.
-  This change enables proper UUID4 type validation in the IPAM schema.</li>
-</ul>
-<h2 id="bring-your-own-mariadb">Bring your own MariaDB<a class="headerlink" href="#bring-your-own-mariadb" title="Permanent link">&para;</a></h2>
-<p>Earlier in the v0.8 cycle the Shaken Fist deployer installed and
-configured MariaDB for you. As of this batch of changes that stopped:
-operators provide their own MariaDB and the deployer slots into existing
-infrastructure rather than prescribing it. This is a breaking change —
-existing deployments must be rebuilt against the new shape.</p>
-<ul>
+<h1 id="phase-7-rename-etcd_master-to-database_node-and-cleanup">Phase 7: rename etcd_master to database_node, and cleanup<a class="headerlink" href="#phase-7-rename-etcd_master-to-database_node-and-cleanup" title="Permanent link">&para;</a></h1>
+<p>This is a sub-plan of <a href="../PLAN-remove-primary/">PLAN-remove-primary.md</a>.
+Phase 6 repackaged the deployer as the <code>shakenfist.shakenfist</code> ansible
+collection and deleted the getsf installer chain. Phase 7 removes the
+last etcd-era naming: the <code>etcd_master</code> inventory group (which has
+meant "the database tier" since PLAN-byo-mariadb), and the vestigial
+etcd-era node role flags.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The master plan scoped phase 7 as "mostly mechanical: rename
+<code>etcd_master</code> → <code>database_node</code> across the surviving collection roles,
+example playbooks, templates, CI, and comments". Investigation while
+drafting this plan found the residue is broader than deployer naming,
+and includes one silent test-coverage gap:</p>
+<ol>
 <li>
-<p><strong>Deployer no longer installs MariaDB.</strong> The <code>roles/mariadb/</code> Ansible
-  role has been deleted. Operators are responsible for running a MariaDB
-  10.6.0+ server before deploying Shaken Fist.</p>
+<p><strong>The inventory group</strong> (<code>etcd_master</code>) is authoritative in the
+   collection world: <code>examples/_shared/site.yml</code> computes
+   <code>node_is_database_node</code> from membership (<code>:145</code>), reduces
+   <code>mariadb_gateway_hosts</code> from the group (<code>:156</code>), and targets four
+   plays at it (<code>:248</code>, <code>:263</code>, <code>:291</code>, <code>:312</code>). It also appears in the
+   example inventories and READMEs, <code>docs/operator_guide/installation.md</code>
+   (which documents the rename caveat), and the actions repo's
+   under-cloud tooling (<code>ci-topology-*.yml</code> <code>add_host</code> groups,
+   <code>ci-include-common-localhost.yml</code>'s topology-facts dump, and the
+   group emitted by <code>tools/ci-make-inventory.py</code>).</p>
 </li>
 <li>
-<p><strong>Bootstrap and tuning helpers ship in the source tree.</strong>
-  <code>tools/bootstrap-mariadb.sql</code> creates the <code>shakenfist</code> database, the
-  <code>shakenfist</code> user, and the required grants. Apply it once against your
-  MariaDB before the first deploy; the script is idempotent and safe to
-  re-run. <code>examples/mariadb-tuning.cnf</code> is an optional drop-in with
-  starting-point InnoDB and connection-pool settings; copy it to
-  <code>/etc/mysql/mariadb.conf.d/</code> if you want SF's recommended baseline.</p>
+<p><strong>The node role flags are vestigial.</strong> <code>node_attributes</code> carries
+   <code>is_etcd_master</code> and <code>is_eventlog_node</code> (schema, MariaDB column,
+   proto field, API external view), but the only writer is
+   <code>Node.observe_this_node()</code>, which hardcodes both to <code>False</code>
+   (<code>shakenfist/node.py:314</code>). No config knob exists to set them. They
+   are dead fields left behind by PLAN-remove-etcd, faithfully
+   marshalled through every layer.</p>
 </li>
 <li>
-<p><strong>The deployer takes connection details as variables.</strong> Set
-  <code>mariadb_host</code>, <code>mariadb_port</code> (default <code>3306</code>), <code>mariadb_user</code> (default
-  <code>shakenfist</code>), <code>mariadb_password</code>, and <code>mariadb_database</code> in your
-  deployment's <code>group_vars/all.yml</code>. The deployer no longer generates a
-  password — operators choose it when they apply
-  <code>tools/bootstrap-mariadb.sql</code>.</p>
+<p><strong>The database tier is not recorded on the node object at all.</strong>
+   <code>node_is_database_node</code> exists only as a deploy-time ansible
+   variable. There is no <code>NODE_IS_DATABASE_NODE</code> config setting and no
+   node attribute, so nothing at runtime can enumerate the database
+   tier.</p>
 </li>
 <li>
-<p><strong><code>sf-ctl ensure-mariadb-schema</code> is the only path for schema work.</strong>
-  <code>sf-database</code> no longer calls <code>ensure_schema()</code> or runs data
-  migrations at startup. Instead it reads the recorded schema version,
-  compares it against its own expectations, and refuses to start on
-  mismatch. Run <code>sf-ctl ensure-mariadb-schema</code> to create or migrate the
-  schema; this command is the single authoritative path for all schema
-  changes.</p>
+<p><strong><code>test_database_tier.py</code> has never run its assertions.</strong> It
+   discovers the tier via <code>n.get('is_etcd_master')</code> — which is always
+   <code>False</code> — so it always finds zero tier nodes and skips (including on
+   the slim-tier CI topology that exists to exercise it). Skips count
+   as passes, so this was invisible.</p>
 </li>
-<li>
-<p><strong>MariaDB compatibility check at startup.</strong> Both
-  <code>sf-ctl ensure-mariadb-schema</code> and <code>sf-database</code> at startup verify
-  that the server is MariaDB (not MySQL), version 10.6.0 or later, with
-  the default storage engine set to InnoDB, the connection charset
-  <code>utf8mb4</code>, and a <code>utf8mb4_*</code> collation. An incompatible server
-  surfaces as a clear refusal-to-start with a multi-line error rather
-  than a runtime failure on the first JSON-column write.</p>
-</li>
-<li>
-<p><strong><code>MARIADB_GATEWAY_HOSTS</code> replaces <code>DATABASE_NODE_IP</code>.</strong> The new
-  config key is a comma-separated list of <code>sf-database</code> gRPC endpoints;
-  single-instance deployments use a one-element list. The companion keys
-  <code>MARIADB_GATEWAY_PORT</code> (default <code>13005</code>) and
-  <code>MARIADB_GATEWAY_METRICS_PORT</code> (default <code>13006</code>) set the gRPC and
-  Prometheus ports that each <code>sf-database</code> instance binds on.</p>
-</li>
-<li>
-<p><strong><code>MARIADB_HOST</code> scope is now narrow.</strong> Set <code>MARIADB_HOST</code> only on
-  nodes that run <code>sf-database</code> and on any node where an operator
-  manually runs <code>sf-ctl ensure-mariadb-schema</code>. The previous
-  <code>MARIADB_HOST=localhost</code> direct-access hack used at config-bootstrap
-  time is gone.</p>
-</li>
-<li>
-<p><strong><code>sf-database</code> is a tier of N &gt;= 1 instances.</strong> All instances
-  connect to the same MariaDB. None is elected leader; all serve any
-  inbound gRPC request. Every other SF daemon reaches the tier through
-  a client-side load-balanced gRPC channel that round-robins requests
-  across the <code>MARIADB_GATEWAY_HOSTS</code> list, skipping dead endpoints via
-  subchannel connectivity state and client keepalives. No external L4
-  load balancer is required. The <code>grpc.health.v1.Health</code> protocol is
-  published for external monitoring via unary <code>Check</code> calls.</p>
-</li>
-<li>
-<p><strong>CI exercises N &gt; 1.</strong> The <code>slim-tier</code> CI topology runs two
-  <code>sf-database</code> instances on every merge-queue run. The multi-instance
-  shape is a supported production configuration.</p>
-</li>
-<li>
-<p><strong>Several <code>sf-ctl</code> commands have been deleted.</strong>
-  <code>migrate-state-to-mariadb</code>, <code>migrate-floating-network-uuid</code>, and all
-  other <code>sf-ctl migrate-*</code> commands tied to the etcd era are gone.
-  Operators on the new shape do not run any migration command. The
-  <code>migrate-etcd-to-mariadb</code> Claude Code skill in <code>.claude/skills/</code> has
-  also been removed.</p>
-</li>
-<li>
-<p><strong>Greenfields only.</strong> PLAN-byo-mariadb does not preserve compatibility
-  with deployments that took the earlier-in-the-v0.8-cycle shape
-  (deployer-installed MariaDB, singular <code>DATABASE_NODE_IP</code>, etc.).
-  Operators rebuild against the new shape.</p>
-</li>
-</ul>
-<p>See <code>docs/plans/PLAN-byo-mariadb.md</code> for the multi-phase rollout
-details.</p>
-<h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
+</ol>
+<p>So the phase is: rename the group with a one-release compatibility
+window, replace the dead flags with one real <code>is_database_node</code> node
+attribute driven by config, and key the tier test on the real flag so
+its assertions finally run.</p>
+<h2 id="decisions-phase-local">Decisions (phase-local)<a class="headerlink" href="#decisions-phase-local" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Events are written directly to MariaDB via a per-daemon local spool
-  rather than through etcd or a dedicated eventlog node. This eliminates
-  all event-related etcd traffic and the single-node bottleneck that the
-  old sf-eventlog daemon represented. (Earlier in the v0.8 cycle events
-  were sent via gRPC to the eventlog node; that stage has also been
-  superseded.)</li>
-<li>We now use gRPC calls to compact etcd, instead of relying on a python client
-  wrapper. This means we can now update our gRPC and protobuf dependencies to
-  much more recent versions.</li>
-<li>etcd traffic levels are now monitored in CI and we attempt to hold fewer
-  cluster level locks for local operations.</li>
+<li><strong><code>database_node</code> is the group name.</strong> Matches the master plan and
+  the role terminology used everywhere since PLAN-byo-mariadb.</li>
+<li><strong>One-release compatibility for inventories.</strong> <code>site.yml</code> plays
+  target <code>database_node:etcd_master</code> and membership/reduction
+  expressions use the union of both groups, with a loud warning task
+  when <code>etcd_master</code> is non-empty. The fallback is removed next
+  release. Operator inventories therefore keep working unchanged for
+  one cycle.</li>
+<li><strong>Replace, don't rename, the dead flags.</strong> A new <code>is_database_node</code>
+  node attribute is written from a new <code>NODE_IS_DATABASE_NODE</code> config
+  setting (templated by the collection's node role from the existing
+  <code>node_is_database_node</code> variable). The dead <code>is_etcd_master</code> /
+  <code>is_eventlog_node</code> fields keep being emitted (always <code>False</code>) for one
+  release so older clients don't KeyError, then the columns, proto
+  fields (numbers reserved), API keys and schema fields are dropped.
+  Renaming a field that has only ever been <code>False</code> would launder bad
+  data into a new name.</li>
+<li><strong>Proto evolution, not mutation.</strong> <code>is_database_node</code> is added as a
+  new field number in <code>NodeAttributesValue</code>; the old field numbers are
+  only reserved when the fields are removed next cycle. Regenerate with
+  <code>tox -e genprotos</code>.</li>
+<li><strong>Schema change follows the established protocol.</strong> The migration
+  adds the <code>is_database_node</code> column (idempotent, default <code>False</code>);
+  operators run <code>sf-ctl ensure-mariadb-schema</code> before rolling daemons,
+  as with every schema change since PLAN-byo-mariadb.</li>
+<li><strong>CI ordering keeps CI green at every step.</strong> actions/main is
+  consumed at runtime by every shakenfist branch, so the generated
+  deploy inventory emits the database tier into BOTH <code>database_node</code>
+  and the legacy <code>etcd_master</code> group for one release cycle --
+  pre-phase-7 <code>site.yml</code> copies (develop until this merges, and any
+  in-flight PR branch) keep deploying, and every CI run exercises the
+  compatibility union and its deprecation warning. The dual emission is
+  removed with the rest of the fallback next release.</li>
 </ul>
-<h2 id="minor-changes">Minor changes<a class="headerlink" href="#minor-changes" title="Permanent link">&para;</a></h2>
+<h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Repo</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>this</td>
+<td><strong>Plan.</strong> This document.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>this</td>
+<td><strong>Real database-tier flag.</strong> Add <code>NODE_IS_DATABASE_NODE</code> (pydantic config, default <code>False</code>); add <code>is_database_node</code> to <code>schema/node_attributes.py</code>, the <code>node_attributes</code> migration in <code>mariadb.py</code>, <code>protos/database.proto</code> (new field number; <code>tox -e genprotos</code>), and the marshalling in <code>daemons/database/main.py</code>. <code>Node.observe_this_node()</code> writes it from config; <code>external_view()</code> emits it alongside the (still always-<code>False</code>) legacy flags. Unit tests for the attribute round-trip and the external view.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>this</td>
+<td><strong>Collection consumes the flag.</strong> The node role templates <code>NODE_IS_DATABASE_NODE</code> into <code>/etc/sf/config</code> from <code>node_is_database_node</code>. <code>site.yml</code>: plays target <code>database_node:etcd_master</code>; <code>node_is_database_node</code> and <code>mariadb_gateway_hosts</code> computed from the union of both groups; a pre-flight warning task fires when <code>groups['etcd_master']</code> is non-empty ("renamed to database_node, support for the old name is removed in the next release"). Comments updated.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>actions</td>
+<td><strong>CI tooling rename.</strong> <code>ci-topology-*.yml</code> <code>add_host</code> groups say <code>database_node</code> (drop <code>etcd_master</code>); <code>ci-include-common-localhost.yml</code> computes <code>is_database_node</code> from the union of both groups (it feeds facts for released-version topologies too); <code>tools/ci-make-inventory.py</code> emits <code>database_node</code>. Coordinated actions/main push; shakenfist CI validates via workflow_dispatch before anything else changes.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>this</td>
+<td><strong>Tier test keys on the real flag.</strong> <code>test_database_tier.py</code> discovers the tier via <code>is_database_node</code>. On slim-tier this un-skips the assertions for the first time — expect to fix whatever they find, since they have never run.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>this</td>
+<td><strong>Docs and examples rename.</strong> Example inventories and READMEs use <code>database_node</code>; <code>installation.md</code> documents the new name and the one-release fallback (removing the phase-7 caveat); <code>ctl.py</code> docstrings say "database node"; release notes gain the rename + deprecation entry; comment sweep for remaining <code>etcd_master</code> mentions outside docs/plans/.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>client-python</td>
+<td><strong>Client display.</strong> <code>commandline/node.py</code> shows a "database node" role sourced from <code>is_database_node</code> (via <code>.get()</code> so older servers don't break it), keeps tolerating the legacy keys, and drops the "etcd master" wording. Prepared as a branch; the operator pushes and PRs.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>this</td>
+<td><strong>Bookkeeping and review.</strong> Flip the phase 6 and 7 rows in <code>PLAN-remove-primary.md</code>'s execution table; final grep gate (below); code review of the whole phase and address findings.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="risks">Risks<a class="headerlink" href="#risks" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Unhandled exceptions are now recorded to <code>/srv/shakenfist/exceptions/</code> for
-  later analysis. See <a href="/operator_guide/exception_tracking/">the operator guide</a>
-  for details.</li>
-<li>CI has been moved from relatively unreliable scraping of the instance serial
-  console over telnet to using the Shaken Fist in-guest agent to inspect the
-  state of instances for correctness.</li>
-<li>The slow lock warning threshold is no longer configurable (SLOW_LOCK_THRESHOLD).
-  Instead, a warning is emitted if a lot takes more than half of the specified
-  timeout period to be acquired. This change was made because in some places we
-  expect to wait a long time for a lock -- for example serialized fetches of a
-  single resource from outside the cluster, but we also wanted to enforce locks
-  didn't take a long time to acquire in CI.</li>
-<li>Shaken Fist now uses <code>Renovate</code> to keep the dependencies of the <code>develop</code>
-  branch up to date. This means that locking requirements at release time is no
-  longer required, and is therefore more reliable.</li>
-<li>The <code>qemu</code> commands generated now vary based on the version of <code>qemu</code> installed
-  on the machine. This was required to support the newer <code>qemu</code> version in
-  Ubuntu 22.04.</li>
-<li>The ansible modules have been rewritten to be more reliable.</li>
-<li>The ShakenFist client now uses HTTP sessions to reduce latency for requests.</li>
-<li><strong>etcd has been removed.</strong> All object storage, cluster locks, work queues,
-  cluster configuration, and the event dead letter queue now live in MariaDB.
-  The <code>etcd.py</code> module is retained as a minimal shim only so that
-  <code>DATA_MIGRATIONS</code> entries can drain residual etcd keys on first startup of
-  an upgraded cluster; it will be removed entirely in the next minor
-  release. Operators no longer need to deploy or maintain etcd. The
-  <code>SHAKENFIST_ETCD_HOST</code>, <code>SHAKENFIST_DATABASE_USE_DIRECT_ETCD</code>,
-  <code>SHAKENFIST_LOG_ETCD_CONNECTIONS</code>, and <code>SHAKENFIST_NODE_IS_ETCD_MASTER</code>
-  configuration settings have been removed. The database tier is identified
-  by the <code>database_node</code> Ansible inventory group; the legacy <code>etcd_master</code>
-  name for that group is still accepted, with a deprecation warning, and is
-  removed in the next release. Nodes now report an <code>is_database_node</code> role
-  flag via the REST API; the vestigial <code>is_etcd_master</code> and
-  <code>is_eventlog_node</code> fields are still emitted (always false) and will be
-  removed in the next release.</li>
-<li><strong><code>sf-backup</code> and <code>sf-restore</code> have been retired.</strong> These commands previously
-  backed up and restored etcd state. With etcd removed, they are no longer
-  functional and will print a message directing you to use MariaDB tooling
-  instead. To back up your Shaken Fist cluster, use <code>mariadb-dump</code> (or
-  <code>mysqldump</code>) to export the Shaken Fist database. To restore, use
-  <code>mariadb</code> (or <code>mysql</code>) to import the dump. Event history is now part of
-  the MariaDB database and no separate backup step is needed for it.</li>
+<li><strong>Mixed-version upgrade window.</strong> Old daemons neither read nor write
+  <code>is_database_node</code>; the migration defaults it <code>False</code>, and the new
+  code only trusts it on nodes whose config was written by the updated
+  collection. Nothing gates on the flag at runtime yet (only the tier
+  test and operator visibility), so a mixed cluster degrades to
+  "the flag is False on stale nodes", which is the pre-phase status quo.
+  One skew is worth naming: a NEW node writing through an OLD
+  sf-database gateway loses proto field 22 in the old gateway's
+  converter, so an upgraded tier node reads False until the gateway is
+  upgraded and the node re-observes (self-healing on the observe
+  cadence).</li>
+<li><strong>Operator inventories using <code>etcd_master</code>.</strong> Covered by the union
+  targeting and warning for one release; the removal next cycle is a
+  documented breaking change in the release notes.</li>
+<li><strong>The tier test has never run.</strong> Un-skipping assertions that have
+  never executed may surface real sf-database-tier bugs on slim-tier.
+  That is the point of doing it; budget an iteration loop like phase
+  6's CI hardening rather than assuming a single green run.</li>
+<li><strong>Forgotten <code>etcd_master</code> consumers outside these repos.</strong> The grep
+  gate covers shakenfist, actions, client-python and kerbside; private
+  operator playbooks are covered by the compat window.</li>
 </ul>
-<h2 id="event-logging-migrated-to-mariadb">Event logging migrated to MariaDB<a class="headerlink" href="#event-logging-migrated-to-mariadb" title="Permanent link">&para;</a></h2>
-<p>Events previously lived in per-object SQLite files managed by a dedicated
-<code>sf-eventlog</code> daemon on a designated eventlog node. They now live in two
-MariaDB tables (<code>events</code> and <code>event_objects</code>) and are written from every
-daemon via a local spool that is drained in batches by a background thread
-directly into the database service. REST reads are served from MariaDB by
-any <code>sf-api</code> node; there is no longer a single eventlog node or a separate
-<code>sf-eventlog</code> daemon. See
-<a href="/operator_guide/events/">the operator guide on events</a> for the full
-write-path, read-path, retention, and metrics reference.</p>
-<h3 id="history-loss-on-upgrade">History loss on upgrade<a class="headerlink" href="#history-loss-on-upgrade" title="Permanent link">&para;</a></h3>
-<p>Events written before the upgrade are not reachable through the REST API
-after cut-over. The on-disk SQLite chunks under <code>/srv/shakenfist/events/</code>
-on the former eventlog node remain present until you remove them — no
-daemon writes there any more. This behaviour was deliberate; preserving
-pre-upgrade history would have required a separate migration tool with no
-operator-visible operational benefit.</p>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Once the new code is running on every node, <code>rm -rf
-  /srv/shakenfist/events/</code> is safe to run on the former eventlog node.</li>
+<li><code>git grep -iE "etcd_master|is_etcd_master" -- ':!docs/plans'</code> in this
+  repo returns only: the one-release compat/deprecation sites (site.yml
+  union targeting and warning), the legacy dual-emission in
+  <code>node.py</code> / schema / proto / mariadb marshalling, and release-note
+  history. The same grep in the actions repo returns only the
+  include-common union.</li>
+<li>Full functional CI (workflow_dispatch) green, with
+  <code>test_database_tier</code> REPORTED AS RUN (not skipped) on the slim-tier
+  job — check the stestr output explicitly, not just the job colour.</li>
+<li><code>sf-client node show &lt;db-node&gt;</code> displays the database-node role
+  against a collection-deployed cluster.</li>
+<li>mkdocs build passes; pre-commit green throughout.</li>
 </ul>
-<h3 id="ansible-inventory-change">Ansible inventory change<a class="headerlink" href="#ansible-inventory-change" title="Permanent link">&para;</a></h3>
-<p>The <code>eventlog_node</code> Ansible host group is gone. The daemon registration,
-service-start, and service-stop blocks that referenced it have been
-removed from the playbooks.</p>
+<h2 id="deferred-to-the-next-release-cycle">Deferred to the next release cycle<a class="headerlink" href="#deferred-to-the-next-release-cycle" title="Permanent link">&para;</a></h2>
+<p>Recorded here so it is not lost: drop the <code>is_etcd_master</code> and
+<code>is_eventlog_node</code> columns (migration), remove the schema fields, API
+keys and client display fallbacks, reserve proto field numbers 5
+(<code>is_etcd_master</code>) and 8 (<code>is_eventlog_node</code>), remove <code>site.yml</code>'s
+<code>etcd_master</code> union targeting and warning, and stop the CI inventory
+generator emitting the legacy <code>etcd_master</code> group alongside
+<code>database_node</code>. One small PR, gated on one released version carrying
+the deprecations.</p>
+<h2 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Remove the <code>eventlog_node</code> group from your inventory before deploying
-  the new version.</li>
+<li>Phase 8 (reusable smoke-cluster rollout to downstream repos),
+  including client-python's broken getsf-era <code>functional_matrix</code>.</li>
+<li>Publishing the collection to ansible-galaxy (operator: needs
+  <code>ANSIBLE_GALAXY_TOKEN</code> and a release tag; until then CI installs from
+  checkouts).</li>
+<li>The reusable workflow's colliding <code>bundle-functional-cluster-smoke</code>
+  artifact name (phase-8-adjacent CI hygiene).</li>
+<li>The node-lifecycle in-guest-kill flake (separate follow-up: kill the
+  under-cloud instance from the runner instead).</li>
 </ul>
-<h3 id="configuration-key-removals">Configuration key removals<a class="headerlink" href="#configuration-key-removals" title="Permanent link">&para;</a></h3>
-<p>The following configuration keys have been deleted and are no longer
-read by any daemon. Leaving them in your environment files is harmless
-but you are encouraged to remove them to avoid confusion:</p>
+<h2 id="cross-repo-operator-actions">Cross-repo / operator actions<a class="headerlink" href="#cross-repo-operator-actions" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>EVENTLOG_NODE_IP</code></li>
-<li><code>EVENTLOG_API_PORT</code></li>
-<li><code>EVENTLOG_METRICS_PORT</code></li>
-<li><code>EVENTLOG_SUPPRESS_GRPC</code></li>
-<li><code>NODE_IS_EVENTLOG_NODE</code></li>
+<li>Push actions/main for step 4 (I cannot push that repo).</li>
+<li>Push and PR the client-python branch from step 7.</li>
+<li>After the release containing this phase ships, schedule the deferred
+  removal PR above.</li>
 </ul>
-<h3 id="rest-events-response-shape-change">REST <code>/events</code> response shape change<a class="headerlink" href="#rest-events-response-shape-change" title="Permanent link">&para;</a></h3>
-<p>The response objects returned by the <code>/{instance,artifact,network,node,
-blob}/&lt;uuid&gt;/events</code> endpoints have been updated:</p>
-<ul>
-<li><code>correlation_id</code> is renamed to <code>event_uuid</code>. Clients that read this
-  key by name must be updated; clients that pass the response dict
-  through opaquely (such as the <code>shakenfist-client</code> Python library)
-  require no change.</li>
-<li><code>type</code> is renamed to <code>event_type</code> to match the new schema column
-  name. Clients that read <code>response["type"]</code> must be updated to read
-  <code>response["event_type"]</code> instead.</li>
-<li><code>request_id</code> is now a first-class top-level field rather than being
-  nested inside <code>extra</code>. Clients that read <code>extra["request_id"]</code> must
-  be updated to read the top-level <code>request_id</code> field instead.</li>
-<li>The <code>limit</code> query parameter is now capped at 1000 server-side. Any
-  request with a <code>limit</code> greater than 1000 returns at most 1000 rows.</li>
-<li>A <code>limit</code> of 0 or any negative value now defaults to 100 rather than
-  returning all rows. Callers that previously passed a negative limit
-  to fetch every event must switch to paginating with a positive limit.</li>
-</ul>
-<h3 id="new-prometheus-metrics">New Prometheus metrics<a class="headerlink" href="#new-prometheus-metrics" title="Permanent link">&para;</a></h3>
-<p>The following metrics are new in this release. The sf-database daemon
-hosts the storage-side counters; the spool metrics are emitted by every
-daemon process:</p>
-<ul>
-<li><code>database_events_rows</code> — gauge, sf-database: current row count in
-  the <code>events</code> table.</li>
-<li><code>database_events_inserted_total{event_type}</code> — counter, sf-database:
-  events written per event type.</li>
-<li><code>database_events_pruned_total{event_type}</code> — counter, sf-database:
-  events pruned per daily retention run, broken down by event type.</li>
-<li><code>database_orphan_events_pruned_total</code> — counter, sf-database: events
-  removed by the orphan sweep (no remaining <code>event_objects</code> row).</li>
-<li><code>eventlog_spool_depth</code> — gauge, every daemon: current number of
-  events queued in the local spool awaiting drain.</li>
-<li><code>eventlog_spool_dropped_total</code> — counter, every daemon: events
-  silently dropped because the spool exceeded the high-water mark
-  (<code>SPOOL_HIGH_WATER_MARK</code>, default 100 000).</li>
-</ul>
-<p>See <a href="/operator_guide/events/">the operator guide on events</a> for alert
-recommendations and the full metrics reference.</p>
-<h2 id="strict-namespace-scoping-on-_ref-lookups">Strict namespace scoping on <code>*_ref</code> lookups<a class="headerlink" href="#strict-namespace-scoping-on-_ref-lookups" title="Permanent link">&para;</a></h2>
-<p>The instance, network, and artifact lookup decorators
-(<code>arg_is_instance_ref</code>, <code>arg_is_network_ref</code>, <code>arg_is_artifact_ref</code>) now
-honour the request body's <code>namespace</code> field strictly. Two behaviours
-changed:</p>
-<ul>
-<li>When a system caller passes <code>namespace=&lt;x&gt;</code> (for example
-  <code>client.get_instance(name, namespace='ovirt-homelab')</code>), the lookup
-  is now scoped strictly to namespace <code>&lt;x&gt;</code>. Previously the namespace
-  body field was ignored for resolution and a same-named object in a
-  different namespace could be returned. A system caller who does
-  <em>not</em> pass <code>namespace</code> retains the historical cross-namespace
-  "search everywhere" behaviour.</li>
-<li>When a tenant caller passes a <code>namespace=&lt;other&gt;</code> that is not their
-  own namespace, the request now returns 404 instead of silently
-  resolving against the caller's own namespace. Tenants who relied on
-  the old shape were already going to get a 404 from the subsequent
-  ownership check; the request is now rejected sooner.</li>
-</ul>
-<p>There is no migration step. Callers that pass <code>namespace</code> matching
-the object's actual namespace are unaffected.</p>
-<p>One specific consequence is worth calling out for operator tooling:
-the floating network has <code>namespace=NULL</code> in the database and
-therefore no longer matches any non-empty <code>namespace=&lt;x&gt;</code> filter.
-Admin scripts that habitually pass <code>namespace='system'</code> on every
-network call will now receive a 404 when querying the floating
-network and must omit <code>namespace</code> to reach it.</p>
 
 
 
@@ -10103,7 +9475,7 @@ network and must omit <code>namespace</code> to reach it.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20release_notes/v07-v08.md&body=%2A%2ASource%20file%3A%2A%2A%20%60release_notes/v07-v08.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/release_notes/v07-v08/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-remove-primary-phase-07-rename-cleanup.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-remove-primary-phase-07-rename-cleanup.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-remove-primary-phase-07-rename-cleanup/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

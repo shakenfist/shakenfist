@@ -9471,9 +9471,10 @@ variables. The groups are:</p>
 <li><code>network_node</code> — the single network node, which is the ingress and egress
   point for all virtual networks, and is where floating IPs live — so it
   needs to be set up as the gateway for your floating IP block;</li>
-<li><code>etcd_master</code> — the database tier: hosts that run <code>sf-database</code>, the gRPC
-  gateway between the cluster and your MariaDB. The group keeps its legacy
-  name for now; it will be renamed <code>database_node</code> in a future release.</li>
+<li><code>database_node</code> — the database tier: hosts that run <code>sf-database</code>, the
+  gRPC gateway between the cluster and your MariaDB. The legacy <code>etcd_master</code>
+  name for this group is still accepted, with a deprecation warning, and is
+  removed in the next release.</li>
 </ul>
 <p>A host may belong to several capability groups. Not every node needs to be in
 the database tier — one is fine for small clusters, and you can add more
@@ -9512,7 +9513,7 @@ supported to have more than one network node.</p>
 <a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="w">      </span><span class="nt">hosts</span><span class="p">:</span>
 <a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="w">        </span><span class="nt">sf-1</span><span class="p">:</span>
 <a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>
-<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">    </span><span class="nt">etcd_master</span><span class="p">:</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">    </span><span class="nt">database_node</span><span class="p">:</span>
 <a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">      </span><span class="nt">hosts</span><span class="p">:</span>
 <a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="w">        </span><span class="nt">sf-1</span><span class="p">:</span>
 <a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>
