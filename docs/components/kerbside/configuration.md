@@ -54,6 +54,15 @@ These settings configure Keystone integration for OpenStack deployments.
 | VDI_SECURE_PORT | Integer (default 5900) | The port the VDI proxy will serve TLS SPICE sessions over. |
 | VDI_INSECURE_PORT | Integer (default 5901) | The port the VDI proxy will serve insecure SPICE sessions over. These insecure sessions are only used to redirect the user to the secure port. |
 
+## Control-plane gRPC service
+
+These settings configure the `KerbsideProxy` gRPC service the daemon hosts over a unix domain socket, which the SPICE proxy consults for connection authorization and channel bookkeeping.
+
+| Configuration Option | Type | Description |
+|---------------------|------|-------------|
+| API_SOCKET_PATH | String (default /run/kerbside/api.sock) | The unix domain socket the KerbsideProxy gRPC service listens on. The containing directory is created with 0700 permissions; access is guarded by filesystem permissions since the peer is a trusted local process. The proxy must be co-located with the daemon to share this socket. |
+| API_GRPC_WORKERS | Integer (default 8) | The size of the thread pool serving KerbsideProxy gRPC requests. |
+
 ## Traffic Inspection
 
 Being able to inspect traffic being passed by the proxy is useful during both

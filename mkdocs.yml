@@ -214,6 +214,9 @@ nav:
                 - "Phase 6: Ryll Cargo feature work + digest decoding + restore keypress-to-screen latency": components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding.md
                 - "Phase 7: First Sextant scenario tempest test": components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test.md
                 - "Phase 8: OpenStack CI lane disposition + oVirt provisioning flake": components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition.md
+                - "Rust proxy phase 1: server-side SPICE primitives": components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives.md
+                - "Rust proxy phase 2: gRPC contract and Python UDS server": components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract.md
+                - "Rust SPICE proxy (kerbside-proxy)": components/kerbside/plans/PLAN-rust-proxy.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md
