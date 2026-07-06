@@ -41,21 +41,25 @@ class TestDatabaseTier(base.BaseNamespacedTestCase):
         super().__init__(*args, **kwargs)
 
     def test_grpc_lb_fans_out_across_sf_database_instances(self):
+        # Discover the database tier via the is_database_node role flag.
+        # (This test previously keyed on a vestigial etcd-era flag that no
+        # writer has ever set, so it always found zero tier nodes and
+        # silently skipped.)
         nodes = self.system_client.get_nodes()
-        etcd_master_nodes = [n for n in nodes if n.get('is_etcd_master')]
+        database_nodes = [n for n in nodes if n.get('is_database_node')]
 
-        if len(etcd_master_nodes) < 2:
+        if len(database_nodes) < 2:
             self.skipTest(
                 'test_grpc_lb_fans_out_across_sf_database_instances requires '
-                'N>=2 sf-database instances; saw N=%d' % len(etcd_master_nodes))
+                'N>=2 sf-database instances; saw N=%d' % len(database_nodes))
 
         self.addDetail(
-            'etcd_master_nodes',
+            'database_nodes',
             content.text_content(json.dumps(
-                etcd_master_nodes, indent=2, sort_keys=True, default=str)))
+                database_nodes, indent=2, sort_keys=True, default=str)))
 
         before = {}
-        for node in etcd_master_nodes:
+        for node in database_nodes:
             mesh_ip = node['ip']
             try:
                 before[node['name']] = _scrape_database_counters(mesh_ip)
@@ -72,7 +76,7 @@ class TestDatabaseTier(base.BaseNamespacedTestCase):
             self.system_client.get_namespaces()
 
         after = {}
-        for node in etcd_master_nodes:
+        for node in database_nodes:
             mesh_ip = node['ip']
             try:
                 after[node['name']] = _scrape_database_counters(mesh_ip)
@@ -86,7 +90,7 @@ class TestDatabaseTier(base.BaseNamespacedTestCase):
             content.text_content(json.dumps(after, indent=2, sort_keys=True)))
 
         per_node_delta = {}
-        for node in etcd_master_nodes:
+        for node in database_nodes:
             name = node['name']
             before_total = sum(before[name].values())
             after_total = sum(after[name].values())

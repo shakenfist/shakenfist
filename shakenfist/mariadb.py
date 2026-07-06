@@ -185,7 +185,7 @@ BLOB_HASHES_VERSION = 2
 BLOB_TRANSFERS_VERSION = 2
 BLOB_ATTRIBUTES_VERSION = 1
 NODES_VERSION = 2
-NODE_ATTRIBUTES_VERSION = 2
+NODE_ATTRIBUTES_VERSION = 3
 NAMESPACES_VERSION = 2
 NAMESPACE_ATTRIBUTES_VERSION = 2
 ARTIFACTS_VERSION = 3
@@ -8796,6 +8796,10 @@ def _get_node_attributes_table() -> sa.Table:
                     'is_eventlog_node', sa.Boolean(),
                     nullable=False, default=False
                 ),
+                sa.Column(
+                    'is_database_node', sa.Boolean(),
+                    nullable=False, default=False
+                ),
                 sa.Column('instances', sa.JSON(), nullable=True),
                 sa.Column('daemons', sa.JSON(), nullable=True),
                 sa.Column('daemon_states', sa.JSON(), nullable=True),
@@ -8894,6 +8898,23 @@ def _ensure_node_attributes_schema(
                     )
 
         current_ver = NODE_ATTRIBUTES_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        # v3: add the live database-tier role flag. Safe to run
+        # repeatedly -- ADD COLUMN IF NOT EXISTS is a no-op when the
+        # column already exists (e.g. fresh deployments where
+        # create_all included it).
+        LOG.info(
+            f'Upgrading {table_name} table to version 3 '
+            '(add is_database_node column)')
+        with engine.connect() as conn:
+            conn.execute(sa.text(
+                'ALTER TABLE node_attributes '
+                'ADD COLUMN IF NOT EXISTS is_database_node '
+                'BOOLEAN NOT NULL DEFAULT FALSE'))
+            conn.commit()
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -9213,6 +9234,7 @@ def _direct_create_node_attributes(
                 is_hypervisor=data.is_hypervisor,
                 is_network_node=data.is_network_node,
                 is_eventlog_node=data.is_eventlog_node,
+                is_database_node=data.is_database_node,
                 instances=data.instances,
                 daemons=data.daemons,
                 daemon_states=data.daemon_states,
@@ -9265,6 +9287,7 @@ def _direct_get_node_attributes(
                 is_hypervisor=result.is_hypervisor,
                 is_network_node=result.is_network_node,
                 is_eventlog_node=result.is_eventlog_node,
+                is_database_node=result.is_database_node,
                 instances=(
                     result.instances
                     if result.instances else []
@@ -9318,6 +9341,7 @@ def _direct_update_node_attributes(
                 is_hypervisor=data.is_hypervisor,
                 is_network_node=data.is_network_node,
                 is_eventlog_node=data.is_eventlog_node,
+                is_database_node=data.is_database_node,
                 instances=data.instances,
                 daemons=data.daemons,
                 daemon_states=data.daemon_states,
@@ -9731,6 +9755,7 @@ def _node_attrs_to_proto(
         is_hypervisor=data.is_hypervisor,
         is_network_node=data.is_network_node,
         is_eventlog_node=data.is_eventlog_node,
+        is_database_node=data.is_database_node,
         instances_json=json.dumps(data.instances),
         daemons_json=json.dumps(data.daemons),
         daemon_states_json=json.dumps(
@@ -9787,6 +9812,7 @@ def _node_attrs_from_proto(
         is_hypervisor=d.is_hypervisor,
         is_network_node=d.is_network_node,
         is_eventlog_node=d.is_eventlog_node,
+        is_database_node=d.is_database_node,
         instances=(
             json.loads(d.instances_json)
             if d.instances_json else []

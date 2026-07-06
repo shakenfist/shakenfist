@@ -499,6 +499,13 @@ class SFConfig(BaseSettings):
         False,
         description='True if this node is the network node.'
     )
+    NODE_IS_DATABASE_NODE: bool = Field(
+        False,
+        description=(
+            'True if this node is part of the database tier, that is it '
+            'runs sf-database and has direct access to MariaDB.'
+        )
+    )
 
     DISK_BUS: str = Field(
         'virtio',

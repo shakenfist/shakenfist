@@ -9,7 +9,7 @@ quickstart and the simplest thing to deploy.
 
 | File | Purpose |
 |------|---------|
-| `inventory.yaml` | `localhost` in every capability group (`hypervisors`, `network_node`, `etcd_master`) plus `allsf`. Per-host identity (`node_name`, `node_mesh_ip`, ...) lives in the host entry. |
+| `inventory.yaml` | `localhost` in every capability group (`hypervisors`, `network_node`, `database_node`) plus `allsf`. Per-host identity (`node_name`, `node_mesh_ip`, ...) lives in the host entry. |
 | `group_vars/all.yml` | Cluster-wide variables and secrets (`auth_secret`, `system_key`, MariaDB credentials, package references). **Edit the secrets before deploying.** |
 | `site.yml` | A one-line wrapper that imports the shared playbook `../_shared/site.yml`. |
 

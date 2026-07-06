@@ -103,9 +103,10 @@ variables. The groups are:
 * `network_node` — the single network node, which is the ingress and egress
   point for all virtual networks, and is where floating IPs live — so it
   needs to be set up as the gateway for your floating IP block;
-* `etcd_master` — the database tier: hosts that run `sf-database`, the gRPC
-  gateway between the cluster and your MariaDB. The group keeps its legacy
-  name for now; it will be renamed `database_node` in a future release.
+* `database_node` — the database tier: hosts that run `sf-database`, the
+  gRPC gateway between the cluster and your MariaDB. The legacy `etcd_master`
+  name for this group is still accepted, with a deprecation warning, and is
+  removed in the next release.
 
 A host may belong to several capability groups. Not every node needs to be in
 the database tier — one is fine for small clusters, and you can add more
@@ -147,7 +148,7 @@ all:
       hosts:
         sf-1:
 
-    etcd_master:
+    database_node:
       hosts:
         sf-1:
 

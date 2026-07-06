@@ -1127,6 +1127,10 @@ message NodeAttributesProto {
   // Complex dicts (JSON-encoded)
   string dependency_versions_json = 20;
   string process_metrics_json = 21;
+
+  // The live database-tier role flag. is_etcd_master (5) and
+  // is_eventlog_node (8) above are vestigial and scheduled for removal.
+  bool is_database_node = 22;
 }
 
 message CreateNodeAttributesRequest {
