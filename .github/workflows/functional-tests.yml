@@ -469,7 +469,25 @@ jobs:
               sf-client instance reboot --hard ${node} || \
                   sf-client instance poweron ${node} || true
           done
-          sleep 90
+
+          # Wait for ssh on every node rather than sleeping a fixed period:
+          # boot time varies with under-cloud load, and log gathering needs
+          # every node reachable. Bounded so a truly dead node still fails
+          # here with a clear message rather than wedging the job.
+          for address in 10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24; do
+              count=0
+              until ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+                  -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+                  debian@${address} true; do
+                  count=$(( count + 1 ))
+                  if [ ${count} -gt 60 ]; then
+                      echo "Node ${address} did not return within 300 seconds"
+                      exit 1
+                  fi
+                  sleep 5
+              done
+              echo "Node ${address} is back."
+          done
 
       - name: Per-node system-level checks
         if: always()
