@@ -454,40 +454,8 @@ jobs:
       - name: Restart Shaken Fist nodes so we can collect logs
         if: always()
         run: |
-          set -x
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          # The sf{N}_uuid values are under-cloud instance UUIDs, so the
-          # reboot has to be issued against the under-cloud's API. The
-          # GitHub runner already has under-cloud sf-client credentials
-          # (the topology playbooks use sf_instance from here). Don't
-          # let one failed reboot abort the rest of the loop -- we want
-          # all five attempted before log collection. The lifecycle test
-          # powers its maintainer victim off entirely (`poweroff --force
-          # --force` exits the QEMU domain), and reboot is not valid for
-          # a powered-off instance, so fall back to poweron.
-          for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
-              sf-client instance reboot --hard ${node} || \
-                  sf-client instance poweron ${node} || true
-          done
-
-          # Wait for ssh on every node rather than sleeping a fixed period:
-          # boot time varies with under-cloud load, and log gathering needs
-          # every node reachable. Bounded so a truly dead node still fails
-          # here with a clear message rather than wedging the job.
-          for address in 10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24; do
-              count=0
-              until ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-                  -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
-                  debian@${address} true; do
-                  count=$(( count + 1 ))
-                  if [ ${count} -gt 60 ]; then
-                      echo "Node ${address} did not return within 300 seconds"
-                      exit 1
-                  fi
-                  sleep 5
-              done
-              echo "Node ${address} is back."
-          done
+          bash ${GITHUB_WORKSPACE}/shakenfist/tools/ci-restart-cluster-nodes.sh debian
 
       - name: Per-node system-level checks
         if: always()
