@@ -957,6 +957,18 @@
          <lastmod>2026-07-06</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/</loc>
          <lastmod>2026-07-06</lastmod>
     </url>

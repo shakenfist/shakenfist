@@ -4512,6 +4512,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#error-replies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error replies
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4714,6 +4725,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parsing-robustness-and-resource-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parsing robustness and resource limits
+      
+    </span>
+  </a>
   
 </li>
       
@@ -5135,6 +5157,90 @@
     
   
     Phase 8: OpenStack CI lane disposition + oVirt provisioning flake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 1: server-side SPICE primitives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 2: gRPC contract and Python UDS server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust SPICE proxy (kerbside-proxy)
   
 
     
@@ -9492,6 +9598,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#error-replies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error replies
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -9698,6 +9815,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#parsing-robustness-and-resource-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parsing robustness and resource limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9734,6 +9862,14 @@
 and authenticate between clients and servers. In Kerbside, this protocol is
 implemented in <code>spiceprotocol/packets/linkmessages.py</code> and
 <code>spiceprotocol/packets/authentication.py</code>.</p>
+<p>There is now a second, independent implementation of this wire format: the
+server/proxy role in the Rust <code>shakenfist-spice-protocol</code> crate (part of
+<a href="https://github.com/shakenfist/ryll">ryll</a>), which the Rust rewrite of the
+Kerbside proxy consumes. The byte-level details below are therefore a
+cross-implementation contract, not merely a description of the Python proxy.
+Where the two implementations differ in robustness (see
+<a href="#parsing-robustness-and-resource-limits">Parsing robustness and resource limits</a>),
+that is called out explicitly.</p>
 <h2 id="connection-handshake-overview">Connection Handshake Overview<a class="headerlink" href="#connection-handshake-overview" title="Permanent link">&para;</a></h2>
 <p>The SPICE connection handshake follows this sequence:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>    Client                                          Server
@@ -9832,8 +9968,32 @@ implemented in <code>spiceprotocol/packets/linkmessages.py</code> and
 <dt><strong>pubkey</strong> (162 bytes)</dt>
 <dd>RSA public key in DER (SubjectPublicKeyInfo) format. Used by the client to
   encrypt the password. Kerbside generates a unique 1024-bit RSA key pair for
-  each connection.</dd>
+  each connection. The field is always exactly 162 bytes because that is the
+  DER SubjectPublicKeyInfo length of a 1024-bit RSA key with the standard
+  65537 exponent; this is why the field is fixed-size on the wire. On error
+  replies (see below) the field is present but zero-filled.</dd>
+<dt><strong>num_common_caps / num_channel_caps</strong> (4 bytes each)</dt>
+<dd>Number of 32-bit words of common and channel capabilities the server
+  advertises. On success Kerbside sends one word of each (see
+  <a href="#capability-handling">Capability Handling</a>).</dd>
+<dt><strong>caps_offset</strong> (4 bytes)</dt>
+<dd>Byte offset to the start of the capability words, measured from the <code>error</code>
+  field (the first byte of the message body, at file offset 16 — the same
+  reference point <code>SpiceLinkMess</code> uses for its <code>connection_id</code> field). On a
+  success reply this is <code>178</code> (= 4 error + 162 pubkey + 4 + 4 + 4), i.e. the
+  words immediately follow this field.</dd>
 </dl>
+<h3 id="error-replies">Error replies<a class="headerlink" href="#error-replies" title="Permanent link">&para;</a></h3>
+<p>A reply carrying a non-zero <code>error</code> (for example the <code>need_secured</code> redirect,
+error 5) has a fixed degenerate shape rather than a truncated one:</p>
+<ul>
+<li><code>pubkey</code> is present but zero-filled (162 zero bytes),</li>
+<li><code>num_common_caps</code> and <code>num_channel_caps</code> are both 0,</li>
+<li><code>caps_offset</code> is <code>0</code> (not 178), and</li>
+<li><code>size</code> is therefore 178 with no capability words following.</li>
+</ul>
+<p>An implementation that always assumes the success layout (non-zero
+<code>caps_offset</code>, a real key) will misparse these replies.</p>
 <h2 id="client-authentication-packet">Client Authentication Packet<a class="headerlink" href="#client-authentication-packet" title="Permanent link">&para;</a></h2>
 <p>After receiving the server hello, the client sends an authentication packet:</p>
 <h3 id="binary-format_2">Binary Format<a class="headerlink" href="#binary-format_2" title="Permanent link">&para;</a></h3>
@@ -9850,7 +10010,11 @@ implemented in <code>spiceprotocol/packets/linkmessages.py</code> and
 <dt><strong>encrypted_password</strong> (128 bytes)</dt>
 <dd>Password encrypted with RSA-OAEP using SHA-1 for both the mask generation
   function (MGF1) and the hash algorithm. The plaintext password must be
-  null-terminated before encryption.</dd>
+  null-terminated before encryption. On the server side, after decrypting,
+  a single trailing NUL is stripped to recover the password. (The Python
+  proxy strips the final byte unconditionally; the Rust implementation strips
+  it only if present, which is equivalent for any spec-conformant client since
+  the terminator is always appended.)</dd>
 </dl>
 <h3 id="encryption-details">Encryption Details<a class="headerlink" href="#encryption-details" title="Permanent link">&para;</a></h3>
 <p>The password encryption uses:
@@ -9901,14 +10065,16 @@ instead of static VM passwords:</p>
    decrypts it and validates it against the token database, checking:</p>
 </li>
 <li>Token existence</li>
-<li>Token expiry time</li>
-<li>
-<p>One-time use (token is invalidated after use)</p>
-</li>
-<li>
-<p><strong>Console Lookup</strong>: Valid tokens are mapped to specific VM consoles,
-   allowing Kerbside to establish the correct backend connection.</p>
-</li>
+<li>Token expiry time (the lookup filters on <code>expires &gt; now</code>)</li>
+</ol>
+<p>Note: a token is <strong>not</strong> invalidated on first use. It remains usable until
+   it expires; expired tokens are reaped only once they also have no open
+   proxy channels. The default token lifetime is short (one minute), which
+   bounds the reuse window, but a token is not strictly single-use despite
+   older descriptions to that effect.</p>
+<ol>
+<li><strong>Console Lookup</strong>: Valid tokens are mapped to specific VM consoles,
+   allowing Kerbside to establish the correct backend connection.</li>
 </ol>
 <h2 id="tlsssl-requirements">TLS/SSL Requirements<a class="headerlink" href="#tlsssl-requirements" title="Permanent link">&para;</a></h2>
 <p>Kerbside enforces TLS for all client connections:</p>
@@ -10020,6 +10186,43 @@ secrecy:</p>
 - Channel caps: 9 (SemiSeamlessMigrate, SeamlessMigrate)</p>
 <p>These values are sent in the server hello before the actual hypervisor
 capabilities are known.</p>
+<p>The wire format permits more than one 32-bit word in each capability vector
+(<code>num_common_caps</code> / <code>num_channel_caps</code> may exceed 1). The Python proxy
+decodes only the first word of each and warns that it ignores the rest; the
+Rust implementation parses and retains every advertised word. New code should
+not assume a single word.</p>
+<h2 id="parsing-robustness-and-resource-limits">Parsing robustness and resource limits<a class="headerlink" href="#parsing-robustness-and-resource-limits" title="Permanent link">&para;</a></h2>
+<p>The link messages are the first bytes a proxy reads from an unauthenticated,
+potentially hostile client, so their length, count, and offset fields must be
+treated as adversarial. In particular, <code>num_common_caps</code> and <code>num_channel_caps</code>
+are attacker-controlled 32-bit counts: a parser that allocates storage sized
+directly from them (for example a capacity hint derived from the count) can be
+driven to an out-of-memory abort by a client that declares billions of
+capability words without sending them. This is a real defect class, not
+hypothetical — it was found by fuzzing the Rust <code>SpiceLinkReply</code> parser and
+fixed there.</p>
+<p>A robust implementation must, before allocating or indexing:</p>
+<ul>
+<li><strong>Cap the declared <code>size</code>.</strong> Reject a link header whose <code>size</code> exceeds a
+  sane ceiling far above any legitimate link message. The Rust implementation
+  uses 4096 bytes.</li>
+<li><strong>Cap the capability-word counts.</strong> Reject <code>num_common_caps</code> or
+  <code>num_channel_caps</code> beyond a small limit (the Rust implementation uses 16
+  words each) <em>before</em> allocating, and never size an allocation from the raw
+  count.</li>
+<li><strong>Bounds-check <code>caps_offset</code>.</strong> Validate that the capability region lies
+  within the declared body before reading it, treating an out-of-range or
+  overflowing offset as a protocol error rather than indexing past the buffer.</li>
+<li><strong>Treat truncation as an error, not a panic.</strong> A message shorter than its
+  declared fields imply must fail cleanly.</li>
+</ul>
+<p>The Rust implementation centralises these checks in a bounded reader used by
+every link parser, and ships fuzz targets that exercise the link-message,
+link-reply, and ticket-decryption paths against arbitrary input
+(see the ryll repository). The Python proxy predates this hardening; it is
+partially protected by Python's own bounds checking (a short buffer raises
+rather than over-reads) but does not enforce explicit size or count caps, so
+it should not be treated as the reference for robustness.</p>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/protocol-overview/">Protocol Overview</a> - High-level protocol introduction</li>

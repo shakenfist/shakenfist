@@ -4872,6 +4872,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 1: server-side SPICE primitives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 2: gRPC contract and Python UDS server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-rust-proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust SPICE proxy (kerbside-proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9201,6 +9285,13 @@ repo root. For pre-push audits of our own work see
 <td>End-to-end SPICE test harness driving Uncalibrated Sextant via Ryll's control socket, with assertions against the visual digest and serial drain; replaces the OpenStack-dependent integration tests with a direct qemu/KVM lane</td>
 <td>Not started</td>
 <td>(phase plans pending)</td>
+</tr>
+<tr>
+<td>2026-07-04</td>
+<td><a href="/components/kerbside/plans/PLAN-rust-proxy/">Rust SPICE proxy (kerbside-proxy)</a></td>
+<td>Replace the Python SPICE proxy with a Rust kerbside-proxy that talks tonic/gRPC over a UDS to the Python daemon, reuses ryll's shakenfist-spice-protocol crate, enforces L0+L1 firewall policy from day one, and ships inside the kerbside pip install via a maturin bin wheel</td>
+<td>In progress</td>
+<td><a href="/components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/">phase 1</a> (done), <a href="/components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/">phase 2</a> (done)</td>
 </tr>
 </tbody>
 </table>

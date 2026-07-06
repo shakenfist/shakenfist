@@ -4249,6 +4249,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#control-plane-grpc-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control-plane gRPC service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#traffic-inspection" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4912,6 +4923,90 @@
     
   
     Phase 8: OpenStack CI lane disposition + oVirt provisioning flake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 1: server-side SPICE primitives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 2: gRPC contract and Python UDS server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust SPICE proxy (kerbside-proxy)
   
 
     
@@ -9230,6 +9325,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#control-plane-grpc-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control-plane gRPC service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#traffic-inspection" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9456,6 +9562,29 @@ discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 <td>VDI_INSECURE_PORT</td>
 <td>Integer (default 5901)</td>
 <td>The port the VDI proxy will serve insecure SPICE sessions over. These insecure sessions are only used to redirect the user to the secure port.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="control-plane-grpc-service">Control-plane gRPC service<a class="headerlink" href="#control-plane-grpc-service" title="Permanent link">&para;</a></h2>
+<p>These settings configure the <code>KerbsideProxy</code> gRPC service the daemon hosts over a unix domain socket, which the SPICE proxy consults for connection authorization and channel bookkeeping.</p>
+<table>
+<thead>
+<tr>
+<th>Configuration Option</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>API_SOCKET_PATH</td>
+<td>String (default /run/kerbside/api.sock)</td>
+<td>The unix domain socket the KerbsideProxy gRPC service listens on. The containing directory is created with 0700 permissions; access is guarded by filesystem permissions since the peer is a trusted local process. The proxy must be co-located with the daemon to share this socket.</td>
+</tr>
+<tr>
+<td>API_GRPC_WORKERS</td>
+<td>Integer (default 8)</td>
+<td>The size of the thread pool serving KerbsideProxy gRPC requests.</td>
 </tr>
 </tbody>
 </table>
