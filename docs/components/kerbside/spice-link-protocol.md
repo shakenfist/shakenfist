@@ -5,6 +5,15 @@ and authenticate between clients and servers. In Kerbside, this protocol is
 implemented in `spiceprotocol/packets/linkmessages.py` and
 `spiceprotocol/packets/authentication.py`.
 
+There is now a second, independent implementation of this wire format: the
+server/proxy role in the Rust `shakenfist-spice-protocol` crate (part of
+[ryll](https://github.com/shakenfist/ryll)), which the Rust rewrite of the
+Kerbside proxy consumes. The byte-level details below are therefore a
+cross-implementation contract, not merely a description of the Python proxy.
+Where the two implementations differ in robustness (see
+[Parsing robustness and resource limits](#parsing-robustness-and-resource-limits)),
+that is called out explicitly.
+
 ## Connection Handshake Overview
 
 The SPICE connection handshake follows this sequence:
@@ -128,7 +137,35 @@ Offset  Size  Type    Field
 **pubkey** (162 bytes)
 : RSA public key in DER (SubjectPublicKeyInfo) format. Used by the client to
   encrypt the password. Kerbside generates a unique 1024-bit RSA key pair for
-  each connection.
+  each connection. The field is always exactly 162 bytes because that is the
+  DER SubjectPublicKeyInfo length of a 1024-bit RSA key with the standard
+  65537 exponent; this is why the field is fixed-size on the wire. On error
+  replies (see below) the field is present but zero-filled.
+
+**num_common_caps / num_channel_caps** (4 bytes each)
+: Number of 32-bit words of common and channel capabilities the server
+  advertises. On success Kerbside sends one word of each (see
+  [Capability Handling](#capability-handling)).
+
+**caps_offset** (4 bytes)
+: Byte offset to the start of the capability words, measured from the `error`
+  field (the first byte of the message body, at file offset 16 — the same
+  reference point `SpiceLinkMess` uses for its `connection_id` field). On a
+  success reply this is `178` (= 4 error + 162 pubkey + 4 + 4 + 4), i.e. the
+  words immediately follow this field.
+
+### Error replies
+
+A reply carrying a non-zero `error` (for example the `need_secured` redirect,
+error 5) has a fixed degenerate shape rather than a truncated one:
+
+- `pubkey` is present but zero-filled (162 zero bytes),
+- `num_common_caps` and `num_channel_caps` are both 0,
+- `caps_offset` is `0` (not 178), and
+- `size` is therefore 178 with no capability words following.
+
+An implementation that always assumes the success layout (non-zero
+`caps_offset`, a real key) will misparse these replies.
 
 ## Client Authentication Packet
 
@@ -152,7 +189,11 @@ Offset  Size  Type    Field
 **encrypted_password** (128 bytes)
 : Password encrypted with RSA-OAEP using SHA-1 for both the mask generation
   function (MGF1) and the hash algorithm. The plaintext password must be
-  null-terminated before encryption.
+  null-terminated before encryption. On the server side, after decrypting,
+  a single trailing NUL is stripped to recover the password. (The Python
+  proxy strips the final byte unconditionally; the Rust implementation strips
+  it only if present, which is equivalent for any spec-conformant client since
+  the terminator is always appended.)
 
 ### Encryption Details
 
@@ -210,8 +251,13 @@ instead of static VM passwords:
 3. **Token Validation**: When Kerbside receives the encrypted password, it
    decrypts it and validates it against the token database, checking:
    - Token existence
-   - Token expiry time
-   - One-time use (token is invalidated after use)
+   - Token expiry time (the lookup filters on `expires > now`)
+
+   Note: a token is **not** invalidated on first use. It remains usable until
+   it expires; expired tokens are reaped only once they also have no open
+   proxy channels. The default token lifetime is short (one minute), which
+   bounds the reuse window, but a token is not strictly single-use despite
+   older descriptions to that effect.
 
 4. **Console Lookup**: Valid tokens are mapped to specific VM consoles,
    allowing Kerbside to establish the correct backend connection.
@@ -300,6 +346,47 @@ Kerbside uses hardcoded default capabilities based on observed behavior:
 
 These values are sent in the server hello before the actual hypervisor
 capabilities are known.
+
+The wire format permits more than one 32-bit word in each capability vector
+(`num_common_caps` / `num_channel_caps` may exceed 1). The Python proxy
+decodes only the first word of each and warns that it ignores the rest; the
+Rust implementation parses and retains every advertised word. New code should
+not assume a single word.
+
+## Parsing robustness and resource limits
+
+The link messages are the first bytes a proxy reads from an unauthenticated,
+potentially hostile client, so their length, count, and offset fields must be
+treated as adversarial. In particular, `num_common_caps` and `num_channel_caps`
+are attacker-controlled 32-bit counts: a parser that allocates storage sized
+directly from them (for example a capacity hint derived from the count) can be
+driven to an out-of-memory abort by a client that declares billions of
+capability words without sending them. This is a real defect class, not
+hypothetical — it was found by fuzzing the Rust `SpiceLinkReply` parser and
+fixed there.
+
+A robust implementation must, before allocating or indexing:
+
+- **Cap the declared `size`.** Reject a link header whose `size` exceeds a
+  sane ceiling far above any legitimate link message. The Rust implementation
+  uses 4096 bytes.
+- **Cap the capability-word counts.** Reject `num_common_caps` or
+  `num_channel_caps` beyond a small limit (the Rust implementation uses 16
+  words each) *before* allocating, and never size an allocation from the raw
+  count.
+- **Bounds-check `caps_offset`.** Validate that the capability region lies
+  within the declared body before reading it, treating an out-of-range or
+  overflowing offset as a protocol error rather than indexing past the buffer.
+- **Treat truncation as an error, not a panic.** A message shorter than its
+  declared fields imply must fail cleanly.
+
+The Rust implementation centralises these checks in a bounded reader used by
+every link parser, and ships fuzz targets that exercise the link-message,
+link-reply, and ticket-decryption paths against arbitrary input
+(see the ryll repository). The Python proxy predates this hardening; it is
+partially protected by Python's own bounds checking (a short buffer raises
+rather than over-reads) but does not enforce explicit size or count caps, so
+it should not be treated as the reference for robustness.
 
 ## Related Documentation
 
