@@ -294,7 +294,7 @@ care.
 | 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | _(see byo-mariadb)_ |
 | 6. Repackage deployer as the `shakenfist.shakenfist` galaxy collection; delete the getsf installer chain; example consumers | [PLAN-remove-primary-phase-06-galaxy-role.md](PLAN-remove-primary-phase-06-galaxy-role.md) | Complete |
 | 7. Rename `etcd_master` → `database_node`; final cleanup | [PLAN-remove-primary-phase-07-rename-cleanup.md](PLAN-remove-primary-phase-07-rename-cleanup.md) | Complete (pending CI confirmation) |
-| 8. Roll the reusable smoke-cluster CI workflow out to the downstream repos (the workflow itself is authored in phase 6 step 5) | PLAN-remove-primary-phase-08-shared-ci.md | Not started |
+| 8. Roll the reusable smoke-cluster CI workflow out to the downstream repos (the workflow itself is authored in phase 6 step 5) | [PLAN-remove-primary-phase-08-shared-ci.md](PLAN-remove-primary-phase-08-shared-ci.md) | Complete (pending CI confirmation) |
 
 Phase notes:
 
@@ -428,8 +428,11 @@ Phase notes:
   `etcd_master` mentions in the example playbooks and role
   comments.
 - **Phase 8** rolls the reusable smoke-cluster CI workflow
-  out to the downstream SF ecosystem repos (`client-python`,
-  `library-python`, `kerbside`, …). The historical pattern
+  out to the downstream SF ecosystem repos. (At execution
+  time the real consumers were `client-python` plus a
+  composite-action mode for kerbside-shaped repos;
+  `library-python` no longer exists -- see the phase 8
+  sub-plan.) The historical pattern
   was to cut-and-paste shakenfist's cluster-build CI into
   each downstream repo, which drifts (the
   `/etc/sf/inventory.yaml` log-gather step is one symptom —

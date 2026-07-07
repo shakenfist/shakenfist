@@ -383,141 +383,25 @@ jobs:
       - name: Setup test environment
         uses: shakenfist/actions/setup-test-environment@main
 
-      - name: Build infrastructure
+      # The deploy is the build-smoke-cluster composite action (shared with
+      # the reusable smoke-cluster workflow); only this job's teardown is
+      # bespoke, because the lifecycle test powers nodes off.
+      - name: Build the smoke cluster
+        timeout-minutes: 90
+        uses: shakenfist/actions/build-smoke-cluster@main
+        with:
+          topology: slim-primary
+
+      # The lifecycle test kills nodes, so upload the cached image to a
+      # random hypervisor rather than the primary the action selected --
+      # matching the getsf-era behaviour of exercising non-primary uploads.
+      - name: Choose a random upload target
         run: |
-          cd ${GITHUB_WORKSPACE}/actions
-
-          # The topology playbooks create the under-cloud test instances with
-          # the collection's native sf_* modules, so the collection must be
-          # resolvable on this runner before they run.
-          tools/install-collection.sh
-
-          ansible-playbook -i /home/debian/ansible-hosts \
-              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} \
-              base_image=sf://label/ci-images/debian-12 base_image_user=debian" \
-              ansible/ci-topology-slim-primary.yml
-
           nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
           random_index=$(( RANDOM % 5 ))
           echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
 
-      - name: Log environmental configuration
-        run: |
-          echo "## ci-environment.sh"
-          cat ${GITHUB_WORKSPACE}/ci-environment.sh
-          echo
-          echo "## Environment variables"
-          echo "SF_HEAD_SHA = ${SF_HEAD_SHA}"
-          echo "SHAKENFIST_NAMESPACE = ${SHAKENFIST_NAMESPACE}"
-          echo "UPLOAD_TARGET = ${UPLOAD_TARGET}"
-
-      - name: Copy CI tools to primary
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null -rp tools \
-              debian@$primary:.
-
-      - name: Install BYO MariaDB on primary
-        run: |
-          set -e
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${GITHUB_WORKSPACE}/shakenfist/tools/bootstrap-mariadb.sql \
-              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-mariadb.sh \
-              ${GITHUB_WORKSPACE}/shakenfist/examples/mariadb-tuning.cnf \
-              debian@${primary}:/tmp/
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@${primary} \
-              'sudo bash /tmp/ci-install-mariadb.sh \
-                   /tmp/bootstrap-mariadb.sql \
-                   /tmp/mariadb-tuning.cnf \
-                   citestpw'
-
-      - name: Install Loki on primary
-        run: |
-          set -e
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${GITHUB_WORKSPACE}/shakenfist/tools/ci-install-loki.sh \
-              debian@${primary}:/tmp/
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@${primary} \
-              'sudo bash /tmp/ci-install-loki.sh'
-
-      - name: Generate the deploy inventory
-        run: |
-          set -e
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-
-          # OpenSSH refuses to use a private key with group/other permissions,
-          # so copy the shared key to a private-perms path for the inventory.
-          install -m 600 /srv/github/id_ci /tmp/ci_id_key
-
-          python3 ${GITHUB_WORKSPACE}/actions/tools/ci-make-inventory.py \
-              --facts-file /srv/github/ci-topology-facts.json \
-              --ssh-user debian \
-              --ssh-key /tmp/ci_id_key \
-              --output /srv/github/ci-inventory.yaml
-
-          echo "====="
-          cat /srv/github/ci-inventory.yaml
-
-      - name: Deploy Shaken Fist via the collection
-        timeout-minutes: 45
-        env:
-          http_proxy: http://192.168.1.15:3128
-          https_proxy: http://192.168.1.15:3128
-          no_proxy: localhost,127.0.0.1,10.0.0.0/8
-          PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
-        run: |
-          set -e
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/shakenfist
-
-          # MariaDB and Loki run only on the primary; multi-node nodes must
-          # reach them on the primary's mesh IP (read from the topology facts),
-          # since 127.0.0.1 would point every node at its own absent services.
-          primary_mesh=$(python3 -c "import json; d = json.load(open('/srv/github/ci-topology-facts.json')); print([n['mesh_ip'] for n in d['nodes'] if n['name'] == 'primary'][0])")
-
-          ${GITHUB_WORKSPACE}/actions/tools/deploy-collection.sh \
-              /srv/github/ci-inventory.yaml \
-              citestpw \
-              ci-auth-secret-do-not-use-in-production-ci-auth-secret \
-              ci-system-key-do-not-use-in-production-ci-system-key \
-              "http://${primary_mesh}:3100" \
-              "${primary_mesh}"
-
-      - name: Wait for the cluster to become schedulable
-        run: |
-          set +e
-
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary 'sudo chmod ugo+r /etc/sf/*'
-
-          count=0
-          while [ $count -lt 60 ]
-          do
-            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary '. /etc/sf/sfrc; /srv/shakenfist/venv/bin/python3 -' \
-              < ${GITHUB_WORKSPACE}/shakenfist/tools/ci_wait_schedulable.py
-            if [ $? == 0 ]; then
-              exit 0
-            fi
-
-            count=$(( $count + 1 ))
-            sleep 5
-          done
-
-          exit 1
-
-      - name: Import cached images
+      - name: Import cached images to the random target
         run: |
           set -e
           . ${GITHUB_WORKSPACE}/ci-environment.sh
@@ -530,6 +414,7 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@${UPLOAD_TARGET} \
               "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
+
 
       - name: Run node lifecycle tests
         timeout-minutes: 60
@@ -568,23 +453,15 @@ jobs:
 
       - name: Restart Shaken Fist nodes so we can collect logs
         if: always()
+        # Log collection is best effort: the functional tests above are
+        # the merge gate. Nodes failing to return from the post-test
+        # reboot has burned three merge queue attempts where the tests
+        # themselves passed. The script still dumps instance state and
+        # guest consoles so the boot wedge stays diagnosable.
+        continue-on-error: true
         run: |
-          set -x
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          # The sf{N}_uuid values are under-cloud instance UUIDs, so the
-          # reboot has to be issued against the under-cloud's API. The
-          # GitHub runner already has under-cloud sf-client credentials
-          # (the topology playbooks use sf_instance from here). Don't
-          # let one failed reboot abort the rest of the loop -- we want
-          # all five attempted before log collection. The lifecycle test
-          # powers its maintainer victim off entirely (`poweroff --force
-          # --force` exits the QEMU domain), and reboot is not valid for
-          # a powered-off instance, so fall back to poweron.
-          for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
-              sf-client instance reboot --hard ${node} || \
-                  sf-client instance poweron ${node} || true
-          done
-          sleep 90
+          bash ${GITHUB_WORKSPACE}/shakenfist/tools/ci-restart-cluster-nodes.sh debian
 
       - name: Per-node system-level checks
         if: always()
@@ -599,6 +476,11 @@ jobs:
 
       - name: Gather logs
         if: always()
+        # Best effort for the same reason as the restart step above --
+        # this job deliberately breaks nodes, and a node that never
+        # returns makes log gathering fail through no fault of the code
+        # under test.
+        continue-on-error: true
         run: |
           # We need the ssh key in the place ansible expects it to be, which isn't
           # true on the CI worker node.
