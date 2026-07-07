@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-remove-primary/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-remove-primary-phase-08-shared-ci/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Remove the primary node and adopt a BYO-infrastructure deployer - Shaken Fist</title>
+        <title>Phase 8: smoke clusters as an ecosystem facility - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#remove-the-primary-node-and-adopt-a-byo-infrastructure-deployer" class="md-skip">
+        <a href="#phase-8-smoke-clusters-as-an-ecosystem-facility" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Remove the primary node and adopt a BYO-infrastructure deployer
+              Phase 8: smoke clusters as an ecosystem facility
             
           </span>
         </div>
@@ -9166,10 +9166,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Context
       
     </span>
   </a>
@@ -9177,10 +9177,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#decisions-phase-local" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        Decisions (phase-local)
       
     </span>
   </a>
@@ -9188,10 +9188,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mission-and-problem-statement" class="md-nav__link">
+  <a href="#steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mission and problem statement
+        Steps
       
     </span>
   </a>
@@ -9199,71 +9199,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#alternatives-considered" class="md-nav__link">
+  <a href="#risks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Alternatives considered
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Alternatives considered">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#smart-cluster-state-aware-load-balancing-on-the-primary-node" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Smart, cluster-state-aware load balancing on the primary node
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#client-following-http-307-redirects-to-specific-nodes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Client-following HTTP 307 redirects to specific nodes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#chosen-direction-for-blob-reads" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Chosen direction for blob reads
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sticky-session-affinity-as-a-refinement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sticky session affinity as a refinement
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Open questions
+        Risks
       
     </span>
   </a>
@@ -9271,163 +9210,35 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
+  <a href="#validation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Execution
+        Validation
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Execution">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#galaxy-collection-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Galaxy collection structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
+  <a href="#out-of-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agent guidance
+        Out of scope
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Agent guidance">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#execution-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution model
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#planning-effort" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planning effort
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-level-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step-level guidance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#management-session-review-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Management session review checklist
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
+  <a href="#cross-repo-operator-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Administration and logistics
+        Cross-repo / operator actions
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -9452,797 +9263,187 @@
   
 
 
-<h1 id="remove-the-primary-node-and-adopt-a-byo-infrastructure-deployer">Remove the primary node and adopt a BYO-infrastructure deployer<a class="headerlink" href="#remove-the-primary-node-and-adopt-a-byo-infrastructure-deployer" title="Permanent link">&para;</a></h1>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the shakenfist codebase thoroughly. Read
-relevant source files, understand existing patterns (object
-lifecycle, state machines, MariaDB storage via the three-layer
-direct/gRPC/public pattern, Pydantic schemas, daemon
-architecture, operation queue system, event logging), and
-ground your answers in what the code actually does today. Do
-not speculate about the codebase when you could read it
-instead. Where a question touches on external concepts
-(KVM/libvirt, VXLAN networking, MariaDB/Galera, gRPC/protobuf,
-ansible-galaxy roles), research as needed to give a confident
-answer. Flag any uncertainty explicitly rather than guessing.</p>
-<p>All planning documents should go into <code>docs/plans/</code>.</p>
-<p>Consult <code>ARCHITECTURE.md</code> for the system architecture
-overview, object types, and daemon structure. Consult
-<code>CLAUDE.md</code> for build commands, project conventions, and
-database access patterns. Key references inside the repo
-include <code>shakenfist/deploy/ansible/deploy.yml</code> (the playbook
-under reform), <code>shakenfist/deploy/ansible/deploy.py</code> (the
-topology-JSON to ansible-groups translator that will be
-retired), <code>shakenfist/deploy/ansible/roles/primary/</code> (the
-role to be removed), <code>shakenfist/deploy/ansible/roles/base/</code>
-(daemon installation, which becomes the heart of the new
-galaxy role), <code>shakenfist/mariadb.py</code> (database access, in
-particular <code>set_cluster_config</code>'s idempotent upsert that the
-role's config tasks rely on), and <code>shakenfist/daemons/database/</code>
-(the gRPC service that becomes a deployer-chosen tier of
-equal stateless instances — see
-<a href="../PLAN-byo-mariadb/"><code>PLAN-byo-mariadb.md</code></a> for that work).</p>
-<p>When we get to detailed planning, I prefer a separate plan
-file per detailed phase. These separate files should be named
-for the master plan, in the same directory as the master
-plan, and simply have <code>-phase-NN-descriptive</code> appended before
-the <code>.md</code> file extension. Tracking of these sub-phases should
-be done via the table in the Execution section below.</p>
-<p>I prefer one commit per logical change, and at minimum one
-commit per phase. Do not batch unrelated changes into a
-single commit. Each commit should be self-contained: it
-should build, pass tests, and have a clear commit message
-explaining what changed and why.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>The Shaken Fist deployer today installs and operates a stack
-of supporting infrastructure on top of the SF daemons
-themselves: rsyslog for log aggregation onto a primary node,
-Apache as a reverse proxy / load balancer for the REST API,
-and MariaDB as the cluster datastore. (Grafana, the
-primary-node Prometheus server, and <code>prometheus-node-exporter</code>
-on every node used to be in this list too; all three have
-been removed as warmup work for this plan. The sample
-Grafana dashboard lives at <code>examples/grafana-dashboard.json</code>
-for operators who want to import it into their own Grafana.
-SF daemons continue to expose their own Prometheus metrics
-endpoints (13001 / 13002 / 13006), but node-level metrics
-are now an operator concern — they choose node_exporter,
-telegraf, or whatever else their monitoring stack uses.) All
-of these run inside the SF deployer's purview and are
-configured by the ansible roles in
-<code>shakenfist/deploy/ansible/</code>.</p>
-<p>The <code>primary_node</code> role in particular is the visible focal
-point: it hosts the rsyslog sink, the Apache reverse proxy,
-and the ad-hoc ansible inventory. It
-also nominally hosts the cluster-bootstrap orchestration,
-though every <code>sf-ctl</code> call in <code>cluster_config.yml</code> is
-<code>delegate_to: groups['etcd_master'][0]</code>, so the primary node
-is the play's <code>hosts:</code> line and little else.</p>
-<p>Over the last several years, the operators who run SF in
-production have all turned out to bring their own monitoring,
-log pipeline, load balancer, and (increasingly) their own
-MariaDB. The primary node's job has become "installing things
-nobody asked for." At the same time, the deployer's
-topology-JSON-to-ansible-groups translator
-(<code>shakenfist/deploy/ansible/deploy.py</code>) is duplicating logic
-that ansible already provides as inventory groups.</p>
-<p>The deployer also still uses the legacy group name
-<code>etcd_master</code> for what is now the MariaDB / <code>sf-database</code>
-node, and <code>shakenfist/etcd.py</code> remains in the tree to drain
-residual etcd keys via <code>DATA_MIGRATIONS</code> — both holdovers
-from the pre-MariaDB era.</p>
-<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Shaken Fist stops being a platform deployer and becomes an
-<strong>opinionated application that runs against operator-provided
-infrastructure</strong>. Concretely:</p>
-<ul>
-<li>The deployer ceases to install Loki/rsyslog aggregation
-  or an API load balancer. (Grafana and the primary-node
-  Prometheus server are already gone — see the situation
-  section. MariaDB-server install and the <code>sf-database</code>
-  SPOF removal have been lifted out of this plan and are
-  tracked separately in
-  <a href="../PLAN-byo-mariadb/"><code>PLAN-byo-mariadb.md</code></a>, which makes
-  MariaDB operator-provided infrastructure and reshapes
-  <code>sf-database</code> into a deployer-chosen tier of equal
-  instances.)</li>
-<li>The deployer is repackaged as an ansible-galaxy
-  <strong>collection</strong> (<code>shakenfist.shakenfist</code>): a parameterised
-  core <code>node</code> role that installs the daemon swarm, writes
-  config, and manages systemd on one SF node, plus a small
-  number of component roles (<code>hypervisor</code>, <code>network</code>,
-  <code>internal_ca</code>) for the genuinely divergent package/config
-  concerns. Which daemons and capabilities a node runs are
-  expressed as <strong>role variables</strong>, not by the role reading
-  inventory group names. The database tier is a capability
-  flag, not a separate role. See "Galaxy collection
-  structure" under the phase notes for the full rationale.</li>
-<li>Operators consume the collection from their own playbook,
-  mapping their inventory groups to role invocations and
-  variables. The current single-node and CI deployments
-  become <em>example consumers</em> of the collection, not the
-  product.</li>
-<li>Cluster-wide bootstrap stays a handful of small,
-  idempotent steps rather than a new orchestrating command.
-  Cluster config (including per-node defaults the role
-  computes from gathered facts via <code>set_fact</code>) is applied
-  idempotently by the role on every run via <code>sf-ctl
-  set-config</code> (<code>set_cluster_config</code> is an upsert).
-  <code>AUTH_SECRET_SEED</code> remains caller-supplied — SF never
-  generates it, so it stays stable even if a prior cluster
-  goes undetected. The <code>system</code> namespace and its initial
-  operator-supplied key are established by the existing
-  idempotent <code>sf-ctl bootstrap-system-key</code>. Schema
-  initialisation and migration are handled by the separate
-  <code>sf-ctl ensure-mariadb-schema</code> command introduced in
-  <code>PLAN-byo-mariadb.md</code>. Because every step is idempotent, a
-  partially-applied bootstrap self-heals on the next role
-  run — no <code>bootstrap_operations</code> table or transaction
-  bracketing is required. (This reverses an earlier design
-  that added a <code>bootstrap_operations</code> table and a single
-  <code>sf-ctl bootstrap-cluster</code> command; see the phase 2 note.)</li>
-<li>Stale <code>etcd_master</code> naming throughout the deployer is
-  renamed to <code>database_node</code>. (The <code>shakenfist/etcd.py</code>
-  drain code itself remains, as already documented in
-  <code>CLAUDE.md</code>, until the next minor.)</li>
-</ul>
-<p>The principle is: SF deploys <code>sf-*</code> daemons on hosts you've
-told it about, against infrastructure (DB, metrics, logs,
-LB) you've told it the addresses of. Nothing else.</p>
-<p>TLS between SF components — including mTLS for gRPC, TLS for
-the MariaDB connection, and graceful cert reload on
-rotation — is <strong>out of scope for this plan</strong> and is tracked
-separately in <code>PLAN-embrace-tls.md</code>. This plan establishes
-the BYO-PKI surface that the TLS plan then consumes.</p>
-<h2 id="alternatives-considered">Alternatives considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
-<h3 id="smart-cluster-state-aware-load-balancing-on-the-primary-node">Smart, cluster-state-aware load balancing on the primary node<a class="headerlink" href="#smart-cluster-state-aware-load-balancing-on-the-primary-node" title="Permanent link">&para;</a></h3>
-<p>An alternative direction would have retained the primary node
-as a smart load balancer that knows where every blob and
-which roles live on which nodes, routing each REST request
-directly to a node holding the relevant data. We reject this:</p>
-<ul>
-<li>It preserves the central tier this plan is otherwise trying
-  to remove, and re-introduces a SPOF that must be made HA
-  and performant in its own right.</li>
-<li>It conflates role-routing (network operations → the network
-  node) with data-routing (blob reads → any node holding a
-  replica). These problems want different mechanisms; the
-  network-facade plan already handles role-routing via
-  queue-enqueue.</li>
-<li>It is a path no comparable distributed system has converged
-  on. S3, HDFS, Cassandra, Ceph and etcd all push routing
-  into the client or into HTTP-level redirects rather than
-  into a central, state-aware tier. The closest mainstream
-  example is GitHub's shard router, which is a custom
-  behemoth requiring an engineering investment incompatible
-  with SF's minimal-and-opinionated manifesto.</li>
-</ul>
-<h3 id="client-following-http-307-redirects-to-specific-nodes">Client-following HTTP 307 redirects to specific nodes<a class="headerlink" href="#client-following-http-307-redirects-to-specific-nodes" title="Permanent link">&para;</a></h3>
-<p>A second alternative would have each REST node redirect the
-client to a specific peer node when it doesn't hold the
-requested data — the pattern used by S3 (region routing) and
-etcd (write redirect to leader). We reject this for SF
-because it punches a hole through the operator's perimeter:
-SF nodes today are reachable only via the operator's load
-balancer (and any WAF / TLS terminator behind it). A 307 to
-a per-node hostname or IP exposes cluster topology to
-clients and bypasses the perimeter that operators rely on.
-Threading the redirect back through the LB would require the
-LB to understand a token that selects a backend, which is
-the smart-LB option above by another route.</p>
-<h3 id="chosen-direction-for-blob-reads">Chosen direction for blob reads<a class="headerlink" href="#chosen-direction-for-blob-reads" title="Permanent link">&para;</a></h3>
-<p>Receiving REST nodes act as a streaming reverse proxy: when
-sf-api is asked for a blob it doesn't hold, it opens a
-connection to a peer that does and streams bytes through
-without staging the blob to local storage. The bandwidth
-cost is a double-hop on the <em>cluster mesh</em>, which is
-typically an order of magnitude faster than the operator's
-outer network (10 GbE within a rack or two versus 1 GbE for
-the LAN/WAN that clients sit on is a common topology), so
-the cost lands where the bandwidth is cheap. Latency on the
-streamed bytes is unaffected once the first byte arrives.</p>
-<p>Operators who want to eliminate the double-hop entirely can,
-in a future iteration, opt into content-addressable blob
-placement combined with consistent-hash routing on their
-existing LB. That work is out of scope for this plan and
-fits more naturally into the blob-storage roadmap.</p>
-<h3 id="sticky-session-affinity-as-a-refinement">Sticky session affinity as a refinement<a class="headerlink" href="#sticky-session-affinity-as-a-refinement" title="Permanent link">&para;</a></h3>
-<p>For multi-request transfer sessions — multi-chunk blob
-uploads, and ranged downloads that the SF client retries on
-connection drops — server-set sticky cookies on the
-operator's load balancer offer a refinement that eliminates
-the double-hop entirely for the session, without exposing
-per-node URLs to clients. The first request in a session
-lands on any node; that node decides which backend should
-own the session and emits a <code>Set-Cookie</code> value that the LB
-intercepts and honours for subsequent requests. The cookie
-is opaque to the client, so the perimeter property
-(clients see only the LB URL) is preserved. The streaming
-proxy above remains the universal fallback when the
-operator's LB does not support server-set sticky cookies
-(open-source nginx is the notable real-world example).
-This refinement has its own scope — LB-specific config,
-cookie format decisions, fallback detection, interaction
-with content-addressable placement — and is tracked
-separately in <code>PLAN-sticky-transfers.md</code>.</p>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<h1 id="phase-8-smoke-clusters-as-an-ecosystem-facility">Phase 8: smoke clusters as an ecosystem facility<a class="headerlink" href="#phase-8-smoke-clusters-as-an-ecosystem-facility" title="Permanent link">&para;</a></h1>
+<p>This is a sub-plan of <a href="../PLAN-remove-primary/">PLAN-remove-primary.md</a>.
+Phase 6 authored the reusable <code>smoke-cluster.yml</code> workflow in
+<code>shakenfist/actions</code> and cut shakenfist's own CI over to it. Phase 8
+turns the smoke cluster into a facility any ecosystem repo can use to
+answer one question cheaply: <em>have I completely and hilariously broken
+things?</em> — and retires the last copies of the getsf-era cluster CI.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The master plan scoped phase 8 as replacing each downstream repo's
+copy-pasted cluster-build workflow with a few-line <code>workflow_call</code>,
+naming <code>client-python</code>, <code>library-python</code> and <code>kerbside</code>. Surveying the
+ecosystem while drafting found a smaller migration but a broader
+design question.</p>
+<p><strong>The landscape:</strong></p>
 <ol>
-<li><strong>Galaxy collection publishing channel.</strong> The collection
-   <em>shape</em> is now decided (see "Galaxy collection structure"
-   below): one <code>shakenfist.shakenfist</code> collection with a
-   parameterised core <code>node</code> role plus <code>hypervisor</code> /
-   <code>network</code> / <code>internal_ca</code> component roles. What remains
-   open is the <em>publishing channel</em>: does SF publish the
-   collection to ansible-galaxy / Automation Hub proper, or
-   ship it inside the existing python package and document
-   how operators wire it into their playbook? The latter is
-   simpler and avoids a second release artefact; the former
-   is more discoverable. Decide before phase 6. This choice
-   also drives the release pipeline: if the collection is
-   published to galaxy proper, phase 6 must add a
-   collection-build-and-publish job to
-   <code>.github/workflows/release.yml</code> alongside the existing
-   PyPI job; if it ships inside the pip package, no
-   <code>release.yml</code> change is needed.</li>
-<li><strong>Dev/test convenience preservation.</strong> The single-node /
-   "I just want a working SF on my laptop" experience needs
-   to survive. Options: ship a separate <code>examples/single-
-   node/</code> playbook that exercises every convenience together,
-   or document a quickstart that wires the new galaxy role
-   together with the documented BYO-MariaDB single-box flow
-   from <code>PLAN-byo-mariadb.md</code>. Decide before phase 6.</li>
-<li><strong>CI rig migration.</strong> <code>shakenfist/deploy/shakenfist_ci</code>
-   currently exercises the deployer end-to-end. As the
-   deployer changes shape, the CI rig becomes one of the
-   first consumers of the new galaxy role. Sequencing this
-   so CI never goes dark for more than one phase needs care
-   — every phase must leave CI green.</li>
-<li><strong>Topology.json migration.</strong> Existing operators with
-   <code>topology.json</code> files need either a shim that translates
-   them to ansible inventory, or a clear "here's how to
-   rewrite this by hand" doc. Phase 7 should decide which.</li>
+<li><strong>client-python</strong> is the only downstream repo with a copy-pasted
+   nested-SF-cluster CI. Its <code>functional_matrix</code> (debian-12,
+   <code>localhost</code>, <code>cluster-ci.conf</code>) has been <strong>hard-broken</strong> since phase
+   6 deleted getsf; its getsf <code>ansible-modules</code> job was removed in
+   phase 6 step 5.</li>
+<li><strong>library-python does not exist</strong>; the master plan mention is stale.</li>
+<li><strong>kerbside / kerbside-patches</strong> use SF as under-cloud infrastructure
+   via bespoke tooling (already collection-migrated during the phase
+   6/7 fallout fixes). They have no nested-SF-cluster CI to migrate —
+   but kerbside has SF-facing code (VDI console integration) that a
+   cheap SF smoke check would protect.</li>
+<li><strong>agent-python</strong> has no cluster CI. Note for later: the getsf-era
+   agent-from-checkout deploy path (<code>GETSF_AGENT_PACKAGE</code>) did not
+   survive into the collection — guests get their agent from the CI
+   images — so agent-python smoke CI would not currently exercise an
+   agent PR's code. Restoring that path is a prerequisite for
+   meaningful agent-python adoption and is out of scope here.</li>
+<li>No other org repo has cluster-shaped CI.</li>
 </ol>
-<p>The <code>bootstrap_operations</code> granularity question that used
-to sit here is resolved: the table is gone (see the phase 2
-note), so there is no granularity to decide.</p>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<p>The work breaks into phases that can each land
-independently, leaving CI green at every step. The early
-phases are pure deletion / rename and carry low risk; the
-remaining new mechanism lives almost entirely in the
-galaxy-collection packaging (phase 6) and needs the most
-care.</p>
+<p><strong>The design question: there are two kinds of consumer.</strong></p>
+<ul>
+<li>Repos whose "not broken" check <em>is</em> SF's own smoke suite with their
+  component swapped into the cluster. client-python is the archetype:
+  <code>setup-test-environment</code> checks out the <em>triggering</em> repo at the PR
+  sha and the others at develop, and the collection deploy builds the
+  client wheel from that checkout — so a client PR is deployed into
+  the cluster and the standard smoke suite exercises it. The
+  <code>workflow_call</code> form fits these directly.</li>
+<li>Repos whose "not broken" check is <em>their own tests against a live SF
+  cluster</em>. kerbside is the archetype. A reusable <strong>workflow</strong> cannot
+  serve them: it runs as a separate job, and cluster access (the
+  under-cloud namespace, inventory, ssh key, <code>/etc/sf</code> credentials)
+  does not transfer between jobs. What they need is a <strong>composite
+  action</strong> that deploys the smoke cluster <em>inside their own job</em> and
+  leaves it usable by subsequent steps.</li>
+</ul>
+<p>Both modes should share one deploy implementation, or we recreate the
+copy-paste drift this phase exists to end.</p>
+<p><strong>One reusable-workflow wart to fix before rollout:</strong> every bundle
+uploads under the fixed name <code>bundle-functional-cluster-smoke</code>, so a
+multi-entry run produces indistinguishable artifacts.</p>
+<h2 id="decisions-phase-local">Decisions (phase-local)<a class="headerlink" href="#decisions-phase-local" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Extract the deploy into a <code>build-smoke-cluster</code> composite action.</strong>
+  It performs: under-cloud topology → BYO MariaDB → Loki → generated
+  inventory → collection deploy (server/client wheels from the
+  checkouts) → wait-schedulable → base image import, and exposes the
+  cluster's coordinates (primary address, inventory path, namespace)
+  as action outputs. <code>smoke-cluster.yml</code> becomes a consumer of the
+  action (deploy via the action, then its stestr/module-test/teardown
+  steps as today), so there is exactly one deploy implementation.</li>
+<li><strong><code>workflow_call</code> consumers use the smoke defaults.</strong> For a
+  did-I-break-it check the right shape is <code>tier: smoke</code>, <code>localhost</code>
+  topology, <code>smoke-ci.conf</code> — what shakenfist's own PR gate uses.
+  client-python's old <code>cluster-ci.conf</code> over-paid; the server repo
+  already runs the full suites on its own merges.</li>
+<li><strong>client-python adopts the workflow; kerbside gets the action.</strong>
+  client-python's caller replaces its broken job (keeping the
+  <code>functional_matrix</code> job id; the operator flips the required status
+  check at merge). A kerbside SF-integration smoke leg via the action
+  is designed here but lands as its own kerbside PR when wanted — the
+  facility existing is this phase's deliverable, the kerbside test
+  content is kerbside's.</li>
+<li><strong>Artifact names become <code>bundle-&lt;component&gt;-&lt;tier&gt;[-&lt;key&gt;]</code>.</strong></li>
+<li><strong>The released/upgrade topologies stay, for now.</strong> Code review of
+  this phase found the "dead" <code>ci-topology-*-released.yml</code> /
+  <code>-upgrade.yml</code> playbooks are consumed from actions@main by nine
+  workflows on shakenfist's v0.6-releases and v0.7-releases branches
+  (backport pushes and PRs run them). They are retained until those
+  release branches' CI is formally retired; the lesson recorded here is
+  that actions-repo grep gates must include release branches, not just
+  default-branch checkouts.</li>
+<li><strong>Document the recipe.</strong> A short "adding SF smoke CI to your repo"
+  section in the actions README covering both modes, so the next repo
+  is a copy of six lines rather than six hundred.</li>
+</ul>
+<h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
+<th>#</th>
+<th>Repo</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>1. Remove rsyslog aggregation from deployer</td>
-<td><em>(realised by <a href="../PLAN-remove-syslog-forwarding/">PLAN-remove-syslog-forwarding.md</a> phase 5)</em></td>
-<td>Complete (pending CI confirmation)</td>
+<td>1</td>
+<td>this</td>
+<td><strong>Plan.</strong> This document.</td>
 </tr>
 <tr>
-<td>2. ~~<code>bootstrap_operations</code> table and idempotent <code>sf-ctl bootstrap-cluster</code>~~</td>
-<td><em>(dissolved — see phase notes; the role-config-idempotency remainder folds into phase 6)</em></td>
-<td>Dissolved</td>
+<td>2</td>
+<td>actions</td>
+<td><strong>Extract <code>build-smoke-cluster</code>.</strong> New composite action containing the deploy sequence currently inlined in <code>smoke-cluster.yml</code>; the workflow consumes it. Outputs: primary address, inventory path, under-cloud namespace. Artifact-name parameterisation and the component-selection documentation fix ride along. Validated by a shakenfist workflow_dispatch run (behaviourally unchanged, distinct artifact names).</td>
 </tr>
 <tr>
-<td>3. Remove Apache reverse proxy from deployer</td>
-<td><em>(realised by <a href="../PLAN-remove-apache-lb/">PLAN-remove-apache-lb.md</a>)</em></td>
-<td>Complete (pending CI confirmation)</td>
+<td>3</td>
+<td>client-python</td>
+<td><strong>Adopt the workflow.</strong> Replace the broken <code>functional_matrix</code> body with a <code>uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main</code> caller: <code>component: client-python</code>, <code>component_ref: ${{ github.sha }}</code>, smoke defaults otherwise, <code>secrets: inherit</code>. Un-breaks the repo's CI. Prepared as a branch; operator pushes, PRs, and updates the required status check (new context: "functional_matrix / Smoke tests (collection)").</td>
 </tr>
 <tr>
-<td>4-5. <em>(MariaDB BYO and sf-database tier — moved to <a href="../PLAN-byo-mariadb/">PLAN-byo-mariadb.md</a>)</em></td>
-<td><em>(separate plan)</em></td>
-<td><em>(see byo-mariadb)</em></td>
+<td>4</td>
+<td>actions</td>
+<td><strong>Kerbside-mode worked example.</strong> Add the README recipe for both modes, including a concrete build-smoke-cluster example job (deploy, then run-your-own-tests against the outputs). Coordinate with kerbside on an actual SF-integration smoke leg as a follow-on kerbside PR (out of this phase's gate).</td>
 </tr>
 <tr>
-<td>6. Repackage deployer as the <code>shakenfist.shakenfist</code> galaxy collection; delete the getsf installer chain; example consumers</td>
-<td><a href="../PLAN-remove-primary-phase-06-galaxy-role/">PLAN-remove-primary-phase-06-galaxy-role.md</a></td>
-<td>Complete</td>
+<td>5</td>
+<td>actions</td>
+<td>~~Delete the dead getsf-era topologies~~ <strong>Retained</strong>: the review's release-branch grep found live consumers on v0.6/v0.7-releases (see Decisions). Deletion is deferred to whenever those branches' CI is retired.</td>
 </tr>
 <tr>
-<td>7. Rename <code>etcd_master</code> → <code>database_node</code>; final cleanup</td>
-<td><a href="../PLAN-remove-primary-phase-07-rename-cleanup/">PLAN-remove-primary-phase-07-rename-cleanup.md</a></td>
-<td>Complete (pending CI confirmation)</td>
-</tr>
-<tr>
-<td>8. Roll the reusable smoke-cluster CI workflow out to the downstream repos (the workflow itself is authored in phase 6 step 5)</td>
-<td><a href="../PLAN-remove-primary-phase-08-shared-ci/">PLAN-remove-primary-phase-08-shared-ci.md</a></td>
-<td>Complete (pending CI confirmation)</td>
+<td>6</td>
+<td>this</td>
+<td><strong>Bookkeeping.</strong> Flip the phase 8 row in <code>PLAN-remove-primary.md</code> and correct its stale repo list; code review of the phase and address findings.</td>
 </tr>
 </tbody>
 </table>
-<p>Phase notes:</p>
+<h2 id="risks">Risks<a class="headerlink" href="#risks" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Phase 1</strong> deletes the rsyslog forwarder configuration in
-  <code>roles/base/tasks/syslog</code> and associated templates. (The
-  primary-node Prometheus server install has already been
-  removed as warmup; rsyslog removal is held back until SF
-  has a Loki-shipper story so operators are not left without
-  a log path.) Documents the metric and log endpoints
-  operators must scrape / collect themselves. Also flips
-  <code>shakenfist-utilities</code> JSON-formatted logging on by
-  default (and removes the non-JSON code path on the SF
-  side, on the assumption operators going to Loki / Elastic
-  / Splunk want structured logs), and documents the SF
-  log-record field-name contract so the operator's log
-  pipeline can index it. <strong>Realised by
-  <a href="../PLAN-remove-syslog-forwarding/"><code>PLAN-remove-syslog-forwarding.md</code></a>
-  phase 5</strong>, which delivers the Loki-shipper story this phase
-  was gated on and then deletes the rsyslog deployer surface
-  (<code>roles/base/tasks/syslog.yml</code>, the client/server
-  <code>rsyslog-*.conf</code> templates, the <code>syslog_target</code> variable, the
-  <code>rsyslog</code> package + service enablement, and the
-  <code>--log-syslog</code> gunicorn flag), in the same way phase 3 was
-  realised by <code>PLAN-remove-apache-lb.md</code>.</li>
-<li><strong>Phase 2 (dissolved).</strong> This phase originally introduced
-  a <code>bootstrap_operations</code> table and an idempotent
-  <code>sf-ctl bootstrap-cluster</code> command that subsumed every
-  <code>set-config</code> / admin-namespace bootstrap task, plus a
-  recorded cluster version and a per-daemon version-compat
-  startup check. Detailed planning reassessed the scope to
-  nothing:</li>
-<li><strong>Config stays in the role.</strong> Several current
-    <code>set-config</code> values (<code>MAX_HYPERVISOR_MTU</code>, <code>DNS_SERVER</code>,
-    <code>HTTP_PROXY</code>) are recomputed by ansible on every deploy,
-    so folding them into a one-time bootstrap would stop
-    those updates propagating. Config — including per-node
-    defaults computed via <code>set_fact</code> from gathered facts —
-    is applied idempotently by the role each run. The
-    role-config idempotency tidy-up folds into phase 6.</li>
-<li><strong>No new bootstrap command or table.</strong> <code>AUTH_SECRET_SEED</code>
-    is a caller-supplied <code>set-config</code>; the <code>system</code> namespace
-    and its operator-supplied key are the existing idempotent
-    <code>bootstrap-system-key</code> (<code>Namespace.new</code> is idempotent and
-    <code>add_key</code> is keyed by name, so a re-run overwrites rather
-    than duplicates). Idempotency already makes a partial
-    bootstrap self-healing on the next run, which was the
-    only thing the one-transaction <code>bootstrap_operations</code>
-    table existed to guarantee.</li>
-<li><strong>No cluster-version table or per-daemon version check.</strong>
-    byo-mariadb's <code>verify_schema_versions</code> already refuses to
-    start a daemon whose build disagrees with the DB schema,
-    covering the real compatibility hazard. A statically
-    bootstrap-recorded version would only catch
-    schema-invariant skew and would go stale on the first
-    rolling upgrade; if that protection is ever wanted it can
-    be derived from the per-node <code>installed_version</code> already
-    stored in node attributes, with no new schema. Dropped.</li>
-<li><strong>Phase 3</strong> deletes <code>roles/primary/tasks/apache2.yml</code> and
-  <code>files/apache-site-primary.conf</code>. Documents the
-  load-balancing requirement for production operators and
-  the localhost:13000 single-node escape hatch.</li>
-<li><strong>Phases 4 and 5</strong> (MariaDB BYO and the sf-database
-  tier model) have been lifted out of this plan and are
-  tracked in <a href="../PLAN-byo-mariadb/"><code>PLAN-byo-mariadb.md</code></a>.
-  That plan removes the MariaDB-server install from the
-  deployer entirely (no opt-in demotion — the role is
-  deleted), reshapes <code>sf-database</code> into a deployer-chosen
-  tier of equal stateless instances reached via client-
-  side gRPC load balancing (not leader election), and
-  carves schema/migration execution out of daemon startup
-  into a new <code>sf-ctl ensure-mariadb-schema</code> command.
-  Phase 6 below assumes the BYO-MariaDB plan has landed
-  first (the galaxy role's documented quickstart for a
-  single-box deploy points at byo-mariadb's
-  <code>tools/bootstrap-mariadb.sql</code> and <code>apt install
-  mariadb-server</code> flow).</li>
-<li><strong>Phase 6</strong> moves <code>roles/base</code> and its dependents into the
-  <code>shakenfist.shakenfist</code> collection described under "Galaxy
-  collection structure" below: a parameterised core <code>node</code>
-  role plus the divergent <code>hypervisor</code> / <code>network</code> /
-  <code>internal_ca</code> component roles. It replaces <code>deploy.py</code>'s
-  topology-JSON translation with direct ansible inventory
-  consumption, converts the role's capability selection so it
-  no longer reads <code>groups['hypervisors']</code> /
-  <code>groups['network_node']</code> / <code>groups['etcd_master']</code>
-  internally (host membership becomes role variables), and
-  recasts the single-node and CI playbooks as example
-  consumers. The legacy installer chain — <code>getsf</code>, its
-  generated <code>/root/sf-deploy</code>, the topology JSON, <code>deploy.py</code>,
-  and the monolithic <code>deploy.yml</code> — is <strong>deleted</strong> in this
-  phase, not slimmed; the example playbooks replace it. This
-  removes the <code>deploy.py</code> / <code>deploy.yml</code> files that phase 7
-  was originally scoped to rename <code>etcd_master</code> in, so
-  phase 7's remaining scope is only the residual
-  <code>etcd_master</code> mentions in surviving roles, templates, CI,
-  and comments.</li>
+<li><strong>Deploy extraction regression.</strong> Moving ~120 lines of workflow steps
+  into a composite action risks subtle env/step-context differences
+  (<code>$GITHUB_ENV</code> propagation, <code>inputs.*</code> vs <code>${{ inputs }}</code> scoping).
+  Mitigated by validating shakenfist's own CI on the extracted form
+  before any downstream adoption.</li>
+<li><strong>Required-check rename in client-python.</strong> Merge-then-flip sequence
+  documented in step 3; the repo has no merge queue, so it is one
+  setting.</li>
+<li><strong>Cross-repo skew.</strong> A client-python PR depending on an unmerged
+  shakenfist change cannot pass (cluster deploys develop server) — the
+  pre-existing land-in-order policy, newly visible after the CI dark
+  period.</li>
+<li><strong>Composite-action mode tempts long-lived clusters.</strong> The action
+  deploys into the caller's job on a shared under-cloud; the recipe
+  must state the cluster's lifetime is the job and teardown is the
+  under-cloud reaper's, mirroring today's behaviour.</li>
 </ul>
-<p>Phase 6 also folds in the ansible integration. The SF
-  ansible modules (<code>sf_instance</code> / <code>sf_network</code> /
-  <code>sf_namespace</code> / <code>sf_snapshot</code>) move into the collection as
-  native <code>AnsibleModule</code>s under <code>plugins/modules/</code>,
-  auto-discovered as <code>shakenfist.shakenfist.sf_*</code>. This
-  retires the bash shims, the <code>sf-client ansible …</code>
-  subcommand they shell out to, and the awkward
-  <code>postinstall.yml</code> install dance
-  (<code>sf-client admin ansible_module_path</code> introspection plus a
-  manual copy into <code>/usr/share/ansible/plugins/modules/</code> with
-  hardcoded fallback paths). The modules call
-  <code>shakenfist_client</code> as their API SDK — the same pattern as
-  <code>community.aws</code> over <code>boto3</code> — so the REST/API logic stays
-  in the client-python repo and only the ansible glue lives
-  in the collection. The collection declares a compatible
-  <code>shakenfist_client</code> version range as a Python requirement;
-  an ansible control node needs <code>ansible-galaxy collection
-  install shakenfist.shakenfist</code> plus <code>pip install
-  shakenfist_client</code>, never the server package. Note the
-  cross-repo coupling: the current module source lives in
-  client-python, so this step either vendors the modules into
-  the collection or is coordinated with a client-python
-  change.
-- <strong>Phase 7</strong> is mostly mechanical: rename <code>etcd_master</code> →
-  <code>database_node</code> across the surviving collection roles,
-  example playbooks, templates, CI, and comments (the
-  <code>deploy.py</code> / <code>deploy.yml</code> occurrences are gone with those
-  files in phase 6). By the time phase 7 runs,
-  <code>PLAN-remove-etcd.md</code> will already have landed and the
-  drain code, <code>etcd_host</code> default, <code>ETCDCTL_API=3</code> line in
-  <code>sfrc</code>, and <code>etcd3gw</code> dependency will be gone. Phase 7's
-  scope is therefore <em>only</em> the deployer-level naming and
-  comments — the ansible group rename and the residual
-  <code>etcd_master</code> mentions in the example playbooks and role
-  comments.
-- <strong>Phase 8</strong> rolls the reusable smoke-cluster CI workflow
-  out to the downstream SF ecosystem repos. (At execution
-  time the real consumers were <code>client-python</code> plus a
-  composite-action mode for kerbside-shaped repos;
-  <code>library-python</code> no longer exists -- see the phase 8
-  sub-plan.) The historical pattern
-  was to cut-and-paste shakenfist's cluster-build CI into
-  each downstream repo, which drifts (the
-  <code>/etc/sf/inventory.yaml</code> log-gather step is one symptom —
-  see the dropped write in phase 6) and over-pays: the
-  downstream repos only need the cheap smoke tier, not the
-  full merge CI. <strong>The reusable workflow itself is authored
-  in phase 6 step 5, not here</strong> — to avoid writing any
-  throwaway intermediate CI, the <code>smoke-cluster.yml</code>
-  (<code>workflow_call</code>) in <code>shakenfist/actions</code> and shakenfist's
-  own cutover onto it are pulled forward into phase 6 (the
-  decision: don't build a getsf-shaped stopgap and then
-  replace it). Phase 8 is therefore <em>only</em> the rollout:
-  replace each downstream repo's copy-pasted cluster-build
-  workflow with a few-line <code>uses:
-  shakenfist/actions/.github/workflows/smoke-cluster.yml@…</code>
-  call, one repo at a time, passing the component/ref/tier
-  inputs. Depends on phase 6 step 5 (the reusable workflow
-  must exist and be proven on shakenfist's own CI first);
-  independent of phase 7. The downstream-repo changes are
-  committed to <code>main</code> and pushed by the operator — the agent
-  prepares the diffs but cannot push them. If it grows, this
-  phase can graduate to its own master plan, the way the old
-  phases 4-5 became <code>PLAN-byo-mariadb.md</code>.</p>
-<h3 id="galaxy-collection-structure">Galaxy collection structure<a class="headerlink" href="#galaxy-collection-structure" title="Permanent link">&para;</a></h3>
-<p>The deployer becomes a single ansible-galaxy <strong>collection</strong>,
-<code>shakenfist.shakenfist</code>, rather than a constellation of
-independently-published roles. The structure and its
-rationale:</p>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>One collection as the distribution unit.</strong> Ansible's
-  community good-practice bundles related roles at the
-  "type or landscape level" into a namespaced, versioned
-  collection that can share plugins — which matches SF
-  wanting one cohesive, versioned deployment artefact.</li>
-<li><strong>A core <code>node</code> role, parameterised.</strong> Every SF node runs
-  the same daemon swarm today (<code>roles/base</code> writes identical
-  systemd units on every host; only <code>sf-database</code> is
-  conditional). Differentiation is three capability flags
-  (<code>NODE_IS_HYPERVISOR</code>, <code>NODE_IS_NETWORK_NODE</code>,
-  <code>NODE_IS_DATABASE_NODE</code>) plus a few package sets. Because
-  the daemon set is uniform, the bulk of the deployer is one
-  parameterised role, not one role per node type — splitting
-  by node type would mostly produce roles that install the
-  same thing, which the good-practice guide warns against
-  ("don't create multiple roles if one parameterised role
-  suffices").</li>
-<li><strong>Component roles only where work genuinely diverges.</strong>
-  <code>hypervisor</code> (libvirt/KVM), <code>network</code> (VXLAN), and
-  <code>internal_ca</code> (PKI) install materially different packages
-  and config, so they stay as separate roles within the
-  collection — the "promote a component to its own role when
-  it diverges" rule. The database tier is <em>not</em> a separate
-  role: <code>PLAN-byo-mariadb.md</code> already made <code>sf-database</code> a
-  stateless daemon, so "database node" is just a capability
-  flag that enables that daemon.</li>
-<li><strong>No inventory group names inside roles.</strong> Today the
-  config template reads <code>groups['hypervisors']</code>,
-  <code>groups['network_node']</code>, and <code>groups['etcd_master']</code>
-  directly. Ansible good-practice is explicit that roles
-  should not embed host-group names — host membership is
-  passed as variables. Phase 6 converts these to role
-  variables; the operator's playbook is what maps their
-  inventory groups to those variables.</li>
-<li><strong>Example playbooks map groups → roles.</strong> The single-node
-  and cluster_ci playbooks become example consumers that
-  assign hosts to the collection's roles with the right
-  variables — the same pattern Kubespray and ceph-ansible
-  use, where the playbook plus inventory decides which hosts
-  run which role.</li>
-<li><strong>Ansible modules ship as collection content.</strong> The SF
-  ansible modules become native <code>AnsibleModule</code>s under the
-  collection's <code>plugins/modules/</code>, replacing the bash-shim +
-  <code>postinstall.yml</code> copy install. Bundling roles and modules
-  in one collection is exactly what the collection format is
-  for; operators get them via <code>ansible-galaxy collection
-  install</code>, with <code>shakenfist_client</code> as the only Python
-  dependency on the control node. See the phase 6 note for
-  the cross-repo coupling with client-python.</li>
+<li>shakenfist workflow_dispatch run green on the extracted action, with
+  per-job distinct bundle names.</li>
+<li>client-python PR run green end-to-end (develop server + PR client,
+  smoke suite) via the reusable workflow.</li>
+<li>The README recipe's example job deploys and reaches the cluster in a
+  scratch run.</li>
+<li>Grep gates: no getsf reference in live (non-release-branch) CI paths;
+  gates over the actions repo must sweep release branches too.</li>
 </ul>
-<p>Precedent: ceph-ansible and Kubespray both split into
-multiple roles, but they split by <em>functional component /
-software</em> (etcd, container-engine, mon, osd) and let the
-playbook map inventory groups to those roles — they do not
-embed group names in role internals. SF differs in that its
-per-node software is near-uniform, so the split is lighter:
-one core role plus a few divergent component roles.</p>
-<p>References: Red Hat "Good Practices for Ansible"
-(<code>redhat-cop.github.io/automation-good-practices</code>),
-ceph-ansible (<code>github.com/ceph/ceph-ansible</code>), Kubespray
-(<code>github.com/kubernetes-sigs/kubespray</code>).</p>
-<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
-<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
-<p>All implementation work is done by sub-agents, never in the
-management session. The management session (this
-conversation) is reserved for planning, review, and
-decision-making. This keeps the management context lean and
-avoids drowning it in implementation diffs.</p>
-<p>The workflow is:</p>
-<ol>
-<li><strong>Plan</strong> at high effort in the management session.</li>
-<li><strong>Spawn a sub-agent</strong> for each implementation step with
-   the brief from the plan, at the recommended effort level
-   and model.</li>
-<li><strong>Review</strong> the sub-agent's output in the management
-   session. Check the actual files — the sub-agent's summary
-   describes what it intended, not necessarily what it did.</li>
-<li><strong>Fix or retry</strong> if the output is wrong. Diagnose whether
-   the brief was insufficient (improve it) or the model was
-   too light (upgrade it), then re-run.</li>
-<li><strong>Commit</strong> once the management session is satisfied with
-   the result.</li>
-</ol>
-<p>This applies to all steps, including high-effort ones. If a
-sub-agent can't succeed even with a detailed brief and the
-right model, that's a signal the brief needs improving, not
-that the management session should do the implementation
-itself.</p>
-<p>Use <code>isolation: "worktree"</code> for sub-agents when the change is
-risky or experimental. Phase 6 in particular reshapes the
-deployer into a galaxy collection and rewrites the ansible
-modules — its more invasive steps should default to worktree
-isolation. Phase 7 is a rename / cleanup and can work
-directly in the main tree.</p>
-<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
-<p>The master plan itself should always be created at <strong>high
-effort</strong> — it requires broad codebase understanding,
-cross-referencing multiple source files, and making judgment
-calls about scope and sequencing.</p>
-<p>Each phase plan should specify the recommended effort level
-for planning that phase. Phase 6 (galaxy-collection
-packaging, including the native ansible modules) is high
-effort because it changes the operator-facing API. Phase 7
-(the <code>etcd_master</code> → <code>database_node</code> rename and final
-cleanup) is largely mechanical and can be planned at medium
-effort. Phase 8 (the shared reusable CI workflow) is high
-effort because it designs a cross-repo CI contract consumed
-by several ecosystem repos. (Phases 1 and 3 are already
-realised by other plans; phase 2 is dissolved; phases 4-5
-moved to <code>PLAN-byo-mariadb.md</code>.)</p>
-<h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
-<p>Each phase plan should include a table like this:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>| Step | Effort | Model | Isolation | Brief for sub-agent |
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|------|--------|-------|-----------|---------------------|
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>| 1a   | medium | sonnet | none     | One-sentence summary of what to do and which files to touch |
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>| 1b   | high   | opus   | worktree | Why this needs high effort: requires understanding X to do Y |
-</code></pre></div>
-<p><strong>Effort levels:</strong></p>
+<h2 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>high</strong> — Requires reading multiple files, making judgment
-  calls, understanding non-obvious invariants, or researching
-  external references.</li>
-<li><strong>medium</strong> — The plan provides enough context that the
-  sub-agent can follow a clear brief.</li>
-<li><strong>low</strong> — Purely mechanical changes (rename, reformat, add
-  a log line, regenerate proto stubs).</li>
+<li>agent-python adoption (needs an agent-from-checkout deploy path in
+  the collection first — recorded above).</li>
+<li>The kerbside SF-integration smoke leg's test content (kerbside's own
+  PR, using the facility this phase provides).</li>
+<li>Collection publication to galaxy; the phase 7 deferred-removal PR;
+  the node-lifecycle in-guest-kill flake.</li>
+<li>Released-version / upgrade testing redesign.</li>
 </ul>
-<p><strong>Model choice:</strong></p>
+<h2 id="cross-repo-operator-actions">Cross-repo / operator actions<a class="headerlink" href="#cross-repo-operator-actions" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>opus</strong> — Deep reasoning, cross-daemon architectural
-  understanding, subtle correctness judgment (locking, state
-  machines, migration), or complex protocol research.</li>
-<li><strong>sonnet</strong> — Good default for well-briefed implementation
-  work.</li>
-<li><strong>haiku</strong> — Purely mechanical tasks: search-and-replace,
-  regenerating proto stubs, adding log lines.</li>
+<li>Push actions/main for steps 2, 4 and 5.</li>
+<li>Push and PR the client-python branch (step 3), updating its required
+  status check at merge time.</li>
+<li>After phase 8, the remove-primary master plan is complete; consider a
+  v0.8 release to start the phase-7 deprecation clock.</li>
 </ul>
-<p><strong>When in doubt, skew to the more capable model.</strong> Saving
-money only matters if the outcome is still acceptable.</p>
-<p><strong>Brief for sub-agent:</strong> Write it as if briefing a colleague
-who has never seen the codebase. Include what to change,
-which files to touch, what patterns to follow, and any
-non-obvious constraints. The better the brief, the lower the
-effort level needed and the lighter the model that can
-succeed.</p>
-<h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
-<p>After a sub-agent completes, the management session should
-verify:</p>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The files that were supposed to change actually changed
-      (read them, don't trust the summary).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No unrelated files were modified.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The code passes <code>pre-commit run --all-files</code> (flake8,
-      stestr unit tests, mypy).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> CI deploys still succeed on the cluster_ci rig (this
-      plan is operator-facing; an internally-clean change
-      that breaks the CI deploy is a regression).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The changes match the intent of the brief — not just
-      syntactically correct but semantically right.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Commit message follows project conventions (including
-      the Co-Authored-By line with model, context window,
-      effort level, and other settings).</li>
-</ul>
-<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
-<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
-<p>We will know when this plan has been successfully implemented
-because the following statements will be true:</p>
-<ul>
-<li>The code passes <code>pre-commit run --all-files</code> (flake8,
-  stestr unit tests, and mypy type checking).</li>
-<li><code>shakenfist/deploy/ansible/roles/primary/</code> no longer
-  exists.</li>
-<li>No part of the deployer installs Grafana, Prometheus,
-  rsyslog server, or Apache by default. (MariaDB-install
-  removal is handled by
-  <a href="../PLAN-byo-mariadb/"><code>PLAN-byo-mariadb.md</code></a> and is
-  outside this plan's scope.)</li>
-<li>Cluster bootstrap is a set of idempotent steps with no
-  dedicated orchestrating command or table: cluster config
-  (including per-node defaults) is applied by the role on
-  every run via <code>set-config</code>, <code>AUTH_SECRET_SEED</code> is
-  caller-supplied, and the <code>system</code> namespace plus its
-  initial operator-supplied key are established by the
-  existing idempotent <code>sf-ctl bootstrap-system-key</code>.
-  Re-running the deploy on a bootstrapped cluster is a no-op.
-  (Schema initialisation is handled by the separate
-  <code>sf-ctl ensure-mariadb-schema</code> command introduced in
-  <code>PLAN-byo-mariadb.md</code>.)</li>
-<li>The SF ansible modules are native collection content under
-  <code>plugins/modules/</code> (<code>shakenfist.shakenfist.sf_*</code>), with no
-  shim / copy-into-<code>/usr/share/ansible</code> install step, and
-  depend only on <code>shakenfist_client</code> on the control node.</li>
-<li>The deployer is consumable as an ansible-galaxy
-  <strong>collection</strong> (<code>shakenfist.shakenfist</code>): an operator can
-  write a one-page playbook that assigns hosts to the
-  collection's <code>node</code> role (plus <code>hypervisor</code> / <code>network</code> /
-  <code>internal_ca</code> component roles as needed), passing the
-  daemon/capability mix as role variables, and arrive at a
-  working node configuration. No role reads inventory group
-  names internally.</li>
-<li>The single-node and cluster_ci deployments are example
-  consumers of the collection, not the collection itself.</li>
-<li>The legacy interactive installer and its topology
-  machinery are gone: <code>shakenfist/deploy/getsf</code>, the
-  <code>/root/sf-deploy</code> script it generated, the topology-JSON
-  input that drove it, <code>deploy.py</code> (the topology → inventory
-  translator), and the monolithic <code>deploy.yml</code> no longer
-  exist. Deployment is driven entirely by operator-authored
-  (or example) playbooks consuming the collection.</li>
-<li>The <code>etcd_master</code> group name is gone from the deployer
-  (excluding the <code>shakenfist/etcd.py</code> drain code, which is
-  out of scope).</li>
-<li>The SF ecosystem repos that stand up a cluster in CI
-  (<code>client-python</code>, <code>library-python</code>, <code>kerbside</code>, …) consume
-  a single reusable smoke-cluster workflow from
-  <code>shakenfist/actions</code> instead of copy-pasting shakenfist's
-  CI, and shakenfist's own CI is the first caller of that
-  workflow. No downstream repo carries a forked copy of the
-  cluster-build CI.</li>
-<li>Documentation in <code>docs/</code> is updated:
-  <code>docs/operator_guide/</code> gains a "deploying SF against your
-  own infrastructure" section; <code>ARCHITECTURE.md</code> loses the
-  primary-node references; <code>README.md</code> and <code>AGENTS.md</code> are
-  updated to reflect the new deployment shape. (BYO-MariaDB
-  updates to <code>docs/operator_guide/database.md</code> are owned
-  by <code>PLAN-byo-mariadb.md</code>.)</li>
-</ul>
-<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>mTLS for gRPC, TLS for MariaDB, graceful cert reload.</strong>
-  Tracked in <code>PLAN-embrace-tls.md</code>. This plan establishes the
-  operator-provides-PKI surface that the TLS plan consumes.</li>
-<li><strong>Retiring <code>shakenfist/etcd.py</code> and the <code>DATA_MIGRATIONS</code>
-  drain code.</strong> Tracked in <code>PLAN-remove-etcd.md</code>. No longer
-  blocked on this plan landing: the decision to close
-  in-place upgrade from etcd-era SF means the drain code
-  is dead weight forever and can be deleted at any time.
-  Sequenced <em>before</em> this plan in <code>index.md</code> so the
-  remove-primary work is not navigating misleading etcd
-  references while it does the <code>etcd_master</code> rename in
-  phase 7.</li>
-<li><strong>Health checks, readiness, and graceful drain semantics.</strong>
-  A precondition for the BYO-LB story being operationally
-  honest: operators need a <code>/healthz</code> (or equivalent) that
-  distinguishes "I'm up," "I'm ready to serve," and "I'm
-  draining" so their LB can route correctly during rolling
-  upgrades. Touches every daemon, has its own design
-  depth (dependency-aware readiness: sf-api isn't ready
-  until sf-database is reachable, etc.), and is useful even
-  without remove-primary, so it wants its own plan. Should
-  land alongside this plan — ideally before phase 6 (the
-  galaxy role), so the role's documentation can point at
-  well-defined health endpoints.</li>
-<li><strong>Remove the eventlog service entirely.</strong> Tracked in
-  <a href="../PLAN-eventlog-direct-mariadb/"><code>PLAN-eventlog-direct-mariadb.md</code></a>.
-  The original framing of this stub was "move sqlite to
-  MariaDB and make the daemon electable," but on closer
-  inspection <code>sf-eventlog</code> is a thin gRPC wrapper in front
-  of sqlite whose only remaining job once storage moves is
-  proxying writes that could go directly to <code>sf-database</code>.
-  The plan therefore deletes the daemon, routes calling-site
-  <code>eventlog.add_event*</code> calls directly through <code>sf-database</code>,
-  moves pruning into the cluster daemon's maintenance loop,
-  and removes the local-sqlite read path that today forces
-  sf-api to be co-located with the eventlog node. No hard
-  ordering against this plan, but the two are mutually
-  reinforcing.</li>
-<li><strong>Network node failover.</strong> Unlike <code>sf-database</code>, the
-  network node owns layer-2/3 identities (egress NIC,
-  floating IPs, NAT/DHCP state). Its HA story is <em>VIP
-  failover</em>, not leader election — the well-known answer is
-  operator-provided keepalived / corosync / BGP. SF should
-  declare "exactly one node holds this role at a time" via
-  <code>cluster_locks</code> and document the recommended FOSS
-  failover mechanism. Its own plan, lower priority than
-  the eventlog change.</li>
-<li><strong>OpenTelemetry instrumentation.</strong> A systematic
-  replacement of the homegrown <code>RecordedOperation</code> plus
-  the ad-hoc prometheus exporters with otel spans and
-  metrics. Buys cross-daemon trace visibility (a user
-  operation traced from sf-api through sf-queues to
-  sf-net visible as one trace in Jaeger / Tempo /
-  Honeycomb) and stabilises the metrics surface as a
-  documented contract. Subsumes the originally-named
-  "metrics audit" thread. Its own plan.</li>
-<li><strong>MariaDB BYO and <code>sf-database</code> as a tier.</strong> Tracked in
-  <a href="../PLAN-byo-mariadb/"><code>PLAN-byo-mariadb.md</code></a>. Removes
-  MariaDB-server install from the deployer entirely,
-  reshapes <code>sf-database</code> into a deployer-chosen tier of
-  equal stateless instances reached via client-side gRPC
-  load balancing, and carves schema/migration execution
-  out of daemon startup into a new
-  <code>sf-ctl ensure-mariadb-schema</code> command. Was originally
-  phases 4-5 of this plan.</li>
-<li><strong>Sticky session affinity for blob transfers.</strong> Tracked in
-  <code>PLAN-sticky-transfers.md</code>. The streaming-proxy baseline
-  this plan delivers is the universal fallback; sticky
-  cookies are an optional refinement for multi-request
-  transfer sessions on LBs that support them.</li>
-</ul>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>This section should list any bugs we encounter during
-development that we fixed.</p>
-<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
-<p>When creating a new master plan from this template, update
-the following files in <code>docs/plans/</code>:</p>
-<ul>
-<li><strong><code>index.md</code></strong> — add a row to the <em>Plan Status</em> table
-  with a link to the plan, its phase breakdown, initial
-  status, and a one-line description.</li>
-<li><strong><code>order.yml</code></strong> — add an entry for the new master plan so
-  it appears in the documentation navigation in the
-  intended order.</li>
-</ul>
-<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
-<p>Before executing any step of this plan, please back brief
-the operator as to your understanding of the plan and how
-the work you intend to do aligns with that plan.</p>
 
 
 
@@ -10263,7 +9464,7 @@ the work you intend to do aligns with that plan.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-remove-primary.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-remove-primary.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-remove-primary/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-remove-primary-phase-08-shared-ci.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-remove-primary-phase-08-shared-ci.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-remove-primary-phase-08-shared-ci/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
