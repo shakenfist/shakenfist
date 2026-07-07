@@ -104,7 +104,14 @@ class Artifact(dbowo):
         return attrs
 
     def _update_attributes(self, **kwargs) -> None:
-        """Update attributes in MariaDB."""
+        """Update attributes in MariaDB.
+
+        Only the columns named in kwargs are written. This object
+        caches its attributes in memory, so an unmasked write would
+        push an arbitrarily stale snapshot of the other columns over
+        any concurrent writer's committed changes (the cross-attribute
+        lost update fixed for instance attributes).
+        """
         attrs = self._ensure_attributes()
         updated = ArtifactAttributesData(
             uuid=attrs.uuid,
@@ -112,7 +119,7 @@ class Artifact(dbowo):
             shared=kwargs.get('shared', attrs.shared),
             highest_index=kwargs.get('highest_index', attrs.highest_index)
         )
-        mariadb.update_artifact_attributes(updated)
+        mariadb.update_artifact_attributes(updated, fields=list(kwargs))
         self.__attributes = updated
 
     @classmethod

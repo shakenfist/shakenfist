@@ -10874,9 +10874,39 @@ def _direct_get_artifact_attributes(
         return None
 
 
+def _artifact_attributes_column_values(
+        data: ArtifactAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map ArtifactAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. See
+    _instance_attributes_column_values for why single-attribute
+    writers must name their field.
+    """
+    all_values: Dict[str, Any] = {
+        'max_versions': data.max_versions,
+        'shared': data.shared,
+        'highest_index': data.highest_index,
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown artifact attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
 def _direct_update_artifact_attributes(
-        data: ArtifactAttributesData) -> bool:
-    """Update artifact attributes in MariaDB."""
+        data: ArtifactAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update artifact attributes in MariaDB.
+
+    fields is the list of model field names to write; None or empty
+    writes every column.
+    """
     engine = _get_engine()
     table = _get_artifact_attributes_table()
 
@@ -10885,10 +10915,7 @@ def _direct_update_artifact_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                max_versions=data.max_versions,
-                shared=data.shared,
-                highest_index=data.highest_index
-            )
+                **_artifact_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -11239,8 +11266,13 @@ def _grpc_get_artifact_attributes(
 
 
 def _grpc_update_artifact_attributes(
-        data: ArtifactAttributesData) -> bool:
-    """Update artifact attributes via the database microservice."""
+        data: ArtifactAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update artifact attributes via the database microservice.
+
+    fields is the list of model field names to write; None or empty
+    writes every column.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateArtifactAttributesRequest(
@@ -11249,7 +11281,8 @@ def _grpc_update_artifact_attributes(
                 max_versions=data.max_versions,
                 shared=data.shared,
                 highest_index=data.highest_index
-            )
+            ),
+            fields=fields or []
         )
         reply = _grpc_call(stub.UpdateArtifactAttributes, request)
         return bool(reply.success)
@@ -11516,18 +11549,25 @@ def get_artifact_attributes(
     return _direct_get_artifact_attributes(artifact_uuid)
 
 
-def update_artifact_attributes(data: ArtifactAttributesData) -> bool:
+def update_artifact_attributes(
+        data: ArtifactAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
     """Update artifact attributes.
 
     Args:
         data: The ArtifactAttributesData with updated values.
+        fields: The model field names to write. None or empty writes
+            every column. Callers changing a subset of attributes
+            should name them so concurrent writers of other attributes
+            on the same row cannot lose their updates to this writer's
+            read-modify-write.
 
     Returns:
         True if updated successfully, False otherwise.
     """
     if _use_database_service():
-        return _grpc_update_artifact_attributes(data)
-    return _direct_update_artifact_attributes(data)
+        return _grpc_update_artifact_attributes(data, fields=fields)
+    return _direct_update_artifact_attributes(data, fields=fields)
 
 
 def delete_artifact_attributes(artifact_uuid: UUID) -> bool:
@@ -13476,9 +13516,38 @@ def _direct_get_network_attributes(
         return None
 
 
+def _network_attributes_column_values(
+        data: NetworkAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map NetworkAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. See
+    _instance_attributes_column_values for why single-attribute
+    writers must name their field.
+    """
+    all_values: Dict[str, Any] = {
+        'floating_gateway': data.floating_gateway,
+        'hosteddns': json.dumps(data.hosteddns),
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown network attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
 def _direct_update_network_attributes(
-        data: NetworkAttributesData) -> bool:
-    """Update Network attributes in MariaDB."""
+        data: NetworkAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update Network attributes in MariaDB.
+
+    fields is the list of model field names to write; None or empty
+    writes every column.
+    """
     engine = _get_engine()
     table = _get_network_attributes_table()
 
@@ -13487,8 +13556,7 @@ def _direct_update_network_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                floating_gateway=data.floating_gateway,
-                hosteddns=json.dumps(data.hosteddns))
+                **_network_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -13705,8 +13773,13 @@ def _grpc_get_network_attributes(
 
 
 def _grpc_update_network_attributes(
-        data: NetworkAttributesData) -> bool:
-    """Update Network attributes via the database service."""
+        data: NetworkAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update Network attributes via the database service.
+
+    fields is the list of model field names to write; None or empty
+    writes every column.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateNetworkAttributesRequest(
@@ -13714,7 +13787,8 @@ def _grpc_update_network_attributes(
                 uuid=str(data.uuid),
                 floating_gateway=(
                     data.floating_gateway or ''),
-                hosteddns_json=json.dumps(data.hosteddns)))
+                hosteddns_json=json.dumps(data.hosteddns)),
+            fields=fields or [])
         reply = _grpc_call(stub.UpdateNetworkAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -13844,18 +13918,26 @@ def get_network_attributes(
 
 
 def update_network_attributes(
-        data: NetworkAttributesData) -> bool:
+        data: NetworkAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
     """Update Network attributes.
 
     Args:
         data: The NetworkAttributesData with updated values.
+        fields: The model field names to write. None or empty writes
+            every column. Callers changing one attribute should name
+            it so concurrent writers of the other attribute on the
+            same row cannot lose their update to this writer's
+            read-modify-write (the Network object also caches its
+            attributes in memory, so its row snapshot can be
+            arbitrarily stale).
 
     Returns:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_network_attributes(data)
-    return _direct_update_network_attributes(data)
+        return _grpc_update_network_attributes(data, fields=fields)
+    return _direct_update_network_attributes(data, fields=fields)
 
 
 def delete_network_attributes(net_uuid: UUID) -> bool:

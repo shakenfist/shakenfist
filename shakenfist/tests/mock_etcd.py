@@ -1579,13 +1579,24 @@ class MockEtcd():
         return data
 
     def _mariadb_update_artifact_attributes(
-            self, data: ArtifactAttributesData) -> bool:
-        """Mock implementation of mariadb.update_artifact_attributes()"""
+            self, data: ArtifactAttributesData,
+            fields: Optional[List[str]] = None) -> bool:
+        """Mock implementation of mariadb.update_artifact_attributes()
+
+        A fields mask limits the write to the named model fields,
+        mirroring the per-column SQL UPDATE.
+        """
         key = str(data.uuid)
         if key in self.artifact_attributes:
-            self.artifact_attributes[key] = data
+            if fields:
+                stored = self.artifact_attributes[key]
+                for field in fields:
+                    setattr(stored, field, getattr(data, field))
+            else:
+                self.artifact_attributes[key] = data
             self._trace(
-                f'MockMariaDB.update_artifact_attributes({key}): updated')
+                f'MockMariaDB.update_artifact_attributes({key}): '
+                f'updated (fields={fields})')
             return True
         self._trace(
             f'MockMariaDB.update_artifact_attributes({key}): not found')
@@ -1872,14 +1883,24 @@ class MockEtcd():
         return data
 
     def _mariadb_update_network_attributes(
-            self, data: NetworkAttributesData) -> bool:
-        """Mock implementation of mariadb.update_network_attributes()"""
+            self, data: NetworkAttributesData,
+            fields: Optional[List[str]] = None) -> bool:
+        """Mock implementation of mariadb.update_network_attributes()
+
+        A fields mask limits the write to the named model fields,
+        mirroring the per-column SQL UPDATE.
+        """
         key = str(data.uuid)
         if key in self.network_attributes:
-            self.network_attributes[key] = data
+            if fields:
+                stored = self.network_attributes[key]
+                for field in fields:
+                    setattr(stored, field, getattr(data, field))
+            else:
+                self.network_attributes[key] = data
             self._trace(
                 f'MockMariaDB.update_network_attributes({key}): '
-                f'updated')
+                f'updated (fields={fields})')
             return True
         self._trace(
             f'MockMariaDB.update_network_attributes({key}): '
