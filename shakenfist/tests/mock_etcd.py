@@ -10,7 +10,7 @@ import os
 import time
 from collections import defaultdict
 from itertools import count
-from typing import Optional
+from typing import List, Optional
 from unittest import mock
 
 from shakenfist.constants import get_object_class
@@ -2123,14 +2123,27 @@ class MockEtcd():
         return data
 
     def _mariadb_update_instance_attributes(
-            self, data: InstanceAttributesData) -> bool:
-        """Mock implementation of mariadb.update_instance_attributes()"""
+            self, data: InstanceAttributesData,
+            fields: Optional[List[str]] = None) -> bool:
+        """Mock implementation of mariadb.update_instance_attributes()
+
+        Like the real implementation, a fields mask limits the write to
+        the named model fields; None or empty replaces every field. The
+        masked path copies onto the stored object so writes to other
+        fields by concurrent callers are preserved, mirroring the
+        per-column SQL UPDATE.
+        """
         key = str(data.uuid)
         if key in self.instance_attributes:
-            self.instance_attributes[key] = data
+            if fields:
+                stored = self.instance_attributes[key]
+                for field in fields:
+                    setattr(stored, field, getattr(data, field))
+            else:
+                self.instance_attributes[key] = data
             self._trace(
                 f'MockMariaDB.update_instance_attributes({key}): '
-                f'updated')
+                f'updated (fields={fields})')
             return True
         self._trace(
             f'MockMariaDB.update_instance_attributes({key}): '

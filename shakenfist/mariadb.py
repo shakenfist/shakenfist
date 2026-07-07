@@ -23,7 +23,7 @@ import json
 import random
 import time
 import threading
-from typing import Any, Callable, cast, Optional, TypeVar
+from typing import Any, Callable, cast, Dict, List, Optional, TypeVar
 from uuid import UUID
 
 import grpc
@@ -15013,9 +15013,48 @@ def _direct_get_instance_attributes(
         return None
 
 
+def _instance_attributes_column_values(
+        data: InstanceAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map InstanceAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. Writers setting a single attribute
+    must name it so concurrent writers of other attributes on the same
+    row cannot lose their updates to this writer's read-modify-write.
+    """
+    all_values: Dict[str, Any] = {
+        'placement': _json_dumps(data.placement),
+        'power_state': _json_dumps(data.power_state),
+        'ports': _json_dumps(data.ports),
+        'enforced_deletes': _json_dumps(data.enforced_deletes),
+        'block_devices': _json_dumps(data.block_devices),
+        'agent_state': _json_dumps(data.agent_state),
+        'agent_attributes': _json_dumps(data.agent_attributes),
+        'agent_operations': _json_dumps(data.agent_operations),
+        'kvm_pid': data.kvm_pid,
+        'error_message': data.error_message or '',
+        'vsock_cids': _json_dumps(data.vsock_cids),
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown instance attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
 def _direct_update_instance_attributes(
-        data: InstanceAttributesData) -> bool:
-    """Update Instance attributes in MariaDB."""
+        data: InstanceAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update Instance attributes in MariaDB.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _instance_attributes_column_values for
+    why single-attribute writers must pass their field name.
+    """
     engine = _get_engine()
     table = _get_instance_attributes_table()
 
@@ -15024,21 +15063,7 @@ def _direct_update_instance_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                placement=_json_dumps(data.placement),
-                power_state=_json_dumps(data.power_state),
-                ports=_json_dumps(data.ports),
-                enforced_deletes=_json_dumps(
-                    data.enforced_deletes),
-                block_devices=_json_dumps(
-                    data.block_devices),
-                agent_state=_json_dumps(data.agent_state),
-                agent_attributes=_json_dumps(
-                    data.agent_attributes),
-                agent_operations=_json_dumps(
-                    data.agent_operations),
-                kvm_pid=data.kvm_pid,
-                error_message=data.error_message or '',
-                vsock_cids=_json_dumps(data.vsock_cids))
+                **_instance_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -15451,8 +15476,14 @@ def _grpc_get_instance_attributes(
 
 
 def _grpc_update_instance_attributes(
-        data: InstanceAttributesData) -> bool:
-    """Update Instance attributes via the database service."""
+        data: InstanceAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update Instance attributes via the database service.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _instance_attributes_column_values for
+    why single-attribute writers must pass their field name.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateInstanceAttributesRequest(
@@ -15477,7 +15508,8 @@ def _grpc_update_instance_attributes(
                 error_message=(
                     data.error_message or ''),
                 vsock_cids_json=_json_dumps(
-                    data.vsock_cids)))
+                    data.vsock_cids)),
+            fields=fields or [])
         reply = _grpc_call(stub.UpdateInstanceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -15654,18 +15686,26 @@ def get_instance_attributes(
 
 
 def update_instance_attributes(
-        data: InstanceAttributesData) -> bool:
+        data: InstanceAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
     """Update Instance attributes.
 
     Args:
         data: The InstanceAttributesData with updated values.
+        fields: The model field names to write. None or empty writes
+            every column. Callers setting a single attribute must name
+            it here so concurrent writers of other attributes on the
+            same row (for example the sidechannel monitor's agent
+            state cache against the API's agent operation enqueue)
+            cannot lose their committed column to this writer's
+            read-modify-write.
 
     Returns:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_instance_attributes(data)
-    return _direct_update_instance_attributes(data)
+        return _grpc_update_instance_attributes(data, fields=fields)
+    return _direct_update_instance_attributes(data, fields=fields)
 
 
 def delete_instance_attributes(inst_uuid: UUID) -> bool:

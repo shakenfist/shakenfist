@@ -436,18 +436,31 @@ class Instance(dbowo):
 
             # Map the attribute name to the model field
             if attribute == 'kvm_pid':
+                field = 'kvm_pid'
                 attrs.kvm_pid = value.get('pid') if isinstance(value, dict) else value
             elif attribute == 'error':
+                field = 'error_message'
                 attrs.error_message = value.get('message', '') if isinstance(value, dict) else str(value)
             elif attribute == 'agent_state':
+                field = 'agent_state'
                 if hasattr(value, 'model_dump'):
                     attrs.agent_state = value.model_dump()
                 else:
                     attrs.agent_state = value
             else:
+                field = attribute
                 setattr(attrs, attribute, value)
 
-            mariadb.update_instance_attributes(attrs)
+            # Only write the column we are setting. Writing the whole
+            # row here is a cross-attribute lost update: this method is
+            # get-row, set-one-field, write-row, and two writers of
+            # different attributes on different nodes (the sidechannel
+            # monitor's agent state cache and the API's agent operation
+            # enqueue) can interleave so the second write reverts the
+            # first writer's committed column to the stale value it
+            # read. Observed as an enqueued agent operation vanishing
+            # from the queue while its state stayed 'queued'.
+            mariadb.update_instance_attributes(attrs, fields=[field])
             self._log_attribute_mutation(attribute, value)
             return
 
