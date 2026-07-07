@@ -614,3 +614,90 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             str(op2.uuid), str(self.inst.agent_operation_next().uuid))
         self.assertEqual([str(op2.uuid)], self._queue())
+
+
+class InstanceAttributeFieldMaskTestCase(base.ShakenFistTestCase):
+    """Regression tests for the cross-attribute lost update.
+
+    Instance._db_set_attribute is get-row, set-one-field, write-row.
+    Before field masking, the write-row step wrote every column, so a
+    writer of one attribute could revert a concurrent writer's
+    committed change to a different attribute of the same row to the
+    stale value it had read (observed as an agent operation enqueued by
+    the API vanishing when the sidechannel monitor wrote agent facts at
+    the same moment). Every single-attribute write must therefore name
+    the one column it is changing.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_instance('cirros', self.instance_uuid)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+    def _last_update_fields(self, mock_update):
+        self.assertTrue(mock_update.called)
+        return mock_update.call_args.kwargs.get('fields')
+
+    def test_set_attribute_masks_named_field(self):
+        with mock.patch(
+                'shakenfist.mariadb.update_instance_attributes',
+                return_value=True) as mock_update:
+            self.inst._db_set_attribute(
+                'agent_attributes', {'facts': {'os': 'debian'}})
+        self.assertEqual(
+            ['agent_attributes'], self._last_update_fields(mock_update))
+
+    def test_set_attribute_masks_error_as_error_message(self):
+        with mock.patch(
+                'shakenfist.mariadb.update_instance_attributes',
+                return_value=True) as mock_update:
+            self.inst._db_set_attribute('error', {'message': 'boom'})
+        self.assertEqual(
+            ['error_message'], self._last_update_fields(mock_update))
+
+    def test_set_attribute_masks_kvm_pid(self):
+        with mock.patch(
+                'shakenfist.mariadb.update_instance_attributes',
+                return_value=True) as mock_update:
+            self.inst._db_set_attribute('kvm_pid', {'pid': 123})
+        self.assertEqual(
+            ['kvm_pid'], self._last_update_fields(mock_update))
+
+    def test_concurrent_writers_do_not_lose_updates(self):
+        # Writer one (the API on another node) enqueues an agent
+        # operation. Writer two (the sidechannel monitor) writes agent
+        # facts from a row snapshot read before the enqueue. With
+        # field-masked writes the enqueue must survive.
+        self.inst.agent_operation_enqueue('op-from-the-api')
+
+        stale = self.mock_etcd._mariadb_get_instance_attributes(
+            self.instance_uuid).model_copy(deep=True)
+        stale.agent_operations = None
+        stale.agent_attributes = {'facts': {'os': 'debian'}}
+        self.mock_etcd._mariadb_update_instance_attributes(
+            stale, fields=['agent_attributes'])
+
+        self.assertEqual(
+            ['op-from-the-api'],
+            self.inst.agent_operations.get('queue', []))
+        self.assertEqual({'os': 'debian'}, self.inst.agent_facts)

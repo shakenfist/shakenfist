@@ -1752,6 +1752,17 @@ message GetInstanceAttributesReply {
 
 message UpdateInstanceAttributesRequest {
   InstanceAttributesProto data = 1;
+
+  // Field mask: the InstanceAttributesData field names to write. An
+  // empty list means write every column (the pre-mask behaviour).
+  // Callers setting a single attribute must name it here, otherwise a
+  // concurrent writer of a different attribute on another node can
+  // interleave with this writer's read-modify-write and have its
+  // committed column silently reverted (a cross-attribute lost
+  // update; observed as an enqueued agent operation vanishing from
+  // instance_attributes.agent_operations when the sidechannel monitor
+  // wrote agent facts at the same moment).
+  repeated string fields = 2;
 }
 
 message DeleteInstanceAttributesRequest {

@@ -3934,7 +3934,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.data)
             success = (
                 mariadb
-                ._direct_update_instance_attributes(data))
+                ._direct_update_instance_attributes(
+                    data, fields=list(request.fields)))
             return database_pb2.StatusReply(
                 success=success, error='')
         except Exception as e:
