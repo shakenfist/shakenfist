@@ -13,7 +13,9 @@ from unittest import mock
 import sqlalchemy as sa
 
 from shakenfist import mariadb
+from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.instance_attributes import InstanceAttributesData
+from shakenfist.schema.network_attributes import NetworkAttributesData
 from shakenfist.tests import base
 
 
@@ -96,3 +98,53 @@ class DirectUpdateFieldMaskTestCase(base.ShakenFistTestCase):
         params = self._run_update(None)
         for column in ALL_COLUMNS:
             self.assertIn(column, params)
+
+
+class NetworkColumnValuesTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.data = NetworkAttributesData(
+            uuid=uuid.uuid4(),
+            floating_gateway='192.168.20.2',
+            hosteddns={'www': '192.168.20.10'})
+
+    def test_no_mask_returns_every_column(self):
+        values = mariadb._network_attributes_column_values(self.data)
+        self.assertEqual({'floating_gateway', 'hosteddns'}, set(values))
+
+    def test_mask_limits_columns(self):
+        values = mariadb._network_attributes_column_values(
+            self.data, ['hosteddns'])
+        self.assertEqual({'hosteddns'}, set(values))
+        self.assertEqual('{"www": "192.168.20.10"}', values['hosteddns'])
+
+    def test_unknown_field_rejected(self):
+        self.assertRaises(
+            ValueError, mariadb._network_attributes_column_values,
+            self.data, ['floating_gateway', 'not_a_column'])
+
+
+class ArtifactColumnValuesTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.data = ArtifactAttributesData(
+            uuid=uuid.uuid4(),
+            max_versions=3,
+            shared=True,
+            highest_index=7)
+
+    def test_no_mask_returns_every_column(self):
+        values = mariadb._artifact_attributes_column_values(self.data)
+        self.assertEqual(
+            {'max_versions', 'shared', 'highest_index'}, set(values))
+
+    def test_mask_limits_columns(self):
+        values = mariadb._artifact_attributes_column_values(
+            self.data, ['highest_index'])
+        self.assertEqual({'highest_index'}, set(values))
+        self.assertEqual(7, values['highest_index'])
+
+    def test_unknown_field_rejected(self):
+        self.assertRaises(
+            ValueError, mariadb._artifact_attributes_column_values,
+            self.data, ['shared', 'not_a_column'])

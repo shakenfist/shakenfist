@@ -1,6 +1,6 @@
 # Copyright 2020 Michael Still
 import random
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from uuid import uuid4
 
@@ -243,10 +243,19 @@ class Network(dbowo):
             self.__attributes = attrs
         return attrs
 
-    def _save_attributes(self) -> None:
-        """Persist current attributes to MariaDB."""
+    def _save_attributes(self, fields: Optional[List[str]] = None) -> None:
+        """Persist current attributes to MariaDB.
+
+        fields names the attributes to write; None or empty writes
+        every column. Callers changing one attribute must name it:
+        this object caches its attributes in memory, so an unmasked
+        write pushes an arbitrarily stale snapshot of the other
+        columns over any concurrent writer's committed changes (the
+        cross-attribute lost update fixed for instance attributes).
+        """
         if self.__attributes is not None:
-            mariadb.update_network_attributes(self.__attributes)
+            mariadb.update_network_attributes(
+                self.__attributes, fields=fields)
 
     @staticmethod
     def allocate_vxid(net_id):
@@ -446,7 +455,7 @@ class Network(dbowo):
         if attrs.floating_gateway and gateway is not None:
             return False
         attrs.floating_gateway = gateway
-        self._save_attributes()
+        self._save_attributes(fields=['floating_gateway'])
         self.add_event(EVENT_TYPE_MUTATE, 'update floating gateway',
                        extra={'floating_gateway': gateway})
         return True
@@ -747,7 +756,7 @@ class Network(dbowo):
 
         attrs = self._ensure_attributes()
         attrs.hosteddns[name] = value
-        self._save_attributes()
+        self._save_attributes(fields=['hosteddns'])
         self.add_event(EVENT_TYPE_MUTATE, 'update dns entry',
                        extra={'name': name, 'value': value})
 
@@ -774,7 +783,7 @@ class Network(dbowo):
         attrs = self._ensure_attributes()
         if name in attrs.hosteddns:
             del attrs.hosteddns[name]
-            self._save_attributes()
+            self._save_attributes(fields=['hosteddns'])
             self.add_event(EVENT_TYPE_MUTATE, 'remove dns entry',
                            extra={'name': name})
 

@@ -3048,7 +3048,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'update_network_attributes'].inc()
             data = self._network_attrs_from_proto(request.data)
             success = mariadb._direct_update_network_attributes(
-                data)
+                data, fields=list(request.fields))
             return database_pb2.StatusReply(
                 success=success, error='')
         except Exception as e:
@@ -3536,7 +3536,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 shared=request.data.shared,
                 highest_index=request.data.highest_index
             )
-            success = mariadb._direct_update_artifact_attributes(data)
+            success = mariadb._direct_update_artifact_attributes(
+                data, fields=list(request.fields))
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception(

@@ -1339,6 +1339,12 @@ message GetArtifactAttributesReply {
 
 message UpdateArtifactAttributesRequest {
   ArtifactAttributesProto data = 1;
+
+  // Field mask: the ArtifactAttributesData field names to write. An
+  // empty list means write every column. See the equivalent comment
+  // on UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents.
+  repeated string fields = 2;
 }
 
 message DeleteArtifactAttributesRequest {
@@ -1584,6 +1590,12 @@ message GetNetworkAttributesReply {
 
 message UpdateNetworkAttributesRequest {
   NetworkAttributesProto data = 1;
+
+  // Field mask: the NetworkAttributesData field names to write. An
+  // empty list means write every column. See the equivalent comment
+  // on UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents.
+  repeated string fields = 2;
 }
 
 message DeleteNetworkAttributesRequest {
