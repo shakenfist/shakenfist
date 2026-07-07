@@ -338,7 +338,7 @@ implemented later.
 |-------|------|--------|
 | 1. Server-side SPICE primitives in shakenfist-spice-protocol (ryll repo) | PLAN-rust-proxy-phase-01-server-primitives.md | Complete (merged to ryll develop, PR #138) |
 | 2. gRPC contract and Python UDS server in the kerbside daemon | PLAN-rust-proxy-phase-02-grpc-contract.md | Complete (kerbside branch rust-proxy, unmerged) |
-| 3. Proxy crate skeleton: listeners, handshake, backend leg, relay | PLAN-rust-proxy-phase-03-proxy-skeleton.md | Not started |
+| 3. Proxy crate skeleton: listeners, handshake, backend leg, relay | PLAN-rust-proxy-phase-03-proxy-skeleton.md | Complete (kerbside branch rust-proxy-phase-3, unmerged) |
 | 4. Firewall policy engine: L0 + L1 enforcing | PLAN-rust-proxy-phase-04-firewall.md | Not started |
 | 5. Daemon integration: exec/supervision, termination push | PLAN-rust-proxy-phase-05-daemon-integration.md | Not started |
 | 6. Packaging: maturin wheel, CI build matrix, version pinning | PLAN-rust-proxy-phase-06-packaging.md | Not started |
@@ -647,6 +647,17 @@ implemented because the following statements will be true:
   performance claim needs only the Prometheus metrics
   and the latency loadtest, and there is no collector
   infrastructure in any deployment yet.
+* **Backend `host_subject` enforcement.** The Python proxy verified
+  the hypervisor's TLS certificate subject against the console's
+  `host_subject`. The ryll `SpiceClient` the Rust proxy reuses does
+  not — its CA verifier validates the chain but relaxes hostname/
+  subject matching (SPICE certs often lack SANs), so `host_subject`
+  is currently informational. This is a security-parity regression
+  accepted for the phase-3 skeleton. Restore real subject pinning
+  before production — most likely by adding optional subject
+  verification to the ryll crate's verifier (so ryll benefits too)
+  and having the proxy pass the console's `host_subject`. Tracked
+  here so it is not lost.
 * **Per-source / per-console firewall policy profiles**
   in the database, with API and web UI surface.
 * **SASL auth and the full non-mini data header**, if a
