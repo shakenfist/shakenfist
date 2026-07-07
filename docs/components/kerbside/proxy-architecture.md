@@ -4,6 +4,12 @@ This document provides a detailed technical description of Kerbside's proxy
 architecture, including the connection state machine, process model, and traffic
 handling.
 
+> **Note:** this describes the Python proxy (`kerbside/proxy.py`), which is the
+> active proxy today. A Rust reimplementation (`rust/kerbside-proxy/`) is in
+> progress and reproduces this behaviour over async tokio tasks, consulting the
+> control-plane gRPC service for authorization; see `ARCHITECTURE.md` and
+> `docs/plans/PLAN-rust-proxy.md`.
+
 ## Process Architecture
 
 Kerbside uses a multiprocess architecture for scalability and isolation:
