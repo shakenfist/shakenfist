@@ -453,6 +453,12 @@ jobs:
 
       - name: Restart Shaken Fist nodes so we can collect logs
         if: always()
+        # Log collection is best effort: the functional tests above are
+        # the merge gate. Nodes failing to return from the post-test
+        # reboot has burned three merge queue attempts where the tests
+        # themselves passed. The script still dumps instance state and
+        # guest consoles so the boot wedge stays diagnosable.
+        continue-on-error: true
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           bash ${GITHUB_WORKSPACE}/shakenfist/tools/ci-restart-cluster-nodes.sh debian
@@ -470,6 +476,11 @@ jobs:
 
       - name: Gather logs
         if: always()
+        # Best effort for the same reason as the restart step above --
+        # this job deliberately breaks nodes, and a node that never
+        # returns makes log gathering fail through no fault of the code
+        # under test.
+        continue-on-error: true
         run: |
           # We need the ssh key in the place ansible expects it to be, which isn't
           # true on the CI worker node.

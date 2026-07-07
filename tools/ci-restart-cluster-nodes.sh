@@ -5,10 +5,13 @@
 # powers off or kills nodes, so all five are power cycled here before CI
 # log gathering fans out over them.
 #
-# We have twice observed a node fail to return from `reboot --hard` when
-# all five instances cycle at once (no route to host for five minutes,
-# i.e. the VM never booted). When that happens, dump some diagnostics
-# and try a full power cycle (poweroff, pause, poweron) before failing.
+# We have repeatedly observed nodes fail to return from `reboot --hard`
+# when all five instances cycle at once. The failure signature is a VM
+# whose network comes up (ssh connections are refused, not unroutable)
+# but where sshd never starts -- a guest-side boot wedge between
+# network-up and ssh.service. When that happens, dump diagnostics
+# including the guest console, and try a full power cycle (poweroff,
+# pause, poweron) before failing.
 #
 # Requires the under-cloud sf-client credentials and the sf{N}_uuid
 # variables from ci-environment.sh, which the caller must have sourced.
@@ -61,6 +64,8 @@ for i in "${!addresses[@]}"; do
 
     echo "Node ${address} did not return within 300 seconds, power cycling..."
     sf-client instance show "${uuid}" || true
+    echo "Guest console tail for ${uuid} before power cycle:"
+    sf-client instance consoledata "${uuid}" 20480 || true
     sf-client instance poweroff "${uuid}" || true
     sleep 10
     sf-client instance poweron "${uuid}" || true
@@ -72,6 +77,8 @@ for i in "${!addresses[@]}"; do
 
     echo "Node ${address} did not return after a power cycle either."
     sf-client instance show "${uuid}" || true
+    echo "Guest console tail for ${uuid} after failed power cycle:"
+    sf-client instance consoledata "${uuid}" 20480 || true
     failed=1
 done
 
