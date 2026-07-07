@@ -5312,6 +5312,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 3: proxy crate skeleton
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-rust-proxy/" class="md-nav__link">
         
   
@@ -10019,6 +10047,13 @@
 <p>This document provides a detailed technical description of Kerbside's proxy
 architecture, including the connection state machine, process model, and traffic
 handling.</p>
+<blockquote>
+<p><strong>Note:</strong> this describes the Python proxy (<code>kerbside/proxy.py</code>), which is the
+active proxy today. A Rust reimplementation (<code>rust/kerbside-proxy/</code>) is in
+progress and reproduces this behaviour over async tokio tasks, consulting the
+control-plane gRPC service for authorization; see <code>ARCHITECTURE.md</code> and
+<code>docs/plans/PLAN-rust-proxy.md</code>.</p>
+</blockquote>
 <h2 id="process-architecture">Process Architecture<a class="headerlink" href="#process-architecture" title="Permanent link">&para;</a></h2>
 <p>Kerbside uses a multiprocess architecture for scalability and isolation:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>+---------------------------+
