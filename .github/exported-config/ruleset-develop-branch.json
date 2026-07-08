@@ -35,6 +35,10 @@
                     "rebase"
                 ],
                 "dismiss_stale_reviews_on_push": true,
+                "dismissal_restriction": {
+                    "allowed_actors": [],
+                    "enabled": false
+                },
                 "require_code_owner_review": false,
                 "require_last_push_approval": false,
                 "required_approving_review_count": 0,
