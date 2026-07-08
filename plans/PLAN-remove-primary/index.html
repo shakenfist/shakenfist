@@ -9725,7 +9725,7 @@ care.</p>
 <tr>
 <td>1. Remove rsyslog aggregation from deployer</td>
 <td><em>(realised by <a href="../PLAN-remove-syslog-forwarding/">PLAN-remove-syslog-forwarding.md</a> phase 5)</em></td>
-<td>Complete (pending CI confirmation)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2. ~~<code>bootstrap_operations</code> table and idempotent <code>sf-ctl bootstrap-cluster</code>~~</td>
@@ -9735,7 +9735,7 @@ care.</p>
 <tr>
 <td>3. Remove Apache reverse proxy from deployer</td>
 <td><em>(realised by <a href="../PLAN-remove-apache-lb/">PLAN-remove-apache-lb.md</a>)</em></td>
-<td>Complete (pending CI confirmation)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>4-5. <em>(MariaDB BYO and sf-database tier — moved to <a href="../PLAN-byo-mariadb/">PLAN-byo-mariadb.md</a>)</em></td>
@@ -9750,12 +9750,12 @@ care.</p>
 <tr>
 <td>7. Rename <code>etcd_master</code> → <code>database_node</code>; final cleanup</td>
 <td><a href="../PLAN-remove-primary-phase-07-rename-cleanup/">PLAN-remove-primary-phase-07-rename-cleanup.md</a></td>
-<td>Complete (pending CI confirmation)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>8. Roll the reusable smoke-cluster CI workflow out to the downstream repos (the workflow itself is authored in phase 6 step 5)</td>
 <td><a href="../PLAN-remove-primary-phase-08-shared-ci/">PLAN-remove-primary-phase-08-shared-ci.md</a></td>
-<td>Complete (pending CI confirmation)</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
@@ -10228,6 +10228,28 @@ because the following statements will be true:</p>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during
 development that we fixed.</p>
+<ul>
+<li><strong>Cross-attribute lost updates on instances, networks and
+  artifacts</strong> (PRs #3337 and #3338). The attribute-update
+  path read the whole attribute row, modified one field and
+  wrote the whole row back, so two daemons concurrently
+  updating <em>different</em> attributes of the same object could
+  silently clobber each other. Surfaced by the phase-6/8 CI
+  as the "agent operation enqueue lost to a concurrent
+  power-state update" wedge; fixed by masking updates to only
+  the named columns.</li>
+<li><strong>Cluster secrets echoed by the deploy plays.</strong> The
+  collection's <code>site.yml</code> originally logged <code>sf-ctl</code>
+  bootstrap output containing cluster secrets; <code>no_log</code> was
+  added to those tasks, <code>sf-ctl show-config</code> now redacts
+  secret-classed keys by default, and the secrets are passed
+  on stdin rather than argv (pre-release audit findings).</li>
+<li><strong><code>/etc/sf/config</code> written world-readable</strong> by the node
+  role while containing the Loki auth header and (on
+  database-tier nodes) the MariaDB password; tightened to
+  <code>root:sudo</code> <code>0440</code> to match the global auth file
+  (pre-release audit finding).</li>
+</ul>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When creating a new master plan from this template, update
 the following files in <code>docs/plans/</code>:</p>

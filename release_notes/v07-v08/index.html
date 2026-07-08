@@ -9811,8 +9811,20 @@
 <li>We now lock versions of all of our indirect python dependencies.</li>
 <li>Nodes can now transition directly from the missing state to the stopping state.</li>
 <li>The Ansible modules have been re-written to skip resources that are already in
-  existence and ask described by your request. The Ansible module is also <a href="/user_guide/ansible">now
-  documented at the user guide</a>.</li>
+  existence and as described by your request. The Ansible modules are also <a href="/user_guide/ansible">now
+  documented in the user guide</a>.</li>
+<li>The <code>sf-client ansible</code> subcommand and the module shims it installed have
+  been removed from the python client. The <code>sf_*</code> modules are now native
+  implementations shipped in the <code>shakenfist.shakenfist</code> collection; update
+  playbooks to reference them by their fully qualified names (for example
+  <code>shakenfist.shakenfist.sf_instance</code>) or via a <code>collections:</code> entry.</li>
+<li>The deployer no longer configures rsyslog forwarding to a central node
+  (there is no primary node to forward to). Structured logs are shipped to
+  the Loki endpoint you configure instead -- see the
+  <a href="/operator_guide/logging">logging guide</a>.</li>
+<li>The deployer no longer installs an Apache reverse proxy in front of the
+  REST API. You bring your own load balancer for the API tier -- see the
+  <a href="/operator_guide/load_balancing">load balancing guide</a>.</li>
 <li>TLS certificates on hypervisors which are within 30 days of expiry are now
   automatically replaced.</li>
 </ul>
@@ -9960,6 +9972,12 @@ details.</p>
 </ul>
 <h2 id="minor-changes">Minor changes<a class="headerlink" href="#minor-changes" title="Permanent link">&para;</a></h2>
 <ul>
+<li>Attribute updates on instances, networks and artifacts now write only the
+  columns named in the update, instead of rewriting the whole attribute row.
+  This fixes a lost-update race where two daemons concurrently updating
+  <em>different</em> attributes of the same object could silently clobber each
+  other's writes (most visibly, an agent operation enqueue lost to a
+  concurrent power-state update).</li>
 <li>Unhandled exceptions are now recorded to <code>/srv/shakenfist/exceptions/</code> for
   later analysis. See <a href="/operator_guide/exception_tracking/">the operator guide</a>
   for details.</li>

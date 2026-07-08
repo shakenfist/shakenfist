@@ -9512,7 +9512,7 @@
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
 <td>Phase 1: Remove monitoring</td>
-<td>Complete (pending CI)</td>
+<td>Complete</td>
 <td>Realised by <a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a> phase 5 (Grafana and the primary-node Prometheus server already removed as warmup)</td>
 </tr>
 <tr>
@@ -9524,7 +9524,7 @@
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
 <td>Phase 3: Remove LB</td>
-<td>Complete (pending CI)</td>
+<td>Complete</td>
 <td>Realised by <a href="PLAN-remove-apache-lb/">Remove the Apache load balancer</a></td>
 </tr>
 <tr>
@@ -9536,20 +9536,20 @@
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
 <td><a href="PLAN-remove-primary-phase-06-galaxy-role/">Phase 6: Galaxy collection</a></td>
-<td>In progress (steps 1-5 authored; 5b awaiting green CI, step 6 remains)</td>
-<td>Repackage deployer as the <code>shakenfist.shakenfist</code> collection (parameterised <code>node</code> role + component roles); native ansible modules under <code>plugins/modules/</code>; delete the getsf/topology installer chain. Step 5a (the <code>release.yml</code> collection build/publish jobs) is done and locally validated. Step 5b is authored: the reusable <code>smoke-cluster.yml</code> + <code>tools/</code> live on <code>shakenfist/actions</code> <code>main</code>, and <code>functional-tests.yml</code> calls it beside the getsf job — pending an operator push and a green CI run before the getsf job and legacy chain (step 6) are removed</td>
+<td>Complete</td>
+<td>Deployer repackaged as the <code>shakenfist.shakenfist</code> collection (parameterised <code>node</code> role + component roles, native ansible modules under <code>plugins/modules/</code>, <code>release.yml</code> galaxy publish jobs); the reusable <code>smoke-cluster.yml</code> + <code>tools/</code> on <code>shakenfist/actions</code> drive all CI topologies; the getsf/topology installer chain and legacy roles are deleted</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td>Phase 7: Rename and cleanup</td>
-<td>Not started</td>
-<td><code>etcd_master</code> → <code>database_node</code>; final dead-code sweep</td>
+<td><a href="PLAN-remove-primary-phase-07-rename-cleanup/">Phase 7: Rename and cleanup</a></td>
+<td>Complete</td>
+<td><code>etcd_master</code> → <code>database_node</code> rename landed with one-release fallbacks (legacy inventory group union + deprecation warning, vestigial <code>is_etcd_master</code>/<code>is_eventlog_node</code> flags pinned False); the deferred-removal PR is scheduled for the release after v0.8.0 ships</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
-<td>Phase 8: Roll out shared smoke-cluster CI</td>
-<td>Not started</td>
-<td>Roll the reusable <code>smoke-cluster.yml</code> (authored in phase 6 step 5) out to <code>client-python</code>/<code>library-python</code>/<code>kerbside</code>, replacing each repo's copy-pasted cluster-build CI with a few-line <code>uses:</code> call</td>
+<td><a href="PLAN-remove-primary-phase-08-shared-ci/">Phase 8: Roll out shared smoke-cluster CI</a></td>
+<td>Complete</td>
+<td><code>build-smoke-cluster</code> composite action extracted; <code>client-python</code> adopted the reusable workflow (replacing its broken getsf-era CI); kerbside-mode recipe documented in the actions README; dead-topology deletion deferred while <code>v0.6</code>/<code>v0.7-releases</code> CI still consumes them</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-apache-lb/">Remove the Apache load balancer</a></td>
@@ -9560,7 +9560,7 @@
 <tr>
 <td><a href="PLAN-remove-apache-lb/">Remove the Apache load balancer</a></td>
 <td><a href="PLAN-remove-apache-lb-phase-02-remove/">Phase 2: Remove Apache from the deployer</a></td>
-<td>Complete (pending CI)</td>
+<td>Complete</td>
 <td>Delete <code>apache2.yml</code> + <code>apache-site-primary.conf</code>; repoint single-node <code>api_url</code> to <code>:13000</code></td>
 </tr>
 <tr>
@@ -9578,25 +9578,25 @@
 <tr>
 <td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
 <td><a href="PLAN-remove-syslog-forwarding-phase-02-loki-shipper/">Phase 2: Loki shipper in shakenfist</a></td>
-<td>Complete (pending CI)</td>
+<td>Complete</td>
 <td><code>logship_spool.py</code> / <code>logship_drainer.py</code> + a <code>logging.Handler</code> modelled on the eventlog spool/drainer; HTTP push, <code>LOKI_*</code> config, lifecycle wiring, metrics, <code>LOG_EVENTS_TO_LOKI</code> echo guard, mypy-covered, tests</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
 <td><a href="PLAN-remove-syslog-forwarding-phase-03-ci-loki/">Phase 3: CI Loki</a></td>
-<td>Complete (pending CI)</td>
+<td>Complete</td>
 <td><code>tools/ci-install-loki.sh</code> stands up Loki on the primary, <code>LOKI_BASE_URL</code> plumbed through getsf/deploy into <code>/etc/sf/config</code>, and <code>test_loki.py</code> asserts SF logs reach Loki end-to-end</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
 <td><a href="PLAN-remove-syslog-forwarding-phase-04-ci-tooling/">Phase 4: Rework CI tooling</a></td>
-<td>Complete (pending operator PR + CI)</td>
+<td>Complete</td>
 <td>New versioned <code>shakenfist/actions</code> log-checks querying Loki (structured <code>\| json</code> LogQL) + clingwrap bundle dumping the logship spool, per-node journald, and Loki (so a shipper failure stays debuggable); system-origin checks deferred to a phase-5 per-node check</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a></td>
 <td><a href="PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog/">Phase 5: Remove rsyslog forwarding</a></td>
-<td>Complete (pending CI)</td>
+<td>Complete</td>
 <td>Atomic cut-over: delete rsyslog configs/<code>syslog_target</code>/install, route gunicorn logs + drop <code>--log-syslog</code>, add tenant/auth plumbing, switch both CI workflows to the phase-4 Loki tooling (realises remove-primary phase 1)</td>
 </tr>
 <tr>

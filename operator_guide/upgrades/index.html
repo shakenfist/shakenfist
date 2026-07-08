@@ -9615,11 +9615,13 @@ the grace period.</p>
 </code></pre></div>
 <p><strong>3. Restart SF services on the node.</strong></p>
 <p>For hypervisor nodes restart all services:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-queues<span class="w"> </span>sf-net<span class="w"> </span>sf-resources<span class="w"> </span>sf-cleaner
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-cleaner<span class="w"> </span>sf-cluster<span class="w"> </span>sf-net<span class="w"> </span>sf-nodelock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>sf-privexec<span class="w"> </span>sf-queues<span class="w"> </span>sf-resources<span class="w"> </span>sf-sidechannel<span class="w"> </span>sf-transfers
 </code></pre></div>
 <p>For a database-tier node restart the database service first:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-database
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-queues<span class="w"> </span>sf-net<span class="w"> </span>sf-resources<span class="w"> </span>sf-cleaner
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-cleaner<span class="w"> </span>sf-cluster<span class="w"> </span>sf-net<span class="w"> </span>sf-nodelock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>sf-privexec<span class="w"> </span>sf-queues<span class="w"> </span>sf-resources<span class="w"> </span>sf-sidechannel<span class="w"> </span>sf-transfers
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
