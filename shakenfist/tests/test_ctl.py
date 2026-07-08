@@ -368,6 +368,39 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         self.assertIn('value', result.output)
 
     @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_show_config_redacts_secrets(self, mock_mariadb):
+        from shakenfist.client.ctl import show_config
+
+        mock_mariadb.get_cluster_config.return_value = {
+            'AUTH_SECRET_SEED': 'sekrit',
+            'MARIADB_PASSWORD': 'hunter2',
+            'LOKI_AUTH_HEADER': 'Basic abc123',
+            'DNS_SERVER': '8.8.8.8'
+        }
+
+        result = self.runner.invoke(show_config)
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertNotIn('sekrit', result.output)
+        self.assertNotIn('hunter2', result.output)
+        self.assertNotIn('abc123', result.output)
+        self.assertIn('<redacted>', result.output)
+        self.assertIn('8.8.8.8', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_show_config_show_secrets(self, mock_mariadb):
+        from shakenfist.client.ctl import show_config
+
+        mock_mariadb.get_cluster_config.return_value = {
+            'AUTH_SECRET_SEED': 'sekrit'
+        }
+
+        result = self.runner.invoke(show_config, ['--show-secrets'])
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn('sekrit', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
     def test_set_config_string(self, mock_mariadb):
         from shakenfist.client.ctl import set_config
 
@@ -411,6 +444,66 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         mock_mariadb.set_cluster_config.assert_called_once_with(
             'myflag', 3.14)
         self.assertIn("<class 'float'>", result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_value_from_stdin(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
+
+        result = self.runner.invoke(
+            set_config, ['myflag', '--value-from-stdin'], input='myvalue\n')
+
+        self.assertEqual(result.exit_code, 0)
+        mock_mariadb.set_cluster_config.assert_called_once_with(
+            'myflag', 'myvalue')
+        self.assertNotIn('myvalue', result.output)
+        self.assertIn('<redacted>', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_secret_flag_not_echoed(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
+
+        result = self.runner.invoke(
+            set_config, ['AUTH_SECRET_SEED', 'sekrit'])
+
+        self.assertEqual(result.exit_code, 0)
+        mock_mariadb.set_cluster_config.assert_called_once_with(
+            'AUTH_SECRET_SEED', 'sekrit')
+        self.assertNotIn('sekrit', result.output)
+        self.assertIn('<redacted>', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_value_arg_and_stdin_conflict(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
+
+        result = self.runner.invoke(
+            set_config, ['myflag', 'myvalue', '--value-from-stdin'])
+
+        self.assertNotEqual(result.exit_code, 0)
+        mock_mariadb.set_cluster_config.assert_not_called()
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_no_value(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
+
+        result = self.runner.invoke(set_config, ['myflag'])
+
+        self.assertNotEqual(result.exit_code, 0)
+        mock_mariadb.set_cluster_config.assert_not_called()
+
+    @mock.patch('shakenfist.client.ctl.Namespace')
+    def test_bootstrap_system_key_from_stdin(self, mock_namespace):
+        from shakenfist.client.ctl import bootstrap_system_key
+
+        mock_ns = mock.MagicMock()
+        mock_namespace.new.return_value = mock_ns
+
+        result = self.runner.invoke(
+            bootstrap_system_key, ['mykey', '--key-from-stdin'],
+            input='myvalue\n')
+
+        self.assertEqual(result.exit_code, 0)
+        mock_namespace.new.assert_called_once_with('system')
+        mock_ns.add_key.assert_called_once_with('mykey', 'myvalue')
 
     @mock.patch('shakenfist.client.ctl.sf_config')
     def test_verify_config(self, mock_sf_config):

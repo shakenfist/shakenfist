@@ -58,15 +58,30 @@
     path: /etc/sf/config
   register: config_stat_result
 
+# The config contains secrets (the Loki auth header everywhere, the MariaDB
+# password on database-tier nodes), so it must not be world-readable. The
+# sudo group matches the global auth file above: the daemons read it as root
+# via systemd EnvironmentFile, while administrators (and the CI test scripts)
+# read it as sudo-group users.
 - name: Write config file on remote host
   ansible.builtin.template:
     src: config
     dest: /etc/sf/config
     owner: root
-    group: root
-    mode: ugo+r
+    group: sudo
+    mode: u=r,g=r,o=
   when: not config_stat_result.stat.exists
   notify: Reload systemd
+
+# Configs written by earlier releases were world-readable and are content-
+# preserved above, so tighten their permissions explicitly on redeploy.
+- name: Ensure existing config file permissions are restrictive
+  ansible.builtin.file:
+    path: /etc/sf/config
+    owner: root
+    group: sudo
+    mode: u=r,g=r,o=
+  when: config_stat_result.stat.exists
 
 - name: Remove obsolete systemd units
   ansible.builtin.file:

@@ -14,6 +14,50 @@ sudo apt-get install -y jq
 # Active the venv which has the client
 . /srv/shakenfist/venv/bin/activate
 
+# The maintainer victim is terminated later via the under-cloud API,
+# not from inside the guest. In-guest kills have proven not durable:
+# `halt --force --force` left the QEMU domain running and the guest
+# reset itself (merge run 27324192652), and `poweroff --force --force`
+# can degrade into a guest crash or reboot, which the under-cloud's
+# libvirt template turns straight back into a running domain
+# (on_reboot and on_crash are both `restart`; in merge run 28860822981
+# the victim was heartbeating again thirteen minutes after the kill).
+# An under-cloud poweroff is virDomainDestroy() -- the QEMU process
+# dies without any guest cooperation -- and records the 'off' power
+# intent at the under-cloud, so nothing brings the domain back until
+# the workflow's log-collection teardown powers it on again.
+#
+# The workflow copies the under-cloud credentials and the
+# ci-environment.sh name -> under-cloud-instance-uuid map into our home
+# directory. Fail fast, before the long setup phases, if either is
+# missing or the under-cloud API does not answer -- silently falling
+# back to an in-guest kill would just readmit the resurrection flake.
+undercloud_creds="${UNDERCLOUD_CREDS:-${HOME}/undercloud-creds.json}"
+undercloud_env="${UNDERCLOUD_ENV:-${HOME}/ci-environment.sh}"
+if [ ! -r "${undercloud_creds}" ]; then
+    log "Under-cloud credentials ${undercloud_creds} not readable. Aborting."
+    exit 1
+fi
+if [ ! -r "${undercloud_env}" ]; then
+    log "Under-cloud environment ${undercloud_env} not readable. Aborting."
+    exit 1
+fi
+. "${undercloud_env}"
+uc_apiurl=$(jq --raw-output '.apiurl' "${undercloud_creds}")
+uc_namespace=$(jq --raw-output '.namespace' "${undercloud_creds}")
+uc_key=$(jq --raw-output '.key' "${undercloud_creds}")
+
+function undercloud_client {
+    SHAKENFIST_API_URL="${uc_apiurl}" SHAKENFIST_NAMESPACE="${uc_namespace}" \
+        SHAKENFIST_KEY="${uc_key}" sf-client "$@"
+}
+
+if ! undercloud_client instance list > /dev/null; then
+    log "Cannot reach the under-cloud API at ${uc_apiurl}. Aborting."
+    exit 1
+fi
+log "Under-cloud API at ${uc_apiurl} is reachable (namespace ${uc_namespace})"
+
 # Log nodes
 echo
 sf-client node list
@@ -280,27 +324,24 @@ log "Will hard stop the cluster maintainer, ${maintainer}"
 maintainer_uuid=$(sf-client --json node show ${maintainer} | jq --raw-output ".uuid")
 other_victim_uuid=$(sf-client --json node show ${other_victim} | jq --raw-output ".uuid")
 
-# Terminate the node uncleanly for ${maintainer}. Use `poweroff`, not
-# `halt`: a halted SMP guest is still a running QEMU domain and can
-# spontaneously reset and reboot (observed in merge run 27324192652,
-# where the halted maintainer came back 63 seconds after
-# `halt --force --force` -- the under-cloud reported the domain
-# "running" throughout, so the reset was guest-internal -- and the
-# resurrected node re-registered and failed the missing-state check).
-# `poweroff --force --force` exits the domain entirely, so the node
-# deterministically stays down; the workflow's post-test revival step
-# powers it back on for log collection.
-#
-# Wrap in `timeout` so a stuck SSH cannot consume the entire
-# 60-minute step budget; observed in CI when the keepalive failed to
-# fire after the remote went down. A clean disconnect (rc 255) or the
-# timeout itself (rc 124) are both fine -- the point is that the node
-# is going away.
-timeout 300 sudo ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=1 \
-    -o ServerAliveCountMax=1 debian@${maintainer} "sudo poweroff --force --force"
-rc=$?
-if [ ${rc} -ne 0 ]; then
-    log "Poweroff SSH exited ${rc} (124=timeout, 255=connection lost are expected)"
+# Resolve the victim's under-cloud instance uuid from the
+# ci-environment.sh map (sf1_uuid, sf2_uuid, ...). The script host can
+# never be the victim, so the sfN entries are sufficient, but check the
+# lookup actually resolved before pulling the trigger.
+maintainer_uc_var="${maintainer//-/_}_uuid"
+maintainer_uc_uuid="${!maintainer_uc_var}"
+if [ -z "${maintainer_uc_uuid}" ]; then
+    log "No under-cloud instance uuid for ${maintainer} (${maintainer_uc_var} is unset). Aborting."
+    exit 1
+fi
+
+# Terminate ${maintainer} uncleanly, from the outside. See the
+# under-cloud kill comment above for why this must be an under-cloud
+# poweroff rather than any in-guest halt or poweroff variant.
+log "Terminating ${maintainer} via the under-cloud (instance ${maintainer_uc_uuid})"
+if ! undercloud_client instance poweroff "${maintainer_uc_uuid}"; then
+    log "Under-cloud poweroff of ${maintainer} failed. Aborting."
+    exit 1
 fi
 echo
 
@@ -385,6 +426,21 @@ fi
 # Wait a bit
 log "Pausing so nodes can be noticed as gone..."
 sleep 480
+
+# The whole point of the under-cloud kill is that the victim stays
+# down. Check that explicitly so a future resurrection fails right
+# here with a specific message, not ten minutes later as a generic
+# missing-state check failure.
+echo
+log "=== Terminated node stayed down check ==="
+uc_power=$(undercloud_client --json instance show "${maintainer_uc_uuid}" | \
+    jq --raw-output '.power_state')
+if [ "${uc_power}" != "off" ]; then
+    log "Under-cloud power state for ${maintainer} is '${uc_power}', expected 'off'."
+    log "The terminated victim was resurrected! See the under-cloud kill comment above."
+    exit 1
+fi
+log "${maintainer} stayed down"
 
 echo
 log "=== Node state checks ==="

@@ -191,14 +191,16 @@ sudo /srv/shakenfist/venv/bin/pip install --upgrade shakenfist
 For hypervisor nodes restart all services:
 
 ```bash
-sudo systemctl restart sf-api sf-queues sf-net sf-resources sf-cleaner
+sudo systemctl restart sf-api sf-cleaner sf-cluster sf-net sf-nodelock \
+    sf-privexec sf-queues sf-resources sf-sidechannel sf-transfers
 ```
 
 For a database-tier node restart the database service first:
 
 ```bash
 sudo systemctl restart sf-database
-sudo systemctl restart sf-api sf-queues sf-net sf-resources sf-cleaner
+sudo systemctl restart sf-api sf-cleaner sf-cluster sf-net sf-nodelock \
+    sf-privexec sf-queues sf-resources sf-sidechannel sf-transfers
 ```
 
 !!! note

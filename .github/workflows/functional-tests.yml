@@ -208,10 +208,14 @@ jobs:
     name: "Automated delinter"
     runs-on: [self-hosted, claude-code]
     needs: [sanity_checks, check_bot_commit]
+    # The same-repo check keeps fork PRs from running their own copy of the
+    # delinter script on the credential-bearing claude-code runners.
     if: >-
       ${{ always() &&
           needs.sanity_checks.outputs.flake8_failed == 'true' &&
-          needs.check_bot_commit.outputs.is_bot != 'true' }}
+          needs.check_bot_commit.outputs.is_bot != 'true' &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository) }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-delinter
       cancel-in-progress: true
@@ -238,9 +242,15 @@ jobs:
 
   smoke_collection:
     name: "Smoke tests (collection)"
+    # The same-repo check is defense in depth: it keeps fork PRs off the
+    # self-hosted runners even if the repository's fork-approval setting is
+    # ever relaxed. Fork contributions are rare enough that a maintainer
+    # re-pushing the branch is an acceptable cost.
     if: >-
       always() && github.event_name != 'merge_group'
       && needs.check_paths.outputs.code_changed != 'false'
+      && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository)
     needs: [check_paths]
     uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
     secrets: inherit
@@ -257,9 +267,12 @@ jobs:
       issues: write
     runs-on: [self-hosted, claude-code]
     needs: [sanity_checks, smoke_collection, check_bot_commit]
+    # The same-repo check keeps fork PRs off the credential-bearing
+    # claude-code runners.
     if: |
       github.event_name == 'pull_request' &&
-      needs.check_bot_commit.outputs.is_bot != 'true'
+      needs.check_bot_commit.outputs.is_bot != 'true' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-reviewer
       cancel-in-progress: true
@@ -424,13 +437,29 @@ jobs:
               -o UserKnownHostsFile=/dev/null \
               ${GITHUB_WORKSPACE}/shakenfist \
               debian@$primary:shakenfist
+          # The lifecycle test terminates its victim node via the
+          # under-cloud API (in-guest kills are not durable -- see the
+          # under-cloud kill comment in nodelifecycletests.sh), so it
+          # needs this runner's under-cloud credentials and the node
+          # name -> under-cloud instance uuid map from ci-environment.sh.
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${HOME}/.shakenfist \
+              debian@$primary:undercloud-creds.json
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/ci-environment.sh \
+              debian@$primary:ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary "chmod u=r,go= undercloud-creds.json"
           # ServerAliveInterval/ServerAliveCountMax: if the remote host
-          # goes down (e.g. the lifecycle test does `poweroff --force
-          # --force` on a victim that turns out to be the script's own
-          # host), the TCP connection can sit half-open until the default
-          # TCP keepalive eventually times out -- hours later, well past
-          # the GitHub step budget. With these options ssh notices a dead
-          # connection in roughly 30 s and the step fails fast instead.
+          # goes down (e.g. a lifecycle test bug takes out the script's
+          # own host), the TCP connection can sit half-open until the
+          # default TCP keepalive eventually times out -- hours later,
+          # well past the GitHub step budget. With these options ssh
+          # notices a dead connection in roughly 30 s and the step fails
+          # fast instead.
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               -o ServerAliveInterval=10 -o ServerAliveCountMax=3 \

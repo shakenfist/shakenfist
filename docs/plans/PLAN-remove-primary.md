@@ -288,13 +288,13 @@ care.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Remove rsyslog aggregation from deployer | _(realised by [PLAN-remove-syslog-forwarding.md](PLAN-remove-syslog-forwarding.md) phase 5)_ | Complete (pending CI confirmation) |
+| 1. Remove rsyslog aggregation from deployer | _(realised by [PLAN-remove-syslog-forwarding.md](PLAN-remove-syslog-forwarding.md) phase 5)_ | Complete |
 | 2. ~~`bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster`~~ | _(dissolved — see phase notes; the role-config-idempotency remainder folds into phase 6)_ | Dissolved |
-| 3. Remove Apache reverse proxy from deployer | _(realised by [PLAN-remove-apache-lb.md](PLAN-remove-apache-lb.md))_ | Complete (pending CI confirmation) |
+| 3. Remove Apache reverse proxy from deployer | _(realised by [PLAN-remove-apache-lb.md](PLAN-remove-apache-lb.md))_ | Complete |
 | 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | _(see byo-mariadb)_ |
 | 6. Repackage deployer as the `shakenfist.shakenfist` galaxy collection; delete the getsf installer chain; example consumers | [PLAN-remove-primary-phase-06-galaxy-role.md](PLAN-remove-primary-phase-06-galaxy-role.md) | Complete |
-| 7. Rename `etcd_master` → `database_node`; final cleanup | [PLAN-remove-primary-phase-07-rename-cleanup.md](PLAN-remove-primary-phase-07-rename-cleanup.md) | Complete (pending CI confirmation) |
-| 8. Roll the reusable smoke-cluster CI workflow out to the downstream repos (the workflow itself is authored in phase 6 step 5) | [PLAN-remove-primary-phase-08-shared-ci.md](PLAN-remove-primary-phase-08-shared-ci.md) | Complete (pending CI confirmation) |
+| 7. Rename `etcd_master` → `database_node`; final cleanup | [PLAN-remove-primary-phase-07-rename-cleanup.md](PLAN-remove-primary-phase-07-rename-cleanup.md) | Complete |
+| 8. Roll the reusable smoke-cluster CI workflow out to the downstream repos (the workflow itself is authored in phase 6 step 5) | [PLAN-remove-primary-phase-08-shared-ci.md](PLAN-remove-primary-phase-08-shared-ci.md) | Complete |
 
 Phase notes:
 
@@ -787,6 +787,27 @@ because the following statements will be true:
 
 This section should list any bugs we encounter during
 development that we fixed.
+
+- **Cross-attribute lost updates on instances, networks and
+  artifacts** (PRs #3337 and #3338). The attribute-update
+  path read the whole attribute row, modified one field and
+  wrote the whole row back, so two daemons concurrently
+  updating *different* attributes of the same object could
+  silently clobber each other. Surfaced by the phase-6/8 CI
+  as the "agent operation enqueue lost to a concurrent
+  power-state update" wedge; fixed by masking updates to only
+  the named columns.
+- **Cluster secrets echoed by the deploy plays.** The
+  collection's `site.yml` originally logged `sf-ctl`
+  bootstrap output containing cluster secrets; `no_log` was
+  added to those tasks, `sf-ctl show-config` now redacts
+  secret-classed keys by default, and the secrets are passed
+  on stdin rather than argv (pre-release audit findings).
+- **`/etc/sf/config` written world-readable** by the node
+  role while containing the Loki auth header and (on
+  database-tier nodes) the MariaDB password; tightened to
+  `root:sudo` `0440` to match the global auth file
+  (pre-release audit finding).
 
 ### Documentation index maintenance
 

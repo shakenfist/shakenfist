@@ -22,7 +22,7 @@ Run `./release.sh` from the relevant release branch.
 
 ## Major release
 
-Branch off develop into a new release branch. Pin the component versions in `requirements.txt` and
-`getsf`. Addittionally, use the clingwrap hashin output to lock all our dependancies to specific
+Branch off develop into a new release branch. Pin the component versions in `requirements.txt`.
+Additionally, use the clingwrap hashin output to lock all our dependencies to specific
 versions. It would be good if this was done with hashes, but that is currently not possible. Then
 run `./release.sh`.

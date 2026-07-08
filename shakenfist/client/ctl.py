@@ -3,6 +3,7 @@ import importlib
 import json
 import logging
 import os
+import re
 import uuid as uuid_module
 from dataclasses import dataclass
 from dataclasses import field
@@ -139,10 +140,37 @@ def cli(ctx: click.Context, verbose: Optional[bool] = None) -> None:
         LOG.setLevel(logging.DEBUG)
 
 
+# Cluster config keys whose values are secrets. show-config redacts matches
+# by default so its output is safe to log; set-config avoids echoing their
+# values. Match generously -- under-matching leaks a credential, while
+# over-matching merely hides a value behind --show-secrets.
+SECRET_CONFIG_KEY_RE = re.compile(
+    r'(SECRET|PASSWORD|PASSPHRASE|TOKEN|AUTH_HEADER|_SEED$|_KEY$)')
+
+
+def _read_stdin_value() -> str:
+    # Trailing newlines are stripped because callers (including ansible's
+    # command module) routinely append one; other whitespace is preserved
+    # in case it is part of the value.
+    return click.get_text_stream('stdin').read().rstrip('\n')
+
+
 @click.command()
 @click.argument('keyname')
-@click.argument('key')
-def bootstrap_system_key(keyname: str, key: str) -> None:
+@click.argument('key', required=False)
+@click.option('--key-from-stdin', is_flag=True, default=False,
+              help='Read the key from stdin instead of an argument, keeping '
+                   'it out of the process table.')
+def bootstrap_system_key(keyname: str, key: Optional[str],
+                         key_from_stdin: bool) -> None:
+    if key_from_stdin == (key is not None):
+        raise click.UsageError(
+            'Provide the key either as an argument or via --key-from-stdin, '
+            'but not both.')
+    if key_from_stdin:
+        key = _read_stdin_value()
+    assert key is not None
+
     click.echo('Creating key %s' % keyname)
     ns = Namespace.new('system')
     ns.add_key(keyname, key)
@@ -150,17 +178,35 @@ def bootstrap_system_key(keyname: str, key: str) -> None:
 
 
 @click.command(name='show-config')
-def show_config() -> None:
-    """Show cluster-wide configuration."""
+@click.option('--show-secrets', is_flag=True, default=False,
+              help='Include secret values instead of redacting them.')
+def show_config(show_secrets: bool) -> None:
+    """Show cluster-wide configuration, redacting secrets by default."""
     config_data = mariadb.get_cluster_config()
+    if not show_secrets:
+        for key in config_data:
+            if SECRET_CONFIG_KEY_RE.search(key):
+                config_data[key] = '<redacted>'
     click.echo(json.dumps(config_data, indent=4, sort_keys=True))
 
 
 @click.command(name='set-config')
 @click.argument('flag')
-@click.argument('value')
-def set_config(flag: str, value: str) -> None:
+@click.argument('value', required=False)
+@click.option('--value-from-stdin', is_flag=True, default=False,
+              help='Read the value from stdin instead of an argument, '
+                   'keeping it out of the process table.')
+def set_config(flag: str, value: Optional[str],
+               value_from_stdin: bool) -> None:
     """Set a cluster-wide configuration value."""
+    if value_from_stdin == (value is not None):
+        raise click.UsageError(
+            'Provide the value either as an argument or via '
+            '--value-from-stdin, but not both.')
+    if value_from_stdin:
+        value = _read_stdin_value()
+    assert value is not None
+
     # Convert values if possible
     converted_value: Any = value
     if value in ['t', 'true', 'True']:
@@ -176,7 +222,11 @@ def set_config(flag: str, value: str) -> None:
         except ValueError:
             pass
 
-    click.echo(f'Setting {flag} to {type(converted_value)}({converted_value})')
+    if value_from_stdin or SECRET_CONFIG_KEY_RE.search(flag):
+        click.echo(f'Setting {flag} to {type(converted_value)}(<redacted>)')
+    else:
+        click.echo(
+            f'Setting {flag} to {type(converted_value)}({converted_value})')
     mariadb.set_cluster_config(flag, converted_value)
 
 

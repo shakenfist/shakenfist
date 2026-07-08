@@ -106,5 +106,5 @@ wrote on one node, scp it back, and use it as the ansible inventory for the
 post-test log-gather step. That round-trip was a drifted convenience; the
 playbook here does not write that file. CI (and operators) should point
 log-gathering at the same inventory they deployed with — the one in this
-directory — which already enumerates every host. Folding that into a shared,
-reusable CI workflow is tracked as its own phase of the remove-primary plan.
+directory — which already enumerates every host. CI does this via the shared
+`smoke-cluster.yml` reusable workflow in the `shakenfist/actions` repository.

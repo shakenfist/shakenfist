@@ -45,7 +45,8 @@ class Node(dbo):
     ACTIVE_STATES = {dbo.STATE_INITIAL, dbo.STATE_CREATED, STATE_DEGRADED}
     INACTIVE_STATES = {dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING}
 
-    # Remember that this list must align with what sf-ctl is called with in deploy.yml.
+    # Remember that this list must align with the daemon names sf-ctl is called with
+    # by the collection's node role (register.yml and the sf.service template).
     VALID_DAEMONS = [
         'database', 'eventlog', 'net', 'resources', 'sidechannel', 'queues',
         'api', 'checksums', 'cleaner', 'cluster', 'transfers', 'privexec',

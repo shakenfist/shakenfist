@@ -7,10 +7,12 @@ from testtools import content
 from shakenfist_ci import base
 
 
-# Where the functional tests run (the inner primary node) Loki is reachable
-# on localhost. The install helper (tools/ci-install-loki.sh) binds Loki to
-# 0.0.0.0:3100, and getsf renders SHAKENFIST_LOKI_BASE_URL into every node's
-# config so all daemons ship to it.
+# Where the smoke tests run (the single-node localhost topology) Loki is
+# reachable on localhost. The install helper (tools/ci-install-loki.sh) binds
+# Loki to 0.0.0.0:3100, and the collection deploy renders
+# SHAKENFIST_LOKI_BASE_URL into every node's config so all daemons ship to
+# it. On multi-node topologies Loki lives at the first node's mesh IP, not
+# localhost, so this test only belongs in the smoke (single-node) suite.
 LOKI_BASE_URL = 'http://localhost:3100'
 
 # How long to wait for a freshly emitted log line to become queryable in

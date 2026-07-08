@@ -56,7 +56,7 @@ control node never needs the Shaken Fist server package installed.
     the risk of breaking your Python installation or OS, by passing
     --break-system-packages.
     hint: See PEP 668 for the detailed specification.
-    ```
+```
 
 ## Referencing the modules
 
@@ -113,17 +113,17 @@ Create a namespace:
 
 ```yaml
 - name: Create a namespace
-    shakenfist.shakenfist.sf_namespace:
+  shakenfist.shakenfist.sf_namespace:
     name: "{{ namespace_name }}"
     state: present
 ```
 
-Delete a network:
+Delete a namespace:
 
 ```yaml
 - name: Delete the namespace
-    shakenfist.shakenfist.sf_namespace:
-    uuid: "{{ namespace_name }}"
+  shakenfist.shakenfist.sf_namespace:
+    name: "{{ namespace_name }}"
     state: absent
 ```
 
@@ -175,7 +175,7 @@ Create a network:
 
 ```yaml
 - name: Create a network for CI infrastructure
-    shakenfist.shakenfist.sf_network:
+  shakenfist.shakenfist.sf_network:
     netblock: "10.0.0.0/24"
     name: "ci"
   register: ci_network
@@ -185,7 +185,7 @@ Delete a network:
 
 ```yaml
 - name: Delete the CI network
-    shakenfist.shakenfist.sf_network:
+  shakenfist.shakenfist.sf_network:
     uuid: "{{ ci_network['meta']['uuid'] }}"
     state: absent
 ```
@@ -224,14 +224,14 @@ Create an instance attached to a network:
 
 ```yaml
 - name: Create an instance
-    shakenfist.shakenfist.sf_instance:
+  shakenfist.shakenfist.sf_instance:
     name: "ci-worker"
     cpu: 2
     ram: 2048
     disks:
-      - "20@debian:12"
+    - "20@debian:12"
     networks:
-      - "{{ ci_network['meta']['uuid'] }}"
+    - "{{ ci_network['meta']['uuid'] }}"
     await: true
   register: ci_worker
 ```
@@ -240,7 +240,7 @@ Delete an instance:
 
 ```yaml
 - name: Delete the instance
-    shakenfist.shakenfist.sf_instance:
+  shakenfist.shakenfist.sf_instance:
     uuid: "{{ ci_worker['meta']['uuid'] }}"
     state: absent
 ```
@@ -265,7 +265,7 @@ Snapshot an instance and update a label:
 
 ```yaml
 - name: Snapshot and update the "ciimage" label
-    shakenfist.shakenfist.sf_snapshot:
+  shakenfist.shakenfist.sf_snapshot:
     instance_uuid: "{{ ci_worker['meta']['uuid'] }}"
     label: ciimage
     state: present
