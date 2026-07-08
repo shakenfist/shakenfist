@@ -174,7 +174,25 @@
         node_is_database_node: "{{ inventory_hostname in database_tier_hosts }}"
 
     # Cluster-wide values -- identical on every host. Computed once from the
-    # group lists, then assigned to every host.
+    # group lists, then assigned to every host. The assertions turn a missing
+    # or misspelled group into a readable failure instead of a cryptic Jinja2
+    # index or empty-sequence error, matching the database tier check above.
+    - name: Fail if the inventory has no network node
+      ansible.builtin.assert:
+        that: groups.get('network_node', []) | length > 0
+        fail_msg: >-
+          No network node found in the inventory. Put exactly one host
+          (which must also be in allsf) in a network_node group.
+      run_once: true
+
+    - name: Fail if the inventory has no hypervisors
+      ansible.builtin.assert:
+        that: groups.get('hypervisors', []) | length > 0
+        fail_msg: >-
+          No hypervisors found in the inventory. Put your hypervisor hosts
+          (which must also be in allsf) in a hypervisors group.
+      run_once: true
+
     - name: Compute the network node mesh IP
       ansible.builtin.set_fact:
         network_node_ip: "{{ hostvars[groups['network_node'][0]]['node_mesh_ip'] }}"
