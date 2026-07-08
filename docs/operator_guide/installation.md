@@ -308,4 +308,4 @@ Interfaces:
     model   : virtio
 ```
 
-Probably the easiest way to interact with this instance is to connect to its console port, which is the serial console of the instance over telnet. In the case above, that is available on port 31829 on localhost (my laptop is called marvin).
+Probably the easiest way to interact with this instance is to connect to its console port, which is the serial console of the instance over telnet. In the case above, that is available on port 31839 on localhost (my laptop is called marvin).

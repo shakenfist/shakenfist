@@ -88,7 +88,7 @@ Authorized users can trigger automation by commenting on PRs:
 ### Code Style
 
 - Single quotes for strings, double quotes for docstrings
-- 80 character line wrap
+- 120 character line wrap
 - Trim trailing whitespace
 - See [CLAUDE.md](CLAUDE.md) for detailed style guide
 
