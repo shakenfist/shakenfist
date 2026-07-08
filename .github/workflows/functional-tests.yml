@@ -437,13 +437,29 @@ jobs:
               -o UserKnownHostsFile=/dev/null \
               ${GITHUB_WORKSPACE}/shakenfist \
               debian@$primary:shakenfist
+          # The lifecycle test terminates its victim node via the
+          # under-cloud API (in-guest kills are not durable -- see the
+          # under-cloud kill comment in nodelifecycletests.sh), so it
+          # needs this runner's under-cloud credentials and the node
+          # name -> under-cloud instance uuid map from ci-environment.sh.
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${HOME}/.shakenfist \
+              debian@$primary:undercloud-creds.json
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${GITHUB_WORKSPACE}/ci-environment.sh \
+              debian@$primary:ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary "chmod u=r,go= undercloud-creds.json"
           # ServerAliveInterval/ServerAliveCountMax: if the remote host
-          # goes down (e.g. the lifecycle test does `poweroff --force
-          # --force` on a victim that turns out to be the script's own
-          # host), the TCP connection can sit half-open until the default
-          # TCP keepalive eventually times out -- hours later, well past
-          # the GitHub step budget. With these options ssh notices a dead
-          # connection in roughly 30 s and the step fails fast instead.
+          # goes down (e.g. a lifecycle test bug takes out the script's
+          # own host), the TCP connection can sit half-open until the
+          # default TCP keepalive eventually times out -- hours later,
+          # well past the GitHub step budget. With these options ssh
+          # notices a dead connection in roughly 30 s and the step fails
+          # fast instead.
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               -o ServerAliveInterval=10 -o ServerAliveCountMax=3 \
