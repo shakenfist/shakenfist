@@ -369,9 +369,13 @@
     extra_config: "[]"
     cluster_db_host: "{{ database_tier_hosts[0] }}"
   tasks:
+    # The seed is passed on stdin rather than as an argument so it never
+    # appears in the process table on the database host.
     - name: Set the auth secret seed
       ansible.builtin.command: >-
-        /srv/shakenfist/venv/bin/sf-ctl set-config AUTH_SECRET_SEED {{ auth_secret }}
+        /srv/shakenfist/venv/bin/sf-ctl set-config --value-from-stdin AUTH_SECRET_SEED
+      args:
+        stdin: "{{ auth_secret }}"
       delegate_to: "{{ cluster_db_host }}"
       changed_when: true
       no_log: true
@@ -416,6 +420,8 @@
       delegate_to: "{{ cluster_db_host }}"
       changed_when: false
 
+    # show-config redacts secret-classed values by default, so this output
+    # is safe to log even though the config contains AUTH_SECRET_SEED.
     - name: Show the cluster configuration
       ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl show-config
       delegate_to: "{{ cluster_db_host }}"
@@ -427,10 +433,13 @@
         msg: "{{ cluster_config.stdout }}"
 
     # Reproduces legacy create_admin_namespace.yml. The legacy keyname was
-    # 'deploy'; preserved here.
+    # 'deploy'; preserved here. The key is passed on stdin rather than as an
+    # argument so it never appears in the process table on the database host.
     - name: Bootstrap the system namespace key
       ansible.builtin.command: >-
-        /srv/shakenfist/venv/bin/sf-ctl bootstrap-system-key deploy {{ system_key }}
+        /srv/shakenfist/venv/bin/sf-ctl bootstrap-system-key --key-from-stdin deploy
+      args:
+        stdin: "{{ system_key }}"
       environment:
         SHAKENFIST_NODE_MESH_IP: "{{ hostvars[cluster_db_host]['node_mesh_ip'] }}"
       delegate_to: "{{ cluster_db_host }}"
