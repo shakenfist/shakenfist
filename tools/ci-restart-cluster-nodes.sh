@@ -57,12 +57,19 @@ for i in "${!addresses[@]}"; do
     address="${addresses[$i]}"
     uuid="${uuids[$i]}"
 
-    if wait_for_ssh "${address}" 60; then
+    # 180 attempts at 5 s spacing is a 15 minute budget. Five instances
+    # hard-rebooting at once on a loaded under-cloud hypervisor routinely
+    # take longer than the old 5 minute budget to reach sshd (merge runs
+    # 28787986916, 28819782726 and 28827810722 all lost otherwise-green
+    # jobs to it). The waits are sequential but the boots are concurrent,
+    # so the budget is really shared across all five nodes -- later nodes
+    # are usually up by the time we ask.
+    if wait_for_ssh "${address}" 180; then
         echo "Node ${address} is back."
         continue
     fi
 
-    echo "Node ${address} did not return within 300 seconds, power cycling..."
+    echo "Node ${address} did not return within 900 seconds, power cycling..."
     sf-client instance show "${uuid}" || true
     echo "Guest console tail for ${uuid} before power cycle:"
     sf-client instance consoledata "${uuid}" 20480 || true
