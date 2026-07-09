@@ -119,6 +119,7 @@ nav:
             - "Format Auto-Detection Safety in Instar": components/instar/format-detection-safety.md
             - "Format Detection and Safety Check Coverage": components/instar/format-coverage.md
             - "Image Handling and qemu-img Security Vulnerabilities": components/instar/security.md
+            - "instar bench — benchmark the sandboxed I/O path": components/instar/bench.md
             - "Integration Test Suite": components/instar/testing.md
             - "qemu-img Output Formats": components/instar/output-formats.md
             - "qemu-img Quirks": components/instar/quirks.md
@@ -158,6 +159,7 @@ nav:
                 - "instar amend subcommand": components/instar/plans/PLAN-amend.md
                 - "instar dd subcommand": components/instar/plans/PLAN-dd.md
                 - "instar bitmap subcommand": components/instar/plans/PLAN-bitmap.md
+                - "instar bench subcommand": components/instar/plans/PLAN-bench.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
