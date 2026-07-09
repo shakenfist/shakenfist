@@ -1845,7 +1845,21 @@ are the same uniform set as `-c` / `-d` above.
   with `file.discard=ignore`, while instar never writes freed
   clusters. With the protocol-level discard disabled, post-apply
   images are **bit-for-bit identical** to instar's across every
-  verified scenario, including diverged applies.
+  scenario the phase 6-8 matrices verified, including diverged
+  applies — with one cache-pressure exception the differential
+  fuzzer later surfaced (issue #381): qemu's `-1` refcount walk
+  refreshes COPIED flags inside the old active chain's L2s
+  through its metadata cache, and when cache pressure (512-byte
+  clusters mean tiny L2/refcount caches) forces an eviction
+  flush mid-walk, a **partially refreshed** L2 lands on disk
+  before the cluster is freed and its remaining dirty flags are
+  discarded with the cache entry. instar never writes freed L2s,
+  so the two tools leave different residue in a cluster both
+  agree is free (refcount 0, `check` clean, `compare`
+  identical). The differential fuzzer's snapshot comparator
+  handles this with its dead-cluster rule: byte differences
+  confined to clusters with refcount 0 in *both* images are
+  residue, not divergence.
 
 ## `check --repair=leaks` Scope vs `qemu-img check -r leaks`
 

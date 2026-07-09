@@ -130,10 +130,15 @@ Supported output formats:
 
 VHD (vpc) encodes virtual size as cylinder × head × sector geometry.
 `instar dd` uses the same CHS rounding algorithm as `qemu-img dd`
-(`chs_rounded_size` in `src/crates/vhd/src/lib.rs`): the byte window
-is rounded up to whole sectors, then mapped to the smallest valid CHS
-geometry that fits. The resulting virtual size is always ≥ the window
-size and is byte- and size-identical to `qemu-img dd`.
+(`chs_rounded_size` in `src/crates/vhd/src/lib.rs`, an exact mirror
+of qemu vpc.c's `calculate_rounded_image_size`): the byte window is
+rounded up to whole sectors, then qemu's upward search finds the
+first sector count whose floor CHS geometry covers the request; that
+geometry's product becomes the declared size and the geometry itself
+the footer CHS. The resulting virtual size is always ≥ the window
+size and is byte- and size-identical to `qemu-img dd`. (An earlier
+one-pass ceil approximation diverged from qemu on schedules like a
+69632-sector window — differential-fuzz issue #382.)
 
 Example (verified against `qemu-img dd 10.0.8`):
 
@@ -143,7 +148,8 @@ Example (verified against `qemu-img dd 10.0.8`):
 | 1 000 | 34 816 | C=1 H=4 S=17 |
 | 3 000 | 34 816 | C=1 H=4 S=17 |
 | 34 817 | 69 632 | C=2 H=4 S=17 |
-| 1 048 576 | 1 079 296 | C=32 H=8 S=17 |
+| 1 048 576 | 1 079 296 | C=31 H=4 S=17 |
+| 35 651 584 | 35 686 400 | C=820 H=5 S=17 |
 
 For a 3 000-byte window (`bs=1000 count=3`) the declared virtual size
 is **34 816 bytes** — significantly larger than the 3 000-byte payload.

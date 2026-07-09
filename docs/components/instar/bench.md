@@ -188,12 +188,25 @@ guest refuses the write test:
 | Dirty / corrupt | The image's dirty or corrupt incompatible bits are set. |
 | Internal snapshots | The image has one or more internal snapshots (`nb_snapshots > 0`) — bench overwrites clusters without a per-write ownership check, so a snapshot-shared cluster must never be touched. |
 
-Allocation never grows the refcount table; if a write test on an
-otherwise-eligible qcow2 image exhausts the existing refcount table's
-free clusters, the run refuses with `bench: image too large for
-in-place bench write` (one 16-bit refblock at 64 KiB clusters covers
-2 GiB of address space, so this is rare in practice but is a
-documented v1 limitation, not a bug).
+Allocation never grows the refcount structures **during** the run.
+Instead, setup computes the schedule's worst-case allocation bound
+and preemptively grows them once, before the timing bracket opens:
+new refblocks are placed at the current end of the host file, and if
+the refcount table itself is out of slots it is relocated to the file
+end, enlarged, and committed with an fsync-ordered header flip. The
+old table is then freed through the normal staged-refcount cadence —
+a crash between the header flip and the next refcount write-back
+leaves the old table's clusters as a repairable leak (reported and
+repaired cleanly by `qemu-img check`), the same benign artifact class
+as any mid-bench crash. A schedule whose worst case already fits the
+populated refblock coverage performs no growth and no extra writes.
+
+The refusal `bench: image too large for in-place bench write`
+survives only for schedules that exceed the staging budget: more than
+2048 refblock slots, more than 2 MiB of staged refblock bytes, or a
+grown refcount table larger than 64 KiB. That is roughly a 256 MiB
+host file at 512-byte clusters, and 64 GiB or more at cluster sizes
+of 64 KiB and up.
 
 ### Write-back design
 
