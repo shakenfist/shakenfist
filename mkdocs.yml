@@ -97,8 +97,10 @@ nav:
             - "Introduction": components/development/index.md
             - "Automated PR Review with Claude Code": components/development/automated-pr-review.md
             - "CI Review Automation": components/development/ci-review-automation.md
+            - "Code review tracking": components/development/code-review-tracking.md
             - "Release Automation": components/development/release-automation.md
             - Plans:
+                - "Systematic whole-codebase review tracking": components/development/plans/PLAN-code-review-tracking.md
                 - "Title for the plan": components/development/plans/PLAN-consistency-audits-v2.md
         - Instar:
             - "Introduction": components/instar/index.md
@@ -160,6 +162,7 @@ nav:
                 - "instar dd subcommand": components/instar/plans/PLAN-dd.md
                 - "instar bitmap subcommand": components/instar/plans/PLAN-bitmap.md
                 - "instar bench subcommand": components/instar/plans/PLAN-bench.md
+                - "bench qcow2 refcount growth": components/instar/plans/PLAN-bench-refcount-growth.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md

@@ -297,7 +297,9 @@ Rather than a big-bang migration, I'd suggest:
 3. ~~Ensure each file links to its template and lists per-project
    status.~~
 4. ~~Add `consistency` label to all project repos.~~ Added to 10
-   repos (ryll has no GitHub repo).
+   repos initially; ryll (which had no GitHub repo at the time)
+   gained one at shakenfist/ryll and the label was added in July
+   2026, making 11.
 5. ~~Create GitHub issues for all known non-compliant items.~~ 35
    issues created across 10 repos.
 
