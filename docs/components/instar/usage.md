@@ -1012,3 +1012,29 @@ silent on success. oVirt's VDSM / ovirt-imageio drive `qemu-img
 bitmap` to manage the checkpoint bitmaps that back incremental
 backup (see the oVirt section above). qcow2 v3-only. See
 [docs/bitmap.md](/components/instar/bitmap/) for the full reference.
+
+### bench
+
+```
+instar bench [-c COUNT] [-d DEPTH] [-s BUFFER_SIZE] [-S STEP_SIZE]
+             [-o OFFSET] [-w] [--pattern NUM] [--flush-interval NUM]
+             [--output {human,json}] FILENAME
+```
+
+Issue a scripted sequence of read or write requests against a disk
+image and report how long they took — the sandboxed equivalent of
+`qemu-img bench`. The Ceph `cli_migration.sh` test script's
+`qemu-img bench -f qcow2 -w -c 65536 -d 16 --pattern 65 -s 4096`
+invocation (see the Ceph section above) is the real-world caller
+`instar bench` targets. The number it reports is **not** qemu's
+number reframed: `instar bench` times instar's own sandboxed I/O
+path end to end (guest format layer → virtio-block → host I/O
+thread → file I/O), not qemu's block layer over the page cache, so
+the two tools' absolute numbers are not comparable — running both
+against the same image with the same arguments is the reproducible
+sandbox-overhead measurement instead. Read tests run against all
+five formats (raw, qcow2, vmdk, vhd, vhdx); write tests (`-w`) are
+supported on raw and qcow2 only (including qcow2 overlays), gated on
+a qcow2 write-envelope check, and mutate the target image in place
+with no confirmation. See [docs/bench.md](/components/instar/bench/) for the full
+reference.
