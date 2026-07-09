@@ -1214,6 +1214,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/release-automation/" class="md-nav__link">
         
   
@@ -1250,10 +1278,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
         
           
-          <label class="md-nav__link" for="__nav_3_5_5" id="__nav_3_5_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
             
   
   
@@ -1271,8 +1299,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_5_5">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1281,6 +1309,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Systematic whole-codebase review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -3338,6 +3394,34 @@
     
   
     instar bench subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-bench-refcount-growth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bench qcow2 refcount growth
   
 
     
@@ -9846,12 +9930,24 @@ guest refuses the write test:</p>
 </tr>
 </tbody>
 </table>
-<p>Allocation never grows the refcount table; if a write test on an
-otherwise-eligible qcow2 image exhausts the existing refcount table's
-free clusters, the run refuses with <code>bench: image too large for
-in-place bench write</code> (one 16-bit refblock at 64 KiB clusters covers
-2 GiB of address space, so this is rare in practice but is a
-documented v1 limitation, not a bug).</p>
+<p>Allocation never grows the refcount structures <strong>during</strong> the run.
+Instead, setup computes the schedule's worst-case allocation bound
+and preemptively grows them once, before the timing bracket opens:
+new refblocks are placed at the current end of the host file, and if
+the refcount table itself is out of slots it is relocated to the file
+end, enlarged, and committed with an fsync-ordered header flip. The
+old table is then freed through the normal staged-refcount cadence —
+a crash between the header flip and the next refcount write-back
+leaves the old table's clusters as a repairable leak (reported and
+repaired cleanly by <code>qemu-img check</code>), the same benign artifact class
+as any mid-bench crash. A schedule whose worst case already fits the
+populated refblock coverage performs no growth and no extra writes.</p>
+<p>The refusal <code>bench: image too large for in-place bench write</code>
+survives only for schedules that exceed the staging budget: more than
+2048 refblock slots, more than 2 MiB of staged refblock bytes, or a
+grown refcount table larger than 64 KiB. That is roughly a 256 MiB
+host file at 512-byte clusters, and 64 GiB or more at cluster sizes
+of 64 KiB and up.</p>
 <h3 id="write-back-design">Write-back design<a class="headerlink" href="#write-back-design" title="Permanent link">&para;</a></h3>
 <p>For each scheduled offset, bench writes <code>bufsize</code> bytes of the
 <code>--pattern</code> byte at that virtual offset through the format layer. For

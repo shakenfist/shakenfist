@@ -1214,6 +1214,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/release-automation/" class="md-nav__link">
         
   
@@ -1250,10 +1278,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
         
           
-          <label class="md-nav__link" for="__nav_3_5_5" id="__nav_3_5_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
             
   
   
@@ -1271,8 +1299,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_5_5">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1281,6 +1309,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Systematic whole-codebase review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -3174,6 +3230,34 @@
     
   
     instar bench subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-bench-refcount-growth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bench qcow2 refcount growth
   
 
     
@@ -9487,6 +9571,13 @@ at the repo root).</p>
 <td>Implement the <code>bench</code> subcommand — the last unimplemented qemu-img subcommand, closing the 15/15 parity roster. Runs a fixed-count sequential read (or <code>-w</code> write) benchmark through the format layer <em>inside the KVM guest</em>, so the reported time measures instar's real sandboxed I/O path; <code>instar bench</code> vs <code>qemu-img bench</code> on the same image is the reproducible sandbox-overhead measurement the announcement email lacked. Byte-parity on the deterministic output surface (header line, validation, exit codes); host-<code>Instant</code> timing bracketed by guest markers (no guest clock exists); <code>-d</code> accepted but serialized in v1 (the synchronous single-buffer virtio driver has no queue depth — true depth is future work); <code>--output json</code> instar extension for perf-regression tracking. New pure <code>crates/bench</code> schedule crate, <code>src/operations/bench/</code> guest op, call-table VERSION 19→20. Explicitly no cross-version baselines (timing is not comparable).</td>
 <td>Complete (phases 1-8): <code>instar bench</code> — the reframed sandboxed-path measurement (instar's own end-to-end guest→virtio→host I/O path, not qemu's block layer) with byte-parity on the deterministic surface (header line, validation, exit codes); reads on all five formats (raw, qcow2 incl. backing chains, vmdk, vhd, vhdx) and writes on raw and qcow2 incl. overlays; live-parity integration tests plus coverage and differential fuzzing, explicitly no cross-version baselines (timing is not comparable); and docs. instar now implements all 15 qemu-img subcommands — the parity roster is closed.</td>
 <td><a href="/components/instar/plans/PLAN-bench-phase-01-crate/">1: schedule crate</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-02-abi/">2: ABI</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-03-guest-read/">3: guest read</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-04-host-cli/">4: host CLI</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-05-write/">5: write test</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-06-integration/">6: integration tests</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-07-fuzz/">7: fuzz</a> ✓, <a href="/components/instar/plans/PLAN-bench-phase-08-docs/">8: docs</a> ✓</td>
+</tr>
+<tr>
+<td>2026-07-09</td>
+<td><a href="/components/instar/plans/PLAN-bench-refcount-growth/">bench qcow2 refcount growth</a></td>
+<td>Let bench's qcow2 <code>-w</code> path grow the refcount structures (new refblocks; refcount-table relocation with a snapshot-style fsync-ordered header flip) preemptively at setup from a worst-case schedule bound, so any schedule qemu-img bench executes on the fuzzer envelope also succeeds under instar with identical virtual content and a clean <code>qemu-img check</code>. Retires the <code>qcow2-write-refblock-coverage</code> fuzzer steer-around (issues #397-#401) and restores the full cluster-size matrix to <code>-w</code> differential coverage.</td>
+<td>Complete (phases 1-4)</td>
+<td><a href="/components/instar/plans/PLAN-bench-refcount-growth-phase-01-planner/">01: planner</a>, <a href="/components/instar/plans/PLAN-bench-refcount-growth-phase-02-guest/">02: guest</a>, <a href="/components/instar/plans/PLAN-bench-refcount-growth-phase-03-integration/">03: integration</a>, <a href="/components/instar/plans/PLAN-bench-refcount-growth-phase-04-fuzzer-docs/">04: fuzzer + docs</a></td>
 </tr>
 </tbody>
 </table>

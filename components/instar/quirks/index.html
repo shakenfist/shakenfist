@@ -1214,6 +1214,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/release-automation/" class="md-nav__link">
         
   
@@ -1250,10 +1278,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
         
           
-          <label class="md-nav__link" for="__nav_3_5_5" id="__nav_3_5_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
             
   
   
@@ -1271,8 +1299,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_5_5">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1281,6 +1309,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Systematic whole-codebase review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -4927,6 +4983,34 @@
     
   
     instar bench subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-bench-refcount-growth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bench qcow2 refcount growth
   
 
     
@@ -14557,7 +14641,21 @@ are the same uniform set as <code>-c</code> / <code>-d</code> above.</p>
   with <code>file.discard=ignore</code>, while instar never writes freed
   clusters. With the protocol-level discard disabled, post-apply
   images are <strong>bit-for-bit identical</strong> to instar's across every
-  verified scenario, including diverged applies.</p>
+  scenario the phase 6-8 matrices verified, including diverged
+  applies — with one cache-pressure exception the differential
+  fuzzer later surfaced (issue #381): qemu's <code>-1</code> refcount walk
+  refreshes COPIED flags inside the old active chain's L2s
+  through its metadata cache, and when cache pressure (512-byte
+  clusters mean tiny L2/refcount caches) forces an eviction
+  flush mid-walk, a <strong>partially refreshed</strong> L2 lands on disk
+  before the cluster is freed and its remaining dirty flags are
+  discarded with the cache entry. instar never writes freed L2s,
+  so the two tools leave different residue in a cluster both
+  agree is free (refcount 0, <code>check</code> clean, <code>compare</code>
+  identical). The differential fuzzer's snapshot comparator
+  handles this with its dead-cluster rule: byte differences
+  confined to clusters with refcount 0 in <em>both</em> images are
+  residue, not divergence.</p>
 </li>
 </ul>
 <h2 id="check-repairleaks-scope-vs-qemu-img-check-r-leaks"><code>check --repair=leaks</code> Scope vs <code>qemu-img check -r leaks</code><a class="headerlink" href="#check-repairleaks-scope-vs-qemu-img-check-r-leaks" title="Permanent link">&para;</a></h2>

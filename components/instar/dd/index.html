@@ -1214,6 +1214,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/release-automation/" class="md-nav__link">
         
   
@@ -1250,10 +1278,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
         
           
-          <label class="md-nav__link" for="__nav_3_5_5" id="__nav_3_5_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
             
   
   
@@ -1271,8 +1299,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_5_5">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1281,6 +1309,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Systematic whole-codebase review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -3344,6 +3400,34 @@
     
   
     instar bench subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-bench-refcount-growth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bench qcow2 refcount growth
   
 
     
@@ -9852,10 +9936,15 @@ always <strong>raw</strong>, regardless of the input format. This matches
 <h3 id="vhd-chs-geometry-rounding">VHD CHS geometry rounding<a class="headerlink" href="#vhd-chs-geometry-rounding" title="Permanent link">&para;</a></h3>
 <p>VHD (vpc) encodes virtual size as cylinder × head × sector geometry.
 <code>instar dd</code> uses the same CHS rounding algorithm as <code>qemu-img dd</code>
-(<code>chs_rounded_size</code> in <code>src/crates/vhd/src/lib.rs</code>): the byte window
-is rounded up to whole sectors, then mapped to the smallest valid CHS
-geometry that fits. The resulting virtual size is always ≥ the window
-size and is byte- and size-identical to <code>qemu-img dd</code>.</p>
+(<code>chs_rounded_size</code> in <code>src/crates/vhd/src/lib.rs</code>, an exact mirror
+of qemu vpc.c's <code>calculate_rounded_image_size</code>): the byte window is
+rounded up to whole sectors, then qemu's upward search finds the
+first sector count whose floor CHS geometry covers the request; that
+geometry's product becomes the declared size and the geometry itself
+the footer CHS. The resulting virtual size is always ≥ the window
+size and is byte- and size-identical to <code>qemu-img dd</code>. (An earlier
+one-pass ceil approximation diverged from qemu on schedules like a
+69632-sector window — differential-fuzz issue #382.)</p>
 <p>Example (verified against <code>qemu-img dd 10.0.8</code>):</p>
 <table>
 <thead>
@@ -9889,7 +9978,12 @@ size and is byte- and size-identical to <code>qemu-img dd</code>.</p>
 <tr>
 <td>1 048 576</td>
 <td>1 079 296</td>
-<td>C=32 H=8 S=17</td>
+<td>C=31 H=4 S=17</td>
+</tr>
+<tr>
+<td>35 651 584</td>
+<td>35 686 400</td>
+<td>C=820 H=5 S=17</td>
 </tr>
 </tbody>
 </table>
