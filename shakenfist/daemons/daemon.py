@@ -74,23 +74,46 @@ def set_syslog_ident(procname):
                 handler.ident = ident
 
 
+def _configured_log_level(name):
+    # Check for configuration override
+    level = getattr(config, 'LOGLEVEL_' + name.upper(), None)
+    if not level:
+        return logging.INFO
+    numeric_level = getattr(logging, level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % level)
+    return numeric_level
+
+
 def set_log_level(log, name):
     # Check that id is a valid name
     process_name(name)
 
-    # Check for configuration override
-    level = getattr(config, 'LOGLEVEL_' + name.upper(), None)
-    if level:
-        numeric_level = getattr(logging, level.upper(), None)
-        if not isinstance(numeric_level, int):
-            raise ValueError('Invalid log level: %s' % level)
-    else:
-        numeric_level = logging.INFO
+    log.setLevel(_configured_log_level(name))
 
-    log.setLevel(numeric_level)
+
+def apply_log_level(daemon_name):
+    """Apply this daemon's configured log level to every shakenfist logger.
+
+    ``logs.setup()`` leaves the root logger at DEBUG and gives each
+    module its own child logger with no explicit level, so until a
+    level is set on the *package* logger every module ships debug
+    records (privexec command dumps, concurrency output captures, ...)
+    to syslog and Loki no matter what ``LOGLEVEL_*`` says --
+    ``set_log_level()`` only quiets the single module logger it is
+    handed. Setting the level once here makes every ``shakenfist.*``
+    logger inherit it. Daemons without a ``LOGLEVEL_*`` config field
+    default to info.
+    """
+    logging.getLogger('shakenfist').setLevel(
+        _configured_log_level(daemon_name))
 
 
 def write_pid_file(daemon_name):
+    # The one universal per-daemon startup hook (see below), so this
+    # is also where the configured log level is enforced.
+    apply_log_level(daemon_name)
+
     with open(f'/run/sf/{daemon_name}.pid', 'w') as f:
         f.write(f'{os.getpid()}')
 

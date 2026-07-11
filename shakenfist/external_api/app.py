@@ -50,6 +50,11 @@ from shakenfist.util import general as util_general
 
 LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
+# The api runs under gunicorn rather than via write_pid_file(), so
+# the package-wide level (which quiets the modules the per-module
+# set_log_level calls cannot reach, like util.concurrency) is
+# applied here at worker import time instead.
+daemon.apply_log_level('api')
 
 
 app = flask.Flask(__name__)

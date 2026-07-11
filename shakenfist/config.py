@@ -559,14 +559,23 @@ class SFConfig(BaseSettings):
         description='Path to libvirt logs.'
     )
 
-    # Logging
+    # Logging. One entry per daemon; daemon.apply_log_level() applies
+    # the value to the whole shakenfist logger namespace at daemon
+    # startup, so a single daemon can be turned up to debug without
+    # drowning the cluster's syslog and Loki streams in every
+    # daemon's debug records.
     LOGLEVEL_API: str = 'info'
     LOGLEVEL_CLEANER: str = 'info'
+    LOGLEVEL_CLUSTER: str = 'info'
+    LOGLEVEL_DATABASE: str = 'info'
     LOGLEVEL_MAIN: str = 'info'
     LOGLEVEL_NET: str = 'info'
+    LOGLEVEL_NODELOCK: str = 'info'
+    LOGLEVEL_PRIVEXEC: str = 'info'
+    LOGLEVEL_QUEUES: str = 'info'
     LOGLEVEL_RESOURCES: str = 'info'
     LOGLEVEL_SIDECHANNEL: str = 'info'
-    LOGLEVEL_QUEUES: str = 'info'
+    LOGLEVEL_TRANSFERS: str = 'info'
 
     # MariaDB
     MARIADB_HOST: str = Field(

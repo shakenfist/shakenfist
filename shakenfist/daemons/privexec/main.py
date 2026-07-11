@@ -18,6 +18,7 @@ import setproctitle
 from shakenfist_utilities import random      # noreorder
 from shakenfist_utilities import logs        # noreorder
 
+from shakenfist.daemons.daemon import apply_log_level
 from shakenfist.daemons.daemon import force_clean_exit
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_stopping
@@ -533,6 +534,10 @@ def write_pid_file():
 def main():
     util_exceptions.install_exception_tracking()
     write_pid_file()
+    # This daemon has its own minimal write_pid_file rather than the
+    # universal hook in daemons.daemon, so the configured log level
+    # must be applied explicitly.
+    apply_log_level('privexec')
     setproctitle.setproctitle('sf-privexec')
 
     if os.path.exists(SOCKET_PATH):
