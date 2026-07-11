@@ -36,6 +36,16 @@ def main():
 
     n = Node.from_db(config.NODE_NAME)
     n.set_daemon_state('sentinel-last', Node.DAEMON_STATE_RUNNING)
+
+    # sentinel-last starts after every other daemon (the systemd ordering
+    # contract), so reaching here means the node is fully up: declare it
+    # created, mirroring how our shutdown declares it stopping. Without
+    # this a restarted node is stranded in stopping or degraded -- the
+    # only other path back to created is the cluster daemon's
+    # missing-node recovery, which never fires while checkins stay
+    # fresh. Being the last daemon to start also makes this the final
+    # state write in any restart interleaving.
+    n.state = Node.STATE_CREATED
     send_systemd_ready()
 
     while daemon.check_abort_path(ABORT_PATH):
