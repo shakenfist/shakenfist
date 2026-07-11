@@ -56,7 +56,19 @@ or set `ANSIBLE_COLLECTIONS_PATH` to a tree containing
 Ansible must be able to reach each host (the sample uses `ansible_host` = the
 mesh IP) and `become` root there.
 
-### 3. Bring your own MariaDB
+### 3. Control node packages
+
+The internal CA plays generate certificates on the control node with
+`certtool`, from the `gnutls-bin` package (Debian/Ubuntu). The role installs
+it via apt when the control-node plays run with root; if you run the deploy
+rootless (overriding `ansible_become` for localhost and pointing `ca_path` at
+a user-writable directory), install it beforehand:
+
+```bash
+apt-get install gnutls-bin
+```
+
+### 4. Bring your own MariaDB
 
 Provision MariaDB on (or reachable by) the database tier and point
 `mariadb_host` / `mariadb_user` / `mariadb_password` / `mariadb_database` in

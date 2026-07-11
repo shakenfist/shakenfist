@@ -53,6 +53,11 @@ pip install shakenfist-client
 node never needs the Shaken Fist server package. The roles additionally
 require `ansible >= 2.15` (see `meta/runtime.yml`).
 
+The `internal_ca` role generates certificates on the control node with
+`certtool` from the `gnutls-bin` package (Debian/Ubuntu). The role installs it
+via apt when its control-node tasks run with root; rootless deploys must
+install it beforehand.
+
 ## Consuming the collection
 
 Install the published collection on your Ansible control node:

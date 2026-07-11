@@ -29,7 +29,9 @@
   ansible.builtin.template:
     src: ca_template.tmpl
     dest: "{{ ca_template_path }}"
-    owner: root
+    # No owner: the invoking user owns the CA material. A root-run
+    # creates root-owned files anyway, and hardcoding owner: root
+    # breaks rootless control nodes (chown as non-root fails).
     mode: u=r
   when: not ca_cert.stat.exists
 
