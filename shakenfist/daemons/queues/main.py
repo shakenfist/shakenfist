@@ -65,7 +65,15 @@ def _check_other_daemon(n, daemon_name, override_daemon_name=None):
 
 def _health_checks():
     healthy = True
-    n = Node.from_db(config.NODE_NAME)
+    n = Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
+    if not n:
+        # Either the node record has not been created yet, or the
+        # database service is unreachable (Node.from_db() cannot
+        # currently tell these apart, see issue 3373). Both mean the
+        # same thing here: not healthy yet, keep waiting.
+        LOG.info('Node record for %s is not readable, waiting'
+                 % config.NODE_NAME)
+        return False
     if not _check_other_daemon(n, 'privexec'):
         healthy = False
     if not _check_other_daemon(n, 'nodelock'):
