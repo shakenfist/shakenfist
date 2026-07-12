@@ -138,7 +138,12 @@ geometry's product becomes the declared size and the geometry itself
 the footer CHS. The resulting virtual size is always ≥ the window
 size and is byte- and size-identical to `qemu-img dd`. (An earlier
 one-pass ceil approximation diverged from qemu on schedules like a
-69632-sector window — differential-fuzz issue #382.)
+69632-sector window — differential-fuzz issue #382. And the footer
+CHS must be the search geometry itself, not the floor geometry of the
+declared size: the two differ when the search's final candidate sits
+above a head-count boundary while its product sits below one, e.g. a
+104349-sector window declares 104363 sectors = 877×7×17 but floors to
+1023×6×17 — coverage-fuzz issue #413.)
 
 Example (verified against `qemu-img dd 10.0.8`):
 
