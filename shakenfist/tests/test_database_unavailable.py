@@ -29,11 +29,13 @@ class FakeRpcError(grpc.RpcError):
 
 
 class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
-    @mock.patch('shakenfist.mariadb.time.sleep')
+    # 'shakenfist.mariadb.time' (not '...time.sleep') so the real time
+    # module is untouched; see the note on ClusterLockAcquireTestCase.
+    @mock.patch('shakenfist.mariadb.time')
     @mock.patch('shakenfist.mariadb._reset_database_stub')
     @mock.patch('shakenfist.mariadb._get_database_stub')
     def test_unavailable_exhaustion_raises_database_unavailable(
-            self, mock_stub, mock_reset, mock_sleep):
+            self, mock_stub, mock_reset, mock_time):
         method = mock.MagicMock(
             side_effect=FakeRpcError(grpc.StatusCode.UNAVAILABLE))
         method._method = b'/shakenfist.protos.DatabaseService/GetNode'
@@ -44,11 +46,11 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
             mariadb._grpc_call, method, mock.MagicMock())
         self.assertEqual(mariadb.GRPC_RETRIES, method.call_count)
 
-    @mock.patch('shakenfist.mariadb.time.sleep')
+    @mock.patch('shakenfist.mariadb.time')
     @mock.patch('shakenfist.mariadb._reset_database_stub')
     @mock.patch('shakenfist.mariadb._get_database_stub')
     def test_non_retryable_rpc_error_raised_unchanged(
-            self, mock_stub, mock_reset, mock_sleep):
+            self, mock_stub, mock_reset, mock_time):
         method = mock.MagicMock(
             side_effect=FakeRpcError(grpc.StatusCode.INTERNAL))
         method._method = b'/shakenfist.protos.DatabaseService/GetNode'
@@ -87,15 +89,22 @@ class CheckDaemonStateTestCase(base.ShakenFistTestCase):
 
 
 class ClusterLockAcquireTestCase(base.ShakenFistTestCase):
-    @mock.patch('shakenfist.locks.time.time',
-                side_effect=[0, 0, 0.5, 1, 1.5])
-    @mock.patch('shakenfist.locks.time.sleep')
+    # Patch the whole time module *as referenced by shakenfist.locks*
+    # rather than time.time itself: locks.py does a plain "import
+    # time", so patching 'shakenfist.locks.time.time' would replace
+    # time.time process-wide, and on Python <= 3.12 the logging module
+    # calls time.time() for every LogRecord and consumes the
+    # side_effect sequence.
+    @mock.patch('shakenfist.locks.time')
     @mock.patch('shakenfist.locks.mariadb.get_cluster_lock_holder',
                 return_value={'holder': None})
     @mock.patch('shakenfist.locks.mariadb.acquire_cluster_lock',
                 side_effect=exceptions.DatabaseUnavailable('down'))
     def test_unavailable_database_retries_until_lock_timeout(
-            self, mock_acquire, mock_holder, mock_sleep, mock_time):
+            self, mock_acquire, mock_holder, mock_time):
+        mock_time.time.side_effect = [0, 0, 0.5, 1, 1.5]
+        mock_time.sleep.return_value = None
+
         lock = locks.ClusterLock('instance', 'uuid', 'test-lock', timeout=1)
         self.assertRaises(exceptions.LockException, lock.__enter__)
         self.assertEqual(2, mock_acquire.call_count)
