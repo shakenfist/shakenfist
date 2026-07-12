@@ -114,11 +114,20 @@ class ClusterLock:
     def __enter__(self):
         start_time = time.time()
         while time.time() - start_time < self.timeout:
-            if self.acquire():
-                return self
+            try:
+                if self.acquire():
+                    return self
+            except exceptions.DatabaseUnavailable:
+                # An unreachable database is just another way of not
+                # holding the lock yet; keep trying until our timeout.
+                self.log_ctx.info(
+                    'Database unavailable while acquiring lock, will retry')
             time.sleep(0.5)
 
-        current = self.get_holder(key_prefix='current')
+        try:
+            current = self.get_holder(key_prefix='current')
+        except exceptions.DatabaseUnavailable:
+            current = {}
         self.log_ctx.with_fields(current).with_fields({
             'duration': round(time.time() - start_time, 2)
             }).info('Failed to acquire lock')
