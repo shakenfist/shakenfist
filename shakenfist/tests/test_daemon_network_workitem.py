@@ -1,8 +1,10 @@
 # Copyright 2019 Michael Still and contributors
 
+import queue as queue_module
 import threading
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -524,3 +526,133 @@ class PartitionedDispatchTest(base.ShakenFistTestCase):
             self.assertEqual(net_op_order, [u for _, u in per_net])
             # ... because both ops ran on the same worker thread.
             self.assertEqual(1, len({t for t, _ in per_net}))
+
+
+class DatabaseUnavailableTest(base.ShakenFistTestCase):
+    """A database outage must pause the network daemon, not kill its
+    dispatcher or worker threads (issue 3373: DatabaseUnavailable is
+    deliberately not an RpcError, so it propagates through the mariadb
+    client wrappers to here)."""
+
+    def test_dispatcher_survives_database_unavailable(self):
+        """A dequeue that raises DatabaseUnavailable must not escape
+        execute() -- the dispatcher pauses and retries instead of dying
+        and churning through supervisor restarts."""
+        dequeues = {'count': 0}
+
+        def fake_dequeue(queue_names, limit):
+            dequeues['count'] += 1
+            if dequeues['count'] == 1:
+                raise exceptions.DatabaseUnavailable('down')
+            return []
+
+        def fake_check_abort(path):
+            if threading.current_thread().name.startswith('net-worker-'):
+                return True
+            return dequeues['count'] < 2
+
+        with mock.patch(
+            'shakenfist.daemons.network.workitem.config'
+        ) as mock_config, mock.patch(
+            'shakenfist.daemons.network.workitem.mariadb'
+        ) as mock_mariadb, mock.patch(
+            'shakenfist.daemons.network.workitem.daemon'
+        ) as mock_daemon, mock.patch(
+            'shakenfist.daemons.network.workitem.time'
+        ), mock.patch(
+            'shakenfist.daemons.network.workitem.util_concurrency'
+        ):
+            mock_config.NODE_UUID = NODE_UUID
+            mock_config.NODE_IS_NETWORK_NODE = False
+            mock_config.NETWORK_OPERATION_WORKERS = 1
+            mock_daemon.check_abort_path.side_effect = fake_check_abort
+            mock_daemon.clear_abort_path.return_value = None
+            mock_mariadb.dequeue_work_items.side_effect = fake_dequeue
+
+            from shakenfist.daemons.network.workitem import Job
+            job = Job.__new__(Job)
+            job.name = 'test-worker'
+            job.abort_path = '/run/sf/net-test-worker.abort'
+
+            # Must not raise; the outage iteration is followed by a
+            # second, successful dequeue before the loop exits.
+            job.execute()
+
+        self.assertEqual(2, dequeues['count'])
+
+    def _run_worker_loop(self, items, fake_execute):
+        """Drive _worker_loop in this thread over a pre-loaded queue.
+
+        The queue ends with the None shutdown sentinel so the loop
+        terminates deterministically.
+        """
+        worker_queue = queue_module.Queue()
+        for item in items:
+            worker_queue.put(item)
+        worker_queue.put(None)
+
+        with mock.patch(
+            'shakenfist.daemons.network.workitem.daemon'
+        ) as mock_daemon, mock.patch(
+            'shakenfist.daemons.network.workitem.util_concurrency'
+        ):
+            mock_daemon.check_abort_path.return_value = True
+
+            from shakenfist.daemons.network.workitem import Job
+            job = Job.__new__(Job)
+            job.name = 'test-worker'
+            job.abort_path = '/run/sf/net-test-worker.abort'
+            # Instance attribute shadows the method, as in
+            # PartitionedDispatchTest.
+            job._cluster_operation_execute = fake_execute
+
+            job._worker_loop(0, worker_queue)
+
+    def test_worker_abandons_item_on_database_unavailable(self):
+        """DatabaseUnavailable from an op leaves its work item claimed
+        (for the stuck-row reaper to re-queue) instead of resolving it,
+        and the worker moves on to the next item rather than dying."""
+        executed = []
+
+        def fake_execute(queue_name, op, batch_size, defer_delays):
+            executed.append(op.uuid)
+            if op.uuid == 'op-1':
+                raise exceptions.DatabaseUnavailable('down')
+
+        items = [
+            (QUEUE_NAME, 'job-op-1', FakeNetOp('op-1', 'net-a'), 1),
+            (QUEUE_NAME, 'job-op-2', FakeNetOp('op-2', 'net-a'), 1),
+        ]
+
+        with mock.patch(
+                'shakenfist.daemons.network.workitem.mariadb') as mock_mariadb:
+            self._run_worker_loop(items, fake_execute)
+
+            # op-1's work item stays claimed; only op-2 resolves.
+            mock_mariadb.resolve_work_item.assert_called_once_with(
+                QUEUE_NAME, 'job-op-2')
+
+        self.assertEqual(['op-1', 'op-2'], executed)
+
+    def test_worker_survives_database_unavailable_during_resolve(self):
+        """DatabaseUnavailable from resolve_work_item itself must not
+        kill the worker thread; the next item is still processed."""
+        executed = []
+
+        def fake_execute(queue_name, op, batch_size, defer_delays):
+            executed.append(op.uuid)
+
+        items = [
+            (QUEUE_NAME, 'job-op-1', FakeNetOp('op-1', 'net-a'), 1),
+            (QUEUE_NAME, 'job-op-2', FakeNetOp('op-2', 'net-a'), 1),
+        ]
+
+        with mock.patch(
+                'shakenfist.daemons.network.workitem.mariadb') as mock_mariadb:
+            mock_mariadb.resolve_work_item.side_effect = [
+                exceptions.DatabaseUnavailable('down'), None]
+            self._run_worker_loop(items, fake_execute)
+
+            self.assertEqual(2, mock_mariadb.resolve_work_item.call_count)
+
+        self.assertEqual(['op-1', 'op-2'], executed)

@@ -11,6 +11,7 @@ from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist import mariadb
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.config import config
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -127,14 +128,34 @@ class Job(util_concurrency.Job):
             util_concurrency.set_thread_name(jobname)
             LOG.debug(
                 f'Network worker {index} is now processing job {jobname}')
+            resolve = True
             try:
                 self._cluster_operation_execute(
                     queue_name, op, batch_size, defer_delays)
+            except DatabaseUnavailable:
+                # The database went away mid-operation. Leave the work
+                # item claimed rather than resolving it: the stuck-row
+                # reaper re-queues it once the database returns, exactly
+                # as for a worker crash, so the op is retried rather
+                # than silently dropped.
+                LOG.warning(
+                    f'Database service unavailable, abandoning work item '
+                    f'{jobname} for the stuck-row reaper')
+                resolve = False
             except Exception as e:
                 util_exceptions.ignore_exception(
                     f'network worker {index}', e)
             finally:
-                mariadb.resolve_work_item(queue_name, jobname)
+                if resolve:
+                    try:
+                        mariadb.resolve_work_item(queue_name, jobname)
+                    except DatabaseUnavailable:
+                        # Same recovery path as above: the row stays
+                        # claimed and the stuck-row reaper re-queues it.
+                        LOG.warning(
+                            f'Database service unavailable resolving work '
+                            f'item {jobname}, leaving it for the stuck-row '
+                            f'reaper')
                 util_concurrency.set_thread_name(f'net-worker-{index}')
 
     def execute(self):
@@ -179,56 +200,71 @@ class Job(util_concurrency.Job):
             # lifetime (NODE_UUID and NODE_IS_NETWORK_NODE don't change at
             # runtime). The first entry is highest priority -- the MariaDB
             # query honours that order via FIELD().
+            util_concurrency.set_thread_name('net-dispatcher')
             while daemon.check_abort_path(self.abort_path):
-                # One round trip claims up to BATCH_SIZE items in priority
-                # order; the win is the dispatcher gRPC count (1 instead
-                # of len(queue_names)) and that lower-priority queues
-                # spill in once the higher ones are exhausted within a
-                # single batch.
-                items = mariadb.dequeue_work_items(
-                    queue_names, limit=BATCH_SIZE)
+                try:
+                    # One round trip claims up to BATCH_SIZE items in
+                    # priority order; the win is the dispatcher gRPC count
+                    # (1 instead of len(queue_names)) and that
+                    # lower-priority queues spill in once the higher ones
+                    # are exhausted within a single batch.
+                    items = mariadb.dequeue_work_items(
+                        queue_names, limit=BATCH_SIZE)
 
-                if not items:
-                    if not was_previously_idle:
-                        util_concurrency.set_thread_name('idle')
-                        LOG.debug('This network thread is now idle')
-                        was_previously_idle = True
-                    time.sleep(0.2)
-                    continue
-
-                was_previously_idle = False
-                batch_size = len(items)
-                for queue_name, jobname, workitem in items:
-                    op_type = workitem.get('operation_type')
-                    op_uuid = workitem.get('operation_uuid')
-                    op = get_object_class(op_type).from_db(op_uuid)
-
-                    if not op:
-                        LOG.with_fields({
-                            'operation_type': op_type,
-                            'operation_uuid': op_uuid,
-                        }).error('Operation not found')
-                        mariadb.resolve_work_item(queue_name, jobname)
+                    if not items:
+                        if not was_previously_idle:
+                            util_concurrency.set_thread_name('idle')
+                            LOG.debug('This network thread is now idle')
+                            was_previously_idle = True
+                        time.sleep(0.2)
                         continue
 
-                    op.current_defer_count = workitem.get('defer_count', 0)
-                    index = (zlib.crc32(self._routing_key(op).encode())
-                             % worker_count)
-                    item = (queue_name, jobname, op, batch_size)
-                    # A blocking put with a timeout so shutdown stays
-                    # responsive while a full worker queue applies
-                    # backpressure.
-                    while daemon.check_abort_path(self.abort_path):
-                        try:
-                            worker_queues[index].put(item, timeout=1)
-                            break
-                        except queue_module.Full:
+                    if was_previously_idle:
+                        util_concurrency.set_thread_name('net-dispatcher')
+                        was_previously_idle = False
+                    batch_size = len(items)
+                    for queue_name, jobname, workitem in items:
+                        op_type = workitem.get('operation_type')
+                        op_uuid = workitem.get('operation_uuid')
+                        op = get_object_class(op_type).from_db(op_uuid)
+
+                        if not op:
+                            LOG.with_fields({
+                                'operation_type': op_type,
+                                'operation_uuid': op_uuid,
+                            }).error('Operation not found')
+                            mariadb.resolve_work_item(queue_name, jobname)
                             continue
 
-                    # Honour abort mid-batch so shutdown is responsive
-                    # even when a batch is large.
-                    if not daemon.check_abort_path(self.abort_path):
-                        break
+                        op.current_defer_count = workitem.get('defer_count', 0)
+                        index = (zlib.crc32(self._routing_key(op).encode())
+                                 % worker_count)
+                        item = (queue_name, jobname, op, batch_size)
+                        # A blocking put with a timeout so shutdown stays
+                        # responsive while a full worker queue applies
+                        # backpressure.
+                        while daemon.check_abort_path(self.abort_path):
+                            try:
+                                worker_queues[index].put(item, timeout=1)
+                                break
+                            except queue_module.Full:
+                                continue
+
+                        # Honour abort mid-batch so shutdown is responsive
+                        # even when a batch is large.
+                        if not daemon.check_abort_path(self.abort_path):
+                            break
+                except DatabaseUnavailable:
+                    # The database will come back; pause dispatch rather
+                    # than letting this thread die and churn through
+                    # supervisor restarts. Items claimed but not yet
+                    # routed when a mid-batch failure struck are
+                    # recovered by the stuck-row reaper, exactly as for
+                    # a worker crash.
+                    LOG.warning(
+                        'Database service unavailable, pausing network '
+                        'work dispatch')
+                    time.sleep(5)
         finally:
             for wq in worker_queues:
                 try:

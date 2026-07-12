@@ -71,8 +71,7 @@ def _health_checks():
         # The node record has not been created yet (an unreachable
         # database instead raises DatabaseUnavailable, which our
         # caller treats as unhealthy). Not healthy yet, keep waiting.
-        LOG.info('Node record for %s is not readable, waiting'
-                 % config.NODE_NAME)
+        LOG.info(f'Node record for {config.NODE_NAME} is not readable, waiting')
         return False
     if not _check_other_daemon(n, 'privexec'):
         healthy = False
