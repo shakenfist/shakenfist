@@ -558,7 +558,11 @@ def _get_engine() -> sa.Engine:
         _local.engine = sa.create_engine(
             url,
             pool_recycle=1800,   # Recycle connections after 30 minutes
-            echo=False           # Set True for SQL debugging
+            echo=False,          # Set True for SQL debugging
+            # BaseObject stores uuids as uuid.UUID objects, so any
+            # sa.JSON column payload may contain them. The stdlib
+            # encoder used by default raises TypeError on UUID.
+            json_serializer=_json_dumps
         )
         sa_event.listen(
             _local.engine, 'before_cursor_execute',
@@ -3176,7 +3180,7 @@ def _direct_set_metadata(
     table = _get_object_metadata_table()
 
     try:
-        metadata_json = json.dumps(metadata_dict) if metadata_dict is not None else None
+        metadata_json = _json_dumps(metadata_dict) if metadata_dict is not None else None
         with engine.connect() as conn:
             stmt = sa.dialects.mysql.insert(table).values(
                 object_uuid=object_uuid,
@@ -3269,7 +3273,7 @@ def _grpc_set_metadata(
             object_type=cast(
                 shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
             object_uuid=object_uuid,
-            metadata_json=json.dumps(metadata_dict) if metadata_dict is not None else ''
+            metadata_json=_json_dumps(metadata_dict) if metadata_dict is not None else ''
         )
         reply = _grpc_call(stub.SetMetadata, request)
         return bool(reply.success)
@@ -4575,7 +4579,7 @@ def _grpc_record_event_batch(events: list[EventRecord]) -> bool:
                 fqdn=record.fqdn,
                 duration=record.duration if record.duration is not None else 0.0,
                 message=record.message,
-                extra_json=json.dumps(record.extra) if record.extra is not None else '',
+                extra_json=_json_dumps(record.extra) if record.extra is not None else '',
                 request_id=record.request_id if record.request_id is not None else '',
                 objects=objects,
             ))
@@ -8523,7 +8527,7 @@ def _grpc_create_blob_attributes(data: BlobAttributesData) -> bool:
             data=database_pb2.BlobAttributesData(
                 uuid=str(data.uuid),
                 size=data.size,
-                info_json=json.dumps(data.info) if data.info else '{}',
+                info_json=_json_dumps(data.info) if data.info else '{}',
                 last_used=data.last_used if data.last_used is not None else 0,
                 has_last_used=data.last_used is not None,
                 expires_at=data.expires_at
@@ -8565,7 +8569,7 @@ def _grpc_update_blob_attributes(data: BlobAttributesData) -> bool:
             data=database_pb2.BlobAttributesData(
                 uuid=str(data.uuid),
                 size=data.size,
-                info_json=json.dumps(data.info) if data.info else '{}',
+                info_json=_json_dumps(data.info) if data.info else '{}',
                 last_used=data.last_used if data.last_used is not None else 0,
                 has_last_used=data.last_used is not None,
                 expires_at=data.expires_at
@@ -9764,27 +9768,27 @@ def _node_attrs_to_proto(
         is_network_node=data.is_network_node,
         is_eventlog_node=data.is_eventlog_node,
         is_database_node=data.is_database_node,
-        instances_json=json.dumps(data.instances),
-        daemons_json=json.dumps(data.daemons),
-        daemon_states_json=json.dumps(
+        instances_json=_json_dumps(data.instances),
+        daemons_json=_json_dumps(data.daemons),
+        daemon_states_json=_json_dumps(
             data.daemon_states
         ),
         qemu_version_json=(
-            json.dumps(data.qemu_version)
+            _json_dumps(data.qemu_version)
             if data.qemu_version is not None else ''
         ),
         has_qemu_version=(
             data.qemu_version is not None
         ),
         libvirt_version_json=(
-            json.dumps(data.libvirt_version)
+            _json_dumps(data.libvirt_version)
             if data.libvirt_version is not None else ''
         ),
         has_libvirt_version=(
             data.libvirt_version is not None
         ),
         python_version_json=(
-            json.dumps(data.python_version)
+            _json_dumps(data.python_version)
             if data.python_version is not None else ''
         ),
         has_python_version=(
@@ -9796,10 +9800,10 @@ def _node_attrs_to_proto(
         has_python_implementation=(
             data.python_implementation is not None
         ),
-        dependency_versions_json=json.dumps(
+        dependency_versions_json=_json_dumps(
             data.dependency_versions
         ),
-        process_metrics_json=json.dumps(
+        process_metrics_json=_json_dumps(
             data.process_metrics
         ),
     )
@@ -10484,8 +10488,8 @@ def _grpc_create_namespace_attributes(data: NamespaceAttributesData) -> bool:
         request = database_pb2.CreateNamespaceAttributesRequest(
             data=database_pb2.NamespaceAttributesProto(
                 name=data.name,
-                keys_json=json.dumps(data.keys),
-                trust_json=json.dumps(data.trust)))
+                keys_json=_json_dumps(data.keys),
+                trust_json=_json_dumps(data.trust)))
         reply = _grpc_call(stub.CreateNamespaceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -10518,8 +10522,8 @@ def _grpc_update_namespace_attributes(data: NamespaceAttributesData) -> bool:
         request = database_pb2.UpdateNamespaceAttributesRequest(
             data=database_pb2.NamespaceAttributesProto(
                 name=data.name,
-                keys_json=json.dumps(data.keys),
-                trust_json=json.dumps(data.trust)))
+                keys_json=_json_dumps(data.keys),
+                trust_json=_json_dumps(data.trust)))
         reply = _grpc_call(stub.UpdateNamespaceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -13480,7 +13484,7 @@ def _direct_create_network_attributes(
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
                 floating_gateway=data.floating_gateway,
-                hosteddns=json.dumps(data.hosteddns))
+                hosteddns=_json_dumps(data.hosteddns))
             conn.execute(stmt)
             conn.commit()
             return True
@@ -13536,7 +13540,7 @@ def _network_attributes_column_values(
     """
     all_values: Dict[str, Any] = {
         'floating_gateway': data.floating_gateway,
-        'hosteddns': json.dumps(data.hosteddns),
+        'hosteddns': _json_dumps(data.hosteddns),
     }
     if not fields:
         return all_values
@@ -13744,7 +13748,7 @@ def _grpc_create_network_attributes(
                 uuid=str(data.uuid),
                 floating_gateway=(
                     data.floating_gateway or ''),
-                hosteddns_json=json.dumps(data.hosteddns)))
+                hosteddns_json=_json_dumps(data.hosteddns)))
         reply = _grpc_call(stub.CreateNetworkAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -13795,7 +13799,7 @@ def _grpc_update_network_attributes(
                 uuid=str(data.uuid),
                 floating_gateway=(
                     data.floating_gateway or ''),
-                hosteddns_json=json.dumps(data.hosteddns)),
+                hosteddns_json=_json_dumps(data.hosteddns)),
             fields=fields or [])
         reply = _grpc_call(stub.UpdateNetworkAttributes, request)
         return bool(reply.success)
@@ -14108,7 +14112,7 @@ def _direct_create_agent_operation(data: AgentOperationData) -> bool:
                 uuid=data.uuid,
                 namespace=data.namespace,
                 instance_uuid=data.instance_uuid,
-                commands=json.dumps(data.commands),
+                commands=_json_dumps(data.commands),
                 version=data.version
             )
             conn.execute(stmt)
@@ -14200,7 +14204,7 @@ def _direct_create_agent_operation_attributes(
         with engine.connect() as conn:
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
-                results=json.dumps(data.results))
+                results=_json_dumps(data.results))
             conn.execute(stmt)
             conn.commit()
             return True
@@ -14256,7 +14260,7 @@ def _direct_update_agent_operation_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                results=json.dumps(data.results))
+                results=_json_dumps(data.results))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -14301,7 +14305,7 @@ def _grpc_create_agent_operation(data: AgentOperationData) -> bool:
                 uuid=str(data.uuid),
                 namespace=data.namespace or '',
                 instance_uuid=str(data.instance_uuid),
-                commands_json=json.dumps(data.commands),
+                commands_json=_json_dumps(data.commands),
                 version=data.version
             )
         )
@@ -14363,7 +14367,7 @@ def _grpc_create_agent_operation_attributes(
         request = database_pb2.CreateAgentOperationAttributesRequest(
             data=database_pb2.AgentOperationAttributesProto(
                 uuid=str(data.uuid),
-                results_json=json.dumps(data.results)))
+                results_json=_json_dumps(data.results)))
         reply = _grpc_call(stub.CreateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -14405,7 +14409,7 @@ def _grpc_update_agent_operation_attributes(
         request = database_pb2.UpdateAgentOperationAttributesRequest(
             data=database_pb2.AgentOperationAttributesProto(
                 uuid=str(data.uuid),
-                results_json=json.dumps(data.results)))
+                results_json=_json_dumps(data.results)))
         reply = _grpc_call(stub.UpdateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -18318,7 +18322,7 @@ def _grpc_set_cluster_config(key_name: str, value: Any) -> None:
 
     request = database_pb2.SetClusterConfigRequest(
         key_name=key_name,
-        value_json=json.dumps(value),
+        value_json=_json_dumps(value),
     )
     response = _grpc_call(stub.SetClusterConfig, request)
     if response is not None and not response.success:

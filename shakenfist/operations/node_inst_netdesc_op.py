@@ -128,7 +128,15 @@ class NodeInstNetdescOp(BaseClusterOperation):
         except Exception as e:
             util_exceptions.ignore_exception('node_inst_netdesc_op', e)
             inst.enqueue_delete_due_error(f'Unhandled error: {e}')
-            self.state = NodeInstNetdescOp.STATE_ERROR
+            try:
+                self.state = NodeInstNetdescOp.STATE_ERROR
+            except InvalidStateException:
+                # The operation may already be in a terminal state (for
+                # example abort, if a previous execution of this work item
+                # aborted it). Raising out of this handler would kill the
+                # queue worker thread.
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'failed to mark operation as errored')
 
     def _instance_preflight(self, inst):
         state = inst.state.value
@@ -171,10 +179,16 @@ class NodeInstNetdescOp(BaseClusterOperation):
             candidates = s.find_candidates(inst, candidates=candidates)
             inst.place_instance(candidates[0])
 
-            redirected = NodeInstNetdescOp.new(
+            # Cluster operations are created in database transactions and
+            # do not have .new() methods; the schema-layer helper is the
+            # only way to mint one.
+            schema.create_and_enqueue(
                 candidates[0], self.instance_uuid, self.net_desc,
                 self.tasks, self.priority, self.request_id)
-            redirected.enqueue()
+            add_event_multi(
+                EVENT_TYPE_AUDIT, [self, inst],
+                'instance start redirected to another node',
+                extra={'target_node': candidates[0]})
 
             try:
                 self.state = NodeInstNetdescOp.STATE_ABORT

@@ -1,6 +1,7 @@
 import json
 import os
 import pathlib
+import threading
 import time
 
 from shakenfist_utilities import logs  # noreorder
@@ -172,6 +173,14 @@ def restore_instances():
     n.instances = instance_uuids
 
 
+def _restore_instances_in_background():
+    try:
+        restore_instances()
+        LOG.info('Background instance restore complete')
+    except Exception as e:
+        util_exceptions.ignore_exception('startup instance restore', e)
+
+
 def _resolve_node_uuid():
     """Populate config.NODE_UUID if not already set.
 
@@ -243,4 +252,21 @@ def startup_tasks():
     # Ensure the blob data store is the most recent version
     upgrade_blob_datastore()
 
-    restore_instances()
+    # Restore this node's networks and instances in the background.
+    # The network restore enqueues cluster operations on this node's
+    # own clusteroperation queues and then waits for them, but the
+    # only consumer of those queues is this daemon's worker pool,
+    # which starts once startup_tasks() has returned (and systemd
+    # only considers the unit started once READY is signalled after
+    # that). Blocking here therefore deadlocks startup until
+    # TimeoutStartSec kills the daemon whenever the node has running
+    # instances -- observed during the first in-flight sfcbr upgrade
+    # on 2026-07-12. The thread's waits complete normally once the
+    # main loop is consuming; ordering is safe because instance
+    # create operations carry depends_on references to the network
+    # operations they need.
+    restore_thread = threading.Thread(
+        target=_restore_instances_in_background, daemon=True,
+        name='startup-restore')
+    restore_thread.start()
+    return restore_thread
