@@ -182,7 +182,6 @@ class SideChannelMonitorJob(SideChannelJob):
         self._record_system_boot_time(response.boot_time)
 
     def _handle_is_system_running(self, reply, sock):
-        self.log.debug('...is system running reply')
         response = reply.is_system_running_reply
         if response.result:
             new_state = constants.AGENT_READY
