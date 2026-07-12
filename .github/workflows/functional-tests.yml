@@ -67,6 +67,12 @@ jobs:
         id: filter
         if: github.event_name != 'workflow_dispatch'
         with:
+          # By default a file matches the filter if it matches ANY listed
+          # pattern, which makes '**' match everything and silently
+          # defeats the '!docs/**' exclusions. 'every' requires a file to
+          # match ALL patterns, which is the correct semantics for an
+          # "everything except docs" filter.
+          predicate-quantifier: 'every'
           filters: |
             code:
               - '**'
@@ -294,7 +300,10 @@ jobs:
   # can_merge.
   functional_matrix_merge_collection:
     name: "${{ matrix.merge.name }} (collection)"
-    if: github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
+    if: >-
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
+      && needs.check_paths.outputs.code_changed != 'false'
+    needs: [check_paths]
     strategy:
       fail-fast: false
       matrix:
@@ -363,7 +372,10 @@ jobs:
   # shakenfist.shakenfist collection. Gated by can_merge.
   ansible_modules_collection:
     name: "Ansible modules (collection)"
-    if: github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
+    if: >-
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
+      && needs.check_paths.outputs.code_changed != 'false'
+    needs: [check_paths]
     uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
     secrets: inherit
     with:
