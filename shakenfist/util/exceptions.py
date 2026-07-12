@@ -59,7 +59,23 @@ def record_exception(
 
         # Persist
         os.write(fd, json.dumps(data, indent=4, sort_keys=True).encode())
-        LOG.with_fields(data).debug('Recorded exception')
+
+        # An exception noteworthy enough to record is noteworthy enough
+        # to reach centralised logging, which generally ships INFO and
+        # above. Log the first occurrence of a given traceback hash at
+        # WARNING with the full detail; repeats log a compact line at
+        # DEBUG so a hot loop does not flood the aggregator (the
+        # on-disk file keeps the authoritative count and event times).
+        log_ctx = LOG.with_fields({
+            'exception_hash': h,
+            'exception_class': exc_type.__name__ if exc_type else None,
+            'count': data['count'],
+        })
+        if data['count'] == 1:
+            log_ctx.with_fields({'traceback': traceback_str}).warning(
+                'Recorded new exception')
+        else:
+            log_ctx.debug('Recorded repeat exception')
 
     except Exception as e:
         # Ignore the exception here because we're already on the error path
