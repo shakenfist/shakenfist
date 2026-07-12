@@ -158,7 +158,6 @@ class SideChannelMonitorJob(SideChannelJob):
                 command_id=sf_random.random_id(),
                 is_system_running_request=agent_pb2.IsSystemRunningRequest()
             )
-            self.log.debug('...is system running request')
 
         self._send_commands_single_envelope(sock, [request])
 
