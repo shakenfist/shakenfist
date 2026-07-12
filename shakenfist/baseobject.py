@@ -103,7 +103,6 @@ def _maintain_version_cache(max_cache_age):
             continue
 
         metrics[node_fqdn] = d['metrics']
-        log.debug('Considering metrics entry')
 
     for possible_objname in ObjectType:
         nodes_by_version = defaultdict(list, [])
