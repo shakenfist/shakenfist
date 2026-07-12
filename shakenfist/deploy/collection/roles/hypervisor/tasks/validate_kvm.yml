@@ -2,6 +2,21 @@
 # Preflight check: confirm this host can actually run KVM. The consuming
 # playbook runs this via:
 #   include_role: { name: shakenfist.shakenfist.hypervisor, tasks_from: validate_kvm }
+
+# The node role's bootstrap also installs cpu-checker, but this preflight
+# runs before bootstrap in the example playbooks -- on a greenfield host
+# kvm-ok does not exist yet, so the preflight must own its tool.
+- name: Install cpu-checker for kvm-ok
+  ansible.builtin.apt:
+    name: cpu-checker
+    state: present
+  register: apt_action
+  retries: 100
+  until: >-
+    apt_action is success or
+    ('Failed to lock apt for exclusive operation' not in apt_action.msg and
+     '/var/lib/dpkg/lock' not in apt_action.msg)
+
 - name: Check that we can run KVM
   ansible.builtin.command: kvm-ok
   changed_when: false

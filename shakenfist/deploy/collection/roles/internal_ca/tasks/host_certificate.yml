@@ -51,7 +51,8 @@
       encryption_key
       signing_key
     dest: "{{ host_template_path }}"
-    owner: root
+    # No owner: see bootstrap.yml -- rootless control nodes cannot
+    # chown, and a root-run creates root-owned files anyway.
     mode: u=r
   delegate_to: localhost
   delegate_facts: true

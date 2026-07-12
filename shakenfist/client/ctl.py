@@ -111,7 +111,9 @@ if os.path.exists('/etc/sf/config'):
             if line == '':
                 continue
 
-            key, value = line.split('=')
+            # Values may legitimately contain '=' (base64 padding, URLs
+            # with query strings), so split on the first one only.
+            key, value = line.split('=', 1)
             value = value.strip('\'"')
 
             if key not in os.environ:
