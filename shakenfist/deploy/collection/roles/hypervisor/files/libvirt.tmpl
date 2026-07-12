@@ -200,6 +200,10 @@
       <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
     </video>
     <memballoon model='virtio'>
+      <!-- The stats period makes the balloon driver report guest internal
+           memory statistics (unused, available, swap activity) every 10
+           seconds, which surface in instance usage events. -->
+      <stats period='10'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
     </memballoon>
 
