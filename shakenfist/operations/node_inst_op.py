@@ -95,8 +95,18 @@ class NodeInstOp(BaseClusterOperation):
         except Exception as e:
             util_exceptions.ignore_exception('node_inst_op', e)
             self.state = NodeInstOp.STATE_ERROR
-            if inst:
-                inst.state = Instance.STATE_ERROR
+            if inst and inst.state.value not in (Instance.STATE_DELETED,
+                                                 Instance.STATE_HARD_DELETED):
+                # A blind STATE_ERROR is an invalid transition from states
+                # with a specific error variant (delete-wait must go to
+                # delete-wait-error) and would raise out of this handler,
+                # abandoning the instance in its current state. Use the
+                # same suffix-then-fallback pattern as
+                # Instance.enqueue_delete_due_error.
+                try:
+                    inst.state = f'{inst.state.value}-error'
+                except Exception:
+                    inst.state = Instance.STATE_ERROR
 
     def _collect_billing_statistics(self, inst):
         with util_libvirt.LibvirtConnection() as lc:
