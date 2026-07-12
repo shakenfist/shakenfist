@@ -5,6 +5,7 @@ import psutil
 import setproctitle
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import exceptions
 from shakenfist import locks as sf_locks
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -65,7 +66,13 @@ def _check_other_daemon(n, daemon_name, override_daemon_name=None):
 
 def _health_checks():
     healthy = True
-    n = Node.from_db(config.NODE_NAME)
+    n = Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
+    if not n:
+        # The node record has not been created yet (an unreachable
+        # database instead raises DatabaseUnavailable, which our
+        # caller treats as unhealthy). Not healthy yet, keep waiting.
+        LOG.info(f'Node record for {config.NODE_NAME} is not readable, waiting')
+        return False
     if not _check_other_daemon(n, 'privexec'):
         healthy = False
     if not _check_other_daemon(n, 'nodelock'):
@@ -86,7 +93,13 @@ def _block_until_healthy(abort_path=None):
     systemd's TimeoutStopSec elapses and it gets SIGKILLed.
     """
     start_time = time.time()
-    while not _health_checks():
+    while True:
+        try:
+            if _health_checks():
+                return
+        except exceptions.DatabaseUnavailable:
+            LOG.info('Database service unavailable during health checks, '
+                     'waiting')
         if abort_path and not daemon.check_abort_path(abort_path):
             LOG.info(
                 'Aborting health check loop because of pending shutdown')
@@ -140,6 +153,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if not self.dequeue_job(workitem.Job):
                     self.idle(0.2)
 
+            except exceptions.DatabaseUnavailable:
+                # Not an error to be ignored noisily: the database will
+                # come back, and _block_until_healthy() knows how to wait
+                # for it.
+                LOG.warning(
+                    'Database service unavailable, pausing queue processing')
+                _block_until_healthy(abort_path=self.abort_path)
             except Exception as e:
                 util_exceptions.ignore_exception('queue worker', e)
 

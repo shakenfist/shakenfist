@@ -441,12 +441,29 @@ class Network(dbowo):
         enqueued ``net_macaddr_ip_op``, so blocking on the op via
         ``raise_for_error()`` is safe (no self-enqueue deadlock)
         and preserves the previous synchronous-with-exception
-        semantics.
+        semantics for genuine failures.
+
+        An ``OperationTimeout`` is deliberately not propagated: it
+        means the op is still queued, not that it failed. Under load
+        the networknode queue can back up past ``API_ASYNC_WAIT``
+        (parallel CI teardown has been observed queueing ops for 90+
+        seconds) and the op still executes when dequeued. The lease
+        removal is idempotent housekeeping, so failing the caller --
+        usually an instance delete -- over queue latency wedges the
+        instance for no benefit.
         """
         if ni.ipv4:
             op = self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
             if op is not None:
-                op.raise_for_error()
+                try:
+                    op.raise_for_error()
+                except exceptions.OperationTimeout:
+                    self.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'timed out waiting for dhcp lease removal, '
+                        'the op remains queued and will still execute',
+                        extra={'op_uuid': str(op.uuid),
+                               'networkinterface': str(ni.uuid)})
 
     def _update_floating_gateway(self, gateway):
         attrs = self._ensure_attributes()

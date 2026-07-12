@@ -204,21 +204,35 @@ per-API guidance and a code example.
 
 #### gRPC Reliability
 
-All gRPC calls use `timeout=30` seconds and `wait_for_ready=True` to handle
-transient service unavailability during startup or momentary congestion. The
-`_grpc_call()` helper in `mariadb.py` enforces this for all database service
-calls and retries up to 3 times on UNAVAILABLE/DEADLINE_EXCEEDED errors with
-channel reset between attempts. The database gRPC channel uses HTTP/2
-keepalive (ping every 10s, 5s timeout) to detect stale connections before
-they cause failures. The database gRPC server uses a 20-thread pool to
-handle concurrent requests from all daemons. The database client in
-`database.py` uses the `_retry_database` decorator for exponential backoff
-retries on transient failures. All gRPC failures are logged at ERROR level.
+All gRPC calls use `timeout=30` seconds. The `_grpc_call()` helper in
+`mariadb.py` enforces this for all database service calls and retries up to
+3 times on UNAVAILABLE/DEADLINE_EXCEEDED errors with channel reset between
+attempts (`wait_for_ready` is deliberately left at the default of False so
+a wedged subchannel fails fast into this retry path instead of parking the
+caller). Once those retries are exhausted, `_grpc_call()` raises
+`shakenfist.exceptions.DatabaseUnavailable` rather than the underlying
+RpcError. The client wrappers in `mariadb.py` translate non-retryable
+RpcErrors into "object not found" return values (`None`/`False`/`[]`), but
+`DatabaseUnavailable` is deliberately not an RpcError subclass and
+propagates through them: an unreachable database must not be
+indistinguishable from a missing object. The few hot paths that
+intentionally tolerate an unreachable database catch it explicitly --
+`Daemon.check_daemon_state()` skips the check, `ClusterLock.__enter__`
+keeps retrying inside the caller's timeout, and the queues daemon's health
+loop treats it as unhealthy and waits.
 
-`get_objects_by_state()` returns `None` on error (distinct from `[]` for no
-matches). All object iterators handle this by falling back to unfiltered
-scans, ensuring that transient gRPC failures do not silently drop objects
-from iteration results (e.g. interfaces during instance deletion).
+The database gRPC channel uses HTTP/2 keepalive (ping every 10s, 5s
+timeout) to detect stale connections before they cause failures. The
+database gRPC server uses a 20-thread pool to handle concurrent requests
+from all daemons. The database client in `database.py` uses the
+`_retry_database` decorator for exponential backoff retries on transient
+failures. All gRPC failures are logged at ERROR level.
+
+`get_objects_by_state()` returns `None` on non-retryable errors (distinct
+from `[]` for no matches). All object iterators handle this by falling back
+to unfiltered scans, ensuring that such failures do not silently drop
+objects from iteration results (e.g. interfaces during instance deletion).
+A database outage instead raises `DatabaseUnavailable` out of the iterator.
 
 Object iterators read from MariaDB via `get_all_*()` functions. All
 object static values now live in MariaDB.

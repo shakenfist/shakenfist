@@ -2,6 +2,7 @@ from unittest import mock
 
 from shakenfist import instance
 from shakenfist.config import BaseSettings
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.daemons.cleaner import main as cleaner_main
 from shakenfist.daemons.cleaner import scheduled_tasks as cleaner_st
 from shakenfist.tests import base
@@ -143,6 +144,48 @@ class CleanerTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 state, inst_attrs.power_state['power_state'],
                 f'State for instance "{name}" does not match "{state}"')
+
+
+class CleanerCrashedInstanceTestCase(CleanerTestCase):
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks.util_concurrency.execute')
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_crashed_delete_wait_instance_is_marked_deleted(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists,
+            mock_execute):
+        """A crashed domain whose instance is in delete-wait must really
+        transition to deleted. The old code assigned to the returned
+        State object's value attribute (inst.state.value = ...), which
+        persisted nothing, so the reaped instance stayed in delete-wait
+        forever.
+        """
+        global _test_instance_uuids
+
+        instance_uuids = {}
+        for name in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
+            inst = self.mock_etcd.create_instance(
+                name, set_state=instance.Instance.STATE_CREATED)
+            instance_uuids[name] = str(inst.uuid)
+        _test_instance_uuids = instance_uuids
+
+        crashed = instance.Instance.from_db(instance_uuids['crashed'])
+        crashed.state = instance.Instance.STATE_DELETE_WAIT
+
+        cleaner_st.update_power_states()
+
+        # The stray domain was undefined...
+        undefines = [c for c in mock_execute.call_args_list
+                     if 'virsh undefine' in c[0][0]]
+        self.assertEqual(1, len(undefines))
+        self.assertIn(instance_uuids['crashed'], undefines[0][0][0])
+
+        # ... and the state change was persisted.
+        db_state = self.mock_etcd.get_mariadb_state(
+            ObjectType.INSTANCE, instance_uuids['crashed'])
+        self.assertEqual(instance.Instance.STATE_DELETED, db_state['value'])
 
 
 class CleanerWatchdogTestCase(base.ShakenFistTestCase):

@@ -231,6 +231,12 @@ This abstraction layer:
 - Only the database daemon has direct access to MariaDB
 - Provides prometheus metrics for all database operations
 - Enables clean separation of concerns
+- Raises `shakenfist.exceptions.DatabaseUnavailable` once gRPC retries are
+  exhausted against an unreachable database service, so "not found" return
+  values (`None`/`False`/`[]`) always mean the object genuinely is not
+  there. Code that intentionally tolerates an unreachable database must
+  catch `DatabaseUnavailable` explicitly (see `Daemon.check_daemon_state()`
+  and `ClusterLock.__enter__` for examples)
 
 Configuration options:
 - `MARIADB_GATEWAY_HOSTS` - List of `sf-database` gRPC endpoints that clients

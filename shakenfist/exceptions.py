@@ -100,6 +100,16 @@ class DatabaseException(Exception):
     ...
 
 
+class DatabaseUnavailable(DatabaseException):
+    """Raised when the database service cannot be reached (retries on
+    UNAVAILABLE or DEADLINE_EXCEEDED exhausted). Deliberately not a
+    grpc.RpcError subclass so the mariadb.py client wrappers, which
+    map RpcError to "object not found" return values, let it propagate
+    to callers instead -- an unreachable database must not be
+    indistinguishable from a missing object (issue 3373)."""
+    ...
+
+
 class LockException(DatabaseException):
     ...
 

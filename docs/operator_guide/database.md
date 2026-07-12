@@ -274,6 +274,32 @@ MariaDB connectivity is restored. Recovery is asymmetric: once
 `/readyz` returns `200` and the worker is restored to rotation
 automatically.
 
+### Client behaviour during an outage
+
+When a daemon cannot reach any `sf-database` instance, its gRPC calls
+retry up to three times on UNAVAILABLE / DEADLINE_EXCEEDED (resetting the
+channel between attempts) and then raise
+`shakenfist.exceptions.DatabaseUnavailable`. This is deliberately distinct
+from the "object not found" return values the client library uses for
+genuinely missing objects, so code never mistakes an outage for a missing
+object and, for example, cleans up something that still exists.
+
+What an operator sees during an outage:
+
+- Daemon work loops log the `DatabaseUnavailable` errors and retry; they
+  do not exit. The queues daemon explicitly pauses queue processing and
+  waits for its health checks to pass again.
+- Held cluster locks survive short outages: the lock refresher retries
+  every ~2s and the lease only lapses if the outage outlives it (see the
+  [locks documentation](locks.md)). Lock *acquisition* keeps retrying
+  inside the caller's timeout.
+- `sf-api` returns 500s for requests that need the database, and its
+  `/readyz` endpoint goes 503 (via the `sf-database` health signal above)
+  so load balancers drain it until the database returns.
+
+Recovery is automatic once an `sf-database` instance is reachable again;
+no daemon restarts are required.
+
 ## Administrative Commands
 
 The `sf-ctl` command provides several database-related administrative functions.

@@ -223,6 +223,16 @@ class SFConfig(BaseSettings):
         8000,
         description='Maximum network MTU our hypervisors can safely set.'
     )
+    NETWORK_OPERATION_WORKERS: int = Field(
+        4,
+        description=(
+            'Number of concurrent network cluster-operation worker threads '
+            'in the net daemon. Operations are partitioned across workers '
+            'by target network, so ops for the same network always execute '
+            'in order on the same worker while different networks proceed '
+            'in parallel. Set to 1 to restore fully serial execution.'
+        )
+    )
     IP_DELETION_HALO_DURATION: int = Field(
         300,
         description='How long an IP is unusable for after being released.'

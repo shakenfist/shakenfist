@@ -142,7 +142,7 @@ def update_power_states():
                     if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
                         util_concurrency.execute(
                             f'virsh undefine --nvram "sf:{instance_uuid}"')
-                        inst.state.value = dbo.STATE_DELETED
+                        inst.state = dbo.STATE_DELETED
                     else:
                         inst.state = inst.state.value + '-error'
 
@@ -200,7 +200,7 @@ def update_power_states():
                         inst.add_event(EVENT_TYPE_AUDIT,
                                        'deleted stray instance')
                         if db_state.value != dbo.STATE_DELETED:
-                            inst.state.value = dbo.STATE_DELETED
+                            inst.state = dbo.STATE_DELETED
                         continue
 
                     inst.place_instance(config.NODE_UUID)
@@ -214,7 +214,7 @@ def update_power_states():
                         inst.add_event(EVENT_TYPE_AUDIT,
                                        'instance files missing')
                         if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
-                            inst.state.value = dbo.STATE_DELETED
+                            inst.state = dbo.STATE_DELETED
                         else:
                             inst.state = inst.state.value + '-error'
 

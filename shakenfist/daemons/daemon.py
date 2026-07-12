@@ -19,6 +19,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist import mariadb
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
@@ -333,10 +334,16 @@ class Daemon:
             set_abort_path(self.abort_path, 'from exit_gracefully')
 
     def check_daemon_state(self):
-        n = Node.this_node(suppress_failure_audit=True)
-        if not n:
+        # This runs every 0.2 seconds via idle() in every daemon, so an
+        # unreachable database must not propagate from here -- we just
+        # can't check right now, and will again shortly.
+        try:
+            n = Node.this_node(suppress_failure_audit=True)
+            if not n:
+                return
+            daemon_state = n.get_daemon_state(self.daemon_name).value
+        except DatabaseUnavailable:
             return
-        daemon_state = n.get_daemon_state(self.daemon_name).value
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:
             set_abort_path(self.abort_path, 'from check_daemon_state')

@@ -1297,6 +1297,56 @@ class NetworkInternalSiblingCallsTestCase(NetworkTestCase):
             '192.168.1.10', 'aa:bb:cc:dd:ee:ff')
         fake_op.raise_for_error.assert_called_once_with()
 
+    def test_remove_networkinterface_lease_tolerates_op_timeout(self):
+        """An OperationTimeout from raise_for_error means the op is
+        still queued, not that it failed -- under load the networknode
+        queue can back up past API_ASYNC_WAIT and the op executes when
+        dequeued. The timeout must not propagate (it used to fail the
+        calling instance delete, wedging the instance in delete-wait),
+        but it should leave an audit event behind.
+        """
+        n, _ = self._make_network(provide_dhcp=True, provide_dns=True,
+                                  provide_nat=False)
+
+        fake_op = mock.MagicMock()
+        fake_op.uuid = str(uuid.uuid4())
+        fake_op.raise_for_error.side_effect = exceptions.OperationTimeout(
+            'operation did not reach terminal state within 60s')
+        with mock.patch.object(
+                network.Network, 'remove_dhcp_lease',
+                return_value=fake_op):
+            with mock.patch.object(
+                    network.Network, 'add_event') as mock_add_event:
+                ni = mock.MagicMock()
+                ni.ipv4 = '192.168.1.10'
+                ni.macaddr = 'aa:bb:cc:dd:ee:ff'
+                ni.uuid = str(uuid.uuid4())
+                # Should not raise.
+                n.remove_networkinterface_lease(ni)
+
+        fake_op.raise_for_error.assert_called_once_with()
+        mock_add_event.assert_called_once()
+
+    def test_remove_networkinterface_lease_propagates_op_failure(self):
+        """A genuine op failure (NetworkOperationFailed) must still
+        propagate to the caller -- only queue latency is tolerated.
+        """
+        n, _ = self._make_network(provide_dhcp=True, provide_dns=True,
+                                  provide_nat=False)
+
+        fake_op = mock.MagicMock()
+        fake_op.raise_for_error.side_effect = \
+            exceptions.NetworkOperationFailed(mock.MagicMock())
+        with mock.patch.object(
+                network.Network, 'remove_dhcp_lease',
+                return_value=fake_op):
+            ni = mock.MagicMock()
+            ni.ipv4 = '192.168.1.10'
+            ni.macaddr = 'aa:bb:cc:dd:ee:ff'
+            self.assertRaises(
+                exceptions.NetworkOperationFailed,
+                n.remove_networkinterface_lease, ni)
+
     def test_remove_networkinterface_lease_handles_none_op(self):
         """When the network has neither DHCP nor DNS, ``remove_dhcp_lease``
         returns ``None``. The caller must not blow up on the absent op

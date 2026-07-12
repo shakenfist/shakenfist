@@ -125,6 +125,77 @@ class RecordExceptionTestCase(base.ShakenFistTestCase):
         self.assertEqual(h1, h2)
 
 
+class RecordExceptionLoggingTestCase(base.ShakenFistTestCase):
+    """The first occurrence of a traceback hash must be logged above
+    DEBUG so it survives shipping to centralised logging; repeats stay
+    at DEBUG so hot loops do not flood the aggregator.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # Stop the global mock of record_exception so we can test the real
+        # function
+        self.mock_record_exception_patcher.stop()
+
+        self.temp_dir = tempfile.mkdtemp()
+        self.exceptions_path = os.path.join(self.temp_dir, 'exceptions')
+        os.makedirs(self.exceptions_path, exist_ok=True)
+
+    def tearDown(self):
+        super().tearDown()
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_first_occurrence_warns_repeats_debug(self):
+        real_os_open = os.open
+        exceptions_path = self.exceptions_path
+
+        def redirect_open(path, flags, mode):
+            new_path = path.replace('/srv/shakenfist/exceptions',
+                                    exceptions_path)
+            return real_os_open(new_path, flags, mode)
+
+        def raise_and_record():
+            try:
+                raise TypeError('type mismatch')
+            except TypeError:
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                util_exceptions.record_exception(exc_type, exc_value, exc_tb)
+
+        with mock.patch('shakenfist.util.exceptions.os.makedirs'):
+            with mock.patch('shakenfist.util.exceptions.os.open',
+                            side_effect=redirect_open):
+                with mock.patch(
+                        'shakenfist.util.exceptions.LOG') as mock_log:
+                    raise_and_record()
+
+                    log_ctx = mock_log.with_fields.return_value
+                    log_ctx.with_fields.return_value.warning\
+                        .assert_called_once_with('Recorded new exception')
+                    log_ctx.debug.assert_not_called()
+
+                    # The WARNING context must carry the correlation
+                    # fields and the full traceback.
+                    fields = mock_log.with_fields.call_args[0][0]
+                    self.assertEqual('TypeError',
+                                     fields['exception_class'])
+                    self.assertEqual(1, fields['count'])
+                    self.assertIn('exception_hash', fields)
+                    detail = log_ctx.with_fields.call_args[0][0]
+                    self.assertIn('type mismatch', detail['traceback'])
+
+                    mock_log.reset_mock()
+                    raise_and_record()
+
+                    log_ctx = mock_log.with_fields.return_value
+                    log_ctx.debug.assert_called_once_with(
+                        'Recorded repeat exception')
+                    log_ctx.with_fields.return_value.warning\
+                        .assert_not_called()
+                    fields = mock_log.with_fields.call_args[0][0]
+                    self.assertEqual(2, fields['count'])
+
+
 class IgnoreExceptionTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.util.exceptions.record_exception')
     @mock.patch('shakenfist.util.exceptions.LOG')

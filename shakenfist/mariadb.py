@@ -351,7 +351,10 @@ def _grpc_call(method: Any, request: Any) -> Any:
 
     Retries on UNAVAILABLE and DEADLINE_EXCEEDED with a short delay
     between attempts. Resets the gRPC channel after persistent failures
-    so the next attempt gets a fresh connection.
+    so the next attempt gets a fresh connection. Once retries are
+    exhausted, raises exceptions.DatabaseUnavailable rather than the
+    underlying RpcError; non-retryable RpcErrors are raised as-is on
+    the first attempt.
 
     The method parameter is a bound method on the stub (e.g.
     stub.GetNode). On retry we must re-resolve the method from a
@@ -426,7 +429,12 @@ def _grpc_call(method: Any, request: Any) -> Any:
 
     LOG.error(
         f'gRPC {method_name or "call"} failed after {GRPC_RETRIES} attempts')
-    raise last_error
+    # Raise a non-RpcError so the client wrappers below, which translate
+    # RpcError into "object not found" return values, let an exhausted
+    # outage propagate to the caller instead (issue 3373).
+    raise exceptions.DatabaseUnavailable(
+        f'database service unreachable: gRPC {method_name or "call"} '
+        f'failed after {GRPC_RETRIES} attempts') from last_error
 
 
 # =============================================================================

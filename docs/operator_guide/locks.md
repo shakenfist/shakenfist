@@ -71,6 +71,14 @@ holder keeps the lock without a re-election. The `RefreshLock` gRPC
 handler signals `UNAVAILABLE` on transient MariaDB errors so the
 client side's standard retry path applies.
 
+On the acquire side, an outage that outlives the gRPC client's own
+retries raises `shakenfist.exceptions.DatabaseUnavailable` out of
+`acquire()`. The context-manager entry path treats that the same as
+"lock not acquired yet" and keeps retrying until the caller's
+timeout, so a short outage during acquisition costs latency rather
+than an error, and a long one surfaces as the usual
+`LockException` timeout.
+
 ## Watchdog-assisted lock failover
 
 The lease mechanism above handles the case where a lock holder **dies**:
