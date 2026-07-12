@@ -108,7 +108,7 @@ dependencies = [
     "linux-utils==0.7",
     "MarkupSafe==3.0.3",
     "marshmallow==4.3.0",
-    "mistune==3.3.2",
+    "mistune==3.3.3",
     "mixed-methods==1.1.1",
     "named==1.4.2",
     "orderings==1.6.0",
