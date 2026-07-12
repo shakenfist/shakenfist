@@ -9137,6 +9137,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#client-behaviour-during-an-outage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client behaviour during an outage
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -10054,6 +10065,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#client-behaviour-during-an-outage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client behaviour during an outage
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -10823,6 +10845,29 @@ MariaDB connectivity is restored. Recovery is asymmetric: once
 <code>sf-database</code> recovers and the checker sees a single <code>SERVING</code> response,
 <code>/readyz</code> returns <code>200</code> and the worker is restored to rotation
 automatically.</p>
+<h3 id="client-behaviour-during-an-outage">Client behaviour during an outage<a class="headerlink" href="#client-behaviour-during-an-outage" title="Permanent link">&para;</a></h3>
+<p>When a daemon cannot reach any <code>sf-database</code> instance, its gRPC calls
+retry up to three times on UNAVAILABLE / DEADLINE_EXCEEDED (resetting the
+channel between attempts) and then raise
+<code>shakenfist.exceptions.DatabaseUnavailable</code>. This is deliberately distinct
+from the "object not found" return values the client library uses for
+genuinely missing objects, so code never mistakes an outage for a missing
+object and, for example, cleans up something that still exists.</p>
+<p>What an operator sees during an outage:</p>
+<ul>
+<li>Daemon work loops log the <code>DatabaseUnavailable</code> errors and retry; they
+  do not exit. The queues daemon explicitly pauses queue processing and
+  waits for its health checks to pass again.</li>
+<li>Held cluster locks survive short outages: the lock refresher retries
+  every ~2s and the lease only lapses if the outage outlives it (see the
+  <a href="../locks/">locks documentation</a>). Lock <em>acquisition</em> keeps retrying
+  inside the caller's timeout.</li>
+<li><code>sf-api</code> returns 500s for requests that need the database, and its
+  <code>/readyz</code> endpoint goes 503 (via the <code>sf-database</code> health signal above)
+  so load balancers drain it until the database returns.</li>
+</ul>
+<p>Recovery is automatic once an <code>sf-database</code> instance is reachable again;
+no daemon restarts are required.</p>
 <h2 id="administrative-commands">Administrative Commands<a class="headerlink" href="#administrative-commands" title="Permanent link">&para;</a></h2>
 <p>The <code>sf-ctl</code> command provides several database-related administrative functions.
 These commands are typically used during cluster bootstrap and maintenance.</p>
