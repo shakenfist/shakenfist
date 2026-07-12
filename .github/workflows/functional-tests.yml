@@ -99,7 +99,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libmariadb-dev python3-mysqldb
+          sudo apt-get install -y libmariadb-dev python3-mysqldb gh
 
       - name: Upgrade base test tools
         timeout-minutes: 5
@@ -153,7 +153,7 @@ jobs:
           echo "Gathering list of failed tests..."
           touch /srv/ci/failed
           . /tmp/venv-test/bin/activate
-          tox -efailing || true > /srv/ci/failed
+          tox -efailing > /srv/ci/failed || true
           echo
 
           failed=$(cat /srv/ci/failed | egrep "^FAIL: " | \
