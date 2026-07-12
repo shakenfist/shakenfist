@@ -169,6 +169,7 @@ def extract_hypervisor_devices(domain: Any) -> dict[str, list[Any]]:
 
 
 def extract_statistics(domain: Any) -> dict[str, Any]:
+    libvirt = get_libvirt()
     devices = extract_hypervisor_devices(domain)
     raw_stats = domain.getCPUStats(True)
 
@@ -178,9 +179,30 @@ def extract_statistics(domain: Any) -> dict[str, Any]:
             'system time ns': raw_stats[0]['system_time'],
             'user time ns': raw_stats[0]['user_time']
         },
+        'memory usage': {},
         'disk usage': {},
         'network usage': {}
     }
+
+    # Memory statistics come from the balloon driver. The host side
+    # values (actual, rss) are always available, but the guest internal
+    # values (unused, available, swap in/out, faults) require a virtio
+    # memballoon with a stats collection period in the domain XML and a
+    # guest driver which reports them, so default anything missing.
+    try:
+        mem_stats = domain.memoryStats()
+        out['memory usage'] = {
+            'actual kb': mem_stats.get('actual', 0),
+            'rss kb': mem_stats.get('rss', 0),
+            'unused kb': mem_stats.get('unused', 0),
+            'available kb': mem_stats.get('available', 0),
+            'swap in kb': mem_stats.get('swap_in', 0),
+            'swap out kb': mem_stats.get('swap_out', 0),
+            'major fault': mem_stats.get('major_fault', 0),
+            'minor fault': mem_stats.get('minor_fault', 0),
+        }
+    except libvirt.libvirtError as e:
+        LOG.debug(f'Failed to collect memory statistics: {e}')
 
     for disk_device in devices['disk']:
         raw_stats = domain.blockStats(disk_device)
@@ -191,6 +213,22 @@ def extract_statistics(domain: Any) -> dict[str, Any]:
             'write bytes': raw_stats[3],
             'errors': raw_stats[4],
         }
+
+        # Capacity is the logical disk size the guest sees, allocation
+        # is the space used within the image, and physical is the host
+        # disk space consumed (sparse files and qcow2 images can make
+        # these differ). Media-less devices (an empty cdrom) have no
+        # block info.
+        try:
+            block_info = domain.blockInfo(disk_device)
+            out['disk usage'][disk_device].update({
+                'capacity bytes': block_info[0],
+                'allocation bytes': block_info[1],
+                'physical bytes': block_info[2],
+            })
+        except libvirt.libvirtError as e:
+            LOG.debug(
+                f'Failed to collect block info for {disk_device}: {e}')
 
     for mac_address, hypervisor_interface in devices['network']:
         raw_stats = domain.interfaceStats(hypervisor_interface)
