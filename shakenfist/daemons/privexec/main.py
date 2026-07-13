@@ -361,9 +361,38 @@ class PrivExecJob:
                 )
             )
 
-        if req.floating_address in privexec_util.get_interface_addresses(
-            floating_interface
+        # The floating address lives on the inner end of the veth pair,
+        # inside the network namespace, so that is where we must look when
+        # deciding if it is already configured.
+        if req.floating_address not in privexec_util.get_interface_addresses(
+            inner_floating_interface, namespace=req.network_uuid
         ):
+            success = privexec_util.add_address_to_interface(
+                inner_floating_interface, req.network_uuid,
+                req.floating_address, '32')
+            if not success:
+                return privexec_pb2.PrivExecReply(
+                    add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                        network_uuid=req.network_uuid,
+                        floating_address=req.floating_address,
+                        inner_address=req.inner_address,
+                        error=privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED
+                    )
+                )
+
+        # Only append the DNAT rule if an identical rule is not already
+        # present. Duplicated rules aren't just clutter -- the first match
+        # wins, so a duplicate from an earlier partial attempt would mask
+        # later changes.
+        dnat_rule = [
+            'PREROUTING', '-d', req.floating_address, '-j', 'DNAT',
+            '--to-destination', req.inner_address]
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-t', 'nat', '-C', *dnat_rule,
+            failure_is_error=False)
+        if returncode == 0:
             return privexec_pb2.PrivExecReply(
                 add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
                     network_uuid=req.network_uuid,
@@ -373,25 +402,10 @@ class PrivExecJob:
                 )
             )
 
-        success = privexec_util.add_address_to_interface(
-            inner_floating_interface, req.network_uuid,
-            req.floating_address, '32')
-        if not success:
-            return privexec_pb2.PrivExecReply(
-                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
-                    network_uuid=req.network_uuid,
-                    floating_address=req.floating_address,
-                    inner_address=req.inner_address,
-                    error=privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED
-                )
-            )
-
         _, _, returncode = privexec_util.command_helper(
             privexec_util.locate_command('ip'), 'netns', 'exec',
             req.network_uuid, privexec_util.locate_command('iptables'),
-            '-w', '10', '-t', 'nat', '-A', 'PREROUTING',
-            '-d', req.floating_address, '-j', 'DNAT',
-            '--to-destination', req.inner_address)
+            '-w', '10', '-t', 'nat', '-A', *dnat_rule)
         if returncode != 0:
             return privexec_pb2.PrivExecReply(
                 add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(

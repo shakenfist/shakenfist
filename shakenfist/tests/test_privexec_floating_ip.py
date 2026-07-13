@@ -77,6 +77,70 @@ class PrivExecFloatingIPTestCase(base.ShakenFistTestCase):
         self.addCleanup(patcher.stop)
 
 
+class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
+    def _request(self):
+        return privexec_pb2.AddFloatingIPRequest(
+            network_uuid=NETWORK_UUID,
+            floating_address='192.168.10.44',
+            inner_address='10.0.0.56')
+
+    def _patch_utils(self, addresses=None):
+        for name, value in [
+                ('create_interface', True),
+                ('get_interface_addresses', addresses or []),
+                ('add_address_to_interface', True)]:
+            patcher = mock.patch(
+                f'shakenfist.daemons.privexec.util.{name}',
+                return_value=value)
+            setattr(self, f'mock_{name}', patcher.start())
+            self.addCleanup(patcher.stop)
+
+    def test_add_fresh_floating_ip(self):
+        recorder = self.patch_commands(results={' -C ': ('', '', 1)})
+        self._patch_utils()
+
+        reply = self.job._add_floating_ip(self._request())
+
+        # The address check must inspect the inner end of the veth pair
+        # inside the network namespace, because that is where the address
+        # is added. It previously inspected the outer end in the root
+        # namespace, which never holds the address.
+        self.mock_get_interface_addresses.assert_called_once_with(
+            INNER_INTERFACE, namespace=NETWORK_UUID)
+        self.mock_add_address_to_interface.assert_called_once_with(
+            INNER_INTERFACE, NETWORK_UUID, '192.168.10.44', '32')
+        self.assertEqual([
+            ('ip', 'netns', 'exec', NETWORK_UUID, 'iptables', '-w', '10',
+             '-t', 'nat', '-A', 'PREROUTING', '-d', '192.168.10.44',
+             '-j', 'DNAT', '--to-destination', '10.0.0.56'),
+        ], recorder.find(' -A '))
+        self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
+                         reply.add_floating_ip_reply.error)
+
+    def test_add_is_idempotent(self):
+        # A repeated add with the address and DNAT rule already in place
+        # must not add a second address or append a duplicate DNAT rule.
+        recorder = self.patch_commands(results={' -C ': ('', '', 0)})
+        self._patch_utils(addresses=['192.168.10.44'])
+
+        reply = self.job._add_floating_ip(self._request())
+
+        self.mock_add_address_to_interface.assert_not_called()
+        self.assertEqual([], recorder.find(' -A '))
+        self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
+                         reply.add_floating_ip_reply.error)
+
+    def test_add_reports_address_failure(self):
+        self.patch_commands()
+        self._patch_utils()
+        self.mock_add_address_to_interface.return_value = False
+
+        reply = self.job._add_floating_ip(self._request())
+
+        self.assertEqual(privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED,
+                         reply.add_floating_ip_reply.error)
+
+
 class RemoveFloatingIPTestCase(PrivExecFloatingIPTestCase):
     def _request(self):
         return privexec_pb2.RemoveFloatingIPRequest(
