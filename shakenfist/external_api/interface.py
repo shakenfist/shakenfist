@@ -110,13 +110,21 @@ class InterfaceDefloatEndpoint(api_base.Resource):
         if err:
             return err
 
+        # ni.floating is a dict ({'floating_address': ...}); the enqueue and
+        # the interface_defloat task want the address itself. Passing the dict
+        # tripped the net_iface_ip_op model's IPvAnyAddress validation.
+        floating_address = ni.floating.get('floating_address')
+        if not floating_address:
+            return sf_api.error(409, 'interface is not floating',
+                                suppress_traceback=True)
+
         # Address is freed as part of the job, so code is "unbalanced" compared
         # to above for reasons.
         ni.add_event(EVENT_TYPE_AUDIT, 'defloat request from REST API')
         nii_create_and_enqueue(
             n.uuid,
             interface_uuid,
-            ni.floating,
+            floating_address,
             [nii_tasks.interface_defloat],
             priority=PRIORITY.user_facing,
             request_id=util_general.get_request_id())
