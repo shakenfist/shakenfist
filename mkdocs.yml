@@ -222,6 +222,11 @@ nav:
                 - "Rust proxy phase 1: server-side SPICE primitives": components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives.md
                 - "Rust proxy phase 2: gRPC contract and Python UDS server": components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract.md
                 - "Rust proxy phase 3: proxy crate skeleton": components/kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton.md
+                - "Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)": components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall.md
+                - "Rust proxy phase 5: daemon integration + session termination": components/kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration.md
+                - "Rust proxy phase 6: packaging (maturin wheel + lockstep release)": components/kerbside/plans/PLAN-rust-proxy-phase-06-packaging.md
+                - "Rust proxy phase 7: CI lane + loadtest": components/kerbside/plans/PLAN-rust-proxy-phase-07-ci.md
+                - "Rust proxy phase 8: cutover (Rust is the only proxy)": components/kerbside/plans/PLAN-rust-proxy-phase-08-cutover.md
                 - "Rust SPICE proxy (kerbside-proxy)": components/kerbside/plans/PLAN-rust-proxy.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md

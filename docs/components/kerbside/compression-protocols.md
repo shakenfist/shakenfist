@@ -13,9 +13,9 @@ commonly observed for non-video console sessions:
 - **GLZ** (Global LZ) - An extension of LZ that references previous images
 
 Both formats use a progressive dictionary compression scheme where previously
-decompressed pixels form the dictionary for later decompression. Kerbside
-includes a simple LZ/GLZ decompression tool (`kerbside-util`) that can
-decompress these formats and convert them to PNG for inspection.
+decompressed pixels form the dictionary for later decompression. The ryll
+client decodes these formats (its `digest-decode` feature) when computing the
+display digest used by the automated test harness.
 
 ## LZ Compression
 
@@ -133,8 +133,9 @@ Finally, add 1 to the offset (cannot reference the current pixel).
 
 ### Implementation Reference
 
-For a working implementation, see `kerbside/utilities/lz.py` in the Kerbside
-codebase.
+For a working implementation, see the ryll `shakenfist-spice-protocol`
+crate's decode path (the `digest-decode` feature), which the Kerbside proxy
+and the test harness rely on.
 
 ## GLZ Compression
 
@@ -233,16 +234,9 @@ for 25-bit offsets.
 
 ### Implementation Reference
 
-For a working implementation, see `kerbside/utilities/glz.py` in the Kerbside
-codebase.
-
-## Utility Tool
-
-Kerbside includes `kerbside-util` which can:
-
-- Decompress LZ and GLZ compressed images
-- Convert compressed images to PNG for inspection
-- Useful for debugging display channel issues
+For a working implementation, see the ryll `shakenfist-spice-protocol`
+crate's decode path (the `digest-decode` feature), which the Kerbside proxy
+and the test harness rely on.
 
 ## Related Documentation
 

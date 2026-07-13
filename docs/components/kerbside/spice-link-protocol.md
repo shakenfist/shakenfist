@@ -2,15 +2,11 @@
 
 This document describes the SPICE link protocol used to establish connections
 and authenticate between clients and servers. In Kerbside, this protocol is
-implemented in `spiceprotocol/packets/linkmessages.py` and
-`spiceprotocol/packets/authentication.py`.
-
-There is now a second, independent implementation of this wire format: the
-server/proxy role in the Rust `shakenfist-spice-protocol` crate (part of
-[ryll](https://github.com/shakenfist/ryll)), which the Rust rewrite of the
-Kerbside proxy consumes. The byte-level details below are therefore a
-cross-implementation contract, not merely a description of the Python proxy.
-Where the two implementations differ in robustness (see
+implemented by the server/proxy role in the Rust `shakenfist-spice-protocol`
+crate (part of [ryll](https://github.com/shakenfist/ryll)), which the Kerbside
+proxy consumes. The byte-level details below are a cross-implementation
+contract with the SPICE specification and other clients (e.g. virt-viewer).
+Where implementations differ in robustness (see
 [Parsing robustness and resource limits](#parsing-robustness-and-resource-limits)),
 that is called out explicitly.
 
@@ -348,10 +344,9 @@ These values are sent in the server hello before the actual hypervisor
 capabilities are known.
 
 The wire format permits more than one 32-bit word in each capability vector
-(`num_common_caps` / `num_channel_caps` may exceed 1). The Python proxy
-decodes only the first word of each and warns that it ignores the rest; the
-Rust implementation parses and retains every advertised word. New code should
-not assume a single word.
+(`num_common_caps` / `num_channel_caps` may exceed 1). The Rust
+implementation parses and retains every advertised word; new code should not
+assume a single word.
 
 ## Parsing robustness and resource limits
 
@@ -382,11 +377,8 @@ A robust implementation must, before allocating or indexing:
 
 The Rust implementation centralises these checks in a bounded reader used by
 every link parser, and ships fuzz targets that exercise the link-message,
-link-reply, and ticket-decryption paths against arbitrary input
-(see the ryll repository). The Python proxy predates this hardening; it is
-partially protected by Python's own bounds checking (a short buffer raises
-rather than over-reads) but does not enforce explicit size or count caps, so
-it should not be treated as the reference for robustness.
+link-reply, and ticket-decryption paths against arbitrary input (see the ryll
+repository).
 
 ## Related Documentation
 

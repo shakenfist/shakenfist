@@ -4,10 +4,11 @@ This document describes the message formats for each SPICE channel type. All
 messages follow the standard header format described in the
 [Protocol Overview](/components/kerbside/protocol-overview/).
 
-**Note**: Message IDs documented here are from Kerbside's internal constants
-(`kerbside/spiceprotocol/packets/constants.py`) and match the values used in
-Kerbside's traffic inspection and audit logging. Some IDs may differ from the
-official SPICE protocol specification for historical reasons.
+**Note**: Message IDs documented here match the constants in the ryll
+`shakenfist-spice-protocol` crate that the Rust proxy uses (and from which
+the L1 firewall allowlist in `rust/kerbside-proxy/src/allowlist.rs` is
+derived). Some IDs may differ from the official SPICE protocol specification
+for historical reasons.
 
 ## Standard Message Header
 

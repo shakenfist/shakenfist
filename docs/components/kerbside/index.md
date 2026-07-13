@@ -7,7 +7,7 @@ Welcome to the Kerbside documentation.
 This documentation covers:
 
 - **SPICE Protocol Version**: 2.2 (current as of spice-protocol 0.14)
-- **Kerbside Version**: Verified against `kerbside/spiceprotocol/packets/constants.py`
+- **Kerbside Version**: Verified against the ryll `shakenfist-spice-protocol` crate used by the Rust proxy
 - **OpenStack Integration**: Nova 2025.1 (Epoxy) and later
 
 Protocol documentation is derived from the official SPICE protocol sources at
@@ -144,8 +144,8 @@ Guides for deploying and configuring Kerbside:
 Internal design of the Kerbside proxy:
 
 - [Proxy Architecture](/components/kerbside/proxy-architecture/) - Internal architecture including
-  process model, connection state machine, traffic inspection, and worker
-  management
+  the process model, the connection state machine, the relay, and the SPICE
+  firewall
 
 - [ARCHITECTURE.md](/components/kerbside/../ARCHITECTURE/) - High-level system architecture
   overview (in project root)
@@ -215,8 +215,12 @@ Protocol for advanced guest integration features:
 | WebDAV Channel | Proxy | Passthrough |
 | VD Agent | Proxy | Clipboard/file transfer passthrough |
 
-**Full**: Protocol decoded and logged during inspection
-**Proxy**: Traffic forwarded transparently without decoding
+**Full**: the channel's message types are modelled in the L1 firewall
+allowlist (`rust/kerbside-proxy/src/allowlist.rs`); its framed traffic is
+classified per message type.
+**Proxy**: relayed and framed, but the channel is not individually modelled
+(treated as an unmodelled channel by the firewall policy). Message bodies are
+relayed opaquely in both cases; the proxy does not decode or log them.
 
 ## Quick Reference
 
@@ -286,8 +290,9 @@ When adding new protocol support or modifying existing implementations:
 1. Update the relevant documentation in this directory
 2. Include binary format descriptions with field offsets
 3. Document any deviations from the official SPICE protocol
-4. Add traffic inspection support in `spiceprotocol/packets/`
-5. Update constants in `spiceprotocol/packets/constants.py`
+4. Reflect any wire-format changes in the ryll `shakenfist-spice-protocol`
+   crate (the proxy's SPICE implementation) and the L1 allowlist in
+   `rust/kerbside-proxy/src/allowlist.rs`
 
 ## Document Conventions
 

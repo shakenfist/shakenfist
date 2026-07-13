@@ -563,33 +563,13 @@ A typical USB redirection session follows this flow:
 
 ## Kerbside Implementation
 
-Kerbside's USB redirection handling is implemented in
-`spiceprotocol/packets/port.py`. The proxy:
-
-1. Parses VMC headers to identify USB redirection messages
-2. Decodes the `usb_redir_hello` message to log version information
-3. Forwards all USB redirection traffic transparently between client and server
-4. Supports traffic inspection/logging when configured
-
-### Decoded Messages
-
-Kerbside currently decodes:
-- `usb_redir_hello` - Logs version string and capabilities
-
-All other USB redirection messages are forwarded without detailed parsing but
-can be logged in raw form for debugging.
-
-### Traffic Inspection
-
-When traffic inspection is enabled, USB redirection traffic can be logged:
-
-```python
-# Example inspection output
-Client sent 80 byte opcode 101 vmc_data
-   ... VMC type usb_redir_hello, length 68, id 0
-   ... version: qemu usb-redir guest 0.8.0
-   ... capabilities: 127
-```
+The Rust proxy relays the USB redirection (`usbredir`) channel between client
+and server, subject to the L0+L1 firewall: message types are checked against
+the per-channel allowlist (`rust/kerbside-proxy/src/allowlist.rs`) and the
+payload is relayed opaquely. Deep VMC / `usb_redir_hello` decoding is not
+implemented (it was part of the removed Python-proxy traffic-inspection
+feature); reintroducing it would belong with a future L2/L3 inspection
+capability.
 
 ## Security Considerations
 
