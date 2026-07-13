@@ -1,11 +1,9 @@
 import base64
 import ipaddress
 import json
-import os
 import time
 
 import requests
-from oslo_concurrency import processutils
 from testtools import content
 
 from shakenfist_ci import base
@@ -129,11 +127,11 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
     through #3383, where removal used the wrong interface name and
     therefore leaked on every release.
 
-    The host level assertions require this test to run on the network
-    node, which is true for the CI topologies the shakenfist.shakenfist
-    ansible collection deploys (the primary node is the network node and
-    runs this suite). Elsewhere the host assertions are skipped and only
-    the API state and reachability assertions run.
+    The host level assertions and the reachability ping run on the
+    network node, which the suite discovers from the API and reaches over
+    the mesh -- it is not necessarily the node running this suite. If that
+    node cannot be reached the whole test skips loudly. See
+    docs/plans/PLAN-ci-node-exec-assertions.md.
     """
 
     def __init__(self, *args, **kwargs):
@@ -142,6 +140,13 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
 
     def setUp(self):
         super().setUp()
+
+        # The floating host state and the egress-side reachability path
+        # both live on the network node, so we must be able to run
+        # commands there. Skip loudly rather than silently if we cannot.
+        self.network_node = self._network_node()
+        self._require_node_exec(self.network_node)
+
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self.addDetail(
@@ -149,20 +154,20 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
             content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
 
-    def _on_network_node(self):
-        return os.path.exists('/var/run/netns/%s' % self.net['uuid'])
-
     def _floating_interface_name(self, floating):
         return 'flt-%08x' % int(ipaddress.IPv4Address(floating))
 
-    def _host_link_names(self):
-        out, _ = processutils.execute('ip', '-json', 'link', 'show')
+    def _network_node_link_names(self):
+        out, _ = self._node_exec(
+            self.network_node, ['ip', '-json', 'link', 'show'])
         return [i['ifname'] for i in json.loads(out) if i]
 
     def _floating_dnat_rules(self, floating):
-        out, _ = processutils.execute(
-            'sudo', 'ip', 'netns', 'exec', self.net['uuid'], 'iptables',
-            '-w', '10', '-t', 'nat', '-S', 'PREROUTING')
+        out, _ = self._node_exec(
+            self.network_node,
+            ['ip', 'netns', 'exec', self.net['uuid'], 'iptables',
+             '-w', '10', '-t', 'nat', '-S', 'PREROUTING'],
+            sudo=True)
         return [r for r in out.split('\n') if '-d %s/32 ' % floating in r]
 
     def _await(self, callback, description, timeout=120):
@@ -182,12 +187,9 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
         return self.test_client.get_interface(interface_uuid).get('floating')
 
     def _assert_floating_plumbed(self, floating, inner):
-        if not self._on_network_node():
-            return
-
         outer = self._floating_interface_name(floating)
         self._await(
-            lambda: outer in self._host_link_names(),
+            lambda: outer in self._network_node_link_names(),
             'floating interface %s to appear' % outer)
 
         self._await(
@@ -201,29 +203,31 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
         self.assertIn('--to-destination %s' % inner, rules[0])
 
     def _assert_floating_cleaned(self, floating):
-        if not self._on_network_node():
-            return
-
         outer = self._floating_interface_name(floating)
         self._await(
-            lambda: outer not in self._host_link_names(),
+            lambda: outer not in self._network_node_link_names(),
             'floating interface %s to be removed' % outer)
         self._await(
             lambda: not self._floating_dnat_rules(floating),
             'DNAT rules for %s to be removed' % floating)
 
     def _await_floating_ping(self, floating):
+        # The floating network is an egress-side island on the network
+        # node, so the ping must originate there (its root namespace),
+        # not on whichever host happens to run the suite.
         start_time = time.time()
         while time.time() - start_time < 300:
-            out, _ = processutils.execute(
-                'ping', '-c', '3', '-W', '2', floating,
+            out, _ = self._node_exec(
+                self.network_node,
+                ['ping', '-c', '3', '-W', '2', floating],
                 check_exit_code=[0, 1, 2])
             if out.find('bytes from') != -1:
                 return
             time.sleep(15)
-        self.fail('Could not ping floating address %s' % floating)
+        self.fail('Could not ping floating address %s from network node %s'
+                  % (floating, self.network_node['name']))
 
-    def test_float_defloat_lifecycle(self):
+    def _create_floatable_instance(self):
         inst = self.test_client.create_instance(
             'floatlifecycle', 1, 1024,
             [
@@ -244,7 +248,10 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
             content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
+        return inst
 
+    def test_float_defloat_lifecycle(self):
+        inst = self._create_floatable_instance()
         iface = self.test_client.get_instance_interfaces(inst['uuid'])[0]
         inner = iface['ipv4']
 
@@ -265,9 +272,15 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
             self._await_floating_address(iface['uuid'], present=False)
             self._assert_floating_cleaned(floating)
 
-        # Deleting an instance with a floating IP still attached must
-        # also clean up the floating IP's host state. This is the common
-        # path for ephemeral CI instances.
+    def test_delete_instance_with_float_cleans_up(self):
+        # Deleting an instance with a floating IP still attached must also
+        # clean up the floating IP's host state. This is the common path
+        # for ephemeral CI instances, and a distinct code path from an
+        # explicit defloat.
+        inst = self._create_floatable_instance()
+        iface = self.test_client.get_instance_interfaces(inst['uuid'])[0]
+        inner = iface['ipv4']
+
         self.test_client.float_interface(iface['uuid'])
         floating = self._await_floating_address(iface['uuid'])
         self._assert_floating_plumbed(floating, inner)
