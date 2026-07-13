@@ -421,8 +421,8 @@ Hypervisor nodes which are not the network node only carry
 These conventions are asserted by the unit tests in
 `shakenfist/tests/test_privexec_floating_ip.py` and exercised end to
 end by `TestFloatingIPLifecycle` in the cluster CI suite. If you change
-a name, change it in the add path, the remove path, the tests and this
-page together.
+a name, change it in the add path, the remove path, the tests, this
+page and `docs/components/cloudgood/networking-shakenfist.md` together.
 
 ## Dispatcher diagnostic events
 
