@@ -414,12 +414,43 @@ class PrivExecJob:
     def _remove_floating_ip(self, req):
         floating_interface = \
             f'flt-{int(ipaddress.IPv4Address(req.floating_address)):08x}'
-        outer_floating_interface = f'{floating_interface}-o'
 
-        if privexec_util.check_for_interface(outer_floating_interface):
-            _, _, returncode = privexec_util.execute(
+        # Remove DNAT rules for this floating IP from the network namespace
+        # before removing the interface. A stale rule matches in preference
+        # to the rule added by any later user of this floating IP on the
+        # same network, silently misdirecting traffic to the old inner
+        # address.
+        if os.path.exists(f'/var/run/netns/{req.network_uuid}'):
+            stdout, _, returncode = privexec_util.command_helper(
+                privexec_util.locate_command('ip'), 'netns', 'exec',
+                req.network_uuid, privexec_util.locate_command('iptables'),
+                '-w', '10', '-t', 'nat', '-S', 'PREROUTING',
+                failure_is_error=False)
+            if returncode == 0:
+                for rule in stdout.split('\n'):
+                    if f'-d {req.floating_address}/32 ' not in rule:
+                        continue
+                    _, _, returncode = privexec_util.command_helper(
+                        privexec_util.locate_command('ip'), 'netns', 'exec',
+                        req.network_uuid,
+                        privexec_util.locate_command('iptables'),
+                        '-w', '10', '-t', 'nat', '-D', *rule.split()[1:])
+                    if returncode != 0:
+                        return privexec_pb2.PrivExecReply(
+                            remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
+                                network_uuid=req.network_uuid,
+                                floating_address=req.floating_address,
+                                error=privexec_pb2.RemoveFloatingIPReply.FAILED
+                            )
+                        )
+
+        # This name must match the outer interface created by
+        # _add_floating_ip. Deleting the outer end also destroys the inner
+        # end in the network namespace, along with the address on it.
+        if privexec_util.check_for_interface(floating_interface):
+            _, _, returncode = privexec_util.command_helper(
                 privexec_util.locate_command('ip'), 'link', 'del',
-                outer_floating_interface)
+                floating_interface)
             if returncode != 0:
                 return privexec_pb2.PrivExecReply(
                     remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
