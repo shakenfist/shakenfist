@@ -4400,10 +4400,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#traffic-inspection" class="md-nav__link">
+  <a href="#spice-firewall" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Traffic Inspection
+        SPICE firewall
       
     </span>
   </a>
@@ -5147,6 +5147,146 @@
     
   
     Rust proxy phase 3: proxy crate skeleton
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 5: daemon integration + session termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 6: packaging (maturin wheel + lockstep release)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 7: CI lane + loadtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 8: cutover (Rust is the only proxy)
   
 
     
@@ -9504,10 +9644,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#traffic-inspection" class="md-nav__link">
+  <a href="#spice-firewall" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Traffic Inspection
+        SPICE firewall
       
     </span>
   </a>
@@ -9756,23 +9896,16 @@ discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="traffic-inspection">Traffic Inspection<a class="headerlink" href="#traffic-inspection" title="Permanent link">&para;</a></h2>
-<p>Being able to inspect traffic being passed by the proxy is useful during both
-development and whilst diagnosing issues in production but has obvious privacy
-concerns.</p>
-<p>The VDI proxy may be configured to log details of traffic for all sessions by
-setting the <code>KERBSIDE_TRAFFIC_INSPECTION</code> environment variable to "1". This will
-write session traffic details to the directory configured by
-<code>KERBSIDE_TRAFFIC_OUTPUT_PATH</code>, in a sub directory per session identifier.
-Additionally, more detailed information can be logged by also setting
-<code>KERBSIDE_TRAFFIC_INSPECTION_INTIMATE</code> to "1".</p>
-<p>Traffic inspection is per proxy not per session and implies a restart of the
-proxy before it is enabled. This ensures that users are aware that traffic
-inspection has been enabled. If traffic inspection is enabled, audit messages
-are recorded per channel logged (as not all channels need to flow through the
-same proxy machine). Additionally, the display channel is altered to show a
-dashed red and yellow border to provide a visual warning that this inspection
-is occurring.</p>
+<h2 id="spice-firewall">SPICE firewall<a class="headerlink" href="#spice-firewall" title="Permanent link">&para;</a></h2>
+<p>The proxy enforces an application-level SPICE firewall on every relayed
+message: L0 framing/size limits and an L1 per-channel, per-direction message
+-type allowlist derived from the SPICE protocol. Python owns the tunable policy
+and delivers it to the proxy in the <code>AuthorizeConnection</code> reply (Python decides
+policy; the Rust proxy enforces it). These settings are deployment-wide.</p>
+<p>Firewall verdicts are exported as the Prometheus metric
+<code>kerbside_proxy_firewall_verdicts_total{channel,direction,rule,action}</code> (where
+<code>action</code> is <code>enforced</code> or <code>observed</code>) and coalesced into one audit event per
+connection.</p>
 <table>
 <thead>
 <tr>
@@ -9783,32 +9916,33 @@ is occurring.</p>
 </thead>
 <tbody>
 <tr>
-<td>TRAFFIC_INSPECTION</td>
-<td>Boolean (default False)</td>
-<td>Whether to log detailed traffic information. Defaults to false, but can be useful for debugging service issues in production.</td>
+<td>FIREWALL_MODE</td>
+<td>String (default "enforce")</td>
+<td>Enforcement mode delivered to the proxy. "enforce" applies blocking verdicts (a disallowed message type or an over-cap message terminates the session). "warn" downgrades every blocking verdict to forward-and-log (metric <code>action=observed</code>) so an operator can observe what enforcement <em>would</em> trip against real traffic before enabling it. Case-insensitive; an unrecognised value falls back to "enforce".</td>
 </tr>
 <tr>
-<td>TRAFFIC_INSPECTION_INTIMATE</td>
-<td>Boolean (default False)</td>
-<td>If TRAFFIC_INSPECTION is true and this option is also set to true, then log intimate debug details of sessions including keystrokes and all display frames.</td>
-</tr>
-<tr>
-<td>TRAFFIC_OUTPUT_PATH</td>
+<td>FIREWALL_PERMITTED_CHANNELS</td>
 <td>String (default empty)</td>
-<td>Where to write traffic inspection logs to. This must be set if TRAFFIC_INSPECTION is True.</td>
+<td>Comma-separated SPICE channel names the proxy may relay (main, display, inputs, cursor, playback, record, tunnel, smartcard, usbredir, port, webdav). Empty means permit all channels; a channel not listed is denied before relay (the client receives a protocol-correct permission-denied).</td>
 </tr>
 </tbody>
 </table>
+<p>The per-channel message-size caps and the (default-off) rate ceiling currently
+use the proxy's compiled-in defaults and are not yet configurable; they are a
+planned extension of the delivered policy.</p>
 <h2 id="logging-and-monitoring-settings">Logging and Monitoring Settings<a class="headerlink" href="#logging-and-monitoring-settings" title="Permanent link">&para;</a></h2>
-<p>The VDI proxy provides Prometheus style metrics on a configurable port (default
-13003). These metric values are also logged for later processing if desired.</p>
+<p>The Rust proxy provides Prometheus style metrics on a configurable port
+(default 13003), bound to a management address (see
+<code>PROMETHEUS_METRICS_ADDRESS</code>).</p>
 <p>Values tracked include:</p>
 <ul>
-<li>Number of active console sessions</li>
-<li>Number of active console channels</li>
-<li>Bandwidth and latency information for each console channel</li>
-<li>REST API request statuses as a metric with labels for each HTTP status code</li>
-<li>REST API request response latency as a histogram per HTTP status code</li>
+<li>Total and currently-active connections
+  (<code>kerbside_proxy_connections_total</code>, <code>kerbside_proxy_active_connections</code>)</li>
+<li>Authorized and denied connection counts
+  (<code>kerbside_proxy_authorized_total</code>, <code>kerbside_proxy_denied_total</code>)</li>
+<li>Bytes relayed per direction
+  (<code>kerbside_proxy_bytes_relayed_total{direction}</code>)</li>
+<li>Firewall verdicts (<code>kerbside_proxy_firewall_verdicts_total{...}</code>)</li>
 </ul>
 <table>
 <thead>
@@ -9838,6 +9972,11 @@ is occurring.</p>
 <td>PROMETHEUS_METRICS_PORT</td>
 <td>Integer (default 13003)</td>
 <td>The TCP port that the prometheus metrics HTTP server will listen on.</td>
+</tr>
+<tr>
+<td>PROMETHEUS_METRICS_ADDRESS</td>
+<td>String (default 127.0.0.1)</td>
+<td>The address the Rust proxy binds its <code>/metrics</code> server to. Defaults to loopback because the endpoint is unauthenticated and must not be exposed on the public VDI interface; set a management address (or 0.0.0.0 behind a firewall) to scrape it from another host.</td>
 </tr>
 </tbody>
 </table>

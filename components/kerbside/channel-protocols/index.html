@@ -6008,6 +6008,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 5: daemon integration + session termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 6: packaging (maturin wheel + lockstep release)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 7: CI lane + loadtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 8: cutover (Rust is the only proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-rust-proxy/" class="md-nav__link">
         
   
@@ -11243,10 +11383,11 @@
 <p>This document describes the message formats for each SPICE channel type. All
 messages follow the standard header format described in the
 <a href="/components/kerbside/protocol-overview/">Protocol Overview</a>.</p>
-<p><strong>Note</strong>: Message IDs documented here are from Kerbside's internal constants
-(<code>kerbside/spiceprotocol/packets/constants.py</code>) and match the values used in
-Kerbside's traffic inspection and audit logging. Some IDs may differ from the
-official SPICE protocol specification for historical reasons.</p>
+<p><strong>Note</strong>: Message IDs documented here match the constants in the ryll
+<code>shakenfist-spice-protocol</code> crate that the Rust proxy uses (and from which
+the L1 firewall allowlist in <code>rust/kerbside-proxy/src/allowlist.rs</code> is
+derived). Some IDs may differ from the official SPICE protocol specification
+for historical reasons.</p>
 <h2 id="standard-message-header">Standard Message Header<a class="headerlink" href="#standard-message-header" title="Permanent link">&para;</a></h2>
 <p>All channel messages use this header:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Offset  Size  Type    Field

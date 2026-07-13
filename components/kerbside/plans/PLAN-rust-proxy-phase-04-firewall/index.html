@@ -1,0 +1,10446 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A minimal cloud aimed at small and edge deployments">
+      
+      
+      
+        <link rel="canonical" href="https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall/">
+      
+      
+        <link rel="prev" href="../PLAN-rust-proxy-phase-03-proxy-skeleton/">
+      
+      
+        <link rel="next" href="../PLAN-rust-proxy-phase-05-daemon-integration/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing) - Shaken Fist</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+  
+  
+    
+      
+      
+    
+  
+    
+      
+      
+    
+  
+  
+  <style>:root{--md-admonition-icon--puzzle:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M22%2013.5c0%201.76-1.3%203.22-3%203.46V20a2%202%200%200%201-2%202h-3.8v-.3a2.7%202.7%200%200%200-2.7-2.7c-1.5%200-2.7%201.21-2.7%202.7v.3H4a2%202%200%200%201-2-2v-3.8h.3C3.79%2016.2%205%2015%205%2013.5s-1.21-2.7-2.7-2.7H2V7a2%202%200%200%201%202-2h3.04c.24-1.7%201.7-3%203.46-3s3.22%201.3%203.46%203H17a2%202%200%200%201%202%202v3.04c1.7.24%203%201.7%203%203.46M17%2015h1.5a1.5%201.5%200%200%200%201.5-1.5%201.5%201.5%200%200%200-1.5-1.5H17V7h-5V5.5A1.5%201.5%200%200%200%2010.5%204%201.5%201.5%200%200%200%209%205.5V7H4v2.12c1.76.68%203%202.38%203%204.38s-1.25%203.7-3%204.38V20h2.12a4.7%204.7%200%200%201%204.38-3c2%200%203.7%201.25%204.38%203H17z%22/%3E%3C/svg%3E');--md-admonition-icon--foreshadow:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M13%203c3.9%200%207%203.1%207%207%200%202.8-1.6%205.2-4%206.3V21H9v-3H8c-1.1%200-2-.9-2-2v-3H4.5c-.4%200-.7-.5-.4-.8L6%209.7C6.2%205.9%209.2%203%2013%203m0-2C8.4%201%204.6%204.4%204.1%208.9L2.5%2011c-.6.8-.6%201.8-.2%202.6.4.7%201%201.2%201.7%201.3V16c0%201.9%201.3%203.4%203%203.9V23h11v-5.5c2.5-1.7%204-4.4%204-7.5%200-5-4-9-9-9m1%2013h-2v-1h2zm1.6-4.5c-.3.4-.6.8-1.1%201.1V12h-3v-1.4c-1.4-.8-1.9-2.7-1.1-4.1s2.7-1.9%204.1-1.1%201.9%202.7%201.1%204.1%22/%3E%3C/svg%3E');}</style>
+
+
+  
+  
+  
+  
+  <style>:root{--md-annotation-icon:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M22%2012a10%2010%200%200%201-10%2010A10%2010%200%200%201%202%2012%2010%2010%200%200%201%2012%202a10%2010%200%200%201%2010%2010M6%2013h8l-3.5%203.5%201.42%201.42L17.84%2012l-5.92-5.92L10.5%207.5%2014%2011H6z%22/%3E%3C/svg%3E');}</style>
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rust-proxy-phase-4-firewall-policy-engine-l0-l1-enforcing" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Shaken Fist
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/shakenfist/shakenfist" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shakenfist/shakenfist
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Shaken Fist
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/shakenfist/shakenfist" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shakenfist/shakenfist
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../manifesto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manifesto
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cloudgood
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cloudgood
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/technology-primer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Technology primer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/fundamentals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fundamentals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/virtualization-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtualization history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/memory-mapped-devices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory mapped devices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/instance-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instance video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/virtual-networking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtual networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/networking-shakenfist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shaken Fist networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/neutron-linuxbridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neutron with Linux bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cloudgood/neutron-legacy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neutron legacy routers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    In guest agent (python)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    In guest agent (python)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../agent-python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../agent-python/developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../agent-python/protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clingwrap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Clingwrap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/command-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../clingwrap/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/automated-pr-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated PR Review with Claude Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/ci-review-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI Review Automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/release-automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5_6" id="__nav_3_5_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Systematic whole-codebase review tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Title for the plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instar
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Instar
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/amend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar amend` — change qcow2 image options in place
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/bitmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar bitmap` — manage qcow2 persistent dirty bitmaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/commit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar commit` — merge an overlay's data into its backing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/create/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar create` — create a new empty disk image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/dd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar dd` — windowed block copy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar map` — emit the allocation map of a disk image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/measure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar measure` — predict file size for a target format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/rebase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar rebase` — change an overlay's backing-file reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/resize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar resize` — change a disk image's virtual size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/snapshot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    `instar snapshot` — manage internal qcow2 snapshots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/openstack-announcement-email/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Announcement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/chain-discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing Chain Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/chain-config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chain Config Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/format-detection-safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format Auto-Detection Safety in Instar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/format-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format Detection and Safety Check Coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image Handling and qemu-img Security Vulnerabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar bench — benchmark the sandboxed I/O path
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Test Suite
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    qemu-img Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/quirks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    qemu-img Quirks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    qemu-img Usage Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/security-audits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Audits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/technology-primer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Technology Primer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/rust-rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Rust for Instar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_27" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6_27" id="__nav_3_6_27_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Commentary
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_27_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_27">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Commentary
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/commentary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instar Commentary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/commentary/architectural-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architectural Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/commentary/reading-order/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading Order
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_28" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6_28" id="__nav_3_6_28_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crates
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_28_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_28">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Crates
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/crates/guest-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guest Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_29" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6_29" id="__nav_3_6_29_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_29_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_29">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Image Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/image_notes/cirros-qcow2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cirros-qcow2 Test Image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/image_notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/image_notes/qcow2-v2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    qcow2-v2 Test Image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/image_notes/virtualpc-vhd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    virtualpc-vhd Test Image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_30" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6_30" id="__nav_3_6_30_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_30_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_30">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-distro-matrix-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Distro matrix CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-release-v0.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release v0.2.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First public release of instar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-coverage-fuzzing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage-guided fuzzing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-fuzz-autofix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fuzz autofix workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-convert-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convert follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-measure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar measure subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-create/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar create subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-resize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar resize subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-rebase-commit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar rebase and commit subcommands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar map subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-snapshot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar snapshot subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-check-repair/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar check --repair for QCOW2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-fuzzing-bugs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fuzzing bug backlog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-bug-fixes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    June 2026 fuzzer bug backlog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-amend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar amend subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-dd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar dd subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-bitmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar bitmap subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instar bench subcommand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-bench-refcount-growth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bench qcow2 refcount growth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_31" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6_31" id="__nav_3_6_31_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prototypes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_31_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_31">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Prototypes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/building-with-docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Prototypes with Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/data-transfer-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Transfer Mechanisms: Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/data-transfer-direct-memory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Direct Memory I/O for KVM Guests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/kvm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    KVM API and Bare-Metal Guest Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/kvm-hello-world2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    KVM Hello World 2 - Using rust-vmm Crates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/kvm-hello-world/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    KVM Hello World Prototype
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/performance-counters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    KVM Performance Counters and Resource Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/data-transfer-other/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Other Data Transfer Mechanisms for KVM Guests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/data-transfer-virtio-block/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtio-block for KVM Guests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/virtio-block/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtio-Block Prototype
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/virtio-block2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtio-Block2 Prototype (with Protobuf)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/virtio-block3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtio-Block3 Prototype
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/virtio-block4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtio-Block4 Prototype
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/virtio-block5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtio-Block5 Prototype
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtio-vsock for KVM Guests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_32" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6_32" id="__nav_3_6_32_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qcow2
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_32_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_32">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Qcow2
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/qcow2/qcow2-compression/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 Compression System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/qcow2/qcow2-encryption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 Encryption System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/qcow2/qcow2-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/qcow2/qcow2-implementation-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 Implementation Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/qcow2/qcow2-l1l2-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 L1/L2 Tables - Address Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/qcow2/qcow2-refcount/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 Reference Counting System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/qcow2/qcow2-snapshots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 Snapshot System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_33" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6_33" id="__nav_3_6_33_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raw
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_33_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_33">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Raw
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/raw/raw-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raw Disk Image Format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6_34" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6_34" id="__nav_3_6_34_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vmdk
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_6_34_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6_34">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vmdk
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/vmdk/vmdk-compression/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VMDK Compression and StreamOptimized Format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/vmdk/vmdk-extents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VMDK Extent Types and Descriptor Format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/vmdk/vmdk-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VMDK Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/vmdk/vmdk-grain-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VMDK Grain Directory and Grain Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kerbside
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuring Kerbside
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../console-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Console Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../proxy-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside Proxy Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scancodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Scancodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../channel-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Channel Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../compression-protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Compression Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../spice-link-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Link Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE Protocol Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usb-redirection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    USB Redirection Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vd-agent-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VD Agent Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_14" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_7_14" id="__nav_3_7_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_14_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated SPICE test harness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Shared visual-digest crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Static source driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Control socket on Ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Port latency loadtest to control socket
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: Direct-qemu CI workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 6: Ryll Cargo feature work + digest decoding + restore keypress-to-screen latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: First Sextant scenario tempest test
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 8: OpenStack CI lane disposition + oVirt provisioning flake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 1: server-side SPICE primitives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 2: gRPC contract and Python UDS server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 3: proxy crate skeleton
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repository-and-branch-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repository and branch logistics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions-to-settle-during-the-phase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions (to settle during the phase)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-protocol-api-facts-front-loaded-for-the-sub-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key protocol / API facts (front-loaded for the sub-agents)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-work-recorded-not-in-this-phase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work (recorded, not in this phase)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#live-capture-validation-step-4f-2026-07-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live capture validation (step 4f, 2026-07-07)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-push-audit-2026-07-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-push audit (2026-07-07)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 5: daemon integration + session termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 6: packaging (maturin wheel + lockstep release)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 7: CI lane + loadtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 8: cutover (Rust is the only proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-rust-proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust SPICE proxy (kerbside-proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Occystrap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Occystrap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/command-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/docker-tarball-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Tarball Format Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/tar-format-selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tar Format Selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8_9" id="__nav_3_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM planning documents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A more structured and less verbose approach to logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementing `info` and `check` subcommands for occystrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make the speed: occystrap performance overhaul
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Quay.io API client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Replace requests with httpx
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: Verification framework and DirWriter verifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: Parallel Quay API resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: quay:// URI parsing and multi-image resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: TarWriter and DockerWriter verifiers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: Concurrent multi-image processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: info and process multi-image support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: RegistryWriter verifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Documentation and functional tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Functional tests and documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Parallel and async output I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: Benchmarking and tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: Filter by tag age (`since` parameter)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Post-write verification for output integrity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quay.io tag-based bulk image discovery and download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registry Proxy Mode (dockerpush as persistent registry)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ryll
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Ryll
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/portability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Binary Portability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/development-macos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building and Testing on macOS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/channel-diagnostics-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channel diagnostics audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/control-socket-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Control Socket Protocol — Version 1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/TOKIO-WEDGING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    K1: tokio waker silently lost on main channel after T+465 s
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/libvirt-spice-recommendations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Libvirt / QEMU Settings for Best SPICE Performance with Ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/macos-metrics-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS runtime-metrics verification runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/multi-mode-parity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-mode parity matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/web-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ryll --web operator guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9_15" id="__nav_3_9_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-initial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Initial porting plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capture mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-packaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-usb-redir/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    USB redirection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-cursor-rendering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cursor rendering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-bug-reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-usb-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    USB UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate extraction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remaining issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Display follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PR 20 follow-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PR 23 follow-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deferred debt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-supply-chain-scanning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supply-chain scanning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-supply-chain-followups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supply-chain follow-ups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Screenshot and latency HUD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idle CPU and latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Display draw-op coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-android-apk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android APK port
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug-report trigger snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paste-as-keystrokes fallback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hamburger menu
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-notifications/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications system
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PR 31 follow-up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-connection-properties/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connection properties
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-display-window-sizing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Display window sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-web-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Opus decoder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-crate-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-session-001-feedback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session 001 feedback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-video-keeping-up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Video keeping up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS runtime metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-ci-platform-matrix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI platform matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stream caps and flap diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../release_notes/v07-v08/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.7 to v0.8 (unreleased)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../community/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Community
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ansible module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/affinity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affinity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/consoles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consoles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../user_guide/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin (/admin/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Operations (/agentoperations/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts (/artifacts/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication (/auth/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blob Checksums (/blob_checksums/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/blobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blobs (/blobs/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/instances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instances (/instances/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/label/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Label (/label/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks (/networks/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Interfaces (/interfaces/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/nodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes (/nodes/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/api_reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload (/upload/)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/agent_protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/ci_api_coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI API coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/mypy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mypy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/network_dispatcher/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network dispatcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/release_process/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/standards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/state_machine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State machine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/updating_docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Updating docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../developer_guide/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../plans/api-query-batching-roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Query Batching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../plans/blob-storage-roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blob Storage Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operator Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operator Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/exception_tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exception Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/load_balancing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load Balancing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/locks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/networking/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/power_states/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power States
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/python_versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/threads/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repository-and-branch-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repository and branch logistics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions-to-settle-during-the-phase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions (to settle during the phase)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-protocol-api-facts-front-loaded-for-the-sub-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key protocol / API facts (front-loaded for the sub-agents)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-work-recorded-not-in-this-phase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work (recorded, not in this phase)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#live-capture-validation-step-4f-2026-07-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live capture validation (step 4f, 2026-07-07)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-push-audit-2026-07-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-push audit (2026-07-07)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+
+                  
+
+
+  
+  
+
+
+<h1 id="rust-proxy-phase-4-firewall-policy-engine-l0-l1-enforcing">Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)<a class="headerlink" href="#rust-proxy-phase-4-firewall-policy-engine-l0-l1-enforcing" title="Permanent link">&para;</a></h1>
+<p>Part of the <a href="/components/kerbside/plans/PLAN-rust-proxy/">Rust SPICE proxy master plan</a>. This
+phase fills the <code>Policy</code>/<code>Verdict</code> seam that phase 3 built (permissive)
+with real, enforcing L0 and L1 firewall policy.</p>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before executing any step, explore the code the step touches and ground
+every decision in what the code and the SPICE protocol actually do.
+Read <code>rust/kerbside-proxy/src/{relay,policy,session,metrics,rpc}.rs</code>,
+the pinned ryll <code>shakenfist-spice-protocol</code> crate
+(<code>constants.rs</code>, <code>logging.rs</code>, <code>messages.rs</code>), the gRPC contract
+(<code>kerbside/rpc/kerbside.proto</code>), and the protocol docs under <code>docs/</code>
+(<code>channel-protocols.md</code>, <code>protocol-overview.md</code>, <code>capabilities.md</code>).
+Verify wire-format / message-type questions against the reference SPICE
+sources at <code>/srv/src-reference/spice/</code> (<code>spice-protocol/spice/enums.h</code>
+is the authoritative message-type list) rather than guessing. Flag
+uncertainty explicitly.</p>
+<p>Planning effort for this phase: <strong>high</strong>. It is deep protocol work
+(deriving per-channel/direction message-type allowlists that must not
+produce false positives against real clients) plus a cross-boundary
+policy-delivery decision.</p>
+<h2 id="repository-and-branch-logistics">Repository and branch logistics<a class="headerlink" href="#repository-and-branch-logistics" title="Permanent link">&para;</a></h2>
+<p>All implementation lands in <strong>kerbside</strong> (the Rust proxy crate, the
+proto, and the Python daemon that fills the policy), except any
+message-type-table gap that must be filled in <strong>ryll</strong>
+(<code>shakenfist-spice-protocol</code>), which is a separate additive change to
+that crate followed by a pin bump here.</p>
+<p>Phase 4 builds directly on phase 3's relay/policy code. Branch from the
+phase-3 tip if phase 3 has not yet merged, or from <code>develop</code> once it
+has; rebase onto <code>develop</code> before the PR. Work in a worktree. This plan
+file lives on the phase-4 branch alongside the code it describes.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>Phase 3 shipped the inspection-first framed relay with the enforcement
+seam in place but empty:</p>
+<ul>
+<li><code>relay.rs::pump</code> already frames every direction by the 6-byte
+  <code>MessageHeader</code> (<code>message_type: u16</code>, <code>message_size: u32</code>), and for
+  every complete message calls <code>policy.inspect(dir, channel, header,
+  payload) -&gt; Verdict</code> and acts on <code>Forward | Drop | Terminate</code>. The
+  header (type + size) is therefore <strong>already parsed</strong> and available to
+  the policy — L0 (size) and L1 (type allowlist) need no new body
+  parsing.</li>
+<li><code>policy.rs</code> defines the <code>Policy</code> trait, the <code>Verdict</code> enum (all three
+  variants handled by the relay, <code>Drop</code>/<code>Terminate</code> currently only
+  constructed in tests behind <code>#[allow(dead_code)]</code>), and the
+  <code>Direction</code> enum. The only implementation is <code>PermissivePolicy</code>
+  (always <code>Forward</code>). Each relay direction owns its own <code>Policy</code>
+  instance (no shared lock on the hot path).</li>
+<li>The relay carries a placeholder flat <code>MAX_MESSAGE_SIZE = 16 MiB</code> cap
+  (documented as "phase 4 tightens this per channel/direction").</li>
+<li><code>session.rs</code> already rejects unknown/obsolete <strong>channel types</strong>
+  before the relay (<code>ChannelType::from_u8</code> → <code>None</code> closes the
+  connection). That is the coarsest L1 check and already present.</li>
+<li>Phase 3's pre-push audit deferred two relay-adjacent hardening items
+  into this phase: a relay <strong>idle timeout</strong> and <strong>client-side TCP
+  keepalive</strong> (an authorized-but-silent client can pin a permit). They
+  are L0-class resource limits and land here.</li>
+</ul>
+<p>There is <strong>no Python precedent</strong> to port: the Python proxy relays
+opaquely post-auth and does no L0/L1 inspection. This is genuinely new
+behaviour, so correctness rests on the SPICE protocol definition and on
+validation against real client traffic, not on parity with <code>proxy.py</code>.</p>
+<p>The ryll crate already provides most of the raw material for the
+allowlists (verified against the pinned rev):</p>
+<ul>
+<li><code>constants.rs</code> has per-channel/direction message-type opcode modules:
+  <code>main_server</code>, <code>main_client</code>, <code>display_server</code>, <code>display_client</code>,
+  <code>inputs_server</code>, <code>inputs_client</code>, <code>cursor_server</code>, <code>cursor_client</code>,
+  <code>playback_server</code>, <code>spicevmc_server</code>, <code>spicevmc_client</code>.</li>
+<li><code>logging.rs</code> has message-type <strong>name-table</strong> functions for every one
+  of those <em>plus</em> <code>playback_client</code> — the most complete enumeration of
+  known types per channel/direction, and the natural basis for a
+  <code>is_known(channel, direction, msg_type)</code> allowlist.</li>
+<li>Common base messages apply to <strong>all</strong> channels: server
+  <code>SPICE_MSG_*</code> 1..7 (MIGRATE=1, MIGRATE_DATA=2, SET_ACK=3, PING=4,
+  WAIT_FOR_CHANNELS=5, DISCONNECTING=6, NOTIFY=7) and client
+  <code>SPICE_MSGC_*</code> 1..6 (ACK_SYNC=1, ACK=2, PONG=3, MIGRATE_FLUSH_MARK=4,
+  MIGRATE_DATA=5, DISCONNECTING=6). Channel-specific opcodes begin at</li>
+<li>An allowlist for a (channel, direction) is therefore
+  <code>common_base ∪ channel_specific</code>.</li>
+<li><strong>Coverage gaps</strong>: the <code>record</code> (audio-in) and <code>smartcard</code> channels
+  have no explicit message-type tables in the crate. <code>usbredir</code>, <code>port</code>
+  and <code>webdav</code> all ride the <code>spicevmc</code> message set (documented in
+  <code>constants.rs</code>). See Design decision 4 for how the gaps are handled.</li>
+</ul>
+<h2 id="mission">Mission<a class="headerlink" href="#mission" title="Permanent link">&para;</a></h2>
+<p>Make the proxy enforce SPICE firewall policy on every relayed message,
+on by default, with no false positives against the supported clients
+(virt-viewer, remote-viewer, ryll headless), and with verdicts visible
+in Prometheus metrics and (aggregated) audit events. Concretely:</p>
+<ul>
+<li><strong>L0 (framing sanity / resource limits)</strong>: per-channel/direction
+  message-size caps replacing the flat 16 MiB; a coarse rate/throughput
+  ceiling that trips only on abuse; an idle-read timeout; client-side
+  TCP keepalive.</li>
+<li><strong>L1 (message grammar)</strong>: a per-channel, per-direction message-type
+  allowlist derived from the SPICE protocol; rejection of
+  unknown/obsolete message types; a per-channel-type "permitted"
+  toggle so a deployment can forbid whole optional channels (e.g.
+  usbredir, webdav). Unknown/obsolete <em>channel</em> rejection already
+  exists in <code>session.rs</code> and is confirmed, not rebuilt.</li>
+<li><strong>Policy ownership</strong>: Python continues to own policy
+  ("Python decides policy; Rust enforces it"). See Design decision 1
+  for the delivery mechanism.</li>
+<li><strong>Observability</strong>: per-verdict Prometheus metrics and locally
+  aggregated (not per-message) firewall audit events.</li>
+</ul>
+<p>Out of scope (deferred, per the master plan): L2 body validation
+(scancode ranges, clipboard/file-transfer/usbredir device-class
+filtering), session recording, L3 rewriting/injection, and detailed
+per-channel state-machine ordering conformance (see Design decision 3).</p>
+<h2 id="design-decisions">Design decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
+<p>Decisions 1 and 3 were settled with the operator during planning
+(deliver policy over gRPC now; Terminate by default with a first-class
+warn-only mode). The rest are the planner's calls, open to revision at
+back brief.</p>
+<ol>
+<li><strong>Policy delivery: over gRPC, in the <code>AuthorizeConnection</code> reply.</strong>
+   Add a <code>FirewallPolicy</code> message to <code>kerbside.proto</code> and carry it in
+   <code>AuthorizeConnectionReply</code> (alongside <code>Target</code>). The Python daemon
+   fills it from deployment-wide pydantic config; the Rust proxy builds
+   each connection's enforcing policy from it. For v1 the value is the
+   same on every reply (deployment-wide), but the <em>mechanism</em> is
+   per-connection, so per-source/per-console policy (master-plan future
+   work) becomes a Python-only change later. This honours "Python
+   decides policy" and matches the master-plan phase-4 sketch ("policy
+   delivered in the <code>AuthorizeConnection</code> reply").</li>
+<li><strong>Allowlist tables are NOT delivered over gRPC.</strong> Which message
+     types are structurally valid on a channel is a fact about the
+     SPICE <em>protocol</em>, not a deployment policy; it is compiled into the
+     proxy (derived from the ryll constants). <code>FirewallPolicy</code> carries
+     only the <em>tunable</em> knobs: enforcement mode, per-channel-type
+     enable set, size-cap overrides, rate ceilings, and the
+     verdict-on-violation severity.</li>
+<li>
+<p><em>Alternative (if deferred):</em> ship compiled defaults + CLI flags in
+     phase 4 and move gRPC delivery to phase 5 (which already wires
+     config→flags). Keeps phase 4 Rust-only. Recommended path is to do
+     it here so enforcement and its policy source ship together.</p>
+</li>
+<li>
+<p><strong>Per-direction policy instances, shared verdict counters.</strong> Keep
+   phase 3's model: each <code>pump</code> owns its own <code>EnforcingPolicy</code> built
+   from a shared <code>Arc&lt;FirewallPolicy&gt;</code> config, so the allowlist lookup
+   and per-direction rate state need no lock on the hot path. Verdict
+   accounting for audit/metrics goes through a shared
+   <code>Arc&lt;VerdictCounters&gt;</code> of atomics that both directions increment
+   (low-cardinality, negligible cost, lock-free); <code>relay::run</code> reads it
+   after the <code>select!</code> and hands it to the audit flusher, so counts
+   survive the dropped losing pump.</p>
+</li>
+<li>
+<p><strong>Verdict severity (recommended defaults).</strong> Enforcing from day one,
+   no log-only grace period.</p>
+</li>
+<li><strong>L1 disallowed message type, client→server</strong> (the dangerous,
+     low-bandwidth direction): <strong>Terminate</strong>. Fail closed.</li>
+<li><strong>L1 disallowed message type, server→client</strong> (the bulk display
+     direction the master plan keeps "framed-but-opaque"): <strong>Terminate</strong>
+     as well — a hypervisor exploiting a client-side CVE by emitting
+     malformed types should be cut off. This is the highest
+     false-positive risk, so the server→client tables are the ones the
+     capture-validation step (4f) must exhaustively cover; the fix for a
+     legitimate-but-unmodeled type is to <strong>add it to the table</strong>, never
+     to weaken the verdict.</li>
+<li><strong>L0 size cap exceeded</strong>: Terminate.</li>
+<li><strong>L0 rate/throughput ceiling exceeded</strong>: metric + aggregated audit,
+     and Terminate only when grossly exceeded (a DoS ceiling tuned well
+     above validated legitimate peaks). Mid-stream <code>Drop</code> is <strong>not</strong>
+     used for rate control — dropping a SPICE message desynchronises the
+     stream. <code>Drop</code> remains in the API for future L2/L3 use (e.g.
+     defanging) but no v1 rule emits it.</li>
+<li><strong>Forbidden channel type</strong> (policy-disabled channel): denied before
+     relay, in <code>session.rs</code>, as a <code>PermissionDenied</code> auth result +
+     audit — same shape as the existing unknown-channel rejection.</li>
+<li>
+<p><strong>Warn-only mode (settled with the operator).</strong> <code>FirewallPolicy</code>
+     carries an <code>enforcement_mode: Enforce | WarnOnly</code> knob (delivered
+     over gRPC, Design decision 1), defaulting to <strong>Enforce</strong>. In
+     <code>WarnOnly</code>, any rule that <em>would</em> <code>Drop</code> or <code>Terminate</code> instead
+     emits the metric, the aggregated audit event, and a <code>tracing</code>
+     warning, then returns <code>Forward</code> — the session is never actually
+     blocked. This is the confidence-building / debugging tool: it lets
+     us run real traffic and see exactly what enforcement <em>would</em> have
+     tripped (especially on the server→client tables, the
+     false-positive risk) before flipping a deployment to <code>Enforce</code>. It
+     is a mode, not a grace period — the default ships enforcing, per
+     the master plan. Structure it so the mode can later be made
+     per-direction (e.g. Enforce client→server, WarnOnly server→client)
+     without a data-model change; a single global mode is enough for
+     v1.</p>
+</li>
+<li>
+<p><strong>Allowlist coverage and the crate gaps.</strong> Derive <code>is_allowed(
+   channel, direction, msg_type)</code> from the ryll <code>logging.rs</code> name
+   tables (<code>Some(name)</code> ⇒ known ⇒ allowed) unioned with the common base
+   sets. For the channels a Kerbside VDI session actually carries —
+   main, display, inputs, cursor, and (if enabled) playback / record /
+   usbredir — this must be complete.</p>
+</li>
+<li><code>usbredir</code>/<code>port</code>/<code>webdav</code> → use the <code>spicevmc</code> tables.</li>
+<li>
+<p><code>record</code>/<code>smartcard</code> have no crate tables. <strong>Preferred:</strong> add their
+     message-type constants + name tables to ryll (small, additive,
+     phase-1-style) and bump the pin — step 4b-ryll, only if the
+     capture step shows those channels are carried. <strong>Fallback for v1:</strong>
+     for a carried channel with no modeled grammar, enforce L0 only
+     (size/rate) and <em>observe</em> (audit, no Terminate) unknown types,
+     documented as a known partial-coverage gap. A channel that is not
+     carried at all is simplest handled by leaving it disabled in the
+     default permitted-channel set.</p>
+</li>
+<li>
+<p><strong>State-machine conformance is scoped to type+channel for v1.</strong> The
+   master plan lists "basic state-machine conformance" under L1. Full
+   per-channel ordering checks (init-before-data, etc.) are high
+   false-positive risk and are deferred to L2/future. v1 L1 =
+   type allowlist + per-channel permit + unknown-channel rejection
+   (already present). This scoping is called out so it is a conscious
+   decision, not an omission.</p>
+</li>
+<li>
+<p><strong>No new untrusted-body parser ⇒ no new fuzz target required.</strong> L0/L1
+   read only the already-parsed header (type + size); they do not parse
+   message bodies. The engine instead gets thorough unit + property
+   tests and the capture-replay validation (4f). If any step adds body
+   parsing it must add a cargo-fuzz target (master-plan requirement).</p>
+</li>
+</ol>
+<h2 id="open-questions-to-settle-during-the-phase">Open questions (to settle during the phase)<a class="headerlink" href="#open-questions-to-settle-during-the-phase" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Exact <code>FirewallPolicy</code> proto shape and defaults: which knobs are
+  scalar vs per-channel maps; how per-channel-type enable is encoded
+  (bitmask vs repeated enum); whether size-cap overrides are per-channel
+  or per-(channel,direction).</li>
+<li>Concrete per-channel/direction size caps and the rate/throughput
+  ceiling values — to be fixed from the 4f captures, not guessed.</li>
+<li>Audit aggregation semantics: flush interval, per-connection buffer
+  bound, and the dropped-with-a-counter behaviour under audit
+  backpressure (a master-plan open question).</li>
+<li>Whether the <code>record</code>/<code>smartcard</code> channels are carried by any
+  supported source+guest combination (decides whether 4b-ryll runs).</li>
+</ul>
+<h2 id="key-protocol-api-facts-front-loaded-for-the-sub-agents">Key protocol / API facts (front-loaded for the sub-agents)<a class="headerlink" href="#key-protocol-api-facts-front-loaded-for-the-sub-agents" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>MessageHeader</code> is <code>{ message_type: u16, message_size: u32 }</code>, 6 bytes,
+  already parsed by <code>relay::pump</code> before <code>policy.inspect</code>. Payload
+  passed to the policy is the body only.</li>
+<li>Common base opcodes (all channels): server 1..7, client 1..6 (listed
+  in Situation). Channel-specific opcodes start at 101.</li>
+<li>ryll message-type sources: <code>constants.rs</code> opcode modules +
+  <code>logging.rs</code> name-table fns (<code>main_server</code>/<code>main_client</code>/… returning
+  <code>&amp;'static str</code>, with an "unknown" sentinel for unmodeled types) +
+  <code>ChannelType</code>/<code>ChannelType::from_u8</code>/<code>ChannelType::name</code>.</li>
+<li>Authoritative external reference: <code>/srv/src-reference/spice/
+  spice-protocol/spice/enums.h</code> (SPICE_MSG_<em> / SPICE_MSGC_</em> per channel).</li>
+<li>gRPC: <code>AuthorizeConnectionReply</code> is a <code>oneof { Denied; Target }</code> today;
+  the bookkeeping RPCs and <code>RecordAuditEvent</code> already exist and are used
+  by the proxy. Metrics live in <code>metrics.rs</code> (global registry + RAII
+  <code>ConnectionGuard</code>, hyper <code>/metrics</code> server).</li>
+<li>The ryll interop note "mouse clicks not working through kerbside
+  proxy" (master-plan Bugs section) touches the <strong>inputs_client</strong>
+  allowlist — make sure the inputs client message set (mouse
+  position/motion/press/release, key down/up) is present and validated,
+  and confirm the firewall is not what blocks clicks.</li>
+</ul>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>One commit per step (per the master plan). Every Rust step must pass
+<code>cargo fmt --check</code>, <code>cargo clippy -- -D warnings</code>, and <code>cargo test</code> in
+the Docker build; every Python step <code>tox -eflake8</code> and <code>tox -epy3</code>;
+<code>pre-commit run --all-files</code> before each proposed commit.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4a</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>Policy engine core.</strong> In <code>rust/kerbside-proxy/src/policy.rs</code>, add a <code>FirewallPolicy</code> config struct (enforcement mode; per-<code>ChannelType</code> permitted set; per-channel/direction size caps; rate/throughput ceilings; verdict-on-violation severities — see Design decisions 1,3) with an enforcing <code>Default</code>, and an <code>EnforcingPolicy</code> implementing the <code>Policy</code> trait that consults the L1 allowlist (from 4b) and L0 caps (from 4c) and returns the configured verdict. Build it from an <code>Arc&lt;FirewallPolicy&gt;</code> per direction. Swap <code>PermissivePolicy</code> for <code>EnforcingPolicy</code> in <code>relay::run</code> (keep <code>run</code>'s signature; thread the <code>Arc</code> and the shared <code>VerdictCounters</code> from 4d in). Remove the <code>#[allow(dead_code)]</code> on <code>Verdict</code> once real code constructs the variants. In <code>WarnOnly</code> mode, downgrade a would-be Drop/Terminate to <code>Forward</code> while signalling it to the <code>VerdictCounters</code>/aggregator as <code>observed</code> (Design decision 3) — so the mode lives in the engine, not scattered through the relay. Unit-test the verdict decision table in both modes (Enforce: allowed→Forward, disallowed→Terminate per direction, oversized→Terminate; WarnOnly: the same inputs all→Forward but recorded as observed; disabled channel handled upstream). Keep <code>PermissivePolicy</code> for tests.</td>
+</tr>
+<tr>
+<td>4b</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>L1 allowlist tables.</strong> Add an <code>allowlist</code> module exposing <code>is_allowed(channel: ChannelType, dir: Direction, msg_type: u16) -&gt; bool</code>, built from the ryll <code>logging.rs</code> name tables (known-name ⇒ allowed) unioned with the common base sets (server 1..7, client 1..6). Cross-check every entry against <code>/srv/src-reference/spice/.../enums.h</code>. Document per (channel,direction) what is covered. Handle <code>usbredir</code>/<code>port</code>/<code>webdav</code> via the <code>spicevmc</code> set. For <code>record</code>/<code>smartcard</code>, follow Design decision 4 (L0-only + observe, or defer to 4b-ryll). Tests: representative known types allowed, a bogus/obsolete type rejected, common base allowed on every channel, the inputs_client mouse/key set allowed (the interop-bug guard).</td>
+</tr>
+<tr>
+<td>4b-ryll</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>(Conditional — only if 4f shows record/smartcard are carried.)</strong> In the ryll <code>shakenfist-spice-protocol</code> crate, add message-type opcode constants + <code>logging.rs</code> name tables for the <code>record</code> and/or <code>smartcard</code> channels, mirroring the existing channel modules, with round-trip/name tests. Land as its own PR to ryll; then bump the pinned rev in <code>rust/kerbside-proxy/Cargo.toml</code> and extend 4b's tables.</td>
+</tr>
+<tr>
+<td>4c</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>L0 limits + relay hardening.</strong> Replace the flat <code>MAX_MESSAGE_SIZE</code> in <code>relay.rs</code> with per-(channel,direction) caps from <code>FirewallPolicy</code> (generous for display server, tight for inputs/cursor client). Add a coarse per-direction rate/throughput accounting (token-bucket or windowed counter) that trips only above the configured ceiling → Terminate + audit (Design decision 3). Add a relay <strong>idle-read timeout</strong> (wrap the pump <code>read</code> in <code>tokio::time::timeout</code>, generous default sized to not kill legitimately-idle interactive sessions) and set <strong>TCP keepalive</strong> on the accepted client socket in <code>listen.rs</code> (mirror the backend leg; <code>socket2</code>) — closing the phase-3 deferred permit-pinning findings. Tests for each cap/limit and the timeout.</td>
+</tr>
+<tr>
+<td>4d</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>Verdict metrics + audit aggregation.</strong> Add Prometheus counters <code>kerbside_proxy_firewall_verdicts_total{channel,direction,rule,action}</code> to <code>metrics.rs</code>, where <code>action</code> distinguishes <strong>enforced</strong> (Terminate/Drop actually applied) from <strong>observed</strong> (would have blocked, but <code>WarnOnly</code> let it through) so warn-only runs are measurable and directly answer "what would Enforce have tripped?" (Design decision 3). Add a shared <code>Arc&lt;VerdictCounters&gt;</code> (atomics) both pump directions increment; <code>relay::run</code> reads it post-<code>select!</code>. Add a bounded local <strong>audit aggregator</strong> that coalesces firewall verdicts per (connection, rule, action) and flushes a single summarising <code>RecordAuditEvent</code> on teardown (and optionally on a periodic interval), never one event per blocked message — with a dropped-events counter under backpressure (Open question). Tests for aggregation/flush, the enforced-vs-observed split, and the counter wiring.</td>
+</tr>
+<tr>
+<td>4e</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Policy delivery over gRPC.</strong> Add a <code>FirewallPolicy</code> message to <code>kerbside/rpc/kerbside.proto</code> and carry it in <code>AuthorizeConnectionReply</code> (Design decision 1); regenerate. In the Python daemon, fill it from new deployment-wide pydantic config (<code>kerbside/config.py</code> + <code>docs/configuration.md</code>), following the existing <code>AuthorizeConnection</code> handler. In the Rust proxy, build the per-connection <code>EnforcingPolicy</code> from the delivered policy (falling back to the enforcing compiled default if absent). Python tests for the handler; Rust tests for the proto→<code>FirewallPolicy</code> mapping. <em>(Optional, if cheap here: add per-unary-call gRPC deadlines in <code>rpc.rs</code> — a phase-3 deferred LOW finding — but NOT a channel-wide timeout, which would kill the <code>ProxyControl</code> stream.)</em></td>
+</tr>
+<tr>
+<td>4f</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Capture-based validation harness.</strong> Extend <code>tools/direct-qemu</code> to capture the set of <code>(channel, direction, message_type, max_size)</code> observed during a real session (a tap/observe mode in the proxy, or a parse of the framed relay), and run it for <strong>virt-viewer, remote-viewer, and ryll headless</strong> against a real qemu. Assert the L1 allowlist and L0 caps cover every observed message with <strong>zero</strong> Terminate verdicts on legitimate traffic (the "no false positives" success criterion); feed the observed sizes back into the 4c caps. Determine whether record/smartcard are carried (gates 4b-ryll). Also fold in the phase-3 deferred harness items: a <strong>deny-token mode</strong> and a <strong>TLS-required backend mode</strong> in <code>tools/direct-qemu/mock-grpc-server.py</code>, enabling the previously-untested session denial-path (<code>PermissionDenied</code>/<code>Error</code> to client) and <code>need_secured</code> retry-orchestration tests. Document results in a <code>VERIFY-*.md</code>.</td>
+</tr>
+<tr>
+<td>4g</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Docs + Outcome.</strong> Update <code>ARCHITECTURE.md</code>, <code>AGENTS.md</code>, <code>README.md</code>, <code>docs/proxy-architecture.md</code>, and <code>docs/configuration.md</code> (new firewall config knobs + the metrics) to describe L0/L1 enforcement. Write this plan's Outcome section (mirroring phase 3: steps landed, deviations, the pre-push audit result) and flip the phase-4 row in <code>PLAN-rust-proxy.md</code> and <code>docs/plans/index.md</code> to Complete.</td>
+</tr>
+</tbody>
+</table>
+<p>Sequencing notes: 4a depends on the shapes from 4b/4c/4d, so land 4b
+(tables) and a skeleton of 4c/4d's types first or co-develop them in one
+worktree; 4e depends on 4a's <code>FirewallPolicy</code>; 4f validates 4a–4e and may
+trigger 4b-ryll and cap retuning; 4g is last. A reasonable order is
+4b → 4c → 4d → 4a (wiring) → 4e → 4f → (4b-ryll if needed) → 4g, or fold
+4a–4d into one worktree since they are tightly coupled and land as a
+small number of self-contained commits.</p>
+<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<ul>
+<li>L0 and L1 enforcement is <strong>on by default</strong>; a disallowed client→server
+  message type and an oversized frame both Terminate the session; a
+  policy-disabled channel is denied before relay.</li>
+<li><strong>Zero false positives</strong>: full virt-viewer, remote-viewer, and ryll
+  sessions complete through the proxy with no firewall Terminate on
+  legitimate traffic (validated by 4f captures). Mouse clicks and keys
+  work (inputs_client allowlist correct).</li>
+<li>Firewall verdicts are visible as Prometheus metrics and as
+  aggregated (not per-message) audit events, with a dropped-events
+  counter under backpressure.</li>
+<li>The relay no longer pins a permit on a silent client (idle timeout +
+  keepalive), and per-channel size caps replace the flat 16 MiB.</li>
+<li>Python decides the policy (delivered via <code>AuthorizeConnection</code>); the
+  Rust proxy enforces it. A <code>WarnOnly</code> mode exists that records what
+  enforcement <em>would</em> have done (metrics + audit, <code>action=observed</code>)
+  without blocking, and the default ships <code>Enforce</code>.</li>
+<li>Rust passes <code>cargo fmt --check</code>, <code>cargo clippy -- -D warnings</code>,
+  <code>cargo test</code>; Python passes <code>tox -eflake8</code>/<code>tox -epy3</code>; the phase-4
+  pre-push audit (<code>PUSH-TEMPLATE.md</code>) is clean.</li>
+<li>Docs updated; master-plan/index status flipped.</li>
+</ul>
+<h2 id="future-work-recorded-not-in-this-phase">Future work (recorded, not in this phase)<a class="headerlink" href="#future-work-recorded-not-in-this-phase" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>L2 body validation</strong>: scancode ranges (inputs), vd-agent/clipboard
+  direction policy, file-transfer allow/deny, usbredir device-class
+  filtering (<code>shakenfist-spice-usbredir</code>). Adds untrusted-body parsers
+  ⇒ cargo-fuzz targets.</li>
+<li><strong>Per-source / per-console policy profiles</strong> in the DB, with API/UI
+  surface — the reason 4e delivers policy per-connection.</li>
+<li><strong>Detailed per-channel state-machine conformance</strong> (ordering,
+  init-before-data), deferred from Design decision 5.</li>
+<li><strong>L3 rewriting/injection</strong> (<code>Inject</code> verdict + ACK accounting):
+  danger-zone recording indicator, defanging, Kerbside-originated
+  devices — the reason <code>Drop</code>/framing are retained even where policy is
+  permissive.</li>
+<li>Phase-3 deferred items not folded in here: struct-ify the repeated
+  identity params; decouple the <code>/metrics</code> bind from the public VDI
+  address (phase 5, daemon integration); the <code>select!</code>
+  metrics-bind-fatal coupling.</li>
+</ul>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>Completed 2026-07-07 on the kerbside <code>rust-proxy-phase-4</code> branch,
+unmerged and unpushed pending operator review and the pre-push audit
+(below). All planned steps landed, including the conditional 4b-ryll
+step — the capture validation showed it was needed for main/display
+false positives, not for record/smartcard. Every Rust step was built,
+linted (<code>clippy -D warnings</code>), and tested in the Docker build; every
+Python step passed <code>flake8</code>/<code>py3</code>.</p>
+<ul>
+<li>4b (<code>b928b44</code>): the L1 message-type allowlist grammar
+  (<code>allowlist.rs</code>) — <code>classify(channel, dir, msg_type) -&gt; Allowed |
+  Disallowed | ChannelUnmodeled</code>, derived from the ryll <code>logging.rs</code>
+  name tables unioned with the SPICE common-base opcode ranges;
+  record/smartcard/tunnel return <code>ChannelUnmodeled</code> (no modeled
+  grammar).</li>
+<li>4a + 4d (<code>513a7e4</code>): the L1 enforcement engine — <code>FirewallPolicy</code>,
+  <code>EnforcementMode</code> (Enforce default / WarnOnly), <code>EnforcingPolicy</code>
+  wired into the relay in place of <code>PermissivePolicy</code>, the
+  lock-free per-connection <code>VerdictTally</code>, and the
+  <code>kerbside_proxy_firewall_verdicts_total</code> metric.</li>
+<li>4c (<code>d8ced99</code>): L0 resource limits — the pre-body <code>check_header</code>
+  hook, per-(channel,direction) size caps (4 KiB tight on
+  inputs/cursor-client, 16 MiB generous elsewhere), a disabled-by-
+  default rate/throughput ceiling, the 15-minute idle-read timeout,
+  and client-side TCP keepalive — closing the phase-3 deferred
+  permit-pinning findings.</li>
+<li>4e (<code>d243b8b</code>): policy delivery over gRPC — the <code>FirewallPolicy</code>
+  proto message carried in the <code>AuthorizeConnection</code> reply, Python's
+  <code>FIREWALL_MODE</code>/<code>FIREWALL_PERMITTED_CHANNELS</code> config feeding
+  <code>servicer.py</code>, and the Rust <code>session.rs</code> channel-permit gate
+  (<code>PermissionDenied</code> before relay for a forbidden channel type).</li>
+<li>ryll pin bump (<code>0e96ecb</code>): bumped to develop rev <code>1c6f19f</code>, picking
+  up the cross-repo ryll change (PR #141: completed main/display
+  message-type tables plus a corrected <code>INVAL_ALL_PIXMAPS</code> opcode
+  that had been mislabelled — the fix also corrected a latent
+  renderer-side bug from the same mislabelling; PR #142: the
+  <code>crossbeam-epoch</code> RUSTSEC-2026-0204 bump), both merged to ryll
+  develop.</li>
+<li>4f harness (<code>eb75cb4</code>): warn-only capture and deny-token/deny-all
+  modes added to <code>mock-grpc-server.py</code> and
+  <code>tools/direct-qemu/verify-rust-proxy.sh</code> (new <code>assert-firewall</code>
+  action), plus <code>tools/direct-qemu/VERIFY-FIREWALL.md</code>.</li>
+<li>4f live results (<code>ab511a0</code>): the live capture run recorded in
+  <code>VERIFY-FIREWALL.md</code>, plus a bugfix to <code>assert-firewall</code> (the
+  <code>set -o pipefail</code> <code>_verdict_sum</code> helper aborted on the
+  all-zero-verdicts case — exactly the clean result it needed to
+  detect).</li>
+</ul>
+<p>Notable decisions and deviations, all deliberate:</p>
+<ul>
+<li>The two operator-level decisions taken during planning both held
+  without revision: policy delivered over gRPC in the
+  <code>AuthorizeConnection</code> reply now (not deferred to phase 5), and
+  Terminate-by-default with a first-class <code>WarnOnly</code> mode rather than
+  a log-only grace period.</li>
+<li><strong>4b-ryll became necessary, but for main/display, not
+  record/smartcard.</strong> The plan's Design decision 4 flagged
+  record/smartcard as the likely trigger for a ryll change; in
+  practice the pinned ryll name tables for main and display were
+  incomplete (missing <code>CLIENT_INFO</code> and the migrate family on
+  main-client, <code>NAME</code>/<code>UUID</code> on main-server, and several display
+  invalidate/quality opcodes) and contained a mislabelled constant
+  (<code>display_server::INVAL_ALL_PIXMAPS</code> held the wire value that
+  <code>enums.h</code> assigns to <code>INVAL_ALL_PALETTES</code>). Left unfixed, these
+  would have been real false positives under <code>Enforce</code> mode against
+  legitimate remote-viewer/virt-viewer traffic. Filed and merged as
+  ryll PR #141 (plus the unrelated but co-landed <code>crossbeam-epoch</code>
+  advisory fix, PR #142), then the pin was bumped here. Record and
+  smartcard were never carried by the 4f capture, so their
+  <code>ChannelUnmodeled</code> observe-only handling needed no further ryll
+  work.</li>
+<li>Size caps, the rate ceiling, and per-verdict severities all kept
+  their compiled-default values for v1 — only <code>mode</code> and
+  <code>permitted_channels</code> are delivered over gRPC (the plan's Open
+  questions left the concrete cap/ceiling values to be fixed from
+  the 4f captures rather than guessed; the 4f run approached none of
+  the compiled defaults, so none were retuned and none were promoted
+  to a gRPC-delivered knob this phase).</li>
+<li>The <code>need_secured</code> backend-retry orchestration (a phase-3 deferred
+  test gap) remains exercised only by the <code>is_need_secured</code> unit
+  tests; the 4f harness does not yet have a TLS-requiring backend
+  leg to drive it live. Tracked as a follow-up, not a phase-4
+  blocker (the plan's success criteria do not require it).</li>
+</ul>
+<h3 id="live-capture-validation-step-4f-2026-07-07">Live capture validation (step 4f, 2026-07-07)<a class="headerlink" href="#live-capture-validation-step-4f-2026-07-07" title="Permanent link">&para;</a></h3>
+<p>Full results are in <code>tools/direct-qemu/VERIFY-FIREWALL.md</code>. Summary:
+remote-viewer (spice-gtk) driven through the proxy in <code>WarnOnly</code> mode
+against the <code>uncalibrated-sextant.qcow2</code> guest completed a clean
+session across 4 channels (main, display, inputs, cursor), ~1.17 MB
+relayed (<code>bytes{s2c}=1,174,716</code>, <code>bytes{c2s}=1,468</code>), with <strong>zero</strong>
+firewall verdicts (<code>enforced=0</code>, <code>observed=0</code>) — no false positives
+against a real client, satisfying the plan's success criterion. No
+size cap was approached, so none needed retuning. A separate
+<code>DENY_ALL=1</code> run confirmed the <code>PermissionDenied</code> client-denial path
+end to end (<code>authorized=0</code>, <code>denied=1</code>, no bytes relayed). virt-viewer
+was not run separately (it shares remote-viewer's spice-gtk client
+engine); ryll headless was not run this pass and remains a worthwhile
+follow-up capture.</p>
+<h3 id="pre-push-audit-2026-07-07">Pre-push audit (2026-07-07)<a class="headerlink" href="#pre-push-audit-2026-07-07" title="Permanent link">&para;</a></h3>
+<p>Ran the <code>PUSH-TEMPLATE.md</code> audit against <code>git diff origin/develop..HEAD</code>.
+Wave 1 (mechanical) was clean: Docker <code>make lint</code> (fmt + <code>clippy -D
+warnings</code>) and <code>make test</code> green, <code>flake8</code>/<code>py3</code> green, no
+<code>unsafe</code>/<code>unwrap</code>/<code>panic!</code>/<code>todo!</code> on any non-test enforcement path, no
+new TODO/FIXME. Wave 2 was two judgment passes — security and
+correctness/tests — on the internet-facing enforcement code. <strong>No
+blocking, critical, or high findings.</strong></p>
+<p>The security pass verified as correct: the <code>header_checked</code> dedup (no
+frame can skip <code>check_header</code>, the rate counter cannot be under-counted),
+the guard ordering (absolute 16 MiB → L0 <code>check_header</code> before body
+buffering → L1 <code>inspect</code>, all fail-closed), panic-safety on untrusted
+input (all indexing bounded, shifts bounded to discriminants 1..=11, no
+overflow), warn-only isolation (the downgrade lives only in <code>apply</code>; the
+absolute guard and idle timeout are correctly NOT subject to it), and
+credential-log safety (token/ticket never logged). The correctness pass
+independently traced the <code>header_checked</code> dedup and the shared
+<code>VerdictTally</code> (single-task <code>select!</code>, losing pump's counts survive) and
+confirmed the <code>from_proto</code> bitmask and the Python↔Rust discriminant
+mapping.</p>
+<p>Two findings were fixed before push (commit <code>f060d73</code>):</p>
+<ul>
+<li><strong>Firewall fail-open on misconfiguration</strong> (security, MEDIUM):
+  <code>build_firewall_policy</code> now raises on an unknown
+  <code>FIREWALL_PERMITTED_CHANNELS</code> name instead of warn-and-skip — a typo'd
+  restrict-list no longer silently collapses to permit-all.</li>
+<li><strong>check_header-exactly-once test</strong> (correctness): a relay unit test
+  now guards the dedup invariant that drives the rate counter.</li>
+</ul>
+<p>Accepted / documented (not fixed): the idle-read timeout is a backstop
+that does not catch a slow-trickle client (bounded by the permit pool +
+the 16 MiB reassembly cap); the allowlist fails open by design
+(name-table-as-ground-truth); and the session channel-permit gate and
+the <code>relay::run</code> teardown audit-flush are covered by the 4f live run
+rather than unit tests (expensive to unit-test; their building blocks
+are individually covered). All re-validated: Rust 56 tests + clippy
+clean, Python <code>flake8</code>/<code>py3</code> clean, <code>pre-commit</code> clean.</p>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step, back brief the operator on the intended
+approach for that step and how it aligns with this plan and the master
+plan. The two operator-level decisions are settled (gRPC delivery now;
+Terminate-by-default plus a warn-only mode). Still to confirm as the
+work progresses: the <code>FirewallPolicy</code> proto shape (Open questions),
+and — once 4f captures exist — the concrete per-channel/direction size
+caps, the rate ceiling, and whether 4b-ryll (record/smartcard tables in
+ryll) is needed.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+
+
+
+
+
+
+<p class="md-content__report-issue">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+    📝 Report an issue with this page
+  </a>
+</p>
+
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

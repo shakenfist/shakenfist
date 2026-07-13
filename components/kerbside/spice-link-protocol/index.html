@@ -5401,6 +5401,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 5: daemon integration + session termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 6: packaging (maturin wheel + lockstep release)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 7: CI lane + loadtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 8: cutover (Rust is the only proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-rust-proxy/" class="md-nav__link">
         
   
@@ -10028,14 +10168,11 @@
 <h1 id="spice-link-protocol">SPICE Link Protocol<a class="headerlink" href="#spice-link-protocol" title="Permanent link">&para;</a></h1>
 <p>This document describes the SPICE link protocol used to establish connections
 and authenticate between clients and servers. In Kerbside, this protocol is
-implemented in <code>spiceprotocol/packets/linkmessages.py</code> and
-<code>spiceprotocol/packets/authentication.py</code>.</p>
-<p>There is now a second, independent implementation of this wire format: the
-server/proxy role in the Rust <code>shakenfist-spice-protocol</code> crate (part of
-<a href="https://github.com/shakenfist/ryll">ryll</a>), which the Rust rewrite of the
-Kerbside proxy consumes. The byte-level details below are therefore a
-cross-implementation contract, not merely a description of the Python proxy.
-Where the two implementations differ in robustness (see
+implemented by the server/proxy role in the Rust <code>shakenfist-spice-protocol</code>
+crate (part of <a href="https://github.com/shakenfist/ryll">ryll</a>), which the Kerbside
+proxy consumes. The byte-level details below are a cross-implementation
+contract with the SPICE specification and other clients (e.g. virt-viewer).
+Where implementations differ in robustness (see
 <a href="#parsing-robustness-and-resource-limits">Parsing robustness and resource limits</a>),
 that is called out explicitly.</p>
 <h2 id="connection-handshake-overview">Connection Handshake Overview<a class="headerlink" href="#connection-handshake-overview" title="Permanent link">&para;</a></h2>
@@ -10355,10 +10492,9 @@ secrecy:</p>
 <p>These values are sent in the server hello before the actual hypervisor
 capabilities are known.</p>
 <p>The wire format permits more than one 32-bit word in each capability vector
-(<code>num_common_caps</code> / <code>num_channel_caps</code> may exceed 1). The Python proxy
-decodes only the first word of each and warns that it ignores the rest; the
-Rust implementation parses and retains every advertised word. New code should
-not assume a single word.</p>
+(<code>num_common_caps</code> / <code>num_channel_caps</code> may exceed 1). The Rust
+implementation parses and retains every advertised word; new code should not
+assume a single word.</p>
 <h2 id="parsing-robustness-and-resource-limits">Parsing robustness and resource limits<a class="headerlink" href="#parsing-robustness-and-resource-limits" title="Permanent link">&para;</a></h2>
 <p>The link messages are the first bytes a proxy reads from an unauthenticated,
 potentially hostile client, so their length, count, and offset fields must be
@@ -10386,11 +10522,8 @@ fixed there.</p>
 </ul>
 <p>The Rust implementation centralises these checks in a bounded reader used by
 every link parser, and ships fuzz targets that exercise the link-message,
-link-reply, and ticket-decryption paths against arbitrary input
-(see the ryll repository). The Python proxy predates this hardening; it is
-partially protected by Python's own bounds checking (a short buffer raises
-rather than over-reads) but does not enforce explicit size or count caps, so
-it should not be treated as the reference for robustness.</p>
+link-reply, and ticket-decryption paths against arbitrary input (see the ryll
+repository).</p>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/protocol-overview/">Protocol Overview</a> - High-level protocol introduction</li>

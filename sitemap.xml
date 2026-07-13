@@ -1037,6 +1037,26 @@
          <lastmod>2026-07-13</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall/</loc>
+         <lastmod>2026-07-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/</loc>
+         <lastmod>2026-07-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-06-packaging/</loc>
+         <lastmod>2026-07-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-07-ci/</loc>
+         <lastmod>2026-07-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-08-cutover/</loc>
+         <lastmod>2026-07-13</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy/</loc>
          <lastmod>2026-07-13</lastmod>
     </url>

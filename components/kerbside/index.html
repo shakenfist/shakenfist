@@ -5339,6 +5339,146 @@
   
   
     <li class="md-nav__item">
+      <a href="plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 5: daemon integration + session termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 6: packaging (maturin wheel + lockstep release)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 7: CI lane + loadtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 8: cutover (Rust is the only proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="plans/PLAN-rust-proxy/" class="md-nav__link">
         
   
@@ -9907,7 +10047,7 @@
 <p>This documentation covers:</p>
 <ul>
 <li><strong>SPICE Protocol Version</strong>: 2.2 (current as of spice-protocol 0.14)</li>
-<li><strong>Kerbside Version</strong>: Verified against <code>kerbside/spiceprotocol/packets/constants.py</code></li>
+<li><strong>Kerbside Version</strong>: Verified against the ryll <code>shakenfist-spice-protocol</code> crate used by the Rust proxy</li>
 <li><strong>OpenStack Integration</strong>: Nova 2025.1 (Epoxy) and later</li>
 </ul>
 <p>Protocol documentation is derived from the official SPICE protocol sources at
@@ -10036,8 +10176,8 @@ of a HTML5 desktop environment.</p>
 <ul>
 <li>
 <p><a href="/components/kerbside/proxy-architecture/">Proxy Architecture</a> - Internal architecture including
-  process model, connection state machine, traffic inspection, and worker
-  management</p>
+  the process model, the connection state machine, the relay, and the SPICE
+  firewall</p>
 </li>
 <li>
 <p><a href="/components/kerbside/../ARCHITECTURE/">ARCHITECTURE.md</a> - High-level system architecture
@@ -10170,8 +10310,12 @@ channel message formats:</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Full</strong>: Protocol decoded and logged during inspection
-<strong>Proxy</strong>: Traffic forwarded transparently without decoding</p>
+<p><strong>Full</strong>: the channel's message types are modelled in the L1 firewall
+allowlist (<code>rust/kerbside-proxy/src/allowlist.rs</code>); its framed traffic is
+classified per message type.
+<strong>Proxy</strong>: relayed and framed, but the channel is not individually modelled
+(treated as an unmodelled channel by the firewall policy). Message bodies are
+relayed opaquely in both cases; the proxy does not decode or log them.</p>
 <h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
 <h3 id="channel-types">Channel Types<a class="headerlink" href="#channel-types" title="Permanent link">&para;</a></h3>
 <table>
@@ -10307,8 +10451,9 @@ for browser-deployment specifics.</p>
 <li>Update the relevant documentation in this directory</li>
 <li>Include binary format descriptions with field offsets</li>
 <li>Document any deviations from the official SPICE protocol</li>
-<li>Add traffic inspection support in <code>spiceprotocol/packets/</code></li>
-<li>Update constants in <code>spiceprotocol/packets/constants.py</code></li>
+<li>Reflect any wire-format changes in the ryll <code>shakenfist-spice-protocol</code>
+   crate (the proxy's SPICE implementation) and the L1 allowlist in
+   <code>rust/kerbside-proxy/src/allowlist.rs</code></li>
 </ol>
 <h2 id="document-conventions">Document Conventions<a class="headerlink" href="#document-conventions" title="Permanent link">&para;</a></h2>
 <p>Throughout this documentation:</p>

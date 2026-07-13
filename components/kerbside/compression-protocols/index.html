@@ -4691,17 +4691,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#utility-tool" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Utility Tool
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5231,6 +5220,146 @@
     
   
     Rust proxy phase 3: proxy crate skeleton
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 5: daemon integration + session termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 6: packaging (maturin wheel + lockstep release)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 7: CI lane + loadtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 8: cutover (Rust is the only proxy)
   
 
     
@@ -9683,17 +9812,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#utility-tool" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Utility Tool
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9737,9 +9855,9 @@ commonly observed for non-video console sessions:</p>
 <li><strong>GLZ</strong> (Global LZ) - An extension of LZ that references previous images</li>
 </ul>
 <p>Both formats use a progressive dictionary compression scheme where previously
-decompressed pixels form the dictionary for later decompression. Kerbside
-includes a simple LZ/GLZ decompression tool (<code>kerbside-util</code>) that can
-decompress these formats and convert them to PNG for inspection.</p>
+decompressed pixels form the dictionary for later decompression. The ryll
+client decodes these formats (its <code>digest-decode</code> feature) when computing the
+display digest used by the automated test harness.</p>
 <h2 id="lz-compression">LZ Compression<a class="headerlink" href="#lz-compression" title="Permanent link">&para;</a></h2>
 <p>LZ compression as implemented in SPICE is a progressive dictionary compression
 scheme. The dictionary is not transmitted separately from the image - instead,
@@ -9921,8 +10039,9 @@ big-endian UINT16 and add 8191:</p>
 <li>Otherwise: Copy <code>length</code> pixels from (current position - offset)</li>
 </ul>
 <h3 id="implementation-reference">Implementation Reference<a class="headerlink" href="#implementation-reference" title="Permanent link">&para;</a></h3>
-<p>For a working implementation, see <code>kerbside/utilities/lz.py</code> in the Kerbside
-codebase.</p>
+<p>For a working implementation, see the ryll <code>shakenfist-spice-protocol</code>
+crate's decode path (the <code>digest-decode</code> feature), which the Kerbside proxy
+and the test harness rely on.</p>
 <h2 id="glz-compression">GLZ Compression<a class="headerlink" href="#glz-compression" title="Permanent link">&para;</a></h2>
 <p>GLZ (Global LZ) extends LZ by allowing references to pixels from previously
 decompressed images in the session, not just the current image. This is
@@ -10035,15 +10154,9 @@ for 25-bit offsets.</p>
 <li>Copy <code>length</code> pixels from that location</li>
 </ul>
 <h3 id="implementation-reference_1">Implementation Reference<a class="headerlink" href="#implementation-reference_1" title="Permanent link">&para;</a></h3>
-<p>For a working implementation, see <code>kerbside/utilities/glz.py</code> in the Kerbside
-codebase.</p>
-<h2 id="utility-tool">Utility Tool<a class="headerlink" href="#utility-tool" title="Permanent link">&para;</a></h2>
-<p>Kerbside includes <code>kerbside-util</code> which can:</p>
-<ul>
-<li>Decompress LZ and GLZ compressed images</li>
-<li>Convert compressed images to PNG for inspection</li>
-<li>Useful for debugging display channel issues</li>
-</ul>
+<p>For a working implementation, see the ryll <code>shakenfist-spice-protocol</code>
+crate's decode path (the <code>digest-decode</code> feature), which the Kerbside proxy
+and the test harness rely on.</p>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/kerbside/protocol-overview/">Protocol Overview</a> - High-level SPICE protocol</li>

@@ -5230,34 +5230,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Kerbside Implementation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#decoded-messages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decoded Messages
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#traffic-inspection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Traffic Inspection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -5717,6 +5689,146 @@
     
   
     Rust proxy phase 3: proxy crate skeleton
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 4: firewall policy engine (L0 + L1 enforcing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 5: daemon integration + session termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 6: packaging (maturin wheel + lockstep release)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 7: CI lane + loadtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust proxy phase 8: cutover (Rust is the only proxy)
   
 
     
@@ -10624,34 +10736,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Kerbside Implementation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#decoded-messages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decoded Messages
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#traffic-inspection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Traffic Inspection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -11331,27 +11415,13 @@ version and capabilities.</p>
 <a id="__codelineno-30-31" name="__codelineno-30-31" href="#__codelineno-30-31"></a>      |&lt;-------------------------------------------|
 </code></pre></div>
 <h2 id="kerbside-implementation">Kerbside Implementation<a class="headerlink" href="#kerbside-implementation" title="Permanent link">&para;</a></h2>
-<p>Kerbside's USB redirection handling is implemented in
-<code>spiceprotocol/packets/port.py</code>. The proxy:</p>
-<ol>
-<li>Parses VMC headers to identify USB redirection messages</li>
-<li>Decodes the <code>usb_redir_hello</code> message to log version information</li>
-<li>Forwards all USB redirection traffic transparently between client and server</li>
-<li>Supports traffic inspection/logging when configured</li>
-</ol>
-<h3 id="decoded-messages">Decoded Messages<a class="headerlink" href="#decoded-messages" title="Permanent link">&para;</a></h3>
-<p>Kerbside currently decodes:
-- <code>usb_redir_hello</code> - Logs version string and capabilities</p>
-<p>All other USB redirection messages are forwarded without detailed parsing but
-can be logged in raw form for debugging.</p>
-<h3 id="traffic-inspection">Traffic Inspection<a class="headerlink" href="#traffic-inspection" title="Permanent link">&para;</a></h3>
-<p>When traffic inspection is enabled, USB redirection traffic can be logged:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="c1"># Example inspection output</span>
-<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="n">Client</span> <span class="n">sent</span> <span class="mi">80</span> <span class="n">byte</span> <span class="n">opcode</span> <span class="mi">101</span> <span class="n">vmc_data</span>
-<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>   <span class="o">...</span> <span class="n">VMC</span> <span class="nb">type</span> <span class="n">usb_redir_hello</span><span class="p">,</span> <span class="n">length</span> <span class="mi">68</span><span class="p">,</span> <span class="nb">id</span> <span class="mi">0</span>
-<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>   <span class="o">...</span> <span class="n">version</span><span class="p">:</span> <span class="n">qemu</span> <span class="n">usb</span><span class="o">-</span><span class="n">redir</span> <span class="n">guest</span> <span class="mf">0.8.0</span>
-<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a>   <span class="o">...</span> <span class="n">capabilities</span><span class="p">:</span> <span class="mi">127</span>
-</code></pre></div>
+<p>The Rust proxy relays the USB redirection (<code>usbredir</code>) channel between client
+and server, subject to the L0+L1 firewall: message types are checked against
+the per-channel allowlist (<code>rust/kerbside-proxy/src/allowlist.rs</code>) and the
+payload is relayed opaquely. Deep VMC / <code>usb_redir_hello</code> decoding is not
+implemented (it was part of the removed Python-proxy traffic-inspection
+feature); reintroducing it would belong with a future L2/L3 inspection
+capability.</p>
 <h2 id="security-considerations">Security Considerations<a class="headerlink" href="#security-considerations" title="Permanent link">&para;</a></h2>
 <p>USB redirection presents security considerations:</p>
 <ol>
