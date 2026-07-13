@@ -63,45 +63,43 @@ These settings configure the `KerbsideProxy` gRPC service the daemon hosts over 
 | API_SOCKET_PATH | String (default /run/kerbside/api.sock) | The unix domain socket the KerbsideProxy gRPC service listens on. The containing directory is created with 0700 permissions; access is guarded by filesystem permissions since the peer is a trusted local process. The proxy must be co-located with the daemon to share this socket. Keep the path short: AF_UNIX socket paths are limited to ~108 bytes (SUN_LEN), and an over-long path will fail to bind/connect; a path under /run is safe. |
 | API_GRPC_WORKERS | Integer (default 8) | The size of the thread pool serving KerbsideProxy gRPC requests. |
 
-## Traffic Inspection
+## SPICE firewall
 
-Being able to inspect traffic being passed by the proxy is useful during both
-development and whilst diagnosing issues in production but has obvious privacy
-concerns.
+The proxy enforces an application-level SPICE firewall on every relayed
+message: L0 framing/size limits and an L1 per-channel, per-direction message
+-type allowlist derived from the SPICE protocol. Python owns the tunable policy
+and delivers it to the proxy in the `AuthorizeConnection` reply (Python decides
+policy; the Rust proxy enforces it). These settings are deployment-wide.
 
-The VDI proxy may be configured to log details of traffic for all sessions by
-setting the `KERBSIDE_TRAFFIC_INSPECTION` environment variable to "1". This will
-write session traffic details to the directory configured by
-`KERBSIDE_TRAFFIC_OUTPUT_PATH`, in a sub directory per session identifier.
-Additionally, more detailed information can be logged by also setting
-`KERBSIDE_TRAFFIC_INSPECTION_INTIMATE` to "1".
-
-Traffic inspection is per proxy not per session and implies a restart of the
-proxy before it is enabled. This ensures that users are aware that traffic
-inspection has been enabled. If traffic inspection is enabled, audit messages
-are recorded per channel logged (as not all channels need to flow through the
-same proxy machine). Additionally, the display channel is altered to show a
-dashed red and yellow border to provide a visual warning that this inspection
-is occurring.
+Firewall verdicts are exported as the Prometheus metric
+`kerbside_proxy_firewall_verdicts_total{channel,direction,rule,action}` (where
+`action` is `enforced` or `observed`) and coalesced into one audit event per
+connection.
 
 | Configuration Option | Type | Description |
 |---------------------|------|-------------|
-| TRAFFIC_INSPECTION | Boolean (default False) | Whether to log detailed traffic information. Defaults to false, but can be useful for debugging service issues in production. |
-| TRAFFIC_INSPECTION_INTIMATE | Boolean (default False) | If TRAFFIC_INSPECTION is true and this option is also set to true, then log intimate debug details of sessions including keystrokes and all display frames. |
-| TRAFFIC_OUTPUT_PATH | String (default empty) | Where to write traffic inspection logs to. This must be set if TRAFFIC_INSPECTION is True. |
+| FIREWALL_MODE | String (default "enforce") | Enforcement mode delivered to the proxy. "enforce" applies blocking verdicts (a disallowed message type or an over-cap message terminates the session). "warn" downgrades every blocking verdict to forward-and-log (metric `action=observed`) so an operator can observe what enforcement *would* trip against real traffic before enabling it. Case-insensitive; an unrecognised value falls back to "enforce". |
+| FIREWALL_PERMITTED_CHANNELS | String (default empty) | Comma-separated SPICE channel names the proxy may relay (main, display, inputs, cursor, playback, record, tunnel, smartcard, usbredir, port, webdav). Empty means permit all channels; a channel not listed is denied before relay (the client receives a protocol-correct permission-denied). |
+
+The per-channel message-size caps and the (default-off) rate ceiling currently
+use the proxy's compiled-in defaults and are not yet configurable; they are a
+planned extension of the delivered policy.
 
 ## Logging and Monitoring Settings
 
-The VDI proxy provides Prometheus style metrics on a configurable port (default
-13003). These metric values are also logged for later processing if desired.
+The Rust proxy provides Prometheus style metrics on a configurable port
+(default 13003), bound to a management address (see
+`PROMETHEUS_METRICS_ADDRESS`).
 
 Values tracked include:
 
-- Number of active console sessions
-- Number of active console channels
-- Bandwidth and latency information for each console channel
-- REST API request statuses as a metric with labels for each HTTP status code
-- REST API request response latency as a histogram per HTTP status code
+- Total and currently-active connections
+  (`kerbside_proxy_connections_total`, `kerbside_proxy_active_connections`)
+- Authorized and denied connection counts
+  (`kerbside_proxy_authorized_total`, `kerbside_proxy_denied_total`)
+- Bytes relayed per direction
+  (`kerbside_proxy_bytes_relayed_total{direction}`)
+- Firewall verdicts (`kerbside_proxy_firewall_verdicts_total{...}`)
 
 | Configuration Option | Type | Description |
 |---------------------|------|-------------|
@@ -109,6 +107,7 @@ Values tracked include:
 | LOG_OUTPUT_JSON | Boolean (default False) | If true, log entries are in JSON format. |
 | LOG_VERBOSE | Boolean (default False) | Whether to log verbose debugging information. |
 | PROMETHEUS_METRICS_PORT | Integer (default 13003) | The TCP port that the prometheus metrics HTTP server will listen on. |
+| PROMETHEUS_METRICS_ADDRESS | String (default 127.0.0.1) | The address the Rust proxy binds its `/metrics` server to. Defaults to loopback because the endpoint is unauthenticated and must not be exposed on the public VDI interface; set a management address (or 0.0.0.0 behind a firewall) to scrape it from another host. |
 
 ## Related Documentation
 
