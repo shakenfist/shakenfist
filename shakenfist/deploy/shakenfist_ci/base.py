@@ -269,6 +269,11 @@ class BaseTestCase(testtools.TestCase):
                 'docs/plans/PLAN-ci-node-exec-assertions.md for the deploy '
                 'prerequisite.' % (node.get('name'), node.get('ip'), e))
 
+    def _node_link_names(self, node):
+        """The names of the network links in node's root namespace."""
+        out, _ = self._node_exec(node, ['ip', '-json', 'link', 'show'])
+        return [link['ifname'] for link in json.loads(out) if link]
+
     def _await_power_off(self, instance_uuid, after=None):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
