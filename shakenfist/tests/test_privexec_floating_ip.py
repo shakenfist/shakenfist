@@ -12,9 +12,11 @@ rules (github issues #3378 through #3383).
 
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.daemons.privexec import main as privexec_main
 from shakenfist.protos import privexec_pb2
 from shakenfist.tests import base
+from shakenfist.util import concurrency as util_concurrency
 
 
 NETWORK_UUID = 'ccc652aa-f7b6-4f99-b76d-443ae4d91412'
@@ -161,6 +163,7 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
         self.assertEqual(
             privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED,
             reply.add_floating_ip_reply.error)
+        self.assertIn('boom', reply.add_floating_ip_reply.error_text)
 
     def test_add_reports_address_failure(self):
         self.patch_commands()
@@ -171,6 +174,8 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
 
         self.assertEqual(privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED,
                          reply.add_floating_ip_reply.error)
+        self.assertIn(INNER_INTERFACE, reply.add_floating_ip_reply.error_text)
+        self.assertIn(NETWORK_UUID, reply.add_floating_ip_reply.error_text)
 
 
 class RemoveFloatingIPTestCase(PrivExecFloatingIPTestCase):
@@ -255,3 +260,42 @@ class RemoveFloatingIPTestCase(PrivExecFloatingIPTestCase):
 
         self.assertEqual(privexec_pb2.RemoveFloatingIPReply.FAILED,
                          reply.remove_floating_ip_reply.error)
+        self.assertIn('boom', reply.remove_floating_ip_reply.error_text)
+
+
+class ConcurrencyFloatingIPTestCase(base.ShakenFistTestCase):
+    """The client side must surface the error detail from the reply.
+
+    A bare AddFloatingIPFailed with no message made this class of failure
+    very hard to diagnose from centralised logging.
+    """
+
+    def test_add_floating_ip_raises_with_detail(self):
+        reply = privexec_pb2.PrivExecReply(
+            add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                error=privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED,
+                error_text='failed to add 192.168.10.44/32'))
+        with mock.patch(
+                'shakenfist.util.concurrency._marshal_privexec_request',
+                return_value=reply):
+            exc = self.assertRaises(
+                exceptions.AddFloatingIPFailed,
+                util_concurrency.add_floating_ip,
+                NETWORK_UUID, '192.168.10.44', '10.0.0.56')
+        self.assertIn('ADD_ADDRESS_FAILED', str(exc))
+        self.assertIn('failed to add 192.168.10.44/32', str(exc))
+
+    def test_remove_floating_ip_raises_with_detail(self):
+        reply = privexec_pb2.PrivExecReply(
+            remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
+                error=privexec_pb2.RemoveFloatingIPReply.FAILED,
+                error_text='failed to delete interface'))
+        with mock.patch(
+                'shakenfist.util.concurrency._marshal_privexec_request',
+                return_value=reply):
+            exc = self.assertRaises(
+                exceptions.RemoveFloatingIPFailed,
+                util_concurrency.remove_floating_ip,
+                NETWORK_UUID, '192.168.10.44')
+        self.assertIn('FAILED', str(exc))
+        self.assertIn('failed to delete interface', str(exc))

@@ -358,9 +358,10 @@ class PrivExecJob:
         # floating IP on another network may have left the pair stranded.
         # Deleting the outer end destroys the pair wherever the inner end
         # is, letting us recreate it cleanly.
+        error_text = ''
         if success and not privexec_util.check_for_interface(
                 inner_floating_interface, namespace=req.network_uuid):
-            _, _, returncode = privexec_util.command_helper(
+            _, stderr, returncode = privexec_util.command_helper(
                 privexec_util.locate_command('ip'), 'link', 'del',
                 floating_interface)
             success = returncode == 0
@@ -370,14 +371,24 @@ class PrivExecJob:
                     ['peer', 'name', inner_floating_interface],
                     inner_namespace=req.network_uuid
                 )
+            else:
+                error_text = (
+                    f'failed to delete stranded interface '
+                    f'{floating_interface}: {stderr}')
 
         if not success:
+            if not error_text:
+                error_text = (
+                    f'failed to create veth pair {floating_interface} / '
+                    f'{inner_floating_interface} with inner end in '
+                    f'namespace {req.network_uuid}')
             return privexec_pb2.PrivExecReply(
                 add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
                     network_uuid=req.network_uuid,
                     floating_address=req.floating_address,
                     inner_address=req.inner_address,
-                    error=privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED
+                    error=privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED,
+                    error_text=error_text
                 )
             )
 
@@ -396,7 +407,11 @@ class PrivExecJob:
                         network_uuid=req.network_uuid,
                         floating_address=req.floating_address,
                         inner_address=req.inner_address,
-                        error=privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED
+                        error=privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED,
+                        error_text=(
+                            f'failed to add {req.floating_address}/32 to '
+                            f'{inner_floating_interface} in namespace '
+                            f'{req.network_uuid}')
                     )
                 )
 
@@ -422,7 +437,7 @@ class PrivExecJob:
                 )
             )
 
-        _, _, returncode = privexec_util.command_helper(
+        _, stderr, returncode = privexec_util.command_helper(
             privexec_util.locate_command('ip'), 'netns', 'exec',
             req.network_uuid, privexec_util.locate_command('iptables'),
             '-w', '10', '-t', 'nat', '-A', *dnat_rule)
@@ -432,7 +447,11 @@ class PrivExecJob:
                     network_uuid=req.network_uuid,
                     floating_address=req.floating_address,
                     inner_address=req.inner_address,
-                    error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED
+                    error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED,
+                    error_text=(
+                        f'failed to append DNAT rule for '
+                        f'{req.floating_address} in namespace '
+                        f'{req.network_uuid}: {stderr}')
                 )
             )
 
@@ -464,7 +483,7 @@ class PrivExecJob:
                 for rule in stdout.split('\n'):
                     if f'-d {req.floating_address}/32 ' not in rule:
                         continue
-                    _, _, returncode = privexec_util.command_helper(
+                    _, stderr, returncode = privexec_util.command_helper(
                         privexec_util.locate_command('ip'), 'netns', 'exec',
                         req.network_uuid,
                         privexec_util.locate_command('iptables'),
@@ -474,7 +493,11 @@ class PrivExecJob:
                             remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
                                 network_uuid=req.network_uuid,
                                 floating_address=req.floating_address,
-                                error=privexec_pb2.RemoveFloatingIPReply.FAILED
+                                error=privexec_pb2.RemoveFloatingIPReply.FAILED,
+                                error_text=(
+                                    f'failed to remove DNAT rule "{rule}" '
+                                    f'in namespace {req.network_uuid}: '
+                                    f'{stderr}')
                             )
                         )
 
@@ -482,7 +505,7 @@ class PrivExecJob:
         # _add_floating_ip. Deleting the outer end also destroys the inner
         # end in the network namespace, along with the address on it.
         if privexec_util.check_for_interface(floating_interface):
-            _, _, returncode = privexec_util.command_helper(
+            _, stderr, returncode = privexec_util.command_helper(
                 privexec_util.locate_command('ip'), 'link', 'del',
                 floating_interface)
             if returncode != 0:
@@ -490,7 +513,10 @@ class PrivExecJob:
                     remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
                         network_uuid=req.network_uuid,
                         floating_address=req.floating_address,
-                        error=privexec_pb2.RemoveFloatingIPReply.FAILED
+                        error=privexec_pb2.RemoveFloatingIPReply.FAILED,
+                        error_text=(
+                            f'failed to delete interface '
+                            f'{floating_interface}: {stderr}')
                     )
                 )
 
