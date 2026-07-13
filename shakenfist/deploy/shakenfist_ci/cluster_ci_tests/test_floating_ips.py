@@ -156,13 +156,13 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
         return 'flt-%08x' % int(ipaddress.IPv4Address(floating))
 
     def _host_link_names(self):
-        out, _ = processutils.execute('ip -json link show', shell=True)
+        out, _ = processutils.execute('ip', '-json', 'link', 'show')
         return [i['ifname'] for i in json.loads(out) if i]
 
     def _floating_dnat_rules(self, floating):
         out, _ = processutils.execute(
-            'sudo ip netns exec %s iptables -w 10 -t nat -S PREROUTING'
-            % self.net['uuid'], shell=True)
+            'sudo', 'ip', 'netns', 'exec', self.net['uuid'], 'iptables',
+            '-w', '10', '-t', 'nat', '-S', 'PREROUTING')
         return [r for r in out.split('\n') if '-d %s/32 ' % floating in r]
 
     def _await(self, callback, description, timeout=120):
@@ -216,7 +216,7 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
         start_time = time.time()
         while time.time() - start_time < 300:
             out, _ = processutils.execute(
-                'ping -c 3 -W 2 %s' % floating, shell=True,
+                'ping', '-c', '3', '-W', '2', floating,
                 check_exit_code=[0, 1, 2])
             if out.find('bytes from') != -1:
                 return
