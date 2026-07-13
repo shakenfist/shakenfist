@@ -351,6 +351,26 @@ class PrivExecJob:
             ['peer', 'name', inner_floating_interface],
             inner_namespace=req.network_uuid
         )
+
+        # create_interface returns success without doing anything if the
+        # outer end already exists, but that doesn't mean the inner end is
+        # in the network namespace we need it in -- a previous user of this
+        # floating IP on another network may have left the pair stranded.
+        # Deleting the outer end destroys the pair wherever the inner end
+        # is, letting us recreate it cleanly.
+        if success and not privexec_util.check_for_interface(
+                inner_floating_interface, namespace=req.network_uuid):
+            _, _, returncode = privexec_util.command_helper(
+                privexec_util.locate_command('ip'), 'link', 'del',
+                floating_interface)
+            success = returncode == 0
+            if success:
+                success = privexec_util.create_interface(
+                    floating_interface, 'veth',
+                    ['peer', 'name', inner_floating_interface],
+                    inner_namespace=req.network_uuid
+                )
+
         if not success:
             return privexec_pb2.PrivExecReply(
                 add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(

@@ -87,6 +87,7 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
     def _patch_utils(self, addresses=None):
         for name, value in [
                 ('create_interface', True),
+                ('check_for_interface', True),
                 ('get_interface_addresses', addresses or []),
                 ('add_address_to_interface', True)]:
             patcher = mock.patch(
@@ -129,6 +130,37 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
         self.assertEqual([], recorder.find(' -A '))
         self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
                          reply.add_floating_ip_reply.error)
+
+    def test_add_recreates_stranded_pair(self):
+        # If the outer end of the veth pair already exists but the inner
+        # end is not in the requested network namespace, the pair was left
+        # behind by a previous user of this floating IP. The pair must be
+        # destroyed and recreated, not reused.
+        recorder = self.patch_commands(results={' -C ': ('', '', 1)})
+        self._patch_utils()
+        self.mock_check_for_interface.return_value = False
+
+        reply = self.job._add_floating_ip(self._request())
+
+        self.mock_check_for_interface.assert_called_once_with(
+            INNER_INTERFACE, namespace=NETWORK_UUID)
+        self.assertEqual(
+            [('ip', 'link', 'del', FLOATING_INTERFACE)],
+            recorder.find('link del'))
+        self.assertEqual(2, self.mock_create_interface.call_count)
+        self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
+                         reply.add_floating_ip_reply.error)
+
+    def test_add_reports_stranded_pair_delete_failure(self):
+        self.patch_commands(results={'link del': ('', 'boom', 1)})
+        self._patch_utils()
+        self.mock_check_for_interface.return_value = False
+
+        reply = self.job._add_floating_ip(self._request())
+
+        self.assertEqual(
+            privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED,
+            reply.add_floating_ip_reply.error)
 
     def test_add_reports_address_failure(self):
         self.patch_commands()
