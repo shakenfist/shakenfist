@@ -468,6 +468,15 @@ class PrivExecJob:
         floating_interface = \
             f'flt-{int(ipaddress.IPv4Address(req.floating_address)):08x}'
 
+        # Removal is best effort cleanup: a failure removing any one piece
+        # of state must not abort the removal of the rest. Aborting midway
+        # strands more than it cleans -- the veth pair this PR exists to
+        # stop leaking would be left behind whenever a single DNAT delete
+        # failed. Accumulate failures and keep going, then report FAILED
+        # at the end if anything did not clean up. The operations are
+        # idempotent, so a caller retry converges on a clean state.
+        errors = []
+
         # Remove DNAT rules for this floating IP from the network namespace
         # before removing the interface. A stale rule matches in preference
         # to the rule added by any later user of this floating IP on the
@@ -487,19 +496,12 @@ class PrivExecJob:
                         privexec_util.locate_command('ip'), 'netns', 'exec',
                         req.network_uuid,
                         privexec_util.locate_command('iptables'),
-                        '-w', '10', '-t', 'nat', '-D', *rule.split()[1:])
+                        '-w', '10', '-t', 'nat', '-D', *rule.split()[1:],
+                        failure_is_error=False)
                     if returncode != 0:
-                        return privexec_pb2.PrivExecReply(
-                            remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
-                                network_uuid=req.network_uuid,
-                                floating_address=req.floating_address,
-                                error=privexec_pb2.RemoveFloatingIPReply.FAILED,
-                                error_text=(
-                                    f'failed to remove DNAT rule "{rule}" '
-                                    f'in namespace {req.network_uuid}: '
-                                    f'{stderr}')
-                            )
-                        )
+                        errors.append(
+                            f'failed to remove DNAT rule "{rule}" in '
+                            f'namespace {req.network_uuid}: {stderr}')
 
         # This name must match the outer interface created by
         # _add_floating_ip. Deleting the outer end also destroys the inner
@@ -507,18 +509,21 @@ class PrivExecJob:
         if privexec_util.check_for_interface(floating_interface):
             _, stderr, returncode = privexec_util.command_helper(
                 privexec_util.locate_command('ip'), 'link', 'del',
-                floating_interface)
+                floating_interface, failure_is_error=False)
             if returncode != 0:
-                return privexec_pb2.PrivExecReply(
-                    remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
-                        network_uuid=req.network_uuid,
-                        floating_address=req.floating_address,
-                        error=privexec_pb2.RemoveFloatingIPReply.FAILED,
-                        error_text=(
-                            f'failed to delete interface '
-                            f'{floating_interface}: {stderr}')
-                    )
+                errors.append(
+                    f'failed to delete interface {floating_interface}: '
+                    f'{stderr}')
+
+        if errors:
+            return privexec_pb2.PrivExecReply(
+                remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    error=privexec_pb2.RemoveFloatingIPReply.FAILED,
+                    error_text='; '.join(errors)
                 )
+            )
 
         return privexec_pb2.PrivExecReply(
             remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(

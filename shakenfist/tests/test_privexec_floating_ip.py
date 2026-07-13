@@ -165,6 +165,42 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
             reply.add_floating_ip_reply.error)
         self.assertIn('boom', reply.add_floating_ip_reply.error_text)
 
+    def test_add_reports_stranded_recreate_failure(self):
+        # The stranded pair is detected (inner end not in the namespace),
+        # the delete succeeds, but recreating the pair fails. This surfaces
+        # the generic create failure message.
+        self.patch_commands(results={' -C ': ('', '', 1)})
+        self._patch_utils()
+        self.mock_check_for_interface.return_value = False
+        self.mock_create_interface.side_effect = [True, False]
+
+        reply = self.job._add_floating_ip(self._request())
+
+        self.assertEqual(2, self.mock_create_interface.call_count)
+        self.assertEqual(
+            privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED,
+            reply.add_floating_ip_reply.error)
+        self.assertIn('failed to create veth pair',
+                      reply.add_floating_ip_reply.error_text)
+        self.assertIn(FLOATING_INTERFACE,
+                      reply.add_floating_ip_reply.error_text)
+
+    def test_add_reports_dnat_append_failure(self):
+        # The DNAT rule is absent (-C returns non-zero) so it is appended,
+        # but the -A append itself fails. This must surface as
+        # IPTABLES_FAILED with the address and namespace in the detail.
+        self.patch_commands(
+            results={' -C ': ('', '', 1), ' -A ': ('', 'append boom', 1)})
+        self._patch_utils()
+
+        reply = self.job._add_floating_ip(self._request())
+
+        self.assertEqual(privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED,
+                         reply.add_floating_ip_reply.error)
+        self.assertIn('192.168.10.44', reply.add_floating_ip_reply.error_text)
+        self.assertIn(NETWORK_UUID, reply.add_floating_ip_reply.error_text)
+        self.assertIn('append boom', reply.add_floating_ip_reply.error_text)
+
     def test_add_reports_address_failure(self):
         self.patch_commands()
         self._patch_utils()
@@ -261,6 +297,34 @@ class RemoveFloatingIPTestCase(PrivExecFloatingIPTestCase):
         self.assertEqual(privexec_pb2.RemoveFloatingIPReply.FAILED,
                          reply.remove_floating_ip_reply.error)
         self.assertIn('boom', reply.remove_floating_ip_reply.error_text)
+
+    def test_remove_is_best_effort_after_dnat_failure(self):
+        # A DNAT delete failing must not abort the interface deletion --
+        # otherwise a single stuck rule leaks the veth pair, which is
+        # exactly the leak class this code exists to stop. The failure is
+        # still reported, but the interface is deleted regardless.
+        listing = '\n'.join([
+            '-P PREROUTING ACCEPT',
+            ('-A PREROUTING -d 192.168.10.44/32 -j DNAT '
+             '--to-destination 10.0.0.56'),
+        ])
+        recorder = self.patch_commands(results={
+            '-S PREROUTING': (listing, '', 0),
+            ' -D ': ('', 'dnat boom', 1)})
+        self.patch_netns_exists(True)
+
+        with mock.patch(
+                'shakenfist.daemons.privexec.util.check_for_interface',
+                return_value=True):
+            reply = self.job._remove_floating_ip(self._request())
+
+        # The interface deletion still ran despite the earlier DNAT failure.
+        self.assertEqual(
+            [('ip', 'link', 'del', FLOATING_INTERFACE)],
+            recorder.find('link del'))
+        self.assertEqual(privexec_pb2.RemoveFloatingIPReply.FAILED,
+                         reply.remove_floating_ip_reply.error)
+        self.assertIn('dnat boom', reply.remove_floating_ip_reply.error_text)
 
 
 class ConcurrencyFloatingIPTestCase(base.ShakenFistTestCase):
