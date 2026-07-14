@@ -163,6 +163,7 @@ nav:
                 - "instar bitmap subcommand": components/instar/plans/PLAN-bitmap.md
                 - "instar bench subcommand": components/instar/plans/PLAN-bench.md
                 - "bench qcow2 refcount growth": components/instar/plans/PLAN-bench-refcount-growth.md
+                - "qcow2 write infrastructure": components/instar/plans/PLAN-qcow2-write-infrastructure.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
@@ -187,6 +188,7 @@ nav:
                 - "QCOW2 L1/L2 Tables - Address Translation": components/instar/qcow2/qcow2-l1l2-tables.md
                 - "QCOW2 Reference Counting System": components/instar/qcow2/qcow2-refcount.md
                 - "QCOW2 Snapshot System": components/instar/qcow2/qcow2-snapshots.md
+                - "QCOW2 Write Planner and Executor": components/instar/qcow2/qcow2-write-planner.md
             - Raw:
                 - "Raw Disk Image Format": components/instar/raw/raw-format.md
             - Vmdk:

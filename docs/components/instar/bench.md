@@ -105,10 +105,11 @@ actually represents:
   bench "request" of `-s` bytes may therefore correspond to several
   virtio round trips, not one.
 - **Write-test metadata decisions happen inside the bracket.** For
-  qcow2, every touched cluster's L1/L2 metadata is read uncached from
-  disk at the moment it is needed, and refcount write-back is
-  concentrated at flush points and again at the end of the run — all
-  of that work is inside the timed window. `qemu-img` instead
+  qcow2, each touched cluster is classified against a staged metadata
+  window that loads L1/L2 tables from disk as the schedule advances,
+  and all metadata write-back (L2, L1 and refcounts, refcounts last)
+  is concentrated at flush points and again at the end of the run —
+  all of that work is inside the timed window. `qemu-img` instead
   amortises its metadata through an in-memory cache across the whole
   run. This means write timings are **not like-for-like at fine
   grain** between the two tools, even on identical arguments.
@@ -186,7 +187,18 @@ guest refuses the write test:
 | External data file | The image stores data in an external file. |
 | Encryption | The image is LUKS-encrypted (`crypt_method != 0`). |
 | Dirty / corrupt | The image's dirty or corrupt incompatible bits are set. |
-| Internal snapshots | The image has one or more internal snapshots (`nb_snapshots > 0`) — bench overwrites clusters without a per-write ownership check, so a snapshot-shared cluster must never be touched. |
+
+**Internal snapshots are now supported (copy-on-write).** Before
+phase 7 of PLAN-qcow2-write-infrastructure, `bench -w` refused any
+image with `nb_snapshots > 0` because its overwrite path had no
+per-write ownership check. Since phase 7 (step 7d) the qcow2 `-w`
+path runs the crate's copy-on-write branch: a snapshot-shared data
+cluster is copied before it is written (copy `D → D'`, repoint the
+L2, `rc(D')=1`, `rc(D)`−1) and a snapshot-shared L2 table is COWed,
+so the pre-existing snapshots are **preserved** (like commit) and the
+active view stays `qemu-img compare`-identical to a qemu twin with
+`qemu-img check` clean. The internal-snapshots write-gate no longer
+fires; its gate id is kept for defensive mapping only.
 
 Allocation never grows the refcount structures **during** the run.
 Instead, setup computes the schedule's worst-case allocation bound
@@ -208,28 +220,57 @@ grown refcount table larger than 64 KiB. That is roughly a 256 MiB
 host file at 512-byte clusters, and 64 GiB or more at cluster sizes
 of 64 KiB and up.
 
+The qcow2 `-w` path runs on the shared `crates/qcow2-write`
+planner and `crates/qcow2-write-exec` executor — the same
+allocate-on-write infrastructure commit and rebase use, with
+bench as its third consumer (PLAN-qcow2-write-infrastructure
+phase 6). The planner classifies each scheduled write from a
+staged metadata window and emits the mutation steps; the
+executor runs them through the call table. Refcount growth (see
+above) stays a bench-specific setup step, but now calls the
+growth planner that moved into `crates/qcow2-write` and routes
+its I/O through the shared executor's byte-range layer. The
+shared write path — the step-program ABI, the envelope, the
+allocate-on-write and copy-on-write emission, refcount growth
+and the crash-ordering contract — is documented in the
+[qcow2 write planner and executor reference](/components/instar/qcow2/qcow2-write-planner/).
+
 ### Write-back design
 
 For each scheduled offset, bench writes `bufsize` bytes of the
 `--pattern` byte at that virtual offset through the format layer. For
 qcow2, an already-allocated, already-`OFLAG_COPIED` cluster is
 patched in place (a sub-sector read-modify-write, no metadata
-change); an unallocated cluster is allocated, filled with its current
-virtual content (read through the backing chain, or zero-filled if
-there is none), patched, and its L1/L2 entries are updated.
+change); an unallocated cluster is allocated (a fresh L2 table first
+when the L1 slot is empty, then the data cluster), filled with its
+current virtual content (read through the backing chain, or
+zero-filled if there is none), patched, and its L1/L2 entries are
+updated. On a backed image a partial allocating write reads the
+pre-image through the chain and resubmits the full cluster, so the
+backing is honoured (the crate refuses a bare partial allocating
+write with a backing file; bench does the chain fill itself).
 
-Metadata write-back is **write-through for L2 and L1, staged for
-refcounts, with refcounts written back last**: a data cluster is
-written to disk, then the L2 entry that makes it reachable, then (if
-a new L2 table was allocated) the L1 entry — no fsync between these.
-Refcount updates accumulate in staged refblocks and are written back
-at each `--flush-interval` flush point and once more after the run
-completes. This ordering means a crash mid-bench leaves, at worst,
-**leaked clusters** (allocated and reachable via L2, but
-under-counted in the refcount table — reported and repaired cleanly
-by `qemu-img check`), and **never** a dangling L2 pointer into
-unallocated space. This is the same benign artifact class a
-`qemu-img bench -w` crash produces.
+Metadata is **staged and written back in dependency order at each
+flush epoch, refcounts last**: within an epoch a data cluster
+reaches disk before the L2 entry that makes it reachable, a fresh
+L2 table before the L1 entry that reaches it, and refblocks after
+all of those. A flush epoch runs at each `--flush-interval` flush
+point and once more after the run completes. This ordering means a
+crash mid-bench leaves, at worst, **leaked clusters** (allocated and
+reachable via L2, but under-counted in the refcount table — reported
+and repaired cleanly by `qemu-img check`), and **never** a dangling
+L2 pointer into unallocated space. This is the same benign artifact
+class a `qemu-img bench -w` crash produces.
+
+**Durability / fsync posture.** bench's image is input slot 0
+opened read-write, so `fsync_input(0)` genuinely syncs. The
+executor's own flushes are disabled; instead bench issues exactly
+one `fsync_input(0)` per `--flush-interval` cadence point, after
+that epoch's write-back, and none at end-of-bracket or for
+`--flush-interval 0`. The `--output json` `flushes-issued` field
+counts those cadence points only — never the 1-2 fsyncs setup-time
+refcount growth issues. This preserves bench's pre-migration fsync
+count exactly.
 
 ### Overlay COW correctness
 
@@ -299,6 +340,7 @@ listed.
 | Flush failure | `bench: flushing the image failed` |
 | Write test refused by the write-envelope gate | `bench: write tests are not supported for this image (<reason>)` (see the write-gate table below) |
 | qcow2 allocation exhausted | `bench: image too large for in-place bench write` |
+| Image metadata inconsistent or an unsupported entry shape (`crates/qcow2-write` classification refusal — unknown/reserved L1 or L2 bit patterns, refcount inconsistency or coverage gap, staged-regions mismatch; a v3 zero-flag on the target L2 entry) | `bench: image metadata is inconsistent` |
 | No result received at all | `bench: guest did not return a result` |
 | Result arrived with no preceding start marker | `bench: guest sent a result without a start marker` |
 
@@ -317,7 +359,7 @@ field:
 | 4 | `external data file` | The qcow2 image stores data in an external file. |
 | 5 | `encryption` | The qcow2 image is LUKS-encrypted. |
 | 6 | `dirty or corrupt` | The qcow2 dirty or corrupt incompatible bits are set. |
-| 7 | `internal snapshots` | `nb_snapshots > 0`; also raised mid-run if an allocated cluster without `OFLAG_COPIED` (snapshot-shared) is found. |
+| 7 | `internal snapshots` | Retained for defensive mapping only. Since phase 7's copy-on-write adoption (step 7d) `bench -w` COWs snapshot-shared clusters instead of refusing, so neither the `nb_snapshots > 0` host check nor a mid-run snapshot-shared cluster raises this gate. |
 | anything else | `unsupported feature` | Reserved for future gate ids. |
 
 ## `--output json`
@@ -478,14 +520,23 @@ $ instar bench -c 0 -f raw disk.raw
 Error: "Invalid request count specified. Must be between 1 and 2147483647."
 ```
 
-Refused — a write-gate error on a qcow2 image with an internal
-snapshot (live transcript; note the header still prints before the
-guest-side gate fires):
+A write test against a qcow2 image with an internal snapshot now
+**succeeds** (copy-on-write, since phase 7):
 
 ```
 $ instar bench -w -c 10 -f qcow2 disk.qcow2
 Sending 10 write requests, 4096 bytes each, 64 in parallel (starting at offset 0, step size 4096)
-Error: "bench: write tests are not supported for this image (internal snapshots)"
+Run completed in 0.012 seconds.
+```
+
+Refused — a write-gate error on a qcow2 image that uses the
+extended-L2 (subcluster) feature (live transcript; note the header
+still prints before the guest-side gate fires):
+
+```
+$ instar bench -w -c 10 -f qcow2 disk.qcow2
+Sending 10 write requests, 4096 bytes each, 64 in parallel (starting at offset 0, step size 4096)
+Error: "bench: write tests are not supported for this image (extended L2)"
 ```
 
 ## Future work
@@ -512,8 +563,14 @@ Error: "bench: write tests are not supported for this image (internal snapshots)
   invocation.
 
 For the request-schedule crate, see
-[`src/crates/bench/`](../src/crates/bench/). For the guest operation,
-see [`src/operations/bench/`](../src/operations/bench/). For the
+[`src/crates/bench/`](../src/crates/bench/); the refcount-growth
+planner now lives in the `growth` module of
+[`src/crates/qcow2-write/`](../src/crates/qcow2-write/), which also
+provides the qcow2 `-w` allocate-on-write planner (executed through
+[`src/crates/qcow2-write-exec/`](../src/crates/qcow2-write-exec/)).
+For the guest operation, see
+[`src/operations/bench/`](../src/operations/bench/). For the
 divergence registry, see `KNOWN_BENCH_DIVERGENCES` at the top of
 [`tests/test_bench.py`](../tests/test_bench.py). See also
-[usage.md](/components/instar/usage/).
+[usage.md](/components/instar/usage/). For the qcow2-write migration quirks, see
+[quirks.md](/components/instar/quirks/).

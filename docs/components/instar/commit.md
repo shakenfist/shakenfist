@@ -119,14 +119,22 @@ that crash recovery is straightforward:
    the backing doesn't already cover that range, and
    writes the data to the backing's allocated cluster.
 2. **Backing metadata.** Once every cluster is written,
-   the guest flushes dirty refcount blocks and L2 tables
-   on the backing. After this point the backing's
+   the guest flushes the backing's dirty L2 tables, then
+   the L1 table, then the refcount blocks (refcounts
+   last, so a crash never leaves a referenced cluster
+   with a stale refcount). After this point the backing's
    metadata fully reflects the merged content.
 3. **Overlay-clear pass.** Last, the guest issues a batch
    of `write_input_sector(0, ...)` calls that zero the
    overlay's L2 entries and refcount-block entries for
    every committed cluster. This is observable as
    "the overlay reads as empty against the new backing".
+   This pass is **skipped when the overlay itself carries
+   internal snapshots** (zeroing shared active metadata in
+   place would corrupt them — see Known divergences): the
+   overlay is left byte-unchanged, its snapshots preserved,
+   and the committed clusters read identically through the
+   new backing.
 
 A crash between steps 1 and 2 leaves the backing in a
 state qemu-img check can repair (clusters allocated but
@@ -173,6 +181,81 @@ behaviour.
   expose vmdk monolithicSparse's `parentFileNameHint`
   via `backing_file`. Tracked separately under
   PLAN-info's vmdk follow-ups.
+- **Snapshot-bearing images copy-on-write (backing
+  snapshots preserved).** Since phase 7 of
+  PLAN-qcow2-write-infrastructure (issues #420 and #423
+  resolved), commit no longer refuses images with internal
+  snapshots — it copies the shared clusters instead (the
+  shared allocate-on-write and copy-on-write machinery is
+  documented in
+  [qcow2/qcow2-write-planner.md](/components/instar/qcow2/qcow2-write-planner/)).
+  Where
+  the per-cluster loop previously blind-overwrote a
+  snapshot-shared backing cluster, commit now COWs it (copy
+  `D → D'`, repoint the L2, `rc(D')=1`, `rc(D)`−1; the old
+  cluster is never freed), so every pre-existing backing
+  snapshot is preserved bit-identically — matching qemu,
+  which COWs and preserves. When the **overlay** has
+  internal snapshots the post-commit overlay-clear pass is
+  skipped (zeroing shared active metadata in place was the
+  #423 corruption): the overlay is left byte-unchanged with
+  its snapshots preserved, and its active view stays
+  `qemu-img compare`-identical to qemu. The correctness bar
+  is qemu-parity (`qemu-img check` clean + active-view
+  compare + a snapshot read-back oracle asserting each
+  backing snapshot equals its pre-commit content), not
+  image-byte identity. **Known limitation:** because the
+  clear pass is skipped, a snapshot-bearing overlay is not
+  byte-emptied the way a snapshot-free overlay is — the
+  committed clusters stay mapped in the overlay's active L2
+  (reading identically through the new backing) rather than
+  zeroed. Full byte-emptying parity would need an
+  overlay-side COW-clear primitive (recorded follow-up).
+- **Backings with unknown or compression feature bits
+  refused.** Since the phase-4 migration onto
+  `crates/qcow2-write`, a backing whose header carries the
+  zstd compression-type bit or any unknown
+  incompatible-features bit refuses (error 16): ``the
+  backing file uses features instar commit does not
+  support (unknown or compression feature bits). Fall
+  back to `qemu-img commit` ``. Spec-mandated (commit
+  previously proceeded illegally); fires before any
+  staging or mutation. qemu-img builds with zstd support
+  proceed on the zstd shape.
+- **Backings with inconsistent metadata refused.** A
+  sparse (holed) refcount table, reserved bits in
+  refcount-table/L1/L2 entries, or snapshot-shared /
+  refcount-inconsistent clusters on a header that claims
+  no snapshots refuse (error 17): ``the backing file's
+  metadata is inconsistent (refcounts, table flags or
+  layout); refusing to write into it. Run `qemu-img
+  check` on the backing, or fall back to `qemu-img
+  commit` ``. The sparse-table refusal fires at staging
+  time, before any mutation; before phase 4 that shape —
+  stock-producible and check-clean — was silently
+  corrupted (see docs/quirks.md). qemu-img proceeds
+  check-clean on it.
+- **Compressed backing clusters refused.** A committed
+  extent landing on a compressed backing L2 entry refuses
+  with the existing `ERROR_UNSUPPORTED_FORMAT` (the code
+  the overlay side has always used for compressed
+  entries). qemu-img allocates a fresh uncompressed
+  cluster instead; before phase 4 instar silently
+  destroyed every stream packed in the shared host
+  cluster (see docs/quirks.md).
+- **Refcount exhaustion refused instead of grown.**
+  Commits that need more free clusters than the backing's
+  existing refcount blocks provide refuse (error 11);
+  qemu-img grows the refcount table and completes. v1
+  never appends refblocks; retiring the ceiling is the
+  refcount-growth generalization (phase 6 of
+  PLAN-qcow2-write-infrastructure). Backing staging
+  capacity itself is byte-driven since phase 4:
+  `min(2048, 3 MiB / cluster_size)` staged refblocks
+  (formerly a flat 32) and a windowed backing-L2 model
+  with no total-count refusal, so strictly more images
+  reach a successful commit. Overlay-side staging caps
+  are unchanged.
 - **Cluster-size mismatch refused.** If the overlay and
   backing have different qcow2 cluster sizes, the host
   pre-check refuses with `commit between mismatched
