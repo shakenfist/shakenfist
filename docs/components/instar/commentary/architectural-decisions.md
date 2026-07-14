@@ -307,3 +307,61 @@ instar-specific output (e.g., LUKS format detection) that qemu-img
 does not support. The `--unsafe-quirks` flag matches qemu-img's less
 secure behavior for compatibility testing. These are opt-in departures
 from compatibility, not accidental differences.
+
+---
+
+## Decision 11: A shared qcow2 write planner + executor, with copy-on-write as data
+
+**The choice:** The qcow2 allocate-on-write logic lives in one pure
+`no_std` planner crate (`crates/qcow2-write`) that classifies each
+touched cluster and emits a windowed **step program** as data, plus a
+literal executor crate (`crates/qcow2-write-exec`) that runs those steps
+against the call-table I/O. The three write consumers -- `commit`,
+`rebase` safe mode, and `bench -w` -- share both, rather than each
+hand-rolling its own per-cluster write loop. Copy-on-write and refcount
+growth are features of the shared planner, adopted by every consumer.
+
+**Why?** Before this work the three consumers independently
+reimplemented allocate-on-write, and **none implemented copy-on-write**.
+Writing into a snapshot-shared cluster in place silently corrupted the
+snapshot -- three real data-corruption defects (#420 commit backing,
+#421 rebase overlay with a data-loss chain, #423 commit overlay). A
+single planner encodes the classification and the crash-ordering
+contract (data durable before the pointer that reaches it; refcounts
+flushed last; barriers between groups) **once**, as data. That makes the
+hardest part -- the ordering and the COW refcount accounting -- unit- and
+fuzz-testable as pure values, replayed through a Vec-backed simulation
+harness with no KVM, and every consumer inherits the guarantees instead
+of re-deriving them. The planner/executor split keeps the planner pure:
+it contains **zero `unsafe`**, so no memory-safety bug is reachable in
+write planning from any crafted image -- the worst case is a typed
+refusal.
+
+**The COW refcount subtlety:** L2-table copy-on-write copies the shared
+table, repoints the L1 entry, decrements the old table's refcount, and
+touches **no child refcount**. qemu bumps every reachable data cluster to
+refcount >= 2 eagerly at *snapshot-creation* time, so by the time a table
+is COWed its children are already shared; incrementing them would drive
+them to refcount 3 and corrupt the image. The governing invariant, which
+the fuzz target asserts after every operation, is `max_rc < 3`. COW also
+needs a net-new refcount **decrement** primitive -- v1 allocate-on-write
+only ever incremented.
+
+**Where we diverge from Decision 10 intentionally:** COW output is the
+one place instar's bytes are **not** identical to qemu's by design.
+qemu's copy-on-write cluster placement is nondeterministic at 512-byte
+clusters, so byte parity is neither achievable nor meaningful. The oracle
+for COW is therefore qemu-*parity* -- `qemu-img check` clean + active-view
+`qemu-img compare` + a snapshot read-back oracle (each pre-existing
+snapshot's virtual view matches qemu's result) -- not image-byte
+identity. The byte-identity oracle of Decision 10 still governs the
+`info`/`check`/`compare` *reporting* paths; only the COW-written image
+content is exempt.
+
+**The cost:** two new crates and a step-program ABI to maintain; the
+executor's generic byte-range layer only partially displaces the
+per-operation raw-pointer staging helpers, which still coexist (a
+recorded deferral); and refcount-growth *execution* stays op-side as a
+shared helper rather than being expressed as steps. The payoff -- COW,
+growth, and the crash-ordering contract implemented and verified once --
+is worth it.

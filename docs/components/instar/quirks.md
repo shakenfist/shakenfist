@@ -941,7 +941,7 @@ host CLI also refuses them via `peek_is_vmdk_descriptor`
 before launching the guest, pointing the user at `qemu-img
 map` as the workaround.
 
-### qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO` not honoured
+### qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO` honoured (fixed)
 
 In qcow2 v3 (compat=1.1) images that use *standard* L2 tables
 (8-byte entries, not extended L2), the `QCOW_OFLAG_ZERO` bit
@@ -949,16 +949,22 @@ In qcow2 v3 (compat=1.1) images that use *standard* L2 tables
 (when `host_offset == 0`) or `QCOW2_CLUSTER_ZERO_ALLOC` (when
 `host_offset != 0`) — both of which qemu-img reports as
 `present: true, zero: true, data: false` (`ZeroAllocated`).
-instar's `classify_qcow2_l2_standard` ignores the bit and
-treats any non-zero L2 entry without `OFLAG_COMPRESSED` as
-`Data`; if `host_offset == 0` it reports `Hole`. This is a
-pre-existing gap in the qcow2 parser (`cluster_lookup` has no
-`OFLAG_ZERO` branch either) inherited by map for consistency.
-Reporting the bit correctly is a single-edit change in
-`classify_qcow2_l2_standard` once we want to land it; tracked
-as future work in PLAN-map.md. Extended-L2 subcluster-bitmap
-`ZeroAllocated` reporting is unaffected — instar walks the
-bitmap and classifies subclusters correctly.
+Historically instar's `classify_qcow2_l2_standard` ignored
+the bit and treated any non-zero L2 entry without
+`OFLAG_COMPRESSED` as `Data` (reporting `Hole` when
+`host_offset == 0`) — a pre-existing gap in the qcow2 parser
+(`cluster_lookup` had no `OFLAG_ZERO` branch either) inherited
+by map for consistency.
+
+**Fixed** as step 7z of PLAN-qcow2-write-infrastructure
+(alongside the chain-reader fix for
+[#432](https://github.com/shakenfist/instar/issues/432)):
+`classify_qcow2_l2_standard` now reports a zero-flag standard
+entry as `ZeroAllocated` for both `host_offset == 0` and
+`host_offset != 0`, and `cluster_lookup` gained a matching
+`ClusterLookup::Zero` verdict. Extended-L2 subcluster-bitmap
+`ZeroAllocated` reporting was always correct — instar walks
+the bitmap and classifies subclusters directly.
 
 ### qcow2 compressed clusters report `compressed: false`
 
@@ -1316,6 +1322,210 @@ hardening item. Use unsafe-mode rebase (`-u`) when the
 caller knows the new backing's data is bit-identical to
 the old.
 
+### Safe-mode rebase copy-on-writes snapshot-bearing overlays
+
+Since the phase-7 copy-on-write work (issue #421 resolved),
+safe-mode rebase of an overlay that carries internal
+snapshots no longer refuses — it succeeds by copying. Where
+the safe-mode allocator would previously have mutated a
+snapshot-shared active L2 table in place and under-counted
+refcounts (`refcount=1 reference=2` on the newly-allocated
+clusters, enabling data loss via a later `snapshot -d`,
+issue #421), it now COWs the shared L2 (copy `T → T'`,
+repoint the L1, `rc(T')=1`, `rc(T)`−1) so no live cluster is
+ever left with a refcount below its reference count.
+
+The load-bearing subtlety is the **snapshot-view semantic**,
+matching qemu's contract exactly: `qemu-img rebase` covers
+the **active view only** and leaves internal snapshots
+untouched, so after the rebase a snapshot's unallocated
+ranges silently **read through the NEW backing** rather than
+staying at their pre-rebase content. instar reproduces that
+read-through-new-backing semantic; the snapshot read-back
+oracle asserts each snapshot resolves to qemu's result for
+the same op, not to a frozen pre-rebase baseline. The proof
+is qemu-parity — `qemu-img check` clean + active-view
+`qemu-img compare`-identical to a qemu twin + the snapshot
+read-back oracle — never image-byte identity (qemu's own COW
+placement is nondeterministic at 512-byte clusters). See
+`tests/test_rebase.py:TestRebaseSnapshotGate`,
+`tests/test_cow_cross_version.py` and the cross-cutting
+"Copy-on-write for snapshot-bearing qcow2 images" section
+below.
+
+Unsafe (`-u`) rebase is unchanged: it only rewrites the
+header backing-pointer region, which is never
+snapshot-shared, and stays parity-tested against qemu-img.
+
+**Growth sizing (known limitation).** rebase's COW gates
+refcount growth on `nb_snapshots > 0` and sizes it at
+`2 × overlay_cluster_count` — coarser than commit's
+allocated-cluster bound, because rebase writes into clusters
+it does not own and cannot cheaply bound the allocation
+ahead of the walk. The over-provisioned refblocks are
+check-clean (they carry the #433 materialization fix), so
+this is a sizing conservatism, not a correctness gap; a
+tighter bound is recorded follow-up work.
+
+### Overlays with extended L2 entries or unknown/compression feature bits are refused
+
+Since the phase-5 migration onto `crates/qcow2-write`,
+safe-mode rebase (including safe detach) refuses an overlay
+whose header carries the extended-L2 incompatible bit, the
+zstd compression-type bit, or any unknown
+incompatible-features bit (`RebaseResult` error 15): ``the
+overlay uses features instar rebase does not support
+(extended L2 entries, or unknown/compression feature bits).
+Use -u for a metadata-only rebase or fall back to `qemu-img
+rebase` ``.
+
+The extended-L2 half is a live-defect fix: before phase 5
+the safe-mode walk misread the 16-byte extended-L2 entries
+as 8-byte classic entries and silently corrupted the
+overlay's virtual content — exit 0, damage visible only on
+read-back (issue
+[#431](https://github.com/shakenfist/instar/issues/431),
+identified during phase 5 of
+PLAN-qcow2-write-infrastructure). The
+zstd/unknown-bit half is spec-mandated (the qcow2 spec
+requires refusing unknown incompatible bits) and is a
+narrowing: the zstd bit is inert when the image contains no
+compressed clusters, so such images rebased correctly
+before phase 5 and now refuse — the same posture as
+commit's error 16. The refusal fires before any staging or
+mutation; `-u` metadata-only rebase only rewrites
+header/path bytes and stays allowed.
+
+### Overlays with inconsistent metadata are refused
+
+Safe-mode rebase refuses overlays whose metadata is
+inconsistent as a write substrate (`RebaseResult` error
+16): ``the overlay's metadata is inconsistent (refcounts,
+table flags or layout); refusing to write into it. Run
+`qemu-img check` on the overlay, or fall back to `qemu-img
+rebase` ``. This covers a sparse (holed) refcount table,
+reserved bits in refcount-table/L1/L2 entries, and
+qcow2-write classification refusals (snapshot-shared or
+refcount-inconsistent clusters on an image whose header
+says it has no snapshots).
+
+The sparse-refcount-table shape matters, exactly as it did
+for commit's backing side
+([#428](https://github.com/shakenfist/instar/issues/428)):
+it is stock-producible (a discard history followed by
+`qemu-img resize --shrink` frees all-zero refblocks below
+still-populated ones), passes `qemu-img check` cleanly, and
+before phase 5 rebase's staging compacted the nonzero table
+entries and indexed them as if dense — silently writing
+refcounts into the wrong refblocks (1092 check errors plus
+32 leaked clusters at exit 0 in the probe that found it;
+the overlay-side rebase sibling of #428; issue
+[#430](https://github.com/shakenfist/instar/issues/430),
+identified during phase 5 of
+PLAN-qcow2-write-infrastructure). qemu-img rebases the same
+shape check-clean. The
+refusal fires at staging time, before any mutation, and is
+byte-idempotent
+(`tests/test_rebase.py:TestRebaseOverlayClassification`).
+
+### Overlay staging capacity widened by the phase-5 migration
+
+The migrated safe mode retires the stage-everything model
+for existing L2 tables (and with it the growable L2 arena
+and its count caps — the #422 hazard class of the arena
+clobbering refblock staging is gone by construction).
+Overlays whose populated-L2 count previously refused
+`ERROR_SCRATCH_TOO_SMALL` at staging time — even when
+nothing needed copying — now rebase: the probe exemplar
+(cs=512, 64 MiB overlay, 512 populated L2 tables, identical
+chains) refused before phase 5 and now succeeds check-clean
+with qemu-img parity. The L2 window is
+`min(256, 2 MiB / cluster_size)` slots with reachable (and
+safe) eviction; refblock staging is byte-capacity-driven at
+`min(2048, 3 MiB / cluster_size)` refblocks (formerly a
+joint 4 MiB bump arena shared with L2 staging); the
+refcount table stages as a bounded prefix (the planner
+reads only the entries covering the staged refblocks), so
+large-cluster refcount tables no longer bound the run. The
+remaining ceiling is refcount exhaustion (`RebaseResult`
+error 10 — v1 never appends new refblocks); retiring it is
+the master plan's refcount-growth generalization.
+
+### Beyond-EOV tail bytes of copied clusters are zeros
+
+When the old backing chain is LARGER than the overlay's
+virtual size and the tail cluster diverges, safe-mode
+rebase copies the tail cluster with bytes beyond
+end-of-virtual-size zero-filled. Both pre-phase-5 instar
+and `qemu-img rebase` instead carry the old chain's
+beyond-EOV bytes into the overlay's raw file. Virtual
+content is identical either way (bytes past EOV are not
+virtual content, and no tool reads them back); this is the
+one sanctioned raw-level divergence from the phase-5
+migration proof (divergence D9 — the only non-byte-identical
+row in the 69-combo matrix, isolated to this shape by its
+byte-identical plain-unaligned twin).
+
+### Compressed chain members still refuse where qemu succeeds
+
+A compressed cluster in an old-chain member surfaces
+`ERROR_PARSE_FAILED` (error 12) mid-loop — the rebase
+binary does not enable the decompress feature — where
+`qemu-img rebase` succeeds. Pre-existing divergence,
+unchanged by the phase-5 migration (lifting it means
+enabling decompression in the rebase binary, a size and
+scope question tracked as future work). Compressed entries
+in the OVERLAY itself are skipped, before and after
+phase 5: the skip probe treats any non-zero L2 entry as
+mapped.
+
+### The chain reader honours the zero flag on classic L2 entries (fixed)
+
+Historically `cluster_lookup`'s classic (non-extended-L2)
+arm in `crates/qcow2` ignored bit 0 (`QCOW_OFLAG_ZERO`) of
+v3 standard L2 entries, so a zero-flag cluster (e.g. from
+`qemu-io write -z`) in a chain member read as fall-through
+to the backing (`host_offset == 0`) or as stale data bytes
+(`host_offset != 0`) instead of zeros — silent active-view
+corruption. Blast radius: every consumer of the chain
+reader — rebase, convert, compare and bench. Pre-existing
+`crates/qcow2` defect
+([#432](https://github.com/shakenfist/instar/issues/432)),
+identified during phase 5 of
+PLAN-qcow2-write-infrastructure and explicitly NOT fixed by
+it.
+
+**Fixed** as step 7z of that plan (the standalone read-path
+fix landed before any COW work): `cluster_lookup` now
+returns a dedicated `ClusterLookup::Zero` verdict whenever
+bit 0 is set on a classic entry — for both `host_offset ==
+0` and `host_offset != 0` — and `read_chain_virtual_cluster`
+zero-fills that cluster without falling through to a backing
+layer or reading the host offset. The map subcommand's
+sibling classifier `classify_qcow2_l2_standard` was fixed in
+the same change (see "qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO`
+honoured" above). Differential matrices no longer need to
+avoid `write -z` seeds.
+
+### Deep-allocation safe rebase refuses on refcount exhaustion instead of hanging
+
+Issue #422's apparent 512-byte-cluster livelock was a guest
+panic spinning in the panic handler, fixed in phase 2 of
+PLAN-qcow2-write-infrastructure (the staged-L2 lookup slice
+went stale after arena growth; the growth arena could also
+clobber the refblock staging regions). Safe-mode rebases
+that allocate deeply no longer hang: shapes that exceed the
+overlay's existing refcount-block capacity now terminate
+promptly with ``the overlay's refcount blocks are full; v1
+doesn't append new ones. Fall back to -u or use `qemu-img
+rebase` `` — qemu-img completes these (it grows the refcount
+table). Retiring that capacity ceiling is the master plan's
+refcount-growth generalization. Note the exhaustion refusal
+is not byte-idempotent (semantically-inert data clusters
+are written before the guest refuses; the image stays
+check-clean); making envelope refusals mutation-free is
+folded into phase 3's ordering contract.
+
 ### `Image rebased.` / `Image detached.` output matches qemu byte-for-byte
 
 instar emits the same trailing-newline-terminated strings
@@ -1369,6 +1579,151 @@ qcow2 → qcow2 and vmdk → vmdk only. Cross-format commit
 `ERROR_UNSUPPORTED_FORMAT`. Lifting needs planner
 extensions plus a cluster-size translation layer.
 
+### Snapshot-bearing images copy-on-write (backing preserved)
+
+Since the phase-7 copy-on-write work (issues #420 and #423
+resolved), `instar commit` succeeds on snapshot-bearing
+images by copying instead of refusing. The phase-2 interim
+refusal gates (backing-side error 14, overlay-side error 15)
+are lifted.
+
+- **Backing side** (was issue #420): where the per-cluster
+  loop previously blind-overwrote snapshot-shared backing
+  clusters, commit now COWs them (copy the shared data
+  cluster `D → D'`, repoint the L2, `rc(D')=1`, `rc(D)`−1;
+  `D` is never freed because the snapshot still holds it).
+  Every pre-existing backing snapshot is **preserved
+  bit-identically** — its read-back after the commit equals
+  its pre-commit content, matching qemu, which COWs and
+  preserves on every version tested.
+- **Overlay side** (was issue #423): the post-commit
+  overlay-clear pass — which zeroes the overlay's active L2
+  and refcount entries in place — is **skipped when the
+  overlay has internal snapshots**, because zeroing shared
+  active metadata in place is exactly the corruption #423
+  described. The overlay is left byte-unchanged, its
+  snapshots preserved, and its active view stays
+  `qemu-img compare`-identical to qemu (the committed
+  clusters now resolve identically through the new backing).
+
+The proof is qemu-parity, never image-byte identity:
+`qemu-img check` clean + active-view compare-identical to a
+qemu twin + the snapshot read-back oracle asserting each
+backing snapshot equals its pre-commit content. See
+`tests/test_commit.py:TestCommitSnapshotGate` and
+`tests/test_cow_cross_version.py`.
+
+**Known limitation (documented non-emptying).** Because the
+overlay-clear pass is skipped for snapshot-bearing overlays,
+the overlay is not byte-emptied the way a snapshot-free
+commit empties it — the committed clusters remain mapped in
+the overlay's active L2 (reading identically through the new
+backing) rather than being zeroed out. Full byte-emptying
+parity would need an overlay-side COW-clear primitive that
+copies the shared active metadata before zeroing it; that is
+recorded follow-up work. The active view and every snapshot
+are correct either way.
+
+### Backings with unknown or compression feature bits are refused
+
+Since the phase-4 migration onto `crates/qcow2-write`,
+commit refuses a backing whose header carries the zstd
+compression-type bit or any unknown incompatible-features
+bit (`CommitResult` error 16): ``the backing file uses
+features instar commit does not support (unknown or
+compression feature bits). Fall back to `qemu-img
+commit` ``. The qcow2 spec mandates refusing unknown
+incompatible bits; commit previously proceeded in
+violation of the spec. The refusal fires before any
+staging or mutation. qemu-img builds with zstd support
+proceed on the zstd shape; instar defers zstd to the
+compressed-write future work.
+
+### Compressed backing clusters are refused
+
+Commit refuses when the committed extent lands on a
+compressed L2 entry in the backing, using the existing
+`ERROR_UNSUPPORTED_FORMAT` code (the same code the
+overlay side has always used for compressed entries).
+Before phase 4 this shape was silently corrupted: the
+per-cluster loop masked the compressed entry's offset and
+overwrote it in place, destroying the deflate streams of
+every virtual cluster packed into that host cluster —
+exit 0, `qemu-img check` clean, damage visible only on
+read-back (issue
+[#427](https://github.com/shakenfist/instar/issues/427),
+identified during phase 4 of
+PLAN-qcow2-write-infrastructure). qemu-img handles the
+same shape correctly: it allocates a fresh uncompressed
+cluster and leaves the other packed streams intact. The
+refusal is a classification refusal: clusters committed
+earlier in the same run remain written (unreferenced
+scaffolding, metadata never flushed, check-clean — the
+same posture as the refcount-exhaustion refusal).
+
+### Backings with inconsistent metadata are refused
+
+Commit refuses backings whose metadata is inconsistent as
+a write substrate (`CommitResult` error 17): ``the backing
+file's metadata is inconsistent (refcounts, table flags or
+layout); refusing to write into it. Run `qemu-img check`
+on the backing, or fall back to `qemu-img commit` ``.
+This covers a sparse (holed) refcount table, reserved bits
+in refcount-table/L1/L2 entries, and snapshot-shared or
+refcount-inconsistent clusters on an image whose header
+says it has no snapshots.
+
+The sparse-refcount-table shape matters: it is producible
+with stock qemu-img operations (a discard history followed
+by `qemu-img resize --shrink` frees all-zero refblocks
+below still-populated ones) and passes `qemu-img check`
+cleanly, and before phase 4 instar's staging compacted the
+nonzero table entries and indexed them as if dense —
+silently writing refcounts into the wrong refblocks (2654
+check errors in the probe that found it; issue
+[#428](https://github.com/shakenfist/instar/issues/428),
+identified during phase 4 of
+PLAN-qcow2-write-infrastructure). qemu-img
+commits into the same shape check-clean. The sparse-table
+refusal fires at staging time, before any mutation; the
+other error-17 shapes are classification refusals with the
+same scaffolding posture as the compressed-cluster refusal
+above.
+
+### Backing staging capacity widened by the phase-4 migration
+
+The migrated backing side stages refblocks by byte
+capacity — `min(2048, 3 MiB / cluster_size)` refblocks,
+strictly wider than the old 32-refblock cap on every
+cluster size — and replaces the old stage-everything
+backing-L2 cap (`min(256, 2 MiB / cluster_size)` tables)
+with a windowed model of the same slot count that has no
+total-count refusal at all. Strictly more images succeed;
+backing shapes that previously refused
+`ERROR_SCRATCH_TOO_SMALL` (e.g. a cs=512 backing with more
+than 32 populated refcount-table entries) now commit with
+qemu-img info/check parity. Overlay-side staging caps are
+unchanged, so overlay-bound shapes refuse exactly as
+before. The remaining backing-side ceiling is refcount
+exhaustion (`CommitResult` error 11 — v1 never appends new
+refblocks); retiring it is the master plan's
+refcount-growth generalization (phase 6).
+
+### Unaligned virtual sizes commit cleanly
+
+Images whose `virtual_size` is not a multiple of the
+cluster size commit byte-identically to qemu-img's
+observed tail behaviour, including when the backing has
+its own backing file. The final (tail) cluster's write is
+clamped to `virtual_size` and classifies as full coverage
+in `crates/qcow2-write` — bytes beyond end-of-virtual-size
+are not virtual content, so the beyond-EOV zero-fill is
+the correct pre-image regardless of backing. Probed
+empirically during phase 4: tail bytes past EOV are zeros
+under both tools on stock fixtures, and the proof matrix's
+unaligned combo passed byte-identical with zero fallbacks
+to virtual-content comparison.
+
 ### `cluster_size > 64 KiB` overflows the commit scratch budget
 
 The commit guest binary's `OVERLAY_RT_LIMIT` and
@@ -1410,6 +1765,122 @@ provides this data" mode (see
 [PLAN-rebase-commit-phase-08-commit-host.md](/components/instar/
 plans/PLAN-rebase-commit-phase-08-commit-host/)) can
 plug in without an ABI change.
+
+## bench subcommand quirks
+
+Since the phase-6 migration (PLAN-qcow2-write-infrastructure),
+`instar bench -w` on a qcow2 image runs its allocate-on-write
+path on the shared `crates/qcow2-write` planner and
+`crates/qcow2-write-exec` executor — bench is the third
+consumer after commit (phase 4) and rebase (phase 5). The read
+path, raw `-w`, and the vmdk/vhd/vhdx read support are
+untouched. The quirks below record how the migration changed
+`-w` behaviour. bench's own oracle is `qemu-img compare` +
+`qemu-img check` (not byte identity), so unlike commit and
+rebase the migration deliberately relaxes byte parity for
+allocating schedules; the rest is behaviour-preserving.
+
+### Allocating writes no longer produce byte-identical images
+
+For a `-w` schedule that allocates (a write to an unallocated
+cluster), the post-run qcow2 image is **not** byte-identical to
+what pre-migration bench produced, nor to `qemu-img bench -w`.
+Pre-migration bench allocated the data cluster first and a
+fresh L2 table second; the shared planner allocates the L2
+table first (its proven order, shared with commit and rebase).
+Under the single linear allocation cursor the two host offsets
+swap for every fresh-L2 write, so the physical layout differs.
+The images are still equivalent: `qemu-img compare` reports
+identical virtual content and `qemu-img check` is clean. This
+is sound because bench's `-w` oracle has always been
+compare + check, never a byte hash — bench was never a
+byte-parity consumer. Overwrite-only schedules allocate
+nothing, so their output stays byte-identical across the
+migration.
+
+### New refusal code 9 for classification-inconsistent images
+
+The migration appends one wire code,
+`BenchResult::ERROR_IMAGE_INCONSISTENT = 9`, rendered as
+`bench: image metadata is inconsistent`. It carries the
+planner's classification refusals that had no existing bench
+rendering:
+unknown/reserved L1 or L2 entry bit patterns, refcount
+inconsistencies, refcount-coverage gaps, and a staged-regions
+mismatch. `RefcountExhausted` keeps `ERROR_ALLOC_EXHAUSTED = 8`
+(``image too large for in-place bench write``); a mid-run
+compressed cluster keeps the gate-2 `ERROR_WRITE_UNSUPPORTED`
+rendering; snapshot-shared clusters keep the gate-7 rendering
+(bench's defensive posture — the image is already gated on
+`nb_snapshots > 0` at setup). These refusals are narrower than
+pre-migration bench, which blind-allocated over exotic entries.
+
+### The contiguity gate keeps `ERROR_PARSE_FAILED` (code 3)
+
+The staging-time refcount-table contiguity gate (a sparse /
+holed refcount table refuses before any mutation) keeps
+returning bench's existing `ERROR_PARSE_FAILED = 3`, not the
+new code 9. It refuses identically to pre-migration bench, so
+the pure-refactor bar wins over cosmetically unifying it with
+commit's (error 17) and rebase's (error 16) equivalents. The
+refusal is pre-mutation and byte-idempotent.
+
+### Zero-flag L2 entries: target-side refused, backing-side fixed
+
+A qcow2 v3 zero-flag (`QCOW_OFLAG_ZERO`) on the L2 entry bench
+is about to overwrite refuses with code 9 (Variant A) —
+pre-migration bench blind-allocated over it and chain-filled a
+pre-image the reader mis-handled. A zero flag in a **backing**
+cluster reached through the COW read (Variant B) was, at phase
+6, still mis-filled: a read-path defect in `crates/qcow2`'s
+`cluster_lookup`
+([#432](https://github.com/shakenfist/instar/issues/432)), not
+fixed by phase 6.
+
+**Fixed** in step 7z (the standalone read-path fix landed
+before the COW work): `cluster_lookup` now returns
+`ClusterLookup::Zero` for a classic zero-flag entry and the
+chain reader zero-fills it, so Variant B no longer corrupts.
+Variant A's code-9 refusal is unchanged.
+
+### Flush and durability posture (fsync census preserved)
+
+The migration preserves bench's fsync census exactly, with no
+change to the shared crate. All `plan_flush` calls run through
+a fsync-DISABLED `CallTableIo` (`CallTableIo::new(ct, false)`),
+so the executor never fsyncs; at each count-based
+`--flush-interval` cadence point the op drives a full flush
+epoch and then issues exactly one `fsync_input(0)` itself — as
+pre-migration bench did. `flushes-issued` (`--output json`)
+counts cadence points only, never growth fsyncs; it is zero at
+end-of-bracket and for `--flush-interval 0`. Setup-time
+refcount growth keeps its own 1-2 fsyncs (1 in-place, 2 on a
+refcount-table relocation), which are not counted in
+`flushes-issued`. Because bench's image is input slot 0 opened
+RW, `fsync_input(0)` genuinely syncs here (unlike commit and
+rebase, whose output-device writes have no fsync primitive and
+rely on ordering alone). Timing character inside the bracket
+is not comparable across versions by design.
+
+### Refcount growth materializes over-provisioned refblocks (#433)
+
+Setup-time growth now marks every newly provisioned refcount
+block dirty before its eager flush, so every block the
+refcount table points at is materialized on disk. Before the
+fix (landed just before the migration,
+[#433](https://github.com/shakenfist/instar/issues/433)), an
+overwrite-dominant schedule that crossed the growth threshold
+provisioned refblocks and wrote their table pointers but
+allocated nothing to dirty them, so `flush_dirty_refblocks`
+(which writes only dirty blocks) never materialized them and
+the refcount table dangled past EOF — silent (exit 0),
+`qemu-img check`-dirty on a check-clean input. The fix restores
+qemu's every-RT-referenced-block-is-allocated invariant and
+rides the existing growth fsync, so the census is unchanged.
+One growth-side write was relocated by the migration: the
+relocating old-refcount-table free is now persisted inside
+growth (an extra byte-range write, no extra fsync), because the
+crate's `plan_flush` writes back only its own dirty state.
 
 ## convert subcommand quirks
 
@@ -1891,6 +2362,114 @@ failure, so it is not flagged as `repair-incomplete`; a subsequent read-only
 differential fuzzer (`scripts/differential-fuzz.py`, the `repair` op), which
 gates its cleanliness-convergence check on the `all` tier precisely because
 the two tools' `leaks` tiers have deliberately different scope.
+
+## Copy-on-write for snapshot-bearing qcow2 images
+
+**Classification: Safe behaviour** (qemu-parity, not a divergence).
+
+Since phase 7 of PLAN-qcow2-write-infrastructure, writes into a
+snapshot-bearing qcow2 image **copy-on-write** the shared clusters
+instead of refusing (the phase-2 interim gates) or corrupting them.
+This cross-cutting change lifts the snapshot caveats from `commit`
+(issues #420 / #423), `rebase` safe mode (issue #421) and `bench -w`,
+so all three now succeed on images that carry internal snapshots.
+
+### The per-op snapshot-view semantic
+
+Phase 7 is net-new behaviour, so the correctness bar is **qemu-parity,
+not before/after byte identity**: `qemu-img check` clean + the active
+view `qemu-img compare`-identical to a qemu twin + a snapshot
+**read-back oracle** that extracts each pre-existing snapshot's virtual
+view (apply-on-a-copy → convert to raw → sha256) and compares it to
+qemu's result for the same op. Byte placement of the COW output is
+explicitly **not** constrained — qemu's own COW placement is
+nondeterministic at 512-byte clusters, so instar takes its own layout
+freedom.
+
+The read-back oracle's expected value is **per op**, not a blanket
+"snapshot unchanged":
+
+- **commit** preserves every backing snapshot bit-identically — a
+  snapshot's post-commit read-back equals its **pre-commit** content
+  (qemu COWs and preserves).
+- **rebase** safe mode covers the active view only; a snapshot's
+  unallocated ranges read **through the new backing** afterwards, so
+  its expected value is the snapshot applied against the new backing,
+  not its pre-rebase content (qemu's read-through-new-backing
+  contract). An overlay snapshot in the post-write shape resolves the
+  same way.
+- **bench -w** writes into the active view and preserves snapshots
+  like commit.
+
+### The refcount COW machinery
+
+Two shared cluster shapes are copied before modification:
+
+- **Data-cluster COW** (a shared `D`, `OFLAG_COPIED` clear, refcount
+  > 1): copy `D → D'`, patch the L2 entry to `D' | COPIED`, set
+  `rc(D')=1`, and **decrement** `rc(D)` (2→1). The old `D` is never
+  freed — the snapshot still references it.
+- **L2-table COW** (a shared L2 table `T`): copy `T → T'`, patch the
+  L1 entry to `T' | COPIED`, set `rc(T')=1`, decrement `rc(T)`, and
+  **leave the child data clusters' refcounts untouched**. This last
+  point is a subtlety worth flagging for future maintainers: qemu
+  eagerly bumps every reachable data cluster to refcount ≥ 2 at
+  *snapshot-creation* time, so by the time an L2 table is COWed its
+  children are already rc ≥ 2 with `OFLAG_COPIED` clear. Copying
+  `T → T'` merely redistributes the reference (net child delta 0); a
+  literal "increment every child" would drive them to rc 3 and make
+  `qemu-img check` dirty. The children already classify shared, so a
+  write through `T'` into a child triggers the per-child data-cluster
+  COW above. The decrement is a net-new refcount primitive (v1 only
+  ever incremented on allocation); an underflow maps to each op's
+  existing inconsistency error.
+
+### The zero-flag WRITE-target policy
+
+Independent of the #432 read fix below, the write planner classifies a
+v3 `QCOW_OFLAG_ZERO` (bit 0) *target* L2 entry by qemu's exact
+semantic (qemu does **not** free the old host offset):
+
+- **host offset == 0** (zero flag, no allocation) → treated as
+  unallocated: allocate a fresh cluster / zero-fill the range.
+- **host offset != 0, refcount 1** → overwrite in place, clearing the
+  zero bit (qemu reuses the offset — no free).
+- **host offset != 0, refcount > 1** → copy-on-write (shared).
+
+The earlier blanket "treat as unallocated → allocate fresh" would have
+leaked the old host cluster (rc 1, unreferenced → check-dirty) or
+skipped a required COW.
+
+### #432: classic-L2 zero flag reads as zeros (fixed)
+
+The chain reader previously ignored `QCOW_OFLAG_ZERO` on classic
+(non-extended) L2 entries, so a v3 zero-flagged backing cluster read as
+the wrong bytes (host == 0 fell through to a lower backing; host != 0
+read stale host bytes) — silent active-view corruption with blast
+radius rebase / convert / compare / bench. Fixed fix-first (step 7z):
+`cluster_lookup` gained a `ClusterLookup::Zero` verdict and the chain
+reader zero-fills for it (both host == 0 and host != 0). See also the
+"qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO` honoured (fixed)" entry in the
+map section for the parser-side twin.
+
+### Known limitations / follow-ups
+
+- **commit does not byte-empty a snapshot-bearing overlay.** The
+  overlay-clear pass is skipped for such overlays (zeroing shared
+  active metadata in place was #423); the committed clusters stay
+  mapped in the overlay's active L2, reading identically through the
+  new backing. Full byte-emptying parity would need an overlay-side
+  COW-clear primitive. Active view and snapshots are correct.
+- **rebase's COW growth is coarsely sized** at
+  `2 × overlay_cluster_count` (rebase writes into unowned clusters);
+  the over-provisioned refblocks are check-clean via the #433
+  materialization fix. A tighter bound is follow-up work.
+
+Verified check-clean and read-back-parity against pinned qemu-img
+6.2.0 / 7.2.0 / 8.2.0 / 9.2.0 / 10.2.0 by
+`tests/test_cow_cross_version.py`, and across 50 randomized
+snapshot-bearing iterations (0 divergences) by `scripts/cow-soak.py`;
+`tests/helpers/snapshot_readback.py` is the reusable read-back oracle.
 
 ## Future Additions
 

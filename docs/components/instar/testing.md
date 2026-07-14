@@ -550,6 +550,21 @@ divergence; the leaks tier is excluded from convergence because it
 is intentionally narrower than `qemu-img -r leaks` (see
 [quirks.md](/components/instar/quirks/#check---repairleaks-scope-vs-qemu-img-check--r-leaks)).
 
+The `op_commit`, `op_rebase` and `op_bench` arms draw a snapshot flag
+(40% probability, phase 8 of PLAN-qcow2-write-infrastructure) and, when
+`qemu-io` is present, build a **snapshot-bearing** fixture that
+exercises the copy-on-write paths phase 7 opened — commit over a
+backing- or overlay-snapshot span, safe rebase of a snapshot-bearing
+overlay, and `bench -w` over a snapshot-shared span. For those fixtures
+the oracle gains the phase-7 read-back triple: active-view `qemu-img
+compare` identical + `qemu-img check` clean (with a `refcount=1
+reference=2` scan) + per-carrier snapshot read-back `instar == qemu
+twin` (via `tests/helpers/snapshot_readback.py`), the last of which the
+active-view compare alone cannot see. Non-snapshot fixtures keep their
+existing oracle. This folds in and retires the standalone
+`scripts/cow-soak.py` soak (phase 7e); a 300-iteration local soak ran
+0 divergences.
+
 Known quirks (see [quirks.md](/components/instar/quirks/)) are excluded from comparison:
 disk size fields and format-specific metadata.
 
@@ -620,7 +635,7 @@ fuzzing (Phase 3) cannot reach.
 
 ### Fuzz targets
 
-27 targets across the parser and planner crates, organized in
+32 targets across the parser and planner crates, organized in
 `src/fuzz/`:
 
 | Target | Crate | Type |
@@ -652,11 +667,19 @@ fuzzing (Phase 3) cannot reach.
 | `fuzz_dd_window` | dd | Buffer-based |
 | `fuzz_chs_rounded_size` | dd | Buffer-based |
 | `fuzz_dd_read` | dd | CallTable |
+| `fuzz_bitmap_parse` | qcow2 | CallTable |
+| `fuzz_bitmap_planners` | bitmap | Buffer-based |
+| `fuzz_bench_schedule` | bench | Buffer-based |
+| `fuzz_qcow2_write` | qcow2-write | Sim harness |
+| `fuzz_qcow2_write_growth` | qcow2-write | Buffer-based |
 
 **Buffer-based** targets call parser functions that take `&[u8]`
 directly (e.g. `QcowHeader::parse(data)`). **CallTable** targets
 use the mock CallTable from `src/fuzz/src/lib.rs` to simulate
-sector-based I/O from the fuzzer input.
+sector-based I/O from the fuzzer input. **Sim harness** targets
+(only `fuzz_qcow2_write`) drive a crate's own Vec-backed simulation
+harness — here `crates/qcow2-write`'s `sim` module, feature-gated
+`#[cfg(any(test, feature = "sim"))]` and OFF in the production build.
 
 The two snapshot targets (phase 12 of PLAN-snapshot) cover the
 streaming snapshot-table parser (`fuzz_snapshot_parse` drives
@@ -678,6 +701,28 @@ raised/lowered/freed tally correctness, the overflow→`AmbiguousCorruption`
 and bounds→`MisalignedAccess` error classifications, idempotence,
 and the "correct generalises reclaim" cross-check. The COPIED
 walker's deep invariants are delegated to `fuzz_snapshot_refcount`.
+
+The two `crates/qcow2-write` targets (phase 8 of
+PLAN-qcow2-write-infrastructure) fuzz the write planner rather than a
+parser. `fuzz_qcow2_write` decodes a fixture archetype (clean /
+backing-present / shared-data / shared-L2 nested / owned-L2 /
+zero-flag-target) at a cluster size {512, 4 KiB, 64 KiB, 2 MiB} and
+runs a bounded `plan_write` / `plan_flush` sequence through the `sim`
+harness, asserting the copy-on-write invariant oracle after every
+operation: `max_rc < 3` (the COW corruption signature — the single
+most important invariant), snapshot-shared clusters byte-preserved and
+never freed, no dangling / past-EOF L1/L2 pointer, and — after a flush
+— `OFLAG_COPIED` set iff refcount is exactly 1. A `WriteError` refusal
+is a valid outcome, not a crash. `fuzz_qcow2_write_growth` feeds
+geometry to the `growth` module's `plan_refcount_growth`, asserting no
+overflow, the self-coverage invariant, and cap adherence. Both are
+registered in the fast tier (`tools/ci/fuzz-tier.sh`); their bring-up
+shake-out found no planner bug. (Note: `plan_refcount_growth` has a
+debug-only non-convergence `debug_assert!` guard that fires only in
+debug builds on out-of-envelope petabyte-scale geometry; in release it
+returns `GrowthOverflow` gracefully, and production only passes bounded
+geometry — softening that guard to always return overflow is a recorded
+follow-up, not a bug.)
 
 ### Running locally
 
