@@ -371,6 +371,17 @@ groundwork exists, and lives mostly outside this repository.
     remain opt-in — they are per-endpoint policy, not
     defaults. Phase 3 should decide whether this inversion
     is in scope or a fast-follow refactor.
+11. **Scopes must compose with trust.** Namespace trust
+    grants cross-namespace visibility, and the deferred CI
+    conductor design leans on it (a PR-scratch namespace
+    with read-trust on the per-repo cache namespace). A
+    scoped key's capabilities must follow it across the
+    trust boundary — `blob.read` means "may read blobs it
+    can see", wherever trust makes them visible, and a
+    scoped token must never gain wildcard behaviour just
+    because the object it touches lives in a trusting
+    namespace. Phase 3 needs a test asserting exactly
+    this, or trust becomes a scope-escape hatch.
 
 ## Execution
 
@@ -436,8 +447,9 @@ Promote keys from `nonced_keys` dict entries to
 `DatabaseBackedObject`s with the standard lifecycle:
 
 * Attributes: key name, bcrypt hash, nonce, optional
-  expiry, scopes (default wildcard), provenance (free-form
-  dict; the exchange will store the satisfied claims),
+  expiry, scopes (default wildcard), provenance (a mapping
+  rule reference plus the satisfied claims, for
+  exchange-minted keys; empty for operator-created ones),
   owning namespace.
 * Per-key audit events (created, used-for-mint (sampled or
   rate-limited if noisy), expired, soft-deleted).
@@ -469,13 +481,17 @@ Promote keys from `nonced_keys` dict entries to
 * **Mapping rule objects**, owned by the namespace they
   target (creation gated like `add-key`: namespace
   ownership or admin): a reference to a trusted issuer,
-  bound claims (exact-match and/or listed alternatives —
-  e.g. `repository_owner`, `repository`, `ref`), scopes,
-  key TTL, key-name template. A rule is a standing,
-  claim-gated authorization to mint keys in its owning
-  namespace; see open question 3 for the ownership
-  rationale. CRUD APIs plus `sf-client federation ...`
-  commands.
+  bound claims (e.g. `repository_owner`, `repository`,
+  `ref`), scopes, key TTL, key-name template. A rule is a
+  standing, claim-gated authorization to mint keys in its
+  owning namespace; see open question 3 for the ownership
+  rationale. The phase plan must define claim-matching
+  semantics precisely: exact values and enumerated
+  alternatives first, anchored patterns only with explicit
+  justification — permissive pattern-matching on bound
+  claims is the classic OIDC-federation vulnerability, and
+  a sloppy pattern silently widens a rule. CRUD APIs plus
+  `sf-client federation ...` commands.
 * **Exchange endpoint** (e.g. `POST /auth/federated`):
   request names its target — `{identity token, namespace,
   rule name}`. Validates the presented identity token
@@ -484,16 +500,28 @@ Promote keys from `nonced_keys` dict entries to
   mints a scoped expiring key in the owning namespace, and
   returns `(namespace, key name, key)`. The key's
   provenance records the rule and the satisfied claims.
-  Audit event carries the satisfied claims — never the
-  secret.
+  Successful exchanges write an audit event carrying the
+  satisfied claims — never the secret. Failed exchanges
+  are audited too, against the rule's owning namespace: a
+  stream of near-miss claim failures is what probing looks
+  like, and the namespace owner is the party who needs to
+  see it.
 * **Capability enforcement**: scopes copied from key into
-  token claims at mint; endpoint decorator (e.g.
-  `@requires_capability('blob.read')`) checks claims;
-  wildcard for key-minted legacy tokens; default-deny for
-  scoped tokens on untagged endpoints. Initial tagging:
-  blob and artifact endpoints, plus the open-question-9
-  decision about admin endpoints.
-* **Abuse resistance** per open question 4.
+  token claims at mint; enforcement lives on the universal
+  `verify_token` path with capabilities derived per the
+  open question 1 hybrid, and a lightweight annotation
+  decorator for per-endpoint overrides; wildcard for
+  tokens minted from unscoped legacy keys; default-deny
+  for scoped tokens wherever derivation is impossible.
+  The open-question-9 decision about admin endpoints and
+  the open-question-10 decision about opt-out inversion
+  land here.
+* **Abuse resistance** per open question 4, including
+  replay: the exchange should be single-use per inbound
+  token `jti` *per rule* — repeat exchange of the same
+  token against the same rule is refused, while the
+  legitimate "one token, two rules, two namespaces"
+  pattern still works.
 * GitHub Actions is the worked first issuer; the phase
   plan must demonstrate (at design level) an Authentik
   `client_credentials` rule differing only in
@@ -600,6 +628,9 @@ As per `PLAN-TEMPLATE.md`, plus for this plan specifically:
       events, logs, or fixtures anywhere in the diff.
 - [ ] Scoped-token behaviour is fail-closed on untagged
       endpoints, proven by a unit test.
+- [ ] Scopes compose with namespace trust — a scoped token
+      touching objects visible via trust keeps its scopes
+      (open question 11), proven by a unit test.
 - [ ] Legacy key/token behaviour is bit-compatible, proven
       by tests that pre-date the change.
 
