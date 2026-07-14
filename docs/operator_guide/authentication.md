@@ -5,6 +5,8 @@
     For a detailed discussion of how Shaken Fist authentication works, please see
     the discussion in the [developer guide](/developer_guide/authentication/).
 
+Terms used here are defined in the [glossary](../glossary.md).
+
 ## Trusts
 
 ???+ info

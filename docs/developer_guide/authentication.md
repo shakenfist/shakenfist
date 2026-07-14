@@ -7,6 +7,8 @@ which case a caller needs to re-authenticate and then retry their request. The
 process to create and use a token is discussed further in the
 *Authentication* section below.
 
+Terms used here are defined in the [glossary](../glossary.md).
+
 Shaken Fist logically divides objects into "namespaces". These namespaces can be
 thought of as tenants, although there might be other reasons to divide resources
 into their own buckets -- for example the Shaken Fist CI system uses a namespace
