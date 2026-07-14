@@ -132,9 +132,11 @@ class InterfaceDefloatEndpointTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
+    @mock.patch('shakenfist.external_api.interface.api_util.release_floating_ip')
     @mock.patch('shakenfist.external_api.interface.nii_create_and_enqueue')
     @mock.patch('shakenfist.external_api.interface.api_util.safe_get_network_interface')
-    def test_defloat_enqueues_address_string(self, mock_safe_get, mock_enqueue):
+    def test_defloat_enqueues_address_string(
+            self, mock_safe_get, mock_enqueue, mock_release):
         interface_uuid = str(uuid4())
         fake_ni = mock.MagicMock()
         fake_ni.floating = {'floating_address': '192.168.230.238'}
@@ -151,11 +153,15 @@ class InterfaceDefloatEndpointTestCase(base.ShakenFistTestCase):
         # The floating address, not the {'floating_address': ...} dict, must
         # be the third positional argument.
         self.assertEqual('192.168.230.238', mock_enqueue.call_args.args[2])
+        # The reservation must also be released and the interface record
+        # cleared, otherwise the address leaks from the floating pool.
+        mock_release.assert_called_once_with(fake_ni)
 
+    @mock.patch('shakenfist.external_api.interface.api_util.release_floating_ip')
     @mock.patch('shakenfist.external_api.interface.nii_create_and_enqueue')
     @mock.patch('shakenfist.external_api.interface.api_util.safe_get_network_interface')
     def test_defloat_when_not_floating_returns_409(
-            self, mock_safe_get, mock_enqueue):
+            self, mock_safe_get, mock_enqueue, mock_release):
         interface_uuid = str(uuid4())
         fake_ni = mock.MagicMock()
         fake_ni.floating = {'floating_address': None}
@@ -167,3 +173,4 @@ class InterfaceDefloatEndpointTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(409, resp.status_code)
         mock_enqueue.assert_not_called()
+        mock_release.assert_not_called()
