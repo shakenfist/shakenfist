@@ -152,7 +152,7 @@ dependencies = [
     "psutil==7.2.2",
     "pydantic_core==2.46.3",
     "typing-inspection==0.4.2",
-    "typing_extensions==4.15.0",
+    "typing_extensions==4.16.0",
     "uv==0.11.28",
     # END_OF_INDIRECT_DEPS
 ]
