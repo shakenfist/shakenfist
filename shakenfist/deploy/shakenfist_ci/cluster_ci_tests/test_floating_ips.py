@@ -227,7 +227,12 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
         self.fail('Could not ping floating address %s from network node %s'
                   % (floating, self.network_node['name']))
 
-    def _create_floatable_instance(self):
+    def _create_floatable_instance(self, wait_ready=True):
+        # wait_ready waits for the guest to finish booting (agent plus
+        # cloud-init), which is only needed by callers that reach into the
+        # guest -- the reachability ping. Floating and its host-side plumbing
+        # live entirely on the network node, so callers that only assert
+        # plumbing can wait for the cheaper 'created' state instead.
         inst = self.test_client.create_instance(
             'floatlifecycle', 1, 1024,
             [
@@ -247,7 +252,10 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
             'inst',
             content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
-        self._await_instance_ready(inst['uuid'])
+        if wait_ready:
+            self._await_instance_ready(inst['uuid'])
+        else:
+            self._await_instance_create(inst['uuid'])
         return inst
 
     def test_float_defloat_lifecycle(self):
@@ -277,7 +285,11 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
         # clean up the floating IP's host state. This is the common path
         # for ephemeral CI instances, and a distinct code path from an
         # explicit defloat.
-        inst = self._create_floatable_instance()
+        #
+        # This path never reaches into the guest (no ping), so a booted OS is
+        # not required -- the cheaper 'created' wait keeps the test well clear
+        # of the suite's wall-clock budget.
+        inst = self._create_floatable_instance(wait_ready=False)
         iface = self.test_client.get_instance_interfaces(inst['uuid'])[0]
         inner = iface['ipv4']
 

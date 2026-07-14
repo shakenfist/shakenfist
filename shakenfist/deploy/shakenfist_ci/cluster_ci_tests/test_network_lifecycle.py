@@ -98,10 +98,10 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
             'instance on %s' % node['name'],
             content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
-        # The scheduler must have honoured the requested placement, else
-        # the presence assertions below would be testing the wrong nodes.
+        # The scheduler must have honoured the requested placement (resolved
+        # synchronously at create time), else the presence assertions below
+        # would be testing the wrong nodes.
         self.assertEqual(node['uuid'], inst['node'])
-        self._await_instance_ready(inst['uuid'])
         return inst
 
     def test_network_plumbing_lifecycle(self):
@@ -116,8 +116,15 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
             self._network_present_on(node_b),
             'network present on %s before any instance' % node_b['name'])
 
+        # Create both instances up front so they build concurrently on their
+        # respective nodes. This test only needs the network plumbing applied,
+        # not a booted guest, so we wait for the 'created' state (by which
+        # point libvirt has attached the instance's tap to the vxlan bridge)
+        # rather than the much slower agent/cloud-init readiness.
         inst_a = self._create_instance_on(node_a)
         inst_b = self._create_instance_on(node_b)
+        self._await_instance_create(inst_a['uuid'])
+        self._await_instance_create(inst_b['uuid'])
 
         # Hosting an instance brings the network's plumbing up on each
         # hypervisor.
