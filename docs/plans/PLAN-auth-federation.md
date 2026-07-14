@@ -387,7 +387,7 @@ groundwork exists, and lives mostly outside this repository.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Terminology and glossary | PLAN-auth-federation-phase-01-glossary.md | Not started |
+| 1. Terminology and glossary | [PLAN-auth-federation-phase-01-glossary.md](PLAN-auth-federation-phase-01-glossary.md) | Planning |
 | 2. Namespace keys as first-class objects | PLAN-auth-federation-phase-02-key-objects.md | Not started |
 | 3. Federated exchange and capability enforcement | PLAN-auth-federation-phase-03-exchange.md | Not started |
 | 4. Authentication documentation | PLAN-auth-federation-phase-04-docs.md | Not started |

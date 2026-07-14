@@ -144,7 +144,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 10: Migration | Not started | Cutover from singleton network node to smeared carriers |
 | [Network carrier model](PLAN-network-carrier-model.md) | Phase 11: Operator documentation | Not started | VIP failover modes and pool sizing |
 | [OIDC authentication](PLAN-oidc-authentication.md) | Master plan | Stub | OIDC as an authentication option for human users; existing namespace keys re-framed as service-account tokens for automation |
-| [Auth federation](PLAN-auth-federation.md) | Phase 1: Terminology and glossary | Not started | Pin authentication vocabulary and other overloaded codebase terms in a docs/ glossary |
+| [Auth federation](PLAN-auth-federation.md) | [Phase 1: Terminology and glossary](PLAN-auth-federation-phase-01-glossary.md) | Planning | Pin authentication vocabulary and other overloaded codebase terms in a docs/ glossary |
 | [Auth federation](PLAN-auth-federation.md) | Phase 2: Namespace keys as first-class objects | Not started | Keys become DBOs with events, soft delete, expiry, scopes, and provenance; cleaner reaps expired keys |
 | [Auth federation](PLAN-auth-federation.md) | Phase 3: Federated exchange and capability enforcement | Not started | Exchange an external identity token (GitHub Actions first, issuer-generic) for a scoped expiring namespace key |
 | [Auth federation](PLAN-auth-federation.md) | Phase 4: Authentication documentation | Not started | Update the three authentication guides for keys, scopes, and federation without depending on private CI internals |
