@@ -22,70 +22,70 @@ jobs:
           echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
 
       - name: Checkout the shakenfist repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: shakenfist
           fetch-depth: 0
           token: ${{ secrets.DEPENDENCIES_TOKEN }}
 
       - name: Checkout the actions repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: shakenfist/actions
           path: actions
           fetch-depth: 0
 
       - name: Checkout the agent-python repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: shakenfist/agent-python
           path: agent-python
           fetch-depth: 0
 
       - name: Checkout the clingwrap repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: shakenfist/clingwrap
           path: clingwrap
           fetch-depth: 0
 
       - name: Checkout the cloudgood repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: shakenfist/cloudgood
           path: cloudgood
           fetch-depth: 0
 
       - name: Checkout the development repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: shakenfist/development
           path: development
           fetch-depth: 0
 
       - name: Checkout the instar repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: shakenfist/instar
           path: instar
           fetch-depth: 0
 
       - name: Checkout the kerbside repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: shakenfist/kerbside
           path: kerbside
           fetch-depth: 0
 
       - name: Checkout the occystrap repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: shakenfist/occystrap
           path: occystrap
           fetch-depth: 0
 
       - name: Checkout the ryll repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: shakenfist/ryll
           path: ryll
