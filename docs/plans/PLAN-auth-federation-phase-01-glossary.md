@@ -83,7 +83,7 @@ consistency pass, step 1d).
 **Seed term list.** From the master plan (authentication):
 identity token *(planned)*, trusted issuer *(planned)*,
 mapping rule *(planned)*, namespace key, access token,
-scope / capability *(planned)*, nonce, trust. From the
+scope *(planned)*, nonce, trust. From the
 preliminary survey done while planning this phase
 (collisions already known): **key** (namespace key vs the
 inter-node `_service_key*` pattern vs SSH keys in deploy

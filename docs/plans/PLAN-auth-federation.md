@@ -139,7 +139,7 @@ that stub against whatever phases 1–4 actually build.
 
 ### Design principles (from the design discussion, 2026-07-14)
 
-1. **Attribute-based issuance, capability-based
+1. **Attribute-based issuance, scope-based
    enforcement.** All policy intelligence — evaluating the
    external token's claims against a mapping rule — runs
    once, at the exchange endpoint. What comes out is a key
@@ -194,7 +194,7 @@ groundwork exists, and lives mostly outside this repository.
 
 ## Open questions
 
-1. **Capability vocabulary.** Three candidate shapes were
+1. **Scope vocabulary.** Three candidate shapes were
    discussed:
    * *Hand-defined intent verbs* — coarse
      `resource-family.verb` strings (`blob.read`,
@@ -232,13 +232,19 @@ groundwork exists, and lives mostly outside this repository.
    applies to every authenticated endpoint without anyone
    remembering to decorate; a lightweight decorator taking
    keyword arguments with these derived defaults (e.g.
-   `@capability(verb='power')`) exists purely to *annotate*
+   `@scope(verb='power')`) exists purely to *annotate*
    overrides at the decoration site, where they are
    greppable and visible in review. The override audit in
    open question 2 is then one grep.
    Phase 3 must publish the chosen vocabulary, the
    derivation rule, and the rule for growing it. If the
    hybrid is chosen, open question 2 largely dissolves.
+   Decided (2026-07-15, forced by the phase 1 terminology
+   survey): the noun is **scope**, not "capability" —
+   `check_capability` already names the client's
+   feature-probe mechanism, and reusing the word would put
+   two meanings in the same CLI surface. The vocabulary
+   *shape* (hybrid derivation) remains open.
 2. **Endpoint tagging coverage.** Phase 3 tags at minimum
    the blob and artifact endpoints (the CI cache needs).
    Untagged endpoints are default-deny for scoped tokens.
@@ -345,7 +351,7 @@ groundwork exists, and lives mostly outside this repository.
 9. **`system` interplay.** Scoped keys in the `system`
    namespace would today pass `caller_is_admin` (it only
    checks the namespace name). Phase 3 must decide whether
-   admin endpoints also require a capability (e.g.
+   admin endpoints also require a scope (e.g.
    `admin.*`) so a scoped system-namespace key cannot
    escalate. Related to the sibling plan's open question 5.
 10. **Opt-out rather than opt-in enforcement.** The
@@ -354,7 +360,7 @@ groundwork exists, and lives mostly outside this repository.
     so a forgotten decorator is a silently open endpoint.
     Inverting this flips the failure mode from fail-open to
     fail-closed: apply authentication and derived
-    capability enforcement universally (either via
+    scope enforcement universally (either via
     `method_decorators` on the shared `api_base.Resource`
     base — class-level decorators run outermost, so auth
     correctly precedes the per-method ownership checks — or
@@ -375,7 +381,7 @@ groundwork exists, and lives mostly outside this repository.
     grants cross-namespace visibility, and the deferred CI
     conductor design leans on it (a PR-scratch namespace
     with read-trust on the per-repo cache namespace). A
-    scoped key's capabilities must follow it across the
+    scoped key's scopes must follow it across the
     trust boundary — `blob.read` means "may read blobs it
     can see", wherever trust makes them visible, and a
     scoped token must never gain wildcard behaviour just
@@ -389,7 +395,7 @@ groundwork exists, and lives mostly outside this repository.
 |-------|------|--------|
 | 1. Terminology and glossary | [PLAN-auth-federation-phase-01-glossary.md](PLAN-auth-federation-phase-01-glossary.md) | Planning |
 | 2. Namespace keys as first-class objects | PLAN-auth-federation-phase-02-key-objects.md | Not started |
-| 3. Federated exchange and capability enforcement | PLAN-auth-federation-phase-03-exchange.md | Not started |
+| 3. Federated exchange and scope enforcement | PLAN-auth-federation-phase-03-exchange.md | Not started |
 | 4. Authentication documentation | PLAN-auth-federation-phase-04-docs.md | Not started |
 | 5. OIDC plan refresh | PLAN-auth-federation-phase-05-oidc-plan-refresh.md | Not started |
 
@@ -422,9 +428,10 @@ Authentication terms to pin (from the design discussion):
   which access tokens are minted.
 * **access token** — a Shaken Fist-issued JWT, minted from
   a namespace key via `/auth`, nonce-bound to that key.
-* **scope / capability** — a `resource-family.verb` string
-  naming an operation class a key (and its tokens) may
-  perform.
+* **scope** — a `resource-family.verb` string naming an
+  operation class a key (and its tokens) may perform. Not
+  "capability": that word already names the client's
+  server-feature-probe mechanism (`check_capability`).
 * **nonce** — the per-key value embedded in derived tokens
   and re-verified on every request; the revocation
   mechanism.
@@ -472,7 +479,7 @@ Promote keys from `nonced_keys` dict entries to
 * Stop writing minted JWTs into audit events; log token
   metadata (keyname, expiry, jti if we add one) instead.
 
-### Phase 3: Federated exchange and capability enforcement
+### Phase 3: Federated exchange and scope enforcement
 
 * **Trusted issuer objects** (admin-managed, system
   namespace only): issuer URL, JWKS endpoint/caching,
@@ -506,10 +513,10 @@ Promote keys from `nonced_keys` dict entries to
   stream of near-miss claim failures is what probing looks
   like, and the namespace owner is the party who needs to
   see it.
-* **Capability enforcement**: scopes copied from key into
+* **Scope enforcement**: scopes copied from key into
   token claims at mint; enforcement lives on the universal
-  `verify_token` path with capabilities derived per the
-  open question 1 hybrid, and a lightweight annotation
+  `verify_token` path with scopes derived per the open
+  question 1 hybrid, and a lightweight annotation
   decorator for per-endpoint overrides; wildcard for
   tokens minted from unscoped legacy keys; default-deny
   for scoped tokens wherever derivation is impossible.
