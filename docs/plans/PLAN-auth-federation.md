@@ -344,10 +344,10 @@ groundwork exists, and lives mostly outside this repository.
      any caching is warranted (with care: a stale cache
      would delay nonce-based revocation, which is the
      mechanism's whole point).
-8. **Glossary location.** A single `docs/glossary.md`
-   linked from all three guides, or per-guide glossaries?
-   Initial lean: one page, top level of `docs/`, in
-   `order.yml`.
+8. **Glossary location.** Resolved by phase 1 (2026-07-15):
+   a single `docs/glossary.md` at the top level, in the
+   mkdocs navigation after Features, linked from the three
+   authentication guides and `objects.md`.
 9. **`system` interplay.** Scoped keys in the `system`
    namespace would today pass `caller_is_admin` (it only
    checks the namespace name). Phase 3 must decide whether
@@ -393,15 +393,16 @@ groundwork exists, and lives mostly outside this repository.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Terminology and glossary | [PLAN-auth-federation-phase-01-glossary.md](PLAN-auth-federation-phase-01-glossary.md) | Planning |
+| 1. Terminology and glossary | [PLAN-auth-federation-phase-01-glossary.md](PLAN-auth-federation-phase-01-glossary.md) | Complete |
 | 2. Namespace keys as first-class objects | PLAN-auth-federation-phase-02-key-objects.md | Not started |
 | 3. Federated exchange and scope enforcement | PLAN-auth-federation-phase-03-exchange.md | Not started |
 | 4. Authentication documentation | PLAN-auth-federation-phase-04-docs.md | Not started |
 | 5. OIDC plan refresh | PLAN-auth-federation-phase-05-oidc-plan-refresh.md | Not started |
 
-Phase plans have not been drafted yet; the open questions
-above should be resolved (or explicitly carried into the
-relevant phase plan) before each phase is cut.
+Phase plans for phases 2–5 have not been drafted yet; the
+open questions above should be resolved (or explicitly
+carried into the relevant phase plan) before each phase is
+cut.
 
 ### Phase 1: Terminology and glossary
 

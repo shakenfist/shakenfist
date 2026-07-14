@@ -65,10 +65,14 @@ pinned in the master plan (identity token, trusted issuer,
 mapping rule, scope/capability) describes objects that do
 not exist until phase 3. These entries are included now —
 pinning the vocabulary before implementation is the point —
-but carry a *(planned — see
-[PLAN-auth-federation](plans/PLAN-auth-federation.md))*
-marker so the glossary never lies to a user about what is
-real. Phase 4 removes the markers as the features land.
+but carry a marker of the form
+`(planned — see PLAN-auth-federation)`, linking to the
+master plan, so the glossary never lies to a user about
+what is real. Phase 4 removes the markers as the features
+land. (The marker is quoted here in backticks rather than
+as live markdown because this page renders under
+`docs/plans/`, where the glossary's relative link target
+would not resolve.)
 
 **Consistency with sibling plans.** The
 blob/artifact/label/snapshot/upload definitions must match
