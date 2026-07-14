@@ -194,25 +194,90 @@ groundwork exists, and lives mostly outside this repository.
 
 ## Open questions
 
-1. **Capability vocabulary.** Proposed: coarse
-   `resource-family.verb` strings (`blob.read`,
-   `artifact.write`, `instance.create`, ...). How coarse is
-   coarse enough? Is read/write per family sufficient, or do
-   some families need finer verbs (e.g. `consoledata.read`)?
-   Phase 3 must publish the initial vocabulary and the rule
-   for growing it.
+1. **Capability vocabulary.** Three candidate shapes were
+   discussed:
+   * *Hand-defined intent verbs* — coarse
+     `resource-family.verb` strings (`blob.read`,
+     `artifact.write`). Readable policy language, but every
+     endpoint must be hand-tagged, which creates the
+     coverage long-tail in open question 2.
+   * *Object name + REST verb* (`instance.get`,
+     `artifact.post`) — mechanically derivable from the
+     resource class and HTTP method, so coverage is
+     automatically complete. But HTTP verbs are
+     implementation vocabulary, not policy vocabulary
+     (operators should not need to know whether an upload
+     is POST or PUT to reason about a rule); POSTed
+     sub-resource actions conflate (`instance.post` is both
+     "create" and "reboot"); and capability strings become
+     coupled to routing, so a REST refactor (e.g. the
+     artifact UX rework) silently churns or widens
+     long-lived mapping rules.
+   * *Hybrid (current lean)* — intent verbs, mechanically
+     derived: GET/HEAD → `.read`, POST/PUT/PATCH →
+     `.write`, DELETE → `.delete`, with an explicit
+     per-endpoint override where the derivation misleads
+     (e.g. sub-resource power actions stay
+     `instance.write`, or gain a named `instance.power` if
+     they ever need separating). Keeps automatic coverage,
+     a three-verb operator vocabulary, and insulation from
+     route changes.
+   Implementation sketch for the hybrid: flask-restful
+   resource methods are literally named after the HTTP
+   verb, so the verb derives from the method name and the
+   object family from the resource class (a class
+   attribute where the class name is unhelpful).
+   Enforcement itself lives on the already-universal
+   `verify_token` path, so derivation-based checking
+   applies to every authenticated endpoint without anyone
+   remembering to decorate; a lightweight decorator taking
+   keyword arguments with these derived defaults (e.g.
+   `@capability(verb='power')`) exists purely to *annotate*
+   overrides at the decoration site, where they are
+   greppable and visible in review. The override audit in
+   open question 2 is then one grep.
+   Phase 3 must publish the chosen vocabulary, the
+   derivation rule, and the rule for growing it. If the
+   hybrid is chosen, open question 2 largely dissolves.
 2. **Endpoint tagging coverage.** Phase 3 tags at minimum
    the blob and artifact endpoints (the CI cache needs).
    Untagged endpoints are default-deny for scoped tokens.
    Do we accept a long tail of untagged endpoints, or drive
-   to full coverage within the phase?
-3. **Namespace targeting in mapping rules.** Fixed
-   namespace per rule, or templated from claims (e.g.
-   `gh-{repository-name}`) with auto-creation on first
-   exchange? Templating means one rule for all repos but
-   implies implicit namespace creation, which wants
-   guardrails. Initial lean: explicit namespace per rule;
-   templating later if rule sprawl becomes real.
+   to full coverage within the phase? Note this question
+   only exists in its hard form under hand-tagging; the
+   hybrid derivation in open question 1 makes coverage
+   automatic, reducing this to auditing the override list.
+3. **Ownership model for mapping rules.** Current lean
+   (from design discussion): split the concept in two.
+   *Trusted issuers* (issuer URL, JWKS, audience) are
+   cluster-level, system-owned objects — "who may vouch
+   for identities here" is an admin decision. *Mapping
+   rules* (bound claims → scopes, TTL, key template) are
+   owned by the namespace they target, like instances and
+   networks, because a rule is a standing, claim-gated
+   authorization to mint keys in that namespace — the same
+   privilege class as `add-key`, gated the same way
+   (namespace ownership, or admin). Rules reference their
+   issuer; minted keys reference their rule in provenance;
+   so the full chain issuer ← rule ← key ← token is
+   object-modelled. Consequences: rules are deleted with
+   their namespace; "who can get into this namespace" is
+   answered by listing its rules (the inbound sibling of
+   the trust list); the exchange request names its target
+   (`{identity token, namespace, rule name}`), so matching
+   is one lookup plus one claim check with no
+   cross-namespace rule enumeration; a workflow needing
+   two namespaces exchanges its token twice against two
+   rules. Deliberately given up: templated namespace
+   auto-creation (`gh-{repository-name}`) — there is no
+   namespace yet to own such a rule, and pre-creating
+   namespace + rule per repository belongs to the
+   orchestration layer (the CI conductor) rather than the
+   platform. To resolve in the phase 3 plan: whether
+   multiple rules per namespace may bind the same issuer,
+   and what rule mutation means for keys already minted
+   from it (lean: nothing — keys stand alone once minted,
+   with provenance recording the rule as it was).
 4. **Exchange endpoint abuse resistance.** The exchange is
    necessarily reachable without an SF credential (its
    authentication *is* the external JWT). It must be cheap
@@ -220,21 +285,59 @@ groundwork exists, and lives mostly outside this repository.
    fetch, JWKS cached with sane TTL and single-flight
    refetch on unknown `kid`, per-source rate limiting, and
    strict maximum token size. How much of this is v1?
-5. **Key visibility and naming.** Federated keys appear in
-   `key_names` listings alongside operator-created keys.
-   Naming convention (e.g. `federated/<rule>/<run id>`)?
-   Should listings distinguish provenance?
+5. **Key visibility and naming.** With phase 2, keys are
+   first-class objects owned by their namespace, so
+   provenance, expiry, and scopes are queryable attributes
+   — a federated key is distinguished by its rule
+   reference, not by smuggling metadata into its name, and
+   "show me every key rule X minted" is an ordinary
+   filtered listing. What actually remains open:
+   * Collision handling for rule-minted names: the rule's
+     key-name template (e.g. incorporating the workflow
+     run id) can collide on re-runs of the same run — does
+     the exchange refuse, replace, or suffix?
+   * How much the legacy `key_names` API shape exposes:
+     it must keep returning names for existing clients,
+     but does it include federated keys (lean: yes — they
+     are real keys, and hiding them from the legacy view
+     makes audits lie), with richer detail reserved for
+     the new object listing?
+   * Whether a light naming convention is still worth
+     having purely for human scanning of mixed listings
+     (lean: let the rule's template decide; no enforced
+     prefix).
 6. **JWT lifetime vs key lifetime.** The nonce check
    already invalidates derived tokens the moment the key
    expires, so capping `expires_delta` at the key's
    remaining lifetime is cosmetic. Do it anyway for
    clarity, or leave mint-time duration alone?
-7. **Storage shape for key objects.** Keys today live
-   inside the `namespace_attributes.keys` JSON column. Does
-   phase 2 move them to their own table (aligning with the
-   BYO-MariaDB direction and enabling SQL-level filtering),
-   or keep the column and wrap object semantics around it?
-   Migration and rollback story required either way.
+7. **Migration mechanics for key storage.** The decision
+   to make keys first-class namespace-owned objects (with
+   rule references, provenance, per-key events, cleaner
+   reaping, and filtered listings) effectively forecloses
+   wrapping object semantics around the existing
+   `namespace_attributes.keys` JSON column: real
+   relationships and SQL-level filtering want a real table
+   with a Pydantic schema, per the codebase's standard
+   object shape and the BYO-MariaDB direction. What
+   remains open is the transition:
+   * Migration path for existing `nonced_keys` entries
+     (bcrypt hashes and nonces copy verbatim; no expiry,
+     wildcard scope): one-shot migration at upgrade, or a
+     dual-read window where `/auth` and `verify_token`
+     consult the table first and fall back to the column?
+   * Rollback story if the migration must be reversed
+     after new-style keys (with expiry/scopes) exist.
+   * When the legacy column is retired: immediately after
+     migration, or kept read-only for a deprecation
+     window?
+   * Hot-path cost: `verify_token` re-verifies the nonce
+     on every request, so the key lookup moves from an
+     attribute-blob read to an indexed table read —
+     confirm this is neutral-or-better, and decide whether
+     any caching is warranted (with care: a stale cache
+     would delay nonce-based revocation, which is the
+     mechanism's whole point).
 8. **Glossary location.** A single `docs/glossary.md`
    linked from all three guides, or per-guide glossaries?
    Initial lean: one page, top level of `docs/`, in
@@ -245,6 +348,29 @@ groundwork exists, and lives mostly outside this repository.
    admin endpoints also require a capability (e.g.
    `admin.*`) so a scoped system-namespace key cannot
    escalate. Related to the sibling plan's open question 5.
+10. **Opt-out rather than opt-in enforcement.** The
+    "must remember to decorate" problem predates this plan:
+    `verify_token` itself is applied by hand per method,
+    so a forgotten decorator is a silently open endpoint.
+    Inverting this flips the failure mode from fail-open to
+    fail-closed: apply authentication and derived
+    capability enforcement universally (either via
+    `method_decorators` on the shared `api_base.Resource`
+    base — class-level decorators run outermost, so auth
+    correctly precedes the per-method ownership checks — or
+    via an app-wide `before_request` hook), with a small
+    explicit `@public` annotation for the genuinely
+    unauthenticated endpoints (`/auth` POST, the federated
+    exchange, the health probes already special-cased in
+    `HEALTH_PROBE_PATHS`). The audit then inverts from
+    "did every endpoint remember auth?" to "is every
+    `@public` justified?", and a custom pre-commit check
+    (precedent: the `from_db_by_ref` scoping hook) can
+    backstop the pattern. Semantic decorators
+    (`caller_is_admin`, `requires_namespace_ownership`)
+    remain opt-in — they are per-endpoint policy, not
+    defaults. Phase 3 should decide whether this inversion
+    is in scope or a fast-follow refactor.
 
 ## Execution
 
@@ -276,9 +402,10 @@ Authentication terms to pin (from the design discussion):
 * **trusted issuer** — an external token issuer the cluster
   is configured to accept, with its JWKS location and
   expected audience.
-* **mapping rule** — a first-class object binding claims on
-  an identity token to the key it can be exchanged for:
-  bound claims, target namespace, scopes, expiry.
+* **mapping rule** — a first-class object, owned by the
+  namespace it targets, that is a standing claim-gated
+  authorization to mint keys there: a trusted-issuer
+  reference, bound claims, scopes, expiry.
 * **namespace key** — the stored credential (bcrypt hash +
   nonce, now optionally expiry, scopes, provenance) from
   which access tokens are minted.
@@ -324,28 +451,41 @@ Promote keys from `nonced_keys` dict entries to
 * Preserve exact `/auth` and `verify_token` semantics,
   including the nonce mechanism, and the `key_names` API
   shape for existing clients.
-* Migration of existing `nonced_keys` entries (no expiry,
-  wildcard scope), with the storage-shape decision from
-  open question 7.
+* Keys move to their own table with a Pydantic schema (the
+  standard object shape; enables the rule/provenance
+  references and SQL-level filtered listings). Existing
+  `nonced_keys` entries migrate with no expiry and
+  wildcard scope; transition mechanics per open question
+  7.
 * Stop writing minted JWTs into audit events; log token
   metadata (keyname, expiry, jti if we add one) instead.
 
 ### Phase 3: Federated exchange and capability enforcement
 
-* **Trusted issuer + mapping rule objects** (admin-managed,
-  system namespace only): issuer URL, JWKS
-  endpoint/caching, audience, bound claims (exact-match
-  and/or listed alternatives — e.g. `repository_owner`,
-  `repository`, `ref`), target namespace, scopes, key TTL,
-  key-name template. CRUD APIs plus
-  `sf-client federation ...` commands.
+* **Trusted issuer objects** (admin-managed, system
+  namespace only): issuer URL, JWKS endpoint/caching,
+  audience. "Who may vouch for identities on this cluster"
+  is a cluster-level decision.
+* **Mapping rule objects**, owned by the namespace they
+  target (creation gated like `add-key`: namespace
+  ownership or admin): a reference to a trusted issuer,
+  bound claims (exact-match and/or listed alternatives —
+  e.g. `repository_owner`, `repository`, `ref`), scopes,
+  key TTL, key-name template. A rule is a standing,
+  claim-gated authorization to mint keys in its owning
+  namespace; see open question 3 for the ownership
+  rationale. CRUD APIs plus `sf-client federation ...`
+  commands.
 * **Exchange endpoint** (e.g. `POST /auth/federated`):
-  validates the presented identity token (signature via
-  cached JWKS, `iss` against the allowlist, `aud`, `exp`),
-  finds the matching rule, mints a scoped expiring key in
-  the target namespace, returns `(namespace, key name,
-  key)`. Audit event carries the satisfied claims — never
-  the secret.
+  request names its target — `{identity token, namespace,
+  rule name}`. Validates the presented identity token
+  (signature via cached JWKS, `iss` matching the rule's
+  issuer, `aud`, `exp`), checks the rule's bound claims,
+  mints a scoped expiring key in the owning namespace, and
+  returns `(namespace, key name, key)`. The key's
+  provenance records the rule and the satisfied claims.
+  Audit event carries the satisfied claims — never the
+  secret.
 * **Capability enforcement**: scopes copied from key into
   token claims at mint; endpoint decorator (e.g.
   `@requires_capability('blob.read')`) checks claims;
