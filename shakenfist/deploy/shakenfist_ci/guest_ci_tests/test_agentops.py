@@ -24,6 +24,25 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
                                             sort_keys=True)))
         self._await_networks_ready([self.net_one['uuid']])
 
+    def _await_agentop_complete(self, instance_uuid, aop, timeout):
+        # Poll a single agent operation to completion with its own independent
+        # timeout window. Previously test_instance_put_and_get_blob shared one
+        # start_time across three sequential operations, so the last and
+        # heaviest of them (get-file, which reads, hashes and uploads a blob
+        # back to the cluster) was left only whatever budget the earlier
+        # operations had not already consumed. Under under-cloud contention
+        # that remainder collapsed and get-file "timed out" while still
+        # legitimately executing -- the intermittent merge-queue flake.
+        start_time = time.time()
+        while aop['state'] != 'complete':
+            if time.time() - start_time > timeout:
+                console_data = self.test_client.get_console_data(instance_uuid)
+                self.fail(
+                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
+            time.sleep(5)
+            aop = self.test_client.get_agent_operation(aop['uuid'])
+        return aop
+
     def test_instance_execute_small(self):
         inst = self.test_client.create_instance(
             'test-instance-execute-small', 1, 1024,
@@ -210,29 +229,14 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self.assertNotEqual(
             None, blob_uuid, 'Failed to find a blob with a hash')
 
-        start_time = time.time()
         aop = self.test_client.instance_put_blob(
             inst['uuid'], blob_uuid, '/tmp/foo', 'ugo+r')
-
-        # Wait for the operation to complete
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 30:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(inst['uuid'], aop, 60)
 
         # Now ensure the data arrived correctly
         aop = self.test_client.instance_execute(
             inst['uuid'], 'sha512sum /tmp/foo')
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 60:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(inst['uuid'], aop, 60)
 
         remote_hash = aop['results']['0']['stdout'].split(' ')[0]
         self.assertEqual(
@@ -240,17 +244,11 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             f'Cluster hash {cluster_hash} does not match remote hash'
             f'{remote_hash}')
 
-        # Now fetch the data back
+        # Now fetch the data back. get-file is the heaviest operation (the
+        # agent reads the file, hashes it and uploads it back as a new blob),
+        # so it gets a more generous independent budget.
         aop = self.test_client.instance_get(inst['uuid'], '/tmp/foo')
-
-        # Wait for the operation to complete
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 60:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(inst['uuid'], aop, 120)
 
         self.assertTrue(
             '0' in aop['results'],
