@@ -22,7 +22,7 @@ env:
 
 jobs:
   indirect-dependencies:
-    runs-on: [self-hosted, vm, debian-12]
+    runs-on: [self-hosted, static]
     timeout-minutes: 60
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -43,24 +43,10 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.DEPENDENCIES_TOKEN }}
 
-      - name: Install the github command line
-        run: |
-          sudo apt update
-          sudo apt install -y curl
-
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-
-          sudo apt update
-          sudo apt install -y gh
-
       - name: Install all our dependencies in a venv
         run: |
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
-            install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
-
-          python3 -m venv  --system-site-packages /srv/ci/venv
+          rm -rf /srv/ci/venv
+          python3 -m venv --system-site-packages /srv/ci/venv
           . /srv/ci/venv/bin/activate
 
           cd ${GITHUB_WORKSPACE}
