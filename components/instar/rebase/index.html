@@ -3357,6 +3357,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    qcow2 write infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4070,6 +4098,34 @@
     
   
     QCOW2 Snapshot System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../qcow2/qcow2-write-planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 Write Planner and Executor
   
 
     
@@ -9891,6 +9947,91 @@ and the overlay becomes standalone.</p>
   rejects with <code>ERROR_UNSUPPORTED_FORMAT</code>. qemu-img also
   rejects vmdk rebase entirely (there is no upstream vmdk
   rebase at all). The vmdk smoke tests use unsafe mode.</li>
+<li><strong>Safe-mode rebase copy-on-writes snapshot-bearing
+  overlays.</strong> Since phase 7 of
+  PLAN-qcow2-write-infrastructure (issue #421 resolved),
+  safe mode (including safe-mode detach) no longer refuses
+  an overlay with internal snapshots — it succeeds by
+  copying. Where the safe-mode allocator would previously
+  have mutated a snapshot-shared active L2 in place and
+  under-counted refcounts (<code>refcount=1 reference=2</code>,
+  enabling data loss via a later <code>snapshot -d</code>, issue
+  #421), it now COWs the shared L2 (copy <code>T → T'</code>, repoint
+  the L1, <code>rc(T')=1</code>, <code>rc(T)</code>−1; the shared write path is
+  documented in
+  <a href="/components/instar/qcow2/qcow2-write-planner/">qcow2/qcow2-write-planner.md</a>).
+  The load-bearing
+  subtlety is the <strong>snapshot-view semantic</strong>: matching
+  qemu's contract, safe-mode rebase covers the active view
+  only, so after the rebase a snapshot's unallocated ranges
+  <strong>read through the new backing</strong> rather than staying at
+  their pre-rebase content — instar reproduces this
+  read-through-new-backing semantic exactly. The
+  correctness bar is qemu-parity (<code>qemu-img check</code> clean +
+  active-view <code>qemu-img compare</code> + a snapshot read-back
+  oracle whose expected value is the snapshot resolved
+  against the new backing), not image-byte identity. <code>-u</code>
+  is unchanged (it only rewrites the header
+  backing-pointer region, which is never snapshot-shared)
+  and stays parity-tested against qemu-img. <strong>Known
+  limitation:</strong> COW growth is coarsely sized at
+  <code>2 × overlay_cluster_count</code> (rebase writes into unowned
+  clusters); the over-provisioned refblocks are
+  check-clean, and a tighter bound is recorded follow-up
+  work.</li>
+<li><strong>Overlays with extended L2 entries or unknown/compression
+  feature bits are refused.</strong> Since the phase-5 migration of
+  safe mode onto <code>crates/qcow2-write</code>, safe-mode rebase
+  (including safe detach) refuses with error 15: <code>the
+  overlay uses features instar rebase does not support
+  (extended L2 entries, or unknown/compression feature
+  bits). Use -u for a metadata-only rebase or fall back to
+  `qemu-img rebase`</code>. The extended-L2 refusal replaces a
+  silent-corruption defect (the walk misread 16-byte
+  extended-L2 entries as 8-byte); the zstd/unknown-bit
+  refusal is spec-mandated and narrows shapes that
+  previously rebased correctly (the bit is inert without
+  compressed clusters). <code>-u</code> stays allowed. qemu-img builds
+  with the matching feature support proceed.</li>
+<li><strong>Overlays with inconsistent metadata are refused.</strong>
+  Safe-mode rebase refuses with error 16: <code>the overlay's
+  metadata is inconsistent (refcounts, table flags or
+  layout); refusing to write into it. Run `qemu-img check`
+  on the overlay, or fall back to `qemu-img rebase`</code>.
+  This covers a sparse (holed) refcount table — a
+  stock-producible, check-clean shape that rebase silently
+  misallocated before phase 5 (the rebase sibling of
+  commit's issue #428) — plus reserved bits and
+  classification inconsistencies. The sparse-table refusal
+  fires before any mutation and is byte-idempotent;
+  qemu-img rebases the same shape check-clean.</li>
+<li><strong>Deep-allocation safe rebases refuse on refcount
+  exhaustion.</strong> v1 never appends refblocks, so a safe
+  rebase that needs more cluster allocations than the
+  overlay's existing refcount blocks can hold refuses with
+  <code>ERROR_REFCOUNT_EXHAUSTED</code> where qemu-img completes.
+  (Before the phase-2 fix for issue #422 these shapes
+  could hang instead of refusing — a staged-L2 lookup went
+  stale after arena growth and the guest spun in its panic
+  handler; fixed, with staging reordered so the growable
+  L2 arena can no longer clobber refblock staging. The
+  phase-5 migration then retired the growable arena and its
+  staging-count caps outright: existing L2 tables are
+  windowed with <code>min(256, 2 MiB / cluster_size)</code> slots and
+  safe eviction, and refblocks stage at
+  <code>min(2048, 3 MiB / cluster_size)</code>, so overlays that
+  previously refused <code>ERROR_SCRATCH_TOO_SMALL</code> at staging
+  time on populated-L2 count alone now rebase.)
+  Retiring the exhaustion ceiling is the master plan's
+  refcount-growth generalization.</li>
+<li><strong>Beyond-EOV tail bytes of copied clusters are zeros.</strong>
+  When the old backing chain is larger than the overlay's
+  virtual size, a copied tail cluster's bytes beyond
+  end-of-virtual-size are zero-filled where <code>qemu-img
+  rebase</code> carries the old chain's bytes into the raw file.
+  Virtual content is identical — bytes past EOV are not
+  virtual content — and this is the only raw-level
+  divergence sanctioned by the phase-5 migration proof.</li>
 <li><strong>Cross-cluster-size rebase is rejected.</strong> If the new
   backing's qcow2 cluster size differs from the overlay's,
   safe-mode rebase refuses with
@@ -9936,9 +10077,12 @@ master plan</a>:</p>
 <li>Targeted seed corpus for <code>fuzz_rebase_planners</code>. The
   <code>scripts/generate-fuzz-seeds.py</code> infrastructure can
   walk the existing testdata.</li>
-<li>Tighter scratch-budget bounds on the safe-mode allocator
-  so larger-cluster-size overlays don't surface
-  <code>ERROR_SCRATCH_TOO_SMALL</code>.</li>
+<li>Lifting the 1 MiB cluster-size cap on safe mode (the
+  per-side compare buffers are 1 MiB; larger cluster sizes
+  surface <code>ERROR_SCRATCH_TOO_SMALL</code>). The phase-5 migration
+  onto <code>crates/qcow2-write</code> retired the old allocator's
+  staging-count refusals, so this cap is the remaining
+  scratch bound.</li>
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Unsafe rebase to a new backing in the same directory:</p>

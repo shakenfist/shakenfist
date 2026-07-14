@@ -681,6 +681,46 @@
          <lastmod>2026-07-14</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-01-semantics/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-02-gates/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-03-crate/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-04-commit/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-05-rebase/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-06-bench/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-07-cow/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-08-fuzz/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-09-docs/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-01-abi/</loc>
          <lastmod>2026-07-14</lastmod>
     </url>
@@ -946,6 +986,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/qcow2/qcow2-snapshots/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/qcow2/qcow2-write-planner/</loc>
          <lastmod>2026-07-14</lastmod>
     </url>
     <url>

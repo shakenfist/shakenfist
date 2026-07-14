@@ -3723,6 +3723,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    qcow2 write infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4436,6 +4464,34 @@
     
   
     QCOW2 Snapshot System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../qcow2/qcow2-write-planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 Write Planner and Executor
   
 
     
@@ -10977,6 +11033,20 @@ refuse/partial behaviour is recorded as conservative, never a
 divergence; the leaks tier is excluded from convergence because it
 is intentionally narrower than <code>qemu-img -r leaks</code> (see
 <a href="/components/instar/quirks/#check---repairleaks-scope-vs-qemu-img-check--r-leaks">quirks.md</a>).</p>
+<p>The <code>op_commit</code>, <code>op_rebase</code> and <code>op_bench</code> arms draw a snapshot flag
+(40% probability, phase 8 of PLAN-qcow2-write-infrastructure) and, when
+<code>qemu-io</code> is present, build a <strong>snapshot-bearing</strong> fixture that
+exercises the copy-on-write paths phase 7 opened — commit over a
+backing- or overlay-snapshot span, safe rebase of a snapshot-bearing
+overlay, and <code>bench -w</code> over a snapshot-shared span. For those fixtures
+the oracle gains the phase-7 read-back triple: active-view <code>qemu-img
+compare</code> identical + <code>qemu-img check</code> clean (with a <code>refcount=1
+reference=2</code> scan) + per-carrier snapshot read-back <code>instar == qemu
+twin</code> (via <code>tests/helpers/snapshot_readback.py</code>), the last of which the
+active-view compare alone cannot see. Non-snapshot fixtures keep their
+existing oracle. This folds in and retires the standalone
+<code>scripts/cow-soak.py</code> soak (phase 7e); a 300-iteration local soak ran
+0 divergences.</p>
 <p>Known quirks (see <a href="/components/instar/quirks/">quirks.md</a>) are excluded from comparison:
 disk size fields and format-specific metadata.</p>
 <h3 id="libyal-cross-validation">libyal cross-validation<a class="headerlink" href="#libyal-cross-validation" title="Permanent link">&para;</a></h3>
@@ -11055,7 +11125,7 @@ mock <code>CallTable</code> backed by fuzzer input provides the I/O layer,
 allowing libFuzzer to explore malformed input space that differential
 fuzzing (Phase 3) cannot reach.</p>
 <h3 id="fuzz-targets">Fuzz targets<a class="headerlink" href="#fuzz-targets" title="Permanent link">&para;</a></h3>
-<p>27 targets across the parser and planner crates, organized in
+<p>32 targets across the parser and planner crates, organized in
 <code>src/fuzz/</code>:</p>
 <table>
 <thead>
@@ -11201,12 +11271,40 @@ fuzzing (Phase 3) cannot reach.</p>
 <td>dd</td>
 <td>CallTable</td>
 </tr>
+<tr>
+<td><code>fuzz_bitmap_parse</code></td>
+<td>qcow2</td>
+<td>CallTable</td>
+</tr>
+<tr>
+<td><code>fuzz_bitmap_planners</code></td>
+<td>bitmap</td>
+<td>Buffer-based</td>
+</tr>
+<tr>
+<td><code>fuzz_bench_schedule</code></td>
+<td>bench</td>
+<td>Buffer-based</td>
+</tr>
+<tr>
+<td><code>fuzz_qcow2_write</code></td>
+<td>qcow2-write</td>
+<td>Sim harness</td>
+</tr>
+<tr>
+<td><code>fuzz_qcow2_write_growth</code></td>
+<td>qcow2-write</td>
+<td>Buffer-based</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Buffer-based</strong> targets call parser functions that take <code>&amp;[u8]</code>
 directly (e.g. <code>QcowHeader::parse(data)</code>). <strong>CallTable</strong> targets
 use the mock CallTable from <code>src/fuzz/src/lib.rs</code> to simulate
-sector-based I/O from the fuzzer input.</p>
+sector-based I/O from the fuzzer input. <strong>Sim harness</strong> targets
+(only <code>fuzz_qcow2_write</code>) drive a crate's own Vec-backed simulation
+harness — here <code>crates/qcow2-write</code>'s <code>sim</code> module, feature-gated
+<code>#[cfg(any(test, feature = "sim"))]</code> and OFF in the production build.</p>
 <p>The two snapshot targets (phase 12 of PLAN-snapshot) cover the
 streaming snapshot-table parser (<code>fuzz_snapshot_parse</code> drives
 <code>for_each_snapshot_entry</code> and the planner converter against
@@ -11226,6 +11324,27 @@ raised/lowered/freed tally correctness, the overflow→<code>AmbiguousCorruption
 and bounds→<code>MisalignedAccess</code> error classifications, idempotence,
 and the "correct generalises reclaim" cross-check. The COPIED
 walker's deep invariants are delegated to <code>fuzz_snapshot_refcount</code>.</p>
+<p>The two <code>crates/qcow2-write</code> targets (phase 8 of
+PLAN-qcow2-write-infrastructure) fuzz the write planner rather than a
+parser. <code>fuzz_qcow2_write</code> decodes a fixture archetype (clean /
+backing-present / shared-data / shared-L2 nested / owned-L2 /
+zero-flag-target) at a cluster size {512, 4 KiB, 64 KiB, 2 MiB} and
+runs a bounded <code>plan_write</code> / <code>plan_flush</code> sequence through the <code>sim</code>
+harness, asserting the copy-on-write invariant oracle after every
+operation: <code>max_rc &lt; 3</code> (the COW corruption signature — the single
+most important invariant), snapshot-shared clusters byte-preserved and
+never freed, no dangling / past-EOF L1/L2 pointer, and — after a flush
+— <code>OFLAG_COPIED</code> set iff refcount is exactly 1. A <code>WriteError</code> refusal
+is a valid outcome, not a crash. <code>fuzz_qcow2_write_growth</code> feeds
+geometry to the <code>growth</code> module's <code>plan_refcount_growth</code>, asserting no
+overflow, the self-coverage invariant, and cap adherence. Both are
+registered in the fast tier (<code>tools/ci/fuzz-tier.sh</code>); their bring-up
+shake-out found no planner bug. (Note: <code>plan_refcount_growth</code> has a
+debug-only non-convergence <code>debug_assert!</code> guard that fires only in
+debug builds on out-of-envelope petabyte-scale geometry; in release it
+returns <code>GrowthOverflow</code> gracefully, and production only passes bounded
+geometry — softening that guard to always return overflow is a recorded
+follow-up, not a bug.)</p>
 <h3 id="running-locally_1">Running locally<a class="headerlink" href="#running-locally_1" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Inside the instar-build container:</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz

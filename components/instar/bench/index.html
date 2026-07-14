@@ -3435,6 +3435,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    qcow2 write infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4148,6 +4176,34 @@
     
   
     QCOW2 Snapshot System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../qcow2/qcow2-write-planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QCOW2 Write Planner and Executor
   
 
     
@@ -9970,10 +10026,11 @@ actually represents:</p>
   bench "request" of <code>-s</code> bytes may therefore correspond to several
   virtio round trips, not one.</li>
 <li><strong>Write-test metadata decisions happen inside the bracket.</strong> For
-  qcow2, every touched cluster's L1/L2 metadata is read uncached from
-  disk at the moment it is needed, and refcount write-back is
-  concentrated at flush points and again at the end of the run — all
-  of that work is inside the timed window. <code>qemu-img</code> instead
+  qcow2, each touched cluster is classified against a staged metadata
+  window that loads L1/L2 tables from disk as the schedule advances,
+  and all metadata write-back (L2, L1 and refcounts, refcounts last)
+  is concentrated at flush points and again at the end of the run —
+  all of that work is inside the timed window. <code>qemu-img</code> instead
   amortises its metadata through an in-memory cache across the whole
   run. This means write timings are <strong>not like-for-like at fine
   grain</strong> between the two tools, even on identical arguments.</li>
@@ -10064,12 +10121,19 @@ guest refuses the write test:</p>
 <td>Dirty / corrupt</td>
 <td>The image's dirty or corrupt incompatible bits are set.</td>
 </tr>
-<tr>
-<td>Internal snapshots</td>
-<td>The image has one or more internal snapshots (<code>nb_snapshots &gt; 0</code>) — bench overwrites clusters without a per-write ownership check, so a snapshot-shared cluster must never be touched.</td>
-</tr>
 </tbody>
 </table>
+<p><strong>Internal snapshots are now supported (copy-on-write).</strong> Before
+phase 7 of PLAN-qcow2-write-infrastructure, <code>bench -w</code> refused any
+image with <code>nb_snapshots &gt; 0</code> because its overwrite path had no
+per-write ownership check. Since phase 7 (step 7d) the qcow2 <code>-w</code>
+path runs the crate's copy-on-write branch: a snapshot-shared data
+cluster is copied before it is written (copy <code>D → D'</code>, repoint the
+L2, <code>rc(D')=1</code>, <code>rc(D)</code>−1) and a snapshot-shared L2 table is COWed,
+so the pre-existing snapshots are <strong>preserved</strong> (like commit) and the
+active view stays <code>qemu-img compare</code>-identical to a qemu twin with
+<code>qemu-img check</code> clean. The internal-snapshots write-gate no longer
+fires; its gate id is kept for defensive mapping only.</p>
 <p>Allocation never grows the refcount structures <strong>during</strong> the run.
 Instead, setup computes the schedule's worst-case allocation bound
 and preemptively grows them once, before the timing bracket opens:
@@ -10088,26 +10152,53 @@ survives only for schedules that exceed the staging budget: more than
 grown refcount table larger than 64 KiB. That is roughly a 256 MiB
 host file at 512-byte clusters, and 64 GiB or more at cluster sizes
 of 64 KiB and up.</p>
+<p>The qcow2 <code>-w</code> path runs on the shared <code>crates/qcow2-write</code>
+planner and <code>crates/qcow2-write-exec</code> executor — the same
+allocate-on-write infrastructure commit and rebase use, with
+bench as its third consumer (PLAN-qcow2-write-infrastructure
+phase 6). The planner classifies each scheduled write from a
+staged metadata window and emits the mutation steps; the
+executor runs them through the call table. Refcount growth (see
+above) stays a bench-specific setup step, but now calls the
+growth planner that moved into <code>crates/qcow2-write</code> and routes
+its I/O through the shared executor's byte-range layer. The
+shared write path — the step-program ABI, the envelope, the
+allocate-on-write and copy-on-write emission, refcount growth
+and the crash-ordering contract — is documented in the
+<a href="/components/instar/qcow2/qcow2-write-planner/">qcow2 write planner and executor reference</a>.</p>
 <h3 id="write-back-design">Write-back design<a class="headerlink" href="#write-back-design" title="Permanent link">&para;</a></h3>
 <p>For each scheduled offset, bench writes <code>bufsize</code> bytes of the
 <code>--pattern</code> byte at that virtual offset through the format layer. For
 qcow2, an already-allocated, already-<code>OFLAG_COPIED</code> cluster is
 patched in place (a sub-sector read-modify-write, no metadata
-change); an unallocated cluster is allocated, filled with its current
-virtual content (read through the backing chain, or zero-filled if
-there is none), patched, and its L1/L2 entries are updated.</p>
-<p>Metadata write-back is <strong>write-through for L2 and L1, staged for
-refcounts, with refcounts written back last</strong>: a data cluster is
-written to disk, then the L2 entry that makes it reachable, then (if
-a new L2 table was allocated) the L1 entry — no fsync between these.
-Refcount updates accumulate in staged refblocks and are written back
-at each <code>--flush-interval</code> flush point and once more after the run
-completes. This ordering means a crash mid-bench leaves, at worst,
-<strong>leaked clusters</strong> (allocated and reachable via L2, but
-under-counted in the refcount table — reported and repaired cleanly
-by <code>qemu-img check</code>), and <strong>never</strong> a dangling L2 pointer into
-unallocated space. This is the same benign artifact class a
-<code>qemu-img bench -w</code> crash produces.</p>
+change); an unallocated cluster is allocated (a fresh L2 table first
+when the L1 slot is empty, then the data cluster), filled with its
+current virtual content (read through the backing chain, or
+zero-filled if there is none), patched, and its L1/L2 entries are
+updated. On a backed image a partial allocating write reads the
+pre-image through the chain and resubmits the full cluster, so the
+backing is honoured (the crate refuses a bare partial allocating
+write with a backing file; bench does the chain fill itself).</p>
+<p>Metadata is <strong>staged and written back in dependency order at each
+flush epoch, refcounts last</strong>: within an epoch a data cluster
+reaches disk before the L2 entry that makes it reachable, a fresh
+L2 table before the L1 entry that reaches it, and refblocks after
+all of those. A flush epoch runs at each <code>--flush-interval</code> flush
+point and once more after the run completes. This ordering means a
+crash mid-bench leaves, at worst, <strong>leaked clusters</strong> (allocated and
+reachable via L2, but under-counted in the refcount table — reported
+and repaired cleanly by <code>qemu-img check</code>), and <strong>never</strong> a dangling
+L2 pointer into unallocated space. This is the same benign artifact
+class a <code>qemu-img bench -w</code> crash produces.</p>
+<p><strong>Durability / fsync posture.</strong> bench's image is input slot 0
+opened read-write, so <code>fsync_input(0)</code> genuinely syncs. The
+executor's own flushes are disabled; instead bench issues exactly
+one <code>fsync_input(0)</code> per <code>--flush-interval</code> cadence point, after
+that epoch's write-back, and none at end-of-bracket or for
+<code>--flush-interval 0</code>. The <code>--output json</code> <code>flushes-issued</code> field
+counts those cadence points only — never the 1-2 fsyncs setup-time
+refcount growth issues. This preserves bench's pre-migration fsync
+count exactly.</p>
 <h3 id="overlay-cow-correctness">Overlay COW correctness<a class="headerlink" href="#overlay-cow-correctness" title="Permanent link">&para;</a></h3>
 <p>Writes against a qcow2 overlay never touch the parent image: all
 allocation and all data lands in the top image only, and every parent
@@ -10285,6 +10376,10 @@ listed.</p>
 <td><code>bench: image too large for in-place bench write</code></td>
 </tr>
 <tr>
+<td>Image metadata inconsistent or an unsupported entry shape (<code>crates/qcow2-write</code> classification refusal — unknown/reserved L1 or L2 bit patterns, refcount inconsistency or coverage gap, staged-regions mismatch; a v3 zero-flag on the target L2 entry)</td>
+<td><code>bench: image metadata is inconsistent</code></td>
+</tr>
+<tr>
 <td>No result received at all</td>
 <td><code>bench: guest did not return a result</code></td>
 </tr>
@@ -10345,7 +10440,7 @@ field:</p>
 <tr>
 <td>7</td>
 <td><code>internal snapshots</code></td>
-<td><code>nb_snapshots &gt; 0</code>; also raised mid-run if an allocated cluster without <code>OFLAG_COPIED</code> (snapshot-shared) is found.</td>
+<td>Retained for defensive mapping only. Since phase 7's copy-on-write adoption (step 7d) <code>bench -w</code> COWs snapshot-shared clusters instead of refusing, so neither the <code>nb_snapshots &gt; 0</code> host check nor a mid-run snapshot-shared cluster raises this gate.</td>
 </tr>
 <tr>
 <td>anything else</td>
@@ -10561,12 +10656,18 @@ only appears when the interval is nonzero):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>$ instar bench -c 0 -f raw disk.raw
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Error: &quot;Invalid request count specified. Must be between 1 and 2147483647.&quot;
 </code></pre></div>
-<p>Refused — a write-gate error on a qcow2 image with an internal
-snapshot (live transcript; note the header still prints before the
-guest-side gate fires):</p>
+<p>A write test against a qcow2 image with an internal snapshot now
+<strong>succeeds</strong> (copy-on-write, since phase 7):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>$ instar bench -w -c 10 -f qcow2 disk.qcow2
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Sending 10 write requests, 4096 bytes each, 64 in parallel (starting at offset 0, step size 4096)
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>Error: &quot;bench: write tests are not supported for this image (internal snapshots)&quot;
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>Run completed in 0.012 seconds.
+</code></pre></div>
+<p>Refused — a write-gate error on a qcow2 image that uses the
+extended-L2 (subcluster) feature (live transcript; note the header
+still prints before the guest-side gate fires):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>$ instar bench -w -c 10 -f qcow2 disk.qcow2
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>Sending 10 write requests, 4096 bytes each, 64 in parallel (starting at offset 0, step size 4096)
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>Error: &quot;bench: write tests are not supported for this image (extended L2)&quot;
 </code></pre></div>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
@@ -10592,11 +10693,17 @@ guest-side gate fires):</p>
   invocation.</li>
 </ul>
 <p>For the request-schedule crate, see
-<a href="../src/crates/bench/"><code>src/crates/bench/</code></a>. For the guest operation,
-see <a href="../src/operations/bench/"><code>src/operations/bench/</code></a>. For the
+<a href="../src/crates/bench/"><code>src/crates/bench/</code></a>; the refcount-growth
+planner now lives in the <code>growth</code> module of
+<a href="../src/crates/qcow2-write/"><code>src/crates/qcow2-write/</code></a>, which also
+provides the qcow2 <code>-w</code> allocate-on-write planner (executed through
+<a href="../src/crates/qcow2-write-exec/"><code>src/crates/qcow2-write-exec/</code></a>).
+For the guest operation, see
+<a href="../src/operations/bench/"><code>src/operations/bench/</code></a>. For the
 divergence registry, see <code>KNOWN_BENCH_DIVERGENCES</code> at the top of
 <a href="../tests/test_bench.py"><code>tests/test_bench.py</code></a>. See also
-<a href="/components/instar/usage/">usage.md</a>.</p>
+<a href="/components/instar/usage/">usage.md</a>. For the qcow2-write migration quirks, see
+<a href="/components/instar/quirks/">quirks.md</a>.</p>
 
 
 
