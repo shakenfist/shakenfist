@@ -122,7 +122,7 @@ and the network maintainer can race the queue worker once -- which
 manifests as the "Recreating not okay network on hypervisor" event
 firing in syslog for that network. The recreate is idempotent with
 the queued operation's own `create_on_hypervisor`, so there is no
-functional breakage; only the audit event.
+functional breakage; only the event.
 
 Operations enqueued after the migration completes record all of
 their targets correctly, so the gate behaves as designed once the

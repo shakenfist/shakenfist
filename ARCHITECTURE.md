@@ -75,8 +75,8 @@ The database microservice (`sf-database`) centralizes all database access:
 - All other daemons use the gRPC interface
 - Provides Prometheus metrics for database operations
 
-The `sf-database` box in the diagram represents a tier of N >= 1 instances.
-All instances connect to the same MariaDB; none is elected. Every other SF
+The `sf-database` box in the diagram represents a tier of N >= 1 replicas.
+All replicas connect to the same MariaDB; none is elected. Every other SF
 daemon reaches the tier through a client-side load-balanced gRPC channel
 constructed over the `MARIADB_GATEWAY_HOSTS` list of endpoints. Dead
 endpoints are skipped via subchannel connectivity state and client
@@ -410,7 +410,7 @@ two layers, both controlled by this metadata:
   transitions every other pending coalescible op on the same target
   to `STATE_COMPLETE` in one SQL statement. When the dispatcher
   surfaces a folded sibling's `work_queue` row, the terminal-state
-  branch drops it cleanly. A `'coalesced sibling ops'` audit event
+  branch drops it cleanly. A `'coalesced sibling ops'` event
   on the survivor records the folded uuids.
 
 The enqueue-side dedup is the cheaper of the two -- the row never

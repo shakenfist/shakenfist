@@ -206,7 +206,7 @@ MariaDB directly using SQLAlchemy. Ordinary cluster nodes (running `sf-api`,
 
 **`MARIADB_GATEWAY_HOSTS`** is set on every cluster node. It is the list of
 `sf-database` gRPC endpoints that non-database daemons connect to. For a
-single-instance deployment this list has one entry; for higher availability,
+single-replica deployment this list has one entry; for higher availability,
 list multiple `sf-database` endpoints and the gRPC client library round-robins
 requests across them.
 
@@ -222,15 +222,15 @@ In summary:
 | `sf-database`, schema tool | `MARIADB_HOST` | Direct SQLAlchemy → MariaDB |
 | All other daemons | `MARIADB_GATEWAY_HOSTS` | gRPC → `sf-database` tier |
 | `sf-database` itself (gRPC listener) | `MARIADB_GATEWAY_PORT` | Port each `sf-database` binds on (default 13005) |
-| Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` instance (default 13006) |
+| Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` replica (default 13006) |
 
-**Multi-instance deployments**: More than one `sf-database` instance can run
-against the same MariaDB server. List every instance's mesh IP in
+**Multi-replica deployments**: More than one `sf-database` replica can run
+against the same MariaDB server. List every replica's mesh IP in
 `MARIADB_GATEWAY_HOSTS`, comma-separated — for example,
 `MARIADB_GATEWAY_HOSTS="10.0.0.20,10.0.0.21,10.0.0.22"`. Every `sf-database`
-instance must be able to reach the MariaDB server; in BYO deployments this
+replica must be able to reach the MariaDB server; in BYO deployments this
 typically means the operator's MariaDB is bound to a routable interface rather
-than `127.0.0.1`. This multi-instance shape is exercised by CI on every
+than `127.0.0.1`. This multi-replica shape is exercised by CI on every
 merge-queue run, so operators can rely on it as a supported production
 configuration.
 
@@ -239,7 +239,7 @@ SF daemon connects to the tier with a gRPC channel that round-robins requests
 across the listed endpoints. Dead endpoints are skipped automatically: the
 round-robin policy avoids subchannels whose TCP connection is down, and
 aggressive client keepalives (a ping every 10 seconds with a 5 second
-timeout) detect a hung instance within about 15 seconds. There is no
+timeout) detect a hung replica within about 15 seconds. There is no
 external load balancer to configure -- the round-robin behaviour and
 failure detection are inside the gRPC client library. `sf-database` also
 publishes the standard `grpc.health.v1.Health` protocol against the
@@ -312,7 +312,7 @@ The status reflects the outcome of the most recent ~10 s background poll:
 `SERVING` means `sf-database` can reach MariaDB; `NOT_SERVING` means the
 last poll failed. Schema currency (whether the schema is up to date) is
 only checked at startup and is not a runtime signal — a running
-`sf-database` instance always has an up-to-date schema.
+`sf-database` replica always has an up-to-date schema.
 
 `sf-api` consumes this signal through its per-worker readiness checker
 (`shakenfist/external_api/health.py`). When `sf-database` reports

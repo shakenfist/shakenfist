@@ -10,8 +10,9 @@ format that you can express in an API call.
 ???+ note
 
     It is not intended that you store large amounts of data in a metadata key.
-    If you want to store more than a couple of kilobytes in a value, then instead
-    store a reference to an external system or a blob which contains the data.
+    If you want to store more than a couple of kilobytes in a value, then
+    instead store a reference to an external system or another store that
+    contains the data.
 
 You can set a metadata key's value on the command line like this:
 
