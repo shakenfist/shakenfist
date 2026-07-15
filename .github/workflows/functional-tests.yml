@@ -326,7 +326,7 @@ jobs:
             topology: 'slim-primary',
             concurrency: 5,
             stestr_config: 'cluster-ci.conf',
-            timeout_minutes: 45
+            timeout_minutes: 60
           },
           {
             name: 'Ubuntu 24.04 cluster',
@@ -336,7 +336,7 @@ jobs:
             topology: 'slim-primary',
             concurrency: 5,
             stestr_config: 'cluster-ci.conf',
-            timeout_minutes: 45
+            timeout_minutes: 60
           },
           {
             name: 'Guests',
@@ -346,7 +346,7 @@ jobs:
             topology: 'slim-primary',
             concurrency: 5,
             stestr_config: 'guest-ci.conf',
-            timeout_minutes: 45
+            timeout_minutes: 60
           },
           {
             # slim-tier runs the same cluster suite on roughly half

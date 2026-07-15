@@ -6,6 +6,7 @@ import logging
 import os
 import random
 import re
+import shlex
 import string
 import sys
 import time
@@ -22,6 +23,16 @@ TRACE_PATH = '/srv/ci/traces'
 
 
 CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
+
+
+# Some functional assertions need to observe real host state (network
+# namespaces, links, iptables, libvirt) on a *specific* cluster node, which is
+# not necessarily the node running the suite. The node-exec helpers on
+# BaseTestCase reach those nodes over the management mesh as this user with
+# this key. See docs/plans/PLAN-ci-node-exec-assertions.md.
+SF_CI_SSH_USER = os.environ.get('SF_CI_SSH_USER', 'debian')
+SF_CI_SSH_KEY = os.environ.get(
+    'SF_CI_SSH_KEY', os.path.expanduser('~/.ssh/id_rsa'))
 
 
 class TimeoutException(Exception):
@@ -146,6 +157,122 @@ class BaseTestCase(testtools.TestCase):
             sys.stderr.write(line)
         sys.stderr.write(
             '----------------------- end netns -----------------------\n')
+
+    # -----------------------------------------------------------------
+    # Cluster node discovery and remote command execution.
+    #
+    # The suite is not necessarily running on the node whose host state a
+    # test needs to inspect (the network node, or a particular hypervisor).
+    # These helpers discover the cluster's nodes from the API -- so tests
+    # carry no knowledge of the CI IP plan or node names -- and run a
+    # command on a chosen node, directly if it is this host and otherwise
+    # over ssh on the management mesh. See
+    # docs/plans/PLAN-ci-node-exec-assertions.md.
+    # -----------------------------------------------------------------
+    def _get_cluster_nodes(self):
+        """Return the cluster's nodes as reported by the API."""
+        return self.system_client.get_nodes()
+
+    def _network_node(self):
+        """Return the node dict for the cluster's network node, or None."""
+        for n in self._get_cluster_nodes():
+            if n.get('is_network_node'):
+                return n
+        return None
+
+    def _hypervisor_nodes(self, exclude_network_node=False):
+        """Return node dicts for hypervisors.
+
+        When exclude_network_node is set, the network node is omitted even
+        if it is also a hypervisor. This is what lets a caller reason about
+        network plumbing that is present *only* because an instance is
+        hosted there, uncontaminated by the network node's always-present
+        DHCP/NAT namespace.
+        """
+        nodes = []
+        for n in self._get_cluster_nodes():
+            if not n.get('is_hypervisor'):
+                continue
+            if exclude_network_node and n.get('is_network_node'):
+                continue
+            nodes.append(n)
+        return nodes
+
+    def _local_ipv4_addresses(self):
+        """The set of IPv4 addresses configured on the local host."""
+        out, _ = processutils.execute('ip', '-json', 'addr', 'show')
+        addresses = set()
+        for link in json.loads(out):
+            for addr in link.get('addr_info', []):
+                if addr.get('family') == 'inet' and addr.get('local'):
+                    addresses.add(addr['local'])
+        return addresses
+
+    def _node_is_local(self, node):
+        """Whether node is the host the suite is running on.
+
+        Decided by mesh IP rather than name, to sidestep the SF node name
+        (config.NODE_NAME, e.g. sf1) versus OS fqdn (e.g. t-6dFds-1)
+        mismatch.
+        """
+        return node.get('ip') in self._local_ipv4_addresses()
+
+    def _node_exec(self, node, args, sudo=False, check_exit_code=True):
+        """Run a command on a cluster node and return (stdout, stderr).
+
+        args is a list of command arguments. The command runs directly when
+        node is this host, otherwise over ssh to the node's mesh IP. Raises
+        processutils.ProcessExecutionError on an unexpected exit code;
+        check_exit_code may be True (only 0), False (any), or a list of
+        acceptable codes.
+        """
+        if sudo:
+            args = ['sudo', *args]
+
+        if check_exit_code is True:
+            acceptable = [0]
+        elif check_exit_code is False:
+            acceptable = list(range(256))
+        else:
+            acceptable = check_exit_code
+
+        if self._node_is_local(node):
+            return processutils.execute(*args, check_exit_code=acceptable)
+
+        remote = ' '.join(shlex.quote(a) for a in args)
+        return processutils.execute(
+            'ssh', '-i', SF_CI_SSH_KEY,
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'LogLevel=ERROR',
+            '-o', 'ConnectTimeout=10',
+            '%s@%s' % (SF_CI_SSH_USER, node['ip']), '--', remote,
+            check_exit_code=acceptable)
+
+    def _require_node_exec(self, node):
+        """Skip the test loudly if commands cannot be run on node.
+
+        A visible skip -- not a silent no-op -- is deliberate: silently
+        skipping host assertions is exactly what let the floating lifecycle
+        test look healthy while asserting nothing.
+        """
+        if node is None:
+            self.skipTest(
+                'No network node reported by the API; cannot run host-level '
+                'assertions.')
+
+        try:
+            self._node_exec(node, ['true'])
+        except processutils.ProcessExecutionError as e:
+            self.skipTest(
+                'Cannot exec on node %s (%s) over the mesh: %s. See '
+                'docs/plans/PLAN-ci-node-exec-assertions.md for the deploy '
+                'prerequisite.' % (node.get('name'), node.get('ip'), e))
+
+    def _node_link_names(self, node):
+        """The names of the network links in node's root namespace."""
+        out, _ = self._node_exec(node, ['ip', '-json', 'link', 'show'])
+        return [link['ifname'] for link in json.loads(out) if link]
 
     def _await_power_off(self, instance_uuid, after=None):
         return self._await_instance_event(

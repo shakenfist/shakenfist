@@ -257,7 +257,9 @@ def add_floating_ip(
     reply = _marshal_privexec_request(request, 'add_floating_ip_reply')
     response = reply.add_floating_ip_reply
     if response.error != privexec_pb2.AddFloatingIPReply.OK:
-        raise AddFloatingIPFailed()
+        raise AddFloatingIPFailed(
+            f'{privexec_pb2.AddFloatingIPReply.Errors.Name(response.error)}: '
+            f'{response.error_text}')
 
 
 def remove_floating_ip(network_uuid: Any, floating_address: str) -> None:
@@ -272,7 +274,9 @@ def remove_floating_ip(network_uuid: Any, floating_address: str) -> None:
     reply = _marshal_privexec_request(request, 'remove_floating_ip_reply')
     response = reply.remove_floating_ip_reply
     if response.error != privexec_pb2.RemoveFloatingIPReply.OK:
-        raise RemoveFloatingIPFailed()
+        raise RemoveFloatingIPFailed(
+            f'{privexec_pb2.RemoveFloatingIPReply.Errors.Name(response.error)}'
+            f': {response.error_text}')
 
 
 def create_vxlan_interface(vx_id: int, mesh_interface: str) -> None:

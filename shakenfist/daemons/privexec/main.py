@@ -351,19 +351,83 @@ class PrivExecJob:
             ['peer', 'name', inner_floating_interface],
             inner_namespace=req.network_uuid
         )
+
+        # create_interface returns success without doing anything if the
+        # outer end already exists, but that doesn't mean the inner end is
+        # in the network namespace we need it in -- a previous user of this
+        # floating IP on another network may have left the pair stranded.
+        # Deleting the outer end destroys the pair wherever the inner end
+        # is, letting us recreate it cleanly.
+        error_text = ''
+        if success and not privexec_util.check_for_interface(
+                inner_floating_interface, namespace=req.network_uuid):
+            _, stderr, returncode = privexec_util.command_helper(
+                privexec_util.locate_command('ip'), 'link', 'del',
+                floating_interface)
+            success = returncode == 0
+            if success:
+                success = privexec_util.create_interface(
+                    floating_interface, 'veth',
+                    ['peer', 'name', inner_floating_interface],
+                    inner_namespace=req.network_uuid
+                )
+            else:
+                error_text = (
+                    f'failed to delete stranded interface '
+                    f'{floating_interface}: {stderr}')
+
         if not success:
+            if not error_text:
+                error_text = (
+                    f'failed to create veth pair {floating_interface} / '
+                    f'{inner_floating_interface} with inner end in '
+                    f'namespace {req.network_uuid}')
             return privexec_pb2.PrivExecReply(
                 add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
                     network_uuid=req.network_uuid,
                     floating_address=req.floating_address,
                     inner_address=req.inner_address,
-                    error=privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED
+                    error=privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED,
+                    error_text=error_text
                 )
             )
 
-        if req.floating_address in privexec_util.get_interface_addresses(
-            floating_interface
+        # The floating address lives on the inner end of the veth pair,
+        # inside the network namespace, so that is where we must look when
+        # deciding if it is already configured.
+        if req.floating_address not in privexec_util.get_interface_addresses(
+            inner_floating_interface, namespace=req.network_uuid
         ):
+            success = privexec_util.add_address_to_interface(
+                inner_floating_interface, req.network_uuid,
+                req.floating_address, '32')
+            if not success:
+                return privexec_pb2.PrivExecReply(
+                    add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                        network_uuid=req.network_uuid,
+                        floating_address=req.floating_address,
+                        inner_address=req.inner_address,
+                        error=privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED,
+                        error_text=(
+                            f'failed to add {req.floating_address}/32 to '
+                            f'{inner_floating_interface} in namespace '
+                            f'{req.network_uuid}')
+                    )
+                )
+
+        # Only append the DNAT rule if an identical rule is not already
+        # present. Duplicated rules aren't just clutter -- the first match
+        # wins, so a duplicate from an earlier partial attempt would mask
+        # later changes.
+        dnat_rule = [
+            'PREROUTING', '-d', req.floating_address, '-j', 'DNAT',
+            '--to-destination', req.inner_address]
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('iptables'),
+            '-w', '10', '-t', 'nat', '-C', *dnat_rule,
+            failure_is_error=False)
+        if returncode == 0:
             return privexec_pb2.PrivExecReply(
                 add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
                     network_uuid=req.network_uuid,
@@ -373,32 +437,21 @@ class PrivExecJob:
                 )
             )
 
-        success = privexec_util.add_address_to_interface(
-            inner_floating_interface, req.network_uuid,
-            req.floating_address, '32')
-        if not success:
-            return privexec_pb2.PrivExecReply(
-                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
-                    network_uuid=req.network_uuid,
-                    floating_address=req.floating_address,
-                    inner_address=req.inner_address,
-                    error=privexec_pb2.AddFloatingIPReply.ADD_ADDRESS_FAILED
-                )
-            )
-
-        _, _, returncode = privexec_util.command_helper(
+        _, stderr, returncode = privexec_util.command_helper(
             privexec_util.locate_command('ip'), 'netns', 'exec',
             req.network_uuid, privexec_util.locate_command('iptables'),
-            '-w', '10', '-t', 'nat', '-A', 'PREROUTING',
-            '-d', req.floating_address, '-j', 'DNAT',
-            '--to-destination', req.inner_address)
+            '-w', '10', '-t', 'nat', '-A', *dnat_rule)
         if returncode != 0:
             return privexec_pb2.PrivExecReply(
                 add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
                     network_uuid=req.network_uuid,
                     floating_address=req.floating_address,
                     inner_address=req.inner_address,
-                    error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED
+                    error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED,
+                    error_text=(
+                        f'failed to append DNAT rule for '
+                        f'{req.floating_address} in namespace '
+                        f'{req.network_uuid}: {stderr}')
                 )
             )
 
@@ -414,20 +467,63 @@ class PrivExecJob:
     def _remove_floating_ip(self, req):
         floating_interface = \
             f'flt-{int(ipaddress.IPv4Address(req.floating_address)):08x}'
-        outer_floating_interface = f'{floating_interface}-o'
 
-        if privexec_util.check_for_interface(outer_floating_interface):
-            _, _, returncode = privexec_util.execute(
+        # Removal is best effort cleanup: a failure removing any one piece
+        # of state must not abort the removal of the rest. Aborting midway
+        # strands more than it cleans -- the veth pair this PR exists to
+        # stop leaking would be left behind whenever a single DNAT delete
+        # failed. Accumulate failures and keep going, then report FAILED
+        # at the end if anything did not clean up. The operations are
+        # idempotent, so a caller retry converges on a clean state.
+        errors = []
+
+        # Remove DNAT rules for this floating IP from the network namespace
+        # before removing the interface. A stale rule matches in preference
+        # to the rule added by any later user of this floating IP on the
+        # same network, silently misdirecting traffic to the old inner
+        # address.
+        if os.path.exists(f'/var/run/netns/{req.network_uuid}'):
+            stdout, _, returncode = privexec_util.command_helper(
+                privexec_util.locate_command('ip'), 'netns', 'exec',
+                req.network_uuid, privexec_util.locate_command('iptables'),
+                '-w', '10', '-t', 'nat', '-S', 'PREROUTING',
+                failure_is_error=False)
+            if returncode == 0:
+                for rule in stdout.split('\n'):
+                    if f'-d {req.floating_address}/32 ' not in rule:
+                        continue
+                    _, stderr, returncode = privexec_util.command_helper(
+                        privexec_util.locate_command('ip'), 'netns', 'exec',
+                        req.network_uuid,
+                        privexec_util.locate_command('iptables'),
+                        '-w', '10', '-t', 'nat', '-D', *rule.split()[1:],
+                        failure_is_error=False)
+                    if returncode != 0:
+                        errors.append(
+                            f'failed to remove DNAT rule "{rule}" in '
+                            f'namespace {req.network_uuid}: {stderr}')
+
+        # This name must match the outer interface created by
+        # _add_floating_ip. Deleting the outer end also destroys the inner
+        # end in the network namespace, along with the address on it.
+        if privexec_util.check_for_interface(floating_interface):
+            _, stderr, returncode = privexec_util.command_helper(
                 privexec_util.locate_command('ip'), 'link', 'del',
-                outer_floating_interface)
+                floating_interface, failure_is_error=False)
             if returncode != 0:
-                return privexec_pb2.PrivExecReply(
-                    remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
-                        network_uuid=req.network_uuid,
-                        floating_address=req.floating_address,
-                        error=privexec_pb2.RemoveFloatingIPReply.FAILED
-                    )
+                errors.append(
+                    f'failed to delete interface {floating_interface}: '
+                    f'{stderr}')
+
+        if errors:
+            return privexec_pb2.PrivExecReply(
+                remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    error=privexec_pb2.RemoveFloatingIPReply.FAILED,
+                    error_text='; '.join(errors)
                 )
+            )
 
         return privexec_pb2.PrivExecReply(
             remove_floating_ip_reply=privexec_pb2.RemoveFloatingIPReply(

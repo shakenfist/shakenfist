@@ -274,11 +274,11 @@ debian@test:~$ ip a
 ...
 17: vnet1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8900 qdisc noqueue master br-vxlan-e2300f state UNKNOWN group default qlen 1000
     link/ether fe:00:00:c7:f9:cc brd ff:ff:ff:ff:ff:ff
-19: flt-c0a80f1d-o@if18: <BROADCAST,MULTICAST> mtu 8900 qdisc noop state DOWN group default qlen 1000
+19: flt-c0a80f1d@if18: <BROADCAST,MULTICAST> mtu 8900 qdisc noop state DOWN group default qlen 1000
     link/ether aa:5c:1c:0c:7c:f6 brd ff:ff:ff:ff:ff:ff link-netns 17be6538-8f96-4ccb-b71e-a7e3022fead3
 ```
 
-But we've also added another veth pair, this time named `flt-c0a80f1d-o` on the
+But we've also added another veth pair, this time named `flt-c0a80f1d` on the
 outside of the network namespace. You can see in the instance details above that
 the floating IP associated with this instance is `192.168.15.29`, which just so
 happens to be `c0a80f1d` in hexadecimal. So this veth is how floating IP traffic
@@ -379,6 +379,51 @@ Such a route might look like this:
 ```
 ip route add 192.168.15.29/32 dev br-vxlan-e2300f
 ```
+
+## Interface naming conventions
+
+The interface names in the examples above are a contract, not a
+coincidence: the privexec daemon derives them independently when adding
+and when removing resources, so the add and remove paths must agree on
+the names or removal silently does nothing. Exactly that happened when
+the floating IP add path dropped the `-o` suffix from the outer veth end
+but the removal path kept looking for it -- every floating IP release
+leaked its veth pair and DNAT rule, and reuse of those floating IPs then
+failed or misdirected traffic (github issues #3378 through #3383).
+
+All names are derived either from the network's VXLAN id as six lower
+case hex digits (`e2300f` for VXLAN id 14823439 in the examples above),
+or from the floating IPv4 address as eight lower case hex digits
+(`c0a80f1d` for 192.168.15.29). Linux limits interface names to 15
+characters, which these conventions exactly fill in the worst case.
+
+On the network node:
+
+| Name | Where | Purpose |
+|------|-------|---------|
+| `vxlan-<vxid>` | root namespace | VXLAN mesh interface for the virtual network |
+| `br-vxlan-<vxid>` | root namespace | bridge joining the VXLAN interface, instance taps and the namespace veth |
+| `veth-<vxid>-o` / `veth-<vxid>-i` | root namespace / network namespace | veth pair attaching the network namespace to `br-vxlan-<vxid>`; the inner end holds the virtual network gateway address and serves DHCP |
+| `egr-<vxid>-o` / `egr-<vxid>-i` | root namespace / network namespace | veth pair attaching the network namespace to the egress bridge for NAT and floating traffic |
+| `flt-<hex ip>` / `flt-<hex ip>-i` | root namespace / network namespace | veth pair delivering traffic for one floating IP; the inner end holds the floating address as a /32 |
+| `egr-br-<nic>` | root namespace | egress bridge on the physical egress NIC, holding the first address of the floating network |
+
+The network namespace itself is named with the UUID of the virtual
+network. Note the asymmetry for floating veth pairs: the outer end has
+no suffix (not `-o`), while the inner end is suffixed `-i`. Each
+floating IP also has a DNAT PREROUTING rule inside the network
+namespace directing the floating address to the instance's inner
+address.
+
+Hypervisor nodes which are not the network node only carry
+`vxlan-<vxid>`, `br-vxlan-<vxid>` and the instance tap devices.
+
+These conventions are asserted by the unit tests in
+`shakenfist/tests/test_privexec_floating_ip.py` and exercised end to
+end by `TestFloatingIPLifecycle` in the cluster CI suite. If you change
+a name, change it in the add path, the remove path, the tests, this
+page and `docs/components/cloudgood/networking-shakenfist.md` together.
+
 ## Dispatcher diagnostic events
 
 Operators reading the event log for a cluster operation will see two

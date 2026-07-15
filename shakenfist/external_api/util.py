@@ -20,6 +20,16 @@ def assign_floating_ip(ni):
         ni.unique_label(), ReservationType.FLOATING, '')
 
 
+def release_floating_ip(ni):
+    # Inverse of assign_floating_ip. The host side teardown (veth and DNAT) is
+    # handled asynchronously by the interface_defloat job; here we release the
+    # IPAM reservation and clear the interface record so the address returns to
+    # the pool. Mirrors the same two steps in NetworkInterface.delete().
+    fn = network.floating_network()
+    fn.ipam.release(ni.floating.get('floating_address'))
+    ni.floating = None
+
+
 def assign_routed_ip(n):
     # Address is allocated and then returned, as there is no network interface
     # to associate it with.
