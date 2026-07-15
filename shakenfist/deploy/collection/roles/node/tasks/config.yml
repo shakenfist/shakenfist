@@ -53,16 +53,19 @@
 # target host. The legacy deployer fetched a control-node-rendered config back
 # and re-templated it; that round trip is unnecessary now that the template is
 # role-local and reads only role variables.
-- name: Check if we have an existing config
-  ansible.builtin.stat:
-    path: /etc/sf/config
-  register: config_stat_result
-
-# The config contains secrets (the Loki auth header everywhere, the MariaDB
-# password on database-tier nodes), so it must not be world-readable. The
-# sudo group matches the global auth file above: the daemons read it as root
-# via systemd EnvironmentFile, while administrators (and the CI test scripts)
-# read it as sudo-group users.
+#
+# It is rendered on EVERY run, not just when absent: a config that is written
+# only once never picks up new keys added upstream, nor a change in this node's
+# role -- most importantly joining or leaving the database tier, which flips
+# NODE_IS_DATABASE_NODE and the MARIADB_HOST/gateway lines. ansible rewrites
+# the file only when the rendered content actually differs, and sets the
+# ownership and mode every run, so this also subsumes the old separate
+# permission-tightening step for configs written by earlier (world-readable)
+# releases. The config contains secrets (the Loki auth header everywhere, the
+# MariaDB password on database-tier nodes), so it must not be world-readable;
+# the sudo group matches the global auth file above, letting the daemons read
+# it as root via systemd EnvironmentFile while administrators (and the CI test
+# scripts) read it as sudo-group users.
 - name: Write config file on remote host
   ansible.builtin.template:
     src: config
@@ -70,18 +73,7 @@
     owner: root
     group: sudo
     mode: u=r,g=r,o=
-  when: not config_stat_result.stat.exists
   notify: Reload systemd
-
-# Configs written by earlier releases were world-readable and are content-
-# preserved above, so tighten their permissions explicitly on redeploy.
-- name: Ensure existing config file permissions are restrictive
-  ansible.builtin.file:
-    path: /etc/sf/config
-    owner: root
-    group: sudo
-    mode: u=r,g=r,o=
-  when: config_stat_result.stat.exists
 
 - name: Remove obsolete systemd units
   ansible.builtin.file:
@@ -142,6 +134,41 @@
     item: database
   when: node_is_database_node
   notify: Reload systemd
+
+# Symmetric teardown: when a node is NOT a database node, remove any database
+# footprint left from a previous role. A node that used to be in the database
+# tier would otherwise keep its sf-database daemon (now crash-looping, because
+# the rewritten config above no longer grants it direct MariaDB access), a
+# stale unit file, and -- worst -- a registered database daemon, which counts
+# as a stopped daemon and reports the node degraded forever. This runs before
+# the register play, so the node is clean by the time it re-registers. Gated on
+# the unit's presence so nodes that were never database nodes do nothing.
+- name: Check for a leftover database unit on non-database nodes
+  ansible.builtin.stat:
+    path: /etc/systemd/system/sf-database.service
+  register: db_unit_leftover
+  when: not node_is_database_node
+
+- name: Tear down the database daemon when this node is not a database node
+  when:
+    - not node_is_database_node
+    - db_unit_leftover.stat.exists | default(false)
+  block:
+    - name: Stop and disable the leftover database daemon
+      ansible.builtin.service:
+        name: sf-database
+        state: stopped
+        enabled: false
+
+    - name: Deregister the database daemon so it stops counting as degraded
+      ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl deregister-daemon database
+      changed_when: true
+
+    - name: Remove the leftover database daemon unit file
+      ansible.builtin.file:
+        path: /etc/systemd/system/sf-database.service
+        state: absent
+      notify: Reload systemd
 
 # https://stackoverflow.com/questions/64701241/how-do-i-write-ansible-task-for-systemctl-set-default-graphical-target-without
 - name: Make sure sf.target unit is the default
