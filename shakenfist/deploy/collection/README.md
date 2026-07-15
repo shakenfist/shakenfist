@@ -15,10 +15,47 @@ another host's facts, so the roles compose cleanly with any inventory layout.
 
 | Role | Purpose |
 |------|---------|
-| `shakenfist.shakenfist.node` | Core per-node setup: OS packages, `/etc/sf/config`, `sfrc`, the global auth file, all `sf-*` systemd units, and registration of the node and its daemons. Folds in the database capability: when `node_is_database_node` is true it also writes, registers and starts `sf-database`. Has `bootstrap`, `config` and `register` entry points (run them as separate plays to order database-tier hosts first). The `bootstrap` entry point creates the `/srv/shakenfist` virtualenv and installs the `shakenfist` server and client packages (override `server_package`/`client_package`/`pip_extra` to install local wheels for local/CI). |
+| `shakenfist.shakenfist.node` | Core per-node setup: OS packages, `/etc/sf/config`, `sfrc`, the global auth file, all `sf-*` systemd units, and registration of the node and its daemons. Folds in the database capability: when `node_is_database_node` is true it also writes, registers and starts `sf-database`. Has `bootstrap`, `config` and `register` entry points (run them as separate plays to order database-tier hosts first). The `bootstrap` entry point creates the `/srv/shakenfist` virtualenv and installs the `shakenfist` server and client packages (override `server_package`/`client_package`/`pip_extra` to install local wheels for local/CI). Re-running the role is **restart-on-change**: it only restarts a node's daemons when the installed code, `/etc/sf/config`, or a systemd unit actually changed (see [Idempotence and restart-on-change](#idempotence-and-restart-on-change)). |
 | `shakenfist.shakenfist.hypervisor` | Hypervisor host preparation: nested KVM detection/enable, KSM, `vhost_vsock`, SPICE TLS, and the libvirt AppArmor/config tweaks. Apply only to hosts where `node_is_hypervisor` is true. |
 | `shakenfist.shakenfist.network` | Network node preparation: removes the distro `dnsmasq` unit, installs the DHCP/DNS templates, enables IPv4 forwarding, and validates the mesh interface MTU. Apply only to hosts where `node_is_network_node` is true. |
 | `shakenfist.shakenfist.internal_ca` | Internal certificate authority: generates a CA on the control node, issues a per-host SPICE TLS certificate, and distributes the certificates to each host. |
+
+## Idempotence and restart-on-change
+
+Re-running the `node` role is safe to do routinely — for example from a daily
+`manage.yml`-style rotation that keeps every node on the tip of a branch. The
+role restarts a node's `sf-*` daemons **only when something they depend on
+actually changed**, so a redeploy on a day nothing moved leaves the running
+cluster completely undisturbed. A daemon is restarted when any of the following
+changed on its node:
+
+* **The installed Shaken Fist code.** The `bootstrap` entry point hashes the
+  *installed* `shakenfist` / `shakenfist_client` package files into a marker
+  (`/srv/shakenfist/.deployed-code.sha256`) after each install and restarts if
+  the hash moved. It deliberately hashes the installed files rather than the
+  wheel: the wheels are rebuilt from source every deploy and embed build
+  timestamps, so their bytes differ every run even when the source did not,
+  whereas identical source always installs byte-identical files. This detects a
+  real code change on a branch bump, on a same-version dirty rebuild (CI), and
+  on a first install (marker absent), while staying quiet on a genuine no-op.
+* **`/etc/sf/config`.** It is the daemons' shared systemd `EnvironmentFile`, so
+  a change to it restarts every daemon on the node. The config is re-rendered
+  every run and changes when a value moved or the node's role did (most
+  importantly joining or leaving the database tier).
+* **A systemd unit file.** A rewritten `sf-*.service`/`sf.target`, or removal of
+  an obsolete unit, restarts the affected daemons. `systemctl daemon-reload`
+  runs in the same play that writes the units, before any restart.
+
+The decision is per node and is logged during `register` as a
+`restart_needed=… (code=… config=… units=…)` line. Granularity is
+node-wide: because the code and config are shared by every daemon on the host,
+any change restarts all of that node's daemons rather than a subset. On a
+database-tier node the restart still honours the ordering the role guarantees —
+`sf-database` first, then a wait until its gRPC gateway (port 13005) is
+accepting connections, then the remaining daemons — so a rolling redeploy of a
+redundant database tier stays outage-free. Registration of the node and its
+daemons is idempotent and runs every time regardless, which is what heals a
+node whose database rows have drifted.
 
 ## Modules
 

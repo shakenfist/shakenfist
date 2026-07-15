@@ -17,6 +17,34 @@
 #      it, because non-database hosts register over that gRPC gateway. The
 #      example playbook orders its plays so database hosts converge first.
 
+# Restart-on-change decision. sf_code_changed (bootstrap.yml) and
+# sf_config_changed / sf_units_changed (config.yml) are host facts set in the
+# earlier bootstrap+config play; here we OR them into a single gate. When nothing
+# a daemon depends on has changed, the service tasks below use state: started (a
+# no-op for an already-running daemon) rather than restarted, so an idempotent
+# redeploy -- for instance a daily manage.yml rotation on a morning develop did
+# not move -- leaves the running cluster completely undisturbed. Registration
+# (initialise-node, register-daemon) still runs every time: it is idempotent and
+# cheap, and it is what heals a node whose daemon rows drifted. Each fact
+# defaults to true so any unexpected gap in the earlier plays fails safe to the
+# old always-restart behaviour rather than silently skipping a needed restart;
+# on a first deploy the facts are genuinely true (config and units are freshly
+# written, code freshly installed), so the initial bring-up is a full start.
+- name: Decide whether SF daemons need a restart this run
+  ansible.builtin.set_fact:
+    sf_restart_needed: >-
+      {{ (sf_code_changed | default(true))
+         or (sf_config_changed | default(true))
+         or (sf_units_changed | default(true)) }}
+
+- name: Report the restart decision
+  ansible.builtin.debug:
+    msg: >-
+      restart_needed={{ sf_restart_needed }}
+      (code={{ sf_code_changed | default('?') }},
+      config={{ sf_config_changed | default('?') }},
+      units={{ sf_units_changed | default('?') }})
+
 # Initialise this node in the database.
 - name: Ensure the node exists in the database
   ansible.builtin.shell: |
@@ -45,18 +73,20 @@
   ansible.builtin.service:
     name: sf-database
     enabled: true
-    state: restarted
+    state: "{{ 'restarted' if sf_restart_needed else 'started' }}"
     daemon_reload: false
   when: node_is_database_node
 
-# Confirm this node's gRPC gateway is accepting connections again before we
-# return. When the example playbook rolls the database tier one node at a time
-# (site.yml play 6b, serial: 1), this gate is what keeps a gateway serving
-# throughout the roll: the next node's restart cannot begin until this one is
-# back up. sf-database binds the gateway to the mesh IP; a listening socket is
-# exactly the signal round_robin failover keys on (subchannel connectivity),
-# and systemd reports the unit started before the port is bound, so the service
-# restart above is not sufficient on its own.
+# Confirm this node's gRPC gateway is accepting connections before we return.
+# This runs whether or not the task above actually restarted sf-database: when
+# the example playbook rolls the database tier one node at a time (site.yml play
+# 6b, serial: 1), this gate is what keeps a gateway serving throughout the roll
+# -- the next node's restart cannot begin until this one is back up -- and on a
+# no-op redeploy it simply confirms the already-running gateway is healthy.
+# sf-database binds the gateway to the mesh IP; a listening socket is exactly the
+# signal round_robin failover keys on (subchannel connectivity), and systemd
+# reports the unit started before the port is bound, so a service restart is not
+# sufficient on its own.
 - name: Wait for this node's database gateway to accept connections
   ansible.builtin.wait_for:
     host: "{{ node_mesh_ip }}"
@@ -74,7 +104,7 @@
   ansible.builtin.service:
     name: "sf-{{ item }}"
     enabled: true
-    state: restarted
+    state: "{{ 'restarted' if sf_restart_needed else 'started' }}"
     daemon_reload: false
   with_items:
     - sentinel-first
@@ -84,11 +114,11 @@
 # TODO(mikal): this is a bit wrong. Some of these should only come up
 # on nodes which are either a network node, hypervisor, or storage
 # node...
-- name: Restart the other SF daemons
+- name: Start or restart the other SF daemons
   ansible.builtin.service:
     name: "sf-{{ item }}"
     enabled: true
-    state: restarted
+    state: "{{ 'restarted' if sf_restart_needed else 'started' }}"
     daemon_reload: false
   with_items:
     - net
