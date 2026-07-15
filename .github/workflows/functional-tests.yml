@@ -82,12 +82,25 @@ jobs:
 
   # These sanity checks used to be three separate jobs, but are now combined
   # to save a little time and reduce CI runner churn.
+  #
+  # NOTE(mikal): this job builds no nested cluster and needs no KVM -- it is
+  # just lint, mypy and unit tests -- so it runs on the shared
+  # [self-hosted, static] runners rather than hogging an ephemeral VM. The
+  # static base image (built in mach33labs/33fl) is expected to already
+  # provide gh, git, and the python build toolchain (python3, python3-venv,
+  # python3-dev, python3-pip, python3-wheel, python3-cffi). The old inline
+  # "sudo apt-get install libmariadb-dev python3-mysqldb" was dropped: the
+  # test venv is isolated (no --system-site-packages) and mysqlclient is not
+  # a dependency, so the mariadb driver is never imported by the unit tests
+  # (they mock the database). If a run ever shows those packages are needed,
+  # add them to the runner image in mach33labs/33fl rather than apt-installing
+  # on the shared runner.
   sanity_checks:
     name: "Sanity checks"
     permissions:
       contents: read
       pull-requests: write
-    runs-on: [self-hosted, vm, debian-12]
+    runs-on: [self-hosted, static]
     needs: [check_paths]
     if: needs.check_paths.outputs.code_changed != 'false'
     outputs:
@@ -102,14 +115,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libmariadb-dev python3-mysqldb gh
-
       - name: Upgrade base test tools
         timeout-minutes: 5
         run: |
+          rm -rf /tmp/venv-test
           python3 -mvenv /tmp/venv-test
           . /tmp/venv-test/bin/activate
           pip3 install uv
@@ -139,6 +148,7 @@ jobs:
       - name: Attempt to install requirements
         timeout-minutes: 5
         run: |
+          rm -rf /tmp/venv-reqs
           python3 -mvenv /tmp/venv-reqs
           . /tmp/venv-reqs/bin/activate
           pip3 install uv
@@ -157,16 +167,16 @@ jobs:
         id: failures
         run: |
           echo "Gathering list of failed tests..."
-          touch /srv/ci/failed
+          touch /tmp/failed
           . /tmp/venv-test/bin/activate
-          tox -efailing > /srv/ci/failed || true
+          tox -efailing > /tmp/failed || true
           echo
 
-          failed=$(cat /srv/ci/failed | egrep "^FAIL: " | \
+          failed=$(cat /tmp/failed | egrep "^FAIL: " | \
               sed -z 's/FAIL: shakenfist_ci\.//g;s/\n/, /g;s/, $/\n/')
 
           echo "Failed tests:"
-          cat /srv/ci/failed
+          cat /tmp/failed
           echo
 
           echo "failures<<EOF" >> ${GITHUB_OUTPUT}
@@ -189,7 +199,7 @@ jobs:
           ```
           COMMENT_EOF
 
-          cat /srv/ci/failed >> /tmp/pr-comment.md
+          cat /tmp/failed >> /tmp/pr-comment.md
 
           cat >> /tmp/pr-comment.md << 'COMMENT_EOF'
           ```
