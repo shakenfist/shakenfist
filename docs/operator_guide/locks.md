@@ -93,9 +93,12 @@ The systemd watchdog now closes that gap for the eight armed daemons
 sidechannel). Each daemon's main loop calls `Daemon.pet_watchdog()`
 from `idle()` and, for long maintenance passes, at explicit points
 inside the pass. If the loop stops petting, systemd delivers SIGABRT
-after `WatchdogSec` (60s for most daemons; 300s for `sf-cluster`, whose
-elected maintenance pass legitimately runs longer than a minute). The
-refresher thread dies with the process, and the lease expires normally.
+after `WatchdogSec` (60s for most daemons; 300s for `sf-cluster` and
+`sf-cleaner`, whose maintenance passes legitimately run longer than a
+minute). The refresher thread dies with the process, and the lease
+expires normally. `sf-cleaner` is per-node and holds no elected cluster
+lock, so its longer window only delays local maintenance on a wedge — the
+failover chain below is specific to the elected `sf-cluster`.
 
 For the elected `sf-cluster` the effect is the full lock failover
 chain:

@@ -125,7 +125,9 @@ daemons communicate internally via gRPC or the MariaDB-backed work queue.
 
 The eight non-trivial daemons — `sf-database`, `sf-net`, `sf-cleaner`,
 `sf-cluster`, `sf-queues`, `sf-resources`, `sf-transfers`, and
-`sf-sidechannel` — are armed with `WatchdogSec=60s` in `sf.service`.
+`sf-sidechannel` — are armed with the systemd watchdog in `sf.service`
+(`WatchdogSec=60s`, except `sf-cluster` and `sf-cleaner` at `300s` — see
+below).
 Four units are deliberately excluded: `sentinel-first`, `sentinel-last`,
 `sf-privexec`, and `sf-nodelock`. Those are short-lived or event-driven
 processes that do not run the `idle()`-based keepalive loop; arming them
@@ -146,13 +148,17 @@ must call `pet_watchdog()` explicitly:
   `lock.lost_event.wait(5)` rather than `idle()`, so it calls
   `pet_watchdog()` explicitly at the top of each iteration.
 - `sf-cluster` `_cluster_wide_cleanup` and `sf-cleaner`
-  `_maintain_blobs` / `_find_missing_blobs`: call `pet_watchdog()` around
-  inner-loop iterations that may each take several seconds.
+  `update_power_states` / `_maintain_blobs` / `_find_missing_blobs`: call
+  `pet_watchdog()` around inner-loop iterations that may each take several
+  seconds. `update_power_states` runs as a scheduled task outside the
+  cleaner's `idle()` loop, so it is petted per libvirt domain.
 
 If a daemon's main loop wedges and stops petting, systemd delivers SIGABRT
-after `WatchdogSec` (60s for most daemons; **300s for `sf-cluster`**, whose
-elected maintenance pass legitimately runs longer) and restarts the process
-(`Restart=on-failure`).
+after `WatchdogSec` (60s for most daemons; **300s for `sf-cluster` and
+`sf-cleaner`**, whose maintenance passes legitimately run longer) and restarts
+the process (`Restart=on-failure`). `sf-cluster`'s longer window also governs
+its cluster-lock failover (below); `sf-cleaner` is per-node and holds no
+elected lock, so its longer window has no failover cost.
 
 The watchdog tracks the **main (supervisor) loop only**. For the
 `WorkerPoolDaemon`-style daemons (net, queues, resources, transfers,
