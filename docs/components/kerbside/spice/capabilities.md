@@ -168,8 +168,8 @@ For a modern SPICE client, the recommended minimum capabilities are:
 
 ## Related Documentation
 
-- [Link Protocol](/components/kerbside/spice-link-protocol/) - Capability exchange during handshake
-- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level protocol structure
-- [Channel Protocols](/components/kerbside/channel-protocols/) - Per-channel message formats
-- [Keyboard Scancodes](/components/kerbside/scancodes/) - KeyScancode capability usage
-- [Compression Protocols](/components/kerbside/compression-protocols/) - LZ4/GLZ compression details
+- [Link Protocol](/components/kerbside/spice/spice-link-protocol/) - Capability exchange during handshake
+- [Protocol Overview](/components/kerbside/spice/protocol-overview/) - High-level protocol structure
+- [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Per-channel message formats
+- [Keyboard Scancodes](/components/kerbside/spice/scancodes/) - KeyScancode capability usage
+- [Compression Protocols](/components/kerbside/spice/compression-protocols/) - LZ4/GLZ compression details

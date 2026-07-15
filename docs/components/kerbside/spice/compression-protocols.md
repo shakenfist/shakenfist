@@ -240,6 +240,6 @@ and the test harness rely on.
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level SPICE protocol
-- [Channel Protocols](/components/kerbside/channel-protocols/) - Display channel message formats
-- [Capabilities](/components/kerbside/capabilities/) - LZ4Compression and PrefCompression capabilities
+- [Protocol Overview](/components/kerbside/spice/protocol-overview/) - High-level SPICE protocol
+- [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Display channel message formats
+- [Capabilities](/components/kerbside/spice/capabilities/) - LZ4Compression and PrefCompression capabilities

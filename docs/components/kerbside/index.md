@@ -155,16 +155,16 @@ Internal design of the Kerbside proxy:
 Core protocol specifications covering connection handshake, authentication, and
 channel message formats:
 
-- [Protocol Overview](/components/kerbside/protocol-overview/) - Introduction to SPICE protocol
-  fundamentals including channel types, message structure, capabilities, and
-  security model
+- [Protocol Overview](/components/kerbside/spice/protocol-overview/) - Introduction to SPICE
+  protocol fundamentals including channel types, message structure,
+  capabilities, and security model
 
-- [Link Protocol](/components/kerbside/spice-link-protocol/) - Connection handshake details
+- [Link Protocol](/components/kerbside/spice/spice-link-protocol/) - Connection handshake details
   including SpiceLinkMess/SpiceLinkReply formats, RSA key exchange, and
   authentication flow
 
-- [Channel Protocols](/components/kerbside/channel-protocols/) - Detailed message formats for each
-  SPICE channel:
+- [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Detailed message formats
+  for each SPICE channel:
   - Main channel - Session control, channel negotiation
   - Display channel - Screen updates, drawing operations, video streaming
   - Inputs channel - Keyboard and mouse input
@@ -172,31 +172,42 @@ channel message formats:
   - Playback/Record channels - Audio streaming
   - Smartcard channel - Smart card redirection
 
-- [Keyboard Scancodes](/components/kerbside/scancodes/) - Complete reference for IBM PC XT
+- [Keyboard Scancodes](/components/kerbside/spice/scancodes/) - Complete reference for IBM PC XT
   scancodes used by the inputs channel, including standard keys, extended keys
   (E0 prefix), and media/browser keys
 
-- [Compression Protocols](/components/kerbside/compression-protocols/) - LZ and GLZ image
+- [Compression Protocols](/components/kerbside/spice/compression-protocols/) - LZ and GLZ image
   compression formats used by the display channel, including header formats,
   command encoding, and dictionary-based decompression
 
-- [Capabilities](/components/kerbside/capabilities/) - Channel capability negotiation including
-  common, display, audio, and input capabilities with recommended settings
+- [Capabilities](/components/kerbside/spice/capabilities/) - Channel capability negotiation
+  including common, display, audio, and input capabilities with recommended
+  settings
 
 ### Device Redirection Protocols
 
 Protocols for redirecting client devices to the virtual machine:
 
-- [USB Redirection](/components/kerbside/usb-redirection/) - USB device redirection protocol
-  (usbredir) including all control and data message formats, capability
-  negotiation, and device filter rules
+- [USB Redirection](/components/kerbside/spice/usb-redirection/) - USB device redirection
+  protocol (usbredir) including all control and data message formats,
+  capability negotiation, and device filter rules
 
 ### Guest Agent Protocol
 
 Protocol for advanced guest integration features:
 
-- [VD Agent Protocol](/components/kerbside/vd-agent-protocol/) - Guest agent protocol for
+- [VD Agent Protocol](/components/kerbside/spice/vd-agent-protocol/) - Guest agent protocol for
   clipboard sharing, file transfer, display configuration, and volume sync
+
+### Connection File Extensions
+
+Extensions and interpretations layered on the standard
+virt-viewer console.vv format:
+
+- [console.vv Extensions](/components/kerbside/spice/console-vv-extensions/) - ryll-specific
+  console.vv keys (`ticket-valid-until`) and standard-key interpretations
+  (`delete-this-file=1` as a one-shot ticket signal). Producers (Kerbside,
+  oVirt, custom gateways) populate these to drive client-side behaviour.
 
 ## Protocol Implementation Status
 
@@ -242,7 +253,7 @@ relayed opaquely in both cases; the proxy does not decode or log them.
 
 ### Error Codes
 
-See [Protocol Overview - Error Codes](/components/kerbside/protocol-overview/#error-codes) for the
+See [Protocol Overview - Error Codes](/components/kerbside/spice/protocol-overview/#error-codes) for the
 complete list of SPICE link error codes.
 
 ### Common Capabilities

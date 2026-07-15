@@ -202,14 +202,6 @@ nav:
             - "Console Sources": components/kerbside/console-sources.md
             - "Database Schema": components/kerbside/schema.md
             - "Kerbside Proxy Architecture": components/kerbside/proxy-architecture.md
-            - "Keyboard Scancodes": components/kerbside/scancodes.md
-            - "SPICE Capabilities": components/kerbside/capabilities.md
-            - "SPICE Channel Protocols": components/kerbside/channel-protocols.md
-            - "SPICE Compression Protocols": components/kerbside/compression-protocols.md
-            - "SPICE Link Protocol": components/kerbside/spice-link-protocol.md
-            - "SPICE Protocol Overview": components/kerbside/protocol-overview.md
-            - "USB Redirection Protocol": components/kerbside/usb-redirection.md
-            - "VD Agent Protocol": components/kerbside/vd-agent-protocol.md
             - Plans:
                 - "Plans index": components/kerbside/plans/index.md
                 - "Automated SPICE test harness": components/kerbside/plans/PLAN-test-harness.md
@@ -230,6 +222,16 @@ nav:
                 - "Rust proxy phase 7: CI lane + loadtest": components/kerbside/plans/PLAN-rust-proxy-phase-07-ci.md
                 - "Rust proxy phase 8: cutover (Rust is the only proxy)": components/kerbside/plans/PLAN-rust-proxy-phase-08-cutover.md
                 - "Rust SPICE proxy (kerbside-proxy)": components/kerbside/plans/PLAN-rust-proxy.md
+            - Spice:
+                - "console.vv Extensions and Interpretations": components/kerbside/spice/console-vv-extensions.md
+                - "Keyboard Scancodes": components/kerbside/spice/scancodes.md
+                - "SPICE Capabilities": components/kerbside/spice/capabilities.md
+                - "SPICE Channel Protocols": components/kerbside/spice/channel-protocols.md
+                - "SPICE Compression Protocols": components/kerbside/spice/compression-protocols.md
+                - "SPICE Link Protocol": components/kerbside/spice/spice-link-protocol.md
+                - "SPICE Protocol Overview": components/kerbside/spice/protocol-overview.md
+                - "USB Redirection Protocol": components/kerbside/spice/usb-redirection.md
+                - "VD Agent Protocol": components/kerbside/spice/vd-agent-protocol.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md

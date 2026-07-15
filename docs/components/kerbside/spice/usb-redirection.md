@@ -589,5 +589,5 @@ security monitoring purposes.
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level protocol introduction
-- [Channel Protocols](/components/kerbside/channel-protocols/) - Per-channel message formats
+- [Protocol Overview](/components/kerbside/spice/protocol-overview/) - High-level protocol introduction
+- [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Per-channel message formats

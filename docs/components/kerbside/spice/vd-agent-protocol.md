@@ -372,5 +372,5 @@ agent communication.
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level SPICE protocol
-- [Channel Protocols](/components/kerbside/channel-protocols/) - Main channel message details
+- [Protocol Overview](/components/kerbside/spice/protocol-overview/) - High-level SPICE protocol
+- [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Main channel message details
