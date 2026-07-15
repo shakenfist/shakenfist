@@ -145,6 +145,35 @@ class CleanerTestCase(base.ShakenFistTestCase):
                 state, inst_attrs.power_state['power_state'],
                 f'State for instance "{name}" does not match "{state}"')
 
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_update_power_states_pets_watchdog(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists):
+        """The per-domain loops must pet the systemd watchdog.
+
+        The cleaner runs this outside its idle() loop, so without an
+        explicit pet a busy pass over many domains overruns the 60s
+        systemd watchdog and systemd SIGABRTs the cleaner mid-operation,
+        stranding the placement lock it holds.
+        """
+        global _test_instance_uuids
+
+        instance_uuids = {}
+        for name in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
+            inst = self.mock_etcd.create_instance(
+                name, set_state=instance.Instance.STATE_CREATED)
+            instance_uuids[name] = str(inst.uuid)
+        _test_instance_uuids = instance_uuids
+
+        pet = mock.Mock()
+        cleaner_st.update_power_states(pet)
+
+        self.assertTrue(
+            pet.called,
+            'update_power_states must pet the watchdog while iterating domains')
+
 
 class CleanerCrashedInstanceTestCase(CleanerTestCase):
     @mock.patch(

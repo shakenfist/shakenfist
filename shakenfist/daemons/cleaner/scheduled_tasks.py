@@ -88,7 +88,17 @@ def _delete_with_kill(instance_uuid, inst):
 
 
 @util_general.recorded_method
-def update_power_states():
+def update_power_states(pet_watchdog=None):
+    # The cleaner runs this as a scheduled task from outside its idle() loop,
+    # so the base watchdog pet does not fire while we are in here. On a busy
+    # node the per-domain loops below perform database and lock operations
+    # (notably place_instance) for every instance and can run longer than the
+    # 60s systemd watchdog, which would have systemd SIGABRT a busy-but-healthy
+    # cleaner mid-operation and strand the placement lock it holds. Pet
+    # explicitly per domain. The pet is internally rate-limited (~10s), so
+    # calling it every iteration is cheap.
+    pet = pet_watchdog or (lambda: None)
+
     with util_libvirt.LibvirtConnection() as lc:
         try:
             seen = []
@@ -96,6 +106,7 @@ def update_power_states():
             # Active VMs have an ID. Active means running in libvirt
             # land.
             for domain in lc.get_sf_domains():
+                pet()
                 instance_uuid = domain.name().split(':')[1]
                 log_ctx = LOG.with_fields({'instance': instance_uuid})
                 log_ctx.debug('Instance is running')
@@ -154,6 +165,7 @@ def update_power_states():
             # in our state system.
             all_libvirt_uuids = []
             for domain in lc.get_all_domains():
+                pet()
                 domain_name = domain.name()
                 all_libvirt_uuids.append(domain.UUIDString())
 
@@ -233,6 +245,7 @@ def update_power_states():
         libvirt_profile_path = '/etc/apparmor.d/libvirt'
         if os.path.exists(libvirt_profile_path):
             for ent in os.listdir(libvirt_profile_path):
+                pet()
                 if not ent.startswith('libvirt-'):
                     continue
                 if len(ent) not in [44, 50]:
