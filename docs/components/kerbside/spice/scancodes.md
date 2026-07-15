@@ -288,10 +288,10 @@ o release: [0x98]           (O up)
 
 - [MDN Keyboard Event Code Values](https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values)
 - [spice-html5 scancode mapping](https://gitlab.freedesktop.org/nicholasbishop/nicholasbishop-spice-html5/-/blob/main/src/code_to_scancode.js)
-- [Inputs Channel Protocol](/components/kerbside/channel-protocols/#inputs-channel-type-3)
+- [Inputs Channel Protocol](/components/kerbside/spice/channel-protocols/#inputs-channel-type-3)
 
 ## Related Documentation
 
-- [Channel Protocols](/components/kerbside/channel-protocols/) - Inputs channel message formats
-- [Capabilities](/components/kerbside/capabilities/) - KeyScancode capability negotiation
-- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level SPICE protocol
+- [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Inputs channel message formats
+- [Capabilities](/components/kerbside/spice/capabilities/) - KeyScancode capability negotiation
+- [Protocol Overview](/components/kerbside/spice/protocol-overview/) - High-level SPICE protocol

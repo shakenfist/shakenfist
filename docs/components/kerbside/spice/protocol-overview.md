@@ -248,6 +248,6 @@ Certain message types are shared across all channels:
 
 ## Related Documentation
 
-- [Link Protocol](/components/kerbside/spice-link-protocol/) - Connection handshake details
-- [Channel Protocols](/components/kerbside/channel-protocols/) - Per-channel message formats
-- [USB Redirection](/components/kerbside/usb-redirection/) - USB device redirection protocol
+- [Link Protocol](/components/kerbside/spice/spice-link-protocol/) - Connection handshake details
+- [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Per-channel message formats
+- [USB Redirection](/components/kerbside/spice/usb-redirection/) - USB device redirection protocol

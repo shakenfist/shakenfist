@@ -2,7 +2,7 @@
 
 This document describes the message formats for each SPICE channel type. All
 messages follow the standard header format described in the
-[Protocol Overview](/components/kerbside/protocol-overview/).
+[Protocol Overview](/components/kerbside/spice/protocol-overview/).
 
 **Note**: Message IDs documented here match the constants in the ryll
 `shakenfist-spice-protocol` crate that the Rust proxy uses (and from which
@@ -21,6 +21,47 @@ Offset  Size  Type    Field
 2       4     uint32  message_size (payload length)
 6+      var   bytes   payload
 ```
+
+## Channel Liveness and Disconnection
+
+The SPICE protocol does not include an application-layer keepalive
+beyond server-initiated PING / client PONG. The server
+(qemu/spice-server) runs a per-channel "rcc" liveness timer; if a
+channel goes more than 30 s without receiving any client message
+the rcc is torn down. This produces a log entry on the host:
+
+```
+kvm: warning: Spice: <channel>:<n> (...): rcc <addr> has been
+unresponsive for more than 30000 ms, disconnecting
+```
+
+The check counts any received client message, including PONG.
+Clients therefore only need to remain responsive to server PINGs —
+there is no requirement to send proactive client-initiated PINGs,
+and no client-side message type for that purpose exists.
+
+Reference clients (spice-gtk, virt-viewer, ryll) defend against
+network-stack-level liveness failures with TCP keepalives at the OS
+level:
+
+| Setting          | Value |
+|------------------|-------|
+| `SO_KEEPALIVE`   | enabled |
+| `TCP_KEEPIDLE`   | 30 s |
+| `TCP_KEEPINTVL`  | 15 s |
+| `TCP_KEEPCNT`    | 3 |
+
+Reference: `spice-gtk/src/spice-session.c:2300`,
+`spice-gtk/src/spice-channel.c:2606`. These are kernel-level
+probes; they do not generate SPICE messages and therefore do not
+satisfy the server's rcc check on their own. They only detect a
+half-open connection promptly when the client cannot reach the
+server.
+
+When a channel disconnects (whether via the rcc timeout, a TCP
+RST/FIN, or the client sending a `DISCONNECTING` message), the
+session implications depend on the authentication model — see
+[Channel Lifecycle Under Ticket Auth](/components/kerbside/spice/spice-link-protocol/#channel-lifecycle-under-ticket-auth).
 
 ## Main Channel (Type 1)
 
@@ -292,7 +333,7 @@ Offset  Size  Type    Field
 ## Inputs Channel (Type 3)
 
 The inputs channel handles keyboard and mouse input from client to server.
-See [Keyboard Scancodes](/components/kerbside/scancodes/) for a complete scancode reference.
+See [Keyboard Scancodes](/components/kerbside/spice/scancodes/) for a complete scancode reference.
 
 ### Client to Server Messages
 
@@ -532,7 +573,7 @@ Offset  Size  Type    Field
 ```
 
 For detailed VMC/USB redirection message formats, see
-[USB Redirection](/components/kerbside/usb-redirection/).
+[USB Redirection](/components/kerbside/spice/usb-redirection/).
 
 ## Common Message Details
 
@@ -905,7 +946,7 @@ Drawing commands use raster operation flags to control how pixels are combined:
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level protocol introduction
-- [Link Protocol](/components/kerbside/spice-link-protocol/) - Connection handshake details
-- [USB Redirection](/components/kerbside/usb-redirection/) - USB device redirection protocol
-- [VD Agent Protocol](/components/kerbside/vd-agent-protocol/) - Guest agent for clipboard and file transfer
+- [Protocol Overview](/components/kerbside/spice/protocol-overview/) - High-level protocol introduction
+- [Link Protocol](/components/kerbside/spice/spice-link-protocol/) - Connection handshake details
+- [USB Redirection](/components/kerbside/spice/usb-redirection/) - USB device redirection protocol
+- [VD Agent Protocol](/components/kerbside/spice/vd-agent-protocol/) - Guest agent for clipboard and file transfer

@@ -423,6 +423,6 @@ channels (main, display, inputs, cursor) torn down by a single
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview/) - SPICE protocol introduction
-- [Link Protocol](/components/kerbside/spice-link-protocol/) - Connection handshake details
-- [Channel Protocols](/components/kerbside/channel-protocols/) - Per-channel message formats
+- [Protocol Overview](/components/kerbside/spice/protocol-overview/) - SPICE protocol introduction
+- [Link Protocol](/components/kerbside/spice/spice-link-protocol/) - Connection handshake details
+- [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Per-channel message formats

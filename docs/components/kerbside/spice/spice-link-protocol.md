@@ -127,7 +127,7 @@ Offset  Size  Type    Field
 
 **error** (4 bytes)
 : Error code. 0 indicates success. See
-  [Protocol Overview - Error Codes](/components/kerbside/protocol-overview/#error-codes) for the
+  [Protocol Overview - Error Codes](/components/kerbside/spice/protocol-overview/#error-codes) for the
   complete list.
 
 **pubkey** (162 bytes)
@@ -258,6 +258,60 @@ instead of static VM passwords:
 4. **Console Lookup**: Valid tokens are mapped to specific VM consoles,
    allowing Kerbside to establish the correct backend connection.
 
+## Channel Lifecycle Under Ticket Auth
+
+The SPICE server validates the authentication ticket on **every
+channel link establishment**, not just the first. From the
+reference implementation (`spice/server/reds.cpp:2098`):
+
+```cpp
+ltime = spice_get_monotonic_time_ns() / NSEC_PER_SEC;
+expired = (reds->config->taTicket.expiration_time < ltime);
+if (expired) {
+    spice_warning("Ticket has expired");
+    goto error;
+}
+```
+
+Combined with Kerbside's one-time-use, time-limited token model,
+this has an important consequence:
+
+**A channel that drops mid-session is permanently lost.**
+Re-establishing the channel requires presenting a valid, unconsumed
+token to the server. Under Kerbside's auth model:
+
+- The token is invalidated on first use (see "Token Validation"
+  above).
+- Even if it weren't, its expiry is short by design.
+
+So if a session establishes (say) main + display + inputs + cursor
++ playback + usbredir at connection bring-up, and the playback
+channel later drops due to a transport hiccup, the user permanently
+loses audio for that session. The remaining channels continue to
+function, but no existing client implements per-channel re-attach
+against a fresh token.
+
+The reference client (spice-gtk) reflects this: its
+`SPICE_CHANNEL_STATE_RECONNECTING` machinery at
+`spice-channel.c:1987,2743-2746` is invoked only for the
+secured-port TLS upgrade dance, not for transport-loss recovery.
+spice-gtk has no "channel dropped, retry" path.
+
+### Implications for proxies
+
+A proxy (Kerbside) cannot transparently re-establish a dropped
+channel on behalf of the client without being given a fresh
+token — and the client does not have one. The user-visible recovery
+path is to reconnect the entire session: fetch a new token from
+the API, present it to a fresh proxy connection, and re-run the
+link protocol from scratch on every channel.
+
+This means clients should treat any per-channel disconnect as a
+diagnostic event worth recording, even when the *session* survives
+(e.g. a non-critical channel like playback or usbredir dropping
+while main + display + inputs continue): the user has silently lost
+that capability for the rest of the session.
+
 ## TLS/SSL Requirements
 
 Kerbside enforces TLS for all client connections:
@@ -382,5 +436,5 @@ repository).
 
 ## Related Documentation
 
-- [Protocol Overview](/components/kerbside/protocol-overview/) - High-level protocol introduction
-- [Channel Protocols](/components/kerbside/channel-protocols/) - Per-channel message formats
+- [Protocol Overview](/components/kerbside/spice/protocol-overview/) - High-level protocol introduction
+- [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Per-channel message formats
