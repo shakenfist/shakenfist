@@ -10,31 +10,27 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/cloudgood/networking-shakenfist/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-ci-node-exec-assertions/">
       
       
-        <link rel="prev" href="../virtual-networking/">
-      
-      
-        <link rel="next" href="../neutron-linuxbridge/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Shaken Fist networking - Shaken Fist</title>
+        <title>CI node-exec assertions and floating / network lifecycle tests - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
   
@@ -74,9 +70,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -101,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#shaken-fist-networking" class="md-skip">
+        <a href="#ci-node-exec-assertions-and-floating-network-lifecycle-tests" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +113,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -137,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Shaken Fist networking
+              CI node-exec assertions and floating / network lifecycle tests
             
           </span>
         </div>
@@ -253,7 +249,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -283,7 +279,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -310,7 +306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../manifesto/" class="md-nav__link">
+      <a href="../../manifesto/" class="md-nav__link">
         
   
   
@@ -334,20 +330,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -368,7 +362,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -386,7 +380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../overview/" class="md-nav__link">
+      <a href="../../components/overview/" class="md-nav__link">
         
   
   
@@ -411,20 +405,18 @@
                 
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
         
           
           <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
@@ -445,7 +437,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -463,7 +455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../components/cloudgood/" class="md-nav__link">
         
   
   
@@ -491,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../technology-primer/" class="md-nav__link">
+      <a href="../../components/cloudgood/technology-primer/" class="md-nav__link">
         
   
   
@@ -519,7 +511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../fundamentals/" class="md-nav__link">
+      <a href="../../components/cloudgood/fundamentals/" class="md-nav__link">
         
   
   
@@ -547,7 +539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../virtualization-history/" class="md-nav__link">
+      <a href="../../components/cloudgood/virtualization-history/" class="md-nav__link">
         
   
   
@@ -575,7 +567,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../memory-mapped-devices/" class="md-nav__link">
+      <a href="../../components/cloudgood/memory-mapped-devices/" class="md-nav__link">
         
   
   
@@ -603,7 +595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../instance-video/" class="md-nav__link">
+      <a href="../../components/cloudgood/instance-video/" class="md-nav__link">
         
   
   
@@ -631,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../virtual-networking/" class="md-nav__link">
+      <a href="../../components/cloudgood/virtual-networking/" class="md-nav__link">
         
   
   
@@ -656,37 +648,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Shaken Fist networking
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../components/cloudgood/networking-shakenfist/" class="md-nav__link">
         
   
   
@@ -702,214 +667,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-bridge-per-network-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The bridge-per-network model
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#naming-conventions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Naming conventions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-a-network-looks-like-on-the-wire" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What a network looks like on the wire
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What a network looks like on the wire">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#before-any-networks-exist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before any networks exist
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#after-creating-a-network" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        After creating a network
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#after-adding-instances" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        After adding instances
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-network-namespace" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The network namespace
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="The network namespace">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#router" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Router
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#nat-gateway" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        NAT gateway
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dhcp-and-dns-server" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DHCP and DNS server
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#floating-ips" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Floating IPs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#routed-ips" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Routed IPs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-vxlan-mesh" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The VXLAN mesh
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#network-node-vs-hypervisor-node" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Network node vs hypervisor node
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bridge-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bridge configuration
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-cost-of-simplicity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The cost of simplicity
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -922,7 +679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../neutron-linuxbridge/" class="md-nav__link">
+      <a href="../../components/cloudgood/neutron-linuxbridge/" class="md-nav__link">
         
   
   
@@ -950,7 +707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../neutron-legacy/" class="md-nav__link">
+      <a href="../../components/cloudgood/neutron-legacy/" class="md-nav__link">
         
   
   
@@ -1033,7 +790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agent-python/" class="md-nav__link">
+      <a href="../../components/agent-python/" class="md-nav__link">
         
   
   
@@ -1061,7 +818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agent-python/developer-guide/" class="md-nav__link">
+      <a href="../../components/agent-python/developer-guide/" class="md-nav__link">
         
   
   
@@ -1089,7 +846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agent-python/protocol/" class="md-nav__link">
+      <a href="../../components/agent-python/protocol/" class="md-nav__link">
         
   
   
@@ -1172,7 +929,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/" class="md-nav__link">
+      <a href="../../components/clingwrap/" class="md-nav__link">
         
   
   
@@ -1200,7 +957,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/command-types/" class="md-nav__link">
+      <a href="../../components/clingwrap/command-types/" class="md-nav__link">
         
   
   
@@ -1228,7 +985,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/configuration/" class="md-nav__link">
+      <a href="../../components/clingwrap/configuration/" class="md-nav__link">
         
   
   
@@ -1256,7 +1013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/examples/" class="md-nav__link">
+      <a href="../../components/clingwrap/examples/" class="md-nav__link">
         
   
   
@@ -1284,7 +1041,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/installation/" class="md-nav__link">
+      <a href="../../components/clingwrap/installation/" class="md-nav__link">
         
   
   
@@ -1367,7 +1124,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/index.md" class="md-nav__link">
+      <a href="../../components/development/index.md" class="md-nav__link">
         
   
   
@@ -1395,7 +1152,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/automated-pr-review/" class="md-nav__link">
+      <a href="../../components/development/automated-pr-review/" class="md-nav__link">
         
   
   
@@ -1423,7 +1180,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/ci-review-automation/" class="md-nav__link">
+      <a href="../../components/development/ci-review-automation/" class="md-nav__link">
         
   
   
@@ -1451,7 +1208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/code-review-tracking/" class="md-nav__link">
+      <a href="../../components/development/code-review-tracking/" class="md-nav__link">
         
   
   
@@ -1479,7 +1236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/release-automation/" class="md-nav__link">
+      <a href="../../components/development/release-automation/" class="md-nav__link">
         
   
   
@@ -1554,7 +1311,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+      <a href="../../components/development/plans/PLAN-code-review-tracking/" class="md-nav__link">
         
   
   
@@ -1582,7 +1339,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+      <a href="../../components/development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
         
   
   
@@ -1673,7 +1430,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/" class="md-nav__link">
+      <a href="../../components/instar/" class="md-nav__link">
         
   
   
@@ -1701,7 +1458,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/amend/" class="md-nav__link">
+      <a href="../../components/instar/amend/" class="md-nav__link">
         
   
   
@@ -1729,7 +1486,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/bitmap/" class="md-nav__link">
+      <a href="../../components/instar/bitmap/" class="md-nav__link">
         
   
   
@@ -1757,7 +1514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/commit/" class="md-nav__link">
+      <a href="../../components/instar/commit/" class="md-nav__link">
         
   
   
@@ -1785,7 +1542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/create/" class="md-nav__link">
+      <a href="../../components/instar/create/" class="md-nav__link">
         
   
   
@@ -1813,7 +1570,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/dd/" class="md-nav__link">
+      <a href="../../components/instar/dd/" class="md-nav__link">
         
   
   
@@ -1841,7 +1598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/map/" class="md-nav__link">
+      <a href="../../components/instar/map/" class="md-nav__link">
         
   
   
@@ -1869,7 +1626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/measure/" class="md-nav__link">
+      <a href="../../components/instar/measure/" class="md-nav__link">
         
   
   
@@ -1897,7 +1654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/rebase/" class="md-nav__link">
+      <a href="../../components/instar/rebase/" class="md-nav__link">
         
   
   
@@ -1925,7 +1682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/resize/" class="md-nav__link">
+      <a href="../../components/instar/resize/" class="md-nav__link">
         
   
   
@@ -1953,7 +1710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/snapshot/" class="md-nav__link">
+      <a href="../../components/instar/snapshot/" class="md-nav__link">
         
   
   
@@ -1981,7 +1738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/openstack-announcement-email/" class="md-nav__link">
+      <a href="../../components/instar/openstack-announcement-email/" class="md-nav__link">
         
   
   
@@ -2009,7 +1766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/chain-discovery/" class="md-nav__link">
+      <a href="../../components/instar/chain-discovery/" class="md-nav__link">
         
   
   
@@ -2037,7 +1794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/chain-config/" class="md-nav__link">
+      <a href="../../components/instar/chain-config/" class="md-nav__link">
         
   
   
@@ -2065,7 +1822,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/configuration/" class="md-nav__link">
+      <a href="../../components/instar/configuration/" class="md-nav__link">
         
   
   
@@ -2093,7 +1850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/format-detection-safety/" class="md-nav__link">
+      <a href="../../components/instar/format-detection-safety/" class="md-nav__link">
         
   
   
@@ -2121,7 +1878,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/format-coverage/" class="md-nav__link">
+      <a href="../../components/instar/format-coverage/" class="md-nav__link">
         
   
   
@@ -2149,7 +1906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/security/" class="md-nav__link">
+      <a href="../../components/instar/security/" class="md-nav__link">
         
   
   
@@ -2177,7 +1934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/bench/" class="md-nav__link">
+      <a href="../../components/instar/bench/" class="md-nav__link">
         
   
   
@@ -2205,7 +1962,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/testing/" class="md-nav__link">
+      <a href="../../components/instar/testing/" class="md-nav__link">
         
   
   
@@ -2233,7 +1990,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/output-formats/" class="md-nav__link">
+      <a href="../../components/instar/output-formats/" class="md-nav__link">
         
   
   
@@ -2261,7 +2018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/quirks/" class="md-nav__link">
+      <a href="../../components/instar/quirks/" class="md-nav__link">
         
   
   
@@ -2289,7 +2046,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/usage/" class="md-nav__link">
+      <a href="../../components/instar/usage/" class="md-nav__link">
         
   
   
@@ -2317,7 +2074,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/security-audits/" class="md-nav__link">
+      <a href="../../components/instar/security-audits/" class="md-nav__link">
         
   
   
@@ -2345,7 +2102,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/technology-primer/" class="md-nav__link">
+      <a href="../../components/instar/technology-primer/" class="md-nav__link">
         
   
   
@@ -2373,7 +2130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/rust-rationale/" class="md-nav__link">
+      <a href="../../components/instar/rust-rationale/" class="md-nav__link">
         
   
   
@@ -2448,7 +2205,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/commentary/" class="md-nav__link">
+      <a href="../../components/instar/commentary/" class="md-nav__link">
         
   
   
@@ -2476,7 +2233,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/commentary/architectural-decisions/" class="md-nav__link">
+      <a href="../../components/instar/commentary/architectural-decisions/" class="md-nav__link">
         
   
   
@@ -2504,7 +2261,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/commentary/reading-order/" class="md-nav__link">
+      <a href="../../components/instar/commentary/reading-order/" class="md-nav__link">
         
   
   
@@ -2587,7 +2344,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/crates/guest-protocol/" class="md-nav__link">
+      <a href="../../components/instar/crates/guest-protocol/" class="md-nav__link">
         
   
   
@@ -2670,7 +2427,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/image_notes/cirros-qcow2/" class="md-nav__link">
+      <a href="../../components/instar/image_notes/cirros-qcow2/" class="md-nav__link">
         
   
   
@@ -2698,7 +2455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/image_notes/" class="md-nav__link">
+      <a href="../../components/instar/image_notes/" class="md-nav__link">
         
   
   
@@ -2726,7 +2483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/image_notes/qcow2-v2/" class="md-nav__link">
+      <a href="../../components/instar/image_notes/qcow2-v2/" class="md-nav__link">
         
   
   
@@ -2754,7 +2511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/image_notes/virtualpc-vhd/" class="md-nav__link">
+      <a href="../../components/instar/image_notes/virtualpc-vhd/" class="md-nav__link">
         
   
   
@@ -2837,7 +2594,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/" class="md-nav__link">
+      <a href="../../components/instar/plans/" class="md-nav__link">
         
   
   
@@ -2865,7 +2622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-distro-matrix-ci/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-distro-matrix-ci/" class="md-nav__link">
         
   
   
@@ -2893,7 +2650,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-release-v0.2/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-release-v0.2/" class="md-nav__link">
         
   
   
@@ -2921,7 +2678,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-release/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-release/" class="md-nav__link">
         
   
   
@@ -2949,7 +2706,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-audit/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-audit/" class="md-nav__link">
         
   
   
@@ -2977,7 +2734,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-coverage-fuzzing/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-coverage-fuzzing/" class="md-nav__link">
         
   
   
@@ -3005,7 +2762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-fuzz-autofix/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-fuzz-autofix/" class="md-nav__link">
         
   
   
@@ -3033,7 +2790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-convert-followups/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-convert-followups/" class="md-nav__link">
         
   
   
@@ -3061,7 +2818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-measure/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-measure/" class="md-nav__link">
         
   
   
@@ -3089,7 +2846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-create/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-create/" class="md-nav__link">
         
   
   
@@ -3117,7 +2874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-resize/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-resize/" class="md-nav__link">
         
   
   
@@ -3145,7 +2902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-rebase-commit/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-rebase-commit/" class="md-nav__link">
         
   
   
@@ -3173,7 +2930,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-map/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-map/" class="md-nav__link">
         
   
   
@@ -3201,7 +2958,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-snapshot/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-snapshot/" class="md-nav__link">
         
   
   
@@ -3229,7 +2986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-check-repair/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-check-repair/" class="md-nav__link">
         
   
   
@@ -3257,7 +3014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-fuzzing-bugs/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-fuzzing-bugs/" class="md-nav__link">
         
   
   
@@ -3285,7 +3042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-bug-fixes/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-bug-fixes/" class="md-nav__link">
         
   
   
@@ -3313,7 +3070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-amend/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-amend/" class="md-nav__link">
         
   
   
@@ -3341,7 +3098,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-dd/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-dd/" class="md-nav__link">
         
   
   
@@ -3369,7 +3126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-bitmap/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-bitmap/" class="md-nav__link">
         
   
   
@@ -3397,7 +3154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-bench/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-bench/" class="md-nav__link">
         
   
   
@@ -3425,7 +3182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-bench-refcount-growth/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-bench-refcount-growth/" class="md-nav__link">
         
   
   
@@ -3453,7 +3210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
+      <a href="../../components/instar/plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
         
   
   
@@ -3536,7 +3293,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/building-with-docker/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/building-with-docker/" class="md-nav__link">
         
   
   
@@ -3564,7 +3321,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-comparison/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-comparison/" class="md-nav__link">
         
   
   
@@ -3592,7 +3349,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-direct-memory/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-direct-memory/" class="md-nav__link">
         
   
   
@@ -3620,7 +3377,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/kvm/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/kvm/" class="md-nav__link">
         
   
   
@@ -3648,7 +3405,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/kvm-hello-world2/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/kvm-hello-world2/" class="md-nav__link">
         
   
   
@@ -3676,7 +3433,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/kvm-hello-world/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/kvm-hello-world/" class="md-nav__link">
         
   
   
@@ -3704,7 +3461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/performance-counters/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/performance-counters/" class="md-nav__link">
         
   
   
@@ -3732,7 +3489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-other/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-other/" class="md-nav__link">
         
   
   
@@ -3760,7 +3517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-virtio-block/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-virtio-block/" class="md-nav__link">
         
   
   
@@ -3788,7 +3545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block/" class="md-nav__link">
         
   
   
@@ -3816,7 +3573,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block2/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block2/" class="md-nav__link">
         
   
   
@@ -3844,7 +3601,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block3/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block3/" class="md-nav__link">
         
   
   
@@ -3872,7 +3629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block4/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block4/" class="md-nav__link">
         
   
   
@@ -3900,7 +3657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/virtio-block5/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/virtio-block5/" class="md-nav__link">
         
   
   
@@ -3928,7 +3685,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
+      <a href="../../components/instar/prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
         
   
   
@@ -4011,7 +3768,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-compression/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-compression/" class="md-nav__link">
         
   
   
@@ -4039,7 +3796,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-encryption/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-encryption/" class="md-nav__link">
         
   
   
@@ -4067,7 +3824,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-format/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-format/" class="md-nav__link">
         
   
   
@@ -4095,7 +3852,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-implementation-notes/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-implementation-notes/" class="md-nav__link">
         
   
   
@@ -4123,7 +3880,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-l1l2-tables/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-l1l2-tables/" class="md-nav__link">
         
   
   
@@ -4151,7 +3908,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-refcount/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-refcount/" class="md-nav__link">
         
   
   
@@ -4179,7 +3936,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-snapshots/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-snapshots/" class="md-nav__link">
         
   
   
@@ -4207,7 +3964,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/qcow2/qcow2-write-planner/" class="md-nav__link">
+      <a href="../../components/instar/qcow2/qcow2-write-planner/" class="md-nav__link">
         
   
   
@@ -4290,7 +4047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/raw/raw-format/" class="md-nav__link">
+      <a href="../../components/instar/raw/raw-format/" class="md-nav__link">
         
   
   
@@ -4373,7 +4130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/vmdk/vmdk-compression/" class="md-nav__link">
+      <a href="../../components/instar/vmdk/vmdk-compression/" class="md-nav__link">
         
   
   
@@ -4401,7 +4158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/vmdk/vmdk-extents/" class="md-nav__link">
+      <a href="../../components/instar/vmdk/vmdk-extents/" class="md-nav__link">
         
   
   
@@ -4429,7 +4186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/vmdk/vmdk-format/" class="md-nav__link">
+      <a href="../../components/instar/vmdk/vmdk-format/" class="md-nav__link">
         
   
   
@@ -4457,7 +4214,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instar/vmdk/vmdk-grain-tables/" class="md-nav__link">
+      <a href="../../components/instar/vmdk/vmdk-grain-tables/" class="md-nav__link">
         
   
   
@@ -4548,7 +4305,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/" class="md-nav__link">
+      <a href="../../components/kerbside/" class="md-nav__link">
         
   
   
@@ -4576,7 +4333,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/configuration/" class="md-nav__link">
+      <a href="../../components/kerbside/configuration/" class="md-nav__link">
         
   
   
@@ -4604,7 +4361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/console-sources/" class="md-nav__link">
+      <a href="../../components/kerbside/console-sources/" class="md-nav__link">
         
   
   
@@ -4632,7 +4389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/schema/" class="md-nav__link">
+      <a href="../../components/kerbside/schema/" class="md-nav__link">
         
   
   
@@ -4660,7 +4417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/proxy-architecture/" class="md-nav__link">
+      <a href="../../components/kerbside/proxy-architecture/" class="md-nav__link">
         
   
   
@@ -4688,7 +4445,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/scancodes/" class="md-nav__link">
+      <a href="../../components/kerbside/scancodes/" class="md-nav__link">
         
   
   
@@ -4716,7 +4473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/capabilities/" class="md-nav__link">
+      <a href="../../components/kerbside/capabilities/" class="md-nav__link">
         
   
   
@@ -4744,7 +4501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/channel-protocols/" class="md-nav__link">
+      <a href="../../components/kerbside/channel-protocols/" class="md-nav__link">
         
   
   
@@ -4772,7 +4529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/compression-protocols/" class="md-nav__link">
+      <a href="../../components/kerbside/compression-protocols/" class="md-nav__link">
         
   
   
@@ -4800,7 +4557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice-link-protocol/" class="md-nav__link">
+      <a href="../../components/kerbside/spice-link-protocol/" class="md-nav__link">
         
   
   
@@ -4828,7 +4585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/protocol-overview/" class="md-nav__link">
+      <a href="../../components/kerbside/protocol-overview/" class="md-nav__link">
         
   
   
@@ -4856,7 +4613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/usb-redirection/" class="md-nav__link">
+      <a href="../../components/kerbside/usb-redirection/" class="md-nav__link">
         
   
   
@@ -4884,7 +4641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/vd-agent-protocol/" class="md-nav__link">
+      <a href="../../components/kerbside/vd-agent-protocol/" class="md-nav__link">
         
   
   
@@ -4959,7 +4716,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/" class="md-nav__link">
         
   
   
@@ -4987,7 +4744,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness/" class="md-nav__link">
         
   
   
@@ -5015,7 +4772,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
   
@@ -5043,7 +4800,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
         
   
   
@@ -5071,7 +4828,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
   
@@ -5099,7 +4856,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
         
   
   
@@ -5127,7 +4884,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
         
   
   
@@ -5155,7 +4912,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
         
   
   
@@ -5183,7 +4940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
         
   
   
@@ -5211,7 +4968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
         
   
   
@@ -5239,7 +4996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
   
@@ -5267,7 +5024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
         
   
   
@@ -5295,7 +5052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
         
   
   
@@ -5323,7 +5080,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
         
   
   
@@ -5351,7 +5108,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
         
   
   
@@ -5379,7 +5136,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
         
   
   
@@ -5407,7 +5164,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
         
   
   
@@ -5435,7 +5192,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
         
   
   
@@ -5463,7 +5220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
+      <a href="../../components/kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
         
   
   
@@ -5554,7 +5311,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/" class="md-nav__link">
+      <a href="../../components/occystrap/" class="md-nav__link">
         
   
   
@@ -5582,7 +5339,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/command-reference/" class="md-nav__link">
+      <a href="../../components/occystrap/command-reference/" class="md-nav__link">
         
   
   
@@ -5610,7 +5367,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/docker-tarball-formats/" class="md-nav__link">
+      <a href="../../components/occystrap/docker-tarball-formats/" class="md-nav__link">
         
   
   
@@ -5638,7 +5395,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/installation/" class="md-nav__link">
+      <a href="../../components/occystrap/installation/" class="md-nav__link">
         
   
   
@@ -5666,7 +5423,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/performance/" class="md-nav__link">
+      <a href="../../components/occystrap/performance/" class="md-nav__link">
         
   
   
@@ -5694,7 +5451,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/pipeline/" class="md-nav__link">
+      <a href="../../components/occystrap/pipeline/" class="md-nav__link">
         
   
   
@@ -5722,7 +5479,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/tar-format-selection/" class="md-nav__link">
+      <a href="../../components/occystrap/tar-format-selection/" class="md-nav__link">
         
   
   
@@ -5750,7 +5507,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/use-cases/" class="md-nav__link">
+      <a href="../../components/occystrap/use-cases/" class="md-nav__link">
         
   
   
@@ -5825,7 +5582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/" class="md-nav__link">
         
   
   
@@ -5853,7 +5610,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
         
   
   
@@ -5881,7 +5638,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-info-check/" class="md-nav__link">
         
   
   
@@ -5909,7 +5666,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
         
   
   
@@ -5937,7 +5694,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
         
   
   
@@ -5965,7 +5722,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
         
   
   
@@ -5993,7 +5750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
         
   
   
@@ -6021,7 +5778,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
         
   
   
@@ -6049,7 +5806,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
         
   
   
@@ -6077,7 +5834,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
         
   
   
@@ -6105,7 +5862,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
         
   
   
@@ -6133,7 +5890,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
         
   
   
@@ -6161,7 +5918,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
         
   
   
@@ -6189,7 +5946,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
         
   
   
@@ -6217,7 +5974,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
         
   
   
@@ -6245,7 +6002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
         
   
   
@@ -6273,7 +6030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
         
   
   
@@ -6301,7 +6058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
         
   
   
@@ -6329,7 +6086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
         
   
   
@@ -6357,7 +6114,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
         
   
   
@@ -6385,7 +6142,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
+      <a href="../../components/occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
         
   
   
@@ -6476,7 +6233,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/" class="md-nav__link">
+      <a href="../../components/ryll/" class="md-nav__link">
         
   
   
@@ -6504,7 +6261,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/portability/" class="md-nav__link">
+      <a href="../../components/ryll/portability/" class="md-nav__link">
         
   
   
@@ -6532,7 +6289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/development-macos/" class="md-nav__link">
+      <a href="../../components/ryll/development-macos/" class="md-nav__link">
         
   
   
@@ -6560,7 +6317,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/channel-diagnostics-audit/" class="md-nav__link">
+      <a href="../../components/ryll/channel-diagnostics-audit/" class="md-nav__link">
         
   
   
@@ -6588,7 +6345,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/configuration/" class="md-nav__link">
+      <a href="../../components/ryll/configuration/" class="md-nav__link">
         
   
   
@@ -6616,7 +6373,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/control-socket-protocol/" class="md-nav__link">
+      <a href="../../components/ryll/control-socket-protocol/" class="md-nav__link">
         
   
   
@@ -6644,7 +6401,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/installation/" class="md-nav__link">
+      <a href="../../components/ryll/installation/" class="md-nav__link">
         
   
   
@@ -6672,7 +6429,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/TOKIO-WEDGING/" class="md-nav__link">
+      <a href="../../components/ryll/TOKIO-WEDGING/" class="md-nav__link">
         
   
   
@@ -6700,7 +6457,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/libvirt-spice-recommendations/" class="md-nav__link">
+      <a href="../../components/ryll/libvirt-spice-recommendations/" class="md-nav__link">
         
   
   
@@ -6728,7 +6485,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/macos-metrics-verification/" class="md-nav__link">
+      <a href="../../components/ryll/macos-metrics-verification/" class="md-nav__link">
         
   
   
@@ -6756,7 +6513,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/multi-mode-parity/" class="md-nav__link">
+      <a href="../../components/ryll/multi-mode-parity/" class="md-nav__link">
         
   
   
@@ -6784,7 +6541,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/releasing/" class="md-nav__link">
+      <a href="../../components/ryll/releasing/" class="md-nav__link">
         
   
   
@@ -6812,7 +6569,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/web-frontend/" class="md-nav__link">
+      <a href="../../components/ryll/web-frontend/" class="md-nav__link">
         
   
   
@@ -6840,7 +6597,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/troubleshooting/" class="md-nav__link">
+      <a href="../../components/ryll/troubleshooting/" class="md-nav__link">
         
   
   
@@ -6915,7 +6672,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/" class="md-nav__link">
+      <a href="../../components/ryll/plans/" class="md-nav__link">
         
   
   
@@ -6943,7 +6700,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-initial/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-initial/" class="md-nav__link">
         
   
   
@@ -6971,7 +6728,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-capture/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-capture/" class="md-nav__link">
         
   
   
@@ -6999,7 +6756,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-packaging/" class="md-nav__link">
         
   
   
@@ -7027,7 +6784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-usb-redir/" class="md-nav__link">
         
   
   
@@ -7055,7 +6812,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-cursor-rendering/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-cursor-rendering/" class="md-nav__link">
         
   
   
@@ -7083,7 +6840,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-bug-reports/" class="md-nav__link">
         
   
   
@@ -7111,7 +6868,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-usb-ui/" class="md-nav__link">
         
   
   
@@ -7139,7 +6896,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webdav/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-webdav/" class="md-nav__link">
         
   
   
@@ -7167,7 +6924,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
         
   
   
@@ -7195,7 +6952,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
   
@@ -7223,7 +6980,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
         
   
   
@@ -7251,7 +7008,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
         
   
   
@@ -7279,7 +7036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
         
   
   
@@ -7307,7 +7064,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
         
   
   
@@ -7335,7 +7092,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-supply-chain-scanning/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-supply-chain-scanning/" class="md-nav__link">
         
   
   
@@ -7363,7 +7120,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-supply-chain-followups/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-supply-chain-followups/" class="md-nav__link">
         
   
   
@@ -7391,7 +7148,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
         
   
   
@@ -7419,7 +7176,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
         
   
   
@@ -7447,7 +7204,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
         
   
   
@@ -7475,7 +7232,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-android-apk/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-android-apk/" class="md-nav__link">
         
   
   
@@ -7503,7 +7260,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
         
   
   
@@ -7531,7 +7288,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
   
@@ -7559,7 +7316,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
         
   
   
@@ -7587,7 +7344,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-notifications/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-notifications/" class="md-nav__link">
         
   
   
@@ -7615,7 +7372,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
         
   
   
@@ -7643,7 +7400,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-connection-properties/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-connection-properties/" class="md-nav__link">
         
   
   
@@ -7671,7 +7428,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-window-sizing/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-display-window-sizing/" class="md-nav__link">
         
   
   
@@ -7699,7 +7456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-web-frontend/" class="md-nav__link">
         
   
   
@@ -7727,7 +7484,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
         
   
   
@@ -7755,7 +7512,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-release/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-crate-release/" class="md-nav__link">
         
   
   
@@ -7783,7 +7540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-session-001-feedback/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-session-001-feedback/" class="md-nav__link">
         
   
   
@@ -7811,7 +7568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-video-keeping-up/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-video-keeping-up/" class="md-nav__link">
         
   
   
@@ -7839,7 +7596,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
         
   
   
@@ -7867,7 +7624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-ci-platform-matrix/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-ci-platform-matrix/" class="md-nav__link">
         
   
   
@@ -7895,7 +7652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
   
@@ -7923,7 +7680,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-self-hosted-runners/" class="md-nav__link">
+      <a href="../../components/ryll/plans/PLAN-self-hosted-runners/" class="md-nav__link">
         
   
   
@@ -7974,7 +7731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../features/" class="md-nav__link">
+      <a href="../../features/" class="md-nav__link">
         
   
   
@@ -8048,7 +7805,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -8083,7 +7840,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/" class="md-nav__link">
+      <a href="../../community/" class="md-nav__link">
         
   
   
@@ -8157,7 +7914,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/usage/" class="md-nav__link">
+      <a href="../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -8185,7 +7942,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/authentication/" class="md-nav__link">
+      <a href="../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -8213,7 +7970,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/ansible/" class="md-nav__link">
+      <a href="../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -8241,7 +7998,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -8269,7 +8026,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/affinity/" class="md-nav__link">
+      <a href="../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -8297,7 +8054,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/consoles/" class="md-nav__link">
+      <a href="../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -8325,7 +8082,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/events/" class="md-nav__link">
+      <a href="../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -8353,7 +8110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/objects/" class="md-nav__link">
+      <a href="../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -8381,7 +8138,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/metadata/" class="md-nav__link">
+      <a href="../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -8510,7 +8267,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/admin/" class="md-nav__link">
         
   
   
@@ -8538,7 +8295,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -8566,7 +8323,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -8594,7 +8351,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -8622,7 +8379,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -8650,7 +8407,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blobs/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -8678,7 +8435,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -8706,7 +8463,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/instances/" class="md-nav__link">
         
   
   
@@ -8734,7 +8491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/label/" class="md-nav__link">
         
   
   
@@ -8762,7 +8519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/networks/" class="md-nav__link">
         
   
   
@@ -8790,7 +8547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -8818,7 +8575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -8846,7 +8603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../../developer_guide/api_reference/upload/" class="md-nav__link">
         
   
   
@@ -8882,7 +8639,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
   
@@ -8910,7 +8667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/authentication/" class="md-nav__link">
+      <a href="../../developer_guide/authentication/" class="md-nav__link">
         
   
   
@@ -8938,7 +8695,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -8966,7 +8723,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/mypy/" class="md-nav__link">
+      <a href="../../developer_guide/mypy/" class="md-nav__link">
         
   
   
@@ -8994,7 +8751,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/network_dispatcher/" class="md-nav__link">
+      <a href="../../developer_guide/network_dispatcher/" class="md-nav__link">
         
   
   
@@ -9022,7 +8779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/release_process/" class="md-nav__link">
+      <a href="../../developer_guide/release_process/" class="md-nav__link">
         
   
   
@@ -9050,7 +8807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/standards/" class="md-nav__link">
+      <a href="../../developer_guide/standards/" class="md-nav__link">
         
   
   
@@ -9078,7 +8835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/state_machine/" class="md-nav__link">
+      <a href="../../developer_guide/state_machine/" class="md-nav__link">
         
   
   
@@ -9106,7 +8863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../../developer_guide/updating_docs/" class="md-nav__link">
         
   
   
@@ -9134,7 +8891,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/workflow/" class="md-nav__link">
+      <a href="../../developer_guide/workflow/" class="md-nav__link">
         
   
   
@@ -9216,7 +8973,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -9244,7 +9001,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -9272,7 +9029,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -9354,7 +9111,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/installation/" class="md-nav__link">
+      <a href="../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -9382,7 +9139,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -9410,7 +9167,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/authentication/" class="md-nav__link">
+      <a href="../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -9438,7 +9195,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/database/" class="md-nav__link">
+      <a href="../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -9466,7 +9223,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/events/" class="md-nav__link">
+      <a href="../../operator_guide/events/" class="md-nav__link">
         
   
   
@@ -9494,7 +9251,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/exception_tracking/" class="md-nav__link">
+      <a href="../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -9522,7 +9279,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/load_balancing/" class="md-nav__link">
+      <a href="../../operator_guide/load_balancing/" class="md-nav__link">
         
   
   
@@ -9550,7 +9307,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/locks/" class="md-nav__link">
+      <a href="../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -9578,7 +9335,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/logging/" class="md-nav__link">
+      <a href="../../operator_guide/logging/" class="md-nav__link">
         
   
   
@@ -9606,7 +9363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -9634,7 +9391,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/power_states/" class="md-nav__link">
+      <a href="../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -9662,7 +9419,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -9690,7 +9447,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/threads/" class="md-nav__link">
+      <a href="../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -9718,7 +9475,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -9773,10 +9530,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-bridge-per-network-model" class="md-nav__link">
+  <a href="#thought-bubble" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The bridge-per-network model
+        Thought bubble
       
     </span>
   </a>
@@ -9784,10 +9541,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#naming-conventions" class="md-nav__link">
+  <a href="#motivation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Naming conventions
+        Motivation
       
     </span>
   </a>
@@ -9795,22 +9552,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-network-looks-like-on-the-wire" class="md-nav__link">
+  <a href="#the-primitive-run-an-assertion-on-any-cluster-node-over-the-mesh" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What a network looks like on the wire
+        The primitive: run an assertion on any cluster node over the mesh
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What a network looks like on the wire">
+    <nav class="md-nav" aria-label="The primitive: run an assertion on any cluster node over the mesh">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#before-any-networks-exist" class="md-nav__link">
+  <a href="#deployment-prerequisite" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Before any networks exist
+        Deployment prerequisite
       
     </span>
   </a>
@@ -9818,21 +9575,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#after-creating-a-network" class="md-nav__link">
+  <a href="#future-consumers-not-built-here" class="md-nav__link">
     <span class="md-ellipsis">
       
-        After creating a network
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#after-adding-instances" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        After adding instances
+        Future consumers (not built here)
       
     </span>
   </a>
@@ -9845,22 +9591,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-network-namespace" class="md-nav__link">
+  <a href="#the-floating-network-lifecycle-tests" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The network namespace
+        The floating / network lifecycle tests
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="The network namespace">
+    <nav class="md-nav" aria-label="The floating / network lifecycle tests">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#router" class="md-nav__link">
+  <a href="#test-a-float-defloat-reachability-and-plumbing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Router
+        Test A - float / defloat reachability and plumbing
       
     </span>
   </a>
@@ -9868,10 +9614,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#nat-gateway" class="md-nav__link">
+  <a href="#test-b-deleting-an-instance-with-a-float-attached-cleans-up" class="md-nav__link">
     <span class="md-ellipsis">
       
-        NAT gateway
+        Test B - deleting an instance with a float attached cleans up
       
     </span>
   </a>
@@ -9879,10 +9625,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#dhcp-and-dns-server" class="md-nav__link">
+  <a href="#test-c-multi-node-network-lifecycle-and-cleanup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        DHCP and DNS server
+        Test C - multi-node network lifecycle and cleanup
       
     </span>
   </a>
@@ -9895,65 +9641,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#floating-ips" class="md-nav__link">
+  <a href="#non-goals" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Floating IPs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#routed-ips" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Routed IPs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-vxlan-mesh" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The VXLAN mesh
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#network-node-vs-hypervisor-node" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Network node vs hypervisor node
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bridge-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bridge configuration
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-cost-of-simplicity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The cost of simplicity
+        Non-goals
       
     </span>
   </a>
@@ -9981,389 +9672,155 @@
   
 
 
-<h1 id="shaken-fist-networking">Shaken Fist networking<a class="headerlink" href="#shaken-fist-networking" title="Permanent link">&para;</a></h1>
-<p>Shaken Fist implements virtual networking using the simplest approach that
-can work: one Linux bridge per virtual network, kernel-native <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> for
-the overlay, and a single network node providing centralized services
-(DHCP, NAT, floating IPs) inside Linux network namespaces. There is no
-OpenFlow, no Open vSwitch, and no complex flow programming. Everything is
-built from standard Linux primitives that can be inspected with <code>ip</code>,
-<code>brctl</code>, <code>iptables</code>, and <code>tcpdump</code>.</p>
-<p>This simplicity is deliberate. The Shaken Fist project describes its
-networking as "complicated, but not as complicated as OpenStack Neutron --
-it's more like the old OpenStack Compute nova-network implementation."
-Understanding how it works provides an excellent foundation for
-understanding the more complex systems that follow.</p>
-<h2 id="the-bridge-per-network-model">The bridge-per-network model<a class="headerlink" href="#the-bridge-per-network-model" title="Permanent link">&para;</a></h2>
-<p>The defining architectural decision is that each virtual network gets its
-own Linux bridge on every host that participates in that network. If a
-hypervisor has instances on three different virtual networks, it will have
-three separate bridges, each with its own <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> interface.</p>
-<p>This means isolation between networks is <em>structural</em> -- traffic from
-network A is on a physically different bridge than traffic from network B.
-There is no tagging, no flow rules, and no possibility of a
-misconfiguration allowing traffic to leak between networks. The kernel
-simply has no path for it.</p>
-<p>The cost is more kernel objects: each network requires a bridge, a <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr>
-interface, and (on the network node) two veth pairs and a network
-namespace. For deployments with hundreds of networks on a single host,
-this adds up. But for the small-to-medium deployments that Shaken Fist
-targets, it's an excellent trade-off of scalability for simplicity and
-debuggability.</p>
-<h2 id="naming-conventions">Naming conventions<a class="headerlink" href="#naming-conventions" title="Permanent link">&para;</a></h2>
-<p>Shaken Fist identifies networks internally by their <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> ID, expressed
-as a hexadecimal string. A network assigned <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> ID 14823439 becomes
-<code>e2300f</code> in hex, and all associated interfaces include this identifier:</p>
-<table>
-<thead>
-<tr>
-<th>Interface</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>vxlan-e2300f</code></td>
-<td><abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> tunnel interface (kernel-native)</td>
-</tr>
-<tr>
-<td><code>br-vxlan-e2300f</code></td>
-<td>Linux bridge for this network</td>
-</tr>
-<tr>
-<td><code>veth-e2300f-o</code></td>
-<td>Outer end of veth to network namespace</td>
-</tr>
-<tr>
-<td><code>veth-e2300f-i</code></td>
-<td>Inner end of veth (inside namespace, holds router IP)</td>
-</tr>
-<tr>
-<td><code>egr-e2300f-o</code></td>
-<td>Outer end of egress veth (on egress bridge)</td>
-</tr>
-<tr>
-<td><code>egr-e2300f-i</code></td>
-<td>Inner end of egress veth (inside namespace, holds floating gateway IP)</td>
-</tr>
-<tr>
-<td><code>flt-XXXXXXXX</code> / <code>flt-XXXXXXXX-i</code></td>
-<td>Floating IP veth pair (hex of the floating IP address); note the outer end has no <code>-o</code> suffix, only the inner end is suffixed</td>
-</tr>
-<tr>
-<td><code>vnetN</code></td>
-<td>Libvirt TAP interface connecting a <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr> to the bridge</td>
-</tr>
-</tbody>
-</table>
-<p>This consistent naming makes it straightforward to trace any interface
-back to its network and understand its role.</p>
-<h2 id="what-a-network-looks-like-on-the-wire">What a network looks like on the wire<a class="headerlink" href="#what-a-network-looks-like-on-the-wire" title="Permanent link">&para;</a></h2>
-<h3 id="before-any-networks-exist">Before any networks exist<a class="headerlink" href="#before-any-networks-exist" title="Permanent link">&para;</a></h3>
-<p>A freshly installed Shaken Fist node has just two relevant interfaces:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>eth0              10.0.0.74/24    Physical interface (mesh traffic)
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>egr-br-eth0       192.168.15.1/24 Egress bridge (empty, for external traffic)
-</code></pre></div>
-<p>The egress bridge (<code>egr-br-eth0</code>) is a Linux bridge with the first IP
-from the cluster's <em>floating network</em> -- the pool of addresses used for
-external connectivity. It starts empty, waiting for virtual networks to
-attach their egress veth pairs.</p>
-<h3 id="after-creating-a-network">After creating a network<a class="headerlink" href="#after-creating-a-network" title="Permanent link">&para;</a></h3>
-<p>When a virtual network is created -- say, <code>172.16.0.0/24</code> with <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> ID
-14823439 (<code>e2300f</code>) -- the following objects appear on the network node:</p>
-<p><strong>Outside the namespace</strong> (visible via <code>ip a</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>vxlan-e2300f       VXLAN interface (member of br-vxlan-e2300f)
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>br-vxlan-e2300f    Linux bridge for this network
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>veth-e2300f-o      → connects bridge to namespace
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>egr-e2300f-o       → connects egress bridge to namespace
-</code></pre></div>
-<p><strong>Inside the namespace</strong> (visible via <code>ip netns exec &lt;uuid&gt; ip a</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>veth-e2300f-i      172.16.0.1/24      Router interface for the virtual network
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>egr-e2300f-i       192.168.15.194/24  Floating gateway address
-</code></pre></div>
-<p>The bridge membership tells the full story:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>br-vxlan-e2300f:
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    vxlan-e2300f      (VXLAN mesh to other hosts)
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    veth-e2300f-o     (to network namespace)
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>egr-br-eth0:
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    egr-e2300f-o      (to network namespace)
-</code></pre></div>
-<p>The network namespace is named with the network's UUID (e.g.
-<code>17be6538-8f96-4ccb-b71e-a7e3022fead3</code>) and contains the inner ends
-of both veth pairs. This namespace is where all the network intelligence
-lives: the routing table, the iptables NAT rules, and the dnsmasq
-process.</p>
-<h3 id="after-adding-instances">After adding instances<a class="headerlink" href="#after-adding-instances" title="Permanent link">&para;</a></h3>
-<p>When an instance boots on a network, libvirt creates a TAP interface
-(<code>vnet0</code>, <code>vnet1</code>, etc.) and Shaken Fist adds it to the network's bridge:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>br-vxlan-e2300f:
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    vxlan-e2300f      (VXLAN mesh)
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    veth-e2300f-o     (to namespace)
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    vnet0             (first instance)
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    vnet1             (second instance)
-</code></pre></div>
-<p>No changes are needed inside the namespace -- the dnsmasq process is
-already connected to the virtual network via the veth pair and can
-provide DHCP to new instances immediately.</p>
-<h2 id="the-network-namespace">The network namespace<a class="headerlink" href="#the-network-namespace" title="Permanent link">&para;</a></h2>
-<p>The network namespace is the central piece of Shaken Fist's networking.
-It serves three roles simultaneously:</p>
-<h3 id="router">Router<a class="headerlink" href="#router" title="Permanent link">&para;</a></h3>
-<p>The namespace's routing table determines where traffic goes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>default via 192.168.15.1 dev egr-e2300f-i
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>172.16.0.0/24 dev veth-e2300f-i proto kernel scope link src 172.16.0.1
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>192.168.15.0/24 dev egr-e2300f-i proto kernel scope link src 192.168.15.194
-</code></pre></div>
-<p>Traffic destined for the virtual network (<code>172.16.0.0/24</code>) goes out
-<code>veth-e2300f-i</code>, which emerges on the bridge and reaches instances
-directly (or via the <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> mesh to remote hypervisors). Everything
-else -- internet traffic, traffic to other floating IPs -- goes out
-<code>egr-e2300f-i</code> to the egress bridge and onward to the physical
-network.</p>
-<h3 id="nat-gateway">NAT gateway<a class="headerlink" href="#nat-gateway" title="Permanent link">&para;</a></h3>
-<p>Instances need to reach the outside world, but they have private
-addresses that aren't routable on the physical network. The namespace
-provides SNAT via a single iptables rule:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>-A POSTROUTING -s 172.16.0.0/24 -j MASQUERADE
-</code></pre></div>
-<p>This rewrites the source address of outbound packets from the instance's
-private IP to the network's floating gateway address
-(<code>192.168.15.194</code>). Conntrack tracks the mapping so return traffic is
-translated back automatically. This is the same mechanism that home
-routers use -- simple, well-understood, and reliable.</p>
-<h3 id="dhcp-and-dns-server">DHCP and DNS server<a class="headerlink" href="#dhcp-and-dns-server" title="Permanent link">&para;</a></h3>
-<p>A <code>dnsmasq</code> process runs inside the namespace, bound to <code>veth-e2300f-i</code>.
-It provides DHCP (assigning IP addresses to instances as they boot) and
-optionally DNS. Because it runs inside the namespace, it's isolated from
-other networks' DHCP servers -- there's no risk of DHCP offers from one
-network reaching instances on another.</p>
-<h2 id="floating-ips">Floating IPs<a class="headerlink" href="#floating-ips" title="Permanent link">&para;</a></h2>
-<p>Floating IPs provide inbound connectivity to specific instances. Unlike
-SNAT (which is one-to-many, with all instances sharing the network's
-floating gateway address), a floating IP is a one-to-one mapping between
-a public address and a specific instance.</p>
-<p>When a floating IP is associated with an instance, Shaken Fist creates
-an additional veth pair. The naming uses the hexadecimal representation
-of the floating IP -- for example, floating IP <code>192.168.15.29</code>
-(<code>c0a80f1d</code> in hex) creates the outer end <code>flt-c0a80f1d</code> in the root
-namespace and the inner end <code>flt-c0a80f1d-i</code> inside the network
-namespace. Unlike the other veth pairs, the outer end has no <code>-o</code>
-suffix; only the inner end is suffixed. The add and remove paths derive
-these names independently and must agree, so if you change the naming,
-change it in the add path, the remove path, the tests, the operator
-guide and this page together.</p>
-<p>The inner end of the veth (inside the namespace) is configured with
-the floating IP as a <code>/32</code> address:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>flt-c0a80f1d-i    192.168.15.29/32
-</code></pre></div>
-<p>A DNAT rule in the namespace's PREROUTING chain rewrites the destination:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>-A PREROUTING -d 192.168.15.29 -j DNAT --to-destination 172.16.0.37
-</code></pre></div>
-<p>The packet flow for inbound floating IP traffic is:</p>
+<h1 id="ci-node-exec-assertions-and-floating-network-lifecycle-tests">CI node-exec assertions and floating / network lifecycle tests<a class="headerlink" href="#ci-node-exec-assertions-and-floating-network-lifecycle-tests" title="Permanent link">&para;</a></h1>
+<h2 id="thought-bubble">Thought bubble<a class="headerlink" href="#thought-bubble" title="Permanent link">&para;</a></h2>
+<p>This is a design note, not a phased delivery plan. It captures why the
+functional CI suite grew a "run an assertion on a specific cluster node"
+primitive, how that primitive is meant to generalise, and the shape of the
+floating-IP / network lifecycle tests that are its first consumers.</p>
+<h2 id="motivation">Motivation<a class="headerlink" href="#motivation" title="Permanent link">&para;</a></h2>
+<p>The floating-IP lifecycle test (<code>TestFloatingIPLifecycle</code>) was written on the
+assumption that "the primary node is the network node and runs this suite".
+That is true for an all-in-one dev cluster but <strong>false for the
+<code>shakenfist.shakenfist</code> collection's multi-node CI topologies</strong>, where:</p>
+<ul>
+<li>the suite runs on the <code>primary</code> node, which is deployed with
+  <code>SHAKENFIST_NODE_IS_NETWORK_NODE=False</code>; and</li>
+<li>the network node is a <em>separate</em> node (<code>sf1</code> in the slim topologies), which
+  is where a floating IP's netns, <code>flt-&lt;hex&gt;</code> veth, <code>/32</code> and DNAT rule are
+  actually plumbed, and where the floating / egress network
+  (<code>192.168.230.0/24</code>) lives as an uplink-less island on <code>egr-br-eth0</code>.</li>
+</ul>
+<p>The consequences were both a false negative and a hidden false positive:</p>
 <ol>
-<li>Packet addressed to <code>192.168.15.29</code> arrives at the host.</li>
-<li>The kernel's routing table sees the <code>/32</code> address on the veth and
-   delivers the packet into the namespace.</li>
-<li>The DNAT rule rewrites the destination to <code>172.16.0.37</code>.</li>
-<li>The namespace routes the rewritten packet out <code>veth-e2300f-i</code> to
-   the bridge, where it reaches the instance.</li>
+<li><code>_await_floating_ping</code> ran <code>ping &lt;floating&gt;</code> locally on <code>primary</code>, which has
+   no interface or route onto the floating network, so it could never succeed
+   (300s timeout -&gt; "Could not ping floating address"). This is the visible
+   merge-queue failure on PR #3389.</li>
+<li>The host-level plumbing/cleanup assertions guarded on a <em>local</em>
+   <code>/var/run/netns/&lt;net&gt;</code> check, which is false on <code>primary</code>, so they silently
+   no-op'd. The test's actual regression coverage (the #3378-#3383 floating
+   leak) never ran.</li>
 </ol>
-<p>Outbound traffic from the instance still uses the MASQUERADE rule and
-exits via the floating gateway. Only inbound traffic uses the dedicated
-floating IP veth.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The instance is never aware of its floating IP at the operating
-system level. Inside the <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>, the only address on the interface is
-<code>172.16.0.37</code>. The DNAT happens entirely in the network namespace,
-outside the <abbr title="Virtual Machine -- an emulation of a computer system running on a host.">VM</abbr>.</p>
-</div>
-<h2 id="routed-ips">Routed IPs<a class="headerlink" href="#routed-ips" title="Permanent link">&para;</a></h2>
-<p>Shaken Fist v0.8 introduced <em>routed IPs</em> as an alternative to floating
-IPs, primarily to support Kubernetes services via metallb. A routed IP
-is an address from the floating pool that uses a simple routing rule
-instead of DNAT:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>ip route add 192.168.15.29/32 dev br-vxlan-e2300f
-</code></pre></div>
-<p>The key difference is that the service <em>inside</em> the virtual network must
-be configured to answer ARP requests for the routed address. With a
-floating IP, the instance doesn't know about the external address; with
-a routed IP, the service must explicitly claim it. This works naturally
-with metallb, which is designed to advertise service IPs via ARP.</p>
-<h2 id="the-vxlan-mesh">The <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> mesh<a class="headerlink" href="#the-vxlan-mesh" title="Permanent link">&para;</a></h2>
-<p>On a multi-node cluster, the <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> interface on each host provides
-connectivity to other hosts participating in the same virtual network.
-The mesh uses the kernel's native <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> implementation -- no <abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr>, no
-userspace tunnel endpoints.</p>
-<p>Each hypervisor has the same bridge structure as the network node (a
-<code>br-vxlan-</code> bridge containing the <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> interface and instance TAP
-devices) but <em>without</em> the network namespace -- no DHCP server, no NAT
-rules, no routing. The namespace exists only on the network node. DHCP
-requests from instances on remote hypervisors reach the network node's
-dnsmasq through the <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> mesh, just as they would if the instance were
-local.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Network node                      Hypervisor node
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>┌───────────────────────┐         ┌───────────────────────┐
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>│ namespace (per net)   │         │                       │
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>│   dnsmasq, NAT, routes│         │                       │
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>│   ↕ veth pair         │         │                       │
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>│ ┌───────────────┐     │         │ ┌───────────────┐     │
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>│ │ br-vxlan-NNN  │     │         │ │ br-vxlan-NNN  │     │
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>│ │  ├ vxlan-NNN  │     │         │ │  ├ vxlan-NNN  │     │
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>│ │  ├ veth-NNN-o │     │         │ │  ├ vnet0      │     │
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>│ │  └ vnet0      │     │         │ │  └ vnet1      │     │
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>│ └───────┬───────┘     │         │ └───────┬───────┘     │
-<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>│         │ VXLAN       │         │         │ VXLAN       │
-<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>└─────────┼─────────────┘         └─────────┼─────────────┘
-<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>          │        VXLAN tunnel             │
-<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>          └─────────────────────────────────┘
-<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>              (UDP encapsulated, same VNI)
-</code></pre></div>
-<p>This means all routed and NAT'd traffic must traverse the <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> mesh to
-reach the network node, which is the same centralization trade-off that
-Neutron's legacy routers make. The difference is in the transport: Shaken
-Fist uses a simple kernel <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> mesh with standard Linux bridges, while
-Neutron uses <abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr> with OpenFlow rules for VLAN-to-VNI translation.</p>
-<h2 id="network-node-vs-hypervisor-node">Network node vs hypervisor node<a class="headerlink" href="#network-node-vs-hypervisor-node" title="Permanent link">&para;</a></h2>
-<p>The distinction between the network node and hypervisor nodes is the
-most important architectural boundary in Shaken Fist networking:</p>
-<table>
-<thead>
-<tr>
-<th></th>
-<th>Network node</th>
-<th>Hypervisor node</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Bridge</td>
-<td>Yes (<code>br-vxlan-*</code>)</td>
-<td>Yes (<code>br-vxlan-*</code>)</td>
-</tr>
-<tr>
-<td><abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> interface</td>
-<td>Yes</td>
-<td>Yes</td>
-</tr>
-<tr>
-<td>Network namespace</td>
-<td>Yes (one per network)</td>
-<td>No</td>
-</tr>
-<tr>
-<td>dnsmasq (DHCP/DNS)</td>
-<td>Yes (in namespace)</td>
-<td>No</td>
-</tr>
-<tr>
-<td>NAT/routing rules</td>
-<td>Yes (in namespace)</td>
-<td>No</td>
-</tr>
-<tr>
-<td>Floating IP veths</td>
-<td>Yes</td>
-<td>No</td>
-</tr>
-<tr>
-<td>Egress bridge</td>
-<td>Yes (<code>egr-br-eth0</code>)</td>
-<td>No</td>
-</tr>
-</tbody>
-</table>
-<p>A hypervisor node's involvement in a virtual network is minimal: a <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr>
-interface, a bridge, and TAP devices for local instances. All the
-intelligence is centralized on the network node.</p>
-<h2 id="bridge-configuration">Bridge configuration<a class="headerlink" href="#bridge-configuration" title="Permanent link">&para;</a></h2>
-<p>Shaken Fist configures its bridges with three notable settings:</p>
-<p><strong>No forwarding delay</strong> (<code>brctl setfd br-vxlan-NNN 0</code>) means ports
-transition to forwarding state immediately when added. Normally, bridges
-wait 15-30 seconds (listening and learning) before forwarding traffic --
-sensible for physical networks where loops are possible, but unnecessary
-in a controlled virtual environment where the topology is known.</p>
-<p><strong>No STP</strong> (<code>brctl stp br-vxlan-NNN off</code>) disables loop detection for
-the same reason. The topology is tree-shaped by construction (<abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr>
-interfaces, veths, and TAP devices don't create loops), so STP's
-overhead and convergence delays are unnecessary.</p>
-<p><strong>No MAC ageing</strong> (<code>brctl setageing br-vxlan-NNN 0</code>) means learned MAC
-addresses never expire from the forwarding table. In a virtual
-environment where MAC addresses are assigned deterministically and don't
-change, this avoids periodic flooding when entries would otherwise time
-out.</p>
-<h2 id="the-cost-of-simplicity">The cost of simplicity<a class="headerlink" href="#the-cost-of-simplicity" title="Permanent link">&para;</a></h2>
-<p>Shaken Fist's networking model has the same centralization cost as
-Neutron legacy routers: all routed traffic between subnets (or to the
-outside world) must traverse the network node, even if the communicating
-instances are on the same hypervisor. The <a href="/components/cloudgood/neutron-legacy/">Neutron legacy routers
-chapter</a> discusses this cost in detail.</p>
-<p>The bridge-per-network model also means that kernel object counts scale
-linearly with the number of active networks. A host participating in 100
-networks has 100 bridges and 100 <abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> interfaces. In practice this is
-fine for Shaken Fist's target deployment sizes, but it's one of the
-motivations for the shared-bridge approach used by <abbr title="Open vSwitch -- a multilayer virtual switch for virtualized environments.">OVS</abbr>-based systems.</p>
-<p>What Shaken Fist gains in return is transparency. Every piece of the
-networking stack is visible with standard tools, every packet path can
-be traced with <code>tcpdump</code> on the relevant bridge, and failures tend to
-be obvious rather than hidden behind OpenFlow table misses. For operators
-who need to debug networking issues at 3am, this has real value.</p>
-<div class="admonition info">
-<p class="admonition-title">Want to know more?</p>
-<table>
-<thead>
-<tr>
-<th>Topic</th>
-<th>Resource</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Shaken Fist networking guide</td>
-<td><a href="https://shakenfist.com/operator_guide/networking/overview/">Networking Overview</a></td>
-</tr>
-<tr>
-<td><abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> kernel implementation</td>
-<td><a href="https://docs.kernel.org/networking/vxlan.html"><abbr title="Virtual Extensible LAN -- a network virtualization technology for overlay networks.">VXLAN</abbr> kernel documentation</a></td>
-</tr>
-<tr>
-<td>Linux bridge administration</td>
-<td><a href="https://man7.org/linux/man-pages/man8/brctl.8.html">brctl(8) man page</a></td>
-</tr>
-<tr>
-<td>dnsmasq</td>
-<td><a href="https://thekelleys.org.uk/dnsmasq/doc.html">dnsmasq documentation</a></td>
-</tr>
-</tbody>
-</table>
-</div>
-<!-- Shared abbreviations for cloudgood documentation pages -->
-<!-- Include at the bottom of cloudgood files with: --8<-- "docs-include/abbreviations.md" -->
-<!-- These definitions are invisible - they enable hover tooltips for the defined terms -->
-
-<!-- CPU and processor terms -->
-<!-- Memory terms -->
-<!-- Virtualization - CPU extensions -->
-<!-- Virtualization - memory -->
-<!-- Virtualization - general -->
-<!-- Networking -->
-<!-- Storage -->
-<!-- Boot and firmware -->
-<!-- Linux and OS concepts -->
-<!-- Containers -->
-<!-- x86 architecture -->
-<!-- APIs and interfaces -->
-<!-- Miscellaneous -->
+<p>The existing API-level <code>ping</code> endpoint (<code>ip netns exec &lt;net&gt; ping</code>) is <strong>not</strong>
+a usable oracle for floating reachability: inside the network namespace the
+floating <code>/32</code> is local and the DNAT PREROUTING path is never exercised. A
+floating IP can only be validated from an egress-side vantage, i.e. the root
+namespace of the network node.</p>
+<h2 id="the-primitive-run-an-assertion-on-any-cluster-node-over-the-mesh">The primitive: run an assertion on any cluster node over the mesh<a class="headerlink" href="#the-primitive-run-an-assertion-on-any-cluster-node-over-the-mesh" title="Permanent link">&para;</a></h2>
+<p>Rather than special-casing the network node, the suite gains a generic
+capability: <strong>discover cluster nodes from the API, then run a command on a
+chosen node over the management mesh.</strong> Floating IPs are simply the first
+caller.</p>
+<p>Design points:</p>
+<ul>
+<li><strong>Discovery is API-native, never hardcoded.</strong> <code>GET /nodes</code>
+  (<code>system_client.get_nodes()</code>) returns each node's <code>name</code>, mesh <code>ip</code>,
+  <code>is_network_node</code> and <code>is_hypervisor</code>. The helper resolves roles and mesh
+  addresses from this data, so the tests carry no knowledge of the CI IP plan
+  or node names. On a single-node cluster the "network node" resolves to the
+  local host and exec runs directly.</li>
+<li><strong>Local vs remote is decided by IP, not by name.</strong> The helper compares the
+  target node's mesh <code>ip</code> against the addresses present on the local host
+  (<code>ip -json addr</code>). A match runs the command directly; otherwise it SSHes to
+  the mesh IP as the base-image user. This sidesteps the SF-node-name
+  (<code>config.NODE_NAME</code>, e.g. <code>sf1</code>) versus OS-fqdn (<code>t-6dFds-1</code>) confusion that
+  already causes the placement tests to skip.</li>
+<li><strong>The exec channel is SSH over the mesh</strong>, matching how the rest of CI
+  reaches nodes (<code>debian@&lt;node&gt;</code> with passwordless sudo). Key path and user are
+  configurable via <code>SF_CI_SSH_KEY</code> (default <code>~/.ssh/id_rsa</code>) and
+  <code>SF_CI_SSH_USER</code> (default <code>debian</code>), with <code>StrictHostKeyChecking=no</code> and a
+  throwaway known-hosts file as elsewhere in CI.</li>
+<li><strong>Unavailable channel skips loudly, never silently.</strong> If node-exec cannot be
+  established (no key, auth failure, unreachable), the affected assertions call
+  <code>skipTest</code> with an explicit reason. Silent no-op is exactly what hid the
+  breakage above; a visible skip does not.</li>
+</ul>
+<h3 id="deployment-prerequisite">Deployment prerequisite<a class="headerlink" href="#deployment-prerequisite" title="Permanent link">&para;</a></h3>
+<p>For the remote path, the node running the suite (<code>primary</code>) must be able to
+SSH to the other nodes over the mesh. Every node already trusts the CI key
+(<code>id_ci</code>) for <code>debian</code> (that is how the runner and ansible reach them), so the
+only missing piece is making the <strong>private</strong> key available to the suite host
+during the test run (e.g. <code>id_ci</code> -&gt; <code>primary:~/.ssh/id_rsa</code>, as the post-test
+<code>ci-node-checks</code> step already does for the runner). This lives in the
+<code>shakenfist/actions</code> reusable smoke-cluster workflow. Until it lands the new
+assertions skip loudly rather than failing; once it lands they run for real.</p>
+<h3 id="future-consumers-not-built-here">Future consumers (not built here)<a class="headerlink" href="#future-consumers-not-built-here" title="Permanent link">&para;</a></h3>
+<p>The same primitive generalises well beyond networking. Candidates worth
+building on it later:</p>
+<ul>
+<li>Assert an instance's block devices are the disk <em>type</em> / bus / cache mode
+  requested, by inspecting <code>virsh dumpxml</code> / <code>qemu</code> args on the hosting
+  hypervisor.</li>
+<li>Assert a virtual network's VXLAN plumbing (<code>br-vxlan-&lt;hex&gt;</code>, <code>vxlan-&lt;hex&gt;</code>)
+  exists on exactly the nodes hosting an instance on it (see test C below) and
+  nowhere else.</li>
+<li>Assert per-node resource accounting (libvirt vs SF's view) after
+  create/delete churn.</li>
+<li>Assert daemon-local on-disk state (lease files, nvram templates) is cleaned
+  on teardown.</li>
+</ul>
+<p>Each is a thin wrapper over "discover the node, run a command, assert on the
+output"; none needs new SF surface area.</p>
+<h2 id="the-floating-network-lifecycle-tests">The floating / network lifecycle tests<a class="headerlink" href="#the-floating-network-lifecycle-tests" title="Permanent link">&para;</a></h2>
+<p>Three tests consume the primitive. All host-level assertions and the
+reachability ping run <strong>on the network node</strong> via the exec helper, and all use
+bounded polling because network-node reconcile (and the floating-gateway
+"deletion halo" reaper) is asynchronous.</p>
+<h3 id="test-a-float-defloat-reachability-and-plumbing">Test A - float / defloat reachability and plumbing<a class="headerlink" href="#test-a-float-defloat-reachability-and-plumbing" title="Permanent link">&para;</a></h3>
+<p>Create one instance, then for two full float/defloat cycles:</p>
+<ul>
+<li>float, wait for the API to report the floating address;</li>
+<li>on the network node, assert the <code>flt-&lt;hex&gt;</code> interface and exactly one DNAT
+  PREROUTING rule to the inner address exist;</li>
+<li>on the network node (root namespace), assert the floating address is
+  pingable — the egress -&gt; DNAT -&gt; VXLAN -&gt; guest path actually carries
+  traffic;</li>
+<li>defloat, and assert the interface and DNAT rule are gone.</li>
+</ul>
+<p>The second cycle is the regression for state leaked by the first: a reused
+floating address must start from a clean slate.</p>
+<h3 id="test-b-deleting-an-instance-with-a-float-attached-cleans-up">Test B - deleting an instance with a float attached cleans up<a class="headerlink" href="#test-b-deleting-an-instance-with-a-float-attached-cleans-up" title="Permanent link">&para;</a></h3>
+<p>Float an instance, confirm plumbed, then delete the <em>instance</em> (not the float)
+and assert the floating host state is fully removed. This is the common
+ephemeral-CI path and a distinct code path from an explicit defloat.</p>
+<h3 id="test-c-multi-node-network-lifecycle-and-cleanup">Test C - multi-node network lifecycle and cleanup<a class="headerlink" href="#test-c-multi-node-network-lifecycle-and-cleanup" title="Permanent link">&para;</a></h3>
+<p>The sharper, multi-node test:</p>
+<ol>
+<li>Allocate a network. Assert (bonus) it is present only on the network node
+   (DHCP/netns) and absent on pure hypervisors.</li>
+<li>Discover two hypervisors that are <strong>not</strong> the network node and pin one
+   instance to each via <code>force_placement=&lt;node name&gt;</code>. Not trusting the
+   scheduler to spread is what makes the presence assertion deterministic;
+   using two non-network-node hypervisors is what makes it <em>sharp</em> (after
+   teardown the network must vanish from both while still present on the
+   network node).</li>
+<li>Assert the network's VXLAN plumbing is now present on both hypervisors.</li>
+<li>Delete both instances. Await and assert the network plumbing is gone from
+   both hypervisors, still present on the network node.</li>
+<li>Delete the network. Await and assert it is gone everywhere, including the
+   netns, floating gateway and egress rules on the network node.</li>
+</ol>
+<p>The presence invariant, stated precisely: a network is present on a node <strong>iff</strong>
+that node hosts an instance on it <strong>or</strong> the node is the network node (which
+always carries it for DHCP/NAT). This catches a different leak class from the
+floating work — stale VXLAN plumbing stranded on drained hypervisors.</p>
+<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No new SF API surface. Assertions observe real kernel/libvirt state
+  out-of-band; they do not read SF's own bookkeeping (which could hide the very
+  drift they exist to catch).</li>
+<li>No periodic node-state logging to Loki. It cannot prove reachability, is a
+  racy oracle for absence/cleanup, and couples test correctness to log volume.
+  An on-demand operator diagnostic that dumps a network's host-side plumbing may
+  be worth building on its own merits, but not as these tests' mechanism.</li>
+</ul>
 
 
 
 
 
 
-
-  
-  
 
 
 
@@ -10378,7 +9835,7 @@ who need to debug networking issues at 3am, this has real value.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/cloudgood/issues/new?title=Docs%20issue%3A%20docs/networking-shakenfist.md&body=%2A%2ASource%20file%3A%2A%2A%20%60docs/networking-shakenfist.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/cloudgood/networking-shakenfist/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-ci-node-exec-assertions.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-ci-node-exec-assertions.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-ci-node-exec-assertions/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
@@ -10419,10 +9876,10 @@ who need to debug networking issues at 3am, this has real value.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

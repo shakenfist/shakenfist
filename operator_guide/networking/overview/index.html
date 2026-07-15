@@ -9495,6 +9495,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interface-naming-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface naming conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dispatcher-diagnostic-events" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9719,6 +9730,17 @@
     <span class="md-ellipsis">
       
         Routed IPs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interface-naming-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface naming conventions
       
     </span>
   </a>
@@ -9983,10 +10005,10 @@ then NAT the traffic out.</p>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>...
 <a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="m">17</span>:<span class="w"> </span>vnet1:<span class="w"> </span>&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8900</span><span class="w"> </span>qdisc<span class="w"> </span>noqueue<span class="w"> </span>master<span class="w"> </span>br-vxlan-e2300f<span class="w"> </span>state<span class="w"> </span>UNKNOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
 <a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span>link/ether<span class="w"> </span>fe:00:00:c7:f9:cc<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="m">19</span>:<span class="w"> </span>flt-c0a80f1d-o@if18:<span class="w"> </span>&lt;BROADCAST,MULTICAST&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8900</span><span class="w"> </span>qdisc<span class="w"> </span>noop<span class="w"> </span>state<span class="w"> </span>DOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="m">19</span>:<span class="w"> </span>flt-c0a80f1d@if18:<span class="w"> </span>&lt;BROADCAST,MULTICAST&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">8900</span><span class="w"> </span>qdisc<span class="w"> </span>noop<span class="w"> </span>state<span class="w"> </span>DOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
 <a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span>link/ether<span class="w"> </span>aa:5c:1c:0c:7c:f6<span class="w"> </span>brd<span class="w"> </span>ff:ff:ff:ff:ff:ff<span class="w"> </span>link-netns<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
 </code></pre></div>
-<p>But we've also added another veth pair, this time named <code>flt-c0a80f1d-o</code> on the
+<p>But we've also added another veth pair, this time named <code>flt-c0a80f1d</code> on the
 outside of the network namespace. You can see in the instance details above that
 the floating IP associated with this instance is <code>192.168.15.29</code>, which just so
 happens to be <code>c0a80f1d</code> in hexadecimal. So this veth is how floating IP traffic
@@ -10064,6 +10086,75 @@ route on the network node into the relevant virtual network bridge is created.
 Such a route might look like this:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ip route add 192.168.15.29/32 dev br-vxlan-e2300f
 </code></pre></div>
+<h2 id="interface-naming-conventions">Interface naming conventions<a class="headerlink" href="#interface-naming-conventions" title="Permanent link">&para;</a></h2>
+<p>The interface names in the examples above are a contract, not a
+coincidence: the privexec daemon derives them independently when adding
+and when removing resources, so the add and remove paths must agree on
+the names or removal silently does nothing. Exactly that happened when
+the floating IP add path dropped the <code>-o</code> suffix from the outer veth end
+but the removal path kept looking for it -- every floating IP release
+leaked its veth pair and DNAT rule, and reuse of those floating IPs then
+failed or misdirected traffic (github issues #3378 through #3383).</p>
+<p>All names are derived either from the network's VXLAN id as six lower
+case hex digits (<code>e2300f</code> for VXLAN id 14823439 in the examples above),
+or from the floating IPv4 address as eight lower case hex digits
+(<code>c0a80f1d</code> for 192.168.15.29). Linux limits interface names to 15
+characters, which these conventions exactly fill in the worst case.</p>
+<p>On the network node:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Where</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vxlan-&lt;vxid&gt;</code></td>
+<td>root namespace</td>
+<td>VXLAN mesh interface for the virtual network</td>
+</tr>
+<tr>
+<td><code>br-vxlan-&lt;vxid&gt;</code></td>
+<td>root namespace</td>
+<td>bridge joining the VXLAN interface, instance taps and the namespace veth</td>
+</tr>
+<tr>
+<td><code>veth-&lt;vxid&gt;-o</code> / <code>veth-&lt;vxid&gt;-i</code></td>
+<td>root namespace / network namespace</td>
+<td>veth pair attaching the network namespace to <code>br-vxlan-&lt;vxid&gt;</code>; the inner end holds the virtual network gateway address and serves DHCP</td>
+</tr>
+<tr>
+<td><code>egr-&lt;vxid&gt;-o</code> / <code>egr-&lt;vxid&gt;-i</code></td>
+<td>root namespace / network namespace</td>
+<td>veth pair attaching the network namespace to the egress bridge for NAT and floating traffic</td>
+</tr>
+<tr>
+<td><code>flt-&lt;hex ip&gt;</code> / <code>flt-&lt;hex ip&gt;-i</code></td>
+<td>root namespace / network namespace</td>
+<td>veth pair delivering traffic for one floating IP; the inner end holds the floating address as a /32</td>
+</tr>
+<tr>
+<td><code>egr-br-&lt;nic&gt;</code></td>
+<td>root namespace</td>
+<td>egress bridge on the physical egress NIC, holding the first address of the floating network</td>
+</tr>
+</tbody>
+</table>
+<p>The network namespace itself is named with the UUID of the virtual
+network. Note the asymmetry for floating veth pairs: the outer end has
+no suffix (not <code>-o</code>), while the inner end is suffixed <code>-i</code>. Each
+floating IP also has a DNAT PREROUTING rule inside the network
+namespace directing the floating address to the instance's inner
+address.</p>
+<p>Hypervisor nodes which are not the network node only carry
+<code>vxlan-&lt;vxid&gt;</code>, <code>br-vxlan-&lt;vxid&gt;</code> and the instance tap devices.</p>
+<p>These conventions are asserted by the unit tests in
+<code>shakenfist/tests/test_privexec_floating_ip.py</code> and exercised end to
+end by <code>TestFloatingIPLifecycle</code> in the cluster CI suite. If you change
+a name, change it in the add path, the remove path, the tests, this
+page and <code>docs/components/cloudgood/networking-shakenfist.md</code> together.</p>
 <h2 id="dispatcher-diagnostic-events">Dispatcher diagnostic events<a class="headerlink" href="#dispatcher-diagnostic-events" title="Permanent link">&para;</a></h2>
 <p>Operators reading the event log for a cluster operation will see two
 events emitted directly by the queue dispatcher (in addition to the
