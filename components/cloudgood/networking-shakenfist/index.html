@@ -10047,8 +10047,8 @@ as a hexadecimal string. A network assigned <abbr title="Virtual Extensible LAN 
 <td>Inner end of egress veth (inside namespace, holds floating gateway IP)</td>
 </tr>
 <tr>
-<td><code>flt-XXXXXXXX</code> / <code>flt-XXXXXXXX-i</code></td>
-<td>Floating IP veth pair (hex of the floating IP address); note the outer end has no <code>-o</code> suffix, only the inner end is suffixed</td>
+<td><code>flt-XXXXXXXX-o/i</code></td>
+<td>Floating IP veth pair (hex of the floating IP address)</td>
 </tr>
 <tr>
 <td><code>vnetN</code></td>
@@ -10146,13 +10146,7 @@ a public address and a specific instance.</p>
 <p>When a floating IP is associated with an instance, Shaken Fist creates
 an additional veth pair. The naming uses the hexadecimal representation
 of the floating IP -- for example, floating IP <code>192.168.15.29</code>
-(<code>c0a80f1d</code> in hex) creates the outer end <code>flt-c0a80f1d</code> in the root
-namespace and the inner end <code>flt-c0a80f1d-i</code> inside the network
-namespace. Unlike the other veth pairs, the outer end has no <code>-o</code>
-suffix; only the inner end is suffixed. The add and remove paths derive
-these names independently and must agree, so if you change the naming,
-change it in the add path, the remove path, the tests, the operator
-guide and this page together.</p>
+(<code>c0a80f1d</code> in hex) creates <code>flt-c0a80f1d-o/i</code>.</p>
 <p>The inner end of the veth (inside the namespace) is configured with
 the floating IP as a <code>/32</code> address:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>flt-c0a80f1d-i    192.168.15.29/32
