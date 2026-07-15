@@ -53,7 +53,7 @@ as a hexadecimal string. A network assigned VXLAN ID 14823439 becomes
 | `veth-e2300f-i` | Inner end of veth (inside namespace, holds router IP) |
 | `egr-e2300f-o` | Outer end of egress veth (on egress bridge) |
 | `egr-e2300f-i` | Inner end of egress veth (inside namespace, holds floating gateway IP) |
-| `flt-XXXXXXXX` / `flt-XXXXXXXX-i` | Floating IP veth pair (hex of the floating IP address); note the outer end has no `-o` suffix, only the inner end is suffixed |
+| `flt-XXXXXXXX-o/i` | Floating IP veth pair (hex of the floating IP address) |
 | `vnetN` | Libvirt TAP interface connecting a VM to the bridge |
 
 This consistent naming makes it straightforward to trace any interface
@@ -186,13 +186,7 @@ a public address and a specific instance.
 When a floating IP is associated with an instance, Shaken Fist creates
 an additional veth pair. The naming uses the hexadecimal representation
 of the floating IP -- for example, floating IP `192.168.15.29`
-(`c0a80f1d` in hex) creates the outer end `flt-c0a80f1d` in the root
-namespace and the inner end `flt-c0a80f1d-i` inside the network
-namespace. Unlike the other veth pairs, the outer end has no `-o`
-suffix; only the inner end is suffixed. The add and remove paths derive
-these names independently and must agree, so if you change the naming,
-change it in the add path, the remove path, the tests, the operator
-guide and this page together.
+(`c0a80f1d` in hex) creates `flt-c0a80f1d-o/i`.
 
 The inner end of the veth (inside the namespace) is configured with
 the floating IP as a `/32` address:
