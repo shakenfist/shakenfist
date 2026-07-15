@@ -1017,18 +1017,6 @@
          <lastmod>2026-07-15</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/capabilities/</loc>
-         <lastmod>2026-07-15</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/channel-protocols/</loc>
-         <lastmod>2026-07-15</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/compression-protocols/</loc>
-         <lastmod>2026-07-15</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/kerbside/configuration/</loc>
          <lastmod>2026-07-15</lastmod>
     </url>
@@ -1037,31 +1025,11 @@
          <lastmod>2026-07-15</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/protocol-overview/</loc>
-         <lastmod>2026-07-15</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/kerbside/proxy-architecture/</loc>
          <lastmod>2026-07-15</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/scancodes/</loc>
-         <lastmod>2026-07-15</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/kerbside/schema/</loc>
-         <lastmod>2026-07-15</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/spice-link-protocol/</loc>
-         <lastmod>2026-07-15</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/usb-redirection/</loc>
-         <lastmod>2026-07-15</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/vd-agent-protocol/</loc>
          <lastmod>2026-07-15</lastmod>
     </url>
     <url>
@@ -1138,6 +1106,42 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness/</loc>
+         <lastmod>2026-07-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/spice/capabilities/</loc>
+         <lastmod>2026-07-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/spice/channel-protocols/</loc>
+         <lastmod>2026-07-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/spice/compression-protocols/</loc>
+         <lastmod>2026-07-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/spice/console-vv-extensions/</loc>
+         <lastmod>2026-07-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/spice/protocol-overview/</loc>
+         <lastmod>2026-07-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/spice/scancodes/</loc>
+         <lastmod>2026-07-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/spice/spice-link-protocol/</loc>
+         <lastmod>2026-07-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/spice/usb-redirection/</loc>
+         <lastmod>2026-07-15</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/spice/vd-agent-protocol/</loc>
          <lastmod>2026-07-15</lastmod>
     </url>
     <url>
