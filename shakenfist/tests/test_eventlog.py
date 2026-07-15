@@ -1,5 +1,6 @@
 import json
 import tempfile
+import uuid
 from unittest import mock
 
 from shakenfist_utilities import logs  # noreorder
@@ -122,3 +123,47 @@ class AddEventMultiSpoolPayloadTestCase(
         self.assertEqual('inst-uuid-5', objects[0]['object_uuid'])
         self.assertEqual('network', objects[1]['object_type'])
         self.assertEqual('net-uuid-5', objects[1]['object_uuid'])
+
+    def test_uuid_object_uuid_is_logged_as_str(self):
+        """A uuid.UUID object uuid must be stringified before it is logged.
+
+        add_event is typed to accept a uuid.UUID and obj.uuid is one. The
+        'Added event' fields are JSON-encoded by the log shipper, and a raw
+        UUID is not JSON serializable -- it made the handler raise mid-emit
+        and silently drop the record. The value logged for the object must
+        be a JSON-serializable str.
+        """
+        emitted = []
+
+        class _RecordingLogger:
+            # The object field is attached via a chained with_fields() call,
+            # so record the fully-merged fields the emit finally sees.
+            def __init__(self, fields=None):
+                self._fields = dict(fields or {})
+
+            def with_fields(self, fields):
+                merged = dict(self._fields)
+                merged.update(fields)
+                return _RecordingLogger(merged)
+
+            def info(self, _message):
+                emitted.append(self._fields)
+
+            def error(self, _message):
+                emitted.append(self._fields)
+
+        obj_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
+        with mock.patch.object(eventlog, 'LOG', _RecordingLogger()):
+            eventlog.add_event_multi(
+                'audit', [('instance', obj_uuid)], 'uuid coercion test')
+
+        self.assertEqual(1, len(emitted))
+        fields = emitted[0]
+        self.assertIsInstance(fields.get('instance'), str)
+        self.assertEqual(str(obj_uuid), fields['instance'])
+        # The log shipper JSON-encodes these fields; this must not raise.
+        json.dumps(fields)
+
+        # The spool payload agrees.
+        payload = self._dequeue_one()
+        self.assertEqual(str(obj_uuid), payload['objects'][0]['object_uuid'])

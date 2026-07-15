@@ -49,16 +49,23 @@ def add_event_multi(
         return
 
     # Flatten objects down to a single data type, whilst also not recording
-    # events for in memory only artifacts.
+    # events for in memory only artifacts. The object uuid is normalised to a
+    # str here: callers may pass a uuid.UUID (add_event is typed to accept
+    # one, and obj.uuid is a UUID), and it flows both into the 'Added event'
+    # log fields below and into the spool payload. A raw UUID is not JSON
+    # serializable, so leaving it unconverted makes the log shipper's JSON
+    # formatter raise mid-emit and drop the record. Stringify at the source so
+    # every consumer gets a serializable value.
     simpler_objects = []
     for obj in objects:
         if isinstance(obj, tuple):
-            simpler_objects.append(obj)
+            object_type, object_uuid = obj
+            simpler_objects.append((object_type, str(object_uuid)))
             continue
 
         if obj.in_memory_only:
             continue
-        simpler_objects.append((obj.object_type, obj.uuid))
+        simpler_objects.append((obj.object_type, str(obj.uuid)))
 
     # If we alter extra, we don't want that to leak back to the caller.
     if not extra:
