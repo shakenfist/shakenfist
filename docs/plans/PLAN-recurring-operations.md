@@ -27,8 +27,9 @@ development priorities. Key references inside the repo
 include `shakenfist/operations/baseoperation.py` (the
 `BaseClusterOperation` framework and its dispatcher
 semantics), `shakenfist/daemons/cluster/scheduled_tasks.py`
-(the existing ad-hoc scheduled-tasks code that this
-framework would absorb), `shakenfist/daemons/network/maintain.py`
+and `shakenfist/daemons/cleaner/scheduled_tasks.py` (the
+existing ad-hoc scheduled-tasks code that this framework
+would absorb), `shakenfist/daemons/network/maintain.py`
 (the network-maintenance loop that will become a consumer
 once the framework lands), and `shakenfist/mariadb.py` (the
 three-layer database access pattern).
@@ -55,7 +56,20 @@ ad-hoc:
    we have to a recurring-operations framework today. It is
    internal-only, tied to the cluster daemon's loop, and
    the schedule is hard-coded.
-2. **`maintain.py`** at `daemons/network/maintain.py` is the
+2. **`daemons/cleaner/scheduled_tasks.py`** is the per-node
+   equivalent. The cleaner daemon runs `update_power_states`,
+   `remove_stale_uploads_for_this_node`, and the
+   blob-directory / image-cache sweeps on a hard-coded
+   `schedule` inside its own loop rather than as queued
+   operations. These passes do their work inline while
+   holding per-object locks — notably the instance placement
+   lock taken by `update_power_states` — so a pass that
+   overruns the systemd watchdog is SIGABRTed mid-operation
+   and strands that lock. That failure mode has already bitten
+   production (see Future work), which makes the cleaner a
+   prime candidate for the queue-item model this plan
+   introduces.
+3. **`maintain.py`** at `daemons/network/maintain.py` is the
    network reconciliation loop. It runs on a thread inside
    `sf-net`, ticking every interval and walking all
    networks. The network-facade plan
@@ -63,7 +77,7 @@ ad-hoc:
    thread for now and gates its enqueues per-network,
    noting that the proper landing place for "maintain is a
    recurring CO" is here.
-3. **User-driven recurrence is currently impossible.** A
+4. **User-driven recurrence is currently impossible.** A
    user who wants "snapshot this instance every 24 hours"
    has to run external cron + REST client. There is no way
    to express "this operation should recur" through the API.
@@ -85,7 +99,8 @@ What we lack:
   still in flight")
 * User-facing REST API
 * A migration path for the existing internal consumers
-  (`scheduled_tasks.py`, `maintain.py`)
+  (`daemons/cluster/scheduled_tasks.py`,
+  `daemons/cleaner/scheduled_tasks.py`, `maintain.py`)
 * Two specific dispatcher gaps the network-facade plan
   flagged: no max-wait semantics for `runs_after`
   (a stuck dep defers the dependent indefinitely); and
@@ -100,7 +115,8 @@ supporting framework so that:
 
 * Any internal subsystem that today runs a recurring loop
   can express it as a `RecurringOperation` instead. Initial
-  consumers: `scheduled_tasks.py` and
+  consumers: `daemons/cluster/scheduled_tasks.py`,
+  `daemons/cleaner/scheduled_tasks.py`, and
   `daemons/network/maintain.py`.
 * Users can create `RecurringOperation` objects via the
   REST API for explicit recurring tasks. Initial supported
@@ -115,8 +131,9 @@ supporting framework so that:
   semantics for `runs_after` so a stuck dep doesn't break
   recurrence permanently, and explicit handling for failed
   ticks (do not break the recurrence on a single failure).
-* When the framework lands, `scheduled_tasks.py` and
-  `daemons/network/maintain.py` migrate to it in subsequent
+* When the framework lands, the cluster and cleaner
+  `scheduled_tasks.py` and `daemons/network/maintain.py`
+  migrate to it in subsequent
   phases. The network-facade plan's Q6 design (per-network
   gating + cooldown + circuit breaker) is preserved through
   the migration — it just lives inside a maintenance-pass
@@ -128,8 +145,8 @@ plan moves out of stub status):
 * **In scope:** the `RecurringOperation` object, its REST
   API, its tick mechanism, the dispatcher changes needed to
   support max-wait `runs_after` and continue-on-failure
-  recurrence semantics, and migration of
-  `scheduled_tasks.py` and `maintain.py` as initial
+  recurrence semantics, and migration of the cluster and
+  cleaner `scheduled_tasks.py` and `maintain.py` as initial
   consumers.
 * **Out of scope:** general workflow engines (we are not
   building Airflow). The recurrence vocabulary is
@@ -217,11 +234,14 @@ significantly when this plan moves out of stub status.
    (`namespaces` / `artifacts` / etc.).
 
 9. **Migration sequencing.** Build the framework first,
-   then migrate `scheduled_tasks.py` (simpler, no
-   user-facing surface), then migrate `maintain.py`
-   (requires the network-maintain-pass op type to exist
-   as a discrete CO, which is itself non-trivial). The
-   user-facing REST surface and the snapshot/agent
+   then migrate the cluster and cleaner `scheduled_tasks.py`
+   (simpler, no user-facing surface), then migrate
+   `maintain.py` (requires the network-maintain-pass op type
+   to exist as a discrete CO, which is itself non-trivial).
+   The cleaner is the more urgent of the two scheduled-task
+   consumers: its inline passes hold per-object locks and
+   have already caused watchdog-kill incidents (see Future
+   work). The user-facing REST surface and the snapshot/agent
    template support can land in parallel with or after
    the internal migrations — they don't block each other.
 
@@ -236,7 +256,7 @@ look like:)
 | 1. `RecurringOperation` object and persistence | TBD | Not started |
 | 2. Dispatcher max-wait for `runs_after` + continue-on-failure recurrence semantics | TBD | Not started |
 | 3. Tick mechanism and gating policies | TBD | Not started |
-| 4. Migrate `scheduled_tasks.py` as first internal consumer | TBD | Not started |
+| 4. Migrate cluster + cleaner `scheduled_tasks.py` as first internal consumers | TBD | Not started |
 | 5. Network-maintain-pass op + migrate `maintain.py` | TBD | Not started |
 | 6. REST API and user-facing template vocabulary | TBD | Not started |
 | 7. Documentation and tests | TBD | Not started |
@@ -263,9 +283,12 @@ When this plan is successfully implemented:
 * A `RecurringOperation` object type exists, follows the
   existing DBO patterns, persists in MariaDB, and is
   documented in `ARCHITECTURE.md`.
-* `daemons/cluster/scheduled_tasks.py` is gone (or is a
-  thin wrapper) — its contents have moved to internal
-  `RecurringOperation` instances.
+* `daemons/cluster/scheduled_tasks.py` and
+  `daemons/cleaner/scheduled_tasks.py` are gone (or are thin
+  wrappers) — their contents have moved to internal
+  `RecurringOperation` instances, so their passes enqueue
+  bounded work items rather than doing all the work inline
+  under a single watchdog budget while holding locks.
 * `daemons/network/maintain.py` is gone — its contents
   have moved to a `network_maintain_pass` CO triggered by
   an internal `RecurringOperation`. The per-network
@@ -287,6 +310,24 @@ When this plan is successfully implemented:
 
 ### Future work
 
+* **Motivating incident: cleaner watchdog kills (2026-07-16).**
+  On the sfcbr cluster the `sf-cleaner` daemon was
+  systemd-watchdog-killed (SIGABRT, result `watchdog`) eight
+  times across sf-1..sf-4 in twelve hours. Each kill landed
+  mid-`update_power_states`, aborting the daemon while it held
+  an instance placement lock; the stranded lock then surfaced
+  cluster-wide as "Lock held by missing process on this node"
+  until its lease expired ~60-80s later, flaking overnight CI
+  instance provisioning. Interim band-aids landed outside this
+  plan (pet the watchdog per libvirt domain in
+  `update_power_states`, and raise `sf-cleaner`'s `WatchdogSec`
+  to 300s), but the structural fix is exactly what this plan
+  proposes: the cleaner's passes should enqueue bounded work
+  items processed by the queue rather than doing all the work
+  inline under one watchdog budget while holding per-object
+  locks. This is concrete evidence that the inline-loop model
+  is fragile at scale and raises the priority of migrating the
+  cleaner (see Migration sequencing, question 9).
 * **Time-aware scheduling.** Cron expressions evaluated in
   the cluster's configured timezone (not just UTC), with
   proper DST handling. Initial implementation is UTC-only.
