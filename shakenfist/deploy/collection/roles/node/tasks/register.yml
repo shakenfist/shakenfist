@@ -49,6 +49,25 @@
     daemon_reload: false
   when: node_is_database_node
 
+# Confirm this node's gRPC gateway is accepting connections again before we
+# return. When the example playbook rolls the database tier one node at a time
+# (site.yml play 6b, serial: 1), this gate is what keeps a gateway serving
+# throughout the roll: the next node's restart cannot begin until this one is
+# back up. sf-database binds the gateway to the mesh IP; a listening socket is
+# exactly the signal round_robin failover keys on (subchannel connectivity),
+# and systemd reports the unit started before the port is bound, so the service
+# restart above is not sufficient on its own.
+- name: Wait for this node's database gateway to accept connections
+  ansible.builtin.wait_for:
+    host: "{{ node_mesh_ip }}"
+    # The gateway port is hardcoded to 13005 across the collection (see the
+    # config template's SHAKENFIST_MARIADB_GATEWAY_PORT); match that here.
+    port: 13005
+    state: started
+    delay: 2
+    timeout: 60
+  when: node_is_database_node
+
 # Start the remaining daemons. The ordering here matches the order they must
 # start in, not alphabetical order.
 - name: Base daemons everywhere

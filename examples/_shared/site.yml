@@ -469,11 +469,23 @@
 # Play 6b: register the database tier (starts sf-database and the gRPC gateway)
 # BEFORE the remaining nodes register over that gateway. The ordering contract
 # in the node role's register.yml requires this.
+#
+# serial: 1 rolls the tier one node at a time. Every SF client round-robins
+# across all gateways in MARIADB_GATEWAY_HOSTS, so restarting them in parallel
+# (ansible's default) takes the whole tier down at once -- the ~5s cluster-wide
+# DatabaseUnavailable window seen on the 2026-07-15 sfcbr deploy, harmless with
+# one gateway but an outage with several. Rolling one at a time keeps a gateway
+# serving throughout; register.yml waits for each node's gateway to accept
+# connections again before this play moves on, so the next restart never begins
+# while a peer is still down. Database nodes reach MariaDB directly (not through
+# the gateway), so a node can always register itself even while its own gateway
+# is mid-restart.
 # ---------------------------------------------------------------------------
 - name: Register the database tier and start its daemons
   hosts: database_node:etcd_master
   become: true
   gather_facts: false
+  serial: 1
   tasks:
     - name: Register the database-tier node
       ansible.builtin.include_role:
