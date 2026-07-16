@@ -188,6 +188,55 @@
     VIRTUAL_ENV: /srv/shakenfist/venv
   changed_when: true
 
+# Restart-on-change (1 of 2): decide whether the installed Shaken Fist CODE
+# actually changed this run. The install above always reports changed (--reinstall
+# rewrites the venv unconditionally), and the wheels themselves are rebuilt from
+# source on every deploy -- python3 -m build embeds build timestamps, so the wheel
+# BYTES differ every morning even when the source did not. Neither is a faithful
+# "did the code change" signal. What IS faithful is the content of the INSTALLED
+# package files: identical source produces byte-identical installed .py files
+# regardless of how the wheel was packed. We hash those files into a marker; the
+# marker changing is the signal register.yml gates daemon restarts on. This fires
+# whenever the code that actually runs changed -- a develop bump that touched the
+# Python source, a CI dirty rebuild (same version string, changed source), or a
+# first install (marker absent) -- and stays quiet otherwise, so folding the
+# deploy into a daily rotation no longer bounces every daemon every morning.
+# Deliberately narrow in two ways. The .dist-info metadata directories are not
+# under these package paths, so a bump that changes only the version string (a
+# docs- or CI-only commit) leaves the hash untouched and correctly restarts
+# nothing. And a pure runtime-dependency bump with no SF source change is not
+# caught either -- acceptable, because uv does not upgrade already-satisfied
+# dependencies on --reinstall, so in practice a dependency only moves alongside a
+# source change this hash already sees. __pycache__ is excluded because .pyc
+# files carry their own embedded timestamps.
+- name: Compute the installed Shaken Fist code signature
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      find /srv/shakenfist/venv/lib/python3*/site-packages/shakenfist
+      /srv/shakenfist/venv/lib/python3*/site-packages/shakenfist_client
+      -type f -not -path '*__pycache__*' -print0
+      | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+    executable: /bin/bash
+  register: sf_code_signature
+  changed_when: false
+
+- name: Record the deployed code signature
+  ansible.builtin.copy:
+    dest: /srv/shakenfist/.deployed-code.sha256
+    content: "{{ sf_code_signature.stdout }}\n"
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  register: sf_code_marker
+
+# Persist the decision as a host fact: register.yml runs in a SEPARATE, later
+# play (the example playbook rolls the database tier serial: 1), and registered
+# results do not survive a play boundary but set_fact host facts do.
+- name: Remember whether the installed code changed this run
+  ansible.builtin.set_fact:
+    sf_code_changed: "{{ sf_code_marker is changed }}"
+
 - name: Enable desired services
   ansible.builtin.service:
     name: "{{ item }}.service"

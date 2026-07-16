@@ -35,6 +35,19 @@ Which will pull in all the relevant other python packages it requires.
 Then simply re-run your deployment playbook as you did when you first
 installed (see [Installation](installation.md)) and the cluster will upgrade.
 
+If you deploy with the [`shakenfist.shakenfist` Ansible
+collection](https://github.com/shakenfist/shakenfist/tree/develop/deploy/collection),
+re-running the playbook is **restart-on-change**: the `node` role restarts a
+node's `sf-*` daemons only when the installed code, `/etc/sf/config`, or a
+systemd unit actually changed on that node. A redeploy on a day nothing moved
+leaves the running cluster undisturbed, so it is safe to run the deploy on a
+schedule; on a day the code did move, the daemons restart to pick it up (a
+built-in daily upgrade-path test). Code changes are detected by hashing the
+installed package files, not the wheel, so a rebuilt-but-identical wheel does
+not trigger a spurious restart. See the collection's *Idempotence and
+restart-on-change* section for details. This automates, per node, the same
+restart the manual procedure below performs by hand.
+
 ## MariaDB schema migrations
 
 Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The
