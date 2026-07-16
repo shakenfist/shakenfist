@@ -205,6 +205,7 @@ nav:
             - Plans:
                 - "Plans index": components/kerbside/plans/index.md
                 - "Automated SPICE test harness": components/kerbside/plans/PLAN-test-harness.md
+                - "Consistency Audit Deferred Work": components/kerbside/plans/PLAN-consistency-audit.md
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
                 - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
