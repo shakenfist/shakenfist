@@ -9678,6 +9678,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#object_states-v2-to-v3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        object_states v2 to v3
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -9831,6 +9842,17 @@
     <span class="md-ellipsis">
       
         cluster_operation_targets v1 to v2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#object_states-v2-to-v3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        object_states v2 to v3
       
     </span>
   </a>
@@ -10019,6 +10041,20 @@ functional breakage; only the audit event.</p>
 <p>Operations enqueued after the migration completes record all of
 their targets correctly, so the gate behaves as designed once the
 in-flight v1 ops drain.</p>
+<h4 id="object_states-v2-to-v3">object_states v2 to v3<a class="headerlink" href="#object_states-v2-to-v3" title="Permanent link">&para;</a></h4>
+<p>The v3 migration adds a standalone index <code>idx_object_states_uuid</code> on
+<code>object_states(object_uuid)</code>. The table's primary key is composite,
+<code>(object_type, object_uuid)</code>, so it cannot serve a join that keys on
+<code>object_uuid</code> alone. The in-flight-operation gate does exactly that — it
+joins <code>cluster_operation_targets.operation_uuid</code> to
+<code>object_states.object_uuid</code> without an <code>object_type</code> — so without the new
+index that join degraded to a full-table Block-Nested-Loop scan of
+<code>object_states</code> on every check. On a busy, long-lived cluster (tens of
+thousands of <code>object_states</code> rows) this produced a steady stream of
+<code>Slow MariaDB query</code> warnings and added latency to every operation gate,
+though no functional failure. The migration is a single online
+<code>CREATE INDEX</code> (MariaDB <code>ALGORITHM=INPLACE</code>), so it does not block writes and
+is quick even on a large table.</p>
 <h3 id="database-service-architecture">Database service architecture<a class="headerlink" href="#database-service-architecture" title="Permanent link">&para;</a></h3>
 <p>Only the database node has direct access to MariaDB credentials. All other
 nodes access MariaDB data through a gRPC database microservice that runs on
