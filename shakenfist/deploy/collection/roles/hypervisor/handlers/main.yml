@@ -1,0 +1,22 @@
+---
+# Restart handlers for the hypervisor role.
+#
+# These fire only when notified -- i.e. when the libvirt qemu.conf or an
+# apparmor profile the tasks manage actually changes -- rather than on every
+# deploy. This keeps a no-op redeploy from bouncing libvirtd/apparmor (and,
+# with it, briefly disrupting hypervisor management) every time the playbook
+# runs. The tasks that manage those files notify these handlers, and the role
+# flushes them (meta: flush_handlers) at the point the old unconditional
+# restart tasks used to sit, so ordering relative to the later
+# `virsh net-destroy default` is preserved.
+
+- name: Restart apparmor
+  ansible.builtin.service:
+    name: apparmor
+    enabled: true
+    state: restarted
+
+- name: Restart libvirt
+  ansible.builtin.service:
+    name: libvirtd
+    state: restarted

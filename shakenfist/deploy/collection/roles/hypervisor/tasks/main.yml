@@ -73,12 +73,14 @@
     path: /etc/libvirt/qemu.conf
     regexp: "#spice_tls = "
     line: 'spice_tls = 1'
+  notify: Restart libvirt
 
 - name: Configure SPICE TLS PKI directory
   ansible.builtin.lineinfile:
     path: /etc/libvirt/qemu.conf
     regexp: "#spice_tls_x509_cert_dir = "
     line: 'spice_tls_x509_cert_dir = "/etc/pki/libvirt-spice"'
+  notify: Restart libvirt
 
 # Ensure libvirt has BPF and perfmon capabilities (see the Debian bug
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=979964 for details).
@@ -87,18 +89,27 @@
     path: /etc/apparmor.d/local/usr.sbin.libvirtd
     regexp: "  capability bpf,"
     line: '  capability bpf,'
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Let libvirt use perfmon
   ansible.builtin.lineinfile:
     path: /etc/apparmor.d/local/usr.sbin.libvirtd
     regexp: "  capability perfmon,"
     line: '  capability perfmon,'
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Let libvirt use sys_rawio
   ansible.builtin.lineinfile:
     path: /etc/apparmor.d/local/usr.sbin.libvirtd
     regexp: "  capability sys_rawio,"
     line: '  capability sys_rawio,'
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Check whether /etc/apparmor.d/local/abstractions/libvirt-qemu exists
   ansible.builtin.stat:
@@ -113,6 +124,9 @@
     regexp: "/srv/shakenfist/instances.*nvme.*"
     line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 # NOTE(mikal): and fix it here too.
 - name: Add an apparmor rule for NVMe disks (older Debian)
@@ -121,6 +135,9 @@
     regexp: "/srv/shakenfist/instances.*nvme.*"
     line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 # Let libvirt read the SSL configuration for its SPICE connections (see the
 # Debian bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1030684 for
@@ -131,6 +148,9 @@
     regexp: "/etc/ssl/openssl.cnf r,"
     line: '/etc/ssl/openssl.cnf r,'
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Let libvirt read our openssl config (older Debian)
   ansible.builtin.lineinfile:
@@ -138,6 +158,9 @@
     regexp: "/etc/ssl/openssl.cnf r,"
     line: '/etc/ssl/openssl.cnf r,'
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 # For instances which are started with no network interface, but then hotplug
 # one later, we need to ensure that we always have access to /dev/vhost-net.
@@ -149,6 +172,9 @@
     regexp: "/dev/vhost-net rw,"
     line: '/dev/vhost-net rw,'
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Add an apparmor rule to always allow vhost-net access (older Debian)
   ansible.builtin.lineinfile:
@@ -156,6 +182,9 @@
     regexp: "/dev/vhost-net rw,"
     line: '/dev/vhost-net rw,'
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 # For vsock communication with guest agents (sf-agent2 side channel), we need
 # access to /dev/vhost-vsock and /dev/vsock. This is similar to vhost-net above.
@@ -165,6 +194,9 @@
     regexp: "/dev/vhost-vsock rw,"
     line: '/dev/vhost-vsock rw,'
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Add an apparmor rule to always allow vhost-vsock access (older Debian)
   ansible.builtin.lineinfile:
@@ -172,6 +204,9 @@
     regexp: "/dev/vhost-vsock rw,"
     line: '/dev/vhost-vsock rw,'
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Add an apparmor rule to always allow vsock access (modern Debian)
   ansible.builtin.lineinfile:
@@ -179,6 +214,9 @@
     regexp: "/dev/vsock rw,"
     line: '/dev/vsock rw,'
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Add an apparmor rule to always allow vsock access (older Debian)
   ansible.builtin.lineinfile:
@@ -186,17 +224,17 @@
     regexp: "/dev/vsock rw,"
     line: '/dev/vsock rw,'
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
-- name: Restart apparmor
-  ansible.builtin.service:
-    name: apparmor
-    enabled: true
-    state: restarted
-
-- name: Restart libvirt
-  ansible.builtin.service:
-    name: libvirtd
-    state: restarted
+# Apply any apparmor / libvirt config changes notified above by restarting
+# those services now -- before the virsh net-destroy below, which must be the
+# last libvirt-affecting step (a libvirtd restart after it would bring the
+# autostart default network back up). On a no-op redeploy nothing was
+# notified, so nothing restarts.
+- name: Flush apparmor / libvirt restart handlers
+  ansible.builtin.meta: flush_handlers
 
 # The libvirt domain template ships with this role; ansible resolves the
 # relative src against the role's files/ directory.
