@@ -128,6 +128,22 @@ Operations enqueued after the migration completes record all of
 their targets correctly, so the gate behaves as designed once the
 in-flight v1 ops drain.
 
+#### object_states v2 to v3
+
+The v3 migration adds a standalone index `idx_object_states_uuid` on
+`object_states(object_uuid)`. The table's primary key is composite,
+`(object_type, object_uuid)`, so it cannot serve a join that keys on
+`object_uuid` alone. The in-flight-operation gate does exactly that — it
+joins `cluster_operation_targets.operation_uuid` to
+`object_states.object_uuid` without an `object_type` — so without the new
+index that join degraded to a full-table Block-Nested-Loop scan of
+`object_states` on every check. On a busy, long-lived cluster (tens of
+thousands of `object_states` rows) this produced a steady stream of
+`Slow MariaDB query` warnings and added latency to every operation gate,
+though no functional failure. The migration is a single online
+`CREATE INDEX` (MariaDB `ALGORITHM=INPLACE`), so it does not block writes and
+is quick even on a large table.
+
 ### Database service architecture
 
 Only the database node has direct access to MariaDB credentials. All other

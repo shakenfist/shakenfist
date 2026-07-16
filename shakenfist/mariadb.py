@@ -175,7 +175,7 @@ _event_objects_table: Optional[sa.Table] = None
 #   All tables v1: Initial schema creation
 #   All tables v2: Data migration from etcd to MariaDB
 #   blob_hashes: Same pattern - v1 schema, v2 data migration from etcd
-OBJECT_STATES_VERSION = 2
+OBJECT_STATES_VERSION = 3
 IPAM_RESERVATIONS_VERSION = 2
 UPLOADS_VERSION = 2
 DNSMASQ_VERSION = 2
@@ -857,6 +857,13 @@ def _get_object_states_table() -> sa.Table:
                 sa.Index(
                     'idx_object_states_type_state',
                     'object_type', 'state_value'),
+                # Standalone index on object_uuid. The composite primary key
+                # leads with object_type, so it cannot serve joins that key on
+                # object_uuid alone -- most importantly the in-flight-operation
+                # gate, which joins cluster_operation_targets.operation_uuid to
+                # object_states.object_uuid without an object_type. Without this
+                # that join degrades to a full-table scan of object_states.
+                sa.Index('idx_object_states_uuid', 'object_uuid'),
             )
     return _object_states_table
 
@@ -958,6 +965,28 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
                     LOG.debug(f'Index {idx.name} creation skipped: {e}')
 
         current_ver = OBJECT_STATES_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        # v2 -> v3: add a standalone index on object_uuid. The composite
+        # primary key (object_type, object_uuid) leads with object_type, so it
+        # cannot serve joins that key on object_uuid alone -- most importantly
+        # the in-flight-operation gate, which joins
+        # cluster_operation_targets.operation_uuid to object_states.object_uuid
+        # without an object_type. Without this index that join degrades to a
+        # full-table Block-Nested-Loop scan of object_states (tens of thousands
+        # of rows) on every check, producing sustained slow-query load that
+        # grows with the table. CREATE INDEX is online (INPLACE) on MariaDB, and
+        # IF NOT EXISTS keeps the step restartable.
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v3: '
+            'adding idx_object_states_uuid on object_uuid.')
+        with engine.connect() as conn:
+            conn.execute(sa.text(
+                f'CREATE INDEX IF NOT EXISTS idx_object_states_uuid '
+                f'ON {table_name} (object_uuid)'))
+            conn.commit()
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
