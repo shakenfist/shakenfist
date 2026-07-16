@@ -142,7 +142,8 @@ class Monitor(daemon.Daemon):
                     b.drop_node_location(config.NODE_NAME)
 
     def _run_inner(self):
-        schedule.every(1).minutes.do(scheduled_tasks.update_power_states)
+        schedule.every(1).minutes.do(
+            scheduled_tasks.update_power_states, self.pet_watchdog)
         schedule.every(5).minutes.do(
             scheduled_tasks.remove_stale_uploads_for_this_node)
         schedule.every(5).minutes.do(observe_local_blobs)

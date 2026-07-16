@@ -62,6 +62,21 @@ RuntimeDirectoryPreserve=yes
 # (worst case ~360s). A watchdog kill is SIGABRT, not SIGTERM, so
 # RestartPreventExitStatus=SIGTERM does not block the restart.
 WatchdogSec=300s
+{% elif item == "cleaner" %}
+# sf-cleaner runs per-node maintenance passes -- update_power_states over every
+# libvirt domain (each calling place_instance, which takes the instance
+# placement lock and makes MariaDB calls), plus the blob-directory and
+# image-cache sweeps. These scale with the instance and blob count on the node.
+# Each pass now pets the watchdog per item, but a single slow libvirt / MariaDB
+# call under load can still stretch a legitimate pass past 60s, and a watchdog
+# kill mid-pass SIGABRTs the cleaner while it holds the placement lock, which
+# then shows up cluster-wide as a stranded lock until its lease expires. It
+# therefore gets the same generous watchdog as sf-cluster. Unlike sf-cluster
+# the cleaner is per-node and holds no elected cluster lock, so a longer window
+# carries no failover cost; a genuinely wedged cleaner is still caught within
+# ~5 min and Restart=on-failure brings it back. A watchdog kill is SIGABRT, not
+# SIGTERM, so RestartPreventExitStatus=SIGTERM does not block the restart.
+WatchdogSec=300s
 {% elif item not in ["sentinel-first", "sentinel-last", "privexec", "nodelock"] %}
 # Arm the systemd watchdog for the other non-trivial daemons. They emit
 # WATCHDOG=1 from their main loop (Daemon.idle(), plus explicit pets in the
