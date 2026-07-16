@@ -234,3 +234,12 @@ strict = true
 [[tool.mypy.overrides]]
 module = "shakenfist.ipam"
 strict = true
+
+# Generated gRPC stubs (mypy-protobuf output) are not hand-maintained, so we
+# do not type check them. Newer mypy releases flag the type: ignore comments
+# and overloads that mypy-protobuf emits, none of which we can fix without
+# regenerating from upstream.
+[[tool.mypy.overrides]]
+module = "shakenfist.protos.*"
+ignore_errors = true
+warn_unused_ignores = false

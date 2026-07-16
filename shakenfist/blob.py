@@ -243,13 +243,13 @@ class Blob(dbo):
 
         # Create BlobData for the new object
         data = BlobData(
-            uuid=blob_uuid,  # type: ignore[arg-type]
+            uuid=blob_uuid,
             modified=normalized_modified,
             fetched_at=fetched_at,
             version=cls.current_version
         )
         b = Blob(data)
-        b.state = Blob.STATE_INITIAL  # type: ignore[misc]
+        b.state = Blob.STATE_INITIAL
 
         # Record the depends_on relationship in the object_references table
         if depends_on:

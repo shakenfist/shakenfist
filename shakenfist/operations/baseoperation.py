@@ -380,7 +380,7 @@ class BaseClusterOperation(BaseOperation):
 
         for t in unique_tasks:
             self.dispatch_task(t)  # type: ignore[attr-defined]
-            if self.state.value in [BaseClusterOperation.STATE_ABORT,  # type: ignore[attr-defined]
+            if self.state.value in [BaseClusterOperation.STATE_ABORT,
                                     BaseClusterOperation.STATE_DELETED,
                                     BaseClusterOperation.STATE_ERROR,
                                     BaseClusterOperation.STATE_QUEUED]:
