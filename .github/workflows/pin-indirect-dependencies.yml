@@ -75,10 +75,18 @@ jobs:
           datestamp=$(date "+%Y%m%d")
           git checkout -b pin-dependencies-${datestamp}
 
+          # NOTE(mikal): compare dependency names in their PEP 503 canonical
+          # form so a dep already pinned with one spelling (e.g.
+          # "typing-extensions") is not re-added under pip freeze's canonical
+          # spelling ("typing_extensions"). Treating "-" and "_" as distinct
+          # here silently created duplicate pins that only diverged -- and
+          # broke resolution -- once Renovate bumped one spelling (see the
+          # duplicate PRs #3398/#3399 for typing-extensions).
           for depver in $(${GITHUB_WORKSPACE}/ci-venv/bin/pip freeze --local); do
             dep=$(echo ${depver} | sed 's/==.*//')
+            depre=$(echo ${dep} | sed -E 's/[-_.]+/[-_.]/g')
 
-            if [ $(egrep -ic "${dep}==" pyproject.toml) -lt 1 ]; then
+            if [ $(egrep -ic "\"${depre}==" pyproject.toml) -lt 1 ]; then
               sed -i "s/    # END_OF_INDIRECT_DEPS/    \"${depver}\",\n    # END_OF_INDIRECT_DEPS/" pyproject.toml
             fi
           done
