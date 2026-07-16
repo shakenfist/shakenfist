@@ -1,5 +1,12 @@
 ---
 # Configure kernel samepage merging (KSM), driven by the ksm_enabled variable.
+#
+# Each "run now" task applies the same sysfs state that the matching "on boot"
+# tmpfiles drop-file persists, so it only needs to run when that drop-file
+# actually changed. Gating the runtime apply on `... is changed` keeps a no-op
+# redeploy from reporting a spurious change (the sysfs values are already set
+# from boot); on first apply or a config change the drop-file is written and
+# the runtime apply runs with it.
 
 - name: Check if KSM advisor mode is supported
   ansible.builtin.stat:
@@ -16,6 +23,7 @@
     dest: /etc/tmpfiles.d/sf-ksm.conf
     owner: root
     mode: ugo+r
+  register: ksm_boot_advisor
   when: ksm_enabled == "1" and ksm_advisor_mode.stat.exists
 
 - name: Configure KSM to run on boot (without advisor)
@@ -27,6 +35,7 @@
     dest: /etc/tmpfiles.d/sf-ksm.conf
     owner: root
     mode: ugo+r
+  register: ksm_boot_no_advisor
   when: ksm_enabled == "1" and not ksm_advisor_mode.stat.exists
 
 # merge_across_nodes requires a reboot, so is skipped below
@@ -37,7 +46,7 @@
     echo 60 > /sys/kernel/mm/ksm/advisor_target_scan_time
   changed_when: true
   failed_when: false
-  when: ksm_enabled == "1" and ksm_advisor_mode.stat.exists
+  when: ksm_enabled == "1" and ksm_advisor_mode.stat.exists and ksm_boot_advisor is changed
 
 - name: Configure KSM to run now (without advisor)
   ansible.builtin.shell: |
@@ -45,7 +54,7 @@
     echo "1000000" > /sys/kernel/mm/ksm/pages_to_scan
   changed_when: true
   failed_when: false
-  when: ksm_enabled == "1" and not ksm_advisor_mode.stat.exists
+  when: ksm_enabled == "1" and not ksm_advisor_mode.stat.exists and ksm_boot_no_advisor is changed
 
 - name: Configure KSM to not run on boot
   ansible.builtin.copy:
@@ -56,6 +65,7 @@
     dest: /etc/tmpfiles.d/sf-ksm.conf
     owner: root
     mode: ugo+r
+  register: ksm_boot_disabled
   when: ksm_enabled != "1"
 
 # merge_across_nodes requires a reboot, so is skipped below
@@ -65,4 +75,4 @@
     echo "none" > /sys/kernel/mm/ksm/advisor_mode
   changed_when: true
   failed_when: false
-  when: ksm_enabled != "1"
+  when: ksm_enabled != "1" and ksm_boot_disabled is changed

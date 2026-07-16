@@ -18,19 +18,36 @@
   failed_when: false
   register: is_amd
 
+# Only reload the kvm module when nested virt is not already enabled, so a
+# no-op redeploy neither reports a spurious change nor attempts a module
+# reload on a host that is already running guests.
+- name: Check whether nested virtualization is already enabled (AMD)
+  ansible.builtin.command: cat /sys/module/kvm_amd/parameters/nested
+  register: amd_nested_state
+  changed_when: false
+  failed_when: false
+  when: is_amd.rc == 0
+
+- name: Check whether nested virtualization is already enabled (Intel)
+  ansible.builtin.command: cat /sys/module/kvm_intel/parameters/nested
+  register: intel_nested_state
+  changed_when: false
+  failed_when: false
+  when: is_intel.rc == 0
+
 - name: Enable nested virtualization now (AMD)
   ansible.builtin.shell: |
     modprobe -r kvm_intel || true
     modprobe kvm_amd nested=1
   changed_when: true
-  when: is_amd.rc == 0
+  when: is_amd.rc == 0 and (amd_nested_state.stdout | default('N') | trim) not in ['Y', '1']
 
 - name: Enable nested virtualization now (Intel)
   ansible.builtin.shell: |
     modprobe -r kvm_amd
     modprobe kvm_intel nested=1
   changed_when: true
-  when: is_intel.rc == 0
+  when: is_intel.rc == 0 and (intel_nested_state.stdout | default('N') | trim) not in ['Y', '1']
 
 - name: Enable nested virtualization on boot (AMD)
   ansible.builtin.copy:
@@ -57,9 +74,15 @@
 # This module is required for the sf-agent2 side channel to work. On some
 # distributions (notably Ubuntu 24.04), this module is not automatically
 # loaded when vsock sockets are created.
+- name: Check whether vhost_vsock is already loaded
+  ansible.builtin.stat:
+    path: /sys/module/vhost_vsock
+  register: vhost_vsock_module
+
 - name: Load vhost_vsock kernel module
   ansible.builtin.command: modprobe vhost_vsock
   changed_when: true
+  when: not vhost_vsock_module.stat.exists
 
 - name: Ensure vhost_vsock is loaded on boot
   ansible.builtin.copy:
