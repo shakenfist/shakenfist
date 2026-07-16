@@ -459,6 +459,46 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
         self.assertIn('api', attrs.daemons)
         mock_set_daemon_state.assert_called_once()
 
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
+                return_value=[])
+    @mock.patch('shakenfist.node.mariadb.set_node_daemon_state',
+                return_value=True)
+    @mock.patch('shakenfist.node.mariadb.update_node_attributes')
+    @mock.patch('shakenfist.node.mariadb.create_node_attributes')
+    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
+    @mock.patch('shakenfist.node.add_event')
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
+    @mock.patch('shakenfist.mariadb.set_state')
+    @mock.patch(
+        'shakenfist.mariadb.get_state',
+        return_value=State(
+            value='created', update_time=1234567890.0))
+    def test_register_daemon_already_registered_is_noop(
+            self, mock_get_state, mock_set_state,
+            mock_lock, mock_add_event, mock_get_attrs,
+            mock_create_attrs, mock_update_attrs,
+            mock_set_daemon_state, mock_get_all_states):
+        """Re-registering an existing daemon must not reset its state.
+
+        A deploy re-runs register-daemon every pass; with restart-on-change the
+        daemon is not restarted when nothing changed. Resetting a running
+        daemon's state to STOPPED here would leave it stuck stopped and the node
+        wrongly degraded, so re-registration must be a true no-op.
+        """
+        attrs = NodeAttributesData(uuid=TEST_UUID)
+        attrs.daemons.append('api')
+        mock_get_attrs.return_value = attrs
+        mock_lock.return_value = mock.MagicMock()
+        mock_update_attrs.return_value = True
+
+        n = self._make_node()
+        n.register_daemon('api')
+
+        # Still registered exactly once, and no state reset / event emitted.
+        self.assertEqual(['api'], attrs.daemons)
+        mock_set_daemon_state.assert_not_called()
+        mock_add_event.assert_not_called()
+
     def test_register_invalid_daemon(self):
         """Test registering invalid daemon raises."""
         n = self._make_node()

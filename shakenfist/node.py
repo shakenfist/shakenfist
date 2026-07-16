@@ -371,9 +371,19 @@ class Node(dbo):
         with self.get_lock_attr('daemons', 'Register daemon'):
             self._invalidate_attributes()
             attrs = self._ensure_attributes()
-            if daemon not in attrs.daemons:
-                attrs.daemons.append(daemon)
-                self._save_attributes()
+            if daemon in attrs.daemons:
+                # Already registered: re-registering must be a true no-op. In
+                # particular it must NOT reset the daemon state. A deploy runs
+                # register-daemon on every pass, and with restart-on-change the
+                # daemon is not restarted when nothing changed -- so resetting a
+                # running daemon's state to STOPPED here would leave it stuck
+                # stopped (nothing re-asserts a running daemon's state without a
+                # restart) and wrongly report the whole node degraded.
+                return
+            attrs.daemons.append(daemon)
+            self._save_attributes()
+        # Only reached for a genuinely new registration: initialise the state to
+        # STOPPED (the daemon has not started yet) and record the event.
         self.set_daemon_state(daemon, self.DAEMON_STATE_STOPPED)
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon registered')
 
