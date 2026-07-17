@@ -657,7 +657,9 @@ implemented because the following statements will be true:
   before production — most likely by adding optional subject
   verification to the ryll crate's verifier (so ryll benefits too)
   and having the proxy pass the console's `host_subject`. Tracked
-  here so it is not lost.
+  here so it is not lost. **Done**: implemented via
+  `PLAN-host-subject.md` (ryll PR #166 + kerbside adoption),
+  2026-07-17.
 * **Per-source / per-console firewall policy profiles**
   in the database, with API and web UI surface.
 * **SASL auth and the full non-mini data header**, if a
