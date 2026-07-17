@@ -140,17 +140,26 @@ benefit automatically.
   without replacement — callers take `candidates[0]` but
   fall back down the list on failure, so the tail order
   matters too.
-- **D4 — `CPU_OVERCOMMIT_RATIO` is redefined against
-  schedulable physical cores,** not threads, and its default
-  is chosen from sfcbr measurements (step 00a-1; working
-  hypothesis ~4:1 per core ≈ 2.7:1 per thread on HT parts)
-  rather than replacing one piece of folklore with another.
-  Admission becomes
-  `cpu_total_instance_vcpus + requested > schedulable_cores × ratio`.
+- **D4 — `CPU_OVERCOMMIT_RATIO` stays thread-denominated but
+  narrows to schedulable threads, with a measured default.**
+  Back-brief outcome (2026-07-17): since loadavg counts
+  against logical CPUs, accounting and admission stay
+  thread-denominated for now — the ratio keeps meaning
+  "vCPUs per logical CPU", only the base narrows from all
+  threads to schedulable threads and the default drops from
+  folklore 16 to the measured value (3.0 — see the
+  Measurements appendix; today's viable packing on plain
+  nodes is 2.3-3.0 vCPUs/thread with RAM binding first, so
+  3.0 preserves normal operation while biting early on
+  reserved-core infra nodes). Admission becomes
+  `cpu_total_instance_vcpus + requested > cpu_schedulable × ratio`.
   This is the only user-visible semantic change in the phase;
   it gets its own commit and a release note (a cluster
   already past the new cap refuses *new* schedules until it
-  drains; existing VMs are untouched).
+  drains; existing VMs are untouched). A per-core
+  redefinition is deferred until there is evidence
+  thread-counting misranks (revisit alongside open question
+  13's demand model).
 - **D5 — track P-cores vs E-cores, don't act on them.**
   Publish `cpu_cores_performance` / `cpu_cores_efficiency`
   when the sysfs paths exist; omit otherwise. No scheduling
@@ -184,7 +193,7 @@ an acceptable saturation point.
 | 00a-1 — measure sfcbr demand | n/a | management session | none | Sample `node_metrics` on sfcbr across several CI bursts (via `tools/sfcbr-capacity.sh` in 33fl and/or direct `sf-ctl` / DB queries): per node, record `cpu_load_1`, `cpu_total_instance_vcpus`, `cpu_max`, core count, roles. Compute the achieved demand-per-vCPU (`load / allocated vCPUs`) at points where load-per-thread crosses ~0.75-1.0. Outputs, recorded in a **Measurements** appendix to this plan: (a) the chosen `CPU_OVERCOMMIT_RATIO` per-core default; (b) confirmation or revision of `SCHEDULER_TARGET_LOAD = 0.75`; (c) the observed demand-per-vCPU range, as the seed constant for open question 13. If burst sampling is impractical quickly, proceed with the hypothesis values and mark the appendix provisional — do not block 00a-2/00a-3. |
 | 00a-2 — resources daemon: topology + reservations | medium | opus | none | In `daemons/resources/main.py` `_get_stats()`: publish `cpu_cores` (`psutil.cpu_count(logical=False)`), `cpu_threads` (`psutil.cpu_count(logical=True)`; keep `cpu_max` as-is for compatibility), and on Intel hybrid parts `cpu_cores_performance` / `cpu_cores_efficiency` parsed from `/sys/devices/cpu_core/cpus` and `/sys/devices/cpu_atom/cpus` (CPU-list format, e.g. `0-15`; omit both fields when the paths are absent). Compute `cpu_cores_reserved = CPU_SYSTEM_RESERVATION + (CPU_INFRA_ROLE_RESERVATION if config.NODE_IS_NETWORK_NODE or config.NODE_IS_DATABASE_NODE else 0)`, `threads_per_core = ceil(cpu_threads / cpu_cores)`, `cpu_schedulable = max(1, cpu_threads - cpu_cores_reserved * threads_per_core)`, `cpu_cores_schedulable = max(1, cpu_cores - cpu_cores_reserved)`; publish all of these. Publish `memory_reserved_mb = int((config.RAM_SYSTEM_RESERVATION + (config.RAM_INFRA_ROLE_RESERVATION if infra-role else 0)) * 1024)`. Add to `config.py` next to the existing scheduler options (`:179-201`): `CPU_SYSTEM_RESERVATION: int = Field(1, ...)`, `CPU_INFRA_ROLE_RESERVATION: int = Field(1, ...)`, `RAM_INFRA_ROLE_RESERVATION: float = Field(4.0, ...)` with descriptions saying cores (not threads) and GB, and that infra-role means network node or database node. Unit tests: reservation arithmetic for HT (2 threads/core), non-HT, and hybrid (24 threads / 16 cores → ceil = 2) topologies; infra-role vs plain hypervisor; sysfs absent → no P/E fields; `cpu_schedulable` floor of 1. Guard the sysfs parsing with try/except (log and omit on parse failure). Commit subject: `resources: publish CPU topology and system reservations.` |
 | 00a-3 — scheduler: load-per-thread ordering + weighted selection | high | opus | none | In `scheduler.py`, replace the load bucketing (`:447-468`): per candidate, `denom = metrics.get('cpu_schedulable') or metrics.get('cpu_max', 1)` (D6 fallback), `normalised = cpu_load_1 / denom`, bucket key `math.floor(normalised / 0.25)`. Keep the existing lowest-bucket-wins structure and event shape; extend `load_detail` with `cpu_load_1`, `cpu_schedulable`, `normalised_load`, `bucket`. Replace the final `random.shuffle` (`:470-476`) with an Efraimidis-Spirakis weighted shuffle over the winning bucket: `weight = max(0.1, config.SCHEDULER_TARGET_LOAD * denom - cpu_load_1)`, sort by `random.random() ** (1.0 / weight)` descending; record per-node weights in the final-candidates audit event. Add `SCHEDULER_TARGET_LOAD: float = Field(0.75, ...)` to `config.py` (description: target sustained load per schedulable thread used for selection weighting). Unit tests (extend `tests/test_scheduler.py`, seed `random` for determinism): (a) **sfcbr regression case** — a 12-thread node at load 9 plus two 24-thread idle nodes: the loaded node must not be in the winning bucket even though floor(raw load) logic would have needed load ≥ 1.0 differences; (b) heterogeneous idle nodes land in the same bucket (spreading preserved); (c) weighted selection: over many seeded draws, a node with 2× headroom wins first place roughly 2× as often (assert a loose ratio band, not exact); (d) D6 fallback: a metrics row without `cpu_schedulable` schedules without error using `cpu_max`; (e) existing tests still pass unmodified where behaviour is unchanged. Commit subject: `scheduler: rank by load per schedulable thread.` |
-| 00a-4 — admission + summarize_resources on reserved capacity | medium | opus | none | In `scheduler.py` `_has_sufficient_cpu()` (`:114-130`): `hard_max_cpus = metrics.get('cpu_cores_schedulable', metrics.get('cpu_max', 0)) * config.CPU_OVERCOMMIT_RATIO` — i.e. the ratio now multiplies schedulable **cores**, falling back to the old thread count for un-upgraded rows (D6; slightly generous during the roll, which is the safe direction). Change the `CPU_OVERCOMMIT_RATIO` default in `config.py` from 16 to the 00a-1 value (hypothesis 4) and rewrite its description to say vCPUs per schedulable physical core. In `_has_sufficient_ram()` (`:132-165`): `reserved = metrics.get('memory_reserved_mb', config.RAM_SYSTEM_RESERVATION * 1024)`; subtract that instead of the direct config read. Update `summarize_resources()` (`:478-544`) to use identical arithmetic for `cpu_available` and `ram_max_per_instance` so the admin resources API agrees with admission. Update rejection-reason dicts to include the new fields (`cpu_cores_schedulable`, `memory_reserved_mb`) so audit events stay diagnosable. Unit tests: admission flips at the core-denominated boundary; infra-role node admits less than an identical plain node; RAM check honours published reservation and falls back to config; `summarize_resources` matches `_has_sufficient_cpu` for the same inputs. Add a release note (`docs/release_notes/` if present, else the changelog convention in the repo) covering the ratio semantic change and the drain caveat. Commit subject: `scheduler: admit against reserved, core-denominated capacity.` |
+| 00a-4 — admission + summarize_resources on reserved capacity | medium | opus | none | In `scheduler.py` `_has_sufficient_cpu()` (`:114-130`): `hard_max_cpus = metrics.get('cpu_schedulable', metrics.get('cpu_max', 0)) * config.CPU_OVERCOMMIT_RATIO` — the ratio stays thread-denominated (D4) but multiplies schedulable threads, falling back to the old all-threads count for un-upgraded rows (D6; slightly generous during the roll, which is the safe direction). Change the `CPU_OVERCOMMIT_RATIO` default in `config.py` from 16 to 3.0 (measured, see appendix) and rewrite its description to say vCPUs per schedulable logical CPU (thread). In `_has_sufficient_ram()` (`:132-165`): `reserved = metrics.get('memory_reserved_mb', config.RAM_SYSTEM_RESERVATION * 1024)`; subtract that instead of the direct config read. Update `summarize_resources()` (`:478-544`) to use identical arithmetic for `cpu_available` and `ram_max_per_instance` so the admin resources API agrees with admission. Update rejection-reason dicts to include the new fields (`cpu_cores_schedulable`, `memory_reserved_mb`) so audit events stay diagnosable. Unit tests: admission flips at the schedulable-thread boundary; infra-role node admits less than an identical plain node; RAM check honours published reservation and falls back to config; `summarize_resources` matches `_has_sufficient_cpu` for the same inputs. Add a release note (`docs/release_notes/` if present, else the changelog convention in the repo) covering the ratio semantic change and the drain caveat. Commit subject: `scheduler: admit against reserved, core-denominated capacity.` |
 | 00a-5 — docs + validation | medium | sonnet | none | Documentation: update `docs/operator_guide/` with a scheduler page (create if missing) covering the ordering model (load per schedulable thread, coarse buckets, headroom-weighted selection), the reservation knobs (`CPU_SYSTEM_RESERVATION`, `CPU_INFRA_ROLE_RESERVATION`, `RAM_SYSTEM_RESERVATION`, `RAM_INFRA_ROLE_RESERVATION`), the new `CPU_OVERCOMMIT_RATIO` semantics with the migration note, and `SCHEDULER_TARGET_LOAD`. Touch `ARCHITECTURE.md` (scheduler section) and `AGENTS.md` (point at the new metrics fields). Validation: extend or add a `deploy/cluster_ci` assertion that a node's published metrics include `cpu_schedulable` and `memory_reserved_mb` and that an infra-role node reports reduced schedulable capacity. Post-deploy sfcbr validation is a management-session task: run a CI burst, confirm via `tools/sfcbr-capacity.sh` that the network+DB node no longer takes a disproportionate share; record the observation in this plan. Commit subject: `docs, tests: load-aware scheduling and system reservations.` |
 
 ## Step ordering and dependencies
@@ -239,6 +248,16 @@ default, (d) the 0.25 bucket width and `SCHEDULER_TARGET_LOAD
 = 0.75` placeholder, and (e) whether 00a-1 measurement happens
 before or in parallel with implementation.
 
+**Back-brief outcomes (2026-07-17):** (a) threads confirmed as
+the accounting and load denominator "at least for now", since
+loadavg counts against logical CPUs — D4 revised accordingly
+(track cores, decide on threads); (b) confirmed; (c) 4.0 GB
+confirmed as a configurable default; (d) confirmed, and
+`SCHEDULER_TARGET_LOAD = 0.75` upgraded from placeholder to
+measured (appendix); (e) measurement ran first — appendix
+filled from live sfcbr snapshots. Implement all of 00a, then
+soak on sfcbr.
+
 ## Review checklist for the management session
 
 Standard checklist from the master plan, plus:
@@ -264,10 +283,46 @@ Standard checklist from the master plan, plus:
 
 ## Measurements (appendix, filled by step 00a-1)
 
-Provisional — to be replaced with sfcbr data.
+Sampled 2026-07-17 from live sfcbr snapshots during active CI
+(`tools/sfcbr-capacity.sh` plus per-node libvirt / loadavg
+probes). Point-in-time samples, not a tracked burst peak; the
+burst figure below is estimated from the 2026-07-17 incident.
 
-- Chosen `CPU_OVERCOMMIT_RATIO` (per schedulable core): TBD
-  (hypothesis 4).
-- `SCHEDULER_TARGET_LOAD` (per schedulable thread): TBD
-  (hypothesis 0.75).
-- Observed demand-per-vCPU range on sfcbr CI workload: TBD.
+| node | CPU | cores/threads | roles | vCPUs alloc | load1 | load15 |
+|------|-----|---------------|-------|-------------|-------|--------|
+| sf-1 | Ryzen 5 3600 | 6/12 | N+D+H | 36 | 4.66 | 12.23 |
+| sf-2 | Ryzen 5 3600 | 6/12 | D+H | 0 | 0.75 | 4.54 |
+| sf-3 | Ryzen 5 3600 | 6/12 | H | 28 | 4.51 | 6.21 |
+| sf-4 | Ryzen 5 3600 | 6/12 | H | 32 | 7.21 | 7.57 |
+| sf-5 | i9-12900 | 16/24 | H | 0 | 0.17 | 7.16 |
+| sf-6 | i9-12900 | 16/24 | H | 9 | 1.05 | 5.14 |
+
+Findings:
+
+- **Achieved packing today**: busy plain nodes run 2.3-3.0
+  allocated vCPUs per thread with RAM binding first. The
+  incident node (sf-1, N+D+H) at 3.0 vCPUs/thread is the
+  crush case the reservations are designed to prevent.
+- **Chosen `CPU_OVERCOMMIT_RATIO` (per schedulable thread,
+  D4): 3.0.** Preserves today's viable packing on plain nodes
+  (where RAM continues to bind first) while capping infra
+  nodes meaningfully once reserved cores are subtracted: sf-1
+  (2 reserved cores → 8 schedulable threads) caps at 24
+  vCPUs vs 36 allocated at measurement time and 192 under
+  the old default.
+- **`SCHEDULER_TARGET_LOAD` (per schedulable thread): 0.75**
+  confirmed. sf-1 at load15/threads ≈ 1.0 was degraded; the
+  incident at ~1.25 sustained was an outage-shaped problem.
+- **Observed demand-per-vCPU** (`cpu_load_1 /
+  allocated_vcpus`): 0.12-0.35 in steady CI; burst peak
+  estimated ~0.6 from the incident (load ~15 on ~24
+  allocated vCPUs). Seed constant for open question 13's
+  expected-demand model: ~0.33 steady / 0.6 conservative.
+- **P/E sysfs validated on real hardware**: i9-12900 nodes
+  report `/sys/devices/cpu_core/cpus` = `0-15` and
+  `/sys/devices/cpu_atom/cpus` = `16-23`; the paths are
+  absent on the AMD nodes (D5's omit-when-absent behaviour
+  is correct).
+- Incidental: sf-5 was NOT-READY (`/readyz` failing, zero
+  VMs, host reachable) at measurement time — unrelated to
+  this plan, flagged to the operator.
