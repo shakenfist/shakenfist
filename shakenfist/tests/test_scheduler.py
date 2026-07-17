@@ -473,6 +473,33 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
                           scheduler.Scheduler().find_candidates,
                           fake_inst2)
 
+    def test_summarize_totals_exclude_overpacked_nodes(self):
+        # A node packed beyond the admission cap reports negative
+        # per-node headroom (honestly), but the cluster totals must only
+        # sum the genuine headroom of the other nodes.
+        self.mock_etcd.set_node_metrics_same(self._baseline(
+            cpu_max=12, cpu_schedulable=10, cpu_total_instance_vcpus=0))
+        self.mock_etcd.update_node_metrics('node2', {
+            'cpu_total_instance_vcpus': 500,
+            'memory_total_instance_actual': 1000000})
+
+        s = scheduler.Scheduler()
+        resources = s.summarize_resources()
+
+        node2 = resources['per_node'][self._node_uuid('node2')]
+        self.assertLess(node2['cpu_available'], 0)
+        self.assertLess(node2['ram_available'], 0)
+
+        expected_cpu = sum(
+            max(0, per_node['cpu_available'])
+            for per_node in resources['per_node'].values())
+        expected_ram = sum(
+            max(0, per_node['ram_available'])
+            for per_node in resources['per_node'].values())
+        self.assertEqual(expected_cpu, resources['total']['cpu_available'])
+        self.assertEqual(expected_ram, resources['total']['ram_available'])
+        self.assertGreater(resources['total']['cpu_available'], 0)
+
     def test_summarize_resources_matches_admission(self):
         # The admin resources API must report numbers computed with the
         # same arithmetic the admission checks use, for both new-dialect

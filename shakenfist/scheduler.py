@@ -583,7 +583,11 @@ class Scheduler:
             hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
             current_cpu = self.metrics[n].get('cpu_total_instance_vcpus', 0)
             resources['per_node'][n]['cpu_available'] = hard_max_cpus - current_cpu
-            resources['total']['cpu_available'] += resources['per_node'][n]['cpu_available']
+            # A node packed beyond the cap (for example after the cap was
+            # lowered) reports negative per-node headroom, which is honest,
+            # but must not eat into the cluster total other nodes provide.
+            resources['total']['cpu_available'] += max(
+                0, resources['per_node'][n]['cpu_available'])
 
             resources['per_node'][n]['cpu_load_1'] = self.metrics[n].get(
                 'cpu_load_1', 0)
@@ -603,7 +607,8 @@ class Scheduler:
             resources['per_node'][n]['ram_available'] = \
                 (self.metrics[n].get('memory_max', 0) * config.RAM_OVERCOMMIT_RATIO -
                  self.metrics[n].get('memory_total_instance_actual', 0))
-            resources['total']['ram_available'] += resources['per_node'][n]['ram_available']
+            resources['total']['ram_available'] += max(
+                0, resources['per_node'][n]['ram_available'])
 
             # Disk
             disk_free = int(self.metrics[n].get(
