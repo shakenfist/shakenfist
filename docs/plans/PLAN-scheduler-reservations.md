@@ -293,7 +293,7 @@ Provisional, to be re-cut after phase 0.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | Planned |
+| 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | Implemented (awaiting sfcbr soak) |
 | 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Not started |
 | 1. `node_reservations` schema and migration | PLAN-scheduler-reservations-phase-01-schema.md | Not started |
 | 2. Conditional-INSERT scheduling primitive | PLAN-scheduler-reservations-phase-02-primitive.md | Not started |
@@ -498,6 +498,19 @@ because the following statements will be true:
 
 This section should list any bugs we encounter during
 development that we fixed.
+
+* **KSM metrics were never published** (pre-existing, found by
+  the phase 00a code review): the resources daemon's KSM block
+  skipped every sysfs file (trailing-newline filter), used a
+  literal `'memory_ksm_{ent}'` key (missing f-prefix), and
+  re-read an exhausted file handle so the swallowed ValueError
+  hid it all. No `memory_ksm_*` field had ever reached
+  `node_metrics`.
+* **ZeroDivisionError on metrics rows lacking `memory_max`**
+  (pre-existing, found by the same review): the KSM overcommit
+  admission check divided by `memory_max` with no guard, so a
+  partially-written hypervisor row crashed `find_candidates()`
+  instead of excluding the node with a recorded reason.
 
 ### Documentation index maintenance
 
