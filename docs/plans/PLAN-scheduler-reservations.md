@@ -417,6 +417,30 @@ because the following statements will be true:
   worth the effort versus capacity-aware placement). Out of
   scope here pending the carrier model and OpenTelemetry
   measurements; revisit once those land.
+- **Real host load and node-role awareness as scheduling
+  inputs.** CPU admission today counts only allocated VM vCPUs
+  (times `CPU_OVERCOMMIT_RATIO`, default 16), so it almost never
+  rejects a node, and the only real-utilisation signal is a
+  `math.floor(cpu_load_1)` tie-break. This ignores three things:
+  (a) actual CPU utilisation; (b) the service load a combined
+  network / database node carries — neither `is_network_node`
+  nor `is_database_node` is consulted anywhere in
+  `scheduler.py`, and there is no CPU analogue of
+  `RAM_SYSTEM_RESERVATION`; and (c) heterogeneous core counts,
+  because the `floor()` quantisation collapses every sub-1.0
+  node into a single uniform-random bucket. Observed on sfcbr
+  2026-07-17: a CI burst stacked three 16 GB VMs onto the
+  12-core network+DB node (load ~15) while two idle 24-core
+  nodes sat ~90% free. Cheapest high-value change is to rank by
+  **load-per-core** instead of `floor(raw load)`, which fixes
+  both the bucket collapse and the heterogeneity blindness in
+  one move; the fuller fix de-weights infra-role nodes and/or
+  adds a CPU service reservation. These are soft-preference
+  ordering inputs, so they should compose with the reservation
+  model's ORDER BY / tie-break surface (open questions 6-7)
+  rather than being bolted on as a parallel heuristic. Diagnose
+  with `tools/sfcbr-capacity.sh` in the 33fl repo (per-node
+  load-per-core plus infra-role tags).
 
 ### Bugs fixed during this work
 
