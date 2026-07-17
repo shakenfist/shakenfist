@@ -59,6 +59,36 @@ def _clean_ip_json(data: str | None) -> list[dict[str, Any]]:
     return [x for x in j if x]
 
 
+# Matches the all-zeroes flood entries a VXLAN interface uses for
+# broadcast / unknown-unicast forwarding in a unicast mesh. This mirrors
+# MESH_RE in the privexec daemon, which owns the mutating side of the
+# mesh (``bridge fdb append`` / ``bridge fdb del``).
+MESH_FLOOD_RE = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
+
+
+def discover_mesh_flood_ips(vx_interface: str) -> set[str] | None:
+    """Return the flood destination IPs in a VXLAN interface's FDB.
+
+    Returns None if the interface does not exist on this node (``bridge
+    fdb show`` exits non-zero with "Cannot find device"), which callers
+    should treat as "nothing to audit" -- interface existence is
+    ``Network.is_created``'s problem, not the mesh's.
+    """
+    try:
+        stdout, _ = concurrency.execute(
+            f'bridge fdb show brport {vx_interface}',
+            suppress_command_logging=True)
+    except ProcessExecutionError:
+        return None
+
+    ips = set()
+    for line in stdout.split('\n'):
+        m = MESH_FLOOD_RE.match(line)
+        if m:
+            ips.add(m.group(1))
+    return ips
+
+
 def check_for_interface(
     name: str, netns: str | None = None, up: bool = False
 ) -> bool:

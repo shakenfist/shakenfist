@@ -358,6 +358,14 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         self.mock_ensure_vxlan_mesh = mock.patch(
             'shakenfist.util.concurrency.ensure_vxlan_mesh').start()
 
+        # The fan-out always tries to include the network node. Default
+        # to "no network node found" so each test controls whether one
+        # participates; this also isolates the tests from the
+        # module-level cache in scheduler.get_network_node().
+        self.mock_get_network_node = mock.patch(
+            'shakenfist.scheduler.get_network_node',
+            side_effect=exceptions.NoNetworkNode('test')).start()
+
     def test_ensure_mesh_enqueues_netop_on_local_node_queue(self):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
@@ -561,6 +569,333 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
             f'{self.NODE_UUID}-network-user_facing',
             spy.call_args.kwargs['queue_name'])
         self.assertIsInstance(op, NetOp)
+
+    def test_ensure_mesh_always_includes_network_node(self):
+        # The network node hosts the netns side of every network, so it
+        # participates in every mesh even when it hosts no instance on
+        # the network. Without this the network node's FDB never gains
+        # the flood entry for an instance's hypervisor, and inbound
+        # floating traffic dies as soon as the learned FDB entry for an
+        # idle guest ages out.
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_node_uuid = '77777777-7777-4777-8777-cccccccccccc'
+        remote_uuid = '99999999-9999-4999-8999-aaaaaaaaaaaa'
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'meshnet', network_uuid,
+            provide_dhcp=True, provide_nat=False)
+        n = network.Network.from_db(network_uuid)
+
+        ni = mock.MagicMock()
+        ni.instance_uuid = 'inst-remote'
+
+        inst = mock.MagicMock()
+        inst.placement = {'node': 'node-remote.fqdn'}
+
+        remote_node = mock.MagicMock()
+        remote_node.uuid = remote_uuid
+
+        network_node = mock.MagicMock()
+        network_node.uuid = network_node_uuid
+        self.mock_get_network_node.side_effect = None
+        self.mock_get_network_node.return_value = network_node
+
+        original = (
+            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+        spy = mock.MagicMock(side_effect=original)
+
+        with mock.patch.object(
+                network.Network, 'networkinterfaces',
+                new_callable=mock.PropertyMock,
+                return_value=[ni]), \
+             mock.patch(
+                'shakenfist.instance.Instance.from_db',
+                return_value=inst), \
+             mock.patch(
+                'shakenfist.network.network.Node.from_db',
+                return_value=remote_node), \
+             mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            op = n.ensure_mesh()
+
+        # One enqueue for the instance's hypervisor, one for the
+        # network node.
+        queue_names = [c.kwargs['queue_name'] for c in spy.call_args_list]
+        self.assertEqual(2, len(queue_names))
+        self.assertIn(
+            f'{remote_uuid}-network-user_facing', queue_names)
+        self.assertIn(
+            f'{network_node_uuid}-network-user_facing', queue_names)
+        self.assertIsInstance(op, NetOp)
+
+    def test_ensure_mesh_network_node_not_duplicated(self):
+        # When the network node also hosts an instance on the network it
+        # is already in the fan-out set; it must not be enqueued twice.
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_node_uuid = '77777777-7777-4777-8777-cccccccccccc'
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'meshnet', network_uuid,
+            provide_dhcp=True, provide_nat=False)
+        n = network.Network.from_db(network_uuid)
+
+        ni = mock.MagicMock()
+        ni.instance_uuid = 'inst-on-network-node'
+
+        inst = mock.MagicMock()
+        inst.placement = {'node': 'network-node.fqdn'}
+
+        placed_node = mock.MagicMock()
+        placed_node.uuid = network_node_uuid
+
+        network_node = mock.MagicMock()
+        network_node.uuid = network_node_uuid
+        self.mock_get_network_node.side_effect = None
+        self.mock_get_network_node.return_value = network_node
+
+        original = (
+            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+        spy = mock.MagicMock(side_effect=original)
+
+        with mock.patch.object(
+                network.Network, 'networkinterfaces',
+                new_callable=mock.PropertyMock,
+                return_value=[ni]), \
+             mock.patch(
+                'shakenfist.instance.Instance.from_db',
+                return_value=inst), \
+             mock.patch(
+                'shakenfist.network.network.Node.from_db',
+                return_value=placed_node), \
+             mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                spy):
+            n.ensure_mesh()
+
+        spy.assert_called_once()
+        self.assertEqual(
+            f'{network_node_uuid}-network-user_facing',
+            spy.call_args.kwargs['queue_name'])
+
+
+class NetworkMeshDesiredNodeIPsTestCase(NetworkTestCase):
+    """Tests for ``Network.mesh_desired_node_ips``, the shared source of
+    truth for what a node's VXLAN flood mesh should contain. The
+    enumeration was lifted from ``BridgedVXLanNetwork._apply_ensure_mesh``
+    so the writer and the ``is_mesh_okay`` auditor can never disagree.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # NODE_MESH_IP is offset from NETWORK_NODE_IP so the network
+        # node IP is included in the computed mesh -- the enumeration
+        # excludes the running host from its own mesh, so distinct
+        # values are required to exercise the "network node IP makes it
+        # into the mesh" branch.
+        fake_config = SFConfig(NODE_EGRESS_IP='10.0.0.2',
+                               NODE_MESH_IP='10.0.0.2',
+                               NETWORK_NODE_IP='10.0.0.1',
+                               NODE_IS_NETWORK_NODE=False)
+        self.config = mock.patch(
+            'shakenfist.network.network.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'meshnet', network_uuid, provide_dhcp=True, provide_nat=False)
+        self.network = network.Network.from_db(network_uuid)
+
+    def _fake_ni(self, instance_uuid):
+        ni = mock.MagicMock()
+        ni.instance_uuid = instance_uuid
+        return ni
+
+    def test_collects_node_ips(self):
+        ifaces = [
+            self._fake_ni('inst-a'),
+            self._fake_ni('inst-b'),
+            # Duplicate iface for inst-a to confirm dedupe.
+            self._fake_ni('inst-a'),
+        ]
+
+        def instance_from_db(instance_uuid):
+            placements = {
+                'inst-a': {'node': 'sf1.example.com'},
+                'inst-b': {'node': 'sf2.example.com'},
+            }
+            inst = mock.Mock()
+            inst.placement = placements[instance_uuid]
+            return inst
+
+        def node_from_db(fqdn):
+            ips = {
+                'sf1.example.com': '10.0.0.3',
+                'sf2.example.com': '10.0.0.4',
+            }
+            n = mock.Mock()
+            n.ip = ips[fqdn]
+            return n
+
+        with mock.patch.object(
+                network.Network, 'networkinterfaces',
+                new_callable=mock.PropertyMock,
+                return_value=ifaces), \
+             mock.patch(
+                'shakenfist.instance.Instance.from_db',
+                side_effect=instance_from_db), \
+             mock.patch(
+                'shakenfist.network.network.Node.from_db',
+                side_effect=node_from_db):
+            self.assertEqual(
+                {'10.0.0.1', '10.0.0.3', '10.0.0.4'},
+                self.network.mesh_desired_node_ips())
+
+    def test_skips_missing_instance(self):
+        with mock.patch.object(
+                network.Network, 'networkinterfaces',
+                new_callable=mock.PropertyMock,
+                return_value=[self._fake_ni('inst-missing')]), \
+             mock.patch(
+                'shakenfist.instance.Instance.from_db',
+                return_value=None):
+            # Only NETWORK_NODE_IP makes it onto the mesh.
+            self.assertEqual(
+                {'10.0.0.1'}, self.network.mesh_desired_node_ips())
+
+    def test_skips_unplaced_instance(self):
+        unplaced = mock.Mock()
+        unplaced.placement = None
+
+        with mock.patch.object(
+                network.Network, 'networkinterfaces',
+                new_callable=mock.PropertyMock,
+                return_value=[self._fake_ni('inst-unplaced')]), \
+             mock.patch(
+                'shakenfist.instance.Instance.from_db',
+                return_value=unplaced):
+            self.assertEqual(
+                {'10.0.0.1'}, self.network.mesh_desired_node_ips())
+
+    def test_omits_network_node_when_self(self):
+        # When this node *is* the network node, NETWORK_NODE_IP must not
+        # be added (it would be us, and we never include ourselves).
+        self.mock_config.NODE_MESH_IP = '10.0.0.1'
+
+        placed = mock.Mock()
+        placed.placement = {'node': 'sf2.example.com'}
+        placed_node = mock.Mock()
+        placed_node.ip = '10.0.0.4'
+
+        with mock.patch.object(
+                network.Network, 'networkinterfaces',
+                new_callable=mock.PropertyMock,
+                return_value=[self._fake_ni('inst-a')]), \
+             mock.patch(
+                'shakenfist.instance.Instance.from_db',
+                return_value=placed), \
+             mock.patch(
+                'shakenfist.network.network.Node.from_db',
+                return_value=placed_node):
+            self.assertEqual(
+                {'10.0.0.4'}, self.network.mesh_desired_node_ips())
+
+    def test_omits_node_when_self(self):
+        # Nodes whose IP equals NODE_MESH_IP are intentionally not added
+        # to the mesh (no self-loop in the FDB).
+        placed = mock.Mock()
+        placed.placement = {'node': 'self.example.com'}
+        placed_node = mock.Mock()
+        placed_node.ip = '10.0.0.2'  # equals NODE_MESH_IP
+
+        with mock.patch.object(
+                network.Network, 'networkinterfaces',
+                new_callable=mock.PropertyMock,
+                return_value=[self._fake_ni('inst-a')]), \
+             mock.patch(
+                'shakenfist.instance.Instance.from_db',
+                return_value=placed), \
+             mock.patch(
+                'shakenfist.network.network.Node.from_db',
+                return_value=placed_node):
+            self.assertEqual(
+                {'10.0.0.1'}, self.network.mesh_desired_node_ips())
+
+
+class NetworkIsMeshOkayTestCase(NetworkTestCase):
+    """Tests for ``Network.is_mesh_okay``, the auditor half of the mesh.
+
+    The maintain loop calls this on every pass; a False return triggers
+    a targeted ensure_mesh repair on this node rather than a full
+    network recreate.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(NODE_EGRESS_IP='10.0.0.2',
+                               NODE_MESH_IP='10.0.0.2',
+                               NETWORK_NODE_IP='10.0.0.1',
+                               NODE_IS_NETWORK_NODE=False)
+        self.config = mock.patch(
+            'shakenfist.network.network.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_etcd.create_network(
+            'meshnet', network_uuid, provide_dhcp=True, provide_nat=False)
+        self.network = network.Network.from_db(network_uuid)
+
+        self.mock_discover = mock.patch(
+            'shakenfist.util.network.discover_mesh_flood_ips').start()
+        self.mock_desired = mock.patch(
+            'shakenfist.network.network.Network.mesh_desired_node_ips').start()
+        self.addCleanup(mock.patch.stopall)
+
+    def test_mesh_matches(self):
+        self.mock_discover.return_value = {'10.0.0.1', '10.0.0.3'}
+        self.mock_desired.return_value = {'10.0.0.1', '10.0.0.3'}
+        self.assertTrue(self.network.is_mesh_okay())
+
+    def test_mesh_missing_entry_is_drift(self):
+        # The raptor failure mode: the network node's FDB has no flood
+        # entry for the hypervisor hosting the network's only instance.
+        self.mock_discover.return_value = set()
+        self.mock_desired.return_value = {'10.0.0.3'}
+        self.assertFalse(self.network.is_mesh_okay())
+
+    def test_mesh_stale_entry_is_drift(self):
+        self.mock_discover.return_value = {'10.0.0.1', '10.0.0.9'}
+        self.mock_desired.return_value = {'10.0.0.1'}
+        self.assertFalse(self.network.is_mesh_okay())
+
+    def test_missing_vxlan_interface_is_not_mesh_drift(self):
+        # A missing vxlan interface is is_created()'s drift to detect;
+        # the mesh audit must not double-report it.
+        self.mock_discover.return_value = None
+        self.assertTrue(self.network.is_mesh_okay())
+        self.mock_desired.assert_not_called()
+
+    def test_floating_network_short_circuits(self):
+        self.mock_etcd.create_network(
+            'floatnet', str(FLOATING_NETWORK_UUID),
+            provide_dhcp=False, provide_nat=False)
+        fn = network.Network.from_db(str(FLOATING_NETWORK_UUID))
+        self.assertTrue(fn.is_mesh_okay())
+        self.mock_discover.assert_not_called()
 
 
 class NetworkFloatingIPEnqueueTestCase(NetworkTestCase):

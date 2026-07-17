@@ -183,7 +183,9 @@ class Job(util_concurrency.Job):
                     # Network state changed in the last minute, punt for now
                     continue
 
-                if n.is_okay():
+                network_okay = n.is_okay()
+                mesh_okay = n.is_mesh_okay() if network_okay else False
+                if network_okay and mesh_okay:
                     # No drift detected for this network on this pass.
                     continue
 
@@ -233,9 +235,26 @@ class Job(util_concurrency.Job):
                             circuit_k))
                     continue
 
-                # Drift remains and no guard fired. Enqueue the
-                # appropriate reconciliation at background priority and
-                # move on -- maintain does not wait for completion.
+                # Drift remains and no guard fired.
+                if network_okay:
+                    # The network itself is fine; only the vxlan mesh
+                    # has drifted. A full recreate is not needed --
+                    # enqueue the targeted repair on this node's queue
+                    # and move on.
+                    n.add_event(
+                        EVENT_TYPE_STATUS,
+                        'Repairing drifted vxlan mesh on this node')
+                    net_create_and_enqueue(
+                        network_uuid=str(n.uuid),
+                        tasks=[net_tasks.network_ensure_mesh],
+                        priority=PRIORITY.background,
+                        target=str(config.NODE_UUID),
+                        family='network')
+                    continue
+
+                # Enqueue the appropriate reconciliation at background
+                # priority and move on -- maintain does not wait for
+                # completion.
                 if config.NODE_IS_NETWORK_NODE:
                     n.add_event(
                         EVENT_TYPE_STATUS,
