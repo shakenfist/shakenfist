@@ -69,10 +69,10 @@ dependencies = [
     # our channel factory. Fixed by disabling Watch-based client-side
     # health checking in shakenfist/util/grpc_channel.py.
     "protobuf==6.33.6",                   # bsd
-    "grpcio==1.81.0",                     # apache2
-    "grpcio-health-checking==1.81.0",     # apache2
-    "grpcio-status==1.81.0",              # apache2
-    "grpcio-tools==1.81.0",               # apache2
+    "grpcio==1.82.1",                     # apache2
+    "grpcio-health-checking==1.82.1",     # apache2
+    "grpcio-status==1.82.1",              # apache2
+    "grpcio-tools==1.82.1",               # apache2
     "googleapis-common-protos==1.75.0",   # apache2
 
     "requests==2.34.2",                   # apache2
