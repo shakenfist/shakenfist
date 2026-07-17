@@ -353,6 +353,50 @@ def stop(daemon: str) -> None:
     n.set_daemon_state(daemon, Node.DAEMON_STATE_STOPPING)
 
 
+@click.command(name='gateway-health')
+@click.option('--host', default=None,
+              help='Gateway mesh IP to probe (defaults to NODE_MESH_IP).')
+@click.option('--timeout', default=2, type=int,
+              help='Health-check RPC deadline, in seconds.')
+def gateway_health(host: Optional[str], timeout: int) -> None:
+    """Check the local sf-database gRPC gateway reports SERVING.
+
+    Exits zero when the gateway's grpc.health.v1 Check returns SERVING
+    (which on sf-database means MariaDB is reachable and the schema is
+    current), and raises -- a non-zero exit -- otherwise.
+
+    This is the health gate for the database tier's rolling restart: the
+    deploy waits on it after (re)starting sf-database so the next node in
+    the serial roll is not taken down until this gateway is actually
+    serving again, not merely listening on its port.
+    """
+    from grpc_health.v1 import health_pb2
+    from grpc_health.v1 import health_pb2_grpc
+    from shakenfist.util.grpc_channel import make_database_channel
+
+    host = host or config.NODE_MESH_IP
+    channel = make_database_channel([host], config.MARIADB_GATEWAY_PORT)
+    try:
+        stub = health_pb2_grpc.HealthStub(channel)
+        # wait_for_ready lets a single call absorb the cold-connect window
+        # (a freshly restarted gateway that is up but whose subchannel has
+        # not connected yet); the RPC deadline still bounds the wait.
+        resp = stub.Check(
+            health_pb2.HealthCheckRequest(service=''),
+            timeout=timeout, wait_for_ready=True)
+    except Exception as e:
+        raise click.ClickException(
+            f'gateway {host} health check failed: {e}')
+    finally:
+        channel.close()
+
+    status = health_pb2.HealthCheckResponse.ServingStatus.Name(resp.status)
+    if resp.status != health_pb2.HealthCheckResponse.SERVING:
+        raise click.ClickException(
+            f'gateway {host} reports {status}, not SERVING')
+    click.echo(f'gateway {host} is SERVING')
+
+
 # All object types that have state stored in etcd. This includes both regular
 # objects (instances, networks, etc.) and cluster operations (node_blob_op, etc.)
 OBJECT_TYPES_WITH_STATE = [
@@ -395,3 +439,4 @@ cli.add_command(initialise_node)
 cli.add_command(register_daemon)
 cli.add_command(deregister_daemon)
 cli.add_command(stop)
+cli.add_command(gateway_health)

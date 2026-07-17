@@ -98,6 +98,35 @@
     timeout: 60
   when: node_is_database_node
 
+# A listening socket is necessary but not sufficient: the gateway binds the
+# port before it can serve, and -- more importantly -- an up gateway whose
+# MariaDB backend is briefly unreachable answers on the port but is not
+# actually serving. Gate the roll on the gRPC health Check reporting SERVING
+# (which on sf-database means MariaDB reachable + schema current), so the
+# next node in the serial:1 roll is never restarted while this one is only
+# half-up. sf-ctl gateway-health probes this node's own gateway.
+- name: Wait for this node's database gateway to report SERVING
+  ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl gateway-health
+  register: sf_gateway_health
+  changed_when: false
+  retries: 12
+  delay: 5
+  until: sf_gateway_health.rc == 0
+  when: node_is_database_node
+
+# Even with a healthy gateway, cluster clients reach the tier over a
+# round_robin gRPC channel and only re-establish the subchannel to this
+# just-restarted gateway on their own reconnect backoff. If the next node in
+# the serial:1 roll takes its gateway down while a peer is still mid-reconnect
+# here, that peer momentarily sees no READY backend ("connections to all
+# backends failing"). A short settle after this gateway is SERVING lets those
+# subchannels reconnect before the next restart. Only meaningful when we
+# actually restarted; skipped on an idempotent no-op redeploy. See #3430.
+- name: Let clients reconnect to the recovered gateway before the next roll
+  ansible.builtin.pause:
+    seconds: "{{ sf_database_roll_settle_seconds | default(10) }}"
+  when: node_is_database_node and sf_restart_needed
+
 # Start the remaining daemons. The ordering here matches the order they must
 # start in, not alphabetical order.
 - name: Base daemons everywhere

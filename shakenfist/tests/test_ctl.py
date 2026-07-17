@@ -655,3 +655,68 @@ class NodeCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_node.set_daemon_state.assert_called_once()
+
+
+class GatewayHealthCommandTestCase(base.ShakenFistTestCase):
+    """Tests for the gateway-health CLI command (the DB-tier roll gate)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.verify_config_patcher = mock.patch(
+            'shakenfist.config.verify_config', mock.MagicMock())
+        cls.verify_config_patcher.start()
+
+        if 'shakenfist.client.ctl' in sys.modules:
+            del sys.modules['shakenfist.client.ctl']
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.verify_config_patcher.stop()
+
+    def setUp(self):
+        super().setUp()
+        self.runner = CliRunner()
+
+    @mock.patch('grpc_health.v1.health_pb2_grpc.HealthStub')
+    @mock.patch('shakenfist.util.grpc_channel.make_database_channel')
+    def test_serving_exits_zero(self, mock_channel, mock_stub):
+        from grpc_health.v1 import health_pb2
+        from shakenfist.client.ctl import gateway_health
+
+        mock_stub.return_value.Check.return_value = \
+            health_pb2.HealthCheckResponse(
+                status=health_pb2.HealthCheckResponse.SERVING)
+
+        result = self.runner.invoke(gateway_health, ['--host', '10.0.0.9'])
+
+        self.assertEqual(0, result.exit_code)
+        self.assertIn('SERVING', result.output)
+        # The channel is always closed, success or failure.
+        mock_channel.return_value.close.assert_called_once()
+
+    @mock.patch('grpc_health.v1.health_pb2_grpc.HealthStub')
+    @mock.patch('shakenfist.util.grpc_channel.make_database_channel')
+    def test_not_serving_exits_nonzero(self, mock_channel, mock_stub):
+        from grpc_health.v1 import health_pb2
+        from shakenfist.client.ctl import gateway_health
+
+        mock_stub.return_value.Check.return_value = \
+            health_pb2.HealthCheckResponse(
+                status=health_pb2.HealthCheckResponse.NOT_SERVING)
+
+        result = self.runner.invoke(gateway_health, ['--host', '10.0.0.9'])
+
+        self.assertNotEqual(0, result.exit_code)
+        mock_channel.return_value.close.assert_called_once()
+
+    @mock.patch('grpc_health.v1.health_pb2_grpc.HealthStub')
+    @mock.patch('shakenfist.util.grpc_channel.make_database_channel')
+    def test_rpc_error_exits_nonzero(self, mock_channel, mock_stub):
+        from shakenfist.client.ctl import gateway_health
+
+        mock_stub.return_value.Check.side_effect = Exception('boom')
+
+        result = self.runner.invoke(gateway_health, ['--host', '10.0.0.9'])
+
+        self.assertNotEqual(0, result.exit_code)
+        mock_channel.return_value.close.assert_called_once()
