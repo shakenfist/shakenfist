@@ -4586,6 +4586,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-host-subject/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend host_subject enforcement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-consistency-audit/" class="md-nav__link">
         
   
@@ -4594,6 +4622,62 @@
     
   
     Consistency Audit Deferred Work
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host subject phase 1: subject pinning in shakenfist-spice-protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host subject phase 2: kerbside adoption, CI proof, docs
   
 
     
@@ -10822,7 +10906,9 @@ implemented because the following statements will be true:</p>
   before production — most likely by adding optional subject
   verification to the ryll crate's verifier (so ryll benefits too)
   and having the proxy pass the console's <code>host_subject</code>. Tracked
-  here so it is not lost.</li>
+  here so it is not lost. <strong>Done</strong>: implemented via
+  <code>PLAN-host-subject.md</code> (ryll PR #166 + kerbside adoption),
+  2026-07-17.</li>
 <li><strong>Per-source / per-console firewall policy profiles</strong>
   in the database, with API and web UI surface.</li>
 <li><strong>SASL auth and the full non-mini data header</strong>, if a

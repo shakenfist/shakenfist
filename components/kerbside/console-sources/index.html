@@ -4708,6 +4708,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-host-subject/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend host_subject enforcement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-consistency-audit/" class="md-nav__link">
         
   
@@ -4716,6 +4744,62 @@
     
   
     Consistency Audit Deferred Work
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host subject phase 1: subject pinning in shakenfist-spice-protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host subject phase 2: kerbside adoption, CI proof, docs
   
 
     
@@ -10161,7 +10245,7 @@ and there is no liveness check on the QEMU process behind the ticket.</p>
 </tr>
 <tr>
 <td>host_subject</td>
-<td>TLS host subject for certificate verification</td>
+<td>TLS host subject for certificate verification. Enforced: when set, the proxy refuses hypervisors whose certificate subject does not match (exact attribute count/order/type).</td>
 </tr>
 </tbody>
 </table>

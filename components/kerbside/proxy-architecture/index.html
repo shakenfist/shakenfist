@@ -4925,6 +4925,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-host-subject/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend host_subject enforcement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-consistency-audit/" class="md-nav__link">
         
   
@@ -4933,6 +4961,62 @@
     
   
     Consistency Audit Deferred Work
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host subject phase 1: subject pinning in shakenfist-spice-protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host subject phase 2: kerbside adoption, CI proof, docs
   
 
     
@@ -10379,10 +10463,12 @@ silently dead peer is detected rather than pinning a task forever.</p>
 <p>The proxy holds a host certificate/key (<code>PROXY_HOST_CERT_PATH</code> /
 <code>PROXY_HOST_CERT_KEY_PATH</code>) and a CA bundle (<code>CACERT_PATH</code>). Client-facing TLS
 is terminated with the host certificate. The backend leg (<code>backend.rs</code>, via
-the ryll <code>SpiceClient</code>) originates TLS to the hypervisor and verifies the
-server against the expected <code>host_subject</code> from the authorization reply, so a
-mis-issued or substituted backend certificate is rejected. The rustls <code>ring</code>
-crypto provider is installed at startup.</p>
+the ryll <code>SpiceClient</code>) originates TLS to the hypervisor. When the console
+carries a <code>host_subject</code>, the backend leg verifies the server certificate's
+subject against it using spice-common matching semantics, substituting for
+hostname verification, so a mis-issued or substituted backend certificate is
+rejected. When the console has no <code>host_subject</code>, the CA chain is the only
+identity check. The rustls <code>ring</code> crypto provider is installed at startup.</p>
 <h2 id="connection-state-machine">Connection State Machine<a class="headerlink" href="#connection-state-machine" title="Permanent link">&para;</a></h2>
 <p>Each accepted connection runs this sequence (<code>session.rs</code>, <code>backend.rs</code>,
 <code>relay.rs</code>):</p>
