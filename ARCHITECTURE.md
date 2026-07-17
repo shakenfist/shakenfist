@@ -734,6 +734,30 @@ journal instead. Loki stream labels are bounded to `{job, daemon, host}`; all
 identifiers stay in the JSON body. See
 [`docs/operator_guide/logging.md`](docs/operator_guide/logging.md).
 
+## Instance Scheduling
+
+The scheduler (`shakenfist/scheduler.py`) is in-process in each `sf-api`
+worker; there is no scheduler daemon. It filters candidate hypervisors
+against the `node_metrics` table (hard constraints: hypervisor role, queue
+health, CPU/RAM/disk admission, disk bandwidth), scores affinity, then
+ranks by **load per schedulable thread** in coarse buckets with
+headroom-weighted selection so differently sized machines share work
+proportionally.
+
+Capacity is reservation-aware: the resources daemon reserves physical
+cores and RAM for the operating system on every hypervisor, plus more on
+nodes carrying cluster-wide roles (network node, database node), and
+publishes the schedulable remainder (`cpu_schedulable`,
+`memory_reserved_mb`) in `node_metrics`. Admission and the
+`/admin/resources` API share the same arithmetic through common helpers.
+`CPU_OVERCOMMIT_RATIO` is denominated in vCPUs per schedulable thread
+(default 3.0, measured on a CI-dominated cluster).
+
+See [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md)
+for the full pipeline, the configuration knobs, and how to diagnose a
+placement decision from audit events. Atomic reservation-table scheduling
+is planned in `docs/plans/PLAN-scheduler-reservations.md`.
+
 ## State Machines
 
 Objects follow defined state machines. Key states:

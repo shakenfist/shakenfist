@@ -111,9 +111,47 @@ class Scheduler:
 
         return True, None
 
+    def _schedulable_threads(self, node):
+        # Scheduling is denominated in schedulable threads -- the thread
+        # count left after the resources daemon subtracts the reserved
+        # cores for the operating system and (on network or database
+        # nodes) cluster-wide daemons. Admission, load ordering and
+        # summarize_resources() must all size a node through this helper
+        # so they cannot disagree. Returns (threads, from_fallback).
+        #
+        # Metrics rows written by an older resources daemon lack
+        # cpu_schedulable. For those we approximate the reservation the
+        # node will publish once its daemon restarts, using the role
+        # flags (which old rows do carry) and assuming two threads per
+        # reserved core. Using the raw thread count instead would make a
+        # not-yet-upgraded node look bigger and idler than an identical
+        # upgraded one, and it would absorb entire bursts during a
+        # rolling upgrade.
+        metrics = self.metrics[node]
+        threads = metrics.get('cpu_schedulable')
+        if threads:
+            return threads, False
+
+        cpu_max = metrics.get('cpu_max', 0)
+        if not cpu_max:
+            return 0, True
+
+        reserved_cores = config.CPU_SYSTEM_RESERVATION
+        if metrics.get('is_network_node') or metrics.get('is_database_node'):
+            reserved_cores += config.CPU_INFRA_ROLE_RESERVATION
+        return max(1, cpu_max - reserved_cores * 2), True
+
+    def _memory_reserved_mb(self, node):
+        # The resources daemon publishes the node's total memory
+        # reservation (operating system plus any infra-role component).
+        # Metrics rows written by an older resources daemon lack it and
+        # fall back to the system reservation alone.
+        return self.metrics[node].get(
+            'memory_reserved_mb', config.RAM_SYSTEM_RESERVATION * 1024)
+
     def _has_sufficient_cpu(self, log_ctx, cpus, node):
-        hard_max_cpus = (self.metrics[node].get(
-            'cpu_max', 0) * config.CPU_OVERCOMMIT_RATIO)
+        cpu_base, from_fallback = self._schedulable_threads(node)
+        hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
         current_cpu = self.metrics[node].get('cpu_total_instance_vcpus', 0)
 
         if current_cpu + cpus > hard_max_cpus:
@@ -122,6 +160,8 @@ class Scheduler:
                 'current_cpus': current_cpu,
                 'requested_cpus': cpus,
                 'hard_max_cpus': hard_max_cpus,
+                'cpu_schedulable': cpu_base,
+                'cpu_schedulable_from_fallback': from_fallback,
             }
             log_ctx.with_fields({'node': node, **reason}).debug(
                 'Scheduling on node would exceed hard maximum CPUs')
@@ -130,17 +170,19 @@ class Scheduler:
         return True, None
 
     def _has_sufficient_ram(self, log_ctx, memory, node):
-        # There are two things to track here... We must always have
-        # RAM_SYSTEM_RESERVATION gb of RAM for operating system tasks -- assume
+        # There are two things to track here... We must always leave the
+        # node's published memory reservation (operating system tasks, plus
+        # cluster-wide daemons on infra-role nodes) untouched -- assume
         # there is no overlap with existing VMs when checking this. Note as
         # well that metrics are in MB...
-        available = (self.metrics[node].get('memory_available', 0) -
-                     (config.RAM_SYSTEM_RESERVATION * 1024))
+        reserved = self._memory_reserved_mb(node)
+        available = self.metrics[node].get('memory_available', 0) - reserved
         if available - memory < 0.0:
             reason = {
                 'reason': 'insufficient memory',
                 'available_mb': available,
                 'requested_memory_mb': memory,
+                'memory_reserved_mb': reserved,
             }
             log_ctx.with_fields({'node': node, **reason}).debug(
                 'Insufficient memory')
@@ -151,6 +193,13 @@ class Scheduler:
         instance_memory = (
             self.metrics[node].get('memory_total_instance_actual', 0) + memory)
         memory_max = self.metrics[node].get('memory_max', 0)
+        if not memory_max:
+            reason = {
+                'reason': 'no memory_max in node metrics',
+            }
+            log_ctx.with_fields({'node': node, **reason}).debug(
+                'Node metrics lack memory_max')
+            return False, reason
         if (instance_memory / memory_max > config.RAM_OVERCOMMIT_RATIO):
             reason = {
                 'reason': 'KSM overcommit ratio exceeded',
@@ -444,17 +493,33 @@ class Scheduler:
                     'affinity_detail': affinity_detail,
                 })
 
-            # Order candidates by current CPU load
+            # Order candidates by current CPU load, normalised by the
+            # schedulable thread count so that differently sized machines
+            # are comparable. The buckets are deliberately coarse (0.25
+            # load per thread wide): the metrics snapshot can be up to a
+            # minute stale, so fine-grained ranking would stack an entire
+            # burst of requests onto whichever node looked best at the
+            # last refresh. Nodes without the reservation-aware
+            # cpu_schedulable field (written by an older resources daemon)
+            # fall back to the raw thread count in cpu_max.
             by_load = defaultdict(list)
             load_detail = {}
+            denominators = {}
             for c in list(candidates):
                 raw_load = self.metrics[c].get('cpu_load_1', 0)
-                load = math.floor(raw_load)
+                denom, from_fallback = self._schedulable_threads(c)
+                denom = denom or 1
+                normalised = raw_load / denom
+                bucket = math.floor(normalised / 0.25)
+                denominators[c] = denom
                 load_detail[c] = {
                     'cpu_load_1': raw_load,
-                    'cpu_load_1_floor': load,
+                    'cpu_schedulable': denom,
+                    'cpu_schedulable_from_fallback': from_fallback,
+                    'normalised_load': normalised,
+                    'bucket': bucket,
                 }
-                by_load[load].append(c)
+                by_load[bucket].append(c)
 
             lowest_load = sorted(by_load)[0]
             candidates = by_load[lowest_load]
@@ -467,12 +532,26 @@ class Scheduler:
                     'load_detail': load_detail,
                 })
 
-            # Return a shuffled list of options
-            random.shuffle(candidates)
+            # Return a weighted shuffle of the winning bucket, where a
+            # node's weight is its load headroom toward the target
+            # sustained load -- so bigger or idler machines draw a
+            # proportionally larger share of a burst. This is weighted
+            # sampling without replacement (Efraimidis-Spirakis A-Res):
+            # callers walk the list on failure, so the tail order matters
+            # as much as the head.
+            weights = {}
+            for c in candidates:
+                raw_load = self.metrics[c].get('cpu_load_1', 0)
+                weights[c] = max(
+                    0.1,
+                    config.SCHEDULER_TARGET_LOAD * denominators[c] - raw_load)
+            candidates.sort(
+                key=lambda c: random.random() ** (1.0 / weights[c]),
+                reverse=True)
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
                 'schedule final candidates',
-                extra={'candidates': candidates})
+                extra={'candidates': candidates, 'weights': weights})
             return candidates
 
     def summarize_resources(self):
@@ -500,15 +579,22 @@ class Scheduler:
 
             resources['per_node'][n] = {}
 
-            # CPU
+            # CPU. This must use the same arithmetic as
+            # _has_sufficient_cpu() so that the resources this API reports
+            # agree with what admission would actually allow.
             resources['per_node'][n]['cpu_max_per_instance'] = \
                 self.metrics[n].get('cpu_max_per_instance', 0)
 
-            hard_max_cpus = (self.metrics[n].get(
-                'cpu_max', 0) * config.CPU_OVERCOMMIT_RATIO)
+            cpu_base, _ = self._schedulable_threads(n)
+            resources['per_node'][n]['cpu_schedulable'] = cpu_base
+            hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
             current_cpu = self.metrics[n].get('cpu_total_instance_vcpus', 0)
             resources['per_node'][n]['cpu_available'] = hard_max_cpus - current_cpu
-            resources['total']['cpu_available'] += resources['per_node'][n]['cpu_available']
+            # A node packed beyond the cap (for example after the cap was
+            # lowered) reports negative per-node headroom, which is honest,
+            # but must not eat into the cluster total other nodes provide.
+            resources['total']['cpu_available'] += max(
+                0, resources['per_node'][n]['cpu_available'])
 
             resources['per_node'][n]['cpu_load_1'] = self.metrics[n].get(
                 'cpu_load_1', 0)
@@ -517,17 +603,19 @@ class Scheduler:
             resources['per_node'][n]['cpu_load_15'] = self.metrics[n].get(
                 'cpu_load_15', 0)
 
-            # Memory
+            # Memory. As with CPU, this must match _has_sufficient_ram().
+            reserved = self._memory_reserved_mb(n)
+            resources['per_node'][n]['memory_reserved_mb'] = reserved
             resources['per_node'][n]['ram_max_per_instance'] = \
-                (self.metrics[n].get('memory_available', 0) -
-                 (config.RAM_SYSTEM_RESERVATION * 1024))
+                (self.metrics[n].get('memory_available', 0) - reserved)
             resources['per_node'][n]['ram_max'] = \
                 self.metrics[n].get('memory_max', 0) * \
                 config.RAM_OVERCOMMIT_RATIO
             resources['per_node'][n]['ram_available'] = \
                 (self.metrics[n].get('memory_max', 0) * config.RAM_OVERCOMMIT_RATIO -
                  self.metrics[n].get('memory_total_instance_actual', 0))
-            resources['total']['ram_available'] += resources['per_node'][n]['ram_available']
+            resources['total']['ram_available'] += max(
+                0, resources['per_node'][n]['ram_available'])
 
             # Disk
             disk_free = int(self.metrics[n].get(

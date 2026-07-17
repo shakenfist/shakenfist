@@ -209,6 +209,26 @@ letting callers that want exception-flow control use a familiar `try/raise`
 pattern without the error type being load-bearing across process
 boundaries.
 
+### Scheduler and node capacity metrics
+
+The scheduler ranks hypervisors by load per schedulable thread and
+admits against reservation-adjusted capacity. The reservation
+arithmetic lives in `shakenfist/daemons/resources/main.py`
+(`_compute_reservations()`, `_get_hybrid_core_counts()`), which
+publishes `cpu_cores`, `cpu_threads`, `cpu_cores_reserved`,
+`cpu_schedulable`, `cpu_cores_schedulable`, `memory_reserved_mb`
+(and `cpu_cores_performance` / `cpu_cores_efficiency` on hybrid
+CPUs) into `node_metrics`. On the consuming side,
+`Scheduler._schedulable_threads()` and
+`Scheduler._memory_reserved_mb()` in `shakenfist/scheduler.py`
+apply per-node fallbacks for metrics rows written by older
+resources daemons (the CPU fallback synthesises a role-aware
+reservation so un-upgraded nodes don't look artificially large) —
+admission, ordering and `summarize_resources()` all go through
+these helpers, so keep them in sync if you touch capacity
+arithmetic. Operator-facing documentation is
+[`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md).
+
 ### Daemon liveness (systemd watchdog)
 
 `Daemon.pet_watchdog()` in `shakenfist/daemons/daemon.py` is the liveness

@@ -254,6 +254,38 @@ questions include at least:
     wants blob X" composes; a capacity-only table doesn't.
     Worth deciding whether to lay the groundwork or
     explicitly defer.
+13. **Demand-denominated capacity and a learned overcommit.**
+    The static `CPU_OVERCOMMIT_RATIO` (default 16, inherited
+    from OpenStack's `cpu_allocation_ratio` folklore) encodes
+    an assumption of many mostly-idle, uncorrelated VMs. CI
+    workloads are few, large and *correlated* — every VM in a
+    job compiles at full tilt simultaneously — so the honest
+    admission model is load-denominated: each hypervisor has
+    a target sustained load per schedulable core, and
+    admission asks whether *effective load* would exceed it.
+    A purely reactive controller cannot deliver this: a CI
+    burst places 50 VMs in seconds, each VM contributes zero
+    load while booting and ramps over minutes, `cpu_load_1`
+    is a one-minute average, and the metrics snapshot is up
+    to 60 seconds stale — the actuation-to-observation lag
+    exceeds the burst, so a reactive scheme admits everything
+    and discovers the overload minutes later. The reservation
+    row is the natural feedforward term: it carries an
+    *expected demand* estimate (initially vCPUs × a
+    demand-per-vCPU constant, later a per-namespace learned
+    value) whose contribution to effective load decays as the
+    instance ages and its real demand becomes visible in
+    measured load — a demand claim consumed over time,
+    analogous to the capacity claim consumed at `building`.
+    Phase 0 must decide whether the reservation schema
+    carries an expected-demand field and a decay /
+    consumption rule from day one (cheap now, painful to
+    retrofit), even though the learning loop that tunes
+    demand estimates is explicitly future work. Phase 00a
+    delivers the static stopgap (load-per-core ordering,
+    core-denominated system reservations, a measured
+    overcommit default) and the tracking groundwork the
+    learner will need.
 
 ## Execution
 
@@ -261,6 +293,7 @@ Provisional, to be re-cut after phase 0.
 
 | Phase | Plan | Status |
 |-------|------|--------|
+| 00a. Load-aware ordering and system reservations (static quick wins) | PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md | Implemented (awaiting sfcbr soak) |
 | 0. Research and decisions document | PLAN-scheduler-reservations-phase-00-decisions.md | Not started |
 | 1. `node_reservations` schema and migration | PLAN-scheduler-reservations-phase-01-schema.md | Not started |
 | 2. Conditional-INSERT scheduling primitive | PLAN-scheduler-reservations-phase-02-primitive.md | Not started |
@@ -440,12 +473,44 @@ because the following statements will be true:
   model's ORDER BY / tie-break surface (open questions 6-7)
   rather than being bolted on as a parallel heuristic. Diagnose
   with `tools/sfcbr-capacity.sh` in the 33fl repo (per-node
-  load-per-core plus infra-role tags).
+  load-per-core plus infra-role tags). **Status: being
+  delivered as phase 00a** (load-per-core ordering, coarse
+  buckets to preserve burst spreading, core-denominated system
+  reservations for the OS and infra-role daemons, headroom-
+  weighted selection, CPU topology tracking, and a measured
+  overcommit default).
+- **Demand-based adaptive overcommit (the learning loop).**
+  The end-state sketched in open question 13: each node's
+  expected demand-per-vCPU is *learned* from observed
+  `cpu_load_1 / cpu_total_instance_vcpus` over time, probably
+  tracked per namespace (a CI namespace learns ~0.8-1.0 per
+  vCPU; a namespace of idle pet VMs learns ~0.05), with
+  damping, floor / ceiling clamps, and a bias toward
+  recent-window *max* rather than mean because correlated
+  bursts are the failure mode that matters. The learned
+  estimate replaces the static demand constant that phase 00a
+  ships and feeds the expected-demand field on reservation
+  rows (if phase 0 adopts it). Validate the model offline
+  first — an analysis report over recorded sfcbr metrics —
+  before anything trusts it in the placement path.
 
 ### Bugs fixed during this work
 
 This section should list any bugs we encounter during
 development that we fixed.
+
+* **KSM metrics were never published** (pre-existing, found by
+  the phase 00a code review): the resources daemon's KSM block
+  skipped every sysfs file (trailing-newline filter), used a
+  literal `'memory_ksm_{ent}'` key (missing f-prefix), and
+  re-read an exhausted file handle so the swallowed ValueError
+  hid it all. No `memory_ksm_*` field had ever reached
+  `node_metrics`.
+* **ZeroDivisionError on metrics rows lacking `memory_max`**
+  (pre-existing, found by the same review): the KSM overcommit
+  admission check divided by `memory_max` with no guard, so a
+  partially-written hypervisor row crashed `find_candidates()`
+  instead of excluding the node with a recorded reason.
 
 ### Documentation index maintenance
 
