@@ -93,7 +93,12 @@ options:
     required: false
     type: str
   side_channels:
-    description: A list of side channel names to expose to the instance.
+    description: >-
+      A list of side channel names to expose to the instance. If not
+      specified, the server applies its default set (currently sf-agent
+      and sf-agent2, which the in-guest agent requires). Pass an explicit
+      empty list to create the instance with no side channels at all,
+      which disables the in-guest agent.
     required: false
     type: list
     elements: str
@@ -388,15 +393,26 @@ def _check_instance(client, existing, params, log):
             kwarg = 'force_placement' if key == 'placement' else key
             instance_kwargs[kwarg] = params[key]
 
-    # Optional list-of-strings values. Normalise both sides through `or []` so
-    # an instance with no side channels (the API reports the field as None)
-    # compares equal to an unset request (which defaults to []). Without this
-    # the comparison is perpetually dirty, which forces a needless
-    # delete-and-recreate on every "ensure present" -- breaking idempotency and,
-    # for an instance with a static address, failing the recreate with a 409
-    # because the address is still reserved by the instance being replaced.
+    # Optional list-of-strings values. An unset parameter means "no
+    # preference": we omit the kwarg entirely so the server applies its
+    # default (for side_channels currently ['sf-agent', 'sf-agent2']), and
+    # we skip the dirty comparison because we cannot know what the server's
+    # default is from here -- comparing unset against the applied default
+    # would be perpetually dirty, forcing a needless delete-and-recreate on
+    # every "ensure present". That breaks idempotency and, for an instance
+    # with a static address, fails the recreate with a 409 because the
+    # address is still reserved by the instance being replaced.
+    #
+    # The previous behaviour normalised unset to [] and passed it through,
+    # but the API treats an explicit empty list as "no side channels at
+    # all", which silently disabled the in-guest agent on every instance
+    # this module created without an explicit side_channels parameter. An
+    # explicit value -- including an explicit empty list to disable the
+    # agent -- is still compared and passed through.
     for key in ['side_channels']:
-        values = params.get(key) or []
+        if params.get(key) is None:
+            continue
+        values = params[key]
         if (existing.get(key) or []) != values:
             log.append('Instance dirty: %s has changed' % key)
             dirty = True
