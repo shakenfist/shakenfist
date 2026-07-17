@@ -10,10 +10,11 @@
 # restart tasks used to sit, so ordering relative to the later
 # `virsh net-destroy default` is preserved.
 
+# Boot-time enablement of apparmor is asserted by an always-run task in the
+# role body; this handler only performs the change-gated restart.
 - name: Restart apparmor
   ansible.builtin.service:
     name: apparmor
-    enabled: true
     state: restarted
 
 - name: Restart libvirt

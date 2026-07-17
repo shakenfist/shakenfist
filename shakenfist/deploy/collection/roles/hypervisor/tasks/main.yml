@@ -19,8 +19,11 @@
   register: is_amd
 
 # Only reload the kvm module when nested virt is not already enabled, so a
-# no-op redeploy neither reports a spurious change nor attempts a module
-# reload on a host that is already running guests.
+# no-op redeploy neither reports a spurious change nor reloads the kvm
+# module when nested virt is already active. (If nested virt is disabled on
+# a host that is already running guests, the reload below will still be
+# attempted and will fail to unload the in-use module -- that pre-existing
+# edge case is unchanged.)
 - name: Check whether nested virtualization is already enabled (AMD)
   ansible.builtin.command: cat /sys/module/kvm_amd/parameters/nested
   register: amd_nested_state
@@ -91,19 +94,33 @@
     owner: root
     mode: '0644'
 
+# These regexps match both the shipped commented default and the uncommented
+# line we write, so a re-run matches the final state and reports no change
+# (and therefore doesn't re-notify the restart handler). A regexp matching
+# only the commented form would stop matching after the first run and
+# re-append the line on every subsequent deploy.
 - name: Enable SPICE TLS
   ansible.builtin.lineinfile:
     path: /etc/libvirt/qemu.conf
-    regexp: "#spice_tls = "
+    regexp: '^#?\s*spice_tls\s*='
     line: 'spice_tls = 1'
   notify: Restart libvirt
 
 - name: Configure SPICE TLS PKI directory
   ansible.builtin.lineinfile:
     path: /etc/libvirt/qemu.conf
-    regexp: "#spice_tls_x509_cert_dir = "
+    regexp: '^#?\s*spice_tls_x509_cert_dir\s*='
     line: 'spice_tls_x509_cert_dir = "/etc/pki/libvirt-spice"'
   notify: Restart libvirt
+
+# The old unconditional restart task also asserted apparmor was enabled at
+# boot on every deploy. Keep that drift correction as its own always-run
+# task (it only reports changed if the enablement actually flips), separate
+# from the change-gated restart handler.
+- name: Ensure apparmor is enabled at boot
+  ansible.builtin.service:
+    name: apparmor
+    enabled: true
 
 # Ensure libvirt has BPF and perfmon capabilities (see the Debian bug
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=979964 for details).
