@@ -11,6 +11,8 @@ from typing import Any
 from typing import Optional
 
 import click
+from grpc_health.v1 import health_pb2
+from grpc_health.v1 import health_pb2_grpc
 from shakenfist_utilities import logs  # noreorder
 
 
@@ -132,6 +134,7 @@ from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
 from shakenfist.schema.object_state import State           # noqa
 from shakenfist.schema.object_types import ObjectType      # noqa
+from shakenfist.util.grpc_channel import make_database_channel  # noqa
 
 
 @click.group()
@@ -370,10 +373,6 @@ def gateway_health(host: Optional[str], timeout: int) -> None:
     the serial roll is not taken down until this gateway is actually
     serving again, not merely listening on its port.
     """
-    from grpc_health.v1 import health_pb2
-    from grpc_health.v1 import health_pb2_grpc
-    from shakenfist.util.grpc_channel import make_database_channel
-
     host = host or config.NODE_MESH_IP
     channel = make_database_channel([host], config.MARIADB_GATEWAY_PORT)
     try:

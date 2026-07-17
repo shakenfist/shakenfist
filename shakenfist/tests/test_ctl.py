@@ -678,7 +678,7 @@ class GatewayHealthCommandTestCase(base.ShakenFistTestCase):
         self.runner = CliRunner()
 
     @mock.patch('grpc_health.v1.health_pb2_grpc.HealthStub')
-    @mock.patch('shakenfist.util.grpc_channel.make_database_channel')
+    @mock.patch('shakenfist.client.ctl.make_database_channel')
     def test_serving_exits_zero(self, mock_channel, mock_stub):
         from grpc_health.v1 import health_pb2
         from shakenfist.client.ctl import gateway_health
@@ -695,7 +695,7 @@ class GatewayHealthCommandTestCase(base.ShakenFistTestCase):
         mock_channel.return_value.close.assert_called_once()
 
     @mock.patch('grpc_health.v1.health_pb2_grpc.HealthStub')
-    @mock.patch('shakenfist.util.grpc_channel.make_database_channel')
+    @mock.patch('shakenfist.client.ctl.make_database_channel')
     def test_not_serving_exits_nonzero(self, mock_channel, mock_stub):
         from grpc_health.v1 import health_pb2
         from shakenfist.client.ctl import gateway_health
@@ -710,7 +710,25 @@ class GatewayHealthCommandTestCase(base.ShakenFistTestCase):
         mock_channel.return_value.close.assert_called_once()
 
     @mock.patch('grpc_health.v1.health_pb2_grpc.HealthStub')
-    @mock.patch('shakenfist.util.grpc_channel.make_database_channel')
+    @mock.patch('shakenfist.client.ctl.make_database_channel')
+    def test_default_host_is_node_mesh_ip(self, mock_channel, mock_stub):
+        from grpc_health.v1 import health_pb2
+        from shakenfist.client import ctl
+
+        mock_stub.return_value.Check.return_value = \
+            health_pb2.HealthCheckResponse(
+                status=health_pb2.HealthCheckResponse.SERVING)
+
+        # No --host: the probe must fall back to this node's own mesh IP,
+        # which is what the deploy-time roll gate relies on.
+        result = self.runner.invoke(ctl.gateway_health, [])
+
+        self.assertEqual(0, result.exit_code)
+        mock_channel.assert_called_once_with(
+            [ctl.config.NODE_MESH_IP], ctl.config.MARIADB_GATEWAY_PORT)
+
+    @mock.patch('grpc_health.v1.health_pb2_grpc.HealthStub')
+    @mock.patch('shakenfist.client.ctl.make_database_channel')
     def test_rpc_error_exits_nonzero(self, mock_channel, mock_stub):
         from shakenfist.client.ctl import gateway_health
 
