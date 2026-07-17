@@ -18,19 +18,39 @@
   failed_when: false
   register: is_amd
 
+# Only reload the kvm module when nested virt is not already enabled, so a
+# no-op redeploy neither reports a spurious change nor reloads the kvm
+# module when nested virt is already active. (If nested virt is disabled on
+# a host that is already running guests, the reload below will still be
+# attempted and will fail to unload the in-use module -- that pre-existing
+# edge case is unchanged.)
+- name: Check whether nested virtualization is already enabled (AMD)
+  ansible.builtin.command: cat /sys/module/kvm_amd/parameters/nested
+  register: amd_nested_state
+  changed_when: false
+  failed_when: false
+  when: is_amd.rc == 0
+
+- name: Check whether nested virtualization is already enabled (Intel)
+  ansible.builtin.command: cat /sys/module/kvm_intel/parameters/nested
+  register: intel_nested_state
+  changed_when: false
+  failed_when: false
+  when: is_intel.rc == 0
+
 - name: Enable nested virtualization now (AMD)
   ansible.builtin.shell: |
     modprobe -r kvm_intel || true
     modprobe kvm_amd nested=1
   changed_when: true
-  when: is_amd.rc == 0
+  when: is_amd.rc == 0 and (amd_nested_state.stdout | default('N') | trim) not in ['Y', '1']
 
 - name: Enable nested virtualization now (Intel)
   ansible.builtin.shell: |
     modprobe -r kvm_amd
     modprobe kvm_intel nested=1
   changed_when: true
-  when: is_intel.rc == 0
+  when: is_intel.rc == 0 and (intel_nested_state.stdout | default('N') | trim) not in ['Y', '1']
 
 - name: Enable nested virtualization on boot (AMD)
   ansible.builtin.copy:
@@ -57,9 +77,15 @@
 # This module is required for the sf-agent2 side channel to work. On some
 # distributions (notably Ubuntu 24.04), this module is not automatically
 # loaded when vsock sockets are created.
+- name: Check whether vhost_vsock is already loaded
+  ansible.builtin.stat:
+    path: /sys/module/vhost_vsock
+  register: vhost_vsock_module
+
 - name: Load vhost_vsock kernel module
   ansible.builtin.command: modprobe vhost_vsock
   changed_when: true
+  when: not vhost_vsock_module.stat.exists
 
 - name: Ensure vhost_vsock is loaded on boot
   ansible.builtin.copy:
@@ -68,17 +94,33 @@
     owner: root
     mode: '0644'
 
+# These regexps match both the shipped commented default and the uncommented
+# line we write, so a re-run matches the final state and reports no change
+# (and therefore doesn't re-notify the restart handler). A regexp matching
+# only the commented form would stop matching after the first run and
+# re-append the line on every subsequent deploy.
 - name: Enable SPICE TLS
   ansible.builtin.lineinfile:
     path: /etc/libvirt/qemu.conf
-    regexp: "#spice_tls = "
+    regexp: '^#?\s*spice_tls\s*='
     line: 'spice_tls = 1'
+  notify: Restart libvirt
 
 - name: Configure SPICE TLS PKI directory
   ansible.builtin.lineinfile:
     path: /etc/libvirt/qemu.conf
-    regexp: "#spice_tls_x509_cert_dir = "
+    regexp: '^#?\s*spice_tls_x509_cert_dir\s*='
     line: 'spice_tls_x509_cert_dir = "/etc/pki/libvirt-spice"'
+  notify: Restart libvirt
+
+# The old unconditional restart task also asserted apparmor was enabled at
+# boot on every deploy. Keep that drift correction as its own always-run
+# task (it only reports changed if the enablement actually flips), separate
+# from the change-gated restart handler.
+- name: Ensure apparmor is enabled at boot
+  ansible.builtin.service:
+    name: apparmor
+    enabled: true
 
 # Ensure libvirt has BPF and perfmon capabilities (see the Debian bug
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=979964 for details).
@@ -87,18 +129,27 @@
     path: /etc/apparmor.d/local/usr.sbin.libvirtd
     regexp: "  capability bpf,"
     line: '  capability bpf,'
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Let libvirt use perfmon
   ansible.builtin.lineinfile:
     path: /etc/apparmor.d/local/usr.sbin.libvirtd
     regexp: "  capability perfmon,"
     line: '  capability perfmon,'
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Let libvirt use sys_rawio
   ansible.builtin.lineinfile:
     path: /etc/apparmor.d/local/usr.sbin.libvirtd
     regexp: "  capability sys_rawio,"
     line: '  capability sys_rawio,'
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Check whether /etc/apparmor.d/local/abstractions/libvirt-qemu exists
   ansible.builtin.stat:
@@ -113,6 +164,9 @@
     regexp: "/srv/shakenfist/instances.*nvme.*"
     line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 # NOTE(mikal): and fix it here too.
 - name: Add an apparmor rule for NVMe disks (older Debian)
@@ -121,6 +175,9 @@
     regexp: "/srv/shakenfist/instances.*nvme.*"
     line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 # Let libvirt read the SSL configuration for its SPICE connections (see the
 # Debian bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1030684 for
@@ -131,6 +188,9 @@
     regexp: "/etc/ssl/openssl.cnf r,"
     line: '/etc/ssl/openssl.cnf r,'
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Let libvirt read our openssl config (older Debian)
   ansible.builtin.lineinfile:
@@ -138,6 +198,9 @@
     regexp: "/etc/ssl/openssl.cnf r,"
     line: '/etc/ssl/openssl.cnf r,'
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 # For instances which are started with no network interface, but then hotplug
 # one later, we need to ensure that we always have access to /dev/vhost-net.
@@ -149,6 +212,9 @@
     regexp: "/dev/vhost-net rw,"
     line: '/dev/vhost-net rw,'
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Add an apparmor rule to always allow vhost-net access (older Debian)
   ansible.builtin.lineinfile:
@@ -156,6 +222,9 @@
     regexp: "/dev/vhost-net rw,"
     line: '/dev/vhost-net rw,'
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 # For vsock communication with guest agents (sf-agent2 side channel), we need
 # access to /dev/vhost-vsock and /dev/vsock. This is similar to vhost-net above.
@@ -165,6 +234,9 @@
     regexp: "/dev/vhost-vsock rw,"
     line: '/dev/vhost-vsock rw,'
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Add an apparmor rule to always allow vhost-vsock access (older Debian)
   ansible.builtin.lineinfile:
@@ -172,6 +244,9 @@
     regexp: "/dev/vhost-vsock rw,"
     line: '/dev/vhost-vsock rw,'
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Add an apparmor rule to always allow vsock access (modern Debian)
   ansible.builtin.lineinfile:
@@ -179,6 +254,9 @@
     regexp: "/dev/vsock rw,"
     line: '/dev/vsock rw,'
   when: stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
 - name: Add an apparmor rule to always allow vsock access (older Debian)
   ansible.builtin.lineinfile:
@@ -186,17 +264,17 @@
     regexp: "/dev/vsock rw,"
     line: '/dev/vsock rw,'
   when: not stat_result.stat.exists
+  notify:
+    - Restart apparmor
+    - Restart libvirt
 
-- name: Restart apparmor
-  ansible.builtin.service:
-    name: apparmor
-    enabled: true
-    state: restarted
-
-- name: Restart libvirt
-  ansible.builtin.service:
-    name: libvirtd
-    state: restarted
+# Apply any apparmor / libvirt config changes notified above by restarting
+# those services now -- before the virsh net-destroy below, which must be the
+# last libvirt-affecting step (a libvirtd restart after it would bring the
+# autostart default network back up). On a no-op redeploy nothing was
+# notified, so nothing restarts.
+- name: Flush apparmor / libvirt restart handlers
+  ansible.builtin.meta: flush_handlers
 
 # The libvirt domain template ships with this role; ansible resolves the
 # relative src against the role's files/ directory.

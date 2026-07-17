@@ -42,13 +42,18 @@
     dest: /etc/sysctl.d/10-sf-ipv6.conf
     owner: root
     mode: ugo+r
+  register: sf_ipv6_sysctl
 
+# Only apply at runtime when the persisted sysctl.d file actually changed; on a
+# no-op redeploy IPv6 is already disabled from boot, so this would otherwise
+# report a spurious change every run.
 - name: Configure IPv6 to be disabled now
   ansible.builtin.shell: |
     sysctl -w net.ipv6.conf.all.disable_ipv6=1
     sysctl -w net.ipv6.conf.default.disable_ipv6=1
   changed_when: true
   failed_when: false
+  when: sf_ipv6_sysctl is changed
 
 - name: Configure journald to not consume heaps of disk
   ansible.builtin.template:
