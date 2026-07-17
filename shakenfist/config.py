@@ -195,6 +195,29 @@ class SFConfig(BaseSettings):
         2.0,
         description='How much RAM is reserved for the OS.'
     )
+    RAM_INFRA_ROLE_RESERVATION: float = Field(
+        4.0,
+        description=(
+            'How much additional RAM (in GB) is reserved on nodes carrying '
+            'a cluster-wide infrastructure role, that is a network node or '
+            'a database node.'
+        )
+    )
+    CPU_SYSTEM_RESERVATION: int = Field(
+        1,
+        description=(
+            'How many physical CPU cores (not threads) are reserved for '
+            'operating system tasks on every hypervisor.'
+        )
+    )
+    CPU_INFRA_ROLE_RESERVATION: int = Field(
+        1,
+        description=(
+            'How many additional physical CPU cores (not threads) are '
+            'reserved on nodes carrying a cluster-wide infrastructure '
+            'role, that is a network node or a database node.'
+        )
+    )
     MINIMUM_FREE_DISK: int = Field(
         20,
         description='Shaken Fist attempts to leave this amount of disk free.'

@@ -1,3 +1,4 @@
+import math
 import os
 import platform
 import re
@@ -39,6 +40,87 @@ LOG, _ = logs.setup(__name__)
 LIBVIRT_KVM_CMDLINE_RE = re.compile('.* guest=sf:([a-z0-9\\-]+).*')
 
 
+def _parse_cpu_list(cpu_list):
+    # Parse the kernel's CPU list format ('0-15', '0-3,8-11', '5') into a
+    # list of CPU (thread) numbers.
+    cpus = []
+    for chunk in cpu_list.strip().split(','):
+        if not chunk:
+            continue
+        if '-' in chunk:
+            start, end = chunk.split('-')
+            cpus.extend(range(int(start), int(end) + 1))
+        else:
+            cpus.append(int(chunk))
+    return cpus
+
+
+def _count_physical_cores(thread_ids, sysfs_root='/sys'):
+    # A physical core's threads share a topology core_id; dedup to count
+    # cores without assuming how many threads each core has.
+    core_ids = set()
+    for t in thread_ids:
+        with open(f'{sysfs_root}/devices/system/cpu/cpu{t}/topology/core_id') as f:
+            core_ids.add(int(f.read().strip()))
+    return len(core_ids)
+
+
+def _get_hybrid_core_counts(sysfs_root='/sys'):
+    """Return performance and efficiency core counts on hybrid CPUs.
+
+    On Intel hybrid parts /sys/devices/cpu_core/cpus and
+    /sys/devices/cpu_atom/cpus list the threads of the performance and
+    efficiency cores respectively. Returns an empty dict on non-hybrid
+    hardware (paths absent) or on any parse failure -- these fields are
+    informational and nothing in scheduling consumes them yet.
+    """
+    core_path = os.path.join(sysfs_root, 'devices/cpu_core/cpus')
+    atom_path = os.path.join(sysfs_root, 'devices/cpu_atom/cpus')
+    if not (os.path.exists(core_path) and os.path.exists(atom_path)):
+        return {}
+
+    try:
+        with open(core_path) as f:
+            performance_threads = _parse_cpu_list(f.read())
+        with open(atom_path) as f:
+            efficiency_threads = _parse_cpu_list(f.read())
+        return {
+            'cpu_cores_performance': _count_physical_cores(
+                performance_threads, sysfs_root=sysfs_root),
+            'cpu_cores_efficiency': _count_physical_cores(
+                efficiency_threads, sysfs_root=sysfs_root),
+        }
+    except Exception as e:
+        util_exceptions.ignore_exception('hybrid cpu topology', e)
+        return {}
+
+
+def _compute_reservations(cpu_cores, cpu_threads, is_infra_role,
+                          cpu_system_reservation, cpu_infra_role_reservation,
+                          ram_system_reservation_gb, ram_infra_role_reservation_gb):
+    """Compute schedulable capacity after system reservations.
+
+    Reservations are expressed in physical cores (an infra-role node -- one
+    running cluster-wide daemons, that is a network node or database node --
+    reserves extra), but scheduling accounts in threads, so reserved cores
+    convert at ceil(threads / cores) threads per core. That rounding is
+    conservative on hybrid parts where threads-per-core is an average.
+    """
+    cpu_cores_reserved = cpu_system_reservation
+    memory_reserved_gb = ram_system_reservation_gb
+    if is_infra_role:
+        cpu_cores_reserved += cpu_infra_role_reservation
+        memory_reserved_gb += ram_infra_role_reservation_gb
+
+    threads_per_core = math.ceil(cpu_threads / cpu_cores)
+    return {
+        'cpu_cores_reserved': cpu_cores_reserved,
+        'cpu_schedulable': max(1, cpu_threads - cpu_cores_reserved * threads_per_core),
+        'cpu_cores_schedulable': max(1, cpu_cores - cpu_cores_reserved),
+        'memory_reserved_mb': int(memory_reserved_gb * 1024),
+    }
+
+
 class Monitor(daemon.Daemon):
     def __init__(self, id):
         super().__init__(id)
@@ -74,6 +156,30 @@ class Monitor(daemon.Daemon):
             })
 
             retval['cpu_max_per_instance'] = lc.get_max_vcpus()
+
+            # CPU topology and system reservations. cpu_cores is physical
+            # cores and cpu_threads is logical CPUs (cpu_max above is also
+            # logical CPUs, from libvirt, and is retained for compatibility).
+            # Scheduling accounts in threads; reservations are expressed in
+            # physical cores. psutil can return None for either count, in
+            # which case we publish nothing and the scheduler falls back to
+            # its unreserved arithmetic for this node.
+            cpu_cores = psutil.cpu_count(logical=False)
+            cpu_threads = psutil.cpu_count(logical=True)
+            if cpu_cores and cpu_threads:
+                infra_role = (config.NODE_IS_NETWORK_NODE or
+                              config.NODE_IS_DATABASE_NODE)
+                retval.update({
+                    'cpu_cores': cpu_cores,
+                    'cpu_threads': cpu_threads,
+                })
+                retval.update(_compute_reservations(
+                    cpu_cores, cpu_threads, infra_role,
+                    config.CPU_SYSTEM_RESERVATION,
+                    config.CPU_INFRA_ROLE_RESERVATION,
+                    config.RAM_SYSTEM_RESERVATION,
+                    config.RAM_INFRA_ROLE_RESERVATION))
+            retval.update(_get_hybrid_core_counts())
 
             # This is disabled as data we don't currently use
             # for i in range(present_cpus):
