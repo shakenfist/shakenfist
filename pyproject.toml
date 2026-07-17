@@ -145,7 +145,7 @@ dependencies = [
     "rpds-py==0.30.0",
     "six==1.17.0",
     "stevedore==5.9.0",
-    "tzdata==2025.3",
+    "tzdata==2026.3",
     "wrapt==2.2.2",
     "gunicorn==25.3.0",
     "psutil==7.2.2",
