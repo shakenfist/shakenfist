@@ -141,7 +141,7 @@ port=5900
 | `tls-port` | No* | SPICE TLS port for secure connections |
 | `password` | No | SPICE password for authentication |
 | `ca` | No | Inline PEM CA certificate for TLS verification |
-| `host-subject` | No | Expected server certificate subject |
+| `host-subject` | No | Server certificate subject; enforced -- the connection fails if the server's certificate subject does not match, and a malformed value is rejected at startup |
 
 ### Example .vv Files
 
@@ -186,6 +186,10 @@ password=mysecretpassword
 ca=-----BEGIN CERTIFICATE-----\nMIIE...\n-----END CERTIFICATE-----\n
 host-subject=CN=spice.example.com
 ```
+
+Note: `host-subject` must match the server certificate's subject
+exactly, including attribute count, order, and type -- not just the
+`CN` value.
 
 ## Keyboard Shortcuts
 
