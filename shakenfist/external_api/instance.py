@@ -515,7 +515,7 @@ class InstancesEndpoint(api_base.Resource):
              nvram_template=None, secure_boot=False, side_channels=None):
         # NOTE(mikal): if we cleaned this up to have less business logic in it,
         # then that would also mean that we could reduce the amount of duplicated
-        # logic in mock_etcd.create_instance().
+        # logic in mock_mariadb.create_instance().
         global SCHEDULER
 
         instance_uuid = str(uuid.uuid4())

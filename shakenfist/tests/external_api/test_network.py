@@ -10,7 +10,7 @@ from shakenfist.config import SFConfig
 from shakenfist.exceptions import NetworkOperationFailed
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class FakeScheduler:
@@ -44,18 +44,18 @@ class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
-        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
 
         self.network_id = str(uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'banana',
             uuid=self.network_id,
             namespace='foo',
@@ -106,18 +106,18 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
-        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
 
         self.network_id = str(uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             name='foonet',
             uuid=self.network_id,
             namespace='foo',
@@ -188,16 +188,16 @@ class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
-        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
 
         self.network_id = str(uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             name='foonet',
             uuid=self.network_id,
             namespace='foo',
@@ -293,17 +293,17 @@ class NetworkDeleteAlreadyDeletedTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
-        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
 
         self.network_id = str(uuid4())
         # Note the state -- the whole point of this test class.
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             name='foonet',
             uuid=self.network_id,
             namespace='foo',
@@ -360,12 +360,12 @@ class NetworkCreateBooleanDefaultsTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
 
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
@@ -450,16 +450,16 @@ class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
-        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
 
         self.network_id = str(uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'dnsnet',
             uuid=self.network_id,
             namespace='foo',

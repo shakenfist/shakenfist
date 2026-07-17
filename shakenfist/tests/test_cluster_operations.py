@@ -1,6 +1,6 @@
 # Copyright 2026 Michael Still and contributors
 #
-# Tests for the cluster_operations public API via the mock_etcd
+# Tests for the cluster_operations public API via the mock_mariadb
 # fixture. The mock is a small in-memory mirror of the real
 # direct-layer contract; any deviation between it and the SQL
 # behaviour would mask bugs, so these tests document the contract
@@ -8,7 +8,7 @@
 
 from shakenfist import mariadb
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 OP_UUID_A = '11111111-1111-4111-8111-111111111111'
@@ -27,8 +27,8 @@ class ClusterOperationsRoundTripTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     def test_create_and_get_round_trip(self):
         metadata = {

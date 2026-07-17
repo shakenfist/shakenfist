@@ -16,7 +16,7 @@ from shakenfist.schema.operations.net_op import create_and_enqueue
 from shakenfist.schema.operations.net_op import model_tasks
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 def _make_network_mock(state_value='created', active=True):
@@ -31,7 +31,7 @@ def _make_network_mock(state_value='created', active=True):
     return network
 
 
-def _make_net_op(test_case, mock_etcd, tasks, network_uuid=None,
+def _make_net_op(test_case, mock_mariadb, tasks, network_uuid=None,
                  floating_address=None, inner_address=None):
     """Enqueue and load a NetOp with the given tasks."""
     if network_uuid is None:
@@ -53,8 +53,8 @@ class NetworkEnsureMeshTaskDispatchTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
@@ -64,7 +64,7 @@ class NetworkEnsureMeshTaskDispatchTestCase(base.ShakenFistTestCase):
         """Dispatching network_ensure_mesh delegates to BridgedVXLanNetwork."""
         mock_network_from_db.return_value = _make_network_mock()
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+        op, _ = _make_net_op(self, self.mock_mariadb, [model_tasks.network_ensure_mesh])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_ensure_mesh)
 
@@ -80,7 +80,7 @@ class NetworkEnsureMeshTaskDispatchTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = _make_network_mock()
         mock_apply.return_value = None
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+        op, _ = _make_net_op(self, self.mock_mariadb, [model_tasks.network_ensure_mesh])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_ensure_mesh)
 
@@ -94,8 +94,8 @@ class EnsureMeshFailedExceptionTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
@@ -107,7 +107,7 @@ class EnsureMeshFailedExceptionTestCase(base.ShakenFistTestCase):
             state_value='deleted', active=False)
         mock_apply.side_effect = EnsureMeshFailed('mesh broke')
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+        op, _ = _make_net_op(self, self.mock_mariadb, [model_tasks.network_ensure_mesh])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_ensure_mesh)
 
@@ -129,7 +129,7 @@ class EnsureMeshFailedExceptionTestCase(base.ShakenFistTestCase):
             state_value='created', active=True)
         mock_apply.side_effect = EnsureMeshFailed('mesh broke on active network')
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+        op, _ = _make_net_op(self, self.mock_mariadb, [model_tasks.network_ensure_mesh])
         op.state = NetOp.STATE_EXECUTING
         op.queue_name = 'test-net-queue'
         op.current_defer_count = 0
@@ -153,7 +153,7 @@ class EnsureMeshFailedExceptionTestCase(base.ShakenFistTestCase):
             state_value='created', active=True)
         mock_apply.side_effect = EnsureMeshFailed('mesh broke on active network')
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+        op, _ = _make_net_op(self, self.mock_mariadb, [model_tasks.network_ensure_mesh])
         op.state = NetOp.STATE_EXECUTING
         op.queue_name = 'test-net-queue'
         # defer_with_backoff()'s default schedule has three entries; a
@@ -173,8 +173,8 @@ class GenericExceptionTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
@@ -185,7 +185,7 @@ class GenericExceptionTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = _make_network_mock()
         mock_apply.side_effect = RuntimeError('unexpected failure')
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+        op, _ = _make_net_op(self, self.mock_mariadb, [model_tasks.network_ensure_mesh])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_ensure_mesh)
 
@@ -200,8 +200,8 @@ class CreateVXLANInterfaceFailedTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_ensure_mesh')
@@ -212,7 +212,7 @@ class CreateVXLANInterfaceFailedTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = _make_network_mock()
         mock_apply.side_effect = CreateVXLANInterfaceFailed('vxlan create failed')
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+        op, _ = _make_net_op(self, self.mock_mariadb, [model_tasks.network_ensure_mesh])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_ensure_mesh)
 
@@ -231,8 +231,8 @@ class RetiredHandlersTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.operations.net_op.Network.from_db')
@@ -242,7 +242,7 @@ class RetiredHandlersTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = _make_network_mock()
 
         op, _ = _make_net_op(
-            self, self.mock_etcd, [model_tasks.network_deploy])
+            self, self.mock_mariadb, [model_tasks.network_deploy])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_deploy)
 
@@ -257,7 +257,7 @@ class RetiredHandlersTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = _make_network_mock()
 
         op, _ = _make_net_op(
-            self, self.mock_etcd, [model_tasks.network_destroy])
+            self, self.mock_mariadb, [model_tasks.network_destroy])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_destroy)
 
@@ -272,7 +272,7 @@ class RetiredHandlersTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = _make_network_mock()
 
         op, _ = _make_net_op(
-            self, self.mock_etcd, [model_tasks.network_update_dnsmasq])
+            self, self.mock_mariadb, [model_tasks.network_update_dnsmasq])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_update_dnsmasq)
 
@@ -285,8 +285,8 @@ class NetworkRemoveNatTaskDispatchTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_remove_nat')
@@ -297,7 +297,7 @@ class NetworkRemoveNatTaskDispatchTestCase(base.ShakenFistTestCase):
         network = _make_network_mock()
         mock_network_from_db.return_value = network
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_remove_nat])
+        op, _ = _make_net_op(self, self.mock_mariadb, [model_tasks.network_remove_nat])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_remove_nat)
 
@@ -312,8 +312,8 @@ class NetworkAddFloatingIPTaskDispatchTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.add_event_multi')
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
@@ -327,7 +327,7 @@ class NetworkAddFloatingIPTaskDispatchTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = network
 
         op, _ = _make_net_op(
-            self, self.mock_etcd, [model_tasks.network_add_floating_ip],
+            self, self.mock_mariadb, [model_tasks.network_add_floating_ip],
             floating_address='192.0.2.5', inner_address='10.0.0.5')
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_add_floating_ip)
@@ -344,7 +344,7 @@ class NetworkAddFloatingIPTaskDispatchTestCase(base.ShakenFistTestCase):
     def test_floating_address_and_inner_address_properties_expose_static_values(self):
         """NetOp.floating_address / inner_address read from static_values."""
         op, _ = _make_net_op(
-            self, self.mock_etcd, [model_tasks.network_add_floating_ip],
+            self, self.mock_mariadb, [model_tasks.network_add_floating_ip],
             floating_address='192.0.2.6', inner_address='10.0.0.6')
         self.assertEqual('192.0.2.6', op.floating_address)
         self.assertEqual('10.0.0.6', op.inner_address)
@@ -352,7 +352,7 @@ class NetworkAddFloatingIPTaskDispatchTestCase(base.ShakenFistTestCase):
     def test_floating_fields_default_to_none_for_other_tasks(self):
         """Tasks that don't carry floating fields see None for those properties."""
         op, _ = _make_net_op(
-            self, self.mock_etcd, [model_tasks.network_ensure_mesh])
+            self, self.mock_mariadb, [model_tasks.network_ensure_mesh])
         self.assertIsNone(op.floating_address)
         self.assertIsNone(op.inner_address)
 
@@ -362,8 +362,8 @@ class NetworkRemoveFloatingIPTaskDispatchTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.add_event_multi')
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
@@ -377,7 +377,7 @@ class NetworkRemoveFloatingIPTaskDispatchTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = network
 
         op, _ = _make_net_op(
-            self, self.mock_etcd, [model_tasks.network_remove_floating_ip],
+            self, self.mock_mariadb, [model_tasks.network_remove_floating_ip],
             floating_address='192.0.2.7', inner_address='10.0.0.7')
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_remove_floating_ip)
@@ -395,8 +395,8 @@ class NetworkRemoveDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_remove_dnsmasq')
@@ -407,7 +407,7 @@ class NetworkRemoveDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
         network = _make_network_mock()
         mock_network_from_db.return_value = network
 
-        op, _ = _make_net_op(self, self.mock_etcd, [model_tasks.network_remove_dnsmasq])
+        op, _ = _make_net_op(self, self.mock_mariadb, [model_tasks.network_remove_dnsmasq])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_remove_dnsmasq)
 
@@ -422,8 +422,8 @@ class NetworkApplyUpdateDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_update_dnsmasq')
@@ -435,7 +435,7 @@ class NetworkApplyUpdateDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = network
 
         op, _ = _make_net_op(
-            self, self.mock_etcd, [model_tasks.network_apply_update_dnsmasq])
+            self, self.mock_mariadb, [model_tasks.network_apply_update_dnsmasq])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_apply_update_dnsmasq)
 
@@ -450,8 +450,8 @@ class NetworkApplyRemoveDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch('shakenfist.network.bridged_vxlan_network.BridgedVXLanNetwork._apply_remove_dnsmasq')
@@ -463,7 +463,7 @@ class NetworkApplyRemoveDnsmasqTaskDispatchTestCase(base.ShakenFistTestCase):
         mock_network_from_db.return_value = network
 
         op, _ = _make_net_op(
-            self, self.mock_etcd, [model_tasks.network_apply_remove_dnsmasq])
+            self, self.mock_mariadb, [model_tasks.network_apply_remove_dnsmasq])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_apply_remove_dnsmasq)
 
@@ -478,8 +478,8 @@ class NetworkApplyCreateNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch(
@@ -492,7 +492,7 @@ class NetworkApplyCreateNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
         mock_network_from_db.return_value = network
 
         op, _ = _make_net_op(
-            self, self.mock_etcd,
+            self, self.mock_mariadb,
             [model_tasks.network_apply_create_network_node])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_apply_create_network_node)
@@ -507,8 +507,8 @@ class NetworkApplyDeleteNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.net_op.mariadb.set_cluster_operation_error')
     @mock.patch(
@@ -524,7 +524,7 @@ class NetworkApplyDeleteNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
         mock_network_from_db.return_value = network
 
         op, _ = _make_net_op(
-            self, self.mock_etcd,
+            self, self.mock_mariadb,
             [model_tasks.network_apply_delete_network_node])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_apply_delete_network_node)
@@ -551,7 +551,7 @@ class NetworkApplyDeleteNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
         mock_defer.return_value = True
 
         op, _ = _make_net_op(
-            self, self.mock_etcd,
+            self, self.mock_mariadb,
             [model_tasks.network_apply_delete_network_node])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_apply_delete_network_node)
@@ -576,7 +576,7 @@ class NetworkApplyDeleteNetworkNodeTaskDispatchTestCase(base.ShakenFistTestCase)
         mock_defer.return_value = False
 
         op, _ = _make_net_op(
-            self, self.mock_etcd,
+            self, self.mock_mariadb,
             [model_tasks.network_apply_delete_network_node])
         op.state = NetOp.STATE_EXECUTING
         op.dispatch_task(model_tasks.network_apply_delete_network_node)

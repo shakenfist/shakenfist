@@ -8,7 +8,7 @@ from shakenfist.config import config
 from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class InterfaceEndpointGetTestCase(base.ShakenFistTestCase):
@@ -47,12 +47,12 @@ class InterfaceEndpointGetTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config_patch.start()
         self.addCleanup(self.config_patch.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
 
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
@@ -120,12 +120,12 @@ class InterfaceDefloatEndpointTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config_patch.start()
         self.addCleanup(self.config_patch.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
 
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))

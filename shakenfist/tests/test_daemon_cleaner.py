@@ -6,7 +6,7 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.daemons.cleaner import main as cleaner_main
 from shakenfist.daemons.cleaner import scheduled_tasks as cleaner_st
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 # Module-level storage for test instance UUIDs that the fake libvirt uses
@@ -105,8 +105,8 @@ class CleanerTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
@@ -119,7 +119,7 @@ class CleanerTestCase(base.ShakenFistTestCase):
         # Create instances and store their UUIDs for later lookup
         instance_uuids = {}
         for name in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
-            inst = self.mock_etcd.create_instance(
+            inst = self.mock_mariadb.create_instance(
                 name, set_state=instance.Instance.STATE_CREATED)
             instance_uuids[name] = str(inst.uuid)
 
@@ -136,7 +136,7 @@ class CleanerTestCase(base.ShakenFistTestCase):
                             ('suspended', 'paused')]:
             inst_uuid = instance_uuids[name]
             # power_state is now written to MariaDB only (no etcd dual-write)
-            inst_attrs = self.mock_etcd.get_mariadb_instance_attributes(
+            inst_attrs = self.mock_mariadb.get_mariadb_instance_attributes(
                 inst_uuid)
             self.assertIsNotNone(
                 inst_attrs,
@@ -162,7 +162,7 @@ class CleanerTestCase(base.ShakenFistTestCase):
 
         instance_uuids = {}
         for name in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
-            inst = self.mock_etcd.create_instance(
+            inst = self.mock_mariadb.create_instance(
                 name, set_state=instance.Instance.STATE_CREATED)
             instance_uuids[name] = str(inst.uuid)
         _test_instance_uuids = instance_uuids
@@ -195,7 +195,7 @@ class CleanerCrashedInstanceTestCase(CleanerTestCase):
 
         instance_uuids = {}
         for name in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
-            inst = self.mock_etcd.create_instance(
+            inst = self.mock_mariadb.create_instance(
                 name, set_state=instance.Instance.STATE_CREATED)
             instance_uuids[name] = str(inst.uuid)
         _test_instance_uuids = instance_uuids
@@ -212,7 +212,7 @@ class CleanerCrashedInstanceTestCase(CleanerTestCase):
         self.assertIn(instance_uuids['crashed'], undefines[0][0][0])
 
         # ... and the state change was persisted.
-        db_state = self.mock_etcd.get_mariadb_state(
+        db_state = self.mock_mariadb.get_mariadb_state(
             ObjectType.INSTANCE, instance_uuids['crashed'])
         self.assertEqual(instance.Instance.STATE_DELETED, db_state['value'])
 

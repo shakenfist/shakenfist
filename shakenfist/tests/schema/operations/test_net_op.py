@@ -16,15 +16,15 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.net_op import NetOp
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class NetOpTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     def test_model(self):
         u1 = str(uuid4())
@@ -129,21 +129,21 @@ class NetOpTestCase(base.ShakenFistTestCase):
                 'request_id': None,
                 'version': current_version
             },
-            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
+            self.mock_mariadb.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {
                 'value': 'queued',
                 'update_time': 123.0
             },
-            self.mock_etcd.get_mariadb_state('net_op', op_uuid)
+            self.mock_mariadb.get_mariadb_state('net_op', op_uuid)
         )
         self.assertEqual(
             {
                 'operation_type': 'net_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_work_queue_payload(
+            self.mock_mariadb.get_work_queue_payload(
                 'networknode-clusteroperation-user_waiting')
         )
 
@@ -189,7 +189,7 @@ class NetOpTestCase(base.ShakenFistTestCase):
             1,
             sum(
                 1 for row
-                in self.mock_etcd.cluster_operations_store.values()
+                in self.mock_mariadb.cluster_operations_store.values()
                 if row.get('operation_type') == 'net_op'
                 and row.get('network_uuid') == u1
             ))
@@ -274,8 +274,8 @@ class ModelVersionTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     def _base_kwargs(self):
         return {
@@ -329,8 +329,8 @@ class CreateAndEnqueueFloatingIpTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('time.time', return_value=456.0)
     def test_floating_address_and_inner_address_in_metadata(self, _mock_time):
@@ -346,7 +346,7 @@ class CreateAndEnqueueFloatingIpTestCase(base.ShakenFistTestCase):
         )
 
         self.assertEqual(ObjectType.NET_OP, op_type)
-        metadata = self.mock_etcd.get_cluster_operation_metadata(op_uuid)
+        metadata = self.mock_mariadb.get_cluster_operation_metadata(op_uuid)
         self.assertEqual('203.0.113.5', metadata['floating_address'])
         self.assertEqual('10.0.1.42', metadata['inner_address'])
         self.assertEqual(['network_add_floating_ip'], metadata['tasks'])
@@ -365,7 +365,7 @@ class CreateAndEnqueueFloatingIpTestCase(base.ShakenFistTestCase):
             inner_address='10.0.1.42',
         )
 
-        metadata = self.mock_etcd.get_cluster_operation_metadata(op_uuid)
+        metadata = self.mock_mariadb.get_cluster_operation_metadata(op_uuid)
         self.assertEqual('203.0.113.5', metadata['floating_address'])
         self.assertEqual('10.0.1.42', metadata['inner_address'])
         self.assertEqual(['network_remove_floating_ip'], metadata['tasks'])
@@ -381,6 +381,6 @@ class CreateAndEnqueueFloatingIpTestCase(base.ShakenFistTestCase):
             priority=PRIORITY.user_waiting,
         )
 
-        metadata = self.mock_etcd.get_cluster_operation_metadata(op_uuid)
+        metadata = self.mock_mariadb.get_cluster_operation_metadata(op_uuid)
         self.assertIsNone(metadata['floating_address'])
         self.assertIsNone(metadata['inner_address'])

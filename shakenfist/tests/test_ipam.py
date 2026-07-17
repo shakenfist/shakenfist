@@ -9,7 +9,7 @@ from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 # Fixed UUID4 for use in tests where a consistent user_uuid is needed
@@ -20,8 +20,8 @@ class IPAMTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     @mock.patch('time.time', return_value=1632261535.027476)
     def test_new(self, mock_time):

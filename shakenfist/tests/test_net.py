@@ -12,25 +12,25 @@ from shakenfist.operations.net_macaddr_ip_op import NetMacaddrIPOp
 from shakenfist.operations.net_op import NetOp
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class NetworkTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        self.etcd_lock = mock.patch('shakenfist.locks.ClusterLock')
-        self.mock_etcd_lock = self.etcd_lock.start()
-        self.addCleanup(self.etcd_lock.stop)
+        self.cluster_lock = mock.patch('shakenfist.locks.ClusterLock')
+        self.mock_cluster_lock = self.cluster_lock.start()
+        self.addCleanup(self.cluster_lock.stop)
 
 
 class NetworkGeneralTestCase(NetworkTestCase):
     def test_str(self):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid)
+        self.mock_mariadb.create_network('bobnet', network_uuid)
         n = network.Network.from_db(network_uuid)
         self.assertEqual('network(%s)' % network_uuid, str(n))
 
@@ -55,12 +55,12 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_yes(self, mock_is_dnsmasq, mock_is_created, mock_pending):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=True)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
@@ -69,12 +69,12 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=False)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
     def test_is_okay_not_created(self, mock_is_dnsmasq, mock_is_created, mock_pending):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=True)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
@@ -83,12 +83,12 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created, mock_pending):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=True)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
@@ -114,12 +114,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
     def test_is_okay_yes(self, mock_is_dnsmasq, mock_is_created, mock_pending):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=True)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
@@ -128,12 +128,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=False)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
     def test_is_okay_not_created(self, mock_is_dnsmasq, mock_is_created, mock_pending):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=True)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
@@ -142,12 +142,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_no_masq(self, mock_is_dnsmasq, mock_is_created, mock_pending):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=False)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=False)
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
@@ -156,12 +156,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=False)
     def test_is_okay_no_masq_no_dhcp(self, mock_is_dnsmasq, mock_is_created, mock_pending):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=False,
-                                      provide_nat=False)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=False,
+                                         provide_nat=False)
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
@@ -174,12 +174,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     def test_is_okay_true_when_pending_operation(self, mock_pending, mock_is_created):
         """is_okay() returns True immediately when a pending op is in flight,
         without calling is_created or is_dnsmasq_running."""
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=True)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
         mock_is_created.assert_not_called()
@@ -191,12 +191,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     def test_is_okay_falls_through_when_no_pending_operation(
             self, mock_is_dnsmasq, mock_is_created, mock_pending):
         """is_okay() falls through to bridge/dnsmasq checks when no op is in flight."""
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=True)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
         mock_is_created.assert_called_once()
@@ -208,12 +208,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     def test_is_okay_false_when_not_created_and_no_pending(
             self, mock_is_dnsmasq, mock_is_created, mock_pending):
         """is_okay() returns False when no pending op and network is not created."""
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=True)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_okay())
 
@@ -229,12 +229,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         return True because has_pending_cluster_operation reports an in-flight
         op. A regression to single-pointer gating would break this test.
         """
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=True)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
@@ -257,12 +257,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         "broadcast": "ff:ff:ff:ff:ff:ff"
     },{},{},{} ]""", ''))
     def test_is_created_yes(self, mock_execute):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=False)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=False)
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_created())
 
@@ -281,35 +281,35 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         "broadcast": "ff:ff:ff:ff:ff:ff"
     },{},{},{} ]""", ''))
     def test_is_created_no(self, mock_execute):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=False)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=False)
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_created())
 
     @mock.patch('shakenfist.util.concurrency.execute',
                 return_value=('', "Device 'br-vxlan-45' does not exist."))
     def test_is_created_no_bridge(self, mock_execute):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=False)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=False)
         n = network.Network.from_db(network_uuid)
         self.assertFalse(n.is_created())
 
     def test_set_state_valid(self):
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid, provide_dhcp=True,
-                                      provide_nat=False)
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=False)
         n = network.Network.from_db(network_uuid)
 
         with testtools.ExpectedException(exceptions.InvalidStateException):
@@ -345,7 +345,7 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         self.addCleanup(self.config.stop)
 
         # The util.enqueue_cluster_operation helper also references
-        # the cluster_operation_targets writer; the MockEtcd fixture
+        # the cluster_operation_targets writer; the MockMariaDB fixture
         # already mocks the underlying mariadb calls, but it does not
         # mock the target writer. Patch it inert so calls succeed.
         self.mock_create_target = mock.patch(
@@ -367,22 +367,22 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
             side_effect=exceptions.NoNetworkNode('test')).start()
 
     def test_ensure_mesh_enqueues_netop_on_local_node_queue(self):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, provide_dhcp=True, provide_nat=False)
         n = network.Network.from_db(network_uuid)
 
-        # Spy on the enqueue path. MockEtcd already wraps the underlying
+        # Spy on the enqueue path. MockMariaDB already wraps the underlying
         # mariadb function via side_effect; we put another patch in front
-        # of it that delegates to the MockEtcd implementation and records
+        # of it that delegates to the MockMariaDB implementation and records
         # the call. This lets us inspect arguments without losing the
-        # mock_etcd state-machine side effects (which NetOp.from_db
+        # mock_mariadb state-machine side effects (which NetOp.from_db
         # depends on for state lookup).
         original = (
-            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+            self.mock_mariadb._mariadb_create_and_enqueue_cluster_operation)
         spy = mock.MagicMock(side_effect=original)
         with mock.patch(
                 'shakenfist.mariadb.create_and_enqueue_cluster_operation',
@@ -415,16 +415,16 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
     def test_ensure_mesh_skips_for_floating_network(self):
         # The floating network short-circuits via the
         # @_not_on_floating_network decorator and must not enqueue.
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'floatnet', str(FLOATING_NETWORK_UUID),
             provide_dhcp=False, provide_nat=False)
         n = network.Network.from_db(str(FLOATING_NETWORK_UUID))
 
         original = (
-            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+            self.mock_mariadb._mariadb_create_and_enqueue_cluster_operation)
         spy = mock.MagicMock(side_effect=original)
         with mock.patch(
                 'shakenfist.mariadb.create_and_enqueue_cluster_operation',
@@ -446,11 +446,11 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         # mesh that broke ``test_single_virtual_networks_work``:
         # ensure_mesh used to only enqueue on the caller's node, so
         # other hypervisors never re-meshed.
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'meshnet', network_uuid,
             provide_dhcp=True, provide_nat=False)
         n = network.Network.from_db(network_uuid)
@@ -459,7 +459,7 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         # instance, and three fake instances each placed on a
         # different node (the local node plus two remotes). We mock
         # the property and the lookups rather than driving the
-        # MockEtcd state machine through full instance / placement
+        # MockMariaDB state machine through full instance / placement
         # flows -- the fan-out logic itself is what's under test.
         remote_a_uuid = '99999999-9999-4999-8999-aaaaaaaaaaaa'
         remote_b_uuid = '88888888-8888-4888-8888-bbbbbbbbbbbb'
@@ -499,7 +499,7 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
             return node
 
         original = (
-            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+            self.mock_mariadb._mariadb_create_and_enqueue_cluster_operation)
         spy = mock.MagicMock(side_effect=original)
 
         with mock.patch.object(
@@ -547,17 +547,17 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         # local node so the caller has something to block on with
         # raise_for_error(). This keeps the existing
         # "ensure_mesh during network bootstrap" callers working.
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'emptynet', network_uuid,
             provide_dhcp=True, provide_nat=False)
         n = network.Network.from_db(network_uuid)
 
         original = (
-            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+            self.mock_mariadb._mariadb_create_and_enqueue_cluster_operation)
         spy = mock.MagicMock(side_effect=original)
         with mock.patch(
                 'shakenfist.mariadb.create_and_enqueue_cluster_operation',
@@ -577,14 +577,14 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         # the flood entry for an instance's hypervisor, and inbound
         # floating traffic dies as soon as the learned FDB entry for an
         # idle guest ages out.
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_node_uuid = '77777777-7777-4777-8777-cccccccccccc'
         remote_uuid = '99999999-9999-4999-8999-aaaaaaaaaaaa'
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'meshnet', network_uuid,
             provide_dhcp=True, provide_nat=False)
         n = network.Network.from_db(network_uuid)
@@ -604,7 +604,7 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         self.mock_get_network_node.return_value = network_node
 
         original = (
-            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+            self.mock_mariadb._mariadb_create_and_enqueue_cluster_operation)
         spy = mock.MagicMock(side_effect=original)
 
         with mock.patch.object(
@@ -635,13 +635,13 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
     def test_ensure_mesh_network_node_not_duplicated(self):
         # When the network node also hosts an instance on the network it
         # is already in the fan-out set; it must not be enqueued twice.
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_node_uuid = '77777777-7777-4777-8777-cccccccccccc'
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'meshnet', network_uuid,
             provide_dhcp=True, provide_nat=False)
         n = network.Network.from_db(network_uuid)
@@ -661,7 +661,7 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         self.mock_get_network_node.return_value = network_node
 
         original = (
-            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+            self.mock_mariadb._mariadb_create_and_enqueue_cluster_operation)
         spy = mock.MagicMock(side_effect=original)
 
         with mock.patch.object(
@@ -708,11 +708,11 @@ class NetworkMeshDesiredNodeIPsTestCase(NetworkTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'meshnet', network_uuid, provide_dhcp=True, provide_nat=False)
         self.network = network.Network.from_db(network_uuid)
 
@@ -851,11 +851,11 @@ class NetworkIsMeshOkayTestCase(NetworkTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'meshnet', network_uuid, provide_dhcp=True, provide_nat=False)
         self.network = network.Network.from_db(network_uuid)
 
@@ -890,7 +890,7 @@ class NetworkIsMeshOkayTestCase(NetworkTestCase):
         self.mock_desired.assert_not_called()
 
     def test_floating_network_short_circuits(self):
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'floatnet', str(FLOATING_NETWORK_UUID),
             provide_dhcp=False, provide_nat=False)
         fn = network.Network.from_db(str(FLOATING_NETWORK_UUID))
@@ -942,17 +942,17 @@ class NetworkFloatingIPEnqueueTestCase(NetworkTestCase):
 
     def _make_network(self):
         """Create a network and return the loaded ``Network``."""
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, provide_dhcp=True, provide_nat=True)
         return network.Network.from_db(network_uuid), network_uuid
 
     def _enqueue_spy(self):
-        """Return a MagicMock wrapping the MockEtcd enqueue side-effect."""
+        """Return a MagicMock wrapping the MockMariaDB enqueue side-effect."""
         original = (
-            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+            self.mock_mariadb._mariadb_create_and_enqueue_cluster_operation)
         return mock.MagicMock(side_effect=original)
 
     def test_add_floating_ip_enqueues_netop(self):
@@ -1130,19 +1130,19 @@ class NetworkDnsmasqEnqueueTestCase(NetworkTestCase):
     def _make_network(self, provide_dhcp=True, provide_dns=True,
                       provide_nat=True):
         """Create a network and return the loaded ``Network``."""
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid,
             provide_dhcp=provide_dhcp, provide_dns=provide_dns,
             provide_nat=provide_nat)
         return network.Network.from_db(network_uuid), network_uuid
 
     def _enqueue_spy(self):
-        """Return a MagicMock wrapping the MockEtcd enqueue side-effect."""
+        """Return a MagicMock wrapping the MockMariaDB enqueue side-effect."""
         original = (
-            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+            self.mock_mariadb._mariadb_create_and_enqueue_cluster_operation)
         return mock.MagicMock(side_effect=original)
 
     def test_update_dnsmasq_enqueues_netop(self):
@@ -1431,10 +1431,10 @@ class NetworkLifecycleEnqueueTestCase(NetworkTestCase):
 
     def _make_network(self, provide_dhcp=True, provide_dns=True,
                       provide_nat=True):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid,
             provide_dhcp=provide_dhcp, provide_dns=provide_dns,
             provide_nat=provide_nat)
@@ -1442,7 +1442,7 @@ class NetworkLifecycleEnqueueTestCase(NetworkTestCase):
 
     def _enqueue_spy(self):
         original = (
-            self.mock_etcd._mariadb_create_and_enqueue_cluster_operation)
+            self.mock_mariadb._mariadb_create_and_enqueue_cluster_operation)
         return mock.MagicMock(side_effect=original)
 
     def test_create_on_hypervisor_enqueues_node_net_op(self):
@@ -1599,10 +1599,10 @@ class NetworkInternalSiblingCallsTestCase(NetworkTestCase):
 
     def _make_network(self, provide_dhcp=True, provide_dns=True,
                       provide_nat=False):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid,
             provide_dhcp=provide_dhcp, provide_dns=provide_dns,
             provide_nat=provide_nat)
