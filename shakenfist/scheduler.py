@@ -193,6 +193,13 @@ class Scheduler:
         instance_memory = (
             self.metrics[node].get('memory_total_instance_actual', 0) + memory)
         memory_max = self.metrics[node].get('memory_max', 0)
+        if not memory_max:
+            reason = {
+                'reason': 'no memory_max in node metrics',
+            }
+            log_ctx.with_fields({'node': node, **reason}).debug(
+                'Node metrics lack memory_max')
+            return False, reason
         if (instance_memory / memory_max > config.RAM_OVERCOMMIT_RATIO):
             reason = {
                 'reason': 'KSM overcommit ratio exceeded',

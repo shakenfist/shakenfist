@@ -473,6 +473,19 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
                           scheduler.Scheduler().find_candidates,
                           fake_inst2)
 
+    def test_missing_memory_max_rejects_node(self):
+        # A metrics row without memory_max must reject the node with a
+        # reason, not raise ZeroDivisionError out of find_candidates.
+        self.mock_etcd.set_node_metrics_same(self._baseline())
+        node2_metrics = self.mock_etcd.node_metrics_store[
+            self._node_uuid('node2')]['metrics']
+        del node2_metrics['memory_max']
+
+        fake_inst = self.mock_etcd.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
     def test_summarize_totals_exclude_overpacked_nodes(self):
         # A node packed beyond the admission cap reports negative
         # per-node headroom (honestly), but the cluster totals must only
