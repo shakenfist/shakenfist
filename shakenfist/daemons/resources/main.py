@@ -97,7 +97,8 @@ def _get_hybrid_core_counts(sysfs_root='/sys'):
 
 def _compute_reservations(cpu_cores, cpu_threads, is_infra_role,
                           cpu_system_reservation, cpu_infra_role_reservation,
-                          ram_system_reservation_gb, ram_infra_role_reservation_gb):
+                          ram_system_reservation_gb, ram_infra_role_reservation_gb,
+                          memory_total_mb):
     """Compute schedulable capacity after system reservations.
 
     Reservations are expressed in physical cores (an infra-role node -- one
@@ -105,6 +106,10 @@ def _compute_reservations(cpu_cores, cpu_threads, is_infra_role,
     reserves extra), but scheduling accounts in threads, so reserved cores
     convert at ceil(threads / cores) threads per core. That rounding is
     conservative on hybrid parts where threads-per-core is an average.
+
+    The memory reservation is capped at half the machine so that a small
+    node carrying every role (the single-node deployment case) can still
+    schedule instances -- the analogue of cpu_schedulable's floor of one.
     """
     cpu_cores_reserved = cpu_system_reservation
     memory_reserved_gb = ram_system_reservation_gb
@@ -112,12 +117,16 @@ def _compute_reservations(cpu_cores, cpu_threads, is_infra_role,
         cpu_cores_reserved += cpu_infra_role_reservation
         memory_reserved_gb += ram_infra_role_reservation_gb
 
+    memory_reserved_mb = int(memory_reserved_gb * 1024)
+    if memory_total_mb:
+        memory_reserved_mb = min(memory_reserved_mb, memory_total_mb // 2)
+
     threads_per_core = math.ceil(cpu_threads / cpu_cores)
     return {
         'cpu_cores_reserved': cpu_cores_reserved,
         'cpu_schedulable': max(1, cpu_threads - cpu_cores_reserved * threads_per_core),
         'cpu_cores_schedulable': max(1, cpu_cores - cpu_cores_reserved),
-        'memory_reserved_mb': int(memory_reserved_gb * 1024),
+        'memory_reserved_mb': memory_reserved_mb,
     }
 
 
@@ -178,7 +187,8 @@ class Monitor(daemon.Daemon):
                     config.CPU_SYSTEM_RESERVATION,
                     config.CPU_INFRA_ROLE_RESERVATION,
                     config.RAM_SYSTEM_RESERVATION,
-                    config.RAM_INFRA_ROLE_RESERVATION))
+                    config.RAM_INFRA_ROLE_RESERVATION,
+                    psutil.virtual_memory().total // 1024 // 1024))
             retval.update(_get_hybrid_core_counts())
 
             # This is disabled as data we don't currently use
