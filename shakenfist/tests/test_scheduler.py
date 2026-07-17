@@ -364,6 +364,128 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
             self._node_uuids_set('node3', 'node4'), set(nodes))
 
 
+class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
+    """Test admission against reserved, schedulable capacity."""
+
+    def _baseline(self, **overrides):
+        # A metrics baseline that passes every admission stage, built on
+        # the same shapes the LowResourceTestCase tests use. The fake
+        # config pins CPU_OVERCOMMIT_RATIO=16.0 and
+        # RAM_SYSTEM_RESERVATION=5.0.
+        metrics = {
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 2000*GiB,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12,
+        }
+        metrics.update(overrides)
+        return metrics
+
+    def test_admission_flips_at_schedulable_boundary(self):
+        # cpu_schedulable=2 and a ratio of 16 cap a node at 32 vCPUs,
+        # even though cpu_max=4 would historically have allowed 64.
+        self.mock_etcd.set_node_metrics_same(self._baseline(
+            cpu_schedulable=2, cpu_total_instance_vcpus=30))
+
+        fits = self.mock_etcd.create_instance('fits', cpus=2)
+        nodes = scheduler.Scheduler().find_candidates(fits)
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
+
+        does_not_fit = self.mock_etcd.create_instance('does-not-fit', cpus=3)
+        exc = self.assertRaises(exceptions.LowResourceException,
+                                scheduler.Scheduler().find_candidates,
+                                does_not_fit)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_idle_cpu',
+            str(exc))
+
+    def test_infra_role_node_admits_less(self):
+        # Two identically sized machines, but one has an extra core
+        # reserved for cluster-wide daemons (smaller cpu_schedulable). A
+        # request that fits the plain nodes must not land on the infra
+        # node.
+        self.mock_etcd.set_node_metrics_same(self._baseline(
+            cpu_max=12, cpu_schedulable=10, cpu_total_instance_vcpus=120))
+        self.mock_etcd.update_node_metrics('node2', {'cpu_schedulable': 8})
+
+        fake_inst = self.mock_etcd.create_instance('fake-inst', cpus=10)
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
+    def test_ram_check_honours_published_reservation(self):
+        # memory_reserved_mb=6144 leaves exactly 1024 MB for the default
+        # 1024 MB instance; one fewer MB available must reject.
+        self.mock_etcd.set_node_metrics_same(self._baseline(
+            memory_available=6144+1024, memory_reserved_mb=6144))
+        fake_inst = self.mock_etcd.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
+
+        self.mock_etcd.set_node_metrics_same(self._baseline(
+            memory_available=6144+1024-1, memory_reserved_mb=6144))
+        fake_inst2 = self.mock_etcd.create_instance('fake-inst2')
+        exc = self.assertRaises(exceptions.LowResourceException,
+                                scheduler.Scheduler().find_candidates,
+                                fake_inst2)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_idle_memory',
+            str(exc))
+
+    def test_ram_check_falls_back_to_config_reservation(self):
+        # Without a published memory_reserved_mb the check falls back to
+        # RAM_SYSTEM_RESERVATION (5 GB in the fake config).
+        self.mock_etcd.set_node_metrics_same(self._baseline(
+            memory_available=5*1024+1024))
+        fake_inst = self.mock_etcd.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
+
+        self.mock_etcd.set_node_metrics_same(self._baseline(
+            memory_available=5*1024+1024-1))
+        fake_inst2 = self.mock_etcd.create_instance('fake-inst2')
+        self.assertRaises(exceptions.LowResourceException,
+                          scheduler.Scheduler().find_candidates,
+                          fake_inst2)
+
+    def test_summarize_resources_matches_admission(self):
+        # The admin resources API must report numbers computed with the
+        # same arithmetic the admission checks use, for both new-dialect
+        # and old-dialect (fallback) metrics rows.
+        self.mock_etcd.set_node_metrics_same(self._baseline(
+            cpu_max=12, cpu_schedulable=10, cpu_total_instance_vcpus=7,
+            memory_reserved_mb=6144))
+        self.mock_etcd.update_node_metrics('node3', {
+            'cpu_max': 24, 'cpu_schedulable': 22, 'memory_reserved_mb': 8192})
+        # node4 is an old-dialect row: fallback arithmetic applies.
+        node4_metrics = self.mock_etcd.node_metrics_store[
+            self._node_uuid('node4')]['metrics']
+        del node4_metrics['cpu_schedulable']
+        del node4_metrics['memory_reserved_mb']
+
+        s = scheduler.Scheduler()
+        resources = s.summarize_resources()
+
+        for n, per_node in resources['per_node'].items():
+            metrics = s.metrics[n]
+            expected_base = metrics.get(
+                'cpu_schedulable', metrics.get('cpu_max', 0))
+            expected_reserved = metrics.get('memory_reserved_mb', 5.0 * 1024)
+
+            self.assertEqual(expected_base, per_node['cpu_schedulable'])
+            self.assertEqual(expected_reserved, per_node['memory_reserved_mb'])
+            self.assertEqual(
+                expected_base * 16.0 -
+                metrics.get('cpu_total_instance_vcpus', 0),
+                per_node['cpu_available'])
+            self.assertEqual(
+                metrics.get('memory_available', 0) - expected_reserved,
+                per_node['ram_max_per_instance'])
+
+
 class AffinityTestCase(SchedulerTestCase):
     """Test CPU load affinity."""
 

@@ -190,7 +190,16 @@ class SFConfig(BaseSettings):
         )
     )
     CPU_OVERCOMMIT_RATIO: float = Field(
-        16, description='How many vCPUS per real CPU.'
+        3.0,
+        description=(
+            'How many vCPUs to admit per schedulable logical CPU (thread). '
+            'The schedulable thread count is published by the resources '
+            'daemon and excludes the cores reserved by '
+            'CPU_SYSTEM_RESERVATION and CPU_INFRA_ROLE_RESERVATION. The '
+            'default was measured on a CI-dominated cluster; the historic '
+            'default of 16 assumed many mostly-idle instances and in '
+            'practice never rejected a node.'
+        )
     )
     RAM_OVERCOMMIT_RATIO: float = Field(
         3.0,
