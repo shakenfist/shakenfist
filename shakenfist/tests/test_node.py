@@ -201,6 +201,8 @@ class NodeClassTestCase(base.ShakenFistTestCase):
         self.assertEqual(result, 5555.0)
         mock_get_attrs.assert_called_once_with(TEST_UUID)
 
+    @mock.patch(
+        'shakenfist.node.mariadb.get_references_from', return_value=[])
     @mock.patch('shakenfist.node.mariadb.get_node_attributes')
     @mock.patch(
         'shakenfist.baseobject.get_minimum_object_version',
@@ -210,7 +212,7 @@ class NodeClassTestCase(base.ShakenFistTestCase):
         return_value=State(value='created', update_time=1234567890.0))
     def test_load_attributes_returns_defaults_when_none(
             self, mock_get_state, mock_get_min,
-            mock_get_attrs):
+            mock_get_attrs, mock_get_refs):
         """Test defaults when no attributes record exists."""
         mock_get_attrs.return_value = None
 
@@ -579,56 +581,40 @@ class NodeInstanceManagementTestCase(base.ShakenFistTestCase):
         return n
 
     @mock.patch('shakenfist.node.mariadb.update_node_attributes')
-    @mock.patch('shakenfist.node.mariadb.create_node_attributes')
     @mock.patch('shakenfist.node.mariadb.get_node_attributes')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
+    @mock.patch('shakenfist.node.mariadb.record_relationship')
     def test_add_instance(
-            self, mock_lock, mock_get_attrs,
-            mock_create_attrs, mock_update_attrs):
-        """Test adding an instance to a node."""
-        attrs = NodeAttributesData(uuid=TEST_UUID)
-        mock_get_attrs.return_value = attrs
-        mock_lock.return_value = mock.MagicMock()
-        mock_update_attrs.return_value = True
-
-        n = self._make_node()
-        inst_uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-        n.add_instance(inst_uuid)
-
-        self.assertIn(inst_uuid, attrs.instances)
-
-    @mock.patch('shakenfist.node.mariadb.update_node_attributes')
-    @mock.patch('shakenfist.node.mariadb.create_node_attributes')
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
-    def test_add_instance_idempotent(
-            self, mock_lock, mock_get_attrs,
-            mock_create_attrs, mock_update_attrs):
-        """Test adding the same instance twice doesn't duplicate."""
-        attrs = NodeAttributesData(uuid=TEST_UUID)
-        mock_get_attrs.return_value = attrs
-        mock_lock.return_value = mock.MagicMock()
-        mock_update_attrs.return_value = True
-
-        n = self._make_node()
-        inst_uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-        n.add_instance(inst_uuid)
-        # Invalidate so second add re-reads (but mock returns same)
-        n._Node__attributes_loaded = False
-        n.add_instance(inst_uuid)
-
-        count = attrs.instances.count(inst_uuid)
-        self.assertEqual(count, 1)
-
-    @mock.patch('shakenfist.node.mariadb.update_node_attributes')
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
-    def test_remove_instance(
-            self, mock_lock, mock_get_attrs,
+            self, mock_record, mock_lock, mock_get_attrs,
             mock_update_attrs):
-        """Test removing an instance from a node."""
+        """Adding an instance records a reference and dual-writes JSON."""
         attrs = NodeAttributesData(uuid=TEST_UUID)
+        mock_get_attrs.return_value = attrs
+        mock_lock.return_value = mock.MagicMock()
+        mock_update_attrs.return_value = True
+
+        n = self._make_node()
         inst_uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+        n.add_instance(inst_uuid)
+
+        mock_record.assert_called_once_with(
+            ObjectType.NODE, str(TEST_UUID),
+            RelationshipType.INSTANCE_LOCATION, None,
+            ObjectType.INSTANCE, inst_uuid)
+        self.assertIn(inst_uuid, attrs.instances)
+        mock_update_attrs.assert_called_once_with(
+            attrs, fields=['instances'])
+
+    @mock.patch('shakenfist.node.mariadb.update_node_attributes')
+    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
+    @mock.patch('shakenfist.node.mariadb.remove_relationship')
+    def test_remove_instance(
+            self, mock_remove, mock_lock, mock_get_attrs,
+            mock_update_attrs):
+        """Removing an instance removes the reference and JSON entry."""
+        inst_uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+        attrs = NodeAttributesData(uuid=TEST_UUID)
         attrs.instances.append(inst_uuid)
         mock_get_attrs.return_value = attrs
         mock_lock.return_value = mock.MagicMock()
@@ -637,7 +623,40 @@ class NodeInstanceManagementTestCase(base.ShakenFistTestCase):
         n = self._make_node()
         n.remove_instance(inst_uuid)
 
+        mock_remove.assert_called_once_with(
+            ObjectType.NODE, str(TEST_UUID),
+            RelationshipType.INSTANCE_LOCATION, None,
+            ObjectType.INSTANCE, inst_uuid)
         self.assertNotIn(inst_uuid, attrs.instances)
+        mock_update_attrs.assert_called_once_with(
+            attrs, fields=['instances'])
+
+    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
+    @mock.patch('shakenfist.node.mariadb.get_references_from')
+    def test_instances_property_unions_legacy(
+            self, mock_get_refs, mock_get_attrs):
+        """Node.instances unions references with the legacy column."""
+        ref_uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+        legacy_uuid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+        mock_get_refs.return_value = [
+            ObjectReference(
+                source_object_type=ObjectType.NODE,
+                source_uuid=str(TEST_UUID),
+                relationship=RelationshipType.INSTANCE_LOCATION,
+                relationship_value=None,
+                target_object_type=ObjectType.INSTANCE,
+                target_uuid=ref_uuid,
+                created=1234567890.0,
+                last_active=1234567890.0)]
+        attrs = NodeAttributesData(uuid=TEST_UUID)
+        attrs.instances.extend([ref_uuid, legacy_uuid])
+        mock_get_attrs.return_value = attrs
+
+        n = self._make_node()
+        self.assertEqual([ref_uuid, legacy_uuid], n.instances)
+        mock_get_refs.assert_called_once_with(
+            ObjectType.NODE, str(TEST_UUID),
+            RelationshipType.INSTANCE_LOCATION)
 
 
 class NodeBlobsTestCase(base.ShakenFistTestCase):

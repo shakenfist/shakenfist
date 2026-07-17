@@ -51,9 +51,19 @@ class NodeAttributesData(BaseModel):
         is_hypervisor: Whether this node runs instances.
         is_network_node: Whether this node handles networking.
         is_eventlog_node: Whether this node runs eventlog.
-        instances: List of instance UUIDs on this node (JSON).
+        instances: Legacy list of instance UUIDs on this node (JSON).
+            Instance placement now lives in object_references as
+            INSTANCE_LOCATION rows, because a JSON list maintained by
+            full-row read-modify-write lost updates to concurrent
+            writers. For one transition release this column is still
+            dual-written (masked, under the instances lock) and
+            unioned into Node.instances reads so rolling upgrade and
+            rollback both see fresh placements; it is dropped in the
+            next release.
         daemons: List of registered daemon names (JSON).
-        daemon_states: Per-daemon state info (JSON dict).
+        daemon_states: Legacy per-daemon state info (JSON dict). No
+            longer read or written (see node_daemon_states); retained
+            for one release cycle as a rollback fallback.
         qemu_version: QEMU version as [major, minor, patch].
         libvirt_version: libvirt version as [major, minor, patch].
         python_version: Python version as [major, minor, patch].

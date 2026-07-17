@@ -85,10 +85,18 @@ class Namespace(dbo):
             self.__attributes = attrs
         return attrs
 
-    def _save_attributes(self) -> None:
-        """Persist current attributes to MariaDB."""
+    def _save_attributes(self, fields: Optional[list[str]]) -> None:
+        """Persist the named attribute fields to MariaDB.
+
+        fields is deliberately required: callers must name exactly the
+        fields they changed so concurrent writers of other attributes
+        on the same row (keys against trust, which hold different
+        attribute locks) cannot lose their committed columns to this
+        writer's read-modify-write. None writes every column and is
+        reserved for row creation and upgrade persistence.
+        """
         if self.__attributes is not None:
-            mariadb.update_namespace_attributes(self.__attributes)
+            mariadb.update_namespace_attributes(self.__attributes, fields=fields)
 
     def _invalidate_attributes(self) -> None:
         """Force reload of attributes on next access."""
@@ -159,7 +167,7 @@ class Namespace(dbo):
         # Initialize attributes in MariaDB
         attrs = n._ensure_attributes()
         attrs.trust = ['system']
-        n._save_attributes()
+        n._save_attributes(fields=['trust'])
         return n
 
     @property
@@ -181,6 +189,7 @@ class Namespace(dbo):
         nonce = sfrandom.random_id()
 
         with self.get_lock_attr('keys', 'Add key'):
+            self._invalidate_attributes()
             attrs = self._ensure_attributes()
             k = dict(attrs.keys)
             nk = dict(k.get('nonced_keys', {}))
@@ -189,12 +198,13 @@ class Namespace(dbo):
                 nk[name]['expiry'] = expiry
             k['nonced_keys'] = nk
             attrs.keys = k
-            self._save_attributes()
+            self._save_attributes(fields=['keys'])
 
         return nonce
 
     def remove_key(self, name):
         with self.get_lock_attr('keys', 'Remove key'):
+            self._invalidate_attributes()
             attrs = self._ensure_attributes()
             k = dict(attrs.keys)
             nk = dict(k.get('nonced_keys', {}))
@@ -202,7 +212,7 @@ class Namespace(dbo):
                 del nk[name]
                 k['nonced_keys'] = nk
                 attrs.keys = k
-                self._save_attributes()
+                self._save_attributes(fields=['keys'])
 
     @property
     def trust(self):
@@ -213,10 +223,11 @@ class Namespace(dbo):
 
     def add_trust(self, namespace):
         with self.get_lock_attr('trust', 'Add trust'):
+            self._invalidate_attributes()
             attrs = self._ensure_attributes()
             if namespace not in attrs.trust:
                 attrs.trust = list(attrs.trust) + [namespace]
-                self._save_attributes()
+                self._save_attributes(fields=['trust'])
 
     def remove_trust(self, namespace):
         with self.get_lock_attr('trust', 'Remove trust'):
@@ -225,11 +236,12 @@ class Namespace(dbo):
             if namespace == 'system':
                 return
 
+            self._invalidate_attributes()
             attrs = self._ensure_attributes()
             if namespace in attrs.trust:
                 new_trust = [n for n in attrs.trust if n != namespace]
                 attrs.trust = new_trust
-                self._save_attributes()
+                self._save_attributes(fields=['trust'])
 
     def hard_delete(self):
         mariadb.delete_namespace_attributes(self.uuid)

@@ -1820,7 +1820,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                            if request.data.has_last_used else None),
                 expires_at=request.data.expires_at
             )
-            success = mariadb._direct_update_blob_attributes(data)
+            success = mariadb._direct_update_blob_attributes(
+                data, fields=list(request.fields))
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -2217,7 +2218,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             self.monitor.counters['update_node_attributes'].inc()
             data = self._node_attrs_from_proto(request.data)
             success = mariadb._direct_update_node_attributes(
-                data
+                data, fields=list(request.fields)
             )
             return database_pb2.StatusReply(
                 success=success, error=''
@@ -2447,7 +2448,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['update_namespace_attributes'].inc()
             data = self._ns_attrs_from_proto(request.data)
-            success = mariadb._direct_update_namespace_attributes(data)
+            success = mariadb._direct_update_namespace_attributes(
+                data, fields=list(request.fields))
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database UpdateNamespaceAttributes failed', e)

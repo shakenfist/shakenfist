@@ -58,6 +58,7 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.node import Node
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_reference import references_to_grouped_dict
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
 from shakenfist.util import exceptions as util_exceptions
@@ -1035,6 +1036,21 @@ class Instance(dbowo):
 
     def hard_delete(self):
         _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
+
+        # Remove any INSTANCE_LOCATION references targeting this
+        # instance. _delete_globally removes the placement node's
+        # reference on the normal path, but this backstop covers the
+        # cases it can miss (node row gone, placement lost, or a
+        # partial earlier delete) so a hard-deleted instance can never
+        # linger in a node's instance list.
+        for ref in mariadb.get_references_to(
+                ObjectType.INSTANCE, self.uuid,
+                RelationshipType.INSTANCE_LOCATION):
+            mariadb.remove_relationship(
+                ref.source_object_type, ref.source_uuid,
+                ref.relationship, ref.relationship_value,
+                ref.target_object_type, ref.target_uuid)
+
         mariadb.delete_instance_attributes(_uuid)
         mariadb.delete_instance(_uuid)
         super().hard_delete()

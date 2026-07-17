@@ -381,7 +381,8 @@ class Scheduler:
                     by_affinity[affinity].append(c)
                     continue
 
-                for instance_uuid in n.instances:
+                node_instances = n.instances
+                for instance_uuid in node_instances:
                     i = instance.Instance.from_db(instance_uuid)
                     if not i:
                         considered.append({
@@ -425,7 +426,7 @@ class Scheduler:
 
                 affinity_detail[c] = {
                     'score': affinity,
-                    'instance_count': len(n.instances),
+                    'instance_count': len(node_instances),
                     'considered': considered,
                 }
                 by_affinity[affinity].append(c)

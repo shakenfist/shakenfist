@@ -498,7 +498,7 @@ dedicated attribute tables:
 | Table | Object Type | Key Fields |
 |-------|-------------|------------|
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
-| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written |
+| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; for one transition release the legacy `instances` JSON column is dual-written and unioned into reads so rolling upgrade and rollback both see fresh placements |
 | `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON) |
 | `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
@@ -507,11 +507,19 @@ dedicated attribute tables:
 | `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict) |
 | `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message, vsock_cids (JSON dict) |
 
-Node attributes consolidate observed state, roles, daemons, instances and
-versions into a single row.
+Node attributes consolidate observed state, roles, daemons and versions
+into a single row.
 
 Namespace attributes consolidate keys (authentication) and trust
 (namespace trust relationships) into a single row.
+
+Because these tables pack several logically independent attributes into
+one row, every updater passes a field mask naming exactly the columns it
+changed (see `update_*_attributes` in `shakenfist/mariadb.py`). Full-row
+read-modify-write cycles are reserved for row creation and schema
+upgrades: with concurrent writers on different nodes, an unmasked write
+pushes a stale snapshot of the other columns over any update committed
+since the writer read the row (a cross-attribute lost update).
 
 #### Node Identity and UUID Persistence
 

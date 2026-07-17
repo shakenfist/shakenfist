@@ -73,5 +73,6 @@ enum RelationshipType {
   RELATIONSHIP_TYPE_TRANSCODE = 5;  // "transcode"
   RELATIONSHIP_TYPE_AGENT_OUTPUT = 6;  // "agent_output"
   RELATIONSHIP_TYPE_BLOB_LOCATION = 7;  // "blob_location"
+  RELATIONSHIP_TYPE_INSTANCE_LOCATION = 8;  // "instance_location"
 }
 

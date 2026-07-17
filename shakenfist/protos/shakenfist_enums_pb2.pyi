@@ -224,6 +224,8 @@ class _RelationshipTypeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Rela
     """"agent_output" """
     RELATIONSHIP_TYPE_BLOB_LOCATION: _RelationshipType.ValueType  # 7
     """"blob_location" """
+    RELATIONSHIP_TYPE_INSTANCE_LOCATION: _RelationshipType.ValueType  # 8
+    """"instance_location" """
 
 class RelationshipType(_RelationshipType, metaclass=_RelationshipTypeEnumTypeWrapper):
     """RelationshipType enum - object reference relationship types
@@ -245,4 +247,6 @@ RELATIONSHIP_TYPE_AGENT_OUTPUT: RelationshipType.ValueType  # 6
 """"agent_output" """
 RELATIONSHIP_TYPE_BLOB_LOCATION: RelationshipType.ValueType  # 7
 """"blob_location" """
+RELATIONSHIP_TYPE_INSTANCE_LOCATION: RelationshipType.ValueType  # 8
+""""instance_location" """
 Global___RelationshipType: _TypeAlias = RelationshipType  # noqa: Y015

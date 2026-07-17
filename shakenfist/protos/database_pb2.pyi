@@ -2971,16 +2971,27 @@ class UpdateBlobAttributesRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     DATA_FIELD_NUMBER: _builtins.int
+    FIELDS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def data(self) -> Global___BlobAttributesData: ...
+    @_builtins.property
+    def fields(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Field mask: the BlobAttributesData field names to write. An empty
+        list means write every column. See the equivalent comment on
+        UpdateInstanceAttributesRequest for the cross-attribute lost
+        update this prevents (here: a full-row expires_at or info write
+        reverting a concurrent update_blob_last_used column write).
+        """
+
     def __init__(
         self,
         *,
         data: Global___BlobAttributesData | None = ...,
+        fields: _abc.Iterable[_builtins.str] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "fields", b"fields"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -3463,16 +3474,29 @@ class UpdateNodeAttributesRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     DATA_FIELD_NUMBER: _builtins.int
+    FIELDS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def data(self) -> Global___NodeAttributesProto: ...
+    @_builtins.property
+    def fields(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Field mask: the NodeAttributesData field names to write. An empty
+        list means write every column. See the equivalent comment on
+        UpdateInstanceAttributesRequest for the cross-attribute lost
+        update this prevents (here: the sentinels' 15-second
+        observe_this_node full-row write reverting a concurrent
+        add_instance, observed as scheduler affinity scoring a node zero
+        because its instances list lost an entry).
+        """
+
     def __init__(
         self,
         *,
         data: Global___NodeAttributesProto | None = ...,
+        fields: _abc.Iterable[_builtins.str] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "fields", b"fields"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -3906,16 +3930,27 @@ class UpdateNamespaceAttributesRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     DATA_FIELD_NUMBER: _builtins.int
+    FIELDS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def data(self) -> Global___NamespaceAttributesProto: ...
+    @_builtins.property
+    def fields(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Field mask: the NamespaceAttributesData field names to write. An
+        empty list means write every column. See the equivalent comment
+        on UpdateInstanceAttributesRequest for the cross-attribute lost
+        update this prevents (here: keys and trust writers clobbering
+        each other despite holding different attribute locks).
+        """
+
     def __init__(
         self,
         *,
         data: Global___NamespaceAttributesProto | None = ...,
+        fields: _abc.Iterable[_builtins.str] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "fields", b"fields"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

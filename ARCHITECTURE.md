@@ -699,11 +699,26 @@ track any object-to-object relationship.
 | `transcode` | Blob | Blob | Style ("qcow2", "raw") |
 | `agent_output` | AgentOperation | Blob | Output type ("stdout", "stderr") |
 | `blob_location` | Node | Blob | NULL (blob is present on this node) |
+| `instance_location` | Node | Instance | NULL (instance is placed on this node) |
 
 This replaces the legacy `ref_count` and `locations` blob attributes with a
 queryable, auditable reference system. Blob reference counts are computed
 dynamically from this table via `mariadb.count_references_to()`. Blob locations
 are queried via `mariadb.get_references_to()` filtered by `BLOB_LOCATION`.
+
+`INSTANCE_LOCATION` references similarly replace the legacy `instances`
+JSON list on `node_attributes`: the list was maintained by read-modify-write
+of the whole attributes row, so concurrent full-row writers (for example the
+sentinels' 15-second `observe_this_node()` heartbeat) could silently revert
+a placement. References are single-row inserts and deletes, needing no
+cross-writer coordination. `Node.instances` queries them via
+`mariadb.get_references_from()` filtered by `INSTANCE_LOCATION`. Unlike
+`BLOB_LOCATION`, these rows key the node by UUID, not FQDN. For one
+transition release the legacy column is dual-written (masked, under the
+`instances` lock) and unioned into `Node.instances` reads, so placements
+written by not-yet-upgraded nodes mid-roll stay visible and a rollback
+still reads fresh data; each node's queues-daemon startup reconciliation
+converges the two stores, and the column is dropped next release.
 
 The `last_active` column is updated whenever a reference is observed to still
 be valid (e.g., when a node's cleaner daemon calls `observe()` on local blobs).

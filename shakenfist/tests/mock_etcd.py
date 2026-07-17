@@ -39,7 +39,9 @@ from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.object_state import State
+from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 
 
 class MockEtcd():
@@ -59,6 +61,7 @@ class MockEtcd():
         self.namespace_attributes = {}  # Mock MariaDB namespace attributes
         self.node_objects = {}  # Mock MariaDB node storage
         self.node_attributes = {}  # Mock MariaDB node attributes
+        self.object_references = {}  # Mock MariaDB object references
         self.artifact_objects = {}  # Mock MariaDB artifact storage
         self.artifact_attributes = {}  # Mock MariaDB artifact attributes
         self.artifact_indexes = {}  # Mock MariaDB artifact indexes
@@ -214,6 +217,18 @@ class MockEtcd():
             side_effect=self._mariadb_get_references_from)
         self.mariadb_get_references_from.start()
         self.test_obj.addCleanup(self.mariadb_get_references_from.stop)
+
+        self.mariadb_record_relationship = mock.patch(
+            'shakenfist.mariadb.record_relationship',
+            side_effect=self._mariadb_record_relationship)
+        self.mariadb_record_relationship.start()
+        self.test_obj.addCleanup(self.mariadb_record_relationship.stop)
+
+        self.mariadb_remove_relationship = mock.patch(
+            'shakenfist.mariadb.remove_relationship',
+            side_effect=self._mariadb_remove_relationship)
+        self.mariadb_remove_relationship.start()
+        self.test_obj.addCleanup(self.mariadb_remove_relationship.stop)
 
         self.mariadb_remove_all_references_from = mock.patch(
             'shakenfist.mariadb.remove_all_references_from',
@@ -1232,39 +1247,103 @@ class MockEtcd():
     # MariaDB ObjectReference mock operations
     #
 
-    def _mariadb_get_references_to(self, object_type: ObjectType,
-                                   object_uuid: str) -> list:
-        """Mock implementation of mariadb.get_references_to()
-
-        Returns an empty list since tests don't typically need actual
-        reference data.
-        """
+    def _mariadb_get_references_to(
+            self, object_type: ObjectType, object_uuid: str,
+            relationship: Optional[RelationshipType] = None) -> list:
+        """Mock implementation of mariadb.get_references_to()"""
+        refs = [
+            r for r in self.object_references.values()
+            if r.target_object_type == object_type
+            and r.target_uuid == str(object_uuid)
+            and (relationship is None or r.relationship == relationship)]
         self._trace(
-            f'MockMariaDB.get_references_to({object_type}, {object_uuid}): []')
-        return []
+            f'MockMariaDB.get_references_to({object_type}, {object_uuid}, '
+            f'{relationship}): {len(refs)} refs')
+        return refs
 
-    def _mariadb_get_references_from(self, object_type: ObjectType,
-                                     object_uuid: str) -> list:
-        """Mock implementation of mariadb.get_references_from()
-
-        Returns an empty list since tests don't typically need actual
-        reference data.
-        """
+    def _mariadb_get_references_from(
+            self, object_type: ObjectType, object_uuid: str,
+            relationship: Optional[RelationshipType] = None) -> list:
+        """Mock implementation of mariadb.get_references_from()"""
+        refs = [
+            r for r in self.object_references.values()
+            if r.source_object_type == object_type
+            and r.source_uuid == str(object_uuid)
+            and (relationship is None or r.relationship == relationship)]
         self._trace(
-            f'MockMariaDB.get_references_from({object_type}, {object_uuid}): '
-            '[]')
-        return []
+            f'MockMariaDB.get_references_from({object_type}, {object_uuid}, '
+            f'{relationship}): {len(refs)} refs')
+        return refs
 
-    def _mariadb_remove_all_references_from(self, object_type: ObjectType,
-                                            object_uuid: str) -> int:
-        """Mock implementation of mariadb.remove_all_references_from()
+    def _mariadb_record_relationship(
+            self, source_type: ObjectType, source_uuid,
+            relationship: RelationshipType,
+            relationship_value: Optional[str],
+            target_type: ObjectType, target_uuid) -> bool:
+        """Mock implementation of mariadb.record_relationship()
 
-        Returns 0 since tests don't typically have actual reference data.
+        Idempotent, like the real implementation. The key deliberately
+        excludes relationship_value, matching the real table's primary
+        key: an upsert against an existing row refreshes last_active
+        but does not change the stored relationship_value.
         """
+        key = (source_type, str(source_uuid), relationship,
+               target_type, str(target_uuid))
+        if key not in self.object_references:
+            self.object_references[key] = ObjectReference(
+                source_object_type=source_type,
+                source_uuid=str(source_uuid),
+                relationship=relationship,
+                relationship_value=relationship_value,
+                target_object_type=target_type,
+                target_uuid=str(target_uuid),
+                created=time.time(),
+                last_active=time.time())
+        else:
+            self.object_references[key].last_active = time.time()
+        self._trace(
+            f'MockMariaDB.record_relationship({key}): recorded')
+        return True
+
+    def _mariadb_remove_relationship(
+            self, source_type: ObjectType, source_uuid,
+            relationship: RelationshipType,
+            relationship_value: Optional[str],
+            target_type: ObjectType, target_uuid) -> bool:
+        """Mock implementation of mariadb.remove_relationship()
+
+        Like the real DELETE, the row is only removed if its stored
+        relationship_value matches the argument, and the return value
+        is True whether or not a row was removed (False only means a
+        database error).
+        """
+        key = (source_type, str(source_uuid), relationship,
+               target_type, str(target_uuid))
+        existing = self.object_references.get(key)
+        removed = False
+        if (existing is not None and
+                existing.relationship_value == relationship_value):
+            del self.object_references[key]
+            removed = True
+        self._trace(
+            f'MockMariaDB.remove_relationship({key}): removed={removed}')
+        return True
+
+    def _mariadb_remove_all_references_from(
+            self, object_type: ObjectType, object_uuid: str,
+            relationship: Optional[RelationshipType] = None) -> int:
+        """Mock implementation of mariadb.remove_all_references_from()"""
+        doomed = [
+            key for key, r in self.object_references.items()
+            if r.source_object_type == object_type
+            and r.source_uuid == str(object_uuid)
+            and (relationship is None or r.relationship == relationship)]
+        for key in doomed:
+            del self.object_references[key]
         self._trace(
             f'MockMariaDB.remove_all_references_from({object_type}, '
-            f'{object_uuid}): 0')
-        return 0
+            f'{object_uuid}, {relationship}): {len(doomed)}')
+        return len(doomed)
 
     #
     # MariaDB Node mock operations
@@ -1382,15 +1461,28 @@ class MockEtcd():
         return data
 
     def _mariadb_update_node_attributes(
-            self, data: NodeAttributesData) -> bool:
+            self, data: NodeAttributesData,
+            fields: Optional[List[str]] = None) -> bool:
         """Mock implementation of
-        mariadb.update_node_attributes()"""
+        mariadb.update_node_attributes()
+
+        Like the real implementation, a fields mask limits the write
+        to the named model fields; None or empty replaces every field.
+        The masked path copies onto the stored object so writes to
+        other fields by concurrent callers are preserved, mirroring
+        the per-column SQL UPDATE.
+        """
         key = str(data.uuid)
         if key in self.node_attributes:
-            self.node_attributes[key] = data
+            if fields:
+                stored = self.node_attributes[key]
+                for field in fields:
+                    setattr(stored, field, getattr(data, field))
+            else:
+                self.node_attributes[key] = data
             self._trace(
                 f'MockMariaDB.update_node_attributes'
-                f'({key}): updated')
+                f'({key}): updated (fields={fields})')
             return True
         self._trace(
             f'MockMariaDB.update_node_attributes'
@@ -1463,11 +1555,24 @@ class MockEtcd():
         self._trace(f'MockMariaDB.get_namespace_attributes({name}): {data}')
         return data
 
-    def _mariadb_update_namespace_attributes(self, data: NamespaceAttributesData) -> bool:
-        """Mock implementation of mariadb.update_namespace_attributes()"""
+    def _mariadb_update_namespace_attributes(
+            self, data: NamespaceAttributesData,
+            fields: Optional[List[str]] = None) -> bool:
+        """Mock implementation of mariadb.update_namespace_attributes()
+
+        Like the real implementation, a fields mask limits the write
+        to the named model fields; None or empty replaces every field.
+        """
         if data.name in self.namespace_attributes:
-            self.namespace_attributes[data.name] = data
-            self._trace(f'MockMariaDB.update_namespace_attributes({data.name}): updated')
+            if fields:
+                stored = self.namespace_attributes[data.name]
+                for field in fields:
+                    setattr(stored, field, getattr(data, field))
+            else:
+                self.namespace_attributes[data.name] = data
+            self._trace(
+                f'MockMariaDB.update_namespace_attributes({data.name}): '
+                f'updated (fields={fields})')
             return True
         self._trace(f'MockMariaDB.update_namespace_attributes({data.name}): not found')
         return False

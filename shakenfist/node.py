@@ -123,10 +123,17 @@ class Node(dbo):
             self.__attributes = attrs
         return attrs
 
-    def _save_attributes(self) -> None:
-        """Persist current attributes to MariaDB."""
+    def _save_attributes(self, fields: Optional[list[str]]) -> None:
+        """Persist the named attribute fields to MariaDB.
+
+        fields is deliberately required: callers must name exactly the
+        fields they changed so concurrent writers of other attributes
+        on the same row cannot lose their committed columns to this
+        writer's read-modify-write. None writes every column and is
+        reserved for row creation and upgrade persistence.
+        """
         if self.__attributes is not None:
-            mariadb.update_node_attributes(self.__attributes)
+            mariadb.update_node_attributes(self.__attributes, fields=fields)
 
     def _invalidate_attributes(self) -> None:
         """Force reload of attributes on next access."""
@@ -320,7 +327,14 @@ class Node(dbo):
         attrs.is_network_node = config.NODE_IS_NETWORK_NODE
         attrs.is_eventlog_node = False
         attrs.is_database_node = config.NODE_IS_DATABASE_NODE
-        n._save_attributes()
+        # This runs unlocked every 15 seconds from both sentinel
+        # daemons, so it must only ever write the fields it owns: a
+        # full-row write here can revert a concurrent instances or
+        # daemons list update made from another node.
+        n._save_attributes(fields=[
+            'last_seen', 'installed_version', 'is_etcd_master',
+            'is_hypervisor', 'is_network_node', 'is_eventlog_node',
+            'is_database_node'])
 
     def external_view(self):
         """Build a dict of node state for the API."""
@@ -348,10 +362,13 @@ class Node(dbo):
         for daemon in self.VALID_DAEMONS:
             retval[f'daemon-{daemon}-state'] = states_by_daemon.get(daemon)
 
-        # Object references use FQDN as the node identifier in the
-        # object_references table.
-        refs_to = mariadb.get_references_to(ObjectType.NODE, self.fqdn)
-        refs_from = mariadb.get_references_from(ObjectType.NODE, self.fqdn)
+        # Object references: legacy BLOB_LOCATION rows key the node by
+        # FQDN, while INSTANCE_LOCATION rows key it by UUID, so query
+        # under both identifiers and merge.
+        refs_to = (mariadb.get_references_to(ObjectType.NODE, self.fqdn) +
+                   mariadb.get_references_to(ObjectType.NODE, str(self.uuid)))
+        refs_from = (mariadb.get_references_from(ObjectType.NODE, self.fqdn) +
+                     mariadb.get_references_from(ObjectType.NODE, str(self.uuid)))
         retval['references_to'] = references_to_grouped_dict(refs_to)
         retval['references_from'] = references_to_grouped_dict(refs_from)
 
@@ -381,7 +398,7 @@ class Node(dbo):
                 # restart) and wrongly report the whole node degraded.
                 return
             attrs.daemons.append(daemon)
-            self._save_attributes()
+            self._save_attributes(fields=['daemons'])
         # Only reached for a genuinely new registration: initialise the state to
         # STOPPED (the daemon has not started yet) and record the event.
         self.set_daemon_state(daemon, self.DAEMON_STATE_STOPPED)
@@ -397,7 +414,7 @@ class Node(dbo):
             attrs = self._ensure_attributes()
             if daemon in attrs.daemons:
                 attrs.daemons.remove(daemon)
-                self._save_attributes()
+                self._save_attributes(fields=['daemons'])
         mariadb.delete_node_daemon_state(self.uuid, daemon)
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon deregistered')
 
@@ -491,34 +508,66 @@ class Node(dbo):
 
     @property
     def instances(self):
-        attrs = self._load_attributes()
-        if attrs is None:
-            return []
-        return list(attrs.instances)
+        """Return list of instance UUIDs placed on this node.
 
-    @instances.setter
-    def instances(self, value):
-        attrs = self._ensure_attributes()
-        attrs.instances = list(value)
-        self._save_attributes()
+        Queries the object_references table for INSTANCE_LOCATION
+        relationships where this node is the source. This replaced the
+        instances list on node_attributes: that list was maintained by
+        read-modify-write of the whole attributes row, so any
+        concurrent full-row writer could silently revert a placement
+        (observed as the scheduler's affinity pass scoring a node zero
+        in CI). References are single-row inserts and deletes, so no
+        cross-writer coordination is needed.
+
+        Transition-only: the result is unioned with the legacy JSON
+        column so placements written by not-yet-upgraded nodes during
+        a rolling upgrade stay visible to upgraded schedulers. The
+        union (and the column) go away next release; each node's
+        queues-daemon startup reconciliation converges the two stores.
+        """
+        refs = mariadb.get_references_from(
+            ObjectType.NODE, str(self.uuid),
+            RelationshipType.INSTANCE_LOCATION)
+        found = [str(ref.target_uuid) for ref in refs]
+
+        attrs = self._load_attributes()
+        if attrs is not None:
+            for instance_uuid in attrs.instances:
+                if instance_uuid not in found:
+                    found.append(instance_uuid)
+        return found
 
     def add_instance(self, instance_uuid):
-        with self.get_lock_attr('instances', 'Add instance'):
-            self._invalidate_attributes()
-            attrs = self._ensure_attributes()
-            instance_str = str(instance_uuid)
-            if instance_str not in attrs.instances:
-                attrs.instances.append(instance_str)
-                self._save_attributes()
+        mariadb.record_relationship(
+            ObjectType.NODE, str(self.uuid),
+            RelationshipType.INSTANCE_LOCATION, None,
+            ObjectType.INSTANCE, str(instance_uuid))
+        self._dual_write_legacy_instances(str(instance_uuid), present=True)
 
     def remove_instance(self, instance_uuid):
-        with self.get_lock_attr('instances', 'Remove instance'):
+        mariadb.remove_relationship(
+            ObjectType.NODE, str(self.uuid),
+            RelationshipType.INSTANCE_LOCATION, None,
+            ObjectType.INSTANCE, str(instance_uuid))
+        self._dual_write_legacy_instances(str(instance_uuid), present=False)
+
+    def _dual_write_legacy_instances(self, instance_str, present):
+        """Keep the legacy node_attributes.instances column current.
+
+        Transition-only: a rollback to the previous release reads its
+        placements from this column, so it must stay fresh for one
+        release cycle after the INSTANCE_LOCATION cutover. Remove this
+        method together with the column.
+        """
+        with self.get_lock_attr('instances', 'Sync legacy instances'):
             self._invalidate_attributes()
             attrs = self._ensure_attributes()
-            instance_str = str(instance_uuid)
-            if instance_str in attrs.instances:
+            if present and instance_str not in attrs.instances:
+                attrs.instances.append(instance_str)
+                self._save_attributes(fields=['instances'])
+            elif not present and instance_str in attrs.instances:
                 attrs.instances.remove(instance_str)
-                self._save_attributes()
+                self._save_attributes(fields=['instances'])
 
     @property
     def dependency_versions(self):
@@ -532,7 +581,7 @@ class Node(dbo):
         attrs = self._ensure_attributes()
         if value != attrs.dependency_versions:
             attrs.dependency_versions = dict(value)
-            self._save_attributes()
+            self._save_attributes(fields=['dependency_versions'])
 
     def _version_tuple_to_semver(self, t):
         while len(t) < 3:
@@ -552,7 +601,7 @@ class Node(dbo):
         new_val = list(value)
         if new_val != (attrs.qemu_version or []):
             attrs.qemu_version = new_val
-            self._save_attributes()
+            self._save_attributes(fields=['qemu_version'])
 
     @property
     def libvirt_version(self):
@@ -567,7 +616,7 @@ class Node(dbo):
         new_val = list(value)
         if new_val != (attrs.libvirt_version or []):
             attrs.libvirt_version = new_val
-            self._save_attributes()
+            self._save_attributes(fields=['libvirt_version'])
 
     @property
     def python_version(self):
@@ -582,7 +631,7 @@ class Node(dbo):
         new_val = list(value)
         if new_val != (attrs.python_version or []):
             attrs.python_version = new_val
-            self._save_attributes()
+            self._save_attributes(fields=['python_version'])
 
     @property
     def python_implementation(self):
@@ -596,7 +645,7 @@ class Node(dbo):
         attrs = self._ensure_attributes()
         if value != attrs.python_implementation:
             attrs.python_implementation = value
-            self._save_attributes()
+            self._save_attributes(fields=['python_implementation'])
 
     @property
     def process_metrics(self):
@@ -610,7 +659,7 @@ class Node(dbo):
         attrs = self._ensure_attributes()
         if value != attrs.process_metrics:
             attrs.process_metrics = dict(value)
-            self._save_attributes()
+            self._save_attributes(fields=['process_metrics'])
 
     def delete(self):
         # NOTE(mikal): the remainder of the cleanup of deleted nodes happens in

@@ -14,8 +14,11 @@ import sqlalchemy as sa
 
 from shakenfist import mariadb
 from shakenfist.schema.artifact_attributes import ArtifactAttributesData
+from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.instance_attributes import InstanceAttributesData
+from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.network_attributes import NetworkAttributesData
+from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.tests import base
 
 
@@ -148,3 +151,95 @@ class ArtifactColumnValuesTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             ValueError, mariadb._artifact_attributes_column_values,
             self.data, ['shared', 'not_a_column'])
+
+
+NODE_ALL_COLUMNS = {
+    'last_seen', 'installed_version', 'is_etcd_master', 'is_hypervisor',
+    'is_network_node', 'is_eventlog_node', 'is_database_node', 'instances',
+    'daemons', 'daemon_states', 'qemu_version', 'libvirt_version',
+    'python_version', 'python_implementation', 'dependency_versions',
+    'process_metrics',
+}
+
+
+class NodeColumnValuesTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.data = NodeAttributesData(
+            uuid=uuid.uuid4(),
+            last_seen=1234567890.0,
+            daemons=['queues', 'resources'],
+            process_metrics={'process_cpu_time_sf_api': 1.5})
+
+    def test_no_mask_returns_every_column(self):
+        values = mariadb._node_attributes_column_values(self.data)
+        self.assertEqual(NODE_ALL_COLUMNS, set(values))
+
+    def test_mask_limits_columns(self):
+        # This mask is the one observe_this_node uses: it must never
+        # include the daemons list, whose writers hold a different
+        # attribute lock.
+        values = mariadb._node_attributes_column_values(
+            self.data, ['last_seen', 'installed_version', 'is_etcd_master',
+                        'is_hypervisor', 'is_network_node',
+                        'is_eventlog_node', 'is_database_node'])
+        self.assertNotIn('daemons', values)
+        self.assertEqual(1234567890.0, values['last_seen'])
+
+    def test_unknown_field_rejected(self):
+        self.assertRaises(
+            ValueError, mariadb._node_attributes_column_values,
+            self.data, ['last_seen', 'not_a_column'])
+
+
+class NamespaceColumnValuesTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.data = NamespaceAttributesData(
+            name='testspace',
+            keys={'nonced_keys': {'deploy': {'key': 'abc', 'nonce': 'n'}}},
+            trust=['system'])
+
+    def test_no_mask_returns_every_column(self):
+        values = mariadb._namespace_attributes_column_values(self.data)
+        self.assertEqual({'keys', 'trust'}, set(values))
+
+    def test_mask_limits_columns(self):
+        values = mariadb._namespace_attributes_column_values(
+            self.data, ['trust'])
+        self.assertEqual({'trust'}, set(values))
+        self.assertEqual(['system'], values['trust'])
+
+    def test_unknown_field_rejected(self):
+        self.assertRaises(
+            ValueError, mariadb._namespace_attributes_column_values,
+            self.data, ['keys', 'not_a_column'])
+
+
+class BlobColumnValuesTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.data = BlobAttributesData(
+            uuid=uuid.uuid4(),
+            size=1024,
+            info={'mime-type': 'application/octet-stream'},
+            last_used=1234567890.0,
+            expires_at=1244567890.0)
+
+    def test_no_mask_returns_every_column(self):
+        values = mariadb._blob_attributes_column_values(self.data)
+        self.assertEqual(
+            {'size', 'info', 'last_used', 'expires_at'}, set(values))
+
+    def test_mask_limits_columns(self):
+        # set_lifetime must not carry a stale last_used along with its
+        # expires_at write.
+        values = mariadb._blob_attributes_column_values(
+            self.data, ['expires_at'])
+        self.assertEqual({'expires_at'}, set(values))
+        self.assertEqual(1244567890.0, values['expires_at'])
+
+    def test_unknown_field_rejected(self):
+        self.assertRaises(
+            ValueError, mariadb._blob_attributes_column_values,
+            self.data, ['expires_at', 'not_a_column'])
