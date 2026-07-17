@@ -990,3 +990,77 @@ the following files in `docs/plans/`:
 Before executing any step of this plan, please back brief
 the operator as to your understanding of the plan and how
 the work you intend to do aligns with that plan.
+
+## Follow-on: database-tier graceful rolling restart (2026-07, #3430)
+
+This plan's success criteria call for a clean rolling upgrade
+of the database tier, and `PLAN-byo-mariadb.md` phase 3/6 landed
+the `serial: 1` roll (`examples/_shared/site.yml` play 6b) plus
+a per-node `wait_for` on port 13005. Live operation of the sfcbr
+cluster then showed that roll is **necessary but not
+sufficient**: every `manage.yml`/`site.yml` redeploy still
+storms the mariadb-broker gRPC tier with `UNAVAILABLE`
+("connections to all backends failing") for 10-20 minutes,
+cascading into `DatabaseUnavailable`, an eventlog-drainer thread
+exit, and the lookup-race of #3373. The storm reproduced on
+shakenfist `61e1ad171`, which already contained the `serial: 1`
+roll — so the gap is real, not a missing deploy.
+
+**Diagnosis (three interacting gaps).**
+
+1. *The client amplifies a single-gateway blip into an outage.*
+   `mariadb._grpc_call` rebuilt the whole gRPC channel
+   (`_reset_database_stub`) on **every** `UNAVAILABLE`. That
+   discards a warm `round_robin` channel — including the healthy
+   subchannel to a still-serving gateway — for a cold one whose
+   own first RPC fails `UNAVAILABLE` (no connected subchannel
+   yet, `wait_for_ready=False` by design), so one gateway's
+   restart cascades into repeated failures and can exhaust the
+   three retries into `DatabaseUnavailable`. Visible as a
+   steady-state signature too: sf-cluster's lock-refresh failing
+   `UNAVAILABLE` → "retrying with a fresh channel" every ~23s
+   *outside* any deploy.
+2. *The deploy gate proves the wrong thing.* `wait_for` on port
+   13005 confirms only that the socket is listening, not that
+   the gateway is serving (MariaDB reachable) nor that cluster
+   clients have re-established their `round_robin` subchannels
+   to the recovered gateway. If the next node in the roll drops
+   its gateway while a peer is still mid-reconnect, that peer
+   momentarily sees no READY backend.
+3. *No graceful drain.* `daemons/database/main.py` stopped the
+   gRPC server with a one-second grace, cutting in-flight RPCs
+   (surfacing as client `UNAVAILABLE`/`CANCELLED`).
+
+**Fix (landed on the `db-gateway-rolling-restart` branch).**
+
+- **Client (`mariadb._grpc_call`).** Split the retry by code.
+  `UNAVAILABLE` → retry on the *same* channel and let
+  `round_robin` serve from a surviving peer while the failed
+  subchannel reconnects in the background. `DEADLINE_EXCEEDED`
+  (the wedged-subchannel signature the `wait_for_ready` note
+  guards against) still rebuilds the channel to shed the wedged
+  backend. This is the highest-leverage change and also cures
+  the ~23s steady-state churn.
+- **Deploy gate (`node` role `register.yml`).** After the port
+  `wait_for`, gate the roll on a new `sf-ctl gateway-health`
+  command that probes this node's own `grpc.health.v1` `Check`
+  for SERVING (which on sf-database means MariaDB reachable +
+  schema current), then a short, configurable
+  (`sf_database_roll_settle_seconds`, default 10s) settle so
+  peers reconnect before the next node's gateway stops.
+- **Server drain (`daemons/database/main.py`).** Replace the
+  one-second stop with `server.stop(config.DATABASE_DRAIN_GRACE)`
+  (new config knob, default 10s, kept below the generic
+  `sf.service` `TimeoutStopSec=30s`) after the existing
+  NOT_SERVING flip, so in-flight RPCs finish instead of being
+  cut.
+
+This honours the two carried-over constraints (no `Watch` on
+the servicer, no `healthCheckConfig` on the client channel) —
+the gate reads `Check` from the deploy, not client-side Watch,
+and the client fix works purely through `round_robin`
+connectivity state. It is the concrete "rolling upgrade drains
+cleanly" success criterion, extended from sf-api (phase 1) to
+the sf-database tier. Recorded here rather than as a new plan
+because it is a hardening of the health/drain model this plan
+already owns; tracked in #3430.
