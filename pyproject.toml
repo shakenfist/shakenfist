@@ -93,7 +93,7 @@ dependencies = [
     # Indirect dependencies. We do not track license for these.
     "aniso8601==10.0.1",
     "annotated-types==0.7.0",
-    "anyio==4.14.1",
+    "anyio==4.14.2",
     "async-extensions==4.0.0",
     "attrs==26.1.0",
     "blinker==1.9.0",
