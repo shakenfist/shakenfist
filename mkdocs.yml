@@ -164,6 +164,7 @@ nav:
                 - "instar bench subcommand": components/instar/plans/PLAN-bench.md
                 - "bench qcow2 refcount growth": components/instar/plans/PLAN-bench-refcount-growth.md
                 - "qcow2 write infrastructure": components/instar/plans/PLAN-qcow2-write-infrastructure.md
+                - "Format coverage expansion": components/instar/plans/PLAN-format-coverage.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
