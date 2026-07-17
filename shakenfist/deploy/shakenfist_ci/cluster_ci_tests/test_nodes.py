@@ -79,8 +79,13 @@ class TestNodes(base.BaseNamespacedTestCase):
                 plain_schedulable.append(per_node['cpu_schedulable'])
 
         # Cluster CI nodes are identically sized VMs, so a hypervisor
-        # carrying an infra role (which reserves an extra core) must offer
-        # fewer schedulable threads than a plain hypervisor. Skip the
-        # comparison on topologies without both kinds.
+        # carrying an infra role (which reserves an extra core) must never
+        # offer more schedulable threads than a plain hypervisor. Equality
+        # is tolerated: if the guest topology defeats psutil's physical
+        # core detection the daemon publishes no reservation fields and
+        # every node falls back to the same synthetic sizing, and on very
+        # small nodes both sizes can floor at the same value. Skip the
+        # comparison entirely on topologies without both kinds of node.
         if infra_schedulable and plain_schedulable:
-            self.assertLess(max(infra_schedulable), min(plain_schedulable))
+            self.assertLessEqual(
+                max(infra_schedulable), min(plain_schedulable))
