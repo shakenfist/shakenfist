@@ -2808,6 +2808,16 @@ class MockEtcd():
                 'metrics': dict(metrics),
             }
 
+    def update_node_metrics(self, fqdn, metrics):
+        """Merge per-node metric overrides on top of already set metrics.
+
+        Call set_node_metrics_same() first to establish the baseline
+        (including role flags); this helper then makes individual nodes
+        heterogeneous.
+        """
+        node_uuid = self.node_uuids[fqdn]
+        self.node_metrics_store[node_uuid]['metrics'].update(metrics)
+
     #
     # Database backed objects
     #

@@ -1,3 +1,4 @@
+import random
 import time
 from unittest import mock
 
@@ -263,6 +264,104 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         s.metrics_updated = time.time() - 400
         s.find_candidates(fake_inst)
         self.assertEqual(11000, s.metrics[net_uuid]['memory_available'])
+
+
+class LoadAwareOrderingTestCase(SchedulerTestCase):
+    """Test load-per-thread bucketing and headroom-weighted selection."""
+
+    def test_loaded_small_node_loses_to_idle_big_nodes(self):
+        # The sfcbr 2026-07-17 incident shape: a small node already under
+        # heavy load must not share the winning bucket with idle large
+        # nodes, even though every raw load here rounds to a floor() value
+        # that the old bucketing would have needed >= 1.0 differences to
+        # separate.
+        self.mock_etcd.set_node_metrics_same()
+        self.mock_etcd.update_node_metrics('node2', {
+            'cpu_max': 12, 'cpu_schedulable': 8, 'cpu_load_1': 9.0})
+        for n in ['node3', 'node4']:
+            self.mock_etcd.update_node_metrics(n, {
+                'cpu_max': 24, 'cpu_schedulable': 22, 'cpu_load_1': 1.0})
+
+        fake_inst = self.mock_etcd.create_instance('fake-inst')
+        for seed in range(20):
+            random.seed(seed)
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+            self.assertSetEqual(
+                self._node_uuids_set('node3', 'node4'), set(nodes))
+
+    def test_similar_nodes_share_bucket_and_spread(self):
+        # Nodes with similar normalised load land in the same coarse
+        # bucket, and every one of them leads the candidate list for some
+        # seed -- a burst scheduled against one stale snapshot still
+        # spreads rather than stacking on a single "best" node.
+        self.mock_etcd.set_node_metrics_same()
+        for n, load in [('node2', 0.3), ('node3', 0.5), ('node4', 0.1)]:
+            self.mock_etcd.update_node_metrics(n, {
+                'cpu_max': 24, 'cpu_schedulable': 22, 'cpu_load_1': load})
+
+        fake_inst = self.mock_etcd.create_instance('fake-inst')
+        firsts = set()
+        for seed in range(50):
+            random.seed(seed)
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+            self.assertSetEqual(
+                self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
+            firsts.add(nodes[0])
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3', 'node4'), firsts)
+
+    def test_selection_is_weighted_by_headroom(self):
+        # Two nodes in the same bucket but with roughly 2x different load
+        # headroom: the bigger node should lead the list about twice as
+        # often. Fixed seed makes the draw deterministic; the band is
+        # deliberately loose.
+        self.mock_etcd.set_node_metrics_same()
+        # weight = 0.75 * 12 - 2.9 = 6.1, normalised load 0.24 (bucket 0)
+        self.mock_etcd.update_node_metrics('node2', {
+            'cpu_max': 12, 'cpu_schedulable': 12, 'cpu_load_1': 2.9})
+        # weight = 0.75 * 22 - 4.4 = 12.1, normalised load 0.2 (bucket 0)
+        self.mock_etcd.update_node_metrics('node3', {
+            'cpu_max': 24, 'cpu_schedulable': 22, 'cpu_load_1': 4.4})
+        # Push node4 out of the winning bucket entirely.
+        self.mock_etcd.update_node_metrics('node4', {
+            'cpu_max': 12, 'cpu_schedulable': 12, 'cpu_load_1': 11.0})
+
+        fake_inst = self.mock_etcd.create_instance('fake-inst')
+        random.seed(42)
+        s = scheduler.Scheduler()
+        wins = {self._node_uuid('node2'): 0, self._node_uuid('node3'): 0}
+        for _ in range(1000):
+            nodes = s.find_candidates(fake_inst)
+            self.assertSetEqual(
+                self._node_uuids_set('node2', 'node3'), set(nodes))
+            wins[nodes[0]] += 1
+
+        ratio = (wins[self._node_uuid('node3')] /
+                 wins[self._node_uuid('node2')])
+        self.assertTrue(
+            1.5 <= ratio <= 3.0,
+            f'Expected node3 to win 1.5-3x as often as node2, got {ratio} '
+            f'({wins})')
+
+    def test_missing_cpu_schedulable_falls_back_to_cpu_max(self):
+        # Metrics rows written by an older resources daemon lack the
+        # reservation-aware cpu_schedulable field; those nodes bucket by
+        # raw load over cpu_max, per-node, without error.
+        self.mock_etcd.set_node_metrics_same()
+        self.mock_etcd.update_node_metrics('node2', {
+            'cpu_max': 12, 'cpu_load_1': 4.0})
+        self.mock_etcd.update_node_metrics('node3', {
+            'cpu_max': 12, 'cpu_load_1': 0.5})
+        self.mock_etcd.update_node_metrics('node4', {
+            'cpu_max': 12, 'cpu_load_1': 0.4})
+
+        fake_inst = self.mock_etcd.create_instance('fake-inst')
+        random.seed(1)
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        # node2 has normalised load 0.33 (bucket 1); the others are in
+        # bucket 0.
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
 
 
 class AffinityTestCase(SchedulerTestCase):

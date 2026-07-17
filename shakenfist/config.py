@@ -180,6 +180,15 @@ class SFConfig(BaseSettings):
     SCHEDULER_CACHE_TIMEOUT: int = Field(
         5, description='How long the scheduler should cache things for.'
     )
+    SCHEDULER_TARGET_LOAD: float = Field(
+        0.75,
+        description=(
+            'The target sustained load per schedulable thread (logical '
+            'CPU) used to weight candidate selection during scheduling. '
+            'Nodes with more headroom below this target draw a larger '
+            'share of new instances.'
+        )
+    )
     CPU_OVERCOMMIT_RATIO: float = Field(
         16, description='How many vCPUS per real CPU.'
     )

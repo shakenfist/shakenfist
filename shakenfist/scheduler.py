@@ -444,17 +444,32 @@ class Scheduler:
                     'affinity_detail': affinity_detail,
                 })
 
-            # Order candidates by current CPU load
+            # Order candidates by current CPU load, normalised by the
+            # schedulable thread count so that differently sized machines
+            # are comparable. The buckets are deliberately coarse (0.25
+            # load per thread wide): the metrics snapshot can be up to a
+            # minute stale, so fine-grained ranking would stack an entire
+            # burst of requests onto whichever node looked best at the
+            # last refresh. Nodes without the reservation-aware
+            # cpu_schedulable field (written by an older resources daemon)
+            # fall back to the raw thread count in cpu_max.
             by_load = defaultdict(list)
             load_detail = {}
+            denominators = {}
             for c in list(candidates):
                 raw_load = self.metrics[c].get('cpu_load_1', 0)
-                load = math.floor(raw_load)
+                denom = (self.metrics[c].get('cpu_schedulable') or
+                         self.metrics[c].get('cpu_max', 1) or 1)
+                normalised = raw_load / denom
+                bucket = math.floor(normalised / 0.25)
+                denominators[c] = denom
                 load_detail[c] = {
                     'cpu_load_1': raw_load,
-                    'cpu_load_1_floor': load,
+                    'cpu_schedulable': denom,
+                    'normalised_load': normalised,
+                    'bucket': bucket,
                 }
-                by_load[load].append(c)
+                by_load[bucket].append(c)
 
             lowest_load = sorted(by_load)[0]
             candidates = by_load[lowest_load]
@@ -467,12 +482,26 @@ class Scheduler:
                     'load_detail': load_detail,
                 })
 
-            # Return a shuffled list of options
-            random.shuffle(candidates)
+            # Return a weighted shuffle of the winning bucket, where a
+            # node's weight is its load headroom toward the target
+            # sustained load -- so bigger or idler machines draw a
+            # proportionally larger share of a burst. This is weighted
+            # sampling without replacement (Efraimidis-Spirakis A-Res):
+            # callers walk the list on failure, so the tail order matters
+            # as much as the head.
+            weights = {}
+            for c in candidates:
+                raw_load = self.metrics[c].get('cpu_load_1', 0)
+                weights[c] = max(
+                    0.1,
+                    config.SCHEDULER_TARGET_LOAD * denominators[c] - raw_load)
+            candidates.sort(
+                key=lambda c: random.random() ** (1.0 / weights[c]),
+                reverse=True)
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
                 'schedule final candidates',
-                extra={'candidates': candidates})
+                extra={'candidates': candidates, 'weights': weights})
             return candidates
 
     def summarize_resources(self):
