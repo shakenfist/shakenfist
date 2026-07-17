@@ -143,7 +143,7 @@ Optional fields (default to null):
 | Field | Description |
 |-------|-------------|
 | secure_port | SPICE TLS port (if QEMU exposes one) |
-| host_subject | TLS host subject for certificate verification |
+| host_subject | TLS host subject for certificate verification. Enforced: when set, the proxy refuses hypervisors whose certificate subject does not match (exact attribute count/order/type). |
 
 **Example sources.yaml entry for a static source:**
 

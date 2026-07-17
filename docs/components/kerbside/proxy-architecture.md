@@ -55,10 +55,12 @@ silently dead peer is detected rather than pinning a task forever.
 The proxy holds a host certificate/key (`PROXY_HOST_CERT_PATH` /
 `PROXY_HOST_CERT_KEY_PATH`) and a CA bundle (`CACERT_PATH`). Client-facing TLS
 is terminated with the host certificate. The backend leg (`backend.rs`, via
-the ryll `SpiceClient`) originates TLS to the hypervisor and verifies the
-server against the expected `host_subject` from the authorization reply, so a
-mis-issued or substituted backend certificate is rejected. The rustls `ring`
-crypto provider is installed at startup.
+the ryll `SpiceClient`) originates TLS to the hypervisor. When the console
+carries a `host_subject`, the backend leg verifies the server certificate's
+subject against it using spice-common matching semantics, substituting for
+hostname verification, so a mis-issued or substituted backend certificate is
+rejected. When the console has no `host_subject`, the CA chain is the only
+identity check. The rustls `ring` crypto provider is installed at startup.
 
 ## Connection State Machine
 

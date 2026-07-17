@@ -247,8 +247,8 @@ searchable from one place.
 | 4. Port latency loadtest to control socket and remove legacy `testclient/ryll/` | kerbside | [PLAN-test-harness-phase-04-port-latency.md](/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/) | Merged |
 | 5. Direct-qemu CI workflow | kerbside | [PLAN-test-harness-phase-05-direct-qemu-ci.md](/components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/) | Merged; lane green in CI |
 | 6. Ryll Cargo feature work: digest decoding, headless feature, restore keypress-to-screen latency | ryll | [PLAN-test-harness-phase-06-digest-decoding.md](/components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/) | Merged (ryll and kerbside sides) |
-| 7. First Sextant scenario tempest test | kerbside | [PLAN-test-harness-phase-07-scenario-test.md](/components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test/) | Implementation complete; PR pending operator |
-| 8. OpenStack CI lane disposition + oVirt provisioning flake | kerbside (+ shakenfist/actions) | [PLAN-test-harness-phase-08-openstack-disposition.md](/components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/) | Implementation complete; PR pending operator |
+| 7. First Sextant scenario tempest test | kerbside | [PLAN-test-harness-phase-07-scenario-test.md](/components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test/) | Merged (kerbside PR #82) |
+| 8. OpenStack CI lane disposition + oVirt provisioning flake | kerbside (+ shakenfist/actions) | [PLAN-test-harness-phase-08-openstack-disposition.md](/components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/) | Merged (kerbside PR #88) |
 
 Indicative effort and model recommendations (firmed up
 when each phase plan is written):
