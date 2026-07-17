@@ -111,16 +111,35 @@ class Scheduler:
 
         return True, None
 
-    def _cpu_admission_base(self, node):
-        # vCPU admission is denominated in schedulable threads -- the
-        # thread count left after the resources daemon subtracts the
-        # reserved cores for the operating system and (on network or
-        # database nodes) cluster-wide daemons. Metrics rows written by an
-        # older resources daemon lack cpu_schedulable and fall back to the
-        # raw thread count in cpu_max, which is slightly generous -- the
-        # safe direction during a rolling upgrade.
-        return self.metrics[node].get(
-            'cpu_schedulable', self.metrics[node].get('cpu_max', 0))
+    def _schedulable_threads(self, node):
+        # Scheduling is denominated in schedulable threads -- the thread
+        # count left after the resources daemon subtracts the reserved
+        # cores for the operating system and (on network or database
+        # nodes) cluster-wide daemons. Admission, load ordering and
+        # summarize_resources() must all size a node through this helper
+        # so they cannot disagree. Returns (threads, from_fallback).
+        #
+        # Metrics rows written by an older resources daemon lack
+        # cpu_schedulable. For those we approximate the reservation the
+        # node will publish once its daemon restarts, using the role
+        # flags (which old rows do carry) and assuming two threads per
+        # reserved core. Using the raw thread count instead would make a
+        # not-yet-upgraded node look bigger and idler than an identical
+        # upgraded one, and it would absorb entire bursts during a
+        # rolling upgrade.
+        metrics = self.metrics[node]
+        threads = metrics.get('cpu_schedulable')
+        if threads:
+            return threads, False
+
+        cpu_max = metrics.get('cpu_max', 0)
+        if not cpu_max:
+            return 0, True
+
+        reserved_cores = config.CPU_SYSTEM_RESERVATION
+        if metrics.get('is_network_node') or metrics.get('is_database_node'):
+            reserved_cores += config.CPU_INFRA_ROLE_RESERVATION
+        return max(1, cpu_max - reserved_cores * 2), True
 
     def _memory_reserved_mb(self, node):
         # The resources daemon publishes the node's total memory
@@ -131,7 +150,7 @@ class Scheduler:
             'memory_reserved_mb', config.RAM_SYSTEM_RESERVATION * 1024)
 
     def _has_sufficient_cpu(self, log_ctx, cpus, node):
-        cpu_base = self._cpu_admission_base(node)
+        cpu_base, from_fallback = self._schedulable_threads(node)
         hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
         current_cpu = self.metrics[node].get('cpu_total_instance_vcpus', 0)
 
@@ -142,8 +161,7 @@ class Scheduler:
                 'requested_cpus': cpus,
                 'hard_max_cpus': hard_max_cpus,
                 'cpu_schedulable': cpu_base,
-                'cpu_schedulable_from_fallback':
-                    'cpu_schedulable' not in self.metrics[node],
+                'cpu_schedulable_from_fallback': from_fallback,
             }
             log_ctx.with_fields({'node': node, **reason}).debug(
                 'Scheduling on node would exceed hard maximum CPUs')
@@ -482,14 +500,15 @@ class Scheduler:
             denominators = {}
             for c in list(candidates):
                 raw_load = self.metrics[c].get('cpu_load_1', 0)
-                denom = (self.metrics[c].get('cpu_schedulable') or
-                         self.metrics[c].get('cpu_max', 1) or 1)
+                denom, from_fallback = self._schedulable_threads(c)
+                denom = denom or 1
                 normalised = raw_load / denom
                 bucket = math.floor(normalised / 0.25)
                 denominators[c] = denom
                 load_detail[c] = {
                     'cpu_load_1': raw_load,
                     'cpu_schedulable': denom,
+                    'cpu_schedulable_from_fallback': from_fallback,
                     'normalised_load': normalised,
                     'bucket': bucket,
                 }
@@ -559,7 +578,7 @@ class Scheduler:
             resources['per_node'][n]['cpu_max_per_instance'] = \
                 self.metrics[n].get('cpu_max_per_instance', 0)
 
-            cpu_base = self._cpu_admission_base(n)
+            cpu_base, _ = self._schedulable_threads(n)
             resources['per_node'][n]['cpu_schedulable'] = cpu_base
             hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
             current_cpu = self.metrics[n].get('cpu_total_instance_vcpus', 0)

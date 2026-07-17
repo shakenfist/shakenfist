@@ -162,9 +162,11 @@ reports as available is what the scheduler would actually admit.
 ## Mixed-version clusters
 
 Metrics rows written by a resources daemon older than the
-reservation scheme lack the new fields. The scheduler falls back
-per-node to the pre-reservation arithmetic (all threads, the
-config RAM reservation) for exactly those rows, which is slightly
-generous -- the safe direction during a rolling upgrade. The
-window closes as each node's resources daemon restarts and
-republishes.
+reservation scheme lack the new fields. For exactly those rows
+the scheduler synthesises an approximate CPU reservation from the
+node's role flags (assuming two threads per reserved core) so
+that a not-yet-upgraded node doesn't look artificially large and
+absorb bursts during the roll, and falls back to the config RAM
+reservation for memory. Audit events mark these nodes with
+`cpu_schedulable_from_fallback`. The window closes as each node's
+resources daemon restarts and republishes.

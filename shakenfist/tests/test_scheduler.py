@@ -343,10 +343,12 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
             f'Expected node3 to win 1.5-3x as often as node2, got {ratio} '
             f'({wins})')
 
-    def test_missing_cpu_schedulable_falls_back_to_cpu_max(self):
+    def test_missing_cpu_schedulable_falls_back_to_synthetic(self):
         # Metrics rows written by an older resources daemon lack the
-        # reservation-aware cpu_schedulable field; those nodes bucket by
-        # raw load over cpu_max, per-node, without error.
+        # reservation-aware cpu_schedulable field; those nodes get a
+        # synthetic reservation approximated from their role flags (one
+        # core, two threads, for these plain hypervisors), per-node,
+        # without error.
         self.mock_etcd.set_node_metrics_same()
         self.mock_etcd.update_node_metrics('node2', {
             'cpu_max': 12, 'cpu_load_1': 4.0})
@@ -358,10 +360,30 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
         fake_inst = self.mock_etcd.create_instance('fake-inst')
         random.seed(1)
         nodes = scheduler.Scheduler().find_candidates(fake_inst)
-        # node2 has normalised load 0.33 (bucket 1); the others are in
-        # bucket 0.
+        # node2 has normalised load 4.0 / 10 = 0.40 (bucket 1); the
+        # others are in bucket 0.
         self.assertSetEqual(
             self._node_uuids_set('node3', 'node4'), set(nodes))
+
+    def test_old_dialect_infra_node_not_favoured(self):
+        # A not-yet-upgraded infra-role node must not look bigger and
+        # idler than an identical upgraded one: the synthetic fallback
+        # applies the role-aware reservation to old-dialect rows, so
+        # both size to 8 schedulable threads and share a bucket.
+        self.mock_etcd.set_node_metrics_same()
+        self.mock_etcd.update_node_metrics('node2', {
+            'cpu_max': 12, 'cpu_schedulable': 8, 'cpu_load_1': 2.5,
+            'is_database_node': True})
+        self.mock_etcd.update_node_metrics('node3', {
+            'cpu_max': 12, 'cpu_load_1': 2.5, 'is_database_node': True})
+        self.mock_etcd.update_node_metrics('node4', {
+            'cpu_max': 12, 'cpu_load_1': 12.0})
+
+        fake_inst = self.mock_etcd.create_instance('fake-inst')
+        random.seed(1)
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3'), set(nodes))
 
 
 class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
@@ -471,8 +493,17 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
 
         for n, per_node in resources['per_node'].items():
             metrics = s.metrics[n]
-            expected_base = metrics.get(
-                'cpu_schedulable', metrics.get('cpu_max', 0))
+            # The expected base must mirror _schedulable_threads(): the
+            # published value when present, otherwise the role-aware
+            # synthetic reservation (two threads per reserved core).
+            expected_base = metrics.get('cpu_schedulable')
+            if not expected_base:
+                reserved_cores = 1
+                if (metrics.get('is_network_node') or
+                        metrics.get('is_database_node')):
+                    reserved_cores += 1
+                expected_base = max(
+                    1, metrics.get('cpu_max', 0) - reserved_cores * 2)
             expected_reserved = metrics.get('memory_reserved_mb', 5.0 * 1024)
 
             self.assertEqual(expected_base, per_node['cpu_schedulable'])
