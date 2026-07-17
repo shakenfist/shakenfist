@@ -387,6 +387,18 @@ class SFConfig(BaseSettings):
         13006,
         description='Prometheus metrics port for the sf-database daemon.'
     )
+    DATABASE_DRAIN_GRACE: int = Field(
+        10,
+        description=(
+            'On shutdown, how many seconds sf-database lets in-flight gRPC '
+            'calls finish (having already flipped its health status to '
+            'NOT_SERVING and stopped accepting new calls) before it forces '
+            'the server down. A cap, not a fixed delay: the server stops as '
+            'soon as the last in-flight call ends. Must stay below the '
+            'generic sf.service TimeoutStopSec (30s) with margin, or systemd '
+            'SIGKILLs the daemon mid-drain.'
+        )
+    )
 
     # Loki log shipping options
     LOKI_BASE_URL: str = Field(
