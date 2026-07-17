@@ -10636,7 +10636,7 @@ the standard virt-viewer format used by <code>remote-viewer</code> and other SPI
 <tr>
 <td><code>host-subject</code></td>
 <td>No</td>
-<td>Expected server certificate subject</td>
+<td>Server certificate subject; enforced -- the connection fails if the server's certificate subject does not match, and a malformed value is rejected at startup</td>
 </tr>
 </tbody>
 </table>
@@ -10674,6 +10674,9 @@ escape sequences for newlines, not a file path. Either <code>port</code> or
 <a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="na">ca</span><span class="o">=</span><span class="s">-----BEGIN CERTIFICATE-----\nMIIE...\n-----END CERTIFICATE-----\n</span>
 <a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="na">host-subject</span><span class="o">=</span><span class="s">CN=spice.example.com</span>
 </code></pre></div></p>
+<p>Note: <code>host-subject</code> must match the server certificate's subject
+exactly, including attribute count, order, and type -- not just the
+<code>CN</code> value.</p>
 <h2 id="keyboard-shortcuts">Keyboard Shortcuts<a class="headerlink" href="#keyboard-shortcuts" title="Permanent link">&para;</a></h2>
 <p>These shortcuts are available during a GUI session. They are consumed
 by ryll and not forwarded to the guest VM.</p>
