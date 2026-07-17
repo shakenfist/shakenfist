@@ -9961,6 +9961,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#follow-on-database-tier-graceful-rolling-restart-2026-07-3430" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Follow-on: database-tier graceful rolling restart (2026-07, #3430)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -11000,6 +11011,77 @@ the following files in <code>docs/plans/</code>:</p>
 <p>Before executing any step of this plan, please back brief
 the operator as to your understanding of the plan and how
 the work you intend to do aligns with that plan.</p>
+<h2 id="follow-on-database-tier-graceful-rolling-restart-2026-07-3430">Follow-on: database-tier graceful rolling restart (2026-07, #3430)<a class="headerlink" href="#follow-on-database-tier-graceful-rolling-restart-2026-07-3430" title="Permanent link">&para;</a></h2>
+<p>This plan's success criteria call for a clean rolling upgrade
+of the database tier, and <code>PLAN-byo-mariadb.md</code> phase 3/6 landed
+the <code>serial: 1</code> roll (<code>examples/_shared/site.yml</code> play 6b) plus
+a per-node <code>wait_for</code> on port 13005. Live operation of the sfcbr
+cluster then showed that roll is <strong>necessary but not
+sufficient</strong>: every <code>manage.yml</code>/<code>site.yml</code> redeploy still
+storms the mariadb-broker gRPC tier with <code>UNAVAILABLE</code>
+("connections to all backends failing") for 10-20 minutes,
+cascading into <code>DatabaseUnavailable</code>, an eventlog-drainer thread
+exit, and the lookup-race of #3373. The storm reproduced on
+shakenfist <code>61e1ad171</code>, which already contained the <code>serial: 1</code>
+roll — so the gap is real, not a missing deploy.</p>
+<p><strong>Diagnosis (three interacting gaps).</strong></p>
+<ol>
+<li><em>The client amplifies a single-gateway blip into an outage.</em>
+   <code>mariadb._grpc_call</code> rebuilt the whole gRPC channel
+   (<code>_reset_database_stub</code>) on <strong>every</strong> <code>UNAVAILABLE</code>. That
+   discards a warm <code>round_robin</code> channel — including the healthy
+   subchannel to a still-serving gateway — for a cold one whose
+   own first RPC fails <code>UNAVAILABLE</code> (no connected subchannel
+   yet, <code>wait_for_ready=False</code> by design), so one gateway's
+   restart cascades into repeated failures and can exhaust the
+   three retries into <code>DatabaseUnavailable</code>. Visible as a
+   steady-state signature too: sf-cluster's lock-refresh failing
+   <code>UNAVAILABLE</code> → "retrying with a fresh channel" every ~23s
+   <em>outside</em> any deploy.</li>
+<li><em>The deploy gate proves the wrong thing.</em> <code>wait_for</code> on port
+   13005 confirms only that the socket is listening, not that
+   the gateway is serving (MariaDB reachable) nor that cluster
+   clients have re-established their <code>round_robin</code> subchannels
+   to the recovered gateway. If the next node in the roll drops
+   its gateway while a peer is still mid-reconnect, that peer
+   momentarily sees no READY backend.</li>
+<li><em>No graceful drain.</em> <code>daemons/database/main.py</code> stopped the
+   gRPC server with a one-second grace, cutting in-flight RPCs
+   (surfacing as client <code>UNAVAILABLE</code>/<code>CANCELLED</code>).</li>
+</ol>
+<p><strong>Fix (landed on the <code>db-gateway-rolling-restart</code> branch).</strong></p>
+<ul>
+<li><strong>Client (<code>mariadb._grpc_call</code>).</strong> Split the retry by code.
+  <code>UNAVAILABLE</code> → retry on the <em>same</em> channel and let
+  <code>round_robin</code> serve from a surviving peer while the failed
+  subchannel reconnects in the background. <code>DEADLINE_EXCEEDED</code>
+  (the wedged-subchannel signature the <code>wait_for_ready</code> note
+  guards against) still rebuilds the channel to shed the wedged
+  backend. This is the highest-leverage change and also cures
+  the ~23s steady-state churn.</li>
+<li><strong>Deploy gate (<code>node</code> role <code>register.yml</code>).</strong> After the port
+  <code>wait_for</code>, gate the roll on a new <code>sf-ctl gateway-health</code>
+  command that probes this node's own <code>grpc.health.v1</code> <code>Check</code>
+  for SERVING (which on sf-database means MariaDB reachable +
+  schema current), then a short, configurable
+  (<code>sf_database_roll_settle_seconds</code>, default 10s) settle so
+  peers reconnect before the next node's gateway stops.</li>
+<li><strong>Server drain (<code>daemons/database/main.py</code>).</strong> Replace the
+  one-second stop with <code>server.stop(config.DATABASE_DRAIN_GRACE)</code>
+  (new config knob, default 10s, kept below the generic
+  <code>sf.service</code> <code>TimeoutStopSec=30s</code>) after the existing
+  NOT_SERVING flip, so in-flight RPCs finish instead of being
+  cut.</li>
+</ul>
+<p>This honours the two carried-over constraints (no <code>Watch</code> on
+the servicer, no <code>healthCheckConfig</code> on the client channel) —
+the gate reads <code>Check</code> from the deploy, not client-side Watch,
+and the client fix works purely through <code>round_robin</code>
+connectivity state. It is the concrete "rolling upgrade drains
+cleanly" success criterion, extended from sf-api (phase 1) to
+the sf-database tier. Recorded here rather than as a new plan
+because it is a hardening of the health/drain model this plan
+already owns; tracked in #3430.</p>
 
 
 
