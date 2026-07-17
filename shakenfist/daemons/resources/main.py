@@ -217,11 +217,11 @@ class Monitor(daemon.Daemon):
             ksm_details = {}
             for ent in os.listdir('/sys/kernel/mm/ksm'):
                 with open('/sys/kernel/mm/ksm/%s' % ent) as f:
-                    d = f.read()
+                    d = f.read().rstrip()
                     if '\n' in d:
                         continue
                     try:
-                        ksm_details['memory_ksm_{ent}'] = int(f.read().rstrip())
+                        ksm_details[f'memory_ksm_{ent}'] = int(d)
                     except ValueError:
                         pass
             retval.update(ksm_details)
