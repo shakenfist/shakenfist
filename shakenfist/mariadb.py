@@ -350,11 +350,13 @@ def _grpc_call(method: Any, request: Any) -> Any:
     """Call a gRPC method with timeout and retry.
 
     Retries on UNAVAILABLE and DEADLINE_EXCEEDED with a short delay
-    between attempts. Resets the gRPC channel after persistent failures
-    so the next attempt gets a fresh connection. Once retries are
-    exhausted, raises exceptions.DatabaseUnavailable rather than the
-    underlying RpcError; non-retryable RpcErrors are raised as-is on
-    the first attempt.
+    between attempts. On DEADLINE_EXCEEDED it rebuilds the channel
+    between attempts to shed a wedged subchannel; on UNAVAILABLE it
+    keeps the channel so round_robin can serve the retry from a
+    surviving peer (see the per-code reasoning at the retry site).
+    Once retries are exhausted, raises exceptions.DatabaseUnavailable
+    rather than the underlying RpcError; non-retryable RpcErrors are
+    raised as-is on the first attempt.
 
     The method parameter is a bound method on the stub (e.g.
     stub.GetNode). On retry we must re-resolve the method from a
@@ -402,19 +404,36 @@ def _grpc_call(method: Any, request: Any) -> Any:
             if e.code() not in retryable_codes:
                 raise
             if attempt < GRPC_RETRIES - 1:
-                # This retry cascade can silently consume up to
+                # Whether to rebuild the channel depends on *why* we failed.
+                # DEADLINE_EXCEEDED is the wedged-subchannel signature: the
+                # transport accepted the call but cygrpc never routed it (see
+                # the wait_for_ready note above), and round_robin still
+                # believes that subchannel is READY, so a plain retry can
+                # re-pick the wedged backend -- rebuilding the channel is
+                # what sheds it. UNAVAILABLE is the opposite: the backend
+                # refused the connection or is unreachable, round_robin
+                # already knows not to route there, so we keep the channel
+                # and let a surviving peer serve the retry while the failed
+                # subchannel reconnects in the background. Rebuilding on
+                # every UNAVAILABLE was actively harmful -- it discarded a
+                # warm round_robin channel (including the healthy subchannel
+                # to a still-serving gateway) for a cold one whose own first
+                # RPC fails UNAVAILABLE too, amplifying a single gateway's
+                # rolling restart into a client-wide outage (#3430).
+                #
+                # This cascade can still silently consume up to
                 # GRPC_RETRIES * GRPC_TIMEOUT seconds of the caller's time
                 # (a DEADLINE_EXCEEDED attempt blocks for the full deadline
-                # before we get here), which has previously made wedged
-                # channels invisible in the logs while starving
-                # latency-sensitive callers. Always log each retry so a
-                # cascade is observable.
+                # before we get here), so always log each retry.
+                rebuild = e.code() == grpc.StatusCode.DEADLINE_EXCEEDED
                 LOG.warning(
                     f'gRPC {method_name or "call"} failed with '
-                    f'{e.code().name}, retrying with a fresh channel '
+                    f'{e.code().name}, retrying'
+                    f'{" with a fresh channel" if rebuild else ""} '
                     f'(attempt {attempt + 1} of {GRPC_RETRIES})')
                 time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
-                _reset_database_stub()
+                if rebuild:
+                    _reset_database_stub()
         except ValueError as e:
             if 'closed channel' not in str(e):
                 raise
