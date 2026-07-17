@@ -117,3 +117,29 @@ class DatabaseHealthLoopTestCase(base.ShakenFistTestCase):
             mock_reach.assert_not_called()
 
         self.assertIsNone(m._last_health_status)
+
+
+class DatabaseDrainTestCase(base.ShakenFistTestCase):
+    def test_health_flips_to_not_serving_before_stop(self):
+        # The ordering is the invariant: NOT_SERVING must be reported
+        # before server.stop() starts refusing new RPCs, so external
+        # Check-based monitoring (and the deploy's gateway-health roll
+        # gate) sees the drain. A shared parent mock records the two
+        # collaborators' calls in a single sequence.
+        parent = mock.Mock()
+        server = parent.server
+        health_servicer = parent.health_servicer
+
+        database_main.drain_and_stop(server, health_servicer)
+
+        self.assertEqual(
+            parent.mock_calls[0],
+            mock.call.health_servicer.set(
+                '', health_pb2.HealthCheckResponse.NOT_SERVING))
+        self.assertEqual(
+            parent.mock_calls[1],
+            mock.call.server.stop(
+                database_main.config.DATABASE_DRAIN_GRACE))
+
+        # And the drain is waited on, not fire-and-forget.
+        server.stop.return_value.wait.assert_called_once_with()

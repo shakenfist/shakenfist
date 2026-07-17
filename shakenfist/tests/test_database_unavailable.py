@@ -60,6 +60,62 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
             FakeRpcError, mariadb._grpc_call, method, mock.MagicMock())
         self.assertEqual(1, method.call_count)
 
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_unavailable_retry_keeps_the_channel(
+            self, mock_stub, mock_reset, mock_time):
+        # An UNAVAILABLE means the backend is unreachable and round_robin
+        # already routes around it, so the retry must reuse the warm channel
+        # rather than discard it for a cold one (#3430). A rebuild here would
+        # amplify a single gateway's restart into a client-wide outage.
+        method = mock.MagicMock(
+            side_effect=[FakeRpcError(grpc.StatusCode.UNAVAILABLE), 'ok'])
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        self.assertEqual('ok', mariadb._grpc_call(method, mock.MagicMock()))
+        self.assertEqual(2, method.call_count)
+        mock_reset.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_deadline_exceeded_retry_rebuilds_the_channel(
+            self, mock_stub, mock_reset, mock_time):
+        # A DEADLINE_EXCEEDED is the wedged-subchannel signature: round_robin
+        # still thinks the subchannel is READY, so the channel must be rebuilt
+        # to shed it before the retry.
+        method = mock.MagicMock(
+            side_effect=[
+                FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED), 'ok'])
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        self.assertEqual('ok', mariadb._grpc_call(method, mock.MagicMock()))
+        self.assertEqual(2, method.call_count)
+        mock_reset.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_mixed_retry_sequence_rebuilds_only_for_deadline(
+            self, mock_stub, mock_reset, mock_time):
+        # The rebuild decision is per attempt, not per call: an UNAVAILABLE
+        # followed by a DEADLINE_EXCEEDED must keep the warm channel for the
+        # first retry and rebuild exactly once for the deadline attempt.
+        method = mock.MagicMock(
+            side_effect=[
+                FakeRpcError(grpc.StatusCode.UNAVAILABLE),
+                FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED),
+                'ok'])
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        self.assertEqual('ok', mariadb._grpc_call(method, mock.MagicMock()))
+        self.assertEqual(3, method.call_count)
+        mock_reset.assert_called_once()
+
     @mock.patch('shakenfist.mariadb._grpc_call',
                 side_effect=exceptions.DatabaseUnavailable('down'))
     @mock.patch('shakenfist.mariadb._get_database_stub')

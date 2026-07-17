@@ -277,9 +277,12 @@ automatically.
 ### Client behaviour during an outage
 
 When a daemon cannot reach any `sf-database` instance, its gRPC calls
-retry up to three times on UNAVAILABLE / DEADLINE_EXCEEDED (resetting the
-channel between attempts) and then raise
-`shakenfist.exceptions.DatabaseUnavailable`. This is deliberately distinct
+retry up to three times on UNAVAILABLE / DEADLINE_EXCEEDED and then raise
+`shakenfist.exceptions.DatabaseUnavailable`. The gRPC channel is only
+rebuilt between attempts on DEADLINE_EXCEEDED (the wedged-subchannel
+signature); on UNAVAILABLE the warm round_robin channel is kept so a
+surviving gateway can serve the retry while the failed one reconnects in
+the background. This is deliberately distinct
 from the "object not found" return values the client library uses for
 genuinely missing objects, so code never mistakes an outage for a missing
 object and, for example, cleans up something that still exists.
@@ -299,6 +302,33 @@ What an operator sees during an outage:
 
 Recovery is automatic once an `sf-database` instance is reachable again;
 no daemon restarts are required.
+
+### Rolling restarts of the database tier
+
+The deployer restarts database-tier nodes one at a time (`serial: 1`),
+and three mechanisms cooperate so cluster clients ride through the roll
+without a visible outage:
+
+- **Graceful drain on stop.** When `sf-database` receives a stop it flips
+  its health status to `NOT_SERVING`, stops accepting new RPCs, and then
+  lets in-flight RPCs finish for up to `DATABASE_DRAIN_GRACE` seconds
+  (default 10) before forcing the server down. The grace is a cap, not a
+  fixed delay — shutdown proceeds as soon as the last in-flight call
+  ends. If you raise it, keep it comfortably below the systemd unit's
+  `TimeoutStopSec` (30s) or systemd will SIGKILL the daemon mid-drain.
+- **A health gate before the next node restarts.** After (re)starting
+  `sf-database` the deploy runs `sf-ctl gateway-health` (see
+  [gateway-health](#gateway-health) below) and retries until the gateway
+  reports `SERVING`, so the next node in the roll is never taken down
+  while this one is only half-up (listening on its port but unable to
+  reach MariaDB yet).
+- **A settle pause so clients reconnect.** Once the gateway is healthy,
+  the deploy pauses for `sf_database_roll_settle_seconds` (an Ansible
+  variable, default 10) before moving to the next node. Cluster clients
+  re-establish their round_robin subchannel to the recovered gateway on
+  their own reconnect backoff; without the pause, the next restart could
+  briefly leave a client with no READY backend at all. The pause is
+  skipped on idempotent no-op deploys that did not restart anything.
 
 ## Administrative Commands
 
@@ -337,6 +367,26 @@ any env-var prefix:
 ```bash
 sf-ctl initialise-node --node-name sf-2 --node-mesh-ip 10.0.0.2
 ```
+
+### gateway-health
+
+Checks that an `sf-database` gateway reports `SERVING` via the standard
+`grpc.health.v1/Check` RPC, exiting zero on `SERVING` and non-zero
+otherwise. On `sf-database`, `SERVING` means MariaDB is reachable and the
+schema was current at startup — a stronger signal than the port merely
+accepting connections. By default it probes this node's own gateway
+(`NODE_MESH_IP`):
+
+```bash
+sf-ctl gateway-health
+sf-ctl gateway-health --host 10.0.0.2 --timeout 5
+```
+
+This is the health gate the deploy's serial rolling restart waits on
+before moving to the next database-tier node (see
+[Rolling restarts of the database tier](#rolling-restarts-of-the-database-tier)
+above). It is equivalent to a `grpc-health-probe` against port 13005, but
+needs no extra binary installed on the node.
 
 ### register-daemon
 

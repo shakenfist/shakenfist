@@ -5179,6 +5179,29 @@ class Monitor(daemon.WorkerPoolDaemon):
             self.check_daemon_state()
 
 
+def drain_and_stop(server: Any, health_servicer: Any) -> None:
+    """Drain in-flight RPCs and stop the gRPC server on shutdown.
+
+    The ordering here is the load-bearing invariant: health flips to
+    NOT_SERVING *before* the server stops accepting calls, so external
+    Check-based monitoring (including the deploy's gateway-health roll
+    gate) sees the drain rather than an abrupt disappearance. SF's own
+    clients fail over via connectivity state and keepalives, not the
+    health protocol.
+    """
+    health_servicer.set('', health_pb2.HealthCheckResponse.NOT_SERVING)
+
+    # Graceful drain: stop accepting new RPCs but let the in-flight ones
+    # finish (up to DATABASE_DRAIN_GRACE seconds) rather than cutting them
+    # at one second. SF clients fail over via round_robin, but an in-flight
+    # RPC on this gateway that gets cut mid-call still surfaces on the
+    # client as a spurious UNAVAILABLE / CANCELLED -- exactly the per-deploy
+    # noise #3430 is about. The grace is a cap, not a fixed delay: stop()
+    # returns as soon as the last in-flight call ends, and it stays below
+    # the unit's TimeoutStopSec (30s) so systemd never SIGKILLs mid-drain.
+    server.stop(config.DATABASE_DRAIN_GRACE).wait()
+
+
 def main() -> None:
     util_exceptions.install_exception_tracking()
     daemon.write_pid_file('database')
@@ -5295,12 +5318,6 @@ def main() -> None:
 
     m.run()
 
-    # Flip the health status to NOT_SERVING so external Check-based
-    # monitoring sees the drain before sf-database stops accepting
-    # requests. SF's own clients fail over via connectivity state and
-    # keepalives, not the health protocol.
-    health_servicer.set('', health_pb2.HealthCheckResponse.NOT_SERVING)
-
-    server.stop(1).wait()
+    drain_and_stop(server, health_servicer)
 
     daemon.force_clean_exit()
