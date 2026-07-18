@@ -9791,34 +9791,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/scheduler/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Scheduler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../operator_guide/threads/" class="md-nav__link">
         
   
@@ -9999,9 +9971,14 @@ The full design rationale is in
 <code>docs/plans/PLAN-code-review-tracking.md</code>.</p>
 <p>The automation lives in this repository:
 <code>scripts/review-tracking.py</code> (subcommands <code>stamp</code>, <code>prune</code>, <code>regen</code>,
-and <code>next</code>) exposed as pre-commit hooks by <code>.pre-commit-hooks.yaml</code>
-at the repository root, with tests in
-<code>scripts/test_review_tracking.py</code>.</p>
+and <code>next</code>), with tests in <code>scripts/test_review_tracking.py</code>. It is
+run by hand -- deliberately not from git hooks. An earlier iteration
+wired <code>stamp</code> and <code>prune</code> into the pre-commit, post-merge,
+post-checkout, and post-rewrite hooks, but review state silently
+changing in the middle of unrelated git operations proved more
+confusing than helpful. Target repositories carry a thin wrapper
+(for example ryll's <code>tools/review-tracking.sh</code>) that locates a
+local clone of this repository and passes through to the script.</p>
 <h2 id="the-pieces">The pieces<a class="headerlink" href="#the-pieces" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>weAudit</strong> (<code>trailofbits.weaudit</code> on the VSCode marketplace)
@@ -10015,7 +9992,7 @@ at the repository root, with tests in
   "who reviewed what, when, at which content version" needs
   nothing beyond git.</li>
 <li><strong>A sidecar file</strong> (<code>.vscode/&lt;username&gt;.weaudit-shas.json</code>,
-  written by the <code>review-stamp</code> hook, never by weAudit) records the
+  written by the <code>stamp</code> subcommand, never by weAudit) records the
   blob SHA and date of each review so staleness is a mechanical
   check, and a generated <strong><code>REVIEWS.md</code></strong> surfaces the review state
   to people who do not know to look in <code>.vscode/</code>.</li>
@@ -10073,34 +10050,18 @@ at the repository root, with tests in
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">&#39;*_pb2.py&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;vendor/*&#39;</span><span class="p">]</span>
 </code></pre></div>
 <ol>
-<li>Wire the repo's <code>.pre-commit-config.yaml</code> to the shared hooks
-   and make plain <code>pre-commit install</code> set up all the needed hook
-   types:</li>
-</ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">default_install_hook_types</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pre-commit</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">post-merge</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">post-checkout</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">post-rewrite</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nt">repos</span><span class="p">:</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shakenfist/development</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;pinned commit or tag&gt;</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">review-stamp</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">review-prune</span>
-</code></pre></div>
-<p>Then re-run <code>pre-commit install</code> in each clone (including the
-   review account's).</p>
-<ol>
+<li>
+<p>Add a thin wrapper (e.g. <code>tools/review-tracking.sh</code>, copied
+   from ryll) that locates a local clone of this repository --
+   <code>$SHAKENFIST_DEVELOPMENT</code>, then a sibling <code>../development</code>,
+   then <code>~/src/shakenfist/development</code> -- and passes its arguments
+   through to <code>scripts/review-tracking.py</code>.</p>
+</li>
 <li>
 <p>Bootstrap existing review marks, if any were made before the
-   hooks were wired up -- and do it <strong>in the same commit as the
-   wiring</strong>. The stamp hook is <code>always_run</code>: once active, the next
-   commit by <em>anyone</em> stamps every unstamped mark at the file's
-   current content, whether or not that content is what was
-   reviewed. A stale pre-existing mark would be silently blessed.
-   So, as part of the wiring commit:</p>
+   tooling was adopted. A stale pre-existing mark must not be
+   blessed: <code>stamp</code> records whatever content the file has <em>now</em>,
+   whether or not that is what was reviewed. So:</p>
 </li>
 <li>
 <p>For each pre-existing mark, check the file is unchanged since
@@ -10110,16 +10071,16 @@ at the repository root, with tests in
 <li>
 <p>Run the stamp by hand, and correct the recorded dates to the
      true review dates (a fresh stamp records today):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>&lt;development-clone&gt;/scripts/review-tracking.py stamp
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a># fix dates in .vscode/&lt;user&gt;.weaudit-shas.json if needed
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>&lt;development-clone&gt;/scripts/review-tracking.py regen
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>./tools/review-tracking.sh stamp
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a># fix dates in .vscode/&lt;user&gt;.weaudit-shas.json if needed
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>./tools/review-tracking.sh regen
 </code></pre></div>
 </li>
 <li>
 <p>Delete any hand-maintained REVIEWS.md; the generated file
      replaces it.</p>
 </li>
-<li>Commit the wiring, corrected weAudit state, sidecar, and
+<li>Commit the wrapper, corrected weAudit state, sidecar, and
      REVIEWS.md together (signed).</li>
 </ol>
 <h2 id="the-review-account">The review account<a class="headerlink" href="#the-review-account" title="Permanent link">&para;</a></h2>
@@ -10141,16 +10102,16 @@ and every signature is recorded in the Rekor transparency log --
 which gives each review attestation an independent public
 timestamp as a side effect.</p>
 <p>Setup in the review account:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git config --global commit.gpgsign true
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>git config --global gpg.format x509
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>git config --global gpg.x509.program gitsign
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git config --global commit.gpgsign true
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git config --global gpg.format x509
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>git config --global gpg.x509.program gitsign
 </code></pre></div>
 <p>Verification, from any account with gitsign installed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>gitsign verify \
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    --certificate-identity=mikal@stillhq.com \
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    --certificate-oidc-issuer=https://github.com/login/oauth \
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    &lt;sha&gt;
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>git log --show-signature -- .vscode/   # with the config above
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>gitsign verify \
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    --certificate-identity=mikal@stillhq.com \
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    --certificate-oidc-issuer=https://github.com/login/oauth \
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    &lt;sha&gt;
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>git log --show-signature -- .vscode/   # with the config above
 </code></pre></div>
 <p>Note that GitHub's web UI shows gitsign commits as "Unverified"
 (reason <code>bad_cert</code>): GitHub cannot validate Fulcio's short-lived
@@ -10171,8 +10132,8 @@ covers, which imposes three rules:</p>
    pulling or rebasing, so the marking commit's tree reflects the
    reviewed state:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git add .vscode/*.weaudit*
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>git commit    # signed, with a &quot;reviewed N files&quot; style message
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git add .vscode/*.weaudit*
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git commit    # signed, with a &quot;reviewed N files&quot; style message
 </code></pre></div>
 <ol>
 <li><strong>Never rewrite history</strong> on the branch carrying review state
@@ -10180,15 +10141,18 @@ covers, which imposes three rules:</p>
 </ol>
 <p>A session therefore looks like:</p>
 <ol>
-<li><code>git pull</code> on a clean tree. The prune hook fires, discards
-   marks for files changed since their review, and regenerates
-   <code>REVIEWS.md</code>. Anything it pruned is a good candidate work
-   queue for the session. If VSCode was already open, reload the
-   window (or toggle the weAudit tree view) so the ticks refresh
-   -- weAudit does not watch its state file for external changes.</li>
-<li>Pick a file:</li>
+<li><code>git pull</code> on a clean tree, then:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>~/src/shakenfist/development/scripts/review-tracking.py next
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>./tools/review-tracking.sh prune
+</code></pre></div>
+<p>discards marks for files changed since their review and
+   regenerates <code>REVIEWS.md</code>. Anything it pruned is a good
+   candidate work queue for the session. If VSCode was already
+   open, reload the window (or toggle the weAudit tree view) so
+   the ticks refresh -- weAudit does not watch its state file for
+   external changes.
+2. Pick a file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>./tools/review-tracking.sh next
 </code></pre></div>
 <p>picks a random unreviewed in-scope file and opens it in VSCode
    (<code>--no-open</code> to just print it).
@@ -10197,47 +10161,47 @@ covers, which imposes three rules:</p>
 4. Mark it reviewed (<code>weAudit: Mark File as Reviewed</code>), attach
    findings or notes as needed.
 5. Repeat from 2. At the end of the session:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>git add .vscode/*.weaudit
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>git commit
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>./tools/review-tracking.sh stamp
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>git add .vscode/*.weaudit* REVIEWS.md
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>git commit
 </code></pre></div>
-<p>The stamp hook records each newly reviewed file's blob SHA and
-   date in the sidecar, regenerates <code>REVIEWS.md</code>, and fails this
-   first commit attempt asking you to stage those updates; do the
-   <code>git add</code> it suggests and re-run the commit. The (signed)
-   commit that lands contains the marks, the stamps, and the
-   regenerated <code>REVIEWS.md</code> together.</p>
+<p>The stamp records each newly reviewed file's blob SHA and date
+   in the sidecar and regenerates <code>REVIEWS.md</code>, printing exactly
+   what to <code>git add</code>. The (signed) commit that lands contains the
+   marks, the stamps, and the regenerated <code>REVIEWS.md</code> together.</p>
 <h2 id="staleness">Staleness<a class="headerlink" href="#staleness" title="Permanent link">&para;</a></h2>
 <p>A review applies to the file content that was read, not the path:
 once the file changes, that review is stale and the file should be
 treated as unreviewed. weAudit does not track this -- a stale tick
 looks identical to a fresh one.</p>
-<p>The hooks make staleness automatic: <code>review-stamp</code> records each
-reviewed file's blob SHA in the sidecar at commit time, and
-<code>review-prune</code> (at the post-merge, post-checkout, and post-rewrite
-stages) discards any mark -- whole-file or region -- whose stamped
-SHA no longer matches <code>HEAD</code>, regenerating <code>REVIEWS.md</code> to match.
-Region marks are pruned wholesale with the file: line ranges shift
-as files change, so a partial review of a changed file is not
-trusted either. See the plan for the full design, including why
-the stamps live in a sidecar rather than in weAudit's own JSON.</p>
-<p>Two behaviours worth knowing about:</p>
+<p>The tooling makes staleness a mechanical check: <code>stamp</code> records
+each reviewed file's blob SHA in the sidecar, and <code>prune</code> discards
+any mark -- whole-file or region -- whose stamped SHA no longer
+matches <code>HEAD</code>, regenerating <code>REVIEWS.md</code> to match. Region marks
+are pruned wholesale with the file: line ranges shift as files
+change, so a partial review of a changed file is not trusted
+either. Because nothing runs automatically, pruning is part of the
+session discipline: run it after every pull (and after any merge
+or rebase in a clone carrying review state). See the plan for the
+full design, including why the stamps live in a sidecar rather
+than in weAudit's own JSON.</p>
+<p>Three behaviours worth knowing about:</p>
 <ul>
-<li>The prune hook fires on <em>any</em> checkout in a clone with the hook
-  types installed -- including switching to an old branch in a
-  development clone, where files legitimately differ from their
-  stamped SHAs. The prune is correct there too (those reviews do
-  not apply to that content), but if it surprises you, <code>git
-  restore .vscode/ REVIEWS.md</code> puts the state back.</li>
+<li>Prune compares against whatever <code>HEAD</code> currently is -- run it
+  with an old branch checked out and it will (correctly, but
+  perhaps surprisingly) discard reviews of files that differ
+  there. If that was not what you meant, <code>git restore .vscode/
+  REVIEWS.md</code> puts the state back.</li>
 <li>A stamped entry is never re-stamped while it exists: if a
   reviewed file changes, the only path forward is prune then
   re-review. This is what prevents a stale review being silently
   refreshed at the file's current content.</li>
 <li>When every file in a directory is reviewed, weAudit adds a
   derived <em>directory</em> entry to <code>auditedFiles</code> alongside the
-  per-file entries. The hooks treat these as pure UI state: they
-  are never stamped or listed in <code>REVIEWS.md</code>, and prune removes
-  them when a file inside stops being reviewed (mirroring what
-  weAudit itself does when a file is unmarked in its UI).</li>
+  per-file entries. The tooling treats these as pure UI state:
+  they are never stamped or listed in <code>REVIEWS.md</code>, and prune
+  removes them when a file inside stops being reviewed (mirroring
+  what weAudit itself does when a file is unmarked in its UI).</li>
 </ul>
 
 
