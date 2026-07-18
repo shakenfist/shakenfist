@@ -241,7 +241,7 @@ searchable from one place.
 
 | Phase | Repo | Plan | Status |
 |-------|------|------|--------|
-| 1. Shared visual-digest crate | new (`shakenfist-visual-digest`) | [PLAN-test-harness-phase-01-digest-crate.md](/components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/) | Implementation complete; Sextant PR pending operator |
+| 1. Shared visual-digest crate | new (`shakenfist-visual-digest`) | [PLAN-test-harness-phase-01-digest-crate.md](/components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/) | Merged (Sextant PR #1, 2026-06-04) |
 | 2. Static source driver | kerbside | [PLAN-test-harness-phase-02-static-hypervisor.md](/components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/) | Merged |
 | 3. Control socket on Ryll | ryll | [PLAN-test-harness-phase-03-control-socket.md](/components/kerbside/plans/PLAN-test-harness-phase-03-control-socket/) | Merged to ryll develop |
 | 4. Port latency loadtest to control socket and remove legacy `testclient/ryll/` | kerbside | [PLAN-test-harness-phase-04-port-latency.md](/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/) | Merged |

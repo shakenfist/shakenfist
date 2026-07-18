@@ -9,9 +9,12 @@ These settings must be changed in the GitHub web interface:
 
 ### Security settings (Settings > Code security and analysis)
 
-- [ ] Enable Dependabot security updates
-- [ ] Enable Secret scanning
-- [ ] Enable Secret scanning push protection
+- [x] Enable Dependabot security updates (verified enabled via the
+      GitHub API, 2026-07-18)
+- [x] Enable Secret scanning (verified enabled via the GitHub API,
+      2026-07-18)
+- [x] Enable Secret scanning push protection (verified enabled via
+      the GitHub API, 2026-07-18)
 
 ### Repository settings (Settings > General)
 
