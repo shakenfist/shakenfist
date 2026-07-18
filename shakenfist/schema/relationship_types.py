@@ -141,3 +141,9 @@ class RelationshipType(str, Enum):
 
     # Node -> Blob relationships
     BLOB_LOCATION = RelationshipTypeValue(string='blob_location', proto_id=7)
+
+    # Node -> Instance relationships. The source is keyed by node UUID
+    # (as a string), not fqdn: the fqdn keying of BLOB_LOCATION rows is
+    # a legacy of the pre-UUID node identity and should not be copied.
+    INSTANCE_LOCATION = RelationshipTypeValue(
+        string='instance_location', proto_id=8)

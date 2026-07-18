@@ -92,6 +92,19 @@ Authorized users can trigger automation by commenting on PRs:
 - Trim trailing whitespace
 - See [CLAUDE.md](CLAUDE.md) for detailed style guide
 
+### Attribute updates use field masks
+
+The `update_*_attributes` functions in `shakenfist/mariadb.py` require a
+`fields` argument naming exactly the model fields the caller changed;
+only those columns are written to MariaDB. `fields=None` (write every
+column) is reserved for row creation and pydantic-upgrade persistence.
+An unmasked update is a cross-attribute lost update waiting to happen:
+it pushes a stale snapshot of the other columns over concurrent
+writers' committed changes. Relational data (like instance placement)
+belongs in a table with per-row inserts and deletes — see the
+`instance_location` rows in `object_references` — never in a JSON list
+on an attributes row.
+
 ### Events vs logs
 
 Shaken Fist has two structured-record streams; choose the right

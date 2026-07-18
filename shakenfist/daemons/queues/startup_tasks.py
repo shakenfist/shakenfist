@@ -165,12 +165,28 @@ def restore_instances():
             inst.etcd.enqueue_delete_due_error(
                 'exception while restoring instance on daemon restart')
 
-    # Ensure we have a cache of the instances on this machine
-    instance_uuids = []
-    for inst in instances:
-        instance_uuids.append(inst.uuid)
+    # Reconcile the recorded instance placements for this node: add any
+    # missing INSTANCE_LOCATION references, and remove stale ones. The
+    # restore work above can take many minutes, so the instances list
+    # gathered at its start is a stale snapshot -- before removing a
+    # reference, re-check the instance's authoritative placement so a
+    # concurrently placed instance is never unrecorded.
+    desired = {str(inst.uuid) for inst in instances}
     n = Node.from_db(config.NODE_NAME)
-    n.instances = instance_uuids
+    current = set(n.instances)
+
+    for instance_uuid in desired - current:
+        n.add_instance(instance_uuid)
+
+    for instance_uuid in current - desired:
+        inst = instance.Instance.from_db(instance_uuid)
+        if inst:
+            placement = inst.placement
+            if (placement.get('node') == str(n.uuid) and
+                    inst.state.value not in instance.Instance.TERMINAL_STATES):
+                # Placed here after our snapshot was taken; keep it.
+                continue
+        n.remove_instance(instance_uuid)
 
 
 def _restore_instances_in_background():

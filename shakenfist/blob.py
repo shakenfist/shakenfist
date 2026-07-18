@@ -341,7 +341,7 @@ class Blob(dbo):
             last_used=attrs.last_used,
             expires_at=attrs.expires_at
         )
-        mariadb.update_blob_attributes(new_attrs)
+        mariadb.update_blob_attributes(new_attrs, fields=['size'])
         self.__attributes = new_attrs
 
     @property
@@ -567,7 +567,7 @@ class Blob(dbo):
             last_used=attrs.last_used,
             expires_at=expires
         )
-        mariadb.update_blob_attributes(new_attrs)
+        mariadb.update_blob_attributes(new_attrs, fields=['expires_at'])
         self.__attributes = new_attrs
 
     # Operations
@@ -607,7 +607,7 @@ class Blob(dbo):
                 last_used=attrs.last_used,
                 expires_at=attrs.expires_at
             )
-            mariadb.update_blob_attributes(new_attrs)
+            mariadb.update_blob_attributes(new_attrs, fields=['info'])
             self.__attributes = new_attrs
 
     def cascading_delete(self) -> None:

@@ -179,7 +179,8 @@ OBJECT_STATES_VERSION = 3
 IPAM_RESERVATIONS_VERSION = 2
 UPLOADS_VERSION = 2
 DNSMASQ_VERSION = 2
-OBJECT_REFERENCES_VERSION = 2
+# v3: seed INSTANCE_LOCATION references from node_attributes.instances
+OBJECT_REFERENCES_VERSION = 3
 BLOBS_VERSION = 2
 BLOB_HASHES_VERSION = 2
 BLOB_TRANSFERS_VERSION = 2
@@ -2099,6 +2100,78 @@ def _get_object_references_table() -> sa.Table:
     return _object_references_table
 
 
+def _migrate_instance_locations_from_node_attributes(
+        engine: sa.Engine) -> tuple[int, int]:
+    """Seed INSTANCE_LOCATION references from node_attributes.instances.
+
+    Idempotent: _direct_record_relationship upserts on the primary
+    key, so re-running on an already-migrated cluster is a no-op. The
+    JSON column is left in place as a rollback fallback; it is dropped
+    in a later schema bump once nothing reads it.
+
+    Rows for deleted or errored nodes are skipped: those nodes never
+    run the queues-daemon reconciliation, so their stale list entries
+    (residue of the lost-update bug this migration cleans up after)
+    would otherwise become permanent phantom references.
+
+    Corrupt (non-list) instances values are logged and skipped without
+    counting as errors -- they are unmigratable and must not block the
+    version stamp forever. The errors count only reflects retryable
+    write failures; the caller declines to stamp the schema version
+    when it is non-zero so a re-run retries them.
+
+    Returns ``(migrated, errors)``.
+    """
+    if not sa.inspect(engine).has_table('node_attributes'):
+        # Databases created before node_attributes existed have no
+        # legacy placement data to seed. (Table ensure ordering runs
+        # object_references before node_attributes.)
+        LOG.info('node_attributes table absent, nothing to migrate')
+        return 0, 0
+
+    src = _get_node_attributes_table()
+    migrated = 0
+    errors = 0
+
+    with engine.connect() as conn:
+        rows = conn.execute(
+            sa.select(src.c.uuid, src.c.instances)).fetchall()
+
+    for row in rows:
+        instances = row.instances or []
+        if not isinstance(instances, list):
+            LOG.warning(
+                f'Skipping corrupt (non-list) instances value on node '
+                f'{row.uuid}')
+            continue
+        if not instances:
+            continue
+
+        node_state = _direct_get_state(ObjectType.NODE, str(row.uuid))
+        if node_state and node_state.value in ('deleted', 'error'):
+            LOG.info(
+                f'Skipping instance locations for node {row.uuid} in '
+                f'state {node_state.value}')
+            continue
+
+        for instance_uuid in instances:
+            try:
+                if _direct_record_relationship(
+                        ObjectType.NODE, str(row.uuid),
+                        RelationshipType.INSTANCE_LOCATION, None,
+                        ObjectType.INSTANCE, str(instance_uuid)):
+                    migrated += 1
+                else:
+                    errors += 1
+            except Exception as e:
+                LOG.warning(
+                    f'Failed to migrate instance location '
+                    f'{row.uuid}/{instance_uuid}: {e}')
+                errors += 1
+
+    return migrated, errors
+
+
 def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
     """Ensure the object_references table schema is up to date.
 
@@ -2128,6 +2201,33 @@ def _ensure_object_references_schema(engine: sa.Engine) -> dict[str, Any]:
 
         current_ver = OBJECT_REFERENCES_VERSION
         _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        # Seed INSTANCE_LOCATION references from the legacy instances
+        # list on node_attributes. Skipped automatically on a fresh
+        # cluster because there is nothing to read. The JSON column is
+        # left in place as a rollback fallback; it is dropped in a
+        # later schema bump once nothing reads it.
+        LOG.info(
+            f'Migrating node_attributes.instances into {table_name} '
+            '(version 3)')
+        migrated, errors = _migrate_instance_locations_from_node_attributes(
+            engine)
+        LOG.info(
+            f'{table_name} migration: {migrated} row(s) copied, '
+            f'{errors} error(s)')
+        if errors:
+            # Do not stamp the version: the seeding is incomplete and
+            # must be retried. Migrations are idempotent, so the
+            # operator re-runs ensure-mariadb-schema once the write
+            # failures are resolved.
+            LOG.error(
+                f'{table_name} migration to version 3 incomplete '
+                f'({errors} error(s)); not stamping the version. '
+                'Re-run sf-ctl ensure-mariadb-schema to retry.')
+        else:
+            current_ver = 3
+            _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,
@@ -8358,11 +8458,42 @@ def _direct_get_blob_attributes(
         return None
 
 
-def _direct_update_blob_attributes(data: BlobAttributesData) -> bool:
+def _blob_attributes_column_values(
+        data: BlobAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map BlobAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. Writers setting a single attribute
+    must name it so a full-row write here cannot revert a concurrent
+    update_blob_last_used column write.
+    """
+    all_values: Dict[str, Any] = {
+        'size': data.size,
+        'info': data.info,
+        'last_used': data.last_used,
+        'expires_at': data.expires_at,
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown blob attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
+def _direct_update_blob_attributes(
+        data: BlobAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
     """Update blob attributes in MariaDB.
 
     Args:
         data: The BlobAttributesData with updated values.
+        fields: The model field names to write. None or empty writes
+            every column. See _blob_attributes_column_values for why
+            single-attribute writers must pass their field name.
 
     Returns:
         True if a row was updated, False otherwise.
@@ -8375,11 +8506,7 @@ def _direct_update_blob_attributes(data: BlobAttributesData) -> bool:
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                size=data.size,
-                info=data.info,
-                last_used=data.last_used,
-                expires_at=data.expires_at
-            )
+                **_blob_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -8609,8 +8736,15 @@ def _grpc_get_blob_attributes(blob_uuid: UUID) -> Optional[BlobAttributesData]:
         return None
 
 
-def _grpc_update_blob_attributes(data: BlobAttributesData) -> bool:
-    """Update blob attributes via the database microservice."""
+def _grpc_update_blob_attributes(
+        data: BlobAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update blob attributes via the database microservice.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _blob_attributes_column_values for why
+    single-attribute writers must pass their field name.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateBlobAttributesRequest(
@@ -8621,7 +8755,8 @@ def _grpc_update_blob_attributes(data: BlobAttributesData) -> bool:
                 last_used=data.last_used if data.last_used is not None else 0,
                 has_last_used=data.last_used is not None,
                 expires_at=data.expires_at
-            )
+            ),
+            fields=fields or []
         )
         reply = _grpc_call(stub.UpdateBlobAttributes, request)
         return bool(reply.success)
@@ -8720,18 +8855,30 @@ def get_blob_attributes(blob_uuid: UUID) -> Optional[BlobAttributesData]:
     return _direct_get_blob_attributes(blob_uuid)
 
 
-def update_blob_attributes(data: BlobAttributesData) -> bool:
+def update_blob_attributes(
+        data: BlobAttributesData,
+        fields: Optional[List[str]]) -> bool:
     """Update blob attributes.
 
     Args:
         data: The BlobAttributesData with updated values.
+        fields: The model field names to write. This argument is
+            deliberately required: callers must name exactly the
+            fields they changed so a full-row write cannot revert a
+            concurrent update_blob_last_used column write. Passing
+            None writes every column and is reserved for row creation
+            and upgrade persistence.
 
     Returns:
         True if updated successfully, False otherwise.
     """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _blob_attributes_column_values(data, fields)
     if _use_database_service():
-        return _grpc_update_blob_attributes(data)
-    return _direct_update_blob_attributes(data)
+        return _grpc_update_blob_attributes(data, fields=fields)
+    return _direct_update_blob_attributes(data, fields=fields)
 
 
 def update_blob_last_used(blob_uuid: UUID, last_used: float) -> bool:
@@ -9383,10 +9530,57 @@ def _direct_get_node_attributes(
         return None
 
 
+def _node_attributes_column_values(
+        data: NodeAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map NodeAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. Writers setting a single attribute
+    must name it so concurrent writers of other attributes on the same
+    row cannot lose their updates to this writer's read-modify-write
+    (the sentinels' 15-second observe_this_node write reverting a
+    concurrent add_instance was observed as a scheduler affinity
+    failure in CI).
+    """
+    all_values: Dict[str, Any] = {
+        'last_seen': data.last_seen,
+        'installed_version': data.installed_version,
+        'is_etcd_master': data.is_etcd_master,
+        'is_hypervisor': data.is_hypervisor,
+        'is_network_node': data.is_network_node,
+        'is_eventlog_node': data.is_eventlog_node,
+        'is_database_node': data.is_database_node,
+        'instances': data.instances,
+        'daemons': data.daemons,
+        'daemon_states': data.daemon_states,
+        'qemu_version': data.qemu_version,
+        'libvirt_version': data.libvirt_version,
+        'python_version': data.python_version,
+        'python_implementation': data.python_implementation,
+        'dependency_versions': data.dependency_versions,
+        'process_metrics': data.process_metrics,
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown node attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
 def _direct_update_node_attributes(
     data: NodeAttributesData,
+    fields: Optional[List[str]] = None,
 ) -> bool:
-    """Update node attributes in MariaDB."""
+    """Update node attributes in MariaDB.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _node_attributes_column_values for why
+    single-attribute writers must pass their field name.
+    """
     engine = _get_engine()
     table = _get_node_attributes_table()
 
@@ -9395,27 +9589,7 @@ def _direct_update_node_attributes(
             stmt = sa.update(table).where(
                 table.c.uuid == data.uuid
             ).values(
-                last_seen=data.last_seen,
-                installed_version=data.installed_version,
-                is_etcd_master=data.is_etcd_master,
-                is_hypervisor=data.is_hypervisor,
-                is_network_node=data.is_network_node,
-                is_eventlog_node=data.is_eventlog_node,
-                is_database_node=data.is_database_node,
-                instances=data.instances,
-                daemons=data.daemons,
-                daemon_states=data.daemon_states,
-                qemu_version=data.qemu_version,
-                libvirt_version=data.libvirt_version,
-                python_version=data.python_version,
-                python_implementation=(
-                    data.python_implementation
-                ),
-                dependency_versions=(
-                    data.dependency_versions
-                ),
-                process_metrics=data.process_metrics,
-            )
+                **_node_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -9760,12 +9934,19 @@ def _grpc_get_node_attributes(
 
 def _grpc_update_node_attributes(
     data: NodeAttributesData,
+    fields: Optional[List[str]] = None,
 ) -> bool:
-    """Update node attributes via the database service."""
+    """Update node attributes via the database service.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _node_attributes_column_values for why
+    single-attribute writers must pass their field name.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateNodeAttributesRequest(
-            data=_node_attrs_to_proto(data)
+            data=_node_attrs_to_proto(data),
+            fields=fields or []
         )
         reply = _grpc_call(stub.UpdateNodeAttributes, request)
         return bool(reply.success)
@@ -10038,18 +10219,32 @@ def get_node_attributes(
 
 def update_node_attributes(
     data: NodeAttributesData,
+    fields: Optional[List[str]],
 ) -> bool:
     """Update node attributes.
 
     Args:
         data: The NodeAttributesData with updated values.
+        fields: The model field names to write. This argument is
+            deliberately required: callers must name exactly the
+            fields they changed so concurrent writers of other
+            attributes on the same row (the sentinels' 15-second
+            observe_this_node writes against the API's instances
+            list updates, for example) cannot lose their committed
+            column to this writer's read-modify-write. Passing None
+            writes every column and is reserved for row creation
+            and pydantic-upgrade persistence.
 
     Returns:
         True if updated successfully, False otherwise.
     """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _node_attributes_column_values(data, fields)
     if _use_database_service():
-        return _grpc_update_node_attributes(data)
-    return _direct_update_node_attributes(data)
+        return _grpc_update_node_attributes(data, fields=fields)
+    return _direct_update_node_attributes(data, fields=fields)
 
 
 def delete_node_attributes(
@@ -10441,15 +10636,47 @@ def _direct_get_namespace_attributes(name: str) -> Optional[NamespaceAttributesD
         return None
 
 
-def _direct_update_namespace_attributes(data: NamespaceAttributesData) -> bool:
-    """Update namespace attributes in MariaDB."""
+def _namespace_attributes_column_values(
+        data: NamespaceAttributesData,
+        fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Map NamespaceAttributesData fields to their column values.
+
+    fields limits the result to the named model fields; None or an
+    empty list means every column. Writers setting a single attribute
+    must name it so concurrent writers of other attributes on the same
+    row (keys against trust, which hold different attribute locks)
+    cannot lose their updates to this writer's read-modify-write.
+    """
+    all_values: Dict[str, Any] = {
+        'keys': data.keys,
+        'trust': data.trust,
+    }
+    if not fields:
+        return all_values
+
+    unknown = set(fields) - set(all_values)
+    if unknown:
+        raise ValueError(
+            f'unknown namespace attribute fields: {sorted(unknown)}')
+    return {field: all_values[field] for field in fields}
+
+
+def _direct_update_namespace_attributes(
+        data: NamespaceAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update namespace attributes in MariaDB.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _namespace_attributes_column_values for
+    why single-attribute writers must pass their field name.
+    """
     engine = _get_engine()
     table = _get_namespace_attributes_table()
 
     try:
         with engine.connect() as conn:
             stmt = sa.update(table).where(table.c.name == data.name).values(
-                keys=data.keys, trust=data.trust)
+                **_namespace_attributes_column_values(data, fields))
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount > 0
@@ -10563,15 +10790,23 @@ def _grpc_get_namespace_attributes(name: str) -> Optional[NamespaceAttributesDat
         return None
 
 
-def _grpc_update_namespace_attributes(data: NamespaceAttributesData) -> bool:
-    """Update namespace attributes via the database service."""
+def _grpc_update_namespace_attributes(
+        data: NamespaceAttributesData,
+        fields: Optional[List[str]] = None) -> bool:
+    """Update namespace attributes via the database service.
+
+    fields is the list of model field names to write; None or empty
+    writes every column. See _namespace_attributes_column_values for
+    why single-attribute writers must pass their field name.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.UpdateNamespaceAttributesRequest(
             data=database_pb2.NamespaceAttributesProto(
                 name=data.name,
                 keys_json=_json_dumps(data.keys),
-                trust_json=_json_dumps(data.trust)))
+                trust_json=_json_dumps(data.trust)),
+            fields=fields or [])
         reply = _grpc_call(stub.UpdateNamespaceAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -10677,18 +10912,31 @@ def get_namespace_attributes(name: str) -> Optional[NamespaceAttributesData]:
     return _direct_get_namespace_attributes(name)
 
 
-def update_namespace_attributes(data: NamespaceAttributesData) -> bool:
+def update_namespace_attributes(
+        data: NamespaceAttributesData,
+        fields: Optional[List[str]]) -> bool:
     """Update namespace attributes.
 
     Args:
         data: The NamespaceAttributesData with updated values.
+        fields: The model field names to write. This argument is
+            deliberately required: callers must name exactly the
+            fields they changed so concurrent writers of other
+            attributes on the same row (keys against trust) cannot
+            lose their committed column to this writer's
+            read-modify-write. Passing None writes every column and
+            is reserved for row creation and upgrade persistence.
 
     Returns:
         True if updated successfully, False otherwise.
     """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _namespace_attributes_column_values(data, fields)
     if _use_database_service():
-        return _grpc_update_namespace_attributes(data)
-    return _direct_update_namespace_attributes(data)
+        return _grpc_update_namespace_attributes(data, fields=fields)
+    return _direct_update_namespace_attributes(data, fields=fields)
 
 
 def delete_namespace_attributes(name: str) -> bool:
@@ -11611,7 +11859,7 @@ def get_artifact_attributes(
 
 def update_artifact_attributes(
         data: ArtifactAttributesData,
-        fields: Optional[List[str]] = None) -> bool:
+        fields: Optional[List[str]]) -> bool:
     """Update artifact attributes.
 
     Args:
@@ -11625,6 +11873,10 @@ def update_artifact_attributes(
     Returns:
         True if updated successfully, False otherwise.
     """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _artifact_attributes_column_values(data, fields)
     if _use_database_service():
         return _grpc_update_artifact_attributes(data, fields=fields)
     return _direct_update_artifact_attributes(data, fields=fields)
@@ -13979,7 +14231,7 @@ def get_network_attributes(
 
 def update_network_attributes(
         data: NetworkAttributesData,
-        fields: Optional[List[str]] = None) -> bool:
+        fields: Optional[List[str]]) -> bool:
     """Update Network attributes.
 
     Args:
@@ -13995,6 +14247,10 @@ def update_network_attributes(
     Returns:
         True if updated, False if not found or error.
     """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _network_attributes_column_values(data, fields)
     if _use_database_service():
         return _grpc_update_network_attributes(data, fields=fields)
     return _direct_update_network_attributes(data, fields=fields)
@@ -15829,7 +16085,7 @@ def get_instance_attributes(
 
 def update_instance_attributes(
         data: InstanceAttributesData,
-        fields: Optional[List[str]] = None) -> bool:
+        fields: Optional[List[str]]) -> bool:
     """Update Instance attributes.
 
     Args:
@@ -15845,6 +16101,10 @@ def update_instance_attributes(
     Returns:
         True if updated, False if not found or error.
     """
+    # Validate the mask before dispatch so a bad field name raises
+    # ValueError on the gRPC path too, rather than becoming a silent
+    # StatusReply failure the caller discards.
+    _instance_attributes_column_values(data, fields)
     if _use_database_service():
         return _grpc_update_instance_attributes(data, fields=fields)
     return _direct_update_instance_attributes(data, fields=fields)

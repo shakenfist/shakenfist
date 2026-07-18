@@ -1020,6 +1020,13 @@ message GetBlobAttributesReply {
 
 message UpdateBlobAttributesRequest {
   BlobAttributesData data = 1;
+
+  // Field mask: the BlobAttributesData field names to write. An empty
+  // list means write every column. See the equivalent comment on
+  // UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents (here: a full-row expires_at or info write
+  // reverting a concurrent update_blob_last_used column write).
+  repeated string fields = 2;
 }
 
 message UpdateBlobLastUsedRequest {
@@ -1148,6 +1155,15 @@ message GetNodeAttributesReply {
 
 message UpdateNodeAttributesRequest {
   NodeAttributesProto data = 1;
+
+  // Field mask: the NodeAttributesData field names to write. An empty
+  // list means write every column. See the equivalent comment on
+  // UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents (here: the sentinels' 15-second
+  // observe_this_node full-row write reverting a concurrent
+  // add_instance, observed as scheduler affinity scoring a node zero
+  // because its instances list lost an entry).
+  repeated string fields = 2;
 }
 
 message DeleteNodeAttributesRequest {
@@ -1248,6 +1264,13 @@ message GetNamespaceAttributesReply {
 
 message UpdateNamespaceAttributesRequest {
   NamespaceAttributesProto data = 1;
+
+  // Field mask: the NamespaceAttributesData field names to write. An
+  // empty list means write every column. See the equivalent comment
+  // on UpdateInstanceAttributesRequest for the cross-attribute lost
+  // update this prevents (here: keys and trust writers clobbering
+  // each other despite holding different attribute locks).
+  repeated string fields = 2;
 }
 
 message DeleteNamespaceAttributesRequest {

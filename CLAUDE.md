@@ -386,6 +386,17 @@ Queue priorities (per-node and global):
 
 1. **Decorator order in API endpoints** - Read comments in `external_api/app.py`
 2. **Lock timeouts** - Always specify reasonable timeouts for ClusterLock
+3. **Attribute updates must pass a field mask** - The
+   `update_*_attributes` functions in `mariadb.py` require a `fields`
+   argument naming exactly the model fields the caller changed; only
+   those columns are written. Never pass `fields=None` outside row
+   creation or pydantic-upgrade persistence: an unmasked write pushes a
+   stale snapshot of every other column over concurrent writers'
+   committed changes (a cross-attribute lost update — the cause of both
+   the vanished-agent-operation flake and the scheduler-affinity CI
+   flake). Never store relational data (like "which instances are on
+   this node") as a JSON list on an attributes row; use a table with
+   per-row inserts and deletes such as `object_references`.
 4. **State machine transitions** - Follow documented state machines in
    `docs/developer_guide/state_machine.md`
 
@@ -459,6 +470,18 @@ performance. This is required for all deployments - MariaDB must be configured.
   on the same node run fully in parallel. The legacy JSON column on
   `node_attributes` is no longer read or written but remains for one
   release cycle as a rollback fallback.
+- **Instance placement** (`object_references` table): Which instances
+  are on which node is recorded as `instance_location` reference rows
+  (source: node UUID, target: instance UUID), written by
+  `Instance.place_instance()` via `Node.add_instance()` /
+  `remove_instance()`. This replaced the `instances` JSON list on
+  `node_attributes`, whose full-row read-modify-write maintenance lost
+  updates to concurrent writers (observed as scheduler affinity
+  failures in CI). For one transition release the legacy column is
+  dual-written (masked, under the `instances` lock) and unioned into
+  `Node.instances` reads, so rolling upgrades and rollback both see
+  fresh placements; column, dual-write and union all go away next
+  release.
 - **Cluster Locks** (`cluster_locks` table): Distributed locks with
   a server-side `expires_at TIMESTAMP`. Holders refresh the lease
   every ~20s while alive; if a holder dies (or is partitioned for
