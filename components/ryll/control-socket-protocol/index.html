@@ -11217,7 +11217,7 @@ completeness as a verb-reference entry.</p>
 <tr>
 <td><code>scancode</code></td>
 <td>u16</td>
-<td>The AT-set 1 scancode to send. Extended scancodes (0xE0 prefix) should be supplied as the full 16-bit value with the prefix byte in the high byte, e.g. <code>0xE04B</code> for left arrow.</td>
+<td>The AT-set 1 <strong>make</strong> code to send. Extended scancodes (0xE0 prefix) should be supplied as the full 16-bit value with the prefix byte in the high byte, e.g. <code>0xE04B</code> for left arrow.</td>
 </tr>
 <tr>
 <td><code>state</code></td>
@@ -11226,6 +11226,14 @@ completeness as a verb-reference entry.</p>
 </tr>
 </tbody>
 </table>
+<p>The server applies the AT-set 1 release encoding itself: for <code>"up"</code>
+(and the up half of <code>"press"</code>) it sets the release bit
+(<code>scancode | 0x80</code>, which for extended scancodes lands on the low
+byte, after the 0xE0 prefix) before injecting the event. Clients
+supply the make code for every state. A client that passes an
+already-encoded release code for <code>"up"</code> still works — the release
+bit is not double-applied — but this is a compatibility affordance,
+not the documented interface.</p>
 <p>Result on success: <code>{}</code></p>
 <p>Verb-specific error codes:</p>
 <table>
@@ -11782,7 +11790,7 @@ the visual-digest wire format.</p>
 <tr>
 <td><code>events</code></td>
 <td>array</td>
-<td>Decoded raw-record events from the digest, each <code>{"kind": "...", "payload": ...}</code>.</td>
+<td>Decoded raw-record events from the digest.  Each element is the <code>shakenfist-visual-digest</code> crate's <code>Event</code> enum in its serde shape: an externally-tagged, single-key object whose key is the snake_case variant name and whose value is an object of the variant's fields (see below).</td>
 </tr>
 <tr>
 <td><code>wallclock_us</code></td>
@@ -11791,13 +11799,28 @@ the visual-digest wire format.</p>
 </tr>
 </tbody>
 </table>
+<p>The <code>events</code> array is a serde pass-through of the digest crate's
+<code>Event</code> enum, not a normalised <code>{"kind": ..., "payload": ...}</code>
+envelope.  Variant names and field names are snake_case; nested
+enums such as <code>Phase</code> and <code>BootloaderChoice</code> serialise as
+snake_case strings; booleans and numbers are native JSON values.
+Observed on the wire:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>{&quot;event&quot;: &quot;digest_updated&quot;, &quot;data&quot;: {&quot;events&quot;: [
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>  {&quot;keypress&quot;: {&quot;scancode&quot;: 0, &quot;timestamp_ms&quot;: 138550, &quot;unicode&quot;: &quot;\r&quot;}},
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>  {&quot;scene_transition&quot;: {&quot;from&quot;: &quot;awaiting&quot;, &quot;timestamp_ms&quot;: 138550, &quot;to&quot;: &quot;booting&quot;}},
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>  {&quot;line_rendered&quot;: {&quot;row&quot;: 0, &quot;timestamp_ms&quot;: 138550}}
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>], &quot;frame_counter&quot;: 281, &quot;framebuffer_hash&quot;: 4022250974, &quot;wallclock_us&quot;: 1765432100000000}}
+</code></pre></div>
+<p>Clients matching on these records should treat unknown variant
+keys as forward-compatible additions and skip them.</p>
 <p>Future-work notes:</p>
 <ul>
 <li>The polling task runs on a fixed 100 ms interval.  A rate-limit knob
   (<code>--digest-min-interval-ms</code>) may be added if phase 7 needs it.</li>
-<li>The wire <code>events</code> schema is a thin pass-through of
-  <code>shakenfist-visual-digest::Record</code>.  If the digest crate ships a
-  schema-breaking v2 the protocol will need a re-cut.</li>
+<li>Because the wire <code>events</code> schema tracks
+  <code>shakenfist-visual-digest::Event</code> directly, a schema-breaking v2 of
+  the digest crate changes this event's payload and the protocol will
+  need a re-cut.</li>
 </ul>
 <hr />
 <h2 id="subscription-semantics">Subscription semantics<a class="headerlink" href="#subscription-semantics" title="Permanent link">&para;</a></h2>
@@ -11855,7 +11878,7 @@ rather than adding a second <code>dropped</code> entry.</p>
 <hr />
 <h2 id="error-model">Error model<a class="headerlink" href="#error-model" title="Permanent link">&para;</a></h2>
 <p>All error responses share the same structure:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">&lt;id&gt;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;stable_code&gt;&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;human_readable&gt;&quot;</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">&lt;id&gt;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;stable_code&gt;&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;human_readable&gt;&quot;</span><span class="p">}}</span>
 </code></pre></div>
 <p>The <code>code</code> field is a stable, machine-readable string. Do not parse
 <code>message</code> programmatically; it may change between minor versions.</p>
@@ -11958,20 +11981,20 @@ exists.</p>
 hello, status, subscribe, a latency event arriving, a key press, a
 paste with async completion, and then disconnect. Arrow direction
 indicates the sender: <code>→</code> is client-to-server, <code>←</code> is server-to-client.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>→ {&quot;id&quot;: 1, &quot;method&quot;: &quot;hello&quot;, &quot;params&quot;: {&quot;client_name&quot;: &quot;demo-client&quot;, &quot;protocol_version&quot;: &quot;1.0&quot;}}
-<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>← {&quot;id&quot;: 1, &quot;ok&quot;: true, &quot;result&quot;: {&quot;server_name&quot;: &quot;ryll&quot;, &quot;protocol_version&quot;: &quot;1.0&quot;, &quot;supported_methods&quot;: [&quot;hello&quot;, &quot;status&quot;, &quot;send_key&quot;, &quot;paste&quot;, &quot;screenshot&quot;, &quot;subscribe&quot;, &quot;unsubscribe&quot;], &quot;supported_events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;, &quot;dropped&quot;]}}
-<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>→ {&quot;id&quot;: 2, &quot;method&quot;: &quot;status&quot;, &quot;params&quot;: {}}
-<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>← {&quot;id&quot;: 2, &quot;ok&quot;: true, &quot;result&quot;: {&quot;spice_connected&quot;: true, &quot;agent_connected&quot;: true, &quot;surfaces&quot;: [{&quot;channel_id&quot;: 1, &quot;surface_id&quot;: 0, &quot;width&quot;: 1024, &quot;height&quot;: 768}]}}
-<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>→ {&quot;id&quot;: 3, &quot;method&quot;: &quot;subscribe&quot;, &quot;params&quot;: {&quot;events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;]}}
-<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>← {&quot;id&quot;: 3, &quot;ok&quot;: true, &quot;result&quot;: {&quot;subscribed&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;]}}
-<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 1.2, &quot;wallclock_us&quot;: 1717000000000100}}
-<a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>→ {&quot;id&quot;: 4, &quot;method&quot;: &quot;send_key&quot;, &quot;params&quot;: {&quot;scancode&quot;: 28, &quot;state&quot;: &quot;press&quot;}}
-<a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>← {&quot;id&quot;: 4, &quot;ok&quot;: true, &quot;result&quot;: {}}
-<a id="__codelineno-27-10" name="__codelineno-27-10" href="#__codelineno-27-10"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 1.1, &quot;wallclock_us&quot;: 1717000002000200}}
-<a id="__codelineno-27-11" name="__codelineno-27-11" href="#__codelineno-27-11"></a>→ {&quot;id&quot;: 5, &quot;method&quot;: &quot;paste&quot;, &quot;params&quot;: {&quot;text&quot;: &quot;hello&quot;, &quot;char_delay_ms&quot;: 10}}
-<a id="__codelineno-27-12" name="__codelineno-27-12" href="#__codelineno-27-12"></a>← {&quot;id&quot;: 5, &quot;ok&quot;: true, &quot;result&quot;: {}}
-<a id="__codelineno-27-13" name="__codelineno-27-13" href="#__codelineno-27-13"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 1.3, &quot;wallclock_us&quot;: 1717000002100300}}
-<a id="__codelineno-27-14" name="__codelineno-27-14" href="#__codelineno-27-14"></a>← {&quot;event&quot;: &quot;paste_completed&quot;, &quot;data&quot;: {&quot;request_id&quot;: 5, &quot;chars_sent&quot;: 5}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>→ {&quot;id&quot;: 1, &quot;method&quot;: &quot;hello&quot;, &quot;params&quot;: {&quot;client_name&quot;: &quot;demo-client&quot;, &quot;protocol_version&quot;: &quot;1.0&quot;}}
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>← {&quot;id&quot;: 1, &quot;ok&quot;: true, &quot;result&quot;: {&quot;server_name&quot;: &quot;ryll&quot;, &quot;protocol_version&quot;: &quot;1.0&quot;, &quot;supported_methods&quot;: [&quot;hello&quot;, &quot;status&quot;, &quot;send_key&quot;, &quot;paste&quot;, &quot;screenshot&quot;, &quot;subscribe&quot;, &quot;unsubscribe&quot;], &quot;supported_events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;, &quot;dropped&quot;]}}
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>→ {&quot;id&quot;: 2, &quot;method&quot;: &quot;status&quot;, &quot;params&quot;: {}}
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>← {&quot;id&quot;: 2, &quot;ok&quot;: true, &quot;result&quot;: {&quot;spice_connected&quot;: true, &quot;agent_connected&quot;: true, &quot;surfaces&quot;: [{&quot;channel_id&quot;: 1, &quot;surface_id&quot;: 0, &quot;width&quot;: 1024, &quot;height&quot;: 768}]}}
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>→ {&quot;id&quot;: 3, &quot;method&quot;: &quot;subscribe&quot;, &quot;params&quot;: {&quot;events&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;]}}
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>← {&quot;id&quot;: 3, &quot;ok&quot;: true, &quot;result&quot;: {&quot;subscribed&quot;: [&quot;latency&quot;, &quot;agent_connected&quot;, &quot;paste_completed&quot;, &quot;paste_failed&quot;]}}
+<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 1.2, &quot;wallclock_us&quot;: 1717000000000100}}
+<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>→ {&quot;id&quot;: 4, &quot;method&quot;: &quot;send_key&quot;, &quot;params&quot;: {&quot;scancode&quot;: 28, &quot;state&quot;: &quot;press&quot;}}
+<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>← {&quot;id&quot;: 4, &quot;ok&quot;: true, &quot;result&quot;: {}}
+<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 1.1, &quot;wallclock_us&quot;: 1717000002000200}}
+<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>→ {&quot;id&quot;: 5, &quot;method&quot;: &quot;paste&quot;, &quot;params&quot;: {&quot;text&quot;: &quot;hello&quot;, &quot;char_delay_ms&quot;: 10}}
+<a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>← {&quot;id&quot;: 5, &quot;ok&quot;: true, &quot;result&quot;: {}}
+<a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a>← {&quot;event&quot;: &quot;latency&quot;, &quot;data&quot;: {&quot;sample_ms&quot;: 1.3, &quot;wallclock_us&quot;: 1717000002100300}}
+<a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>← {&quot;event&quot;: &quot;paste_completed&quot;, &quot;data&quot;: {&quot;request_id&quot;: 5, &quot;chars_sent&quot;: 5}}
 </code></pre></div>
 <p>After the <code>paste_completed</code> event the client closes the connection
 (TCP FIN). Ryll detects the EOF on the socket, cleans up the per-client
