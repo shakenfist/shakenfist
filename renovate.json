@@ -26,8 +26,9 @@
       ]
     },
     {
-      "description": "Group grpcio updates together",
+      "description": "Group grpcio updates together. grpcio and protobuf are coupled (each grpcio release pins a protobuf range), so major and minor updates must land in a single PR or neither can pass dependency resolution",
       "groupName": "grpcio",
+      "separateMajorMinor": false,
       "matchPackageNames": [
         "/grpcio/",
         "/protobuf/"
