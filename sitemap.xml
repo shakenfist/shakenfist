@@ -2185,6 +2185,10 @@
          <lastmod>2026-07-18</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/operator_guide/scheduler/</loc>
+         <lastmod>2026-07-18</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/operator_guide/threads/</loc>
          <lastmod>2026-07-18</lastmod>
     </url>
@@ -2470,6 +2474,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation/</loc>
+         <lastmod>2026-07-18</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-00a-load-aware-ordering/</loc>
          <lastmod>2026-07-18</lastmod>
     </url>
     <url>

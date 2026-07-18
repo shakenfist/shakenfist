@@ -9762,6 +9762,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operator_guide/scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operator_guide/threads/" class="md-nav__link">
         
   
@@ -10359,6 +10387,12 @@
 <td>Phase 6: Cleanup</td>
 <td>Not started</td>
 <td>Close out remaining <code>sf-net</code> direct-exec sites and the sysctl / arping corners</td>
+</tr>
+<tr>
+<td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>
+<td><a href="PLAN-scheduler-reservations-phase-00a-load-aware-ordering/">Phase 00a: Load-aware ordering and system reservations</a></td>
+<td>Implemented (awaiting sfcbr soak)</td>
+<td>Static quick wins for sfcbr: load-per-thread ordering, core-denominated OS / infra-role reservations (CPU and RAM), headroom-weighted selection, CPU topology tracking, measured overcommit default</td>
 </tr>
 <tr>
 <td><a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a></td>

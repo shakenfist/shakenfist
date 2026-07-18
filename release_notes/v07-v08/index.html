@@ -8325,6 +8325,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#load-aware-scheduling-and-system-reservations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Load-aware scheduling and system reservations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Load-aware scheduling and system reservations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cpu_overcommit_ratio-semantic-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU_OVERCOMMIT_RATIO semantic change
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -9955,6 +9983,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operator_guide/scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operator_guide/threads/" class="md-nav__link">
         
   
@@ -10266,6 +10322,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#load-aware-scheduling-and-system-reservations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Load-aware scheduling and system reservations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Load-aware scheduling and system reservations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cpu_overcommit_ratio-semantic-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU_OVERCOMMIT_RATIO semantic change
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -10716,6 +10800,44 @@ therefore no longer matches any non-empty <code>namespace=&lt;x&gt;</code> filte
 Admin scripts that habitually pass <code>namespace='system'</code> on every
 network call will now receive a 404 when querying the floating
 network and must omit <code>namespace</code> to reach it.</p>
+<h2 id="load-aware-scheduling-and-system-reservations">Load-aware scheduling and system reservations<a class="headerlink" href="#load-aware-scheduling-and-system-reservations" title="Permanent link">&para;</a></h2>
+<p>The scheduler now understands that machines come in different sizes
+and that some machines have other jobs to do. Three related changes
+landed together:</p>
+<ul>
+<li><strong>System reservations.</strong> Every hypervisor reserves one physical CPU
+  core for the operating system, and nodes carrying a cluster-wide
+  infrastructure role (the network node, or a database node) reserve
+  one further core plus additional RAM. New configuration variables
+  control this: <code>CPU_SYSTEM_RESERVATION</code> (default 1 core),
+  <code>CPU_INFRA_ROLE_RESERVATION</code> (default 1 core) and
+  <code>RAM_INFRA_ROLE_RESERVATION</code> (default 4 GB, additional to the
+  existing <code>RAM_SYSTEM_RESERVATION</code>). The resources daemon publishes
+  the resulting schedulable capacity in node metrics, along with CPU
+  topology (physical cores, threads, and performance / efficiency
+  core counts on hybrid parts).</li>
+<li><strong>Placement is load-aware and size-aware.</strong> Candidate nodes are
+  ranked by load per schedulable thread rather than raw load average,
+  and selection within a band of similar nodes is weighted by each
+  node's headroom toward a target load (<code>SCHEDULER_TARGET_LOAD</code>,
+  default 0.75 per schedulable thread). Larger or idler machines now
+  draw a proportionally larger share of a burst of instance creates;
+  previously a small busy machine and a large idle one could be
+  treated as equals.</li>
+</ul>
+<h3 id="cpu_overcommit_ratio-semantic-change"><code>CPU_OVERCOMMIT_RATIO</code> semantic change<a class="headerlink" href="#cpu_overcommit_ratio-semantic-change" title="Permanent link">&para;</a></h3>
+<p><code>CPU_OVERCOMMIT_RATIO</code> now multiplies the <em>schedulable</em> thread count
+(threads minus reserved cores) rather than all threads, and its
+default has dropped from 16 to 3.0. The old default dated back to
+assumptions about many mostly-idle instances and in practice never
+rejected a node; the new default was measured on a CI-dominated
+cluster where busy hypervisors sustain 2.3-3.0 allocated vCPUs per
+thread with RAM as the binding constraint.</p>
+<p>If your cluster is already packed beyond the new cap, existing
+instances are untouched but new schedules to full nodes will be
+refused until they drain. Operators who prefer the historic
+behaviour can set <code>CPU_OVERCOMMIT_RATIO=16</code> (and the reservation
+variables to zero) in their deployment configuration.</p>
 
 
 
