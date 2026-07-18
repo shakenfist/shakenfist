@@ -11,9 +11,14 @@ The full design rationale is in
 
 The automation lives in this repository:
 `scripts/review-tracking.py` (subcommands `stamp`, `prune`, `regen`,
-and `next`) exposed as pre-commit hooks by `.pre-commit-hooks.yaml`
-at the repository root, with tests in
-`scripts/test_review_tracking.py`.
+and `next`), with tests in `scripts/test_review_tracking.py`. It is
+run by hand -- deliberately not from git hooks. An earlier iteration
+wired `stamp` and `prune` into the pre-commit, post-merge,
+post-checkout, and post-rewrite hooks, but review state silently
+changing in the middle of unrelated git operations proved more
+confusing than helpful. Target repositories carry a thin wrapper
+(for example ryll's `tools/review-tracking.sh`) that locates a
+local clone of this repository and passes through to the script.
 
 ## The pieces
 
@@ -28,7 +33,7 @@ at the repository root, with tests in
   "who reviewed what, when, at which content version" needs
   nothing beyond git.
 * **A sidecar file** (`.vscode/<username>.weaudit-shas.json`,
-  written by the `review-stamp` hook, never by weAudit) records the
+  written by the `stamp` subcommand, never by weAudit) records the
   blob SHA and date of each review so staleness is a mechanical
   check, and a generated **`REVIEWS.md`** surfaces the review state
   to people who do not know to look in `.vscode/`.
@@ -88,35 +93,16 @@ at the repository root, with tests in
    exclude = ['*_pb2.py', 'vendor/*']
    ```
 
-5. Wire the repo's `.pre-commit-config.yaml` to the shared hooks
-   and make plain `pre-commit install` set up all the needed hook
-   types:
-
-   ```yaml
-   default_install_hook_types:
-     - pre-commit
-     - post-merge
-     - post-checkout
-     - post-rewrite
-
-   repos:
-     - repo: https://github.com/shakenfist/development
-       rev: <pinned commit or tag>
-       hooks:
-         - id: review-stamp
-         - id: review-prune
-   ```
-
-   Then re-run `pre-commit install` in each clone (including the
-   review account's).
+5. Add a thin wrapper (e.g. `tools/review-tracking.sh`, copied
+   from ryll) that locates a local clone of this repository --
+   `$SHAKENFIST_DEVELOPMENT`, then a sibling `../development`,
+   then `~/src/shakenfist/development` -- and passes its arguments
+   through to `scripts/review-tracking.py`.
 
 6. Bootstrap existing review marks, if any were made before the
-   hooks were wired up -- and do it **in the same commit as the
-   wiring**. The stamp hook is `always_run`: once active, the next
-   commit by *anyone* stamps every unstamped mark at the file's
-   current content, whether or not that content is what was
-   reviewed. A stale pre-existing mark would be silently blessed.
-   So, as part of the wiring commit:
+   tooling was adopted. A stale pre-existing mark must not be
+   blessed: `stamp` records whatever content the file has *now*,
+   whether or not that is what was reviewed. So:
 
    * For each pre-existing mark, check the file is unchanged since
      its signed review commit; unmark any that changed (they are
@@ -125,14 +111,14 @@ at the repository root, with tests in
      true review dates (a fresh stamp records today):
 
      ```
-     <development-clone>/scripts/review-tracking.py stamp
+     ./tools/review-tracking.sh stamp
      # fix dates in .vscode/<user>.weaudit-shas.json if needed
-     <development-clone>/scripts/review-tracking.py regen
+     ./tools/review-tracking.sh regen
      ```
 
    * Delete any hand-maintained REVIEWS.md; the generated file
      replaces it.
-   * Commit the wiring, corrected weAudit state, sidecar, and
+   * Commit the wrapper, corrected weAudit state, sidecar, and
      REVIEWS.md together (signed).
 
 ## The review account
@@ -206,16 +192,22 @@ covers, which imposes three rules:
 
 A session therefore looks like:
 
-1. `git pull` on a clean tree. The prune hook fires, discards
-   marks for files changed since their review, and regenerates
-   `REVIEWS.md`. Anything it pruned is a good candidate work
-   queue for the session. If VSCode was already open, reload the
-   window (or toggle the weAudit tree view) so the ticks refresh
-   -- weAudit does not watch its state file for external changes.
+1. `git pull` on a clean tree, then:
+
+   ```
+   ./tools/review-tracking.sh prune
+   ```
+
+   discards marks for files changed since their review and
+   regenerates `REVIEWS.md`. Anything it pruned is a good
+   candidate work queue for the session. If VSCode was already
+   open, reload the window (or toggle the weAudit tree view) so
+   the ticks refresh -- weAudit does not watch its state file for
+   external changes.
 2. Pick a file:
 
    ```
-   ~/src/shakenfist/development/scripts/review-tracking.py next
+   ./tools/review-tracking.sh next
    ```
 
    picks a random unreviewed in-scope file and opens it in VSCode
@@ -227,16 +219,15 @@ A session therefore looks like:
 5. Repeat from 2. At the end of the session:
 
    ```
-   git add .vscode/*.weaudit
+   ./tools/review-tracking.sh stamp
+   git add .vscode/*.weaudit* REVIEWS.md
    git commit
    ```
 
-   The stamp hook records each newly reviewed file's blob SHA and
-   date in the sidecar, regenerates `REVIEWS.md`, and fails this
-   first commit attempt asking you to stage those updates; do the
-   `git add` it suggests and re-run the commit. The (signed)
-   commit that lands contains the marks, the stamps, and the
-   regenerated `REVIEWS.md` together.
+   The stamp records each newly reviewed file's blob SHA and date
+   in the sidecar and regenerates `REVIEWS.md`, printing exactly
+   what to `git add`. The (signed) commit that lands contains the
+   marks, the stamps, and the regenerated `REVIEWS.md` together.
 
 ## Staleness
 
@@ -245,31 +236,32 @@ once the file changes, that review is stale and the file should be
 treated as unreviewed. weAudit does not track this -- a stale tick
 looks identical to a fresh one.
 
-The hooks make staleness automatic: `review-stamp` records each
-reviewed file's blob SHA in the sidecar at commit time, and
-`review-prune` (at the post-merge, post-checkout, and post-rewrite
-stages) discards any mark -- whole-file or region -- whose stamped
-SHA no longer matches `HEAD`, regenerating `REVIEWS.md` to match.
-Region marks are pruned wholesale with the file: line ranges shift
-as files change, so a partial review of a changed file is not
-trusted either. See the plan for the full design, including why
-the stamps live in a sidecar rather than in weAudit's own JSON.
+The tooling makes staleness a mechanical check: `stamp` records
+each reviewed file's blob SHA in the sidecar, and `prune` discards
+any mark -- whole-file or region -- whose stamped SHA no longer
+matches `HEAD`, regenerating `REVIEWS.md` to match. Region marks
+are pruned wholesale with the file: line ranges shift as files
+change, so a partial review of a changed file is not trusted
+either. Because nothing runs automatically, pruning is part of the
+session discipline: run it after every pull (and after any merge
+or rebase in a clone carrying review state). See the plan for the
+full design, including why the stamps live in a sidecar rather
+than in weAudit's own JSON.
 
-Two behaviours worth knowing about:
+Three behaviours worth knowing about:
 
-* The prune hook fires on *any* checkout in a clone with the hook
-  types installed -- including switching to an old branch in a
-  development clone, where files legitimately differ from their
-  stamped SHAs. The prune is correct there too (those reviews do
-  not apply to that content), but if it surprises you, `git
-  restore .vscode/ REVIEWS.md` puts the state back.
+* Prune compares against whatever `HEAD` currently is -- run it
+  with an old branch checked out and it will (correctly, but
+  perhaps surprisingly) discard reviews of files that differ
+  there. If that was not what you meant, `git restore .vscode/
+  REVIEWS.md` puts the state back.
 * A stamped entry is never re-stamped while it exists: if a
   reviewed file changes, the only path forward is prune then
   re-review. This is what prevents a stale review being silently
   refreshed at the file's current content.
 * When every file in a directory is reviewed, weAudit adds a
   derived *directory* entry to `auditedFiles` alongside the
-  per-file entries. The hooks treat these as pure UI state: they
-  are never stamped or listed in `REVIEWS.md`, and prune removes
-  them when a file inside stops being reviewed (mirroring what
-  weAudit itself does when a file is unmarked in its UI).
+  per-file entries. The tooling treats these as pure UI state:
+  they are never stamped or listed in `REVIEWS.md`, and prune
+  removes them when a file inside stops being reviewed (mirroring
+  what weAudit itself does when a file is unmarked in its UI).
