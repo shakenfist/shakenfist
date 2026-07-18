@@ -124,6 +124,42 @@ class AddEventMultiSpoolPayloadTestCase(
         self.assertEqual('network', objects[1]['object_type'])
         self.assertEqual('net-uuid-5', objects[1]['object_uuid'])
 
+    def test_suppressed_event_still_reaches_spool(self):
+        """suppress_event_logging mutes the log echo, not the store.
+
+        Billing statistics (and other high-volume callers) add their
+        events with suppress_event_logging=True. The flag must only
+        skip the 'Added event' Loki echo; the event itself still has
+        to reach the spool, and from there the events table. A
+        regression here silently discards all instance usage data.
+        """
+        self.mock_config.LOG_EVENTS_TO_LOKI = True
+        with mock.patch.object(eventlog, 'LOG') as mock_log:
+            eventlog.add_event_multi(
+                'usage', [('instance', 'inst-uuid-6')], 'usage',
+                extra={'cpu usage': {'cpu time ns': 12345}},
+                suppress_event_logging=True)
+            mock_log.with_fields.assert_not_called()
+
+        payload = self._dequeue_one()
+        self.assertEqual('usage', payload['event_type'])
+        self.assertEqual(
+            'inst-uuid-6', payload['objects'][0]['object_uuid'])
+        self.assertEqual(
+            {'cpu usage': {'cpu time ns': 12345}},
+            json.loads(payload['extra']))
+
+    def test_unsuppressed_event_is_echoed_to_log(self):
+        """Without the flag the 'Added event' echo is emitted."""
+        self.mock_config.LOG_EVENTS_TO_LOKI = True
+        with mock.patch.object(eventlog, 'LOG') as mock_log:
+            eventlog.add_event_multi(
+                'audit', [('instance', 'inst-uuid-7')], 'echoed event')
+            mock_log.with_fields.assert_called()
+
+        payload = self._dequeue_one()
+        self.assertEqual('audit', payload['event_type'])
+
     def test_uuid_object_uuid_is_logged_as_str(self):
         """A uuid.UUID object uuid must be stringified before it is logged.
 

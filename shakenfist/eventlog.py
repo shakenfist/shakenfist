@@ -42,9 +42,6 @@ def add_event_multi(
         suppress_event_logging: bool = False,
         log_as_error: bool = False
 ) -> None:
-    if suppress_event_logging:
-        return
-
     if not objects:
         return
 
@@ -86,11 +83,13 @@ def add_event_multi(
 
     # The 'Added event' diagnostic line is what flows to the log stream
     # (Loki). It is gated by LOG_EVENTS_TO_LOKI so an operator can mute
-    # the event echo without affecting the authoritative MariaDB write
-    # below. The 'fqdn' field is intentionally omitted here -- it would
-    # duplicate the host label on the log stream -- but is kept in the
-    # MariaDB payload below, which is the authoritative record.
-    if config.LOG_EVENTS_TO_LOKI:
+    # the event echo, and by suppress_event_logging so high-volume
+    # callers (billing statistics, object creation) can mute their own
+    # echo per-event. Neither gate affects the authoritative MariaDB
+    # write below. The 'fqdn' field is intentionally omitted here -- it
+    # would duplicate the host label on the log stream -- but is kept in
+    # the MariaDB payload below, which is the authoritative record.
+    if config.LOG_EVENTS_TO_LOKI and not suppress_event_logging:
         log = LOG.with_fields({
             'event_type': event_type,
             'duration': duration,
