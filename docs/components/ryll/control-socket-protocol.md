@@ -389,8 +389,17 @@ Params:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `scancode` | u16 | The AT-set 1 scancode to send. Extended scancodes (0xE0 prefix) should be supplied as the full 16-bit value with the prefix byte in the high byte, e.g. `0xE04B` for left arrow. |
+| `scancode` | u16 | The AT-set 1 **make** code to send. Extended scancodes (0xE0 prefix) should be supplied as the full 16-bit value with the prefix byte in the high byte, e.g. `0xE04B` for left arrow. |
 | `state` | string | One of `"down"`, `"up"`, or `"press"`. `"press"` sends a down event immediately followed by an up event in a single operation. |
+
+The server applies the AT-set 1 release encoding itself: for `"up"`
+(and the up half of `"press"`) it sets the release bit
+(`scancode | 0x80`, which for extended scancodes lands on the low
+byte, after the 0xE0 prefix) before injecting the event. Clients
+supply the make code for every state. A client that passes an
+already-encoded release code for `"up"` still works — the release
+bit is not double-applied — but this is a compatibility affordance,
+not the documented interface.
 
 Result on success: `{}`
 
@@ -815,16 +824,35 @@ Data fields:
 |-------|------|-------------|
 | `frame_counter` | u32 | Monotonic frame counter from the digest header.  The polling task deduplicates by this value: an unchanged counter does not fire an event. |
 | `framebuffer_hash` | u32 | CRC32C of the framebuffer at the moment the digest was encoded. |
-| `events` | array | Decoded raw-record events from the digest, each `{"kind": "...", "payload": ...}`. |
+| `events` | array | Decoded raw-record events from the digest.  Each element is the `shakenfist-visual-digest` crate's `Event` enum in its serde shape: an externally-tagged, single-key object whose key is the snake_case variant name and whose value is an object of the variant's fields (see below). |
 | `wallclock_us` | u64 | Server wallclock at translation time, microseconds since the Unix epoch. |
+
+The `events` array is a serde pass-through of the digest crate's
+`Event` enum, not a normalised `{"kind": ..., "payload": ...}`
+envelope.  Variant names and field names are snake_case; nested
+enums such as `Phase` and `BootloaderChoice` serialise as
+snake_case strings; booleans and numbers are native JSON values.
+Observed on the wire:
+
+```
+{"event": "digest_updated", "data": {"events": [
+  {"keypress": {"scancode": 0, "timestamp_ms": 138550, "unicode": "\r"}},
+  {"scene_transition": {"from": "awaiting", "timestamp_ms": 138550, "to": "booting"}},
+  {"line_rendered": {"row": 0, "timestamp_ms": 138550}}
+], "frame_counter": 281, "framebuffer_hash": 4022250974, "wallclock_us": 1765432100000000}}
+```
+
+Clients matching on these records should treat unknown variant
+keys as forward-compatible additions and skip them.
 
 Future-work notes:
 
 - The polling task runs on a fixed 100 ms interval.  A rate-limit knob
   (`--digest-min-interval-ms`) may be added if phase 7 needs it.
-- The wire `events` schema is a thin pass-through of
-  `shakenfist-visual-digest::Record`.  If the digest crate ships a
-  schema-breaking v2 the protocol will need a re-cut.
+- Because the wire `events` schema tracks
+  `shakenfist-visual-digest::Event` directly, a schema-breaking v2 of
+  the digest crate changes this event's payload and the protocol will
+  need a re-cut.
 
 ---
 
