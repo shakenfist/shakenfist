@@ -80,11 +80,13 @@ dependencies = [
     "chardet==7.4.3",                     # lgpl
     "urllib3==2.7.0",                     # mit
 
-    # These must move as a set
-    "pydantic==2.13.3",                   # mit
-    "pydantic-settings==2.14.2",           # mit
-    "pydantic-core==2.46.3",              # (indirect dependency)
-    "pydantic-extra-types==2.11.1",       # (indirect dependency)
+    # These must move as a set. pydantic-core is deliberately not pinned
+    # here: pydantic pins it exactly (==), so the resolved version is fully
+    # determined by the pydantic pin and an explicit pin here can only ever
+    # agree with it or break resolution.
+    "pydantic==2.13.4",                   # mit
+    "pydantic-settings==2.14.2",          # mit
+    "pydantic-extra-types==2.11.1",       # mit
 
     # Is difficult to get install working, use system packages instead.
     # libvirt-python                      # lgpl
