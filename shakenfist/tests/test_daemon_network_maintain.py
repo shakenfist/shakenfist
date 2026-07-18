@@ -14,13 +14,14 @@ from shakenfist.tests import base
 
 
 def _build_mock_network(uuid='net-uuid-001', vxid=42, state='created',
-                        is_okay=False, interfaces=None):
+                        is_okay=False, is_mesh_okay=True, interfaces=None):
     n = mock.MagicMock()
     n.uuid = uuid
     n.vxid = vxid
     n.state.value = state
     n.state.update_time = 0.0
     n.is_okay.return_value = is_okay
+    n.is_mesh_okay.return_value = is_mesh_okay
     n.networkinterfaces = interfaces if interfaces is not None else []
     return n
 
@@ -366,8 +367,9 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         active['nn_create_and_enqueue'].assert_not_called()
 
     def test_is_okay_skips_reconciliation(self):
-        """When is_okay() returns True no reconciliation is enqueued."""
-        n = _build_mock_network(is_okay=True)
+        """When is_okay() and is_mesh_okay() both return True no
+        reconciliation is enqueued."""
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
         active = self._run_one_iteration(
             network_node=True,
             networks=[n],
@@ -375,6 +377,55 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
         active['net_create_and_enqueue'].assert_not_called()
         active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_mesh_drift_enqueues_targeted_ensure_mesh(self):
+        """When the network itself is okay but the vxlan mesh has
+        drifted, the maintainer enqueues only the targeted ensure_mesh
+        repair on this node -- not a full recreate."""
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+        from shakenfist.schema.operations.net_op \
+            import model_tasks as net_tasks
+
+        n = _build_mock_network(is_okay=True, is_mesh_okay=False)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+        )
+
+        # No full recreate on either node type.
+        active['nn_create_and_enqueue'].assert_not_called()
+
+        active['net_create_and_enqueue'].assert_called_once()
+        kwargs = active['net_create_and_enqueue'].call_args.kwargs
+        self.assertEqual([net_tasks.network_ensure_mesh], kwargs['tasks'])
+        self.assertEqual(PRIORITY.background, kwargs['priority'])
+        self.assertEqual('node-uuid-test', kwargs['target'])
+        self.assertEqual('network', kwargs['family'])
+
+    def test_mesh_drift_respects_pending_op_gate(self):
+        """A mesh-drift repair must not race an in-flight cluster
+        operation for the same network."""
+        n = _build_mock_network(is_okay=True, is_mesh_okay=False)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            pending_op=True,
+        )
+
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_mesh_audit_skipped_when_network_not_okay(self):
+        """When is_okay() is already False the full reconcile owns the
+        repair (it ends with an ensure_mesh) -- the separate mesh audit
+        is not consulted."""
+        n = _build_mock_network(is_okay=False)
+        self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+        )
+
+        n.is_mesh_okay.assert_not_called()
 
     def test_hypervisor_node_enqueues_network_apply_create_hypervisor(self):
         """On a non-network-node (hypervisor) a drifting network must be

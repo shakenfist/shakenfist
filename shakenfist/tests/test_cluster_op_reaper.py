@@ -15,7 +15,7 @@ from shakenfist.daemons.cluster import scheduled_tasks
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 def _counter_value(name):
@@ -23,13 +23,13 @@ def _counter_value(name):
 
 
 class StuckJobReaperTestCase(base.ShakenFistTestCase):
-    """Exercises the reaper against MockEtcd's work_queue_store."""
+    """Exercises the reaper against MockMariaDB's work_queue_store."""
 
     def setUp(self):
         super().setUp()
 
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
         self.config_patches = [
             mock.patch.object(
@@ -58,7 +58,7 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
             'payload': payload or {},
             'created_at': claimed_at - 10.0,
         }
-        self.mock_etcd.work_queue_store.append(row)
+        self.mock_mariadb.work_queue_store.append(row)
         return row
 
     def _requeued_delta(self):
@@ -106,7 +106,7 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
         self.assertIsNone(row['claimed_by'])
         self.assertEqual(2, row['attempts'])
         # And it did NOT delete the row.
-        self.assertEqual(1, len(self.mock_etcd.work_queue_store))
+        self.assertEqual(1, len(self.mock_mariadb.work_queue_store))
 
     @mock.patch(
         'shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
@@ -131,7 +131,7 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, self._requeued_delta())
         self.assertEqual(1, self._rejected_delta())
         # Row is gone.
-        self.assertEqual(0, len(self.mock_etcd.work_queue_store))
+        self.assertEqual(0, len(self.mock_mariadb.work_queue_store))
         # State transition and audit event fired on the op.
         mock_class.from_db.assert_called_once_with('aaaa')
         self.assertEqual(
@@ -179,7 +179,7 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
         # Row 2 continued to be re-queued.
         self.assertEqual(1, self._requeued_delta())
         remaining_ids = [
-            r['id'] for r in self.mock_etcd.work_queue_store]
+            r['id'] for r in self.mock_mariadb.work_queue_store]
         self.assertEqual([2], remaining_ids)
 
     def test_persistently_crashing_job_is_rejected_on_cycle_n(self):
@@ -227,6 +227,6 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
 
             self.assertEqual(1, self._rejected_delta())
             self.assertEqual(
-                0, len(self.mock_etcd.work_queue_store))
+                0, len(self.mock_mariadb.work_queue_store))
             self.assertEqual(
                 BaseClusterOperation.STATE_ERROR, mock_op.state)

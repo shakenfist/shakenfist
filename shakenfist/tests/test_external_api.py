@@ -15,7 +15,7 @@ from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class FakeResponse:
@@ -123,8 +123,8 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.recorded_op.start()
         self.addCleanup(self.recorded_op.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.scheduler = mock.patch('shakenfist.scheduler.Scheduler', FakeScheduler)
         self.mock_scheduler = self.scheduler.start()
@@ -150,13 +150,13 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         # correctly applied.
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
         self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
-        self.mock_etcd.create_namespace('two', 'key1', 'space')
+        self.mock_mariadb.create_namespace('two', 'key1', 'space')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'two', 'key': 'space'}))
         self.assertEqual(200, resp.status_code)
@@ -172,8 +172,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.recorded_op.start()
         self.addCleanup(self.recorded_op.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.scheduler = mock.patch(
             'shakenfist.scheduler.Scheduler', FakeScheduler)
@@ -200,25 +200,25 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         # correctly applied.
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
         self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
-        self.mock_etcd.create_namespace('two', 'key1', 'space')
+        self.mock_mariadb.create_namespace('two', 'key1', 'space')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'two', 'key': 'space'}))
         self.assertEqual(200, resp.status_code)
         self.auth_token_two = 'Bearer %s' % resp.get_json()['access_token']
 
-        self.mock_etcd.create_namespace('three', 'key1', 'pass')
+        self.mock_mariadb.create_namespace('three', 'key1', 'pass')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'three', 'key': 'pass'}))
         self.assertEqual(200, resp.status_code)
         self.auth_token_three = 'Bearer %s' % resp.get_json()['access_token']
 
-        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
 
     def test_get_root(self):
         resp = self.client.get('/')
@@ -228,9 +228,9 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual('text/html; charset=utf-8', resp.content_type)
 
     def test_get_instance(self):
-        self.mock_etcd.create_instance('barry')
-        self.mock_etcd.create_instance('alice')
-        self.mock_etcd.create_instance('bob')
+        self.mock_mariadb.create_instance('barry')
+        self.mock_mariadb.create_instance('alice')
+        self.mock_mariadb.create_instance('bob')
 
         # Instance by name
         resp = self.client.get('/instances/barry',
@@ -266,9 +266,9 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
     def test_get_instance_by_namespace(self):
-        self.mock_etcd.create_instance('barry')
-        self.mock_etcd.create_instance('barry', namespace='two')
-        self.mock_etcd.create_instance('bob', namespace='two')
+        self.mock_mariadb.create_instance('barry')
+        self.mock_mariadb.create_instance('barry', namespace='two')
+        self.mock_mariadb.create_instance('bob', namespace='two')
 
         # Instance by name
         resp = self.client.get('/instances/barry',
@@ -305,7 +305,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
     def test_get_instance_metadata(self):
-        self.mock_etcd.create_instance('banana', metadata={'a': 'a', 'b': 'b'})
+        self.mock_mariadb.create_instance('banana', metadata={'a': 'a', 'b': 'b'})
         resp = self.client.get(
             '/instances/12345678-1234-4321-8234-000000000001/metadata',
             headers={'Authorization': self.auth_token})
@@ -314,7 +314,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
 
     def test_put_instance_metadata(self):
-        self.mock_etcd.create_instance('banana')
+        self.mock_mariadb.create_instance('banana')
         resp = self.client.put(
             '/instances/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token},
@@ -326,11 +326,11 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            self.mock_etcd.object_metadata[
+            self.mock_mariadb.object_metadata[
                 'instance/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_post_instance_metadata(self):
-        self.mock_etcd.create_instance('banana')
+        self.mock_mariadb.create_instance('banana')
         resp = self.client.post(
             '/instances/12345678-1234-4321-8234-000000000001/metadata',
             headers={'Authorization': self.auth_token},
@@ -342,13 +342,13 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            self.mock_etcd.object_metadata[
+            self.mock_mariadb.object_metadata[
                 'instance/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_get_network(self):
-        self.mock_etcd.create_network('barry')
-        self.mock_etcd.create_network('alice')
-        self.mock_etcd.create_network('bob')
+        self.mock_mariadb.create_network('barry')
+        self.mock_mariadb.create_network('alice')
+        self.mock_mariadb.create_network('bob')
 
         # Instance by name
         resp = self.client.get('/networks/barry',
@@ -384,8 +384,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
     def test_get_network_metadata(self):
-        self.mock_etcd.create_network('banana', namespace='foo',
-                                      metadata={'a': 'a', 'b': 'b'})
+        self.mock_mariadb.create_network('banana', namespace='foo',
+                                         metadata={'a': 'a', 'b': 'b'})
         resp = self.client.get(
             '/networks/12345678-1234-4321-8234-000000000001/metadata',
             headers={'Authorization': self.auth_token})
@@ -394,7 +394,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual('application/json', resp.content_type)
 
     def test_put_network_metadata(self):
-        self.mock_etcd.create_network('banana', namespace='foo')
+        self.mock_mariadb.create_network('banana', namespace='foo')
         resp = self.client.put(
             '/networks/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token},
@@ -406,11 +406,11 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            self.mock_etcd.object_metadata[
+            self.mock_mariadb.object_metadata[
                 'network/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_post_network_metadata(self):
-        self.mock_etcd.create_network('banana', namespace='foo')
+        self.mock_mariadb.create_network('banana', namespace='foo')
         resp = self.client.post(
             '/networks/12345678-1234-4321-8234-000000000001/metadata',
             headers={'Authorization': self.auth_token},
@@ -422,12 +422,12 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            self.mock_etcd.object_metadata[
+            self.mock_mariadb.object_metadata[
                 'network/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_delete_instance_metadata(self):
-        self.mock_etcd.create_instance('banana',
-                                       metadata={'foo': 'bar', 'real': 'smart'})
+        self.mock_mariadb.create_instance('banana',
+                                          metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/instances/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token})
@@ -435,12 +435,12 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(
             {'real': 'smart'},
-            self.mock_etcd.object_metadata[
+            self.mock_mariadb.object_metadata[
                 'instance/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_delete_instance_metadata_bad_key(self):
         # We now just silently ignore deletes of things which don't exist
-        self.mock_etcd.create_instance(
+        self.mock_mariadb.create_instance(
             'banana', metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/instances/12345678-1234-4321-8234-000000000001/metadata/wrong',
@@ -449,8 +449,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
 
     def test_delete_network_metadata(self):
-        self.mock_etcd.create_network('banana', namespace='foo',
-                                      metadata={'foo': 'bar', 'real': 'smart'})
+        self.mock_mariadb.create_network('banana', namespace='foo',
+                                         metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/networks/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token})
@@ -458,13 +458,13 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'real': 'smart'},
-            self.mock_etcd.object_metadata[
+            self.mock_mariadb.object_metadata[
                 'network/12345678-1234-4321-8234-000000000001']['metadata'])
 
     def test_delete_network_metadata_bad_key(self):
         # We now just silently ignore deletes of things which don't exist
-        self.mock_etcd.create_network('banana', namespace='system',
-                                      metadata={'foo': 'bar', 'real': 'smart'})
+        self.mock_mariadb.create_network('banana', namespace='system',
+                                         metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/networks/12345678-1234-4321-8234-000000000001/metadata/wrong',
             headers={'Authorization': self.auth_token})
@@ -477,9 +477,9 @@ class ExternalApiNetworkInterfaceTestCase(ExternalApiTestCase):
         id1 = str(uuid4())
         id2 = str(uuid4())
 
-        net = self.mock_etcd.create_network('barrynet')
-        nd = self.mock_etcd.generate_netdesc(net.uuid)
-        self.mock_etcd.create_network_interface(
+        net = self.mock_mariadb.create_network('barrynet')
+        nd = self.mock_mariadb.generate_netdesc(net.uuid)
+        self.mock_mariadb.create_network_interface(
             uuid=id1,
             netdesc=nd,
             instance_uuid=id2)
@@ -622,8 +622,8 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.assertEqual(400, resp.status_code)
 
     def test_post_instance_specific_ip(self):
-        self.mock_etcd.create_network('betsy', netblock='10.1.2.0/24',
-                                      namespace='two')
+        self.mock_mariadb.create_network('betsy', netblock='10.1.2.0/24',
+                                         namespace='two')
 
         # Request in range IP address
         resp = self.client.post(
@@ -658,8 +658,8 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.assertEqual(400, resp.status_code)
 
         # Check that instance create API catches duplicate network names
-        self.mock_etcd.create_network('betsy', netblock='10.1.3.0/24',
-                                      namespace='two')
+        self.mock_mariadb.create_network('betsy', netblock='10.1.3.0/24',
+                                         namespace='two')
         resp = self.client.post(
             '/instances',
             headers={'Authorization': self.auth_token_two},
@@ -691,7 +691,7 @@ class ExternalApiExceptionRecordingTestCase(ExternalApiTestCase):
         """
         from uuid import UUID
 
-        self.mock_etcd.create_instance('barry')
+        self.mock_mariadb.create_instance('barry')
 
         # Mock external_view to return an unserializable UUID
         def bad_external_view(namespace=None, **kwargs):

@@ -222,22 +222,22 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
         grpc.assert_not_called()
 
 
-class MockEtcdWorkQueueTestCase(base.ShakenFistTestCase):
-    """Verify the MockEtcd work_queue_store round trip.
+class MockMariaDBWorkQueueTestCase(base.ShakenFistTestCase):
+    """Verify the MockMariaDB work_queue_store round trip.
 
     These tests exercise the mock's own implementation of the
     public queue API end to end through mariadb.enqueue_work_item
     / dequeue_work_items / resolve_work_item, so every consumer
-    that drives work through MockEtcd continues to see a working
+    that drives work through MockMariaDB continues to see a working
     queue after the unified batched-dequeue change.
     """
 
     def setUp(self):
         super().setUp()
         # Import here to avoid a cycle at module load time.
-        from shakenfist.tests.mock_etcd import MockEtcd
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        from shakenfist.tests.mock_mariadb import MockMariaDB
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     def test_enqueue_dequeue_resolve_round_trip(self):
         mariadb.enqueue_work_item('q1', {'task': 't1'})

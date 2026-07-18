@@ -15,7 +15,7 @@ from shakenfist.schema.operations.node_net_op import create_and_enqueue
 from shakenfist.schema.operations.node_net_op import model_tasks
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 def _make_network_mock():
@@ -49,8 +49,8 @@ class NetworkDestroyRoutesThroughBridgedVXLanNetworkTestCase(base.ShakenFistTest
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.node_net_op.mariadb.set_cluster_operation_error')
     @mock.patch(
@@ -78,8 +78,8 @@ class NetworkApplyCreateHypervisorTaskDispatchTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.node_net_op.mariadb.set_cluster_operation_error')
     @mock.patch(
@@ -112,8 +112,8 @@ class GenericExceptionPersistsErrorReportTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.operations.node_net_op.mariadb.set_cluster_operation_error')
     @mock.patch(

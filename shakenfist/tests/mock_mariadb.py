@@ -1,10 +1,9 @@
 #
-# MockEtcd
+# MockMariaDB
 #
 # Test fixture that patches Shaken Fist's MariaDB layer with in-memory
-# Python dictionaries. The name "MockEtcd" is vestigial -- the class
-# originally backed the (now-removed) shakenfist.etcd module too -- and
-# is retained because many test files import the symbol by name.
+# Python dictionaries. This class was previously named MockEtcd, because
+# it originally backed the (now-removed) shakenfist.etcd module too.
 #
 import os
 import time
@@ -44,8 +43,8 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 
 
-class MockEtcd():
-    """Mock the etcd store with a simple dictionary
+class MockMariaDB():
+    """Mock the MariaDB store with simple dictionaries
 
     test_obj:   TestCase object
     nodes:      List of node tuples (name, ip, list_of_node_jobs)
@@ -97,7 +96,7 @@ class MockEtcd():
         self.node_names = [n[0] for n in self.nodes]
 
         # Optional trace logging
-        self.emit_tracing = os.environ.get('MOCK_ETCD_TRACE', '0') == '1'
+        self.emit_tracing = os.environ.get('MOCK_MARIADB_TRACE', '0') == '1'
 
     def setup(self):
         # Mock MariaDB functions for state storage

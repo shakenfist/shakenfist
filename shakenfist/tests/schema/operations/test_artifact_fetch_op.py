@@ -14,15 +14,15 @@ from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.artifact_fetch_op import ArtifactFetchOp
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     def test_model(self):
         u1 = str(uuid4())
@@ -140,21 +140,21 @@ class ArtifactFetchOpTestCase(base.ShakenFistTestCase):
                 'uuid': op_uuid,
                 'version': 1
             },
-            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
+            self.mock_mariadb.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {
                 'value': 'queued',
                 'update_time': 123.0
             },
-            self.mock_etcd.get_mariadb_state('artifact_fetch_op', op_uuid)
+            self.mock_mariadb.get_mariadb_state('artifact_fetch_op', op_uuid)
         )
         self.assertEqual(
             {
                 'operation_type': 'artifact_fetch_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_work_queue_payload(
+            self.mock_mariadb.get_work_queue_payload(
                 'any-clusteroperation-user_facing')
         )
 

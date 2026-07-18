@@ -10,7 +10,7 @@ from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 def _fake_op(uuid_, operation_type, depends_on=None, created_at=1.0,
@@ -57,19 +57,19 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config_patch.start()
         self.addCleanup(self.config_patch.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
-        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
-        self.mock_etcd.create_namespace('other', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('other', 'key1', 'bar')
 
         # The chain endpoint touches the network if any chain member
         # targets it. Pre-create a network in namespace 'foo'.
         self.network_uuid = str(uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'banana',
             uuid=self.network_uuid,
             namespace='foo',
@@ -77,7 +77,7 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
 
         # And a network in 'other' for foreign-namespace tests.
         self.other_network_uuid = str(uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'apple',
             uuid=self.other_network_uuid,
             namespace='other',
@@ -128,7 +128,7 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
         # Build the fake op objects that _hydrate_op() would return for
         # operation lookups. Target-object lookups (the namespace check
         # path) still go through the real ``get_object_class`` so the
-        # Network rows MockEtcd has stashed are visible.
+        # Network rows MockMariaDB has stashed are visible.
         fakes = {
             uuid_: _fake_op(
                 uuid_, op_type, depends_on=depends_on,
@@ -397,24 +397,24 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config_patch.start()
         self.addCleanup(self.config_patch.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
-        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
-        self.mock_etcd.create_namespace('other', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('other', 'key1', 'bar')
 
         self.network_uuid = str(uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'banana',
             uuid=self.network_uuid,
             namespace='foo',
             set_state=dbo.STATE_CREATED)
 
         self.other_network_uuid = str(uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'apple',
             uuid=self.other_network_uuid,
             namespace='other',

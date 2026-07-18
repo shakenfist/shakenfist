@@ -8,7 +8,7 @@ from shakenfist.network.interface import NetworkInterface
 from shakenfist.network.interface import NetworkInterfaces
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 MARIADB_ALL_INTERFACES = [
@@ -66,8 +66,8 @@ class NetworkInterfacesPropertyTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     def _build(self):
         net_uuid = str(uuid.uuid4())
@@ -75,9 +75,9 @@ class NetworkInterfacesPropertyTestCase(base.ShakenFistTestCase):
         ni_one_uuid = str(uuid.uuid4())
         ni_two_uuid = str(uuid.uuid4())
 
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'testnet', net_uuid, netblock='127.0.0.0/8')
-        ni_one = self.mock_etcd.create_network_interface(
+        ni_one = self.mock_mariadb.create_network_interface(
             ni_one_uuid,
             {
                 'network_uuid': net_uuid,
@@ -86,7 +86,7 @@ class NetworkInterfacesPropertyTestCase(base.ShakenFistTestCase):
                 'macaddress': '1a:91:64:d2:15:39',
             },
             instance_uuid=inst_uuid, order=0)
-        ni_two = self.mock_etcd.create_network_interface(
+        ni_two = self.mock_mariadb.create_network_interface(
             ni_two_uuid,
             {
                 'network_uuid': net_uuid,
@@ -124,7 +124,7 @@ class NetworkInterfacesPropertyTestCase(base.ShakenFistTestCase):
 
     def test_property_empty_for_network_with_no_nis(self):
         net_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'lonely', net_uuid, netblock='127.0.0.0/8')
         n = network.Network.from_db(net_uuid)
         self.assertEqual([], n.networkinterfaces)

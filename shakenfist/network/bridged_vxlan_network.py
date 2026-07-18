@@ -36,7 +36,6 @@ from typing import TYPE_CHECKING
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import instance
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -46,7 +45,6 @@ from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import NotOnNetworkNode
 from shakenfist.managed_executables import dnsmasq
-from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations.node_net_op \
@@ -134,40 +132,12 @@ class BridgedVXLanNetwork:
         if self.network.uuid == FLOATING_NETWORK_UUID:
             return
 
-        # Determine which IPs should be on this mesh and where
-        instances = []
-        for ni in self.network.networkinterfaces:
-            if ni.instance_uuid not in instances:
-                instances.append(ni.instance_uuid)
-
-        node_fqdns = []
-        for inst_uuid in instances:
-            inst = instance.Instance.from_db(inst_uuid)
-            if not inst:
-                continue
-            placement = inst.placement
-            if not placement:
-                continue
-            if not placement.get('node'):
-                continue
-
-            if not placement.get('node') in node_fqdns:
-                node_fqdns.append(placement.get('node'))
-
-        # NOTE(mikal): why not use DNS here? Well, DNS might be outside
-        # the control of the deployer if we're running in a public cloud
-        # as an overlay cloud... Also, we don't include ourselves in the
-        # mesh as that would cause duplicate packets to reflect back to us.
-        # (see bug #859).
-        node_ips = set()
-        if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
-            # Always add Network node if it is not this node
-            node_ips.add(config.NETWORK_NODE_IP)
-
-        for fqdn in node_fqdns:
-            n = Node.from_db(fqdn)
-            if n and n.ip != config.NODE_MESH_IP:
-                node_ips.add(n.ip)
+        # Determine which IPs should be on this mesh. The enumeration
+        # lives on the wrapped Network (``mesh_desired_node_ips``) so
+        # the writer (this method) and the auditor
+        # (``Network.is_mesh_okay``) can never disagree about what the
+        # mesh should contain.
+        node_ips = self.network.mesh_desired_node_ips()
 
         added, removed = util_concurrency.ensure_vxlan_mesh(
             self.network.uuid, self.network.vxid, node_ips)

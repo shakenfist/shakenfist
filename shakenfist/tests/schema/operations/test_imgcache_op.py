@@ -14,7 +14,7 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.imgcache_op import ImageCacheOp
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 CACHE_PATH = ('/srv/shakenfist/image_cache/'
@@ -25,8 +25,8 @@ class ImageCacheOpTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     def test_model(self):
         u1 = str(uuid4())
@@ -111,21 +111,21 @@ class ImageCacheOpTestCase(base.ShakenFistTestCase):
                 'uuid': op_uuid,
                 'version': 1
             },
-            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
+            self.mock_mariadb.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {
                 'value': 'queued',
                 'update_time': 123.0
             },
-            self.mock_etcd.get_mariadb_state('imgcache_op', op_uuid)
+            self.mock_mariadb.get_mariadb_state('imgcache_op', op_uuid)
         )
         self.assertEqual(
             {
                 'operation_type': 'imgcache_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_work_queue_payload(
+            self.mock_mariadb.get_work_queue_payload(
                 f'{u1}-clusteroperation-background_high_io')
         )
 

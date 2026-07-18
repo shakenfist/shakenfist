@@ -16,15 +16,15 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.node_inst_net_iface_op import NodeInstNetIfaceOp
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class NodeInstNetIfaceOpTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     def test_model(self):
         u1 = str(uuid4())
@@ -122,21 +122,21 @@ class NodeInstNetIfaceOpTestCase(base.ShakenFistTestCase):
                 'uuid': op_uuid,
                 'version': 1
             },
-            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
+            self.mock_mariadb.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {
                 'value': 'queued',
                 'update_time': 123.0
             },
-            self.mock_etcd.get_mariadb_state('node_inst_net_iface_op', op_uuid)
+            self.mock_mariadb.get_mariadb_state('node_inst_net_iface_op', op_uuid)
         )
         self.assertEqual(
             {
                 'operation_type': 'node_inst_net_iface_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_work_queue_payload(
+            self.mock_mariadb.get_work_queue_payload(
                 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
                 '-clusteroperation-user_waiting')
         )

@@ -1,6 +1,7 @@
 from unittest import mock
 
 from shakenfist.config import BaseSettings
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.tests import base
 from shakenfist.util import network as util_network
 
@@ -164,3 +165,39 @@ class UtilTestCase(base.ShakenFistTestCase):
 
     def test_random_macaddr(self):
         self.assertTrue(util_network.random_macaddr().startswith('02:00:00'))
+
+
+class DiscoverMeshFloodIPsTestCase(base.ShakenFistTestCase):
+    """Tests for ``discover_mesh_flood_ips``, the read-only side of the
+    VXLAN mesh used by the ``Network.is_mesh_okay`` audit."""
+
+    @mock.patch(
+        'shakenfist.util.concurrency.execute',
+        return_value=(
+            '00:00:00:00:00:00 dst 192.168.21.51 self permanent\n'
+            '00:00:00:00:00:00 dst 192.168.21.56 self permanent\n'
+            '02:00:00:b4:f4:b4 dst 192.168.21.56 self \n'
+            '33:33:00:00:00:01 self permanent\n',
+            ''))
+    def test_parses_flood_entries_only(self, mock_execute):
+        found = util_network.discover_mesh_flood_ips('vxlan-453a3e')
+        self.assertEqual({'192.168.21.51', '192.168.21.56'}, found)
+        mock_execute.assert_called_with(
+            'bridge fdb show brport vxlan-453a3e',
+            suppress_command_logging=True)
+
+    @mock.patch(
+        'shakenfist.util.concurrency.execute',
+        return_value=('', ''))
+    def test_empty_fdb_returns_empty_set(self, mock_execute):
+        found = util_network.discover_mesh_flood_ips('vxlan-000001')
+        self.assertEqual(set(), found)
+
+    @mock.patch(
+        'shakenfist.util.concurrency.execute',
+        side_effect=ProcessExecutionError(
+            stderr='Cannot find device "vxlan-000002"', exit_code=255,
+            cmd='bridge fdb show brport vxlan-000002'))
+    def test_missing_interface_returns_none(self, mock_execute):
+        found = util_network.discover_mesh_flood_ips('vxlan-000002')
+        self.assertIsNone(found)

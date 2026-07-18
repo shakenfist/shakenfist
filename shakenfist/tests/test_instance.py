@@ -15,7 +15,7 @@ from shakenfist import instance
 from shakenfist.config import SFConfig
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class VirtMetaTestCase(base.ShakenFistTestCase):
@@ -32,8 +32,8 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
                 return_value={'value': None, 'update_time': 0})
@@ -51,10 +51,10 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                 'value': instance.Instance.STATE_INITIAL,
                 'update_time': 1234
             },
-            self.mock_etcd.get_mariadb_state(
+            self.mock_mariadb.get_mariadb_state(
                 'instance', '42424242-4242-4242-8242-424242424242'))
         # power_state is now written to MariaDB only (no etcd dual-write)
-        inst_attrs = self.mock_etcd.get_mariadb_instance_attributes(
+        inst_attrs = self.mock_mariadb.get_mariadb_instance_attributes(
             '42424242-4242-4242-8242-424242424242')
         self.assertIsNotNone(inst_attrs)
         self.assertEqual(
@@ -63,8 +63,8 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
 
         # etcd.create is no longer called (base class no longer writes
         # to etcd). Instance static values are written to MariaDB via
-        # mariadb.create_instance() which is mocked by mock_etcd.
-        inst_data = self.mock_etcd.instance_objects.get(
+        # mariadb.create_instance() which is mocked by mock_mariadb.
+        inst_data = self.mock_mariadb.instance_objects.get(
             '42424242-4242-4242-8242-424242424242')
         self.assertIsNotNone(inst_data)
         self.assertEqual(1, inst_data.cpus)
@@ -93,13 +93,13 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.mock_gmov = self.gmov.start()
         self.addCleanup(self.gmov.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     def test_set_state_valid1(self):
         instance_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_instance('cirros', instance_uuid,
-                                       set_state=instance.Instance.STATE_PREFLIGHT)
+        self.mock_mariadb.create_instance('cirros', instance_uuid,
+                                          set_state=instance.Instance.STATE_PREFLIGHT)
         i = instance.Instance.from_db(instance_uuid)
 
         with testtools.ExpectedException(exceptions.InvalidStateException):
@@ -114,8 +114,8 @@ class InstanceTestCase(base.ShakenFistTestCase):
 
     def test_set_state_valid2(self):
         instance_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_instance('cirros', instance_uuid,
-                                       set_state=instance.Instance.STATE_PREFLIGHT)
+        self.mock_mariadb.create_instance('cirros', instance_uuid,
+                                          set_state=instance.Instance.STATE_PREFLIGHT)
         i = instance.Instance.from_db(instance_uuid)
 
         i.state = 'preflight-error'
@@ -124,7 +124,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
 
     def test_update_power_state(self):
         instance_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_instance('cirros', instance_uuid)
+        self.mock_mariadb.create_instance('cirros', instance_uuid)
         i = instance.Instance.from_db(instance_uuid)
         i.update_power_state('off')
 
@@ -135,7 +135,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
 
     def test_update_power_state_duplicate(self):
         instance_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_instance('cirros', instance_uuid)
+        self.mock_mariadb.create_instance('cirros', instance_uuid)
         i = instance.Instance.from_db(instance_uuid)
         i.update_power_state('off')
         etcd_value_one = i._db_get_attribute('power_state')
@@ -149,7 +149,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
 
     def test_str(self):
         instance_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_instance('cirros', instance_uuid)
+        self.mock_mariadb.create_instance('cirros', instance_uuid)
         i = instance.Instance.from_db(instance_uuid)
         s = str(i)
         self.assertEqual('instance(%s)' % instance_uuid, s)
@@ -160,8 +160,8 @@ class InstanceTestCase(base.ShakenFistTestCase):
         iface_uuid_one = str(uuid.uuid4())
         iface_uuid_two = str(uuid.uuid4())
 
-        self.mock_etcd.create_network('testing', network_uuid, netblock='127.0.0.0/8')
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network('testing', network_uuid, netblock='127.0.0.0/8')
+        self.mock_mariadb.create_network_interface(
             iface_uuid_one,
             {
                 'network_uuid': network_uuid,
@@ -170,7 +170,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                 'macaddress': '1a:91:64:d2:15:39',
             },
             instance_uuid=instance_uuid, order=0)
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network_interface(
             iface_uuid_two,
             {
                 'network_uuid': network_uuid,
@@ -179,7 +179,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                 'macaddress': '1a:91:64:d2:15:40',
             },
             instance_uuid=instance_uuid, order=1)
-        self.mock_etcd.create_instance(
+        self.mock_mariadb.create_instance(
             'cirros', instance_uuid, 1, ssh_key='thisisasshkey',
             user_data=str(base64.b64encode(b'thisisuserdata'), 'utf-8'))
 
@@ -307,9 +307,9 @@ class InstanceTestCase(base.ShakenFistTestCase):
         iface_uuid_one = str(uuid.uuid4())
         iface_uuid_two = str(uuid.uuid4())
 
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'testing', network_uuid, netblock='10.0.0.0/8', provide_dns=True)
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network_interface(
             iface_uuid_one,
             {
                 'network_uuid': network_uuid,
@@ -318,7 +318,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                 'macaddress': '1a:91:64:d2:15:39',
             },
             instance_uuid=instance_uuid, order=0)
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network_interface(
             iface_uuid_two,
             {
                 'network_uuid': network_uuid,
@@ -327,7 +327,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                 'macaddress': '1a:91:64:d2:15:40',
             },
             instance_uuid=instance_uuid, order=1)
-        self.mock_etcd.create_instance(
+        self.mock_mariadb.create_instance(
             'cirros', instance_uuid, 1, ssh_key='thisisasshkey',
             user_data=str(base64.b64encode(b'thisisuserdata'), 'utf-8'))
 
@@ -455,18 +455,18 @@ class InstancesTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
-        self.mock_etcd.create_instance(
+        self.mock_mariadb.create_instance(
             name='cirros', uuid='373a165e-9720-4e14-bd0e-9612de79ff15',
             namespace='gerkin', set_state=instance.Instance.STATE_DELETED,
             place_on_node='node1')
-        self.mock_etcd.create_instance(
+        self.mock_mariadb.create_instance(
             name='cirros', uuid='b078cb4e-857c-4f04-b011-751742ef5817',
             namespace='namespace', set_state=instance.Instance.STATE_CREATED,
             place_on_node='node1')
-        self.mock_etcd.create_instance(
+        self.mock_mariadb.create_instance(
             name='cirros', uuid='a7c5ecec-c3a9-4774-ad1b-249d9e90e806',
             namespace='namespace', set_state=instance.Instance.STATE_DELETED,
             place_on_node='node1')
@@ -533,11 +533,11 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
         self.mock_gmov = self.gmov.start()
         self.addCleanup(self.gmov.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.instance_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_instance('cirros', self.instance_uuid)
+        self.mock_mariadb.create_instance('cirros', self.instance_uuid)
         self.inst = instance.Instance.from_db(self.instance_uuid)
 
     def _make_agentop(self, state=None):
@@ -647,11 +647,11 @@ class InstanceAttributeFieldMaskTestCase(base.ShakenFistTestCase):
         self.mock_gmov = self.gmov.start()
         self.addCleanup(self.gmov.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         self.instance_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_instance('cirros', self.instance_uuid)
+        self.mock_mariadb.create_instance('cirros', self.instance_uuid)
         self.inst = instance.Instance.from_db(self.instance_uuid)
 
     def _last_update_fields(self, mock_update):
@@ -690,11 +690,11 @@ class InstanceAttributeFieldMaskTestCase(base.ShakenFistTestCase):
         # field-masked writes the enqueue must survive.
         self.inst.agent_operation_enqueue('op-from-the-api')
 
-        stale = self.mock_etcd._mariadb_get_instance_attributes(
+        stale = self.mock_mariadb._mariadb_get_instance_attributes(
             self.instance_uuid).model_copy(deep=True)
         stale.agent_operations = None
         stale.agent_attributes = {'facts': {'os': 'debian'}}
-        self.mock_etcd._mariadb_update_instance_attributes(
+        self.mock_mariadb._mariadb_update_instance_attributes(
             stale, fields=['agent_attributes'])
 
         self.assertEqual(

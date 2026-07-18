@@ -10,7 +10,7 @@ from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 def _clean_traceback(resp):
@@ -36,10 +36,10 @@ class AuthTestCase(base.ShakenFistTestCase):
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
-        self.mock_etcd.create_namespace('banana', 'key1', 'bacon')
+        self.mock_mariadb.create_namespace('banana', 'key1', 'bacon')
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
@@ -160,8 +160,8 @@ class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         ns = Namespace.new('banana')
         ns.add_key('_service_key', 'cheese')
@@ -191,18 +191,18 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
-        self.mock_etcd.create_namespace('foo', 'key1', 'banana')
-        self.mock_etcd.create_instance(
+        self.mock_mariadb.create_namespace('foo', 'key1', 'banana')
+        self.mock_mariadb.create_instance(
             name='fooinst', namespace='foo')
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
@@ -232,20 +232,20 @@ class AuthWithLingeringNetwork(base.ShakenFistTestCase):
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
-        self.mock_etcd.create_namespace('foo', 'key1', 'banana')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'banana')
 
         self.network_id = str(uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             name='foonet', uuid=self.network_id, namespace='foo')
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
@@ -279,14 +279,14 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
         self.add_event.start()
         self.addCleanup(self.add_event.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
@@ -378,10 +378,10 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.recorded_op.start()
         self.addCleanup(self.recorded_op.stop)
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
-        self.mock_etcd.create_namespace('banana', 'key1', 'cheese')
+        self.mock_mariadb.create_namespace('banana', 'key1', 'cheese')
 
         self.scheduler = mock.patch(
             'shakenfist.scheduler.Scheduler', FakeScheduler)
@@ -407,25 +407,25 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         # correctly applied.
         self.client = external_api.app.test_client()
 
-        self.mock_etcd.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
         self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
-        self.mock_etcd.create_namespace('two', 'key1', 'space')
+        self.mock_mariadb.create_namespace('two', 'key1', 'space')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'two', 'key': 'space'}))
         self.assertEqual(200, resp.status_code)
         self.auth_token_two = 'Bearer %s' % resp.get_json()['access_token']
 
-        self.mock_etcd.create_namespace('three', 'key1', 'pass')
+        self.mock_mariadb.create_namespace('three', 'key1', 'pass')
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'three', 'key': 'pass'}))
         self.assertEqual(200, resp.status_code)
         self.auth_token_three = 'Bearer %s' % resp.get_json()['access_token']
 
-        self.mock_etcd.create_namespace('foo', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
 
     def test_get_namespaces(self):
         resp = self.client.get('/auth/namespaces',
@@ -497,7 +497,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
 
     def test_get_namespace_metadata(self):
         # Set up metadata in MariaDB mock
-        self.mock_etcd.object_metadata['namespace/system'] = {
+        self.mock_mariadb.object_metadata['namespace/system'] = {
             'metadata': {'a': 'a', 'b': 'b'}
         }
         resp = self.client.get(
@@ -518,7 +518,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            self.mock_etcd.object_metadata['namespace/system']['metadata'])
+            self.mock_mariadb.object_metadata['namespace/system']['metadata'])
 
     @mock.patch('shakenfist.locks.ClusterLock')
     def test_post_namespace_metadata(self, mock_get_lock):
@@ -532,12 +532,12 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'foo': 'bar'},
-            self.mock_etcd.object_metadata['namespace/system']['metadata'])
+            self.mock_mariadb.object_metadata['namespace/system']['metadata'])
 
     @mock.patch('shakenfist.locks.ClusterLock')
     def test_delete_namespace_metadata(self, mock_get_lock):
         # Set up metadata in MariaDB mock
-        self.mock_etcd.object_metadata['namespace/system'] = {
+        self.mock_mariadb.object_metadata['namespace/system'] = {
             'metadata': {'foo': 'bar', 'real': 'smart'}
         }
         resp = self.client.delete('/auth/namespaces/system/metadata/foo',
@@ -546,7 +546,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {'real': 'smart'},
-            self.mock_etcd.object_metadata['namespace/system']['metadata'])
+            self.mock_mariadb.object_metadata['namespace/system']['metadata'])
 
     @mock.patch('shakenfist.locks.ClusterLock')
     def test_delete_namespace_metadata_bad_key(self, mock_get_lock):

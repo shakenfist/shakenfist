@@ -576,6 +576,90 @@ class Network(dbowo):
 
         return True
 
+    def _mesh_participant_node_identifiers(self):
+        """Return the deduplicated placement node identifiers for every
+        instance with an interface on this network."""
+        # Late-import ``instance`` to avoid the network <-> instance
+        # circular import at module load.
+        from shakenfist import instance  # noqa: PLC0415
+
+        seen_instances: set[str] = set()
+        identifiers: list[str] = []
+        for ni in self.networkinterfaces:
+            if ni.instance_uuid in seen_instances:
+                continue
+            seen_instances.add(ni.instance_uuid)
+            inst = instance.Instance.from_db(ni.instance_uuid)
+            if not inst:
+                continue
+            placement = inst.placement
+            if not placement or not placement.get('node'):
+                continue
+            if placement['node'] not in identifiers:
+                identifiers.append(placement['node'])
+        return identifiers
+
+    def mesh_desired_node_ips(self):
+        """Return the mesh IPs this node's VXLAN FDB should flood to.
+
+        The set contains the network node plus every node hosting an
+        instance with an interface on this network, always excluding
+        this node itself -- flooding back to ourselves would reflect
+        duplicate packets (see bug #859). This is the shared source of
+        truth for the mesh: ``BridgedVXLanNetwork._apply_ensure_mesh``
+        writes it to the FDB and ``is_mesh_okay`` audits the FDB
+        against it.
+
+        NOTE(mikal): why not use DNS here? Well, DNS might be outside
+        the control of the deployer if we're running in a public cloud
+        as an overlay cloud...
+        """
+        node_ips = set()
+        if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
+            # Always add the network node if it is not this node
+            node_ips.add(config.NETWORK_NODE_IP)
+
+        for identifier in self._mesh_participant_node_identifiers():
+            n = Node.from_db(identifier)
+            if n and n.ip != config.NODE_MESH_IP:
+                node_ips.add(n.ip)
+
+        return node_ips
+
+    def is_mesh_okay(self):
+        """Audit this node's VXLAN flood mesh for this network.
+
+        Compares the flood (all-zeroes) FDB entries on the vxlan
+        interface against ``mesh_desired_node_ips``. This catches the
+        drift where the mesh was never (or only partially) written on a
+        node -- most notably the network node, which forwards all
+        floating traffic but can only reach an idle guest via a flood
+        entry once learned FDB entries have aged out.
+        """
+        # The floating network has no vxlan mesh of its own.
+        if self.uuid == FLOATING_NETWORK_UUID:
+            return True
+
+        subst = self.subst_dict()
+        discovered = util_network.discover_mesh_flood_ips(
+            subst['vx_interface'])
+        if discovered is None:
+            # There is no vxlan interface on this node. That is
+            # ``is_created``'s drift to detect; the mesh audit is moot.
+            return True
+
+        desired = self.mesh_desired_node_ips()
+        if discovered != desired:
+            self.add_event(
+                EVENT_TYPE_STATUS, 'network not ok, vxlan mesh has drifted',
+                extra={
+                    'desired': sorted(desired),
+                    'discovered': sorted(discovered)
+                })
+            return False
+
+        return True
+
     def is_dead(self):
         """Check if the network is deleted or being deleted, or in error.
 
@@ -827,9 +911,9 @@ class Network(dbowo):
         FDB entry for A.
 
         The fan-out enumerates the set of nodes hosting any of this
-        network's interfaces (mirroring the peer-enumeration logic in
-        ``BridgedVXLanNetwork._apply_ensure_mesh``) and enqueues one
-        ensure_mesh op on each node's per-node ``network`` queue. The
+        network's interfaces, plus the network node (which participates
+        in every mesh -- see below), and enqueues one ensure_mesh op on
+        each node's per-node ``network`` queue. The
         enqueue-side dedup in ``net_op.create_and_enqueue`` is keyed on
         ``target='networknode'`` only, so per-node enqueues are *not*
         collapsed across nodes -- each node's worker sees its own op
@@ -844,40 +928,41 @@ class Network(dbowo):
         API-only node), returns the first remote op enqueued so the
         caller still has *something* to block on.
         """
-        # Enumerate participating hypervisors. The FQDN -> node UUID
-        # translation goes through the node table; instances store
-        # placement by FQDN. Late-import ``instance`` to avoid the
-        # network <-> instance circular import at module load.
-        from shakenfist import instance  # noqa: PLC0415
-
-        seen_instances: set[str] = set()
-        node_fqdns: list[str] = []
-        for ni in self.networkinterfaces:
-            if ni.instance_uuid in seen_instances:
-                continue
-            seen_instances.add(ni.instance_uuid)
-            inst = instance.Instance.from_db(ni.instance_uuid)
-            if not inst:
-                continue
-            placement = inst.placement
-            if not placement or not placement.get('node'):
-                continue
-            fqdn = placement['node']
-            if fqdn not in node_fqdns:
-                node_fqdns.append(fqdn)
-
-        # Map FQDN -> node UUID. We need the UUID because the per-node
-        # queue name is composed from it (``<node_uuid>-network-...``).
-        # Skip nodes the database doesn't know about (shouldn't happen
-        # in practice, but a stale placement on a deleted node would
-        # land here otherwise).
+        # Enumerate participating hypervisors, then map the placement
+        # node identifier to a node UUID through the node table. We need
+        # the UUID because the per-node queue name is composed from it
+        # (``<node_uuid>-network-...``). Skip nodes the database doesn't
+        # know about (shouldn't happen in practice, but a stale
+        # placement on a deleted node would land here otherwise).
         node_uuids: list[str] = []
         local_node_uuid = config.NODE_UUID
-        for fqdn in node_fqdns:
-            n = Node.from_db(fqdn)
+        for identifier in self._mesh_participant_node_identifiers():
+            n = Node.from_db(identifier)
             if n is None:
                 continue
             node_uuids.append(str(n.uuid))
+
+        # The network node hosts the netns side of every network (DHCP,
+        # DNS, NAT and the floating IP path), so it participates in
+        # every mesh. The interface walk above only finds nodes hosting
+        # instances though, so unless the network node happens to host
+        # one itself it never re-meshes: its FDB lacks the flood entry
+        # for the instance's hypervisor, and inbound floating traffic
+        # then only works while a learned FDB entry for the guest
+        # exists -- which ages out once the guest goes idle. Always
+        # include the network node in the fan-out. Late-import
+        # ``scheduler`` to avoid the circular import at module load
+        # (scheduler imports instance, which imports this module).
+        from shakenfist import scheduler  # noqa: PLC0415
+        try:
+            network_node_uuid = str(scheduler.get_network_node().uuid)
+            if network_node_uuid not in node_uuids:
+                node_uuids.append(network_node_uuid)
+        except exceptions.NoNetworkNode:
+            # A cluster mid-bootstrap may not have a network node in
+            # the database yet; fan out to the instance-hosting nodes
+            # only.
+            pass
 
         # If no participating hypervisors were found, still enqueue on
         # the local node. This keeps the bootstrap case sane: an empty

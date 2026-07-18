@@ -24,7 +24,7 @@ from shakenfist.schema.operations.node_inst_netdesc_op import create_and_enqueue
 from shakenfist.schema.operations.node_inst_netdesc_op import model_tasks
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class FakeInstance:
@@ -65,8 +65,8 @@ class FakeInstance:
 class PreflightRedirectTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     def _make_op(self):
         _, op_uuid = create_and_enqueue(

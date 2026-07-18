@@ -55,12 +55,6 @@ def _patch_network_node_config(test_case, **overrides):
     test_case.addCleanup(patcher.stop)
 
 
-def _make_interface(instance_uuid):
-    iface = mock.Mock()
-    iface.instance_uuid = instance_uuid
-    return iface
-
-
 class BridgedVXLanNetworkRequireNetworkNodeTestCase(base.ShakenFistTestCase):
     """The ``_apply_*`` guard refuses to run on a non-network-node.
 
@@ -106,16 +100,16 @@ class BridgedVXLanNetworkRequireNetworkNodeTestCase(base.ShakenFistTestCase):
 
 
 class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
+    """The mesh enumeration now lives on the wrapped Network
+    (``mesh_desired_node_ips``, tested in test_net.py); the apply layer
+    just writes the result to the FDB via privexec and emits events on
+    a non-empty diff."""
 
     def setUp(self):
         super().setUp()
 
         # ``_apply_ensure_mesh`` is per-hypervisor (not network-node-only),
-        # so no ``NODE_IS_NETWORK_NODE`` guard fires. NODE_MESH_IP is
-        # offset from NETWORK_NODE_IP so the network-node IP is included
-        # in the computed mesh -- the body excludes the running host from
-        # its own mesh, so distinct values are required to exercise the
-        # "network node IP makes it into the mesh" branch.
+        # so no ``NODE_IS_NETWORK_NODE`` guard fires.
         _patch_network_node_config(
             self, NODE_EGRESS_IP='10.0.0.2', NODE_MESH_IP='10.0.0.2',
             NETWORK_NODE_IP='10.0.0.1')
@@ -127,67 +121,32 @@ class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
         # Default: nothing added or removed.
         self.mock_ensure_vxlan_mesh.return_value = ([], [])
 
-        self.mock_instance_from_db = mock.patch(
-            'shakenfist.network.bridged_vxlan_network.instance.Instance.'
-            'from_db').start()
-        self.mock_node_from_db = mock.patch(
-            'shakenfist.network.bridged_vxlan_network.Node.from_db').start()
-
     def test_floating_network_short_circuits(self):
         network = _make_network_mock(uuid=FLOATING_NETWORK_UUID)
         bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
 
         bvn._apply_ensure_mesh()
 
-        # No host mutation, no event, no lock.
+        # No host mutation, no event, no lock, no enumeration.
         self.mock_ensure_vxlan_mesh.assert_not_called()
+        network.mesh_desired_node_ips.assert_not_called()
         network.get_lock.assert_not_called()
         network.add_event.assert_not_called()
 
-    def test_apply_ensure_mesh_collects_node_ips(self):
-        iface_a = _make_interface('inst-a')
-        iface_b = _make_interface('inst-b')
-        # Duplicate iface for inst-a to confirm dedupe of instance_uuids.
-        iface_a_dup = _make_interface('inst-a')
-
+    def test_apply_ensure_mesh_writes_desired_node_ips(self):
         network = _make_network_mock(
-            uuid='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-            vxid=99,
-            networkinterfaces=[iface_a, iface_b, iface_a_dup])
+            uuid='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', vxid=99)
+        network.mesh_desired_node_ips.return_value = {
+            '10.0.0.1', '10.0.0.3', '10.0.0.4'}
         bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
-
-        def instance_from_db(uuid):
-            inst = mock.Mock()
-            if uuid == 'inst-a':
-                inst.placement = {'node': 'sf1.example.com'}
-            elif uuid == 'inst-b':
-                inst.placement = {'node': 'sf2.example.com'}
-            else:
-                return None
-            return inst
-
-        def node_from_db(fqdn):
-            n = mock.Mock()
-            if fqdn == 'sf1.example.com':
-                n.ip = '10.0.0.3'
-            elif fqdn == 'sf2.example.com':
-                n.ip = '10.0.0.4'
-            else:
-                return None
-            return n
-
-        self.mock_instance_from_db.side_effect = instance_from_db
-        self.mock_node_from_db.side_effect = node_from_db
 
         bvn._apply_ensure_mesh()
 
         # No lock taken; the single-threaded dispatcher provides serialisation.
         network.get_lock.assert_not_called()
 
-        # The expected node IP set:
-        # - 10.0.0.1 (NETWORK_NODE_IP, since != NODE_MESH_IP)
-        # - 10.0.0.3 (sf1)
-        # - 10.0.0.4 (sf2)
+        # The privexec call receives the enumeration verbatim -- the
+        # writer and the auditor (``Network.is_mesh_okay``) share it.
         self.mock_ensure_vxlan_mesh.assert_called_once_with(
             'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             99,
@@ -195,33 +154,6 @@ class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
 
         # No events emitted because added/removed are both empty.
         network.add_event.assert_not_called()
-
-    def test_apply_ensure_mesh_skips_missing_instance(self):
-        iface = _make_interface('inst-missing')
-        network = _make_network_mock(networkinterfaces=[iface])
-        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
-
-        self.mock_instance_from_db.return_value = None
-
-        bvn._apply_ensure_mesh()
-
-        # Only NETWORK_NODE_IP makes it onto the mesh.
-        self.mock_ensure_vxlan_mesh.assert_called_once_with(
-            network.uuid, network.vxid, {'10.0.0.1'})
-
-    def test_apply_ensure_mesh_skips_unplaced_instance(self):
-        iface = _make_interface('inst-unplaced')
-        network = _make_network_mock(networkinterfaces=[iface])
-        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
-
-        unplaced = mock.Mock()
-        unplaced.placement = None
-        self.mock_instance_from_db.return_value = unplaced
-
-        bvn._apply_ensure_mesh()
-
-        self.mock_ensure_vxlan_mesh.assert_called_once_with(
-            network.uuid, network.vxid, {'10.0.0.1'})
 
     def test_apply_ensure_mesh_emits_added_event(self):
         network = _make_network_mock()
@@ -267,55 +199,6 @@ class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
             EVENT_TYPE_MUTATE, 'add mesh elements',
             extra={'added': ['10.0.0.7']})
         self.assertEqual(2, network.add_event.call_count)
-
-    def test_apply_ensure_mesh_omits_network_node_when_self(self):
-        # When this node *is* the network node, NETWORK_NODE_IP must not be
-        # added (it would be us, and we never include ourselves).
-        fake_config = SFConfig(NODE_EGRESS_IP='10.0.0.1',
-                               NODE_MESH_IP='10.0.0.1',
-                               NETWORK_NODE_IP='10.0.0.1',
-                               NODE_IS_NETWORK_NODE=True)
-        with mock.patch(
-                'shakenfist.network.bridged_vxlan_network.config',
-                fake_config):
-            iface = _make_interface('inst-a')
-            network = _make_network_mock(networkinterfaces=[iface])
-            bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
-
-            inst = mock.Mock()
-            inst.placement = {'node': 'sf2.example.com'}
-            self.mock_instance_from_db.return_value = inst
-
-            node = mock.Mock()
-            node.ip = '10.0.0.4'
-            self.mock_node_from_db.return_value = node
-
-            bvn._apply_ensure_mesh()
-
-            # NETWORK_NODE_IP not in the set; only sf2's IP.
-            self.mock_ensure_vxlan_mesh.assert_called_once_with(
-                network.uuid, network.vxid, {'10.0.0.4'})
-
-    def test_apply_ensure_mesh_omits_node_when_self(self):
-        # Nodes whose IP equals NODE_MESH_IP are intentionally not added to
-        # the mesh (no self-loop in the FDB).
-        iface = _make_interface('inst-a')
-        network = _make_network_mock(networkinterfaces=[iface])
-        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
-
-        inst = mock.Mock()
-        inst.placement = {'node': 'self.example.com'}
-        self.mock_instance_from_db.return_value = inst
-
-        node = mock.Mock()
-        node.ip = '10.0.0.2'  # equals NODE_MESH_IP in the default config
-        self.mock_node_from_db.return_value = node
-
-        bvn._apply_ensure_mesh()
-
-        # Only NETWORK_NODE_IP (10.0.0.1) ends up in the mesh.
-        self.mock_ensure_vxlan_mesh.assert_called_once_with(
-            network.uuid, network.vxid, {'10.0.0.1'})
 
 
 class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):

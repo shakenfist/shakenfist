@@ -13,7 +13,7 @@ from shakenfist.network import network
 from shakenfist.config import BaseSettings
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import dnsmasq
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -44,11 +44,11 @@ class DnsMasqTestCase(testtools.TestCase):
         self.addCleanup(self.config.stop)
 
     def test_init(self):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid)
+        self.mock_mariadb.create_network('bobnet', network_uuid)
         n = network.Network.from_db(network_uuid)
 
         d = dnsmasq.DnsMasq.new(n)
@@ -56,11 +56,11 @@ class DnsMasqTestCase(testtools.TestCase):
             f'{TEST_DIR}/files/dhcp/{network_uuid}', d.config_directory)
 
     def test_str(self):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network('bobnet', network_uuid)
+        self.mock_mariadb.create_network('bobnet', network_uuid)
         n = network.Network.from_db(network_uuid)
 
         d = dnsmasq.DnsMasq.new(n)
@@ -69,11 +69,11 @@ class DnsMasqTestCase(testtools.TestCase):
             f'dhcp({network_uuid}, as owned by network({network_uuid}))', s)
 
     def test_override_config_dir(self):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
 
@@ -83,11 +83,11 @@ class DnsMasqTestCase(testtools.TestCase):
             self.assertEqual(dir, d.config_directory)
 
     def test_subst_just_dhcp(self):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=False,
@@ -125,11 +125,11 @@ class DnsMasqTestCase(testtools.TestCase):
             }, s)
 
     def test_subst_just_dhcp_and_nat(self):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8', provide_nat=True)
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=True,
@@ -167,11 +167,11 @@ class DnsMasqTestCase(testtools.TestCase):
             }, s)
 
     def test_subst_just_dns(self):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=False, provide_nat=False,
@@ -210,11 +210,11 @@ class DnsMasqTestCase(testtools.TestCase):
 
     @mock.patch('os.makedirs')
     def test_make_config_just_dhcp(self, mock_makedir):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=False,
@@ -264,11 +264,11 @@ class DnsMasqTestCase(testtools.TestCase):
 
     @mock.patch('os.makedirs')
     def test_make_config_just_dhcp_and_nat(self, mock_makedir):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8', provide_nat=True)
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=True,
@@ -319,11 +319,11 @@ class DnsMasqTestCase(testtools.TestCase):
 
     @mock.patch('os.makedirs')
     def test_make_config_just_dns(self, mock_makedir):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=False, provide_nat=False,
@@ -367,11 +367,11 @@ class DnsMasqTestCase(testtools.TestCase):
 
     @mock.patch('os.makedirs')
     def test_make_config_just_nat(self, mock_makedir):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         self.assertRaises(
@@ -380,11 +380,11 @@ class DnsMasqTestCase(testtools.TestCase):
 
     @mock.patch('os.makedirs')
     def test_make_config_nothing(self, mock_makedir):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         self.assertRaises(
@@ -393,11 +393,11 @@ class DnsMasqTestCase(testtools.TestCase):
 
     @mock.patch('os.makedirs')
     def test_make_config_everything(self, mock_makedir):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8', provide_nat=True)
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dhcp=True, provide_nat=True,
@@ -451,8 +451,8 @@ class DnsMasqTestCase(testtools.TestCase):
 
     @mock.patch('os.makedirs')
     def test_make_dhcp_hosts(self, mock_makedir):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         instance_uuid_one = str(uuid.uuid4())
         instance_uuid_two = str(uuid.uuid4())
@@ -460,9 +460,9 @@ class DnsMasqTestCase(testtools.TestCase):
         iface_uuid_one = str(uuid.uuid4())
         iface_uuid_two = str(uuid.uuid4())
 
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'testing', network_uuid, netblock='127.0.0.0/8')
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network_interface(
             iface_uuid_one,
             {
                 'network_uuid': network_uuid,
@@ -471,7 +471,7 @@ class DnsMasqTestCase(testtools.TestCase):
                 'macaddress': '1a:91:64:d2:15:39',
             },
             instance_uuid=instance_uuid_one, order=0)
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network_interface(
             iface_uuid_two,
             {
                 'network_uuid': network_uuid,
@@ -480,8 +480,8 @@ class DnsMasqTestCase(testtools.TestCase):
                 'macaddress': '1a:91:64:d2:15:40',
             },
             instance_uuid=instance_uuid_two, order=0)
-        self.mock_etcd.create_instance('inst1', instance_uuid_one)
-        self.mock_etcd.create_instance('inst2', instance_uuid_two)
+        self.mock_mariadb.create_instance('inst1', instance_uuid_one)
+        self.mock_mariadb.create_instance('inst2', instance_uuid_two)
 
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n)
@@ -502,8 +502,8 @@ class DnsMasqTestCase(testtools.TestCase):
 
     @mock.patch('os.makedirs')
     def test_make_dns_hosts(self, mock_makedir):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         instance_uuid_one = str(uuid.uuid4())
         instance_uuid_two = str(uuid.uuid4())
@@ -511,9 +511,9 @@ class DnsMasqTestCase(testtools.TestCase):
         iface_uuid_one = str(uuid.uuid4())
         iface_uuid_two = str(uuid.uuid4())
 
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'testing', network_uuid, netblock='127.0.0.0/8')
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network_interface(
             iface_uuid_one,
             {
                 'network_uuid': network_uuid,
@@ -522,7 +522,7 @@ class DnsMasqTestCase(testtools.TestCase):
                 'macaddress': '1a:91:64:d2:15:39',
             },
             instance_uuid=instance_uuid_one, order=0)
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network_interface(
             iface_uuid_two,
             {
                 'network_uuid': network_uuid,
@@ -531,8 +531,8 @@ class DnsMasqTestCase(testtools.TestCase):
                 'macaddress': '1a:91:64:d2:15:40',
             },
             instance_uuid=instance_uuid_two, order=0)
-        self.mock_etcd.create_instance('inst1', instance_uuid_one)
-        self.mock_etcd.create_instance('inst2', instance_uuid_two)
+        self.mock_mariadb.create_instance('inst1', instance_uuid_one)
+        self.mock_mariadb.create_instance('inst2', instance_uuid_two)
 
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n, provide_dns=True)
@@ -553,8 +553,8 @@ class DnsMasqTestCase(testtools.TestCase):
 
     @mock.patch('os.makedirs')
     def test_make_dns_hosts_with_extras(self, mock_makedir):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         instance_uuid_one = str(uuid.uuid4())
         instance_uuid_two = str(uuid.uuid4())
@@ -562,9 +562,9 @@ class DnsMasqTestCase(testtools.TestCase):
         iface_uuid_one = str(uuid.uuid4())
         iface_uuid_two = str(uuid.uuid4())
 
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'testing', network_uuid, netblock='127.0.0.0/8', provide_dns=True)
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network_interface(
             iface_uuid_one,
             {
                 'network_uuid': network_uuid,
@@ -573,7 +573,7 @@ class DnsMasqTestCase(testtools.TestCase):
                 'macaddress': '1a:91:64:d2:15:39',
             },
             instance_uuid=instance_uuid_one, order=0)
-        self.mock_etcd.create_network_interface(
+        self.mock_mariadb.create_network_interface(
             iface_uuid_two,
             {
                 'network_uuid': network_uuid,
@@ -582,8 +582,8 @@ class DnsMasqTestCase(testtools.TestCase):
                 'macaddress': '1a:91:64:d2:15:40',
             },
             instance_uuid=instance_uuid_two, order=0)
-        self.mock_etcd.create_instance('inst1', instance_uuid_one)
-        self.mock_etcd.create_instance('inst2', instance_uuid_two)
+        self.mock_mariadb.create_instance('inst1', instance_uuid_one)
+        self.mock_mariadb.create_instance('inst2', instance_uuid_two)
 
         n = network.Network.from_db(network_uuid)
         n.update_dns_entry('www.shakenfist.com', '1.2.3.4')
@@ -609,11 +609,11 @@ class DnsMasqTestCase(testtools.TestCase):
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shutil.rmtree')
     def test_remove_config(self, mock_rmtree, mock_exists):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n)
@@ -628,11 +628,11 @@ class DnsMasqTestCase(testtools.TestCase):
     @mock.patch('os.waitpid')
     def test_send_signal(self, mock_waitpid, mock_kill, mock_pid_exists,
                          mock_path_exists):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n)
@@ -651,11 +651,11 @@ class DnsMasqTestCase(testtools.TestCase):
     @mock.patch('os.kill')
     def test_send_signal_no_process(self, mock_kill, mock_pid_exists,
                                     mock_path_exists):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n)
@@ -672,11 +672,11 @@ class DnsMasqTestCase(testtools.TestCase):
     @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._send_signal')
     @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._remove_config')
     def test_remove_dhcpd(self, mock_remove_config, mock_signal):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
         d = dnsmasq.DnsMasq.new(n)
@@ -693,11 +693,11 @@ class DnsMasqTestCase(testtools.TestCase):
     @mock.patch('shakenfist.util.concurrency.execute')
     def test_restart(self, mock_execute, mock_config, mock_signal,
                      mock_makedirs, mock_exists):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
 
@@ -727,11 +727,11 @@ class DnsMasqTestCase(testtools.TestCase):
     @mock.patch('shakenfist.util.concurrency.execute')
     def test_remove_leases(self, mock_execute, mock_hosts, mock_config,
                            mock_signal, mock_exists):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
 
@@ -779,11 +779,11 @@ class DnsMasqTestCase(testtools.TestCase):
     @mock.patch('shakenfist.util.concurrency.execute')
     def test_remove_no_leases(self, mock_execute, mock_hosts, mock_config,
                               mock_signal, mock_exists):
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
         network_uuid = str(uuid.uuid4())
-        self.mock_etcd.create_network(
+        self.mock_mariadb.create_network(
             'bobnet', network_uuid, netblock='10.0.0.0/8')
         n = network.Network.from_db(network_uuid)
 

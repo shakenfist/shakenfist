@@ -8,7 +8,7 @@ from shakenfist.schema.cluster_operation_target import ClusterOperationTargetDat
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 TEST_UUID = '12345678-1234-4321-8234-123456789012'
 OP_UUID = 'abcd1234-0000-4000-8000-000000000001'
@@ -291,8 +291,8 @@ class MockDeleteStaleClusterOperationTargetsTestCase(
 
     def setUp(self):
         super().setUp()
-        self.mock_etcd = MockEtcd(self, node_count=1)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
 
     def test_mock_prunes_old_terminal_keeps_active_and_recent(self):
         now = time.time()

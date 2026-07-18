@@ -13,15 +13,15 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.operations.node_blob_op import NodeBlobOp
 from shakenfist.tests import base
-from shakenfist.tests.mock_etcd import MockEtcd
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class NodeBlobOpTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
-        self.mock_etcd = MockEtcd(self, node_count=4)
-        self.mock_etcd.setup()
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
 
     def test_model(self):
         u1 = str(uuid4())
@@ -108,28 +108,28 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
                 'uuid': op_uuid,
                 'version': 1
             },
-            self.mock_etcd.get_cluster_operation_metadata(op_uuid)
+            self.mock_mariadb.get_cluster_operation_metadata(op_uuid)
         )
         self.assertEqual(
             {
                 'value': 'queued',
                 'update_time': 123.0
             },
-            self.mock_etcd.get_mariadb_state('node_blob_op', op_uuid)
+            self.mock_mariadb.get_mariadb_state('node_blob_op', op_uuid)
         )
         self.assertEqual(
             {
                 'operation_type': 'node_blob_op',
                 'operation_uuid': op_uuid
             },
-            self.mock_etcd.get_work_queue_payload(
+            self.mock_mariadb.get_work_queue_payload(
                 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
                 '-clusteroperation-background_high_io')
         )
 
         # Verify that create_and_enqueue records the blob as the operation
         # target in MariaDB cluster_operation_targets table
-        target = self.mock_etcd.cluster_operation_targets.get(op_uuid)
+        target = self.mock_mariadb.cluster_operation_targets.get(op_uuid)
         self.assertIsNotNone(target)
         self.assertEqual('node_blob_op', target.operation_type)
         self.assertEqual('blob', target.target_object_type)
