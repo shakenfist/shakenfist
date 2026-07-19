@@ -27,6 +27,7 @@ from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_all_background_node_queues
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util.caller_identity import set_caller_identity
 from shakenfist.util import libvirt as util_libvirt
 
 
@@ -222,6 +223,9 @@ def health_check_api():
 class Daemon:
     def __init__(self, name):
         self.daemon_name = name
+        # Record this daemon's name process-globally so the sf-database gRPC
+        # client interceptor can attribute each call to it.
+        set_caller_identity(name)
 
         procname = process_name(name)
         setproctitle.setproctitle(procname)

@@ -698,6 +698,8 @@ def main():
     # must be applied explicitly.
     apply_log_level('privexec')
     setproctitle.setproctitle('sf-privexec')
+    from shakenfist.util.caller_identity import set_caller_identity
+    set_caller_identity('privexec')
 
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
