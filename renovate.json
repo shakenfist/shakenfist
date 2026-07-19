@@ -50,13 +50,6 @@
         "zope.event",
         "zope.interface"
       ]
-    },
-    {
-      "description": "Group gunicorn updates together, as it is pinned both as a direct and indirect dependency",
-      "groupName": "gunicorn",
-      "matchPackageNames": [
-        "/gunicorn/"
-      ]
     }
   ],
   "minimumReleaseAge": "3 days",
