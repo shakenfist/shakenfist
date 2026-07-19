@@ -180,6 +180,24 @@ class SFConfig(BaseSettings):
     SCHEDULER_CACHE_TIMEOUT: int = Field(
         5, description='How long the scheduler should cache things for.'
     )
+    OBJECT_CACHE_TTL_IMMUTABLE: int = Field(
+        300,
+        description=(
+            'Seconds to cache the static values of objects that have no '
+            'post-creation writer (instance, network, networkinterface, '
+            'agentoperation). Only cross-process deletion can make these '
+            'stale, so the TTL can be long. 0 disables this cache tier.'
+        )
+    )
+    OBJECT_CACHE_TTL_MUTABLE: int = Field(
+        30,
+        description=(
+            'Seconds to cache the static values of objects whose row can be '
+            'rewritten by an online version upgrade (node, blob, artifact, '
+            'upload, dnsmasq, namespace). Kept short to bound cross-process '
+            'upgrade staleness. 0 disables this cache tier.'
+        )
+    )
     SCHEDULER_TARGET_LOAD: float = Field(
         0.75,
         description=(

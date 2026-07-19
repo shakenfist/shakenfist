@@ -117,6 +117,106 @@ ORPHAN_EVENTS_PRUNED = Counter(
 MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
 
 
+# ---------------------------------------------------------------------------
+# Read-through cache for immutable static object values.
+#
+# Restores the etcd-era principle "objects are cacheable, attributes are not":
+# each public get_<type>() returns a frozen Pydantic model of static columns
+# only (mutable fields come from separate get_<type>_attributes()), so caching
+# the whole result is safe. Keyed by (object_type, key) -> (monotonic expiry,
+# frozen model). Process-global under a dedicated lock so the sf-database
+# daemon's 64 worker threads share one cache rather than holding 64 disjoint
+# thread-local copies.
+#
+# Correctness rests on three rules, enforced here and by the wiring in the
+# public get_/update_/delete_ functions:
+#   * Only present rows are cached -- never a miss -- so a create-after-lookup
+#     or delete-then-lookup can never be masked by a negative entry.
+#   * Every public update_<type>/delete_<type> evicts (object_type, key). The
+#     lazy online-upgrade persist routes through the public update_<type>, so
+#     the cache self-heals after an upgrade.
+#   * Every entry is TTL-bounded, which is the only bound on staleness from a
+#     write made by another process (no local eviction hook fires there).
+# See PLAN-database-load-reduction-phase-02-static-cache.md.
+# ---------------------------------------------------------------------------
+_OBJECT_CACHE: dict[tuple[str, str], tuple[float, Any]] = {}
+_OBJECT_CACHE_LOCK = threading.Lock()
+
+
+def _object_cache_key(object_type: str, key: Any) -> tuple[str, str]:
+    """Normalise a cache key to (object_type, str(key)).
+
+    Readers pass a UUID (get_instance) while writers may pass a UUID or a
+    string (delete_instance via _ensure_uuid, or a namespace name). Keying on
+    str() makes those forms collide correctly, so an evict always finds the
+    entry a get created.
+    """
+    return (object_type, str(key))
+
+
+OBJECT_CACHE_HITS = Counter(
+    'database_object_cache_hits_total',
+    'Static-object reads served from the in-process cache.',
+    ['object_type']
+)
+OBJECT_CACHE_MISSES = Counter(
+    'database_object_cache_misses_total',
+    'Static-object reads that missed the in-process cache.',
+    ['object_type']
+)
+OBJECT_CACHE_EVICTIONS = Counter(
+    'database_object_cache_evictions_total',
+    'Static-object cache entries evicted by an update or delete.',
+    ['object_type']
+)
+
+
+def _object_cache_get(object_type: str, key: Any) -> Any:
+    """Return a cached static model for (object_type, key), or None.
+
+    Never returns an expired entry; an expired entry is dropped on access.
+    Callers treat None as "not cached" and fall through to the database.
+    """
+    cache_key = _object_cache_key(object_type, key)
+    now = time.monotonic()
+    hit = None
+    with _OBJECT_CACHE_LOCK:
+        entry = _OBJECT_CACHE.get(cache_key)
+        if entry is not None:
+            expiry, model = entry
+            if expiry > now:
+                hit = model
+            else:
+                del _OBJECT_CACHE[cache_key]
+    if hit is not None:
+        OBJECT_CACHE_HITS.labels(object_type=object_type).inc()
+        return hit
+    OBJECT_CACHE_MISSES.labels(object_type=object_type).inc()
+    return None
+
+
+def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
+    """Cache a present static model for ttl seconds. No-op when ttl <= 0.
+
+    Must never be called with model is None -- misses are not cached, so a
+    later create or a delete-then-read is never masked by a stale entry.
+    """
+    if ttl <= 0 or model is None:
+        return
+    with _OBJECT_CACHE_LOCK:
+        _OBJECT_CACHE[_object_cache_key(object_type, key)] = (
+            time.monotonic() + ttl, model)
+
+
+def _object_cache_evict(object_type: str, key: Any) -> None:
+    """Drop any cached entry for (object_type, key). Safe if absent."""
+    with _OBJECT_CACHE_LOCK:
+        present = _OBJECT_CACHE.pop(
+            _object_cache_key(object_type, key), None) is not None
+    if present:
+        OBJECT_CACHE_EVICTIONS.labels(object_type=object_type).inc()
+
+
 class _UUIDEncoder(json.JSONEncoder):
     """JSON encoder that converts UUID objects to strings."""
 
