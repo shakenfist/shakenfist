@@ -230,9 +230,11 @@ loop treats it as unhealthy and waits.
 The database gRPC channel uses HTTP/2 keepalive (ping every 10s, 5s
 timeout) to detect stale connections before they cause failures. The
 database gRPC server uses a 20-thread pool to handle concurrent requests
-from all daemons. The database client in `database.py` uses the
-`_retry_database` decorator for exponential backoff retries on transient
-failures. All gRPC failures are logged at ERROR level.
+from all daemons. The database client in `mariadb.py` (`_grpc_call`)
+retries `UNAVAILABLE` and `DEADLINE_EXCEEDED` failures, rebuilding the
+channel on a wedged subchannel but keeping it on a refused connection so
+`round_robin` can serve the retry from a surviving gateway. All gRPC
+failures are logged at ERROR level.
 
 `get_objects_by_state()` returns `None` on non-retryable errors (distinct
 from `[]` for no matches). All object iterators handle this by falling back

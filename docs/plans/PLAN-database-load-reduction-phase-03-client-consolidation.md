@@ -2,6 +2,18 @@
 
 Master plan: [PLAN-database-load-reduction.md](PLAN-database-load-reduction.md)
 
+**Status: Complete.** The step 3a gate re-verified at branch tip
+that `shakenfist/database.py`'s only importer was its own unit test
+(no dynamic import, no deploy/console-script reference), so the
+module and `shakenfist/tests/test_database.py` were deleted and the
+authoritative references updated (`ARCHITECTURE.md`, `CLAUDE.md`, the
+`grpc_channel.py` docstring, the `config.py` bootstrap comment). Net
+−387 lines. `pre-commit run --all-files` green including the full
+unit suite (proving nothing dangled). This phase is a negative
+control: it removes no live call path, so no `database_*_total`
+counter rate is expected to move — confirm the sfcbr dashboard stays
+flat across the deploy.
+
 ## Goal
 
 Reduce the sf-database gRPC client surface to a single live

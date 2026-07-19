@@ -206,7 +206,7 @@ shakenfist/
 | `blob.py` | Content-addressable binary storage with replication |
 | `baseobject.py` | State machine, versioning, DB sync for all objects |
 | `locks.py` | Distributed cluster locks (MariaDB-backed) |
-| `database.py` | Database microservice client library |
+| `mariadb.py` | Three-layer (direct/gRPC/public) database client and sf-database RPC access |
 | `config.py` | 100+ Pydantic settings with env overrides |
 
 ### Storage: MariaDB and the Database Service

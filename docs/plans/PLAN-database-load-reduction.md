@@ -264,7 +264,7 @@ so the phase plans do not reopen them:
 |-------|------|--------|
 | 1. Stop the idle-loop polls | PLAN-database-load-reduction-phase-01-idle-loop.md | Not started |
 | 2. Static object value caching | PLAN-database-load-reduction-phase-02-static-cache.md | Not started |
-| 3. Consolidate the gRPC client stacks | PLAN-database-load-reduction-phase-03-client-consolidation.md | Not started |
+| 3. Consolidate the gRPC client stacks | PLAN-database-load-reduction-phase-03-client-consolidation.md | Complete |
 | 4. Caller attribution on counters | PLAN-database-load-reduction-phase-04-attribution.md | Not started |
 | 5. Next-tier reductions | PLAN-database-load-reduction-phase-05-next-tier.md | Not started |
 

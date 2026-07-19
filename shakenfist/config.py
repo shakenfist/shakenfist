@@ -42,8 +42,8 @@ def load_cluster_config() -> None:
     Falls back silently on any failure so that fresh-install
     nodes with no database daemon yet can still start.
 
-    Built inline to avoid circular imports (database.py and
-    mariadb.py both import config.py).
+    Built inline to avoid a circular import (mariadb.py imports
+    config.py, so the bootstrap channel cannot route through it).
     """
     mariadb_host = os.getenv('SHAKENFIST_MARIADB_HOST')
     if mariadb_host:
