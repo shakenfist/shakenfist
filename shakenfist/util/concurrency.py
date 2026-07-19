@@ -243,15 +243,19 @@ def ensure_vxlan_mesh(
 
 
 def add_floating_ip(
-    network_uuid: Any, floating_address: str, inner_address: str
+    network_uuid: Any, floating_address: str, inner_address: str,
+    vxid: int = 0
 ) -> None:
-    # Convert network_uuid to string if it's a UUID object
+    # Convert network_uuid to string if it's a UUID object. The vxid
+    # lets privexec derive the egress veth so it can announce the new
+    # address with a gratuitous ARP; zero skips the announcement.
     network_uuid_str = str(network_uuid)
     request = privexec_pb2.PrivExecRequest(
         add_floating_ip_request=privexec_pb2.AddFloatingIPRequest(
             network_uuid=network_uuid_str,
             floating_address=floating_address,
-            inner_address=inner_address
+            inner_address=inner_address,
+            vxid=vxid
         )
     )
     reply = _marshal_privexec_request(request, 'add_floating_ip_reply')

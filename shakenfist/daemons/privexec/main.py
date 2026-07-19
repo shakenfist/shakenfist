@@ -6,6 +6,7 @@
 import ipaddress
 import os
 import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -415,6 +416,32 @@ class PrivExecJob:
                     )
                 )
 
+        # The floating address is an address anchor only -- neither end
+        # of the veth pair carries traffic (ARP for the address is
+        # answered via the egress veth thanks to arp_ignore=0). It
+        # historically worked with both ends left admin-DOWN because
+        # the kernel keeps the /32's local route in that state, but
+        # that is subtle enough to be fragile. Bring both ends up so
+        # the interface state matches intent. Best effort: an already
+        # working datapath should not fail because of this.
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'link', 'set',
+            floating_interface, 'up', failure_is_error=False)
+        if returncode != 0:
+            LOG.with_fields({
+                'interface': floating_interface}).warning(
+                'Failed to bring floating veth outer end up')
+        _, _, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, privexec_util.locate_command('ip'),
+            'link', 'set', inner_floating_interface, 'up',
+            failure_is_error=False)
+        if returncode != 0:
+            LOG.with_fields({
+                'interface': inner_floating_interface,
+                'netns': req.network_uuid}).warning(
+                'Failed to bring floating veth inner end up')
+
         # Only append the DNAT rule if an identical rule is not already
         # present. Duplicated rules aren't just clutter -- the first match
         # wins, so a duplicate from an earlier partial attempt would mask
@@ -427,33 +454,37 @@ class PrivExecJob:
             req.network_uuid, privexec_util.locate_command('iptables'),
             '-w', '10', '-t', 'nat', '-C', *dnat_rule,
             failure_is_error=False)
-        if returncode == 0:
-            return privexec_pb2.PrivExecReply(
-                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
-                    network_uuid=req.network_uuid,
-                    floating_address=req.floating_address,
-                    inner_address=req.inner_address,
-                    error=privexec_pb2.AddFloatingIPReply.OK
-                )
-            )
-
-        _, stderr, returncode = privexec_util.command_helper(
-            privexec_util.locate_command('ip'), 'netns', 'exec',
-            req.network_uuid, privexec_util.locate_command('iptables'),
-            '-w', '10', '-t', 'nat', '-A', *dnat_rule)
         if returncode != 0:
-            return privexec_pb2.PrivExecReply(
-                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
-                    network_uuid=req.network_uuid,
-                    floating_address=req.floating_address,
-                    inner_address=req.inner_address,
-                    error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED,
-                    error_text=(
-                        f'failed to append DNAT rule for '
-                        f'{req.floating_address} in namespace '
-                        f'{req.network_uuid}: {stderr}')
+            _, stderr, returncode = privexec_util.command_helper(
+                privexec_util.locate_command('ip'), 'netns', 'exec',
+                req.network_uuid, privexec_util.locate_command('iptables'),
+                '-w', '10', '-t', 'nat', '-A', *dnat_rule)
+            if returncode != 0:
+                return privexec_pb2.PrivExecReply(
+                    add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                        network_uuid=req.network_uuid,
+                        floating_address=req.floating_address,
+                        inner_address=req.inner_address,
+                        error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED,
+                        error_text=(
+                            f'failed to append DNAT rule for '
+                            f'{req.floating_address} in namespace '
+                            f'{req.network_uuid}: {stderr}')
+                    )
                 )
-            )
+
+        # Announce the address with a gratuitous ARP out the egress
+        # veth once the datapath is complete. Floating addresses are
+        # recycled between networks (each with a distinct egress veth
+        # MAC), so upstream ARP caches can hold the previous holder's
+        # MAC; the announcement converges them immediately. This is
+        # the same L2 advertisement the network carrier model plans to
+        # use on lease acquire (PLAN-network-carrier-model phase 9),
+        # and one of the exec sites PLAN-replace-exec-with-netlink
+        # phase 6 will absorb. Best effort: reachability usually works
+        # without it, so a missing arping binary or a transient
+        # failure should not fail the float add.
+        self._announce_floating_ip(req)
 
         return privexec_pb2.PrivExecReply(
             add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
@@ -463,6 +494,38 @@ class PrivExecJob:
                 error=privexec_pb2.AddFloatingIPReply.OK
             )
         )
+
+    def _announce_floating_ip(self, req):
+        """Send a gratuitous ARP for a just-added floating address.
+
+        Emitted from inside the network namespace out the egress veth
+        (derived from the vxid), announcing the namespace's MAC for
+        the floating address to the upstream L2 segment. A zero vxid
+        means the caller predates the field; skip silently.
+        """
+        if not req.vxid:
+            return
+
+        arping = shutil.which('arping')
+        if not arping:
+            LOG.warning(
+                'arping not found, skipping gratuitous ARP for '
+                'floating address')
+            return
+
+        egress_veth_inner = f'egr-{req.vxid:06x}-i'
+        _, stderr, returncode = privexec_util.command_helper(
+            privexec_util.locate_command('ip'), 'netns', 'exec',
+            req.network_uuid, arping, '-c', '2', '-U',
+            '-i', egress_veth_inner, '-S', req.floating_address,
+            req.floating_address, failure_is_error=False)
+        if returncode != 0:
+            LOG.with_fields({
+                'floating_address': req.floating_address,
+                'netns': req.network_uuid,
+                'interface': egress_veth_inner,
+                'stderr': stderr}).warning(
+                'Gratuitous ARP for floating address failed')
 
     def _remove_floating_ip(self, req):
         floating_interface = \

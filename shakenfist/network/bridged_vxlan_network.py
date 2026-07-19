@@ -187,7 +187,8 @@ class BridgedVXLanNetwork:
         self._require_network_node('_apply_add_floating_ip')
 
         util_concurrency.add_floating_ip(
-            str(self.network.uuid), floating_address, inner_address)
+            str(self.network.uuid), floating_address, inner_address,
+            vxid=self.network.vxid)
 
     def _apply_remove_floating_ip(
             self, floating_address: str, inner_address: str) -> None:

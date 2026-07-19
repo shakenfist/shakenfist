@@ -284,7 +284,7 @@ class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):
 
     def test_apply_add_floating_ip_invokes_privexec(self):
         network = _make_network_mock(
-            uuid='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+            uuid='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', vxid=42)
         bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
 
         bvn._apply_add_floating_ip('203.0.113.5', '10.0.0.5')
@@ -292,7 +292,7 @@ class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):
         network.get_lock.assert_not_called()
         self.mock_add_floating_ip.assert_called_once_with(
             'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-            '203.0.113.5', '10.0.0.5')
+            '203.0.113.5', '10.0.0.5', vxid=42)
         # The apply layer does NOT emit events; that is the dispatcher's job.
         network.add_event.assert_not_called()
 
