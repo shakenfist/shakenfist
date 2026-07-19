@@ -535,7 +535,17 @@ because the following statements will be true:
 
 ### Bugs fixed during this work
 
-* (to be filled in as work proceeds)
+* **`GET /clusteroperations?target_object_type=&target_uuid=`
+  was broken on arrival** (fixed in phase 1). The handler
+  `ClusterOperationsEndpoint.get(self)` accepted neither
+  target parameter as a keyword argument and read them from
+  `flask.request.args`, but the SF client sends parameters in
+  a JSON body which the `log_request` decorator injects as
+  kwargs — so every real client call raised a `TypeError`
+  surfaced as HTTP 400. The endpoint's unit tests only drove
+  the query-string path via Flask's test client and never
+  caught it. Fixed by accepting the injected kwargs (with a
+  query-string fallback) and adding a body-path unit test.
 * Candidate already identified: `_set_last_cluster_operation`
   in `baseobject.py` is dead code and will be removed in
   phase 2.

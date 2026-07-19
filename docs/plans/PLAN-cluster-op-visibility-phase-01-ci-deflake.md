@@ -10,9 +10,30 @@ and file/line references this phase relies on.
 Rewrite the two functional-CI await helpers so they wait on
 *every* outstanding cluster operation targeting the object,
 instead of following the racy `last_cluster_operation`
-single pointer. No server changes. This phase merges alone
-and immediately deflakes `test_interface_plug_and_exec_reboot`
-(and any other test using these helpers).
+single pointer. This phase merges alone and immediately
+deflakes `test_interface_plug_and_exec_reboot` (and any other
+test using these helpers).
+
+**Scope correction (discovered during CI):** the phase was
+originally scoped as test-only, on the assumption that the
+history-aware `GET /clusteroperations?target_object_type=&
+target_uuid=` endpoint already worked. The first CI run
+(PR #3465) proved it did not: every call returned HTTP 400
+with `ClusterOperationsEndpoint.get() got an unexpected
+keyword argument 'target_object_type'`. The endpoint was
+broken on arrival and had never been exercised end-to-end.
+The SF client sends request parameters in a JSON body, and
+the `log_request` decorator (`external_api/base.py`) injects
+each body key as a keyword argument before the handler runs
+-- the convention the rest of the API follows. The endpoint's
+`def get(self)` accepted neither `target_object_type` nor
+`target_uuid` as kwargs, and read them from `flask.request.
+args` (the query string, which the client never populates).
+Its unit tests only exercised the query-string path via
+Flask's test client, so the body path -- the only one real
+clients use -- was never covered. Fixing the endpoint (accept
+the injected kwargs, keep a query-string fallback) is
+therefore part of this phase.
 
 Out of scope, deliberately: the observational flag (phase 2/3),
 `has_pending_operations` (phase 4), and switching these
@@ -122,6 +143,14 @@ lco-shadowing race, with a pointer to the master plan).
   and are present on develop. If `IncapableException` fires
   in CI, something is genuinely wrong with the deploy — do
   not swallow it.
+* The by-target endpoint was broken on arrival (see Scope
+  correction). Lesson for later phases: an endpoint with unit
+  tests is not proven working end-to-end if those tests only
+  drive Flask's test client with query-string args — the real
+  client's JSON-body-plus-`log_request`-kwarg-injection path
+  is a distinct code path that must be exercised. Phase 4,
+  which touches these endpoints again, should add body-path
+  coverage for anything it changes.
 * Semantics change for `error`: today an error op only fails
   the await if it happens to be the pointer target; the new
   rule fails on any watched op erroring. This is stricter and
