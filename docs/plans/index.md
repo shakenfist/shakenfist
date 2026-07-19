@@ -147,7 +147,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Database load reduction](PLAN-database-load-reduction.md) | [Phase 1: Stop the idle-loop polls](PLAN-database-load-reduction-phase-01-idle-loop.md) | Complete | Remove the 5 Hz `get_node`/`get_node_daemon_state` polling from `Daemon.idle()` (~57% of measured sf-database load) |
 | [Database load reduction](PLAN-database-load-reduction.md) | Phase 2: Static object value caching | Not started | Narrow client-side cache for immutable static object values; restores the objects-cacheable/attributes-not principle |
 | [Database load reduction](PLAN-database-load-reduction.md) | [Phase 3: Consolidate the gRPC client stacks](PLAN-database-load-reduction-phase-03-client-consolidation.md) | Complete | Remove the orphaned `database.py` client (dead since commit e48d3257f) so the live `mariadb.py` stack is the sole interceptor seam for attribution |
-| [Database load reduction](PLAN-database-load-reduction.md) | Phase 4: Caller attribution on counters | Not started | gRPC metadata caller identity + per-caller labels on `database_*_total`; mTLS-compatible, first slice of the OpenTelemetry thread |
+| [Database load reduction](PLAN-database-load-reduction.md) | [Phase 4: Caller attribution on counters](PLAN-database-load-reduction-phase-04-attribution.md) | Planning | gRPC metadata caller identity + an additive `database_requests_total{operation, caller_daemon}` counter; mTLS-compatible, first slice of the OpenTelemetry thread |
 | [Database load reduction](PLAN-database-load-reduction.md) | Phase 5: Next-tier reductions | Not started | Data-driven reduction of `dequeue`/`get_ipam`/locks/blob-transfer polling, planned from phase 4 attribution numbers |
 
 ### Status Definitions

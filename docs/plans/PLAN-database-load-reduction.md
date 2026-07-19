@@ -243,14 +243,17 @@ so the phase plans do not reopen them:
    decide whether to keep or delete the `is_available()` /
    `reset_client()` helpers if anything references them
    (the sweep found none).
-4. **Counter label shape.** Adding a `caller` label to
-   ~190 existing `database_*_total` counters multiplies
-   series count. Bounded (~12 daemon names × 6 nodes, most
-   pairs absent) but the phase 4 plan should decide whether
-   `caller_node` is a label or whether daemon name alone is
-   enough (the server already knows the peer address).
-   Dashboard queries in the 33fl repo must be updated to
-   sum away the new label where they aggregate.
+4. **Counter label shape.** *(Resolved in the phase 4
+   plan.)* Rather than relabel the ~150 existing
+   `database_<op>_total` counters (invasive, breaks current
+   queries), phase 4 adds one additive counter
+   `database_requests_total{operation, caller_daemon}`
+   incremented centrally by a server interceptor. `caller_node`
+   is sent as gRPC metadata (for the mTLS cross-check) but not
+   used as a label — the `operation` axis (~150) dominates
+   cardinality and there are only ~6 nodes recoverable via
+   `context.peer()`. Existing dashboards are unaffected; a new
+   panel uses the additive counter.
 5. **Does the queues daemon need a 0.2s dequeue poll?**
    `dequeue` at 38/s suggests tight-loop polling by the
    queues and transfers daemons. Adaptive backoff when the
@@ -265,7 +268,7 @@ so the phase plans do not reopen them:
 | 1. Stop the idle-loop polls | PLAN-database-load-reduction-phase-01-idle-loop.md | Complete |
 | 2. Static object value caching | PLAN-database-load-reduction-phase-02-static-cache.md | Not started |
 | 3. Consolidate the gRPC client stacks | PLAN-database-load-reduction-phase-03-client-consolidation.md | Complete |
-| 4. Caller attribution on counters | PLAN-database-load-reduction-phase-04-attribution.md | Not started |
+| 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Planning |
 | 5. Next-tier reductions | PLAN-database-load-reduction-phase-05-next-tier.md | Not started |
 
 Phase summaries:
@@ -321,13 +324,21 @@ this plan) rather than a delete.
 
 **Phase 4 — caller attribution on counters.** A single gRPC
 client interceptor on the phase 3 consolidated client
-attaches `caller-daemon` / `caller-node` metadata; the
-sf-database servicer adds the caller label(s) to the existing
-per-operation Prometheus counters; the shakenfist Grafana
-dashboard (in the 33fl repo) gains a per-caller breakdown
-panel and existing aggregate queries are checked against
-the new label. Designed per Decision 4 to compose with the
-future mTLS work rather than duplicate it.
+attaches `caller-daemon` / `caller-node` metadata (caller
+daemon from a process-global set at startup, node from
+`config.NODE_NAME`); a gRPC server interceptor on sf-database
+increments one new additive counter
+`database_requests_total{operation, caller_daemon}`, leaving
+the ~150 existing `database_<op>_total` counters — and every
+dashboard/alert on them — untouched. The Grafana dashboard
+(in the separate 33fl repo) gains a per-caller breakdown
+panel. Attribution must be server-side because only three
+daemons expose a scraped metrics endpoint. Designed per
+Decision 4 to compose with the future mTLS work (the
+`caller-node` metadata is what mTLS later cross-checks against
+the peer SAN) rather than duplicate it. Detailed design,
+including the label-cardinality resolution of open question 4,
+is in the phase 4 plan file.
 
 **Phase 5 — next-tier reductions.** With per-caller data
 from phase 4, attack the remaining table: `dequeue` (38/s,
