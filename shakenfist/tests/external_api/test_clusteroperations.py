@@ -481,6 +481,26 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
             [op_uuid_1, op_uuid_2],
             [entry['uuid'] for entry in body])
 
+    def test_body_params_are_accepted(self):
+        # The SF client sends the target parameters in a JSON request body,
+        # not the query string. The log_request decorator parses the body
+        # and injects each key as a keyword argument before the handler
+        # runs, so the handler must accept them. A bare ``def get(self)``
+        # raised a TypeError ("unexpected keyword argument") on every real
+        # client call, surfaced to the client as a 400. Exercise the body
+        # path explicitly so that regression cannot return.
+        op_uuid = str(uuid4())
+        self._patch_list_and_hydrate([(op_uuid, 'net_op', 1.0)])
+
+        resp = self.client.get(
+            '/clusteroperations',
+            json={'target_object_type': 'network',
+                  'target_uuid': self.network_uuid},
+            headers={'Authorization': self.foo_token})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            [op_uuid], [entry['uuid'] for entry in resp.get_json()])
+
     def test_non_admin_foreign_namespace_returns_403(self):
         # No hydration patches needed -- the access check fails before
         # we'd consult mariadb.list_cluster_operations_for_target.

@@ -2007,6 +2007,14 @@ message DeleteClusterOperationRequest {
   string uuid = 1;
 }
 
+// One cluster_operation_targets row to write in the same transaction
+// as the operation itself. operation_uuid, operation_type and
+// created_at are shared with the parent request and not repeated here.
+message CreateAndEnqueueClusterOperationTarget {
+  ObjectType target_object_type = 1;
+  string target_uuid = 2;
+}
+
 message CreateAndEnqueueClusterOperationRequest {
   string uuid = 1;           // Operation UUID as string
   string operation_type = 2; // e.g. "node_net_op"
@@ -2014,6 +2022,9 @@ message CreateAndEnqueueClusterOperationRequest {
   string queue_name = 4;     // Target work queue name
   double delay = 5;          // Seconds to defer before the job is eligible
   string metadata_json = 6;  // Full operation metadata dict as JSON
+  // cluster_operation_targets rows written atomically with the op so a
+  // by-target query never sees an enqueued op without its target rows.
+  repeated CreateAndEnqueueClusterOperationTarget targets = 7;
 }
 
 message SetClusterOperationErrorRequest {

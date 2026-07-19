@@ -305,18 +305,26 @@ class ClusterOperationsEndpoint(api_base.Resource):
          (404, 'Target object not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
-    def get(self):
-        # webargs is not in use here -- flask_restful surfaces these
-        # query string parameters via flask.request.args.
-        target_object_type = flask.request.args.get('target_object_type')
-        target_uuid = flask.request.args.get('target_uuid')
+    def get(self, target_object_type=None, target_uuid=None):
+        # These parameters arrive as keyword arguments when the SF client
+        # sends them in a JSON request body: the log_request decorator
+        # (external_api/base.py) parses the body and injects each key as a
+        # kwarg before the handler runs, which is how the rest of the API
+        # receives request parameters. A bare ``def get(self)`` raised a
+        # TypeError ("unexpected keyword argument") on every such call. We
+        # also fall back to the query string so a raw ``?target_...=`` GET
+        # keeps working.
+        if target_object_type is None:
+            target_object_type = flask.request.args.get('target_object_type')
+        if target_uuid is None:
+            target_uuid = flask.request.args.get('target_uuid')
 
         if not target_object_type:
             return sf_api.error(
-                400, 'target_object_type query parameter is required')
+                400, 'target_object_type parameter is required')
         if not target_uuid:
             return sf_api.error(
-                400, 'target_uuid query parameter is required')
+                400, 'target_uuid parameter is required')
 
         try:
             object_type_enum = ObjectType(target_object_type)
