@@ -194,23 +194,6 @@ def create_vx_interface(vx_interface, vx_id, vx_bridge, mesh_interface):
         log.with_fields({'create_interface_rc': rc}).debug(
             'create_interface returned for vxlan bridge')
 
-        command = [
-            'ip', 'link', 'set', str(vx_interface), 'master', str(vx_bridge)
-        ]
-        _, _, returncode = command_helper(*command)
-        if returncode != 0:
-            return False
-
-        command = ['ip', 'link', 'set', str(vx_interface), 'up']
-        _, _, returncode = command_helper(*command)
-        if returncode != 0:
-            return False
-
-        command = ['ip', 'link', 'set', str(vx_bridge), 'up']
-        _, _, returncode = command_helper(*command)
-        if returncode != 0:
-            return False
-
         command = ['sysctl', '-w', f'net.ipv4.conf.{vx_bridge}.arp_notify=1']
         _, _, returncode = command_helper(*command)
         if returncode != 0:
@@ -232,6 +215,32 @@ def create_vx_interface(vx_interface, vx_id, vx_bridge, mesh_interface):
             return False
     else:
         log.debug('vxlan bridge already present')
+
+    # Enslavement and admin state are converged unconditionally rather
+    # than only when the bridge was just created: this function can be
+    # entered with any combination of the pair already existing (for
+    # example the vxlan interface deleted by a racing teardown while
+    # the bridge survived). In that state the recreated interface was
+    # previously left unenslaved and down -- mesh FDB entries would
+    # render onto it and the drift auditor would report the mesh
+    # healthy, while the bridge silently had no vxlan member and the
+    # overlay was dark. All three commands are idempotent.
+    command = [
+        'ip', 'link', 'set', str(vx_interface), 'master', str(vx_bridge)
+    ]
+    _, _, returncode = command_helper(*command)
+    if returncode != 0:
+        return False
+
+    command = ['ip', 'link', 'set', str(vx_interface), 'up']
+    _, _, returncode = command_helper(*command)
+    if returncode != 0:
+        return False
+
+    command = ['ip', 'link', 'set', str(vx_bridge), 'up']
+    _, _, returncode = command_helper(*command)
+    if returncode != 0:
+        return False
 
     log.debug('vxlan interface and bridge ready')
     return True
