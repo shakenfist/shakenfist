@@ -863,14 +863,20 @@ class Instance(dbowo):
             i += 1
 
         # NVME disks require a different treatment because libvirt doesn't natively
-        # support them yet.
+        # support them yet. werror/rerror=stop are the qemu-commandline equivalent
+        # of the error_policy/rerror_policy='stop' we set on libvirt-managed disks
+        # in libvirt.tmpl: without them an NVME-bus disk would fall back to qemu's
+        # default 'report' policy and pass a backing-store I/O error to the guest
+        # while the domain kept running, which is exactly the failure the disk
+        # error policy exists to make visible (the domain pauses instead).
         nvme_counter = 0
         for d in block_devices['devices']:
             if d['bus'] == 'nvme':
                 nvme_counter += 1
                 block_devices['extracommands'].extend([
                     '-drive',
-                    f'file={d["path"]},format={d["type"]},if=none,id=NVME{nvme_counter}',
+                    f'file={d["path"]},format={d["type"]},if=none,'
+                    f'id=NVME{nvme_counter},werror=stop,rerror=stop',
                     '-device', f'nvme,drive=NVME{nvme_counter},serial=nvme-{nvme_counter}'
                 ])
 
