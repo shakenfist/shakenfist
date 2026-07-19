@@ -216,6 +216,7 @@ class Root(api_base.Resource):
              'cluster-operation-chain, cluster-operations-by-target</li>'
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
+             'vdi-console-proxy, '
              'instance-put-blob, instance-execute, instance-get, instance-screenshot, '
              'get-instance-namespace, hot-plug-interface, '
              'include-queued-agent-operations, instance-clusteroperations</li>'
@@ -354,6 +355,8 @@ api.add_resource(api_instance.InstanceConsoleDataEndpoint,
                  '/instances/<instance_ref>/consoledata')
 api.add_resource(api_instance.InstanceVDIConsoleHelperEndpoint,
                  '/instances/<instance_ref>/vdiconsolehelper')
+api.add_resource(api_instance.InstanceVDIProxyConsoleHelperEndpoint,
+                 '/instances/<instance_ref>/vdiconsoleproxy')
 api.add_resource(api_instance.InstanceAgentPutEndpoint,
                  '/instances/<instance_ref>/agent/put')
 api.add_resource(api_instance.InstanceAgentGetEndpoint,

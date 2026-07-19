@@ -192,6 +192,61 @@ def active_signing_key(material: dict[str, Any]) -> dict[str, Any]:
         f'active_kid {active_kid} is not present in the published keys')
 
 
+def mint_console_token(
+    instance_uuid: str, namespace: str, *,
+    audience: str, issuer: str, duration: int,
+) -> dict[str, Any]:
+    """Mint a short-lived Ed25519-signed JWT for a VDI console session.
+
+    Signs the token with the active key from ``get_signing_material()``
+    and returns ``{'token', 'jti', 'kid', 'expires_at'}``. Raises
+    ``SigningKeyError`` if no signing material is configured, so the
+    caller can translate that to a clear HTTP error.
+
+    ``audience``, ``issuer`` and ``duration`` are explicit keyword-only
+    arguments rather than read from ``config`` here, so this helper stays
+    unit-testable without mocking the config singleton. The token and any
+    private key material must never be logged.
+    """
+    material = get_signing_material()
+    if material is None:
+        raise SigningKeyError('no signing key is configured')
+    key = active_signing_key(material)
+
+    iat = int(time.time())
+    exp = iat + duration
+    jti = uuid.uuid4().hex
+    claims = {
+        'iss': issuer,
+        'aud': audience,
+        'sub': instance_uuid,
+        'sf:namespace': namespace,
+        'iat': iat,
+        'exp': exp,
+        'jti': jti,
+    }
+
+    # NOTE: imported inline to keep PyJWT off the module import path for
+    # callers that only touch the key helpers.
+    import jwt
+
+    # On PyJWT 2.x jwt.encode returns a str, so no decode is needed.
+    token = jwt.encode(
+        claims, key['private_pem'], algorithm=SIGNING_ALG,
+        headers={'kid': key['kid']})
+
+    LOG.with_fields(
+        {'kid': key['kid'], 'jti': jti, 'sub': instance_uuid}).info(
+        'Minted Kerbside VDI console token')
+
+    return {
+        'token': token,
+        'jti': jti,
+        'kid': key['kid'],
+        'expires_at': exp,
+    }
+
+
 def public_view(material: dict[str, Any]) -> dict[str, Any]:
     """Return the public-only view of the signing material.
 

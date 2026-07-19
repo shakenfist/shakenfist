@@ -185,3 +185,73 @@ class ActiveSigningKeyTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             vdi_tokens.SigningKeyError,
             vdi_tokens.active_signing_key, material)
+
+
+class MintConsoleTokenTestCase(base.ShakenFistTestCase):
+    """Tests for mint_console_token()."""
+
+    def setUp(self):
+        super().setUp()
+        self.store = _FakeClusterConfigStore()
+        self.mariadb_patch = _patch_mariadb(self.store)
+        self.mariadb_patch.start()
+        self.addCleanup(self.mariadb_patch.stop)
+
+    def test_minted_token_claims_and_header_are_correct(self):
+        vdi_tokens.ensure_signing_key()
+        material = vdi_tokens.get_signing_material()
+        active = vdi_tokens.active_signing_key(material)
+        public_pem = vdi_tokens.public_view(material)['keys'][0]['public_pem']
+
+        instance_uuid = 'e4a3f6d0-1234-4a5b-9c6d-abcdef012345'
+        namespace = 'ns-a'
+        audience = 'https://kerbside.example.com'
+        issuer = 'zone-a'
+        duration = 300
+
+        minted = vdi_tokens.mint_console_token(
+            instance_uuid, namespace, audience=audience, issuer=issuer,
+            duration=duration)
+
+        self.assertEqual(active['kid'], minted['kid'])
+        self.assertTrue(minted['jti'])
+        self.assertIsInstance(minted['expires_at'], int)
+
+        header = jwt.get_unverified_header(minted['token'])
+        self.assertEqual(active['kid'], header['kid'])
+
+        decoded = jwt.decode(
+            minted['token'], public_pem, algorithms=[vdi_tokens.SIGNING_ALG],
+            audience=audience)
+
+        self.assertEqual(issuer, decoded['iss'])
+        self.assertEqual(audience, decoded['aud'])
+        self.assertEqual(instance_uuid, decoded['sub'])
+        self.assertEqual(namespace, decoded['sf:namespace'])
+        self.assertEqual(minted['jti'], decoded['jti'])
+        self.assertEqual(minted['expires_at'], decoded['exp'])
+        self.assertEqual(duration, decoded['exp'] - decoded['iat'])
+
+    def test_minted_token_fails_verification_for_wrong_audience(self):
+        vdi_tokens.ensure_signing_key()
+        material = vdi_tokens.get_signing_material()
+        public_pem = vdi_tokens.public_view(material)['keys'][0]['public_pem']
+
+        minted = vdi_tokens.mint_console_token(
+            'e4a3f6d0-1234-4a5b-9c6d-abcdef012345', 'ns-a',
+            audience='https://kerbside.example.com', issuer='zone-a',
+            duration=300)
+
+        self.assertRaises(
+            jwt.InvalidAudienceError,
+            jwt.decode, minted['token'], public_pem,
+            algorithms=[vdi_tokens.SIGNING_ALG],
+            audience='https://not-kerbside.example.com')
+
+    def test_raises_when_no_signing_key_configured(self):
+        self.assertRaises(
+            vdi_tokens.SigningKeyError,
+            vdi_tokens.mint_console_token,
+            'e4a3f6d0-1234-4a5b-9c6d-abcdef012345', 'ns-a',
+            audience='https://kerbside.example.com', issuer='zone-a',
+            duration=300)
