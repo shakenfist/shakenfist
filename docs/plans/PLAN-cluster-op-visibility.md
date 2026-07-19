@@ -583,6 +583,27 @@ because the following statements will be true:
   the query-string path via Flask's test client and never
   caught it. Fixed by accepting the injected kwargs (with a
   query-string fallback) and adding a body-path unit test.
+* **The by-target listing query never matched** (fixed in
+  phase 1b). `_direct_list_cluster_operations_for_target`
+  JOINed `cluster_operation_targets.operation_uuid`
+  (`String(36)`, dashed form) directly against
+  `cluster_operations.uuid` (a `Uuid()` column whose stored
+  form has no dashes / is native), so the JOIN never matched
+  and the endpoint always returned `[]` even for a queued op.
+  `has_pending`/`get_latest` were unaffected because they JOIN
+  `operation_uuid` against `object_states.object_uuid` (both
+  dashed `String(36)`). It escaped notice because the endpoint
+  400'd on arrival (so the query never ran) and its SQLite
+  unit fixture used `String(36)` for `cluster_operations.uuid`
+  instead of the real `Uuid()`, so String==String matched and
+  masked the bug. Fixed with a two-step query (select
+  operation_uuids from targets, then `ops.uuid.IN` the UUID
+  objects so the `Uuid` bind processor converts to storage
+  form), and the fixture was corrected to use `Uuid()` so the
+  existing SQL tests now guard it. This is the fix that
+  actually made the CI hot-plug await reliable -- the
+  atomic-write fix (phase 1b) was necessary but not
+  sufficient on its own.
 * Candidate already identified: `_set_last_cluster_operation`
   in `baseobject.py` is dead code and will be removed in
   phase 2.
