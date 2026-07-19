@@ -1191,15 +1191,23 @@ class DirectListClusterOperationsForTargetTestCase(
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
         )
+        # cluster_operations.uuid is a Uuid() column exactly as in
+        # production. An earlier version of this fixture used String(36)
+        # here, which stored the dashed UUID form and so happened to
+        # match the dashed String in cluster_operation_targets on a
+        # naive JOIN -- masking the production bug where the Uuid()
+        # column's storage form has no dashes and the JOIN never
+        # matched. Using the real type makes these tests a faithful
+        # regression guard for _direct_list_cluster_operations_for_target.
         self._ops_table = sa.Table(
             'cluster_operations',
             self._metadata,
-            sa.Column('uuid', sa.String(36), primary_key=True),
+            sa.Column('uuid', sa.Uuid(), primary_key=True),
             sa.Column('operation_type', sa.String(64), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
-            sa.Column('node_uuid', sa.String(36), nullable=True),
-            sa.Column('instance_uuid', sa.String(36), nullable=True),
-            sa.Column('network_uuid', sa.String(36), nullable=True),
+            sa.Column('node_uuid', sa.Uuid(), nullable=True),
+            sa.Column('instance_uuid', sa.Uuid(), nullable=True),
+            sa.Column('network_uuid', sa.Uuid(), nullable=True),
             sa.Column('priority', sa.String(32), nullable=True),
             sa.Column('metadata_json', sa.JSON(), nullable=False),
         )
@@ -1230,11 +1238,14 @@ class DirectListClusterOperationsForTargetTestCase(
 
     def _insert_op(self, op_uuid, op_type, created_at,
                    metadata=None):
+        from uuid import UUID
         if metadata is None:
             metadata = {}
         with self._engine.begin() as conn:
             conn.execute(self._ops_table.insert().values(
-                uuid=op_uuid,
+                # A Uuid() column binds UUID objects, not strings --
+                # production passes UUID objects here too.
+                uuid=UUID(op_uuid),
                 operation_type=op_type,
                 created_at=created_at,
                 node_uuid=None,

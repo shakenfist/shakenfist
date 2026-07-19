@@ -16541,16 +16541,31 @@ def _direct_list_cluster_operations_for_target(
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(ops_table).select_from(
-                targets_table.join(
-                    ops_table,
-                    targets_table.c.operation_uuid == ops_table.c.uuid
+            # Two steps rather than a single JOIN.
+            # cluster_operation_targets.operation_uuid is a String(36)
+            # holding the dashed UUID form, but cluster_operations.uuid
+            # is a Uuid() column whose stored representation differs
+            # (no dashes / native), so a column-to-column JOIN on the two
+            # never matches and the query silently returned nothing.
+            # Selecting the operation_uuids first and passing them through
+            # an IN clause routes each value through the Uuid type's bind
+            # processor, which converts it to the column's storage form so
+            # the comparison matches.
+            target_rows = conn.execute(
+                sa.select(targets_table.c.operation_uuid).where(
+                    sa.and_(
+                        targets_table.c.target_object_type
+                        == target_object_type,
+                        targets_table.c.target_uuid == target_uuid
+                    )
                 )
-            ).where(
-                sa.and_(
-                    targets_table.c.target_object_type == target_object_type,
-                    targets_table.c.target_uuid == target_uuid
-                )
+            ).fetchall()
+            if not target_rows:
+                return []
+
+            op_uuids = [UUID(r.operation_uuid) for r in target_rows]
+            stmt = sa.select(ops_table).where(
+                ops_table.c.uuid.in_(op_uuids)
             ).order_by(ops_table.c.created_at.desc())
             result = conn.execute(stmt).fetchall()
             return [_cluster_operation_row_to_dict(row) for row in result]
