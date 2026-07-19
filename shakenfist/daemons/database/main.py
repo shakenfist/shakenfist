@@ -4914,6 +4914,61 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             vsock_cids_json=json.dumps(data.vsock_cids))
 
 
+# Per-caller request attribution. This is additive: the existing unlabelled
+# database_<op>_total counters (and every dashboard/alert on them) are left
+# untouched. A single server interceptor increments this one labelled counter
+# so we can answer "which daemon drives operation X". See
+# PLAN-database-load-reduction-phase-04-attribution.md.
+DATABASE_REQUESTS = Counter(
+    'database_requests_total',
+    'sf-database gRPC requests, by operation and calling daemon.',
+    ['operation', 'caller_daemon']
+)
+
+
+def _method_to_operation(method: str) -> str:
+    """Return the RPC name from a gRPC method path.
+
+    ``/shakenfist.protos.DatabaseService/GetNode`` -> ``GetNode``. The raw
+    PascalCase name is used as-is rather than converted to snake_case: several
+    RPCs carry acronym runs (GetIPAM, GetDnsMasq) that no algorithmic
+    conversion maps back to the hand-written counter names cleanly, so the
+    unambiguous wire name is the label.
+    """
+    return method.rsplit('/', 1)[-1] or 'unknown'
+
+
+def _caller_from_metadata(metadata: Any) -> str:
+    """Read caller-daemon from invocation metadata, defaulting to unknown."""
+    for key, value in (metadata or ()):
+        if key == 'caller-daemon':
+            return str(value)
+    return 'unknown'
+
+
+class _CallerMetricsInterceptor(grpc.ServerInterceptor):  # type: ignore[type-arg]  # noqa: E501
+    """Count every RPC by operation and calling daemon.
+
+    Additive and best-effort: it touches no handler and, on any failure,
+    proceeds with the call rather than disrupting it. Health-check RPCs are
+    skipped to keep the operation cardinality bounded to DatabaseService.
+    """
+
+    def intercept_service(self, continuation: Any,
+                          handler_call_details: Any) -> Any:
+        try:
+            method = handler_call_details.method or ''
+            if not method.startswith('/grpc.health.v1.Health/'):
+                DATABASE_REQUESTS.labels(
+                    operation=_method_to_operation(method),
+                    caller_daemon=_caller_from_metadata(
+                        handler_call_details.invocation_metadata)
+                ).inc()
+        except Exception:
+            pass
+        return continuation(handler_call_details)
+
+
 class Monitor(daemon.WorkerPoolDaemon):
     """Background monitor for the database daemon.
 
@@ -5276,6 +5331,7 @@ def main() -> None:
     # costs only ~8 KiB of Python stack.
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=64),
+        interceptors=[_CallerMetricsInterceptor()],
         options=[
             ('grpc.http2.min_recv_ping_interval_without_data_ms', 5000),
             ('grpc.keepalive_permit_without_calls', 1),
