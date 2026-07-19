@@ -80,6 +80,12 @@ message AddFloatingIPRequest {
     string network_uuid = 1;
     string floating_address = 2;
     string inner_address = 3;
+
+    // The network's vxid, used to derive the egress veth name for the
+    // gratuitous ARP announcement of the new floating address. Zero
+    // (the proto default) means "not supplied" and skips the
+    // announcement, preserving compatibility with older callers.
+    int64 vxid = 4;
 }
 
 message AddFloatingIPReply {

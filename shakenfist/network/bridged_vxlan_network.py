@@ -132,6 +132,28 @@ class BridgedVXLanNetwork:
         if self.network.uuid == FLOATING_NETWORK_UUID:
             return
 
+        # The vxlan device may be missing on this node entirely -- either
+        # it has never been created here, or a teardown raced an earlier
+        # op. The privexec mesh handler treats a missing device as a
+        # benign no-op (correct for the racing-teardown case), which
+        # means an ensure_mesh against a missing device silently renders
+        # nothing and the network stays dark until the maintain loop's
+        # full "not okay" recreate path notices. Materialise the device
+        # first instead: a renderer must be able to render from nothing.
+        # The create methods below are idempotent and refuse dead or
+        # deleted networks, so the teardown race keeps its old benign
+        # behaviour.
+        subst = self.network.subst_dict()
+        if not util_network.check_for_interface(subst['vx_interface']):
+            self.network.add_event(
+                EVENT_TYPE_AUDIT,
+                'vxlan device missing, creating before mesh render',
+                extra={'vx_interface': subst['vx_interface']})
+            if config.NODE_IS_NETWORK_NODE:
+                self._apply_create_on_network_node()
+            else:
+                self._apply_create_on_hypervisor()
+
         # Determine which IPs should be on this mesh. The enumeration
         # lives on the wrapped Network (``mesh_desired_node_ips``) so
         # the writer (this method) and the auditor
@@ -165,7 +187,8 @@ class BridgedVXLanNetwork:
         self._require_network_node('_apply_add_floating_ip')
 
         util_concurrency.add_floating_ip(
-            str(self.network.uuid), floating_address, inner_address)
+            str(self.network.uuid), floating_address, inner_address,
+            vxid=self.network.vxid)
 
     def _apply_remove_floating_ip(
             self, floating_address: str, inner_address: str) -> None:

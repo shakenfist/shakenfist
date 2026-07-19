@@ -270,19 +270,27 @@ class AddFloatingIPRequest(_message.Message):
     NETWORK_UUID_FIELD_NUMBER: _builtins.int
     FLOATING_ADDRESS_FIELD_NUMBER: _builtins.int
     INNER_ADDRESS_FIELD_NUMBER: _builtins.int
+    VXID_FIELD_NUMBER: _builtins.int
     network_uuid: _builtins.str
     floating_address: _builtins.str
     inner_address: _builtins.str
+    vxid: _builtins.int
+    """The network's vxid, used to derive the egress veth name for the
+    gratuitous ARP announcement of the new floating address. Zero
+    (the proto default) means "not supplied" and skips the
+    announcement, preserving compatibility with older callers.
+    """
     def __init__(
         self,
         *,
         network_uuid: _builtins.str = ...,
         floating_address: _builtins.str = ...,
         inner_address: _builtins.str = ...,
+        vxid: _builtins.int = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["floating_address", b"floating_address", "inner_address", b"inner_address", "network_uuid", b"network_uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["floating_address", b"floating_address", "inner_address", b"inner_address", "network_uuid", b"network_uuid", "vxid", b"vxid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
