@@ -273,6 +273,31 @@ Prometheus counters (labelled by `object_type`) report cache behaviour, and a
 working cache shows up as reduced `database_get_<type>_total` rates on the
 `sf-database` tier.
 
+### Attributing database load to callers
+
+Alongside the per-operation `database_<op>_total` counters, sf-database
+publishes `database_requests_total{operation, caller_daemon}` — the same
+request stream, but labelled with the daemon that issued each call. The
+calling daemon is carried as gRPC metadata (`caller-daemon`) stamped by every
+SF client and counted by a server-side interceptor, so the attribution is
+complete even for daemons (sf-api, sf-net, sf-queues, …) that expose no
+metrics endpoint of their own. A caller that never identified itself, or a
+one-shot such as the config bootstrap, shows up as `caller_daemon="unknown"`.
+
+Use it to answer "which daemon drives operation X", for example the hottest
+callers overall:
+
+```promql
+topk(15, sum by (caller_daemon, operation) (rate(database_requests_total[5m])))
+```
+
+The existing `database_<op>_total` counters are unchanged — this metric is
+additive — so summing `database_requests_total` by `operation` should track
+the matching `database_<op>_total` rate (the `operation` label is the
+PascalCase RPC name, e.g. `GetNode`, so it reads as the CamelCase form of the
+counter suffix). The `caller-node` metadata is also sent but not yet a label;
+it is reserved for the mTLS peer-identity cross-check.
+
 ### Monitoring sf-database with grpc-health-probe
 
 `sf-database` reports live MariaDB reachability through the standard
