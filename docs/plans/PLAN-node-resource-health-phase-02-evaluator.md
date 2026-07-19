@@ -171,12 +171,19 @@ no nodelock and its cadence is independent.
 The thread loops every `NODE_HEALTH_CHECK_INTERVAL` (default 60 s;
 `PathCheck`'s own `write_interval` gates the writes to 300 s), and:
 
-- If the result is **unhealthy** and `node.state != error`: set
-  `node.state = STATE_ERROR`, then `node.error = reason` (that order —
-  E-note on the setter guard), write the structured attribute
-  `node.resource_health = {healthy: False, failed: [{identity, status,
-  detail}], affected_types: [...]}` (a new `Node` property backed by
-  `_db_set_attribute`), and `add_event(EVENT_TYPE_AUDIT, ...)`.
+- If the result is **unhealthy** and `node.state != error`:
+  `add_event(EVENT_TYPE_AUDIT, reason, extra={affected_types,
+  failed})`, then set `node.state = STATE_ERROR`. **Implementation
+  note:** node attributes are a fixed typed schema
+  (`schema/node_attributes.py` `NodeAttributesData`) with no free-form
+  field, and `node.error` is not persisted for nodes (the base
+  `_db_set_attribute` warns "subclass should override" and `Node` does
+  not, storing typed columns instead). Rather than add a schema
+  migration for a `resource_health` column in this lightweight phase,
+  the durable record is the **audit event** — which phase 3 consumes
+  for the affected object types. `node.state = STATE_ERROR` is the
+  load-bearing action (it alone stops scheduling and discounts blob
+  replicas); the reason and structure live in the event.
 - If unhealthy and the node is **already** `error`: do nothing (no
   re-set, no event spam; the transition already recorded the
   diagnosis).
@@ -213,7 +220,7 @@ Sequential; review and commit each. Isolation `none`.
 |------|--------|-------|-----------|-------|
 | 2a — declarations + config | low | sonnet | none | Add the `health_dependencies` class attribute to `Instance` (`['instances', 'image_cache', 'blobs']`), `Blob` (`['blobs']`), and `Upload` (`['uploads']`) — a plain list of `STORAGE_PATH`-relative subdir names, placed near each class's `state_targets`/`object_type`; no new imports on those classes. Add `NODE_HEALTH_CHECK_INTERVAL=60`, `NODE_HEALTH_WRITE_INTERVAL=300`, `NODE_HEALTH_PROBE_TIMEOUT=30` as `Field(...)` in `config.py` near `STORAGE_PATH` (`:607`), each with a description. A tiny test asserting the three attributes are present and are lists of str. Commit subject: `object types: declare storage health dependencies.` |
 | 2b — the evaluator | high | opus | none | Create `shakenfist/node_health.py`: `node_object_types()` per E3; `build_checks(types, *, storage_path, write_interval, timeout)` returning `(list_of_unique_PathChecks, {identity: set(ObjectType)})` (de-dup by `PathCheck.identity`, resolve each subdir against `storage_path`); `NodeHealthResult` (a frozen dataclass: `healthy`, `failed: list[HealthResult]`, `affected_types: set`, `reason: str`); and `evaluate(checks, types_by_identity)` that runs each check once, collects failures, unions affected types, and composes the reason. Fully unit-tested and hermetic (construct checks over a `TemporaryDirectory`, and use fakes / a stub check for failure and dedup cases): dedup (Instance+Blob both wanting `blobs` → one check, identity mapped to both types); an `instances` failure → `affected_types` includes INSTANCE; an `uploads`-only failure → affected is {UPLOAD}, **not** INSTANCE; healthy → `NodeHealthResult.healthy` True and empty failed/affected; the reason names the failed path(s) and status(es). Add to the mypy rollout (fully typed). Commit subject: `node_health: capability-aware health evaluator.` |
-| 2c — sf-resources integration + node.resource_health | high | opus | none | Add a `resource_health` property to `Node` (get/set via `_db_get_attribute`/`_db_set_attribute`, default `{}`), storing the structured record. In the resources daemon, build the evaluator's checks **once** at startup (from `node_object_types()` + config), and start a **daemon background thread** (mirror the eventlog-drainer start pattern; guard with the daemon's abort path) that every `NODE_HEALTH_CHECK_INTERVAL` s calls `evaluate(...)` and applies E4: on unhealthy-and-not-already-error, set `node.state = STATE_ERROR` **then** `node.error = result.reason`, set `node.resource_health = {...}`, and `add_event`; on already-error or healthy, do nothing. Do not run this in the metrics loop and do not hold the nodelock. Unit tests (mock the evaluator to return healthy / unhealthy results, mock the node): unhealthy from `created` → node goes to `error` with the reason, the attribute, and one event, and `affected_types` is persisted; a second unhealthy cycle while already `error` → no second event, state unchanged; healthy → state untouched and error not cleared; the state/error ordering is correct (state set before error). Commit subject: `resources: evaluate node resource health and mark node errored.` |
+| 2c — sf-resources integration | high | opus | none | Add `apply_result(node, result)` to `node_health` (record an `EVENT_TYPE_AUDIT` event with `extra={affected_types, failed}` then set `node.state = STATE_ERROR`, only on unhealthy-and-not-already-error; never clear error; never touch created/degraded). In the resources daemon, build the evaluator's checks **once** at startup (`build_for_this_node()`), and start a **daemon background thread** (guarded with the daemon's abort path, sleeping in 1 s slices) that every `NODE_HEALTH_CHECK_INTERVAL` s calls `evaluate(...)` then `apply_result(...)`. Do not run this in the metrics loop and do not hold the nodelock. Unit tests (a fake node): unhealthy from `created` → node goes to `error` with one audit event carrying the reason and `affected_types`; from `degraded` → also `error`; a second cycle while already `error` → no event, unchanged; healthy → state untouched, error not cleared. Commit subject: `resources: evaluate node resource health and mark node errored.` |
 
 ## Step ordering and dependencies
 
@@ -229,9 +236,9 @@ Sequential; review and commit each. Isolation `none`.
   fails — dead disk (`statvfs` EIO → `missing`), read-only remount
   (`readonly`), or hung hard-NFS mount (`timeout`) — the node
   transitions to `STATE_ERROR` within `NODE_HEALTH_CHECK_INTERVAL`,
-  with a reason string naming the failed path and status, a
-  `resource_health` attribute recording the failed checks and affected
-  types (INSTANCE among them), and one audit event.
+  with one audit event whose message names the failed path and status
+  and whose `extra` records the failed checks and affected types
+  (INSTANCE among them).
 - That node stops receiving new instances and its blob copies stop
   counting as replicas — **with no scheduler or replicator change**,
   purely from being in `error` (verify against `ACTIVE_STATES` and
@@ -250,9 +257,10 @@ Sequential; review and commit each. Isolation `none`.
 Confirm the understanding that phase 2 only ever moves a node **into**
 `error` (never out — D6), that the evaluator runs in its own thread
 (not the metrics loop) to avoid the nodelock/first-hang-block hazard,
-and that the `resource_health` attribute written here is the interface
-phase 3 consumes. Flag the Upload-on-every-node conservative mapping
-(E3) for the operator to confirm.
+and that the audit event written here (message + `extra` with
+`affected_types`) is the interface phase 3 consumes. Flag the
+Upload-on-every-node conservative mapping (E3) for the operator to
+confirm.
 
 ## Review checklist for the management session
 
@@ -262,11 +270,11 @@ phase 3 consumes. Flag the Upload-on-every-node conservative mapping
       attributes a failed path to *all* depending types.
 - [ ] `evaluate` never raises for an unhealthy resource (it reads
       `HealthResult`s, which `PathCheck` returns rather than raising).
-- [ ] The daemon sets `node.state = error` **before** `node.error`,
-      and only on the not-already-error transition (no event spam).
+- [ ] The daemon records the audit event and moves the node to `error`
+      only on the not-already-error transition (no event spam).
 - [ ] Healthy results never clear `error` and never touch
       `created`/`degraded`.
 - [ ] The evaluator runs in its own abort-aware thread, not the metrics
       loop, and takes no nodelock.
-- [ ] `affected_types` is persisted in `resource_health` for phase 3.
+- [ ] `affected_types` is recorded in the audit event for phase 3.
 - [ ] `pre-commit run --all-files` passes; mypy rollout updated.

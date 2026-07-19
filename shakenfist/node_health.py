@@ -16,6 +16,8 @@ from shakenfist import blob
 from shakenfist import instance
 from shakenfist import upload
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.node import Node
 from shakenfist.resource_health import HealthCheck, HealthResult, PathCheck
 from shakenfist.schema.object_types import ObjectType
 
@@ -109,3 +111,37 @@ def build_for_this_node(
         storage_path=config.STORAGE_PATH,
         write_interval=config.NODE_HEALTH_WRITE_INTERVAL,
         timeout=config.NODE_HEALTH_PROBE_TIMEOUT)
+
+
+def apply_result(node: Node, result: NodeHealthResult) -> bool:
+    """Apply a health result to a node's state.
+
+    On an unhealthy result for a node not already in error, record an audit
+    event carrying the diagnosis (reason, affected object types, failed
+    checks) and move the node to STATE_ERROR -- which, by existing mechanics,
+    stops scheduling onto the node and stops its blob copies counting as
+    replicas. Returns True if the node was changed.
+
+    It never clears error (recovery is operator-only, master plan D6) and
+    never touches created/degraded, which the daemon-state and heartbeat
+    logic own. Already-errored nodes are left untouched so the diagnosis is
+    recorded once, not re-emitted every cycle. The audit event is the durable
+    record phase 3 consumes for the affected object types (node attributes are
+    a fixed typed schema, so a free-form record lives in the event log).
+    """
+    if result.healthy:
+        return False
+    if node.state.value == Node.STATE_ERROR:
+        return False
+    node.add_event(
+        EVENT_TYPE_AUDIT, result.reason,
+        extra={
+            'affected_types': sorted(str(t) for t in result.affected_types),
+            'failed': [
+                {'path': r.identity, 'status': r.status, 'detail': r.detail}
+                for r in result.failed],
+        })
+    # The base state property's setter is not visible under the silent
+    # follow-imports mypy uses for this module; the setter does exist.
+    node.state = Node.STATE_ERROR  # type: ignore[misc]
+    return True

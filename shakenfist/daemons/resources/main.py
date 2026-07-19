@@ -2,6 +2,7 @@ import math
 import os
 import platform
 import re
+import threading
 import time
 
 import psutil
@@ -12,6 +13,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist import instance
+from shakenfist import node_health
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -541,6 +543,25 @@ class Monitor(daemon.Daemon):
                 self.last_logged_resources = time.time()
             return retval
 
+    def _run_health_checks(self, checks, types_by_identity):
+        # Runs in its own daemon thread (see _run_inner). Evaluates the node's
+        # storage-dependency health every NODE_HEALTH_CHECK_INTERVAL and, on
+        # failure, marks the node errored. Sleeps in one-second slices so it
+        # stops promptly when the daemon aborts.
+        while daemon.check_abort_path(self.abort_path):
+            try:
+                result = node_health.evaluate(checks, types_by_identity)
+                n = Node.from_db(config.NODE_NAME)
+                if n:
+                    node_health.apply_result(n, result)
+            except Exception as e:
+                util_exceptions.ignore_exception('node health check', e)
+
+            for _ in range(max(1, config.NODE_HEALTH_CHECK_INTERVAL)):
+                if not daemon.check_abort_path(self.abort_path):
+                    break
+                time.sleep(1)
+
     def _run_inner(self):
         gauges = {
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
@@ -559,6 +580,16 @@ class Monitor(daemon.Daemon):
 
         n.python_version = platform.python_version_tuple()
         n.python_implementation = platform.python_implementation()
+
+        # Node resource health runs in its own thread, not this loop: a probe
+        # can block up to the timeout the first time a path hangs (a hard NFS
+        # mount blocks rather than erroring), and this loop holds the nodelock
+        # and drives metrics -- a stall here would time out other nodelock
+        # waiters. The checks are built once from this node's capabilities.
+        health_checks, health_types = node_health.build_for_this_node()
+        threading.Thread(
+            target=self._run_health_checks, name='node-health',
+            args=(health_checks, health_types), daemon=True).start()
 
         last_metrics = 0
         last_billing = 0

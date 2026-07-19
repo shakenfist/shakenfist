@@ -5,8 +5,27 @@ from shakenfist import instance
 from shakenfist import node_health
 from shakenfist import resource_health
 from shakenfist import upload
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.node import Node
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
+
+
+class _FakeNode:
+    def __init__(self, state_value):
+        self._state = state_value
+        self.events = []
+
+    @property
+    def state(self):
+        return mock.Mock(value=self._state)
+
+    @state.setter
+    def state(self, value):
+        self._state = value
+
+    def add_event(self, eventtype, message, extra=None, **kwargs):
+        self.events.append((eventtype, message, extra))
 
 
 class _FakeCheck(resource_health.HealthCheck):
@@ -128,3 +147,46 @@ class EvaluateTestCase(base.ShakenFistTestCase):
         result = node_health.evaluate(checks, tbi)
         self.assertEqual(
             {ObjectType.INSTANCE, ObjectType.BLOB}, result.affected_types)
+
+
+class ApplyResultTestCase(base.ShakenFistTestCase):
+    def _unhealthy(self):
+        return node_health.NodeHealthResult(
+            healthy=False,
+            failed=[resource_health.HealthResult(
+                '/s/instances', resource_health.HealthStatus.TIMEOUT, 'hung')],
+            affected_types={ObjectType.INSTANCE},
+            reason='resource health check failed: instance depends on '
+                   '/s/instances (timeout: hung)')
+
+    def test_unhealthy_created_node_goes_error_with_event(self):
+        node = _FakeNode('created')
+        changed = node_health.apply_result(node, self._unhealthy())
+        self.assertTrue(changed)
+        self.assertEqual(Node.STATE_ERROR, node._state)
+        self.assertEqual(1, len(node.events))
+        eventtype, message, extra = node.events[0]
+        self.assertEqual(EVENT_TYPE_AUDIT, eventtype)
+        self.assertIn('/s/instances', message)
+        self.assertEqual(['instance'], extra['affected_types'])
+        self.assertEqual('/s/instances', extra['failed'][0]['path'])
+        self.assertEqual('timeout', extra['failed'][0]['status'])
+
+    def test_degraded_node_can_go_error(self):
+        node = _FakeNode('degraded')
+        self.assertTrue(node_health.apply_result(node, self._unhealthy()))
+        self.assertEqual(Node.STATE_ERROR, node._state)
+
+    def test_already_error_node_is_untouched(self):
+        node = _FakeNode(Node.STATE_ERROR)
+        changed = node_health.apply_result(node, self._unhealthy())
+        self.assertFalse(changed)
+        self.assertEqual([], node.events)
+
+    def test_healthy_result_does_not_touch_state(self):
+        node = _FakeNode('created')
+        healthy = node_health.NodeHealthResult(True, [], set(), 'ok')
+        changed = node_health.apply_result(node, healthy)
+        self.assertFalse(changed)
+        self.assertEqual('created', node._state)
+        self.assertEqual([], node.events)
