@@ -2,6 +2,19 @@
 
 Master plan: [PLAN-database-load-reduction.md](PLAN-database-load-reduction.md)
 
+**Status: Complete (pending deploy measurement).** Implemented in
+`daemons/daemon.py`: `check_daemon_state()` now reads its own
+daemon-state row directly via `config.NODE_UUID` (no `get_node`) and
+rate-limits that read to `DAEMON_STATE_POLL_INTERVAL` (2s), mirroring
+`pet_watchdog`. Open question 1 resolved to 2s from the writer
+inventory below. Unit tests in
+`tests/test_database_unavailable.py::CheckDaemonStateTestCase` cover:
+no `Node.this_node`/`get_node` call, abort on STOPPING/STOPPED, no
+abort on RUNNING/missing, missing-UUID skip, DB-unavailable swallow,
+and the rate limit. `pre-commit run --all-files` green. The
+before/after counter numbers on sfcbr will be recorded here once the
+PR is deployed.
+
 ## Goal
 
 Remove the two per-tick database reads that `check_daemon_state()`
