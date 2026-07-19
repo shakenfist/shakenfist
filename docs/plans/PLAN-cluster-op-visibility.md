@@ -256,7 +256,7 @@ every consumer, so that:
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. CI await helper deflake | PLAN-cluster-op-visibility-phase-01-ci-deflake.md | Not started |
+| 1. CI await helper deflake | PLAN-cluster-op-visibility-phase-01-ci-deflake.md | Planning |
 | 2. Observational flag: schema and query layer | PLAN-cluster-op-visibility-phase-02-observational-schema.md | Not started |
 | 3. Classify and mark observational enqueue sites | PLAN-cluster-op-visibility-phase-03-mark-observational.md | Not started |
 | 4. API surface: has_pending_operations and truthful outstanding ops | PLAN-cluster-op-visibility-phase-04-api-surface.md | Not started |
