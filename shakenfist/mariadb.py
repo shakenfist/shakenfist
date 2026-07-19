@@ -5949,9 +5949,15 @@ def get_upload(upload_uuid: UUID) -> Optional[UploadData]:
     Returns:
         An UploadData object, or None if not found.
     """
+    cached: Optional[UploadData] = _object_cache_get('upload', upload_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_upload(upload_uuid)
-    return _direct_get_upload(upload_uuid)
+        row = _grpc_get_upload(upload_uuid)
+    else:
+        row = _direct_get_upload(upload_uuid)
+    _object_cache_put('upload', upload_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_uploads(
@@ -5983,8 +5989,11 @@ def delete_upload(upload_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_upload(upload_uuid)
-    return _direct_delete_upload(upload_uuid)
+        result = _grpc_delete_upload(upload_uuid)
+    else:
+        result = _direct_delete_upload(upload_uuid)
+    _object_cache_evict('upload', upload_uuid)
+    return result
 
 
 def update_upload(data: UploadData) -> bool:
@@ -5999,8 +6008,11 @@ def update_upload(data: UploadData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_upload(data)
-    return _direct_update_upload(data)
+        result = _grpc_update_upload(data)
+    else:
+        result = _direct_update_upload(data)
+    _object_cache_evict('upload', data.uuid)
+    return result
 
 
 # =============================================================================
@@ -6035,9 +6047,15 @@ def get_blob(blob_uuid: UUID) -> Optional[BlobData]:
     Returns:
         A BlobData object, or None if not found.
     """
+    cached: Optional[BlobData] = _object_cache_get('blob', blob_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_blob(blob_uuid)
-    return _direct_get_blob(blob_uuid)
+        row = _grpc_get_blob(blob_uuid)
+    else:
+        row = _direct_get_blob(blob_uuid)
+    _object_cache_put('blob', blob_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_all_blob_uuids() -> list[str]:
@@ -6061,8 +6079,11 @@ def delete_blob(blob_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_blob(blob_uuid)
-    return _direct_delete_blob(blob_uuid)
+        result = _grpc_delete_blob(blob_uuid)
+    else:
+        result = _direct_delete_blob(blob_uuid)
+    _object_cache_evict('blob', blob_uuid)
+    return result
 
 
 def update_blob(data: BlobData) -> bool:
@@ -6077,8 +6098,11 @@ def update_blob(data: BlobData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_blob(data)
-    return _direct_update_blob(data)
+        result = _grpc_update_blob(data)
+    else:
+        result = _direct_update_blob(data)
+    _object_cache_evict('blob', data.uuid)
+    return result
 
 
 def get_active_blob_uuids() -> list[str]:
@@ -7439,9 +7463,15 @@ def get_dnsmasq(dnsmasq_uuid: UUID) -> Optional[DnsMasqData]:
     Returns:
         A DnsMasqData object, or None if not found.
     """
+    cached: Optional[DnsMasqData] = _object_cache_get('dnsmasq', dnsmasq_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_dnsmasq(dnsmasq_uuid)
-    return _direct_get_dnsmasq(dnsmasq_uuid)
+        row = _grpc_get_dnsmasq(dnsmasq_uuid)
+    else:
+        row = _direct_get_dnsmasq(dnsmasq_uuid)
+    _object_cache_put('dnsmasq', dnsmasq_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_dnsmasqs(
@@ -7472,8 +7502,11 @@ def delete_dnsmasq(dnsmasq_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_dnsmasq(dnsmasq_uuid)
-    return _direct_delete_dnsmasq(dnsmasq_uuid)
+        result = _grpc_delete_dnsmasq(dnsmasq_uuid)
+    else:
+        result = _direct_delete_dnsmasq(dnsmasq_uuid)
+    _object_cache_evict('dnsmasq', dnsmasq_uuid)
+    return result
 
 
 def update_dnsmasq(data: DnsMasqData) -> bool:
@@ -7488,8 +7521,11 @@ def update_dnsmasq(data: DnsMasqData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_dnsmasq(data)
-    return _direct_update_dnsmasq(data)
+        result = _grpc_update_dnsmasq(data)
+    else:
+        result = _direct_update_dnsmasq(data)
+    _object_cache_evict('dnsmasq', data.uuid)
+    return result
 
 
 # =============================================================================
@@ -10227,9 +10263,15 @@ def get_node(node_uuid: UUID) -> Optional[NodeData]:
     Returns:
         A NodeData object, or None if not found.
     """
+    cached: Optional[NodeData] = _object_cache_get('node', node_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_node(node_uuid)
-    return _direct_get_node(node_uuid)
+        row = _grpc_get_node(node_uuid)
+    else:
+        row = _direct_get_node(node_uuid)
+    _object_cache_put('node', node_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_node_by_fqdn(fqdn: str) -> Optional[NodeData]:
@@ -10267,8 +10309,11 @@ def delete_node(node_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_node(node_uuid)
-    return _direct_delete_node(node_uuid)
+        result = _grpc_delete_node(node_uuid)
+    else:
+        result = _direct_delete_node(node_uuid)
+    _object_cache_evict('node', node_uuid)
+    return result
 
 
 def update_node(data: NodeData) -> bool:
@@ -10281,8 +10326,11 @@ def update_node(data: NodeData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_node(data)
-    return _direct_update_node(data)
+        result = _grpc_update_node(data)
+    else:
+        result = _direct_update_node(data)
+    _object_cache_evict('node', data.uuid)
+    return result
 
 
 def create_node_attributes(
@@ -10941,8 +10989,11 @@ def create_namespace(name: str, version: int) -> bool:
         True if created, False if already exists or error.
     """
     if _use_database_service():
-        return _grpc_create_namespace(name, version)
-    return _direct_create_namespace(name, version)
+        result = _grpc_create_namespace(name, version)
+    else:
+        result = _direct_create_namespace(name, version)
+    _object_cache_evict('namespace', name)
+    return result
 
 
 def get_namespace(name: str) -> Optional[NamespaceData]:
@@ -10954,9 +11005,15 @@ def get_namespace(name: str) -> Optional[NamespaceData]:
     Returns:
         A NamespaceData object, or None if not found.
     """
+    cached: Optional[NamespaceData] = _object_cache_get('namespace', name)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_namespace(name)
-    return _direct_get_namespace(name)
+        row = _grpc_get_namespace(name)
+    else:
+        row = _direct_get_namespace(name)
+    _object_cache_put('namespace', name, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_all_namespace_names() -> list[str]:
@@ -10980,8 +11037,11 @@ def delete_namespace(name: str) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_namespace(name)
-    return _direct_delete_namespace(name)
+        result = _grpc_delete_namespace(name)
+    else:
+        result = _direct_delete_namespace(name)
+    _object_cache_evict('namespace', name)
+    return result
 
 
 def create_namespace_attributes(data: NamespaceAttributesData) -> bool:
@@ -11863,9 +11923,15 @@ def get_artifact(artifact_uuid: UUID) -> Optional[ArtifactData]:
     Returns:
         An ArtifactData object, or None if not found.
     """
+    cached: Optional[ArtifactData] = _object_cache_get('artifact', artifact_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_artifact(artifact_uuid)
-    return _direct_get_artifact(artifact_uuid)
+        row = _grpc_get_artifact(artifact_uuid)
+    else:
+        row = _direct_get_artifact(artifact_uuid)
+    _object_cache_put('artifact', artifact_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_all_artifacts() -> list[ArtifactData]:
@@ -11906,8 +11972,11 @@ def update_artifact(data: ArtifactData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_artifact(data)
-    return _direct_update_artifact(data)
+        result = _grpc_update_artifact(data)
+    else:
+        result = _direct_update_artifact(data)
+    _object_cache_evict('artifact', data.uuid)
+    return result
 
 
 def delete_artifact(artifact_uuid: UUID) -> bool:
@@ -11920,8 +11989,11 @@ def delete_artifact(artifact_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_artifact(artifact_uuid)
-    return _direct_delete_artifact(artifact_uuid)
+        result = _grpc_delete_artifact(artifact_uuid)
+    else:
+        result = _direct_delete_artifact(artifact_uuid)
+    _object_cache_evict('artifact', artifact_uuid)
+    return result
 
 
 # =============================================================================
@@ -13050,9 +13122,17 @@ def get_network_interface(
     Returns:
         A NetworkInterfaceData object, or None if not found.
     """
+    cached: Optional[NetworkInterfaceData] = _object_cache_get(
+        'networkinterface', ni_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_network_interface(ni_uuid)
-    return _direct_get_network_interface(ni_uuid)
+        row = _grpc_get_network_interface(ni_uuid)
+    else:
+        row = _direct_get_network_interface(ni_uuid)
+    _object_cache_put(
+        'networkinterface', ni_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
+    return row
 
 
 def get_network_interfaces_by_instance(
@@ -13124,8 +13204,11 @@ def delete_network_interface(ni_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_network_interface(ni_uuid)
-    return _direct_delete_network_interface(ni_uuid)
+        result = _grpc_delete_network_interface(ni_uuid)
+    else:
+        result = _direct_delete_network_interface(ni_uuid)
+    _object_cache_evict('networkinterface', ni_uuid)
+    return result
 
 
 def update_network_interface(data: NetworkInterfaceData) -> bool:
@@ -13140,8 +13223,11 @@ def update_network_interface(data: NetworkInterfaceData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_network_interface(data)
-    return _direct_update_network_interface(data)
+        result = _grpc_update_network_interface(data)
+    else:
+        result = _direct_update_network_interface(data)
+    _object_cache_evict('networkinterface', data.uuid)
+    return result
 
 
 def create_network_interface_attributes(
@@ -14254,9 +14340,15 @@ def get_network(net_uuid: UUID) -> Optional[NetworkData]:
     Returns:
         A NetworkData object, or None if not found.
     """
+    cached: Optional[NetworkData] = _object_cache_get('network', net_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_network(net_uuid)
-    return _direct_get_network(net_uuid)
+        row = _grpc_get_network(net_uuid)
+    else:
+        row = _direct_get_network(net_uuid)
+    _object_cache_put('network', net_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
+    return row
 
 
 def get_all_networks() -> list[NetworkData]:
@@ -14295,8 +14387,11 @@ def delete_network(net_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_network(net_uuid)
-    return _direct_delete_network(net_uuid)
+        result = _grpc_delete_network(net_uuid)
+    else:
+        result = _direct_delete_network(net_uuid)
+    _object_cache_evict('network', net_uuid)
+    return result
 
 
 def create_network_attributes(
@@ -14868,9 +14963,17 @@ def get_agent_operation(
     Returns:
         An AgentOperationData object, or None if not found.
     """
+    cached: Optional[AgentOperationData] = _object_cache_get(
+        'agentoperation', aop_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_agent_operation(aop_uuid)
-    return _direct_get_agent_operation(aop_uuid)
+        row = _grpc_get_agent_operation(aop_uuid)
+    else:
+        row = _direct_get_agent_operation(aop_uuid)
+    _object_cache_put(
+        'agentoperation', aop_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
+    return row
 
 
 def delete_agent_operation(aop_uuid: UUID) -> bool:
@@ -14883,8 +14986,11 @@ def delete_agent_operation(aop_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_agent_operation(aop_uuid)
-    return _direct_delete_agent_operation(aop_uuid)
+        result = _grpc_delete_agent_operation(aop_uuid)
+    else:
+        result = _direct_delete_agent_operation(aop_uuid)
+    _object_cache_evict('agentoperation', aop_uuid)
+    return result
 
 
 def create_agent_operation_attributes(
@@ -16097,9 +16203,15 @@ def get_instance(
     Returns:
         An InstanceData object, or None if not found.
     """
+    cached: Optional[InstanceData] = _object_cache_get('instance', inst_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_instance(inst_uuid)
-    return _direct_get_instance(inst_uuid)
+        row = _grpc_get_instance(inst_uuid)
+    else:
+        row = _direct_get_instance(inst_uuid)
+    _object_cache_put('instance', inst_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
+    return row
 
 
 def get_all_instances() -> list[InstanceData]:
@@ -16148,8 +16260,11 @@ def delete_instance(inst_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_instance(inst_uuid)
-    return _direct_delete_instance(inst_uuid)
+        result = _grpc_delete_instance(inst_uuid)
+    else:
+        result = _direct_delete_instance(inst_uuid)
+    _object_cache_evict('instance', inst_uuid)
+    return result
 
 
 def create_instance_attributes(

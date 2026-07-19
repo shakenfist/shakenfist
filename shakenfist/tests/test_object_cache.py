@@ -9,6 +9,7 @@ evict) is covered in the object-type test modules.
 
 import time
 import uuid
+from unittest import mock
 
 from shakenfist import mariadb
 from shakenfist.tests import base
@@ -81,3 +82,56 @@ class ObjectCacheCoreTestCase(base.ShakenFistTestCase):
         model = object()
         mariadb._object_cache_put('namespace', 'sys', model, ttl=300)
         self.assertIs(model, mariadb._object_cache_get('namespace', 'sys'))
+
+
+class ObjectCacheWiringTestCase(base.ShakenFistTestCase):
+    """End-to-end: the public get_/update_/delete_ functions use the cache."""
+
+    def setUp(self):
+        super().setUp()
+        mariadb._OBJECT_CACHE.clear()
+        self.addCleanup(mariadb._OBJECT_CACHE.clear)
+        self.uuid = uuid.uuid4()
+
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    @mock.patch('shakenfist.mariadb._direct_get_blob')
+    def test_reader_caches_then_writers_evict(self, mock_get, _mock_use):
+        model = mock.Mock(uuid=self.uuid)
+        mock_get.return_value = model
+
+        # First read hits the database; the second is served from cache.
+        self.assertIs(model, mariadb.get_blob(self.uuid))
+        self.assertIs(model, mariadb.get_blob(self.uuid))
+        self.assertEqual(1, mock_get.call_count)
+
+        # An update evicts (this is the online-upgrade self-heal path), so the
+        # next read hits the database again.
+        with mock.patch('shakenfist.mariadb._direct_update_blob',
+                        return_value=True):
+            mariadb.update_blob(model)
+        mariadb.get_blob(self.uuid)
+        self.assertEqual(2, mock_get.call_count)
+
+        # A delete also evicts, so a dead object is never resurrected.
+        with mock.patch('shakenfist.mariadb._direct_delete_blob',
+                        return_value=True):
+            mariadb.delete_blob(self.uuid)
+        mariadb.get_blob(self.uuid)
+        self.assertEqual(3, mock_get.call_count)
+
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    @mock.patch('shakenfist.mariadb._direct_get_blob', return_value=None)
+    def test_missing_row_is_not_cached(self, mock_get, _mock_use):
+        # A None result must not be cached, or a later create would be masked.
+        self.assertIsNone(mariadb.get_blob(self.uuid))
+        self.assertIsNone(mariadb.get_blob(self.uuid))
+        self.assertEqual(2, mock_get.call_count)
+
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    @mock.patch('shakenfist.mariadb._direct_get_blob')
+    def test_ttl_zero_disables_reader_caching(self, mock_get, _mock_use):
+        mock_get.return_value = mock.Mock(uuid=self.uuid)
+        with mock.patch.object(mariadb.config, 'OBJECT_CACHE_TTL_MUTABLE', 0):
+            mariadb.get_blob(self.uuid)
+            mariadb.get_blob(self.uuid)
+        self.assertEqual(2, mock_get.call_count)
