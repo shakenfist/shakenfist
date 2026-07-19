@@ -373,7 +373,7 @@ Recommendations are recorded inline.
 |-------|------|------|--------|
 | 0. Decisions and token format | shakenfist | PLAN-kerbside-vdi-tokens-phase-00-decisions.md | Not started |
 | 1. Cluster signing key + pubkey publication | shakenfist | [PLAN-kerbside-vdi-tokens-phase-01-signing-key.md](PLAN-kerbside-vdi-tokens-phase-01-signing-key.md) | Done |
-| 2. vdiconsoleproxy endpoint | shakenfist | PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md | Not started |
+| 2. vdiconsoleproxy endpoint | shakenfist | [PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md](PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md) | In progress |
 | 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Not started |
 | 4. Client, CLI, and viewer launch | client-python | PLAN-vdi-console-tokens.md (in that repo) | Not started |
 | 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside) | Not started |
