@@ -35,6 +35,8 @@ def main():
     util_exceptions.install_exception_tracking()
     daemon.clear_abort_path(ABORT_PATH)
     setproctitle.setproctitle('sf-sentinel-first')
+    from shakenfist.util.caller_identity import set_caller_identity
+    set_caller_identity('sentinel-first')
     LOG.info('Started')
 
     n = Node.from_db(config.NODE_NAME)
