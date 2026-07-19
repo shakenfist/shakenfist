@@ -157,6 +157,55 @@ def update_power_states(pet_watchdog=None):
                     else:
                         inst.state = inst.state.value + '-error'
 
+                elif state == 'paused':
+                    # Paused is ambiguous: operators pause instances via the
+                    # API, but qemu also pauses a guest when a disk operation
+                    # fails (error_policy='stop' in our domain XML, or qemu's
+                    # default ENOSPC write handling). The pause reason tells
+                    # them apart. A guest paused by an I/O error has broken
+                    # backing storage and cannot make progress. There is no
+                    # recovery: an errored instance cannot return to created,
+                    # so we mark it errored -- terminal, but still snapshottable
+                    # and deletable -- exactly as the crashed branch above does,
+                    # rather than enqueueing a delete and denying the operator a
+                    # chance to salvage. The paused domain is left in place as
+                    # forensic state until the operator deletes it.
+                    pause_reason = lc.extract_pause_reason(domain)
+                    if pause_reason != util_libvirt.PAUSED_REASON_IOERROR:
+                        pass
+                    elif inst.state.value in [dbo.STATE_DELETE_WAIT,
+                                              dbo.STATE_DELETED]:
+                        # A delete was already in flight. Unlike a crashed
+                        # domain (whose qemu has already exited, so an undefine
+                        # suffices) an I/O error paused domain still has a live
+                        # qemu process, so it must be destroyed.
+                        if not _delete_with_virsh(instance_uuid, inst):
+                            _delete_with_kill(instance_uuid, inst)
+                        inst.state = dbo.STATE_DELETED
+                    elif inst.state.value not in instance.Instance.ERROR_STATES:
+                        # Guard against re-entry: the paused domain lingers
+                        # until the operator deletes it, so we observe it on
+                        # every poll. Only record the error once -- and note
+                        # '<state>-error' -> '<state>-error-error' is not a
+                        # valid transition, so re-marking would raise.
+                        disk_errors = lc.extract_disk_errors(domain)
+                        errors = ', '.join(
+                            f'{dev}: {err}' for dev, err
+                            in sorted(disk_errors.items()))
+                        inst.add_event(
+                            EVENT_TYPE_AUDIT,
+                            'instance paused by disk I/O error',
+                            extra={'disk_errors': disk_errors})
+                        log_ctx.with_fields({'disk_errors': disk_errors}).warning(
+                            'Instance paused by disk I/O error, marking errored')
+                        # State must move to the error state before error is
+                        # set: the error setter rejects a message unless the
+                        # instance is already errored.
+                        inst.state = inst.state.value + '-error'
+                        inst.error = (
+                            'instance paused by disk I/O error' +
+                            (f' ({errors})' if errors else ''))
+
         except lc.libvirt.libvirtError as e:
             LOG.debug(f'Failed to lookup running domains: {e}')
 
