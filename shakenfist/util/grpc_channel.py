@@ -73,8 +73,8 @@ def make_database_channel(
     Per-caller overrides go in ``extra_options``. gRPC accepts
     duplicate option keys; the last entry wins. Callers therefore
     pass override values for any default they need to change (for
-    example, the blob path in ``shakenfist/database.py`` shortens
-    the keepalive timeout to 200 ms).
+    example, a caller wanting faster failover can shorten the
+    keepalive timeout).
 
     Raises ``ValueError`` if ``hosts`` is empty.
     """

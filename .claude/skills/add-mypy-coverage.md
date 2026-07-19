@@ -359,7 +359,7 @@ Based on the mypy rollout plan, these files have high impact:
 
 1. **Phase 1 - Database Layer:**
    - `shakenfist/etcd.py` (done)
-   - `shakenfist/database.py`
+   - `shakenfist/mariadb.py`
 
 2. **Phase 2 - Base Objects:**
    - `shakenfist/baseobject.py`

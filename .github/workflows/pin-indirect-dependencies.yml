@@ -82,11 +82,17 @@ jobs:
           # here silently created duplicate pins that only diverged -- and
           # broke resolution -- once Renovate bumped one spelling (see the
           # duplicate PRs #3398/#3399 for typing-extensions).
+          # NOTE(mikal): a direct dependency pinned with extras (e.g.
+          # "gunicorn[gevent]==...") must also count as pinned, or we add a
+          # bare duplicate pin ("gunicorn==..."). Renovate collapses such
+          # duplicates into a single update and patches only one of them,
+          # which leaves the two pins disagreeing and makes dependency
+          # resolution unsatisfiable (see PR #3462 for gunicorn v26).
           for depver in $(${GITHUB_WORKSPACE}/ci-venv/bin/pip freeze --local); do
             dep=$(echo ${depver} | sed 's/==.*//')
             depre=$(echo ${dep} | sed -E 's/[-_.]+/[-_.]/g')
 
-            if [ $(egrep -ic "\"${depre}==" pyproject.toml) -lt 1 ]; then
+            if [ $(egrep -ic "\"${depre}(\[[a-z0-9,_.-]+\])?==" pyproject.toml) -lt 1 ]; then
               sed -i "s/    # END_OF_INDIRECT_DEPS/    \"${depver}\",\n    # END_OF_INDIRECT_DEPS/" pyproject.toml
             fi
           done
