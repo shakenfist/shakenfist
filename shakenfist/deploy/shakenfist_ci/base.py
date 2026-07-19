@@ -519,29 +519,54 @@ class BaseTestCase(testtools.TestCase):
             f'After time {after}, instance {instance_uuid} had no event '
             f'"{operation}:{message}"')
 
-    def _await_instance_operations_complete(self, instance_uuid):
+    def _await_object_operations_complete(
+            self, object_type, object_uuid, poll_interval, label):
+        # Enumerate *every* cluster operation targeting the object rather
+        # than following its ``last_cluster_operation`` pointer. That
+        # single pointer is racy: a later terminal op (a routine
+        # billing/health sweep, say) reaching a terminal state between
+        # polls masks an earlier still-queued op, so a pointer-following
+        # helper returns before the operation under test has run. This
+        # bit test_interface_plug_and_exec_reboot -- see
+        # docs/plans/PLAN-cluster-op-visibility.md.
+        terminal_states = ['complete', 'deleted', 'abort']
+
+        # Only operations we have actually watched go in-flight during
+        # this wait may fail the test on error. A stale error op from
+        # earlier in the object's history must not poison every
+        # subsequent await.
+        observed_outstanding = set()
+
         start_time = time.time()
         while time.time() - start_time < 5 * 60:
-            i = self.system_client.get_instance(instance_uuid)
-            lco = i['last_cluster_operation']
+            ops = self.system_client.list_cluster_operations_for_target(
+                object_type, object_uuid)
 
-            if not lco:
+            outstanding = False
+            for op in ops:
+                state = op['state']
+                if state == 'error':
+                    if op['uuid'] in observed_outstanding:
+                        self.fail(
+                            f'Cluster operation {op["uuid"]} for {label} '
+                            f'{object_uuid} ended in error state')
+                    continue
+                if state not in terminal_states:
+                    observed_outstanding.add(op['uuid'])
+                    outstanding = True
+
+            if not outstanding:
                 return
 
-            lco_details = self.system_client.get_cluster_operation(
-                lco['op_type'], lco['op_uuid'])
-            if lco_details['state'] in ['complete', 'deleted', 'abort']:
-                return
-            if lco_details['state'] == 'error':
-                self.fail(
-                    f'Cluster operation {lco["op_uuid"]} for instance '
-                    f'{instance_uuid} ended in error state')
-
-            time.sleep(10)
+            time.sleep(poll_interval)
 
         self.fail(
-            f'Instance operations did not complete within 5 minutes '
-            f'for {instance_uuid}')
+            f'{label.capitalize()} operations did not complete within 5 '
+            f'minutes for {object_uuid}')
+
+    def _await_instance_operations_complete(self, instance_uuid):
+        self._await_object_operations_complete(
+            'instance', instance_uuid, 10, 'instance')
 
     def _await_network_operations_complete(self, network_uuid):
         # Network mutation API endpoints (DNS updates, route updates, NAT
@@ -550,28 +575,8 @@ class BaseTestCase(testtools.TestCase):
         # runs later. Tests that assert on the post-mutation network
         # node state must wait for that op to drain or they will race
         # the dnsmasq/iptables/etc reload.
-        start_time = time.time()
-        while time.time() - start_time < 5 * 60:
-            n = self.system_client.get_network(network_uuid)
-            lco = n.get('last_cluster_operation')
-
-            if not lco:
-                return
-
-            lco_details = self.system_client.get_cluster_operation(
-                lco['op_type'], lco['op_uuid'])
-            if lco_details['state'] in ['complete', 'deleted', 'abort']:
-                return
-            if lco_details['state'] == 'error':
-                self.fail(
-                    f'Cluster operation {lco["op_uuid"]} for network '
-                    f'{network_uuid} ended in error state')
-
-            time.sleep(5)
-
-        self.fail(
-            f'Network operations did not complete within 5 minutes '
-            f'for {network_uuid}')
+        self._await_object_operations_complete(
+            'network', network_uuid, 5, 'network')
 
     def _await_image_download_success(self, image_uuid, after=None):
         return self._await_image_event(image_uuid, 'fetch', 'success', after)
