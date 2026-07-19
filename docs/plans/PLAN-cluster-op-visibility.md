@@ -257,15 +257,52 @@ every consumer, so that:
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. CI await helper deflake | PLAN-cluster-op-visibility-phase-01-ci-deflake.md | Implemented, awaiting CI |
+| 1b. Atomic target-row writes | (folded into phase 1 PR; see below) | Implemented, awaiting CI |
 | 2. Observational flag: schema and query layer | PLAN-cluster-op-visibility-phase-02-observational-schema.md | Not started |
 | 3. Classify and mark observational enqueue sites | PLAN-cluster-op-visibility-phase-03-mark-observational.md | Not started |
 | 4. API surface: has_pending_operations and truthful outstanding ops | PLAN-cluster-op-visibility-phase-04-api-surface.md | Not started |
 | 5. CI helper simplification, functional coverage, documentation | PLAN-cluster-op-visibility-phase-05-coverage-docs.md | Not started |
 
+### Phase 1b: Atomic cluster_operation_targets writes (done, in the phase 1 PR)
+
+Discovered while verifying phase 1 in CI. Even with the
+by-target endpoint fixed, `test_interface_plug_and_exec_dhcp`
+still failed intermittently: the CI await helper's first
+by-target poll, fired microseconds after the interface
+hot-plug POST returned, saw `[]` and concluded "done" while
+the hot-plug op was in fact queued. The bundle proved it -- op
+"created" at T, POST returned at T+3ms, poll at T+5ms returned
+`[]`. The cause: `enqueue_cluster_operation`
+(`schema/operations/util.py`) wrote the op's state/work-queue
+rows via `create_and_enqueue_cluster_operation` (one
+transaction) and *then* wrote the `cluster_operation_targets`
+rows in a separate, non-transactional loop. A by-target reader
+in that gap sees an enqueued op with no target rows. This same
+race undermines `has_pending_cluster_operation()`, the
+network-node `is_okay()` gating, and everything phase 2/4 will
+build on the by-target query -- so it is a root-cause fix, not
+a test workaround.
+
+Fix (shipped in the phase 1 PR): thread a `targets` list of
+`(ObjectType, target_uuid)` pairs through
+`create_and_enqueue_cluster_operation` (public/gRPC/direct)
+and the `CreateAndEnqueueClusterOperationRequest` proto, and
+write those rows in the **same** transaction as the op.
+`enqueue_cluster_operation` now derives the list from
+`model_class.target_fields` and passes it down instead of
+looping `create_cluster_operation_target` after the fact.
+`create_cluster_operation_target` remains for its other caller
+(`node_blob_op.py`) and for `_set_last_cluster_operation`
+(dead code, still slated for removal in phase 2). Unit tests:
+`_direct_create_and_enqueue_cluster_operation` writes N target
+inserts before a single commit; `enqueue_cluster_operation`
+passes the derived `targets` and no longer calls the retired
+per-row writer.
+
 ### Phase 1: CI await helper deflake (plan at medium effort)
 
-Requires **no server changes** and can merge immediately,
-killing the active flake. Rewrite
+Requires a small server-side fix after all (see phase 1b and
+the phase 1 plan's scope correction). Rewrite
 `_await_instance_operations_complete()` and
 `_await_network_operations_complete()` in
 `deploy/shakenfist_ci/base.py` to call
