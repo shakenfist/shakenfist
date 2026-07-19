@@ -93,6 +93,31 @@ startup, not a runtime health signal.
 See [`docs/operator_guide/database.md`](docs/operator_guide/database.md) —
 "MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.
 
+#### Static object value cache
+
+The database client in `mariadb.py` carries a small read-through cache for
+immutable static object values, restoring the etcd-era principle "objects are
+cacheable, attributes are not". Each public `get_<type>()` returns a frozen
+Pydantic model of static columns only (mutable fields — states, metadata,
+attributes, IPAM, daemon states — come from separate `get_<type>_attributes()`
+readers and are never cached). The cache sits above the direct/gRPC branch, so
+it serves both compute nodes (avoiding a gRPC round trip) and the `sf-database`
+daemon's own worker threads (avoiding a SQL query); it is a single
+process-global dict keyed `(object_type, uuid)` under a lock.
+
+Correctness rests on three rules: only present rows are cached (never a miss,
+so a create-after-lookup or delete-then-lookup is never masked); every public
+`update_<type>`/`delete_<type>` evicts, and because the lazy online-upgrade
+persist routes through the public `update_<type>`, the cache self-heals after
+an upgrade; and every entry is TTL-bounded, which is the only bound on
+staleness from a write made by another process. Two tiers set the TTL —
+`OBJECT_CACHE_TTL_IMMUTABLE` (default 300 s) for types with no post-creation
+writer (instance, network, networkinterface, agentoperation) and
+`OBJECT_CACHE_TTL_MUTABLE` (default 30 s) for the upgradeable types (node,
+blob, artifact, upload, dnsmasq, namespace). Setting either to 0 disables that
+tier. Effectiveness is visible in the `database_object_cache_{hits,misses,
+evictions}_total` counters and in reduced `database_get_<type>_total` rates.
+
 #### sf-api HTTP health surface
 
 `sf-api` exposes three unauthenticated HTTP endpoints on port 13000 for load

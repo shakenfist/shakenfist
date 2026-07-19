@@ -248,6 +248,31 @@ Watch-based client-side health checking (`healthCheckConfig`) is
 deliberately not enabled: the synchronous health servicer can deadlock the
 gRPC server's event thread when Watch streams open and close concurrently.
 
+### Static object value cache
+
+Each SF process caches the immutable static values of objects (their
+`get_<type>()` results — uuid, name, version and other create-time columns)
+in memory, so repeatedly loading the same node, blob or instance does not hit
+`sf-database` every time. Mutable data (object state, metadata, attributes,
+IPAM, daemon states) is never cached. The cache invalidates itself when this
+process updates or deletes an object; a change made by another process is
+picked up when the entry's TTL expires.
+
+Two settings control it, both in seconds:
+
+| Setting | Default | Applies to |
+|---------|---------|-----------|
+| `OBJECT_CACHE_TTL_IMMUTABLE` | 300 | instance, network, networkinterface, agentoperation (no post-creation writer) |
+| `OBJECT_CACHE_TTL_MUTABLE` | 30 | node, blob, artifact, upload, dnsmasq, namespace (rewritten only by an online version upgrade) |
+
+Setting a value to `0` disables caching for that tier — a fast rollback to
+pure read-through that needs only a config change and a restart, no code
+change. The `database_object_cache_hits_total`,
+`database_object_cache_misses_total` and `database_object_cache_evictions_total`
+Prometheus counters (labelled by `object_type`) report cache behaviour, and a
+working cache shows up as reduced `database_get_<type>_total` rates on the
+`sf-database` tier.
+
 ### Monitoring sf-database with grpc-health-probe
 
 `sf-database` reports live MariaDB reachability through the standard

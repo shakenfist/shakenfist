@@ -2,6 +2,18 @@
 
 Master plan: [PLAN-database-load-reduction.md](PLAN-database-load-reduction.md)
 
+**Status: Complete (pending deploy measurement).** Landed in four
+commits: 2a feeds the version cache from `get_all_node_metrics` (no
+per-node `get_node`); 2b adds the cache core (process-global dict +
+lock, `get`/`put`/`evict`, hit/miss/evict counters, two TTL config
+options, `str()`-normalised keys); 2c+2d wire all ten public
+`get_<type>()` readers and all `update_/delete_/create_namespace`
+writers (landed together as the cache is inert until fully wired);
+2e is this docs/status pass (ARCHITECTURE.md caching section,
+operator guide config table). `pre-commit run --all-files` green
+including mypy `--strict`. The before/after `database_get_*` numbers
+on sfcbr will be recorded here once phase 1 and phase 2 deploy.
+
 ## Goal
 
 Restore the etcd-era principle "objects are cacheable, attributes are
