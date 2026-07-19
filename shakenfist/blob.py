@@ -93,6 +93,11 @@ class Blob(dbo):
     initial_version = 8
     current_version = 11
 
+    # STORAGE_PATH-relative subdirectories this object type depends on to be
+    # healthy on a node that hosts it (PLAN-node-resource-health). Blob
+    # replicas live in the blobs store.
+    health_dependencies = ['blobs']
+
     # docs/developer_guide/state_machine.md has a description of these states.
     state_targets = {
         None: (dbo.STATE_INITIAL),

@@ -160,6 +160,12 @@ class Instance(dbowo):
     initial_version = 19
     current_version = 19
 
+    # STORAGE_PATH-relative subdirectories this object type depends on to be
+    # healthy on a node that hosts it (PLAN-node-resource-health). An
+    # instance needs its own COW disk dir, the image cache it boots from, and
+    # the blob store its backing image lives in.
+    health_dependencies = ['instances', 'image_cache', 'blobs']
+
     # Attributes stored in MariaDB (everything else stays in etcd).
     # ``interfaces`` was here pre-phase-7; the column on
     # ``instance_attributes`` is dropped in phase 7e and the property

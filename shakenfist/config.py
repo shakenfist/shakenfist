@@ -609,6 +609,34 @@ class SFConfig(BaseSettings):
         description='Where on disk instances are stored.'
     )
 
+    NODE_HEALTH_CHECK_INTERVAL: int = Field(
+        60,
+        description=(
+            'How often, in seconds, sf-resources evaluates the health of the '
+            'storage paths this node depends on. Bounds detection latency for '
+            'a fully-dead path (the cheap statvfs check runs every '
+            'evaluation).'
+        )
+    )
+    NODE_HEALTH_WRITE_INTERVAL: int = Field(
+        300,
+        description=(
+            'How often, in seconds, the node health check writes an '
+            'authoritative heartbeat (write plus fsync) to each monitored '
+            'path. This catches write-only failures a read cannot, and leaves '
+            'a forensic last-seen-live timestamp.'
+        )
+    )
+    NODE_HEALTH_PROBE_TIMEOUT: int = Field(
+        30,
+        description=(
+            'Deadline, in seconds, for a single node health probe. A probe '
+            'that does not return in time is treated as unhealthy -- this is '
+            'how a hung hard-NFS mount (which blocks rather than erroring) is '
+            'detected.'
+        )
+    )
+
     LIBVIRT_USER: str = Field(
         'libvirt-qemu',
         description='Name of the libvirt user.'
