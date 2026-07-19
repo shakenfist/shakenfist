@@ -203,7 +203,8 @@ class Root(api_base.Resource):
              '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
              '<p>Machine searchable API capabilities:</p><ul>'
 
-             '<li>admin: cluster-cacert, cluster-resources</li>'
+             '<li>admin: cluster-cacert, cluster-resources, '
+             'vdi-token-pubkey</li>'
              '<li>agent-operations: agentoperations-crud, instance-agentoperations, '
              'instance-agentoperations-all, agentoperations-put-with-mode</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types, '
@@ -261,6 +262,8 @@ api.add_resource(Readyz, '/healthz', endpoint='healthz')
 
 api.add_resource(api_admin.AdminLocksEndpoint, '/admin/locks')
 api.add_resource(api_admin.AdminClusterCaCertificateEndpoint, '/admin/cacert')
+api.add_resource(api_admin.AdminVDITokenPublicKeyEndpoint,
+                 '/admin/vditokenpubkey')
 api.add_resource(api_admin.AdminResourcesEndpoint, '/admin/resources')
 
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_ref>')

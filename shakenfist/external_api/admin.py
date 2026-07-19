@@ -9,10 +9,12 @@ import os
 
 import flask
 from flasgger import swag_from
+from shakenfist_utilities import api as sf_api
 
 from shakenfist import locks
 from shakenfist import scheduler
 from shakenfist.external_api import base as api_base
+from shakenfist.util import vdi_tokens
 
 
 admin_locks_get_example = """{
@@ -60,6 +62,40 @@ class AdminClusterCaCertificateEndpoint(api_base.Resource):
         resp = flask.Response(cacert, mimetype='text/plain')
         resp.status_code = 200
         return resp
+
+
+admin_vdi_token_pubkey_get_example = """{
+    "active_kid": "3f2a9c1e",
+    "keys": [
+        {
+            "kid": "3f2a9c1e",
+            "alg": "EdDSA",
+            "public_pem": "-----BEGIN PUBLIC KEY-----\\n...\\n-----END PUBLIC KEY-----\\n",
+            "created": 1789000000
+        }
+    ]
+}"""
+
+
+class AdminVDITokenPublicKeyEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'admin',
+        'Retrieve the public half of the Kerbside VDI console token '
+        'signing key(s).', [],
+        [(200, 'The active key id and all currently published public keys.',
+          admin_vdi_token_pubkey_get_example),
+         (404, 'No Kerbside VDI token signing key has been configured.',
+          None)]))
+    @api_base.verify_token
+    @api_base.log_token_use
+    def get(self):
+        material = vdi_tokens.get_signing_material()
+        if material is None:
+            return sf_api.error(
+                404,
+                'no Kerbside VDI token signing key configured, run '
+                'sf-ctl ensure-kerbside-signing-key')
+        return vdi_tokens.public_view(material)
 
 
 admin_resources_get_example = """{
