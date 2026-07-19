@@ -222,15 +222,20 @@ so the phase plans do not reopen them:
    phase 1 plan must grep for writers of daemon state other
    than the daemon itself (e.g. `sf-ctl`, cluster daemon)
    and check their expectations.
-2. **TTL for the static-values cache.** Static values are
-   immutable for a node's process lifetime with one
-   exception: the `version` field changes across upgrades,
-   and `ip` can change on redeploy. A process-lifetime
-   cache for *own-node* identity (uuid/fqdn) is safe; for
-   other nodes' rows a short TTL (30–60s) is provisional.
-   Phase 2 planning must check what actually consumes
-   other-node `NodeData` and how stale each consumer can
-   tolerate.
+2. **TTL for the static-values cache.** *(Resolved in the
+   phase 2 plan.)* Two config-tunable tiers, both TTL-bounded
+   (0 disables): immutable types with no post-creation writer
+   (Instance, Network, NetworkInterface, AgentOperation) at a
+   long TTL (default 300s, bounding only cross-process
+   deletion); upgradeable types (Blob, Node, Artifact,
+   Upload, DnsMasq, Namespace) at a short TTL (default 30s,
+   bounding rare cross-process upgrade-persist). No unbounded
+   "process-lifetime" entries — a cross-process `hard_delete`
+   would otherwise resurrect a dead object. Misses are never
+   cached; the public `update_<type>`/`delete_<type>` hooks
+   invalidate local writes, and because `_persist_pydantic_upgrade`
+   routes through the public `update_<type>`, the cache
+   self-heals after an online upgrade.
 3. **Confirm `database.py` is fully dead before deleting.**
    Decision 3 concludes it is orphaned. The phase plan's
    first step must re-verify this against the tip of the
@@ -263,7 +268,7 @@ so the phase plans do not reopen them:
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Stop the idle-loop polls | PLAN-database-load-reduction-phase-01-idle-loop.md | Complete |
-| 2. Static object value caching | PLAN-database-load-reduction-phase-02-static-cache.md | Not started |
+| 2. Static object value caching | [PLAN-database-load-reduction-phase-02-static-cache.md](PLAN-database-load-reduction-phase-02-static-cache.md) | Planning |
 | 3. Consolidate the gRPC client stacks | PLAN-database-load-reduction-phase-03-client-consolidation.md | Complete |
 | 4. Caller attribution on counters | PLAN-database-load-reduction-phase-04-attribution.md | Not started |
 | 5. Next-tier reductions | PLAN-database-load-reduction-phase-05-next-tier.md | Not started |
@@ -287,17 +292,22 @@ small and ships alone.
 
 **Phase 2 — static object value caching.** A narrow
 read-through cache for immutable static object values,
-client-side in `mariadb.py` at the `_use_database_service()`
-branch so both direct and gRPC callers benefit:
-process-lifetime for own-node identity, short-TTL
-(provisional 30–60s, see open question 2) for other
-objects' static rows, invalidated locally on write.
-Explicitly excludes states, attributes, metadata and daemon
-states. Also fixes `_maintain_version_cache()` to source
-fqdn from the bulk node iterator rather than per-node
-`get_node()` calls. Expected effect: remaining steady-state
-`get_node` load (~20/s) approaches zero; API-path object
-hydration gets cheaper as a side effect.
+client-side in `mariadb.py` above the `_use_database_service()`
+branch so both direct and gRPC callers benefit. A single
+process-global dict keyed `(type, uuid)` → frozen model under
+a lock, TTL-bounded in two tiers (immutable types at ~300s,
+upgradeable types at ~30s; 0 disables), invalidated on the
+public `update_<type>`/`delete_<type>` so it self-heals after
+online upgrades, and never caching misses. Explicitly excludes
+states, attributes, metadata, daemon states, IPAM, queues and
+locks. Also fixes `_maintain_version_cache()` to source fqdn
+from `get_all_node_metrics()` rather than per-node `get_node()`
+calls. Expected effect: remaining steady-state `get_node` load
+(~20/s) approaches zero, the hot Blob/Node/Instance point
+re-hydration in the scheduler/cluster/resources loops drops,
+and bursty API object hydration gets cheaper. Detailed design,
+including the full invalidation surface and correctness
+invariants, is in the phase 2 plan file.
 
 **Phase 3 — consolidate the gRPC client stacks (remove the
 orphan).** Investigation (recorded in Decision 3 and the
