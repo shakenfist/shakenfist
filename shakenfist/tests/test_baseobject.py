@@ -1,10 +1,39 @@
+import time
 from unittest import mock
 
 import testtools
+from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.baseobject import State
 from shakenfist.tests import base
+
+
+class MaintainVersionCacheTestCase(base.ShakenFistTestCase):
+    @mock.patch('shakenfist.mariadb.get_node')
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value=DatabaseBackedObject.STATE_CREATED,
+                                   update_time=10))
+    @mock.patch('shakenfist.mariadb.get_all_node_metrics')
+    def test_refresh_does_not_fetch_node_objects(
+            self, mock_all_metrics, mock_state, mock_get_node):
+        # The version cache is fed from node metrics (which already carry
+        # fqdn); it must not fan out a per-node get_node any more.
+        mock_all_metrics.return_value = [{
+            'node_uuid': '12345678-1234-4321-8234-123456789012',
+            'fqdn': 'sf-1',
+            'timestamp': time.time(),
+            'metrics': {'object_version_node': 3},
+        }]
+        # Force a refresh rather than relying on the TTL.
+        baseobject.VERSION_CACHE_MINIMUM = None
+        baseobject.VERSION_CACHE_MAXIMUM = None
+        baseobject.VERSION_CACHE_AGE = 0
+
+        baseobject._maintain_version_cache(0)
+
+        mock_get_node.assert_not_called()
+        mock_all_metrics.assert_called_once()
 
 
 class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
