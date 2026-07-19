@@ -2,6 +2,21 @@
 
 Master plan: [PLAN-database-load-reduction.md](PLAN-database-load-reduction.md)
 
+**Status: Complete (shakenfist code); dashboard pending, deploy
+measurement pending.** Landed: 4a caller-identity plumbing
+(`util/caller_identity.py` + set at every process entry point); 4b a
+client `UnaryUnaryClientInterceptor` in `grpc_channel.py` stamping
+`caller-daemon`/`caller-node` on every call; 4c a server
+`ServerInterceptor` in `daemons/database/main.py` incrementing the new
+additive `database_requests_total{operation, caller_daemon}` (existing
+counters untouched); 4e this docs pass. `pre-commit run --all-files`
+green including mypy. The `operation` label is the raw PascalCase RPC
+name (acronym RPCs like `GetIPAM` defeat a clean snake_case
+conversion — noted in code and the commit). 4d (the 33fl Grafana
+panel) is made in the working tree of the separate 33fl repo but left
+for the operator to commit on a branch. Per-caller numbers for the hot
+ops will be recorded once this deploys.
+
 ## Goal
 
 Attribute each sf-database gRPC operation to the caller (which
