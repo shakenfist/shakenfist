@@ -7076,6 +7076,33 @@ class DeleteClusterOperationRequest(_message.Message):
 Global___DeleteClusterOperationRequest: _TypeAlias = DeleteClusterOperationRequest  # noqa: Y015
 
 @_typing.final
+class CreateAndEnqueueClusterOperationTarget(_message.Message):
+    """One cluster_operation_targets row to write in the same transaction
+    as the operation itself. operation_uuid, operation_type and
+    created_at are shared with the parent request and not repeated here.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    TARGET_OBJECT_TYPE_FIELD_NUMBER: _builtins.int
+    TARGET_UUID_FIELD_NUMBER: _builtins.int
+    target_object_type: _shakenfist_enums_pb2.ObjectType.ValueType
+    target_uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        target_object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        target_uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateAndEnqueueClusterOperationTarget: _TypeAlias = CreateAndEnqueueClusterOperationTarget  # noqa: Y015
+
+@_typing.final
 class CreateAndEnqueueClusterOperationRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
@@ -7085,6 +7112,7 @@ class CreateAndEnqueueClusterOperationRequest(_message.Message):
     QUEUE_NAME_FIELD_NUMBER: _builtins.int
     DELAY_FIELD_NUMBER: _builtins.int
     METADATA_JSON_FIELD_NUMBER: _builtins.int
+    TARGETS_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """Operation UUID as string"""
     operation_type: _builtins.str
@@ -7097,6 +7125,12 @@ class CreateAndEnqueueClusterOperationRequest(_message.Message):
     """Seconds to defer before the job is eligible"""
     metadata_json: _builtins.str
     """Full operation metadata dict as JSON"""
+    @_builtins.property
+    def targets(self) -> _containers.RepeatedCompositeFieldContainer[Global___CreateAndEnqueueClusterOperationTarget]:
+        """cluster_operation_targets rows written atomically with the op so a
+        by-target query never sees an enqueued op without its target rows.
+        """
+
     def __init__(
         self,
         *,
@@ -7106,10 +7140,11 @@ class CreateAndEnqueueClusterOperationRequest(_message.Message):
         queue_name: _builtins.str = ...,
         delay: _builtins.float = ...,
         metadata_json: _builtins.str = ...,
+        targets: _abc.Iterable[Global___CreateAndEnqueueClusterOperationTarget] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "queue_name", b"queue_name", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "queue_name", b"queue_name", "targets", b"targets", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

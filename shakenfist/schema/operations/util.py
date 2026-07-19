@@ -8,6 +8,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import eventlog
 from shakenfist import mariadb
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import ClusterOperation
 
 
@@ -42,12 +43,33 @@ def enqueue_cluster_operation(
     creation_time = time.time()
     queue_name = f'{target}-{family}-{metadata["priority"]}'
 
+    # Collect the cluster_operation_targets rows to write for every
+    # target declared by the model class. The declaration is a
+    # class-level ClassVar mapping metadata field names to ObjectType
+    # enum members. Fields whose value on the metadata is None are
+    # skipped (the schema permits Optional UUIDs in some ops). These
+    # are passed to create_and_enqueue_cluster_operation so they are
+    # written in the SAME transaction as the operation itself: a
+    # previously separate loop left a window where an enqueued op had
+    # no target rows, and a by-target reader (has_pending, is_okay
+    # gating, the /clusteroperations listing, the CI await helpers)
+    # in that window wrongly concluded nothing targeted the object.
+    op_targets: list[tuple[ObjectType, str]] = []
+    if model_class is not None:
+        target_fields = getattr(model_class, 'target_fields', {})
+        for field_name, target_object_type in target_fields.items():
+            target_uuid = metadata.get(field_name)
+            if target_uuid is None:
+                continue
+            op_targets.append((target_object_type, target_uuid))
+
     success = mariadb.create_and_enqueue_cluster_operation(
         op_uuid=metadata['uuid'],
         operation_type=object_type_str,
         metadata=metadata,
         created_at=creation_time,
         queue_name=queue_name,
+        targets=op_targets,
     )
 
     if not success:
@@ -61,25 +83,6 @@ def enqueue_cluster_operation(
         'operation_uuid': metadata['uuid'],
         'queue_name': queue_name,
     }).info('Enqueued cluster operation')
-
-    # Auto-write cluster_operation_targets rows for every target
-    # declared by the model class. The declaration is a class-level
-    # ClassVar mapping metadata field names to ObjectType enum
-    # members. Fields whose value on the metadata is None are
-    # skipped (the schema permits Optional UUIDs in some ops).
-    if model_class is not None:
-        target_fields = getattr(model_class, 'target_fields', {})
-        for field_name, target_object_type in target_fields.items():
-            target_uuid = metadata.get(field_name)
-            if target_uuid is None:
-                continue
-            mariadb.create_cluster_operation_target(
-                operation_uuid=metadata['uuid'],
-                operation_type=object_type_str,
-                target_object_type=target_object_type,
-                target_uuid=target_uuid,
-                created_at=creation_time,
-            )
 
     # Build the audit event targets: the operation itself plus
     # every object referenced in the metadata via an _uuid key.

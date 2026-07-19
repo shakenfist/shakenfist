@@ -112,6 +112,7 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
             created_at=1000.0,
             queue_name=(
                 f'{NODE_UUID}-clusteroperation-user_waiting'),
+            targets=[],
         )
 
         self.mock_add_event_multi.assert_called_once()
@@ -189,14 +190,19 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
 
 
 class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
-    """Tests for the phase 3a auto-target writes.
+    """Tests for the auto-target derivation.
 
     enqueue_cluster_operation iterates the model_class's
-    target_fields ClassVar and writes one
-    cluster_operation_targets row per non-None target. These
-    tests exercise the four cases called out in the phase plan:
-    single-target, multi-target, nullable, and missing-
-    declaration.
+    target_fields ClassVar and passes one ``(ObjectType,
+    target_uuid)`` pair per non-None target to
+    create_and_enqueue_cluster_operation via its ``targets``
+    argument, so the target rows are written in the same
+    transaction as the operation. These tests exercise the four
+    cases called out in the phase plan: single-target,
+    multi-target, nullable, and missing-declaration. They also
+    assert the retired non-atomic writer
+    (mariadb.create_cluster_operation_target) is never called
+    from this path.
     """
 
     def setUp(self):
@@ -232,6 +238,9 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
         md.update(overrides)
         return md
 
+    def _targets_arg(self):
+        return self.mock_create_and_enqueue.call_args.kwargs['targets']
+
     def test_single_target_writes_one_row(self):
         util.enqueue_cluster_operation(
             _FakeObjectType('NET_OP'),
@@ -239,13 +248,11 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             target='networknode',
             model_class=_NetOnlyModel)
 
-        self.mock_create_target.assert_called_once_with(
-            operation_uuid=OP_UUID,
-            operation_type='net_op',
-            target_object_type=ObjectType.NETWORK,
-            target_uuid=NETWORK_UUID,
-            created_at=2000.0,
-        )
+        self.assertEqual(
+            [(ObjectType.NETWORK, NETWORK_UUID)],
+            self._targets_arg())
+        # The retired non-atomic writer must not be used any more.
+        self.mock_create_target.assert_not_called()
 
     def test_multi_target_writes_three_rows(self):
         util.enqueue_cluster_operation(
@@ -257,27 +264,12 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             ),
             model_class=_MultiTargetModel)
 
-        self.assertEqual(3, self.mock_create_target.call_count)
-        target_types = {
-            call.kwargs['target_object_type']
-            for call in self.mock_create_target.call_args_list
-        }
         self.assertEqual(
-            {ObjectType.INSTANCE, ObjectType.NETWORK,
-             ObjectType.INTERFACE},
-            target_types)
-        target_uuids = {
-            call.kwargs['target_uuid']
-            for call in self.mock_create_target.call_args_list
-        }
-        self.assertEqual(
-            {INSTANCE_UUID, NETWORK_UUID, INTERFACE_UUID},
-            target_uuids)
-        for call in self.mock_create_target.call_args_list:
-            self.assertEqual(OP_UUID, call.kwargs['operation_uuid'])
-            self.assertEqual(
-                'node_inst_net_iface_op',
-                call.kwargs['operation_type'])
+            {(ObjectType.INSTANCE, INSTANCE_UUID),
+             (ObjectType.NETWORK, NETWORK_UUID),
+             (ObjectType.INTERFACE, INTERFACE_UUID)},
+            set(self._targets_arg()))
+        self.mock_create_target.assert_not_called()
 
     def test_nullable_target_field_is_skipped(self):
         # instance_uuid present in metadata but None -- should be
@@ -287,16 +279,18 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             self._metadata(instance_uuid=None),
             model_class=_NullableTargetModel)
 
+        self.assertEqual([], self._targets_arg())
         self.mock_create_target.assert_not_called()
 
     def test_missing_declaration_is_a_noop(self):
         # A model class without target_fields must not crash --
-        # the central writer simply does nothing.
+        # the derived targets list is simply empty.
         util.enqueue_cluster_operation(
             _FakeObjectType('NODE_INST_OP'),
             self._metadata(instance_uuid=INSTANCE_UUID),
             model_class=_NoDeclarationModel)
 
+        self.assertEqual([], self._targets_arg())
         self.mock_create_target.assert_not_called()
 
     def test_no_model_class_argument_is_a_noop(self):
@@ -306,6 +300,7 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             _FakeObjectType('NODE_INST_OP'),
             self._metadata(instance_uuid=INSTANCE_UUID))
 
+        self.assertEqual([], self._targets_arg())
         self.mock_create_target.assert_not_called()
 
 
@@ -423,10 +418,7 @@ class EnqueueClusterOperationFamilyTestCase(base.ShakenFistTestCase):
             model_class=_NetOnlyModel,
             family='network')
 
-        self.mock_create_target.assert_called_once_with(
-            operation_uuid=OP_UUID,
-            operation_type='net_op',
-            target_object_type=ObjectType.NETWORK,
-            target_uuid=NETWORK_UUID,
-            created_at=3000.0,
-        )
+        self.assertEqual(
+            [(ObjectType.NETWORK, NETWORK_UUID)],
+            self.mock_create_and_enqueue.call_args.kwargs['targets'])
+        self.mock_create_target.assert_not_called()
