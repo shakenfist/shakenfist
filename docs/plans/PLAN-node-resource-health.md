@@ -25,13 +25,13 @@ One commit per logical change, at minimum one per phase; each commit
 self-contained. Consult `ARCHITECTURE.md` and `CLAUDE.md` for the
 daemon inventory, build commands, and conventions.
 
-**Status: draft.** This master plan captures the model and the
-decisions already reached in design discussion (recorded below).
-Phase 0 ratifies them against the code and resolves the remaining
-open questions; later phases implement. The narrow instance-level
-half of this story has already landed on the `instance-disk-errors`
-branch (see Prior work) and is treated here as the first realised
-piece of the model.
+**Status: complete.** This master plan captures the model and the
+decisions reached in design discussion (recorded below). All four
+implementation phases have landed on the `node-resource-health` branch;
+the decisions (D1–D8) were ratified against the code as each phase went
+in, so no separate phase-0 document was written. The narrow instance-
+level half of this story landed earlier on the `instance-disk-errors`
+branch (see Prior work) and is the first realised piece of the model.
 
 ## Situation
 
@@ -299,11 +299,15 @@ the code.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 0. Research and decisions | PLAN-node-resource-health-phase-00-decisions.md | Not started |
-| 1. Check abstraction + path check + tests | PLAN-node-resource-health-phase-01-checks.md | Not started |
-| 2. sf-resources evaluator: hosted-type checks → `node.state` | PLAN-node-resource-health-phase-02-evaluator.md | Not started |
-| 3. Cluster-daemon cascade (blob locations + instances) | PLAN-node-resource-health-phase-03-cascade.md | Not started |
-| 4. Operator docs + observability | PLAN-node-resource-health-phase-04-docs.md | Not started |
+| 0. Research and decisions | (folded into phases 1–4; decisions ratified inline against the code) | Complete |
+| 1. Check abstraction + path check + tests | PLAN-node-resource-health-phase-01-checks.md | Complete |
+| 2. sf-resources evaluator: hosted-type checks → `node.state` | PLAN-node-resource-health-phase-02-evaluator.md | Complete |
+| 3. Cluster-daemon cascade (blob locations + instances) | PLAN-node-resource-health-phase-03-cascade.md | Complete |
+| 4. Operator docs + observability | PLAN-node-resource-health-phase-04-docs.md | Complete |
+
+**All phases complete** on the `node-resource-health` branch. Phase 0
+was not written as a separate document — its decisions (D1–D8) are
+recorded above and were ratified against the code as each phase landed.
 
 Sequencing notes:
 
@@ -385,6 +389,21 @@ Sequencing notes:
   `HealthCheck` implementation and a one-line addition to a type's
   dependency list — no change to the evaluator.
 - `pre-commit run --all-files` passes.
+
+### Completion note (criteria review)
+
+All criteria are met, with one **partial**: the "adding a new check
+type" criterion. The `HealthCheck` abstraction (phase 1) and the
+`evaluate()` composer (phase 2) are already check-type-agnostic, so a
+new check type needs no evaluator change. But the *declaration → check*
+wiring built now (`node_health.build_checks`) reads each type's
+`health_dependencies` as **path** subdirectories and constructs
+`PathCheck`s; adding a non-path check (e.g. libvirtd liveness) will
+require a small generalisation of that wiring (a richer dependency
+descriptor than a bare path string), not merely a one-line list
+addition. This is consistent with D3/Future work, which deferred
+non-path checks until first needed; the seam is in the right place and
+the generalisation is local to `build_checks`.
 
 ## Back brief
 

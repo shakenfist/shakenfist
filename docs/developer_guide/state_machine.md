@@ -265,9 +265,16 @@ stateDiagram-v2
   object is the only object type to never hard delete, although a `node` cannot
   be undeleted.
 * `missing`: the node has not checked in within the NODE_CHECKIN_MAXIMUM deadline.
-* `error`: the node has not check in for ten times NODE_CHECKIN_MAXIMUM, and all
-  instances on this node have been declared to be in an error state. The `node`
-  object is the only object which can return from an `error` state to other states.
+* `degraded`: one of the node's daemons is self-reporting as not running. A
+  degraded node is still a scheduling candidate.
+* `error`: a resource the node depends on has failed -- for example its blob or
+  instance storage is unreadable, remounted read-only, or a hung NFS mount (see
+  [Node resource health](../operator_guide/node_health.md)). An errored node is
+  not a scheduling candidate, and its blob replicas stop counting toward
+  replication targets. Resource-health errors never clear automatically; an
+  operator runs `sf-ctl clear-node-error` once the underlying problem is fixed.
+  The `node` object is the only object which can return from an `error` state to
+  other states.
 
 The following transitions are possible:
 
@@ -281,22 +288,33 @@ stateDiagram-v2
   created --> error
   created --> missing
   created --> stopping
+  created --> degraded
 
   stopping --> stopped
   stopping --> deleted
   stopping --> error
   stopping --> created
+  stopping --> degraded
 
   stopped --> created
   stopped --> deleted
   stopped --> error
+  stopped --> degraded
+
+  degraded --> created
+  degraded --> deleted
+  degraded --> error
+  degraded --> missing
+  degraded --> stopping
 
   error --> created
   error --> deleted
+  error --> degraded
 
   missing --> created
   missing --> deleted
   missing --> error
+  missing --> degraded
 ```
 
 ## Upload

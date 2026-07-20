@@ -242,6 +242,23 @@ these helpers, so keep them in sync if you touch capacity
 arithmetic. Operator-facing documentation is
 [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md).
 
+### Node resource health
+
+Node storage health drives `node.state`, on a different axis from the
+daemon-liveness watchdog below. `shakenfist/resource_health.py` is the
+reusable, timeout-guarded path-check primitive (a hung `hard`-NFS mount
+blocks rather than erroring, so the deadline is the unhealthy signal).
+`shakenfist/node_health.py` maps a node's role to the object types it
+hosts, runs each type's declared `health_dependencies` paths, and marks
+the node `STATE_ERROR` via an audit event carrying the affected object
+types. `sf-resources` runs this on its own thread (not the metrics
+loop); `sf-cluster` reads the affected types back
+(`node_health.errored_node_affected_types`) and cascades — erroring
+instances and re-replicating blobs — mirroring the deleted-node path but
+erroring rather than deleting. Node error is operator-cleared only
+(`sf-ctl clear-node-error`). Operator docs:
+[`docs/operator_guide/node_health.md`](docs/operator_guide/node_health.md).
+
 ### Daemon liveness (systemd watchdog)
 
 `Daemon.pet_watchdog()` in `shakenfist/daemons/daemon.py` is the liveness
