@@ -113,6 +113,14 @@ the database tier — one is fine for small clusters, and you can add more
 hosts to the group later for higher availability. It is not currently
 supported to have more than one network node.
 
+The deploy tolerates a hypervisor that is temporarily absent: a preflight step
+probes every host, quarantines any that do not answer, and deploys around them,
+so a single powered-off or failed hypervisor no longer aborts the run for the
+rest of the cluster. It reports which nodes it skipped, and you re-run once they
+return — you do not have to edit the inventory. The network node and the
+database tier are not optional, so the deploy stops with a clear error if either
+is unreachable.
+
 Per-host identity lives on each host entry: `node_name`, `node_egress_ip`,
 `node_egress_nic`, `node_mesh_ip` and `node_mesh_nic`. A three node example
 (from `examples/cluster/inventory.yaml`) looks like this:
