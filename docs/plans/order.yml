@@ -29,4 +29,5 @@
 - PLAN-oidc-authentication.md: OIDC authentication for Shaken Fist
 - PLAN-qemu-futures.md: Owning more of the QEMU stack — QMP, and one day maybe libvirt's job too
 - PLAN-artifact-ux-rework.md: Rework the artifact, blob, label, upload, and snapshot user interface
+- PLAN-cluster-op-visibility.md: Truthful cluster operation visibility
 - PLAN-database-load-reduction.md: Reduce steady-state MariaDB load from the sf-database tier

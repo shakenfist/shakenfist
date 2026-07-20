@@ -2569,14 +2569,18 @@ class MockMariaDB():
 
     def _mariadb_create_and_enqueue_cluster_operation(
             self, op_uuid, operation_type, metadata,
-            created_at, queue_name, delay=0.0):
+            created_at, queue_name, delay=0.0, targets=None):
         """Mock implementation of the atomic create+enqueue path.
 
         Mirrors the real function's contract: insert-only on
         cluster_operations (returns False on duplicate), records
-        a work_queue row in work_queue_store. Until phase 5
-        switches from_db() to read cluster_operations from
-        MariaDB, this mock also writes the legacy etcd path at
+        a work_queue row in work_queue_store, and -- when
+        ``targets`` is supplied -- writes one
+        cluster_operation_targets row per target in the same call,
+        matching the real function which now writes them in the
+        same transaction as the operation. Until phase 5 switches
+        from_db() to read cluster_operations from MariaDB, this
+        mock also writes the legacy etcd path at
         /sf/{operation_type}/{uuid} so existing tests that load
         operations via from_db() continue to work.
         """
@@ -2618,6 +2622,19 @@ class MockMariaDB():
             'update_time': created_at,
             'message': None,
         }
+
+        # Write the cluster_operation_targets rows the real function
+        # now writes in the same transaction. Delegating to the
+        # existing target-writer preserves the mock's storage and
+        # idempotency semantics.
+        for target_object_type, target_uuid in (targets or []):
+            self._mariadb_create_cluster_operation_target(
+                operation_uuid=key,
+                operation_type=operation_type,
+                target_object_type=target_object_type,
+                target_uuid=target_uuid,
+                created_at=created_at,
+            )
 
         self._trace(
             f'MockMariaDB.create_and_enqueue_cluster_operation'

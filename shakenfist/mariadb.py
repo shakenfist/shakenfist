@@ -16541,16 +16541,31 @@ def _direct_list_cluster_operations_for_target(
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(ops_table).select_from(
-                targets_table.join(
-                    ops_table,
-                    targets_table.c.operation_uuid == ops_table.c.uuid
+            # Two steps rather than a single JOIN.
+            # cluster_operation_targets.operation_uuid is a String(36)
+            # holding the dashed UUID form, but cluster_operations.uuid
+            # is a Uuid() column whose stored representation differs
+            # (no dashes / native), so a column-to-column JOIN on the two
+            # never matches and the query silently returned nothing.
+            # Selecting the operation_uuids first and passing them through
+            # an IN clause routes each value through the Uuid type's bind
+            # processor, which converts it to the column's storage form so
+            # the comparison matches.
+            target_rows = conn.execute(
+                sa.select(targets_table.c.operation_uuid).where(
+                    sa.and_(
+                        targets_table.c.target_object_type
+                        == target_object_type,
+                        targets_table.c.target_uuid == target_uuid
+                    )
                 )
-            ).where(
-                sa.and_(
-                    targets_table.c.target_object_type == target_object_type,
-                    targets_table.c.target_uuid == target_uuid
-                )
+            ).fetchall()
+            if not target_rows:
+                return []
+
+            op_uuids = [UUID(r.operation_uuid) for r in target_rows]
+            stmt = sa.select(ops_table).where(
+                ops_table.c.uuid.in_(op_uuids)
             ).order_by(ops_table.c.created_at.desc())
             result = conn.execute(stmt).fetchall()
             return [_cluster_operation_row_to_dict(row) for row in result]
@@ -16584,10 +16599,11 @@ def _direct_create_and_enqueue_cluster_operation(
         metadata: dict[str, Any],
         created_at: float,
         queue_name: str,
-        delay: float = 0.0) -> bool:
+        delay: float = 0.0,
+        targets: Optional[list[tuple[ObjectType, str]]] = None) -> bool:
     """Atomically create a cluster operation and enqueue its work item.
 
-    Writes three rows in a single MariaDB transaction:
+    Writes the following rows in a single MariaDB transaction:
 
     1. A cluster_operations row with the full operation metadata
        and the same indexed-column extraction as
@@ -16601,6 +16617,15 @@ def _direct_create_and_enqueue_cluster_operation(
        {'operation_type': operation_type,
         'operation_uuid': str(op_uuid)} -- the same shape
        phase 5's from_db() consumer will read via Dequeue.
+    4. One cluster_operation_targets row per entry in ``targets``
+       (each an ``(ObjectType, target_uuid)`` pair). Writing these
+       in the same transaction as the op is what makes a by-target
+       query (has_pending_cluster_operation, is_okay gating, the
+       /clusteroperations listing) see the op the instant it is
+       enqueued -- previously the target rows were written by a
+       separate, non-transactional loop in the schema layer, so a
+       reader in the gap saw an enqueued op with no target rows and
+       concluded, wrongly, that nothing targeted the object.
 
     This is the only function in mariadb.py that writes to more
     than one table in a single transaction. The existing
@@ -16620,6 +16645,7 @@ def _direct_create_and_enqueue_cluster_operation(
     cluster_ops_table = _get_cluster_operations_table()
     states_table = _get_object_states_table()
     queue_table = _get_work_queue_table()
+    targets_table = _get_cluster_operation_targets_table()
 
     scheduled_at = created_at + delay
     work_item = {
@@ -16668,6 +16694,16 @@ def _direct_create_and_enqueue_cluster_operation(
                 created_at=created_at,
             )
             conn.execute(queue_stmt)
+
+            for target_object_type, target_uuid in (targets or []):
+                target_stmt = sa.insert(targets_table).values(
+                    operation_uuid=str(op_uuid),
+                    operation_type=operation_type,
+                    target_object_type=target_object_type,
+                    target_uuid=target_uuid,
+                    created_at=created_at,
+                )
+                conn.execute(target_stmt)
 
             conn.commit()
             return True
@@ -16881,10 +16917,20 @@ def _grpc_create_and_enqueue_cluster_operation(
         metadata: dict[str, Any],
         created_at: float,
         queue_name: str,
-        delay: float = 0.0) -> bool:
+        delay: float = 0.0,
+        targets: Optional[list[tuple[ObjectType, str]]] = None) -> bool:
     """Atomic create+enqueue via the database microservice."""
     try:
         stub = _get_database_stub()
+        target_msgs = [
+            database_pb2.CreateAndEnqueueClusterOperationTarget(
+                target_object_type=cast(
+                    shakenfist_enums_pb2.ObjectType.ValueType,
+                    target_object_type.proto_id),
+                target_uuid=target_uuid,
+            )
+            for target_object_type, target_uuid in (targets or [])
+        ]
         request = (
             database_pb2
             .CreateAndEnqueueClusterOperationRequest(
@@ -16894,6 +16940,7 @@ def _grpc_create_and_enqueue_cluster_operation(
                 queue_name=queue_name,
                 delay=delay,
                 metadata_json=_json_dumps(metadata),
+                targets=target_msgs,
             )
         )
         reply = _grpc_call(
@@ -17301,12 +17348,14 @@ def create_and_enqueue_cluster_operation(
         metadata: dict[str, Any],
         created_at: float,
         queue_name: str,
-        delay: float = 0.0) -> bool:
+        delay: float = 0.0,
+        targets: Optional[list[tuple[ObjectType, str]]] = None) -> bool:
     """Atomically create a cluster operation and enqueue its job.
 
     Writes the cluster_operations header, an object_states row
-    (state='queued'), and a work_queue row in a single MariaDB
-    transaction.
+    (state='queued'), a work_queue row, and one
+    cluster_operation_targets row per entry in ``targets`` -- all in
+    a single MariaDB transaction.
 
     Audit events are NOT written by this function; callers should
     emit them via shakenfist.eventlog.add_event_multi() after this
@@ -17314,12 +17363,11 @@ def create_and_enqueue_cluster_operation(
 
     Note: this is the low-level transactional primitive. The
     schema-layer helper shakenfist/schema/operations/util.py:
-    enqueue_cluster_operation() should normally be preferred --
-    it adds automatic cluster_operation_targets registration
-    based on each schema's ``target_fields`` ClassVar. Calling
-    this function directly bypasses that registration and
-    should only be done when the caller has its own reason to
-    skip it (e.g. internal bookkeeping migrations).
+    enqueue_cluster_operation() should normally be preferred -- it
+    derives the ``targets`` list from each schema's ``target_fields``
+    ClassVar and passes it here so the target rows are written
+    atomically with the operation. Callers using this function
+    directly own the ``targets`` argument themselves.
 
     Args:
         op_uuid: The operation's UUID (str or UUID).
@@ -17329,6 +17377,9 @@ def create_and_enqueue_cluster_operation(
         queue_name: Target work queue name, e.g.
             '{target}-clusteroperation-{priority}'.
         delay: Seconds to defer the job (default 0).
+        targets: Optional list of ``(ObjectType, target_uuid)`` pairs
+            recording every object this operation targets. Written to
+            cluster_operation_targets in the same transaction.
 
     Returns:
         True on success. False if the operation uuid already
@@ -17338,10 +17389,10 @@ def create_and_enqueue_cluster_operation(
     if _use_database_service():
         return _grpc_create_and_enqueue_cluster_operation(
             u, operation_type, metadata, created_at,
-            queue_name, delay)
+            queue_name, delay, targets)
     return _direct_create_and_enqueue_cluster_operation(
         u, operation_type, metadata, created_at,
-        queue_name, delay)
+        queue_name, delay, targets)
 
 
 def set_cluster_operation_error(

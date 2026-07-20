@@ -4760,6 +4760,14 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 json.loads(request.metadata_json)
                 if request.metadata_json else {}
             )
+            targets: list[tuple[ObjectType, str]] = []
+            for t in request.targets:
+                ot = ObjectType.from_proto_id(t.target_object_type)
+                if ot is None:
+                    return database_pb2.StatusReply(
+                        success=False,
+                        error='Invalid target_object_type')
+                targets.append((ot, t.target_uuid))
             success = (
                 mariadb
                 ._direct_create_and_enqueue_cluster_operation(
@@ -4769,6 +4777,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     request.created_at,
                     request.queue_name,
                     request.delay,
+                    targets,
                 )
             )
             return database_pb2.StatusReply(

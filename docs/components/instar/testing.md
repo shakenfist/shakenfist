@@ -37,6 +37,9 @@ defeats the security purpose of instar.
 
 Tests for the `instar check` operation:
 - **Format detection**: Verifies check correctly identifies QCOW2, VMDK, VHD formats
+- **Per-format refusal**: `TestCheckVdiRefusal`, `TestCheckParallelsRefusal`,
+  `TestCheckDmgRefusal`, and `TestCheckQedRefusal` verify `check` refuses each
+  read-only-input format with the correct exit code and message
 - **Corrupt images**: Tests against deliberately corrupt format headers (VMDK, VHDX, VHD)
 - **QCOW2 structural validation**: Uses 4 script-generated corrupt QCOW2 images:
   - Clean baseline (should pass with 0 errors)
@@ -128,7 +131,10 @@ identical stdout and matching exit codes with `qemu-img compare`.
 ### Convert Tests (`test_convert.py`)
 
 Tests for the `instar convert` operation (QCOW2 to raw), cross-validated
-against `qemu-img convert`:
+against `qemu-img convert`. Per-format convert matrices cover VDI
+(`TestConvertVdiToRaw`), Parallels (`TestConvertParallelsToRaw`), QCOW1
+(`TestConvertQcow1ToRaw`), and DMG (`TestConvertDmgToRaw`) input; QCOW1
+also gets a dedicated smoke test module, `tests/test_qcow1_smoke.py`.
 
 **Basic conversion (`TestConvertBasicQcow2ToRaw`):**
 - Empty QCOW2 image to raw
@@ -635,7 +641,7 @@ fuzzing (Phase 3) cannot reach.
 
 ### Fuzz targets
 
-32 targets across the parser and planner crates, organized in
+40 targets across the parser and planner crates, organized in
 `src/fuzz/`:
 
 | Target | Crate | Type |
@@ -653,6 +659,14 @@ fuzzing (Phase 3) cannot reach.
 | `fuzz_vhdx_metadata` | vhdx | CallTable |
 | `fuzz_raw_partition` | raw | Buffer-based |
 | `fuzz_luks_header` | luks | Buffer-based |
+| `fuzz_vdi_header` | vdi | Buffer-based |
+| `fuzz_vdi_bat` | vdi | CallTable |
+| `fuzz_parallels_header` | parallels | Buffer-based |
+| `fuzz_parallels_bat` | parallels | CallTable |
+| `fuzz_qcow1_header` | qcow1 | Buffer-based |
+| `fuzz_qcow1_table` | qcow1 | CallTable |
+| `fuzz_dmg_table` | dmg | CallTable |
+| `fuzz_dmg_chunk` | dmg | CallTable |
 | `fuzz_measure_calc` | measure | Buffer-based |
 | `fuzz_measure_scan` | all parsers | CallTable |
 | `fuzz_create_emitters` | create | Buffer-based |
