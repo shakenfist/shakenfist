@@ -69,7 +69,7 @@ Features unique to instar that do not exist in qemu-img.
 |----------|-------------|
 | [Integration Testing](/components/instar/testing/) | Test suite comparing instar output against qemu-img |
 | [Differential Fuzzing](/components/instar/testing/#differential-fuzzing) | Randomised instar vs qemu-img comparison |
-| [Format Coverage](/components/instar/format-coverage/) | Comparison with oslo.utils format_inspector, test coverage gaps |
+| [Format Coverage](/components/instar/format-coverage/) | Comparison with oslo.utils format_inspector, plus the qemu-img parity axis: a consolidated op × format matrix tracking coverage against qemu-img's real format-driver roster |
 
 ## Understanding the Codebase
 

@@ -182,8 +182,8 @@ allowlist as a QCOW2 backing file.
 ## Decision 6: `no_std` format crates with feature flags
 
 **The choice:** Format parsing crates (`qcow2`, `vmdk`, `vhd`, `vhdx`,
-`luks`, `raw`) are `no_std` libraries with optional features behind
-Cargo feature flags.
+`luks`, `raw`, `vdi`, `parallels`, `qcow1`, `dmg`) are `no_std`
+libraries with optional features behind Cargo feature flags.
 
 **Why `no_std`?** These crates run inside the bare-metal guest, which
 has no standard library. They must compile without `std`. This also
