@@ -10663,8 +10663,8 @@
 </tr>
 <tr>
 <td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
-<td>Phase 2: Static object value caching</td>
-<td>Not started</td>
+<td><a href="PLAN-database-load-reduction-phase-02-static-cache/">Phase 2: Static object value caching</a></td>
+<td>Complete</td>
 <td>Narrow client-side cache for immutable static object values; restores the objects-cacheable/attributes-not principle</td>
 </tr>
 <tr>
@@ -10675,9 +10675,9 @@
 </tr>
 <tr>
 <td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
-<td>Phase 4: Caller attribution on counters</td>
-<td>Not started</td>
-<td>gRPC metadata caller identity + per-caller labels on <code>database_*_total</code>; mTLS-compatible, first slice of the OpenTelemetry thread</td>
+<td><a href="PLAN-database-load-reduction-phase-04-attribution/">Phase 4: Caller attribution on counters</a></td>
+<td>Complete</td>
+<td>gRPC metadata caller identity + an additive <code>database_requests_total{operation, caller_daemon}</code> counter; mTLS-compatible, first slice of the OpenTelemetry thread</td>
 </tr>
 <tr>
 <td><a href="PLAN-database-load-reduction/">Database load reduction</a></td>
