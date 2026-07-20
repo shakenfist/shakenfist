@@ -2058,6 +2058,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 d.installed_version
                 if d.has_installed_version else None
             ),
+            spice_server_cert_subject=(
+                d.spice_server_cert_subject
+                if d.has_spice_server_cert_subject else None
+            ),
             is_etcd_master=d.is_etcd_master,
             is_hypervisor=d.is_hypervisor,
             is_network_node=d.is_network_node,
@@ -2114,6 +2118,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             ),
             has_installed_version=(
                 data.installed_version is not None
+            ),
+            spice_server_cert_subject=(
+                data.spice_server_cert_subject or ''
+            ),
+            has_spice_server_cert_subject=(
+                data.spice_server_cert_subject is not None
             ),
             is_etcd_master=data.is_etcd_master,
             is_hypervisor=data.is_hypervisor,

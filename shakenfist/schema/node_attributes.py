@@ -46,6 +46,8 @@ class NodeAttributesData(BaseModel):
         uuid: The node's unique identifier (references nodes.uuid).
         last_seen: Unix timestamp when the node was last observed.
         installed_version: The Shaken Fist release version installed.
+        spice_server_cert_subject: The subject of the node's SPICE server
+            certificate as a SPICE host-subject string, or None.
         is_etcd_master: Vestigial etcd-era flag, always False.
         is_database_node: Whether this node is part of the database tier.
         is_hypervisor: Whether this node runs instances.
@@ -81,6 +83,14 @@ class NodeAttributesData(BaseModel):
     # Observation data
     last_seen: Annotated[float, SQLIndex()] = 0.0
     installed_version: Optional[str] = None
+
+    # The subject of this node's SPICE server certificate
+    # (/etc/pki/libvirt-spice/server-cert.pem), rendered as the
+    # comma-separated OpenSSL short-name key=value string the SPICE
+    # host-subject verifier compares against. None when the node has no
+    # such certificate (a non-hypervisor, or one whose cert could not be
+    # read or expressed in that form).
+    spice_server_cert_subject: Optional[str] = None
 
     # Role flags. is_etcd_master and is_eventlog_node are vestigial (their
     # only writer hardcodes False) and are retained for one release before

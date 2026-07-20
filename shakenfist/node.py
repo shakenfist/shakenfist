@@ -5,6 +5,8 @@ from collections import defaultdict
 from typing import Any, Optional, Union
 
 import semver
+from cryptography import x509
+from cryptography.x509.oid import NameOID
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import mariadb
@@ -27,6 +29,73 @@ from shakenfist.util import general as util_general
 
 
 LOG, _ = logs.setup(__name__)
+
+
+# The SPICE server certificate a hypervisor presents on its TLS console
+# port. Provisioned by the deploy's internal_ca role; absent on nodes
+# that do not run SPICE instances.
+SPICE_SERVER_CERT_PATH = '/etc/pki/libvirt-spice/server-cert.pem'
+
+# OpenSSL short names for the subject attributes the SPICE host-subject
+# verifier accepts, per shakenfist-spice-protocol's host_subject module
+# (which replicates spice-common). Any other attribute type cannot be
+# expressed in a matchable host-subject string.
+_SPICE_SUBJECT_SHORT_NAMES = {
+    NameOID.COUNTRY_NAME: 'C',
+    NameOID.STATE_OR_PROVINCE_NAME: 'ST',
+    NameOID.LOCALITY_NAME: 'L',
+    NameOID.ORGANIZATION_NAME: 'O',
+    NameOID.ORGANIZATIONAL_UNIT_NAME: 'OU',
+    NameOID.COMMON_NAME: 'CN',
+    NameOID.DOMAIN_COMPONENT: 'DC',
+    NameOID.EMAIL_ADDRESS: 'emailAddress',
+}
+
+
+def _spice_host_subject_from_cert(cert: x509.Certificate) -> Optional[str]:
+    """Render a certificate subject as a SPICE host-subject string.
+
+    The verifier compares the certificate subject attribute-by-attribute
+    in the order they appear in the certificate, requiring the same
+    count, types, and (case- and whitespace-normalised) values. The
+    string must therefore list the attributes in that same order, using
+    the OpenSSL short names, with backslash and comma escaped in values.
+    Returns None if the subject carries an attribute we cannot name or a
+    value we cannot render, since that would make an exact, matchable
+    rendering impossible (and a partial one would wrongly reject the
+    backend).
+    """
+    parts = []
+    for attr in cert.subject:
+        short = _SPICE_SUBJECT_SHORT_NAMES.get(attr.oid)
+        if short is None:
+            return None
+        value = attr.value
+        if not isinstance(value, str):
+            return None
+        escaped = value.replace('\\', '\\\\').replace(',', '\\,')
+        parts.append('%s=%s' % (short, escaped))
+    return ','.join(parts)
+
+
+def read_spice_server_cert_subject() -> Optional[str]:
+    """Read this node's SPICE server certificate subject, or None.
+
+    Never raises: a missing (non-hypervisor node), unreadable, or
+    unparseable certificate yields None, which leaves host-subject
+    enforcement disabled for this backend rather than failing the
+    node's observation loop.
+    """
+    try:
+        with open(SPICE_SERVER_CERT_PATH, 'rb') as f:
+            cert = x509.load_pem_x509_certificate(f.read())
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        LOG.with_fields({'path': SPICE_SERVER_CERT_PATH}).warning(
+            'Could not read SPICE server certificate: %s' % e)
+        return None
+    return _spice_host_subject_from_cert(cert)
 
 
 class Node(dbo):
@@ -327,6 +396,11 @@ class Node(dbo):
         attrs.is_network_node = config.NODE_IS_NETWORK_NODE
         attrs.is_eventlog_node = False
         attrs.is_database_node = config.NODE_IS_DATABASE_NODE
+        # The SPICE server certificate subject kerbside pins the backend
+        # TLS leg against. Re-read each pass so a certificate rotation or
+        # a node gaining the hypervisor role is picked up; the read is a
+        # small local file and never raises.
+        attrs.spice_server_cert_subject = read_spice_server_cert_subject()
         # This runs unlocked every 15 seconds from both sentinel
         # daemons, so it must only ever write the fields it owns: a
         # full-row write here can revert a concurrent instances or
@@ -334,7 +408,7 @@ class Node(dbo):
         n._save_attributes(fields=[
             'last_seen', 'installed_version', 'is_etcd_master',
             'is_hypervisor', 'is_network_node', 'is_eventlog_node',
-            'is_database_node'])
+            'is_database_node', 'spice_server_cert_subject'])
 
     def external_view(self):
         """Build a dict of node state for the API."""
@@ -355,6 +429,8 @@ class Node(dbo):
             retval['is_network_node'] = attrs.is_network_node
             retval['is_eventlog_node'] = attrs.is_eventlog_node
             retval['is_database_node'] = attrs.is_database_node
+            retval['spice_server_cert_subject'] = (
+                attrs.spice_server_cert_subject)
 
         # Add daemon states (single round trip rather than one per daemon)
         rows = mariadb.get_all_node_daemon_states(self.uuid) or []  # nopushdown: per-node scope, ~12 rows

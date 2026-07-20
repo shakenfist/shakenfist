@@ -1138,6 +1138,11 @@ message NodeAttributesProto {
   // The live database-tier role flag. is_etcd_master (5) and
   // is_eventlog_node (8) above are vestigial and scheduled for removal.
   bool is_database_node = 22;
+
+  // The node's SPICE server certificate subject, as a SPICE
+  // host-subject string. Optional: absent on nodes with no such cert.
+  string spice_server_cert_subject = 23;
+  bool has_spice_server_cert_subject = 24;
 }
 
 message CreateNodeAttributesRequest {
