@@ -512,9 +512,11 @@ Future work (qemu has no implementation to mirror).
 
 #### QED
 
-Not supported. qemu-img can resize QED but the format is
-deprecated upstream and instar's parser is read-only. Add
-to Future work.
+Not supported. qemu-img can resize QED but instar's parser
+is read-only. (Note, corrected by PLAN-format-coverage
+phase 6: qemu does NOT deprecate QED — the read-only-parser
+decision is instar's own scope choice, not a response to
+qemu sunsetting the format.) Add to Future work.
 
 #### LUKS
 
@@ -1216,8 +1218,9 @@ We will know this plan has been successfully implemented when:
 * **VHD fixed shrink.** Trivial in principle (footer move +
   set_len) but the allocation walk to refuse on non-zero
   data above the new size adds complexity.
-* **QED resize.** Format is deprecated upstream; defer
-  unless a user requests it.
+* **QED resize.** instar's QED parser is read-only; defer
+  unless a user requests it. (Not because qemu deprecates
+  QED — see PLAN-format-coverage phase 6.)
 * **LUKS / encrypted resize.** Pair with encrypted-create
   support; needs the same passphrase-through-config
   plumbing convert already has, plus per-format
