@@ -27,6 +27,95 @@
 
 
 # ---------------------------------------------------------------------------
+# Preflight: quarantine unreachable nodes so one absent machine cannot abort the
+# deploy for the rest. A host listed in the inventory may not answer this run --
+# powered off, a dead disk (the 2026-07-20 sfcbr deploy hit exactly this), or in
+# CI a node deliberately never created to prove the deploy survives it.
+#
+# Why a preflight rather than per-play error handling: ansible-playbook exits
+# non-zero (code 4) if ANY host is ever unreachable, even with zero failed
+# tasks, so an absent node would fail the whole deploy on its exit code alone.
+# ignore_unreachable makes the probe below non-fatal (the run exits 0 with the
+# absent node left out), and every later play targets '<pattern>:&reachable' so
+# it never contacts an absent node again -- this probe is the only place one is
+# reached, and keeping unreachable hosts out of the later plays also keeps them
+# out of ansible_play_hosts, which the cross-host reductions depend on.
+# ---------------------------------------------------------------------------
+- name: Probe every node for reachability
+  hosts: allsf
+  gather_facts: false
+  become: false
+  ignore_unreachable: true
+  tasks:
+    - name: Probe this node
+      ansible.builtin.ping:
+      register: node_probe
+
+
+# ---------------------------------------------------------------------------
+# Build the 'reachable' group from the probe results and validate the cluster
+# shape. This runs on localhost -- not allsf -- on purpose: add_host has
+# BYPASS_HOST_LOOP set, so a per-host "register myself" task would run only once
+# (for the first host) and silently drop every other node. Looping add_host over
+# the probe results from a single host is the reliable idiom.
+#
+# A hypervisor is fungible capacity, so an absent one is tolerated (the deploy
+# runs on the rest). The network node and the database tier are not -- the
+# cluster cannot come up without them -- so an absent one fails here, loudly and
+# early, rather than deep in a later play with a cryptic error. Runs on localhost
+# so the assertions fire even when the reachable set is empty.
+# ---------------------------------------------------------------------------
+- name: Quarantine unreachable nodes and validate the cluster shape
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    database_tier: "{{ (groups.get('database_node', []) + groups.get('etcd_master', [])) | unique }}"
+  tasks:
+    - name: Register the nodes that answered in the 'reachable' group
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: reachable
+      loop: "{{ groups['allsf'] }}"
+      when:
+        - hostvars[item].node_probe is defined
+        - hostvars[item].node_probe is not unreachable
+      changed_when: false
+
+    - name: Warn about nodes absent from this deploy
+      ansible.builtin.debug:
+        msg: >-
+          Deploying around absent node(s):
+          {{ groups['allsf'] | difference(groups['reachable'] | default([])) | join(', ') }}.
+          They did not answer and are excluded from this run; re-run once they
+          return.
+      when: (groups['allsf'] | difference(groups['reachable'] | default([]))) | length > 0
+
+    - name: Fail if no hypervisor is reachable
+      ansible.builtin.assert:
+        that: (groups.get('hypervisors', []) | intersect(groups['reachable'] | default([]))) | length > 0
+        fail_msg: >-
+          No hypervisor answered this deploy. At least one hypervisor must be
+          reachable to compute cluster-wide values and run instances.
+
+    - name: Fail if the network node is absent
+      ansible.builtin.assert:
+        that: (groups.get('network_node', []) | intersect(groups['reachable'] | default([]))) | length > 0
+        fail_msg: >-
+          The network node did not answer this deploy. Unlike a hypervisor it
+          cannot be deployed around -- the cluster's networking depends on it --
+          so fix its reachability and re-run.
+
+    - name: Fail if no database-tier node is reachable
+      ansible.builtin.assert:
+        that: (database_tier | intersect(groups['reachable'] | default([]))) | length > 0
+        fail_msg: >-
+          No database-tier node answered this deploy. At least one must be
+          reachable to bootstrap and serve the cluster database.
+
+
+# ---------------------------------------------------------------------------
 # Play 0 (optional, gated): build the server and client wheels from local git
 # checkouts and distribute them to every host's /tmp, then point
 # server_package / client_package at the distributed wheels. Operators
@@ -86,7 +175,7 @@
             local_client_wheel: "{{ client_wheel.stdout }}"
 
 - name: Distribute local wheels and override the package references
-  hosts: allsf
+  hosts: allsf:&reachable
   gather_facts: false
   become: true
   vars:
@@ -118,14 +207,15 @@
 # fact-computation stage and the only place groups[...] / hostvars[...] are
 # read. It runs against allsf (and gathers facts so ansible_memtotal_mb is
 # available). validate_mtus runs FIRST (below) so node_mtu is populated before
-# we reduce max_hypervisor_mtu.
+# we reduce max_hypervisor_mtu over the hypervisors that answered this run; see
+# the absent-node tolerance note inside the play.
 # ---------------------------------------------------------------------------
 
 # Determine each host's mesh-interface MTU on the network + hypervisor hosts so
 # the reduction below can take the minimum. This is also part of preflight
 # validation (it aborts on an MTU that is too low).
 - name: Validate mesh MTUs (network + hypervisor hosts)
-  hosts: network_node:hypervisors
+  hosts: network_node:hypervisors:&reachable
   become: true
   gather_facts: true
   tasks:
@@ -135,7 +225,7 @@
         tasks_from: validate_mtus
 
 - name: Compute capability flags and cluster-wide values
-  hosts: allsf
+  hosts: allsf:&reachable
   become: false
   gather_facts: true
   tasks:
@@ -193,6 +283,29 @@
           (which must also be in allsf) in a hypervisors group.
       run_once: true
 
+    # -----------------------------------------------------------------------
+    # Absent-node tolerance. This play runs on allsf:&reachable, so both
+    # ansible_play_hosts and groups['reachable'] already exclude any node that
+    # did not answer the preflight probe (see the "Quarantine unreachable nodes"
+    # play at the top of this file and the reachable-cluster assertions right
+    # after it, which fail loudly if an essential node is absent).
+    #
+    # The reductions below come in two kinds, and conflating them is what broke
+    # the 2026-07-20 sfcbr deploy (one dead hypervisor aborted every healthy
+    # node):
+    #   * Reductions over static inventory host_vars (node_mesh_ip) are defined
+    #     for every inventory host whether or not it answered, so they reduce
+    #     over the full group -- and SHOULD: a node that is down for this run
+    #     still belongs in the mesh so it rejoins when it returns.
+    #   * Reductions over runtime-gathered facts (node_mtu, which validate_mtus
+    #     sets only on reachable hosts) must reduce over the reachable subset.
+    #     Over the full group they dereference a fact that was never set on the
+    #     absent host and fail the task on EVERY host (HostVarsVars has no
+    #     attribute 'node_mtu').
+    - name: Compute the hypervisors that answered the reachability probe
+      ansible.builtin.set_fact:
+        reachable_hypervisors: "{{ groups['hypervisors'] | intersect(groups['reachable']) }}"
+
     - name: Compute the network node mesh IP
       ansible.builtin.set_fact:
         network_node_ip: "{{ hostvars[groups['network_node'][0]]['node_mesh_ip'] }}"
@@ -212,10 +325,14 @@
                         | map('extract', hostvars, 'node_mesh_ip')
                         | list)) }}
 
-    - name: Compute the lowest MTU across all hypervisors
+    # Reduces over reachable_hypervisors, not groups['hypervisors']: node_mtu is
+    # a runtime fact set only on hosts that answered (see the absent-node note
+    # above), so an absent hypervisor left in the reduction fails this on every
+    # host.
+    - name: Compute the lowest MTU across all reachable hypervisors
       ansible.builtin.set_fact:
         max_hypervisor_mtu: >-
-          {{ groups['hypervisors']
+          {{ reachable_hypervisors
              | map('extract', hostvars, 'node_mtu')
              | map('int')
              | min }}
@@ -236,7 +353,7 @@
 # (validate_mtus already ran above.)
 # ---------------------------------------------------------------------------
 - name: Validate KVM on hypervisors
-  hosts: hypervisors
+  hosts: hypervisors:&reachable
   become: true
   gather_facts: false
   tasks:
@@ -264,7 +381,7 @@
         tasks_from: bootstrap
 
 - name: Issue and distribute per-host certificates
-  hosts: allsf
+  hosts: allsf:&reachable
   become: true
   gather_facts: false
   tasks:
@@ -292,7 +409,7 @@
 # register before the rest.
 # ---------------------------------------------------------------------------
 - name: Bootstrap and configure the database tier
-  hosts: database_node:etcd_master
+  hosts: database_node:etcd_master:&reachable
   become: true
   gather_facts: true
   tasks:
@@ -307,7 +424,7 @@
         tasks_from: config
 
 - name: Bootstrap and configure the remaining nodes
-  hosts: allsf:!database_node:!etcd_master
+  hosts: allsf:!database_node:!etcd_master:&reachable
   become: true
   gather_facts: true
   tasks:
@@ -335,7 +452,7 @@
 # happen to carry those capabilities (for example the single-node deploy where
 # localhost is everything). Applied after the database tier is configured.
 - name: Apply component roles to database-tier hosts that also carry them
-  hosts: database_node:etcd_master
+  hosts: database_node:etcd_master:&reachable
   become: true
   gather_facts: false
   tasks:
@@ -356,7 +473,7 @@
 # This is the byo-mariadb command, and it must run before any node registers.
 # ---------------------------------------------------------------------------
 - name: Ensure the MariaDB schema exists (once)
-  hosts: database_node:etcd_master
+  hosts: database_node:etcd_master:&reachable
   become: true
   gather_facts: false
   tasks:
@@ -378,7 +495,7 @@
 # roles/base/create_admin_namespace.yml.
 # ---------------------------------------------------------------------------
 - name: Write the cluster configuration (once, before register)
-  hosts: database_node:etcd_master
+  hosts: database_node:etcd_master:&reachable
   become: true
   gather_facts: false
   run_once: true
@@ -482,7 +599,7 @@
 # is mid-restart.
 # ---------------------------------------------------------------------------
 - name: Register the database tier and start its daemons
-  hosts: database_node:etcd_master
+  hosts: database_node:etcd_master:&reachable
   become: true
   gather_facts: false
   serial: 1
@@ -493,7 +610,7 @@
         tasks_from: register
 
 - name: Register the remaining nodes and start their daemons
-  hosts: allsf:!database_node:!etcd_master
+  hosts: allsf:!database_node:!etcd_master:&reachable
   become: true
   gather_facts: false
   tasks:
@@ -510,7 +627,7 @@
 # every host that runs the API (allsf).
 # ---------------------------------------------------------------------------
 - name: Final deployment sanity checks
-  hosts: allsf
+  hosts: allsf:&reachable
   become: true
   gather_facts: false
   tasks:
