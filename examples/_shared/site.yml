@@ -35,29 +35,52 @@
 # Why a preflight rather than per-play error handling: ansible-playbook exits
 # non-zero (code 4) if ANY host is ever unreachable, even with zero failed
 # tasks, so an absent node would fail the whole deploy on its exit code alone.
-# ignore_unreachable keeps the host in ansible_play_hosts (which would re-break
-# the cross-host reductions), so instead every REACHABLE host registers itself
-# in a 'reachable' group here -- add_host does not run reliably on an
-# ignore_unreachable host, so we invert it -- and every later play targets
-# '<pattern>:&reachable'. This probe is the only place an absent node is
-# contacted, and ignore_unreachable makes it non-fatal, so the run exits 0 with
-# the absent node simply left out.
+# ignore_unreachable makes the probe below non-fatal (the run exits 0 with the
+# absent node left out), and every later play targets '<pattern>:&reachable' so
+# it never contacts an absent node again -- this probe is the only place one is
+# reached, and keeping unreachable hosts out of the later plays also keeps them
+# out of ansible_play_hosts, which the cross-host reductions depend on.
 # ---------------------------------------------------------------------------
-- name: Quarantine unreachable nodes
+- name: Probe every node for reachability
   hosts: allsf
   gather_facts: false
   become: false
   ignore_unreachable: true
   tasks:
-    - name: Probe each node for reachability
+    - name: Probe this node
       ansible.builtin.ping:
       register: node_probe
 
+
+# ---------------------------------------------------------------------------
+# Build the 'reachable' group from the probe results and validate the cluster
+# shape. This runs on localhost -- not allsf -- on purpose: add_host has
+# BYPASS_HOST_LOOP set, so a per-host "register myself" task would run only once
+# (for the first host) and silently drop every other node. Looping add_host over
+# the probe results from a single host is the reliable idiom.
+#
+# A hypervisor is fungible capacity, so an absent one is tolerated (the deploy
+# runs on the rest). The network node and the database tier are not -- the
+# cluster cannot come up without them -- so an absent one fails here, loudly and
+# early, rather than deep in a later play with a cryptic error. Runs on localhost
+# so the assertions fire even when the reachable set is empty.
+# ---------------------------------------------------------------------------
+- name: Quarantine unreachable nodes and validate the cluster shape
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    database_tier: "{{ (groups.get('database_node', []) + groups.get('etcd_master', [])) | unique }}"
+  tasks:
     - name: Register the nodes that answered in the 'reachable' group
       ansible.builtin.add_host:
-        name: "{{ inventory_hostname }}"
+        name: "{{ item }}"
         groups: reachable
-      when: node_probe is not unreachable
+      loop: "{{ groups['allsf'] }}"
+      when:
+        - hostvars[item].node_probe is defined
+        - hostvars[item].node_probe is not unreachable
       changed_when: false
 
     - name: Warn about nodes absent from this deploy
@@ -68,36 +91,17 @@
           They did not answer and are excluded from this run; re-run once they
           return.
       when: (groups['allsf'] | difference(groups['reachable'] | default([]))) | length > 0
-      run_once: true
 
-
-# ---------------------------------------------------------------------------
-# Reachable-cluster validation. A hypervisor is fungible capacity, so an absent
-# one is tolerated (the deploy runs on the rest). The network node and the
-# database tier are not -- the cluster cannot come up without them -- so an
-# absent one fails here, loudly and early, rather than deep in a later play with
-# a cryptic error. Runs on localhost so it fires even when the reachable set is
-# empty.
-# ---------------------------------------------------------------------------
-- name: Assert the reachable nodes can form a cluster
-  hosts: localhost
-  connection: local
-  gather_facts: false
-  become: false
-  vars:
-    reachable: "{{ groups['reachable'] | default([]) }}"
-    database_tier: "{{ (groups.get('database_node', []) + groups.get('etcd_master', [])) | unique }}"
-  tasks:
     - name: Fail if no hypervisor is reachable
       ansible.builtin.assert:
-        that: (groups.get('hypervisors', []) | intersect(reachable)) | length > 0
+        that: (groups.get('hypervisors', []) | intersect(groups['reachable'] | default([]))) | length > 0
         fail_msg: >-
           No hypervisor answered this deploy. At least one hypervisor must be
           reachable to compute cluster-wide values and run instances.
 
     - name: Fail if the network node is absent
       ansible.builtin.assert:
-        that: (groups.get('network_node', []) | intersect(reachable)) | length > 0
+        that: (groups.get('network_node', []) | intersect(groups['reachable'] | default([]))) | length > 0
         fail_msg: >-
           The network node did not answer this deploy. Unlike a hypervisor it
           cannot be deployed around -- the cluster's networking depends on it --
@@ -105,7 +109,7 @@
 
     - name: Fail if no database-tier node is reachable
       ansible.builtin.assert:
-        that: (database_tier | intersect(reachable)) | length > 0
+        that: (database_tier | intersect(groups['reachable'] | default([]))) | length > 0
         fail_msg: >-
           No database-tier node answered this deploy. At least one must be
           reachable to bootstrap and serve the cluster database.
