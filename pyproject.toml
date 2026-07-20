@@ -202,7 +202,7 @@ test = [
     "flake8==7.3.0",            # mit
     "tox==4.56.4",              # mit
     "mkdocs==1.6.1",            # bsd
-    "mkdocs-material==9.7.6",   # mit
+    "mkdocs-material==9.7.7",   # mit
     "testscenarios==0.6.2",     # bsd
     "mypy==2.3.0",             # mit
     "mypy-protobuf==5.1.0",     # apache2
