@@ -10787,6 +10787,9 @@ defeats the security purpose of instar.</p>
 <h3 id="check-validation-tests-test_check_formatspy">Check Validation Tests (<code>test_check_formats.py</code>)<a class="headerlink" href="#check-validation-tests-test_check_formatspy" title="Permanent link">&para;</a></h3>
 <p>Tests for the <code>instar check</code> operation:
 - <strong>Format detection</strong>: Verifies check correctly identifies QCOW2, VMDK, VHD formats
+- <strong>Per-format refusal</strong>: <code>TestCheckVdiRefusal</code>, <code>TestCheckParallelsRefusal</code>,
+  <code>TestCheckDmgRefusal</code>, and <code>TestCheckQedRefusal</code> verify <code>check</code> refuses each
+  read-only-input format with the correct exit code and message
 - <strong>Corrupt images</strong>: Tests against deliberately corrupt format headers (VMDK, VHDX, VHD)
 - <strong>QCOW2 structural validation</strong>: Uses 4 script-generated corrupt QCOW2 images:
   - Clean baseline (should pass with 0 errors)
@@ -10864,7 +10867,10 @@ chains), so no external testdata is needed.</p>
 identical stdout and matching exit codes with <code>qemu-img compare</code>.</p>
 <h3 id="convert-tests-test_convertpy">Convert Tests (<code>test_convert.py</code>)<a class="headerlink" href="#convert-tests-test_convertpy" title="Permanent link">&para;</a></h3>
 <p>Tests for the <code>instar convert</code> operation (QCOW2 to raw), cross-validated
-against <code>qemu-img convert</code>:</p>
+against <code>qemu-img convert</code>. Per-format convert matrices cover VDI
+(<code>TestConvertVdiToRaw</code>), Parallels (<code>TestConvertParallelsToRaw</code>), QCOW1
+(<code>TestConvertQcow1ToRaw</code>), and DMG (<code>TestConvertDmgToRaw</code>) input; QCOW1
+also gets a dedicated smoke test module, <code>tests/test_qcow1_smoke.py</code>.</p>
 <p><strong>Basic conversion (<code>TestConvertBasicQcow2ToRaw</code>):</strong>
 - Empty QCOW2 image to raw
 - QCOW2 with written data to raw
@@ -11376,7 +11382,7 @@ mock <code>CallTable</code> backed by fuzzer input provides the I/O layer,
 allowing libFuzzer to explore malformed input space that differential
 fuzzing (Phase 3) cannot reach.</p>
 <h3 id="fuzz-targets">Fuzz targets<a class="headerlink" href="#fuzz-targets" title="Permanent link">&para;</a></h3>
-<p>32 targets across the parser and planner crates, organized in
+<p>40 targets across the parser and planner crates, organized in
 <code>src/fuzz/</code>:</p>
 <table>
 <thead>
@@ -11451,6 +11457,46 @@ fuzzing (Phase 3) cannot reach.</p>
 <td><code>fuzz_luks_header</code></td>
 <td>luks</td>
 <td>Buffer-based</td>
+</tr>
+<tr>
+<td><code>fuzz_vdi_header</code></td>
+<td>vdi</td>
+<td>Buffer-based</td>
+</tr>
+<tr>
+<td><code>fuzz_vdi_bat</code></td>
+<td>vdi</td>
+<td>CallTable</td>
+</tr>
+<tr>
+<td><code>fuzz_parallels_header</code></td>
+<td>parallels</td>
+<td>Buffer-based</td>
+</tr>
+<tr>
+<td><code>fuzz_parallels_bat</code></td>
+<td>parallels</td>
+<td>CallTable</td>
+</tr>
+<tr>
+<td><code>fuzz_qcow1_header</code></td>
+<td>qcow1</td>
+<td>Buffer-based</td>
+</tr>
+<tr>
+<td><code>fuzz_qcow1_table</code></td>
+<td>qcow1</td>
+<td>CallTable</td>
+</tr>
+<tr>
+<td><code>fuzz_dmg_table</code></td>
+<td>dmg</td>
+<td>CallTable</td>
+</tr>
+<tr>
+<td><code>fuzz_dmg_chunk</code></td>
+<td>dmg</td>
+<td>CallTable</td>
 </tr>
 <tr>
 <td><code>fuzz_measure_calc</code></td>

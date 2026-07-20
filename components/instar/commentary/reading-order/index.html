@@ -10822,11 +10822,12 @@ Refcount table reading. Backing chain walking via <code>read_virtual_offset()</c
   it is read into <code>COMPRESSED_BUF_SIZE</code> (cluster size + one sector).</p>
 </li>
 <li>
-<p>The <code>read_virtual_offset()</code> function implements backing chain flattening.
-  If a cluster is unallocated in the top image, it walks down the chain
-  to find it in a backing image. Each backing image may be a different
-  format (QCOW2, raw, VMDK, VHD), so the function dispatches to the
-  appropriate reader based on the <code>ChainConfig</code> metadata.</p>
+<p>The <code>read_chain_virtual_cluster()</code> function implements backing chain
+  flattening. If a cluster is unallocated in the top image, it walks down
+  the chain to find it in a backing image. Each backing image may be a
+  different format (QCOW2, raw, VMDK incl. descriptor, VHD, VHDX, VDI,
+  Parallels, QCOW1, DMG), so the function dispatches to the appropriate
+  reader based on the <code>ChainConfig</code> metadata.</p>
 </li>
 <li>
 <p>Checked arithmetic (<code>checked_mul</code>, <code>checked_add</code>) is used throughout

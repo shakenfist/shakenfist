@@ -3308,6 +3308,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete-2026-07-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete (2026-07-20)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3460,6 +3471,67 @@
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#programme-retrospective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programme retrospective
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Programme retrospective">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-seven-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The seven phases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-shipped-capability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shipped capability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-along-the-way" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed along the way
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -10015,6 +10087,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-complete-2026-07-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Complete (2026-07-20)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10171,6 +10254,67 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#programme-retrospective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programme retrospective
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Programme retrospective">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-seven-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The seven phases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-shipped-capability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shipped capability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-along-the-way" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed along the way
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#future-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10241,6 +10385,7 @@
 
 
 <h1 id="format-coverage-expansion">Format coverage expansion<a class="headerlink" href="#format-coverage-expansion" title="Permanent link">&para;</a></h1>
+<h2 id="status-complete-2026-07-20">Status: Complete (2026-07-20)<a class="headerlink" href="#status-complete-2026-07-20" title="Permanent link">&para;</a></h2>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -10463,7 +10608,22 @@ tracked manner:</p>
    (b) add a read path for parity. Leaning (a) — the format
    was never widely deployed — but if archives of QED images
    surface in practice, (b) is a small format (it is
-   essentially a simplified qcow2 without refcounts).</li>
+   essentially a simplified qcow2 without refcounts).
+   <strong>RESOLVED 2026-07-19 by phase 6: (a), refusal as
+   policy</strong> — see
+   <a href="/components/instar/plans/PLAN-format-coverage-phase-06-qed/">PLAN-format-coverage-phase-06-qed.md</a>
+   for the decision record, with one correction to this
+   question's framing: QEMU does NOT formally deprecate QED
+   (no deprecated.rst entry, no runtime warning, create
+   still works on 10.2.0) — the refusal is instar's own
+   scope choice, aligned with oslo.utils' explicit ban and
+   nil demand, with recorded revisit criteria and a
+   path-(b) sketch preserved in the phase plan. <strong>Phase 6
+   executed this decision on 2026-07-20</strong>: QED-named refusal
+   pins now cover every subcommand that previously lacked
+   one, and a stale, unconsumed testdata baseline set was
+   retired (commits <code>3fd48e6</code> in instar, <code>cecb16565a</code> in
+   instar-testdata).</li>
 <li><strong>DMG detection is trailer-based.</strong> DMG has no magic at
    offset 0 — the UDIF "koly" signature lives in the last
    512 bytes of the file. <code>detect_format_from_header()</code>
@@ -10478,7 +10638,7 @@ tracked manner:</p>
    majority of real DMGs and the guest already links a
    no_std inflate for qcow2/vmdk. bzip2 (UDBZ) and lzfse
    (ULFO) would each need a new no_std decompressor inside
-   the 384KB guest binary cap. Proposal: v1 = zlib +
+   the 768KB guest binary cap. Proposal: v1 = zlib +
    uncompressed + zero/ignore chunk types, with typed
    refusals naming the unsupported codec for UDBZ/ULFO, and
    codec expansion recorded as future work.</li>
@@ -10524,38 +10684,38 @@ is the tracking source of truth.</p>
 <tbody>
 <tr>
 <td>1. Detection + info parity (Parallels, Bochs, cloop, DMG; settle the trailer-probe question)</td>
-<td>PLAN-format-coverage-phase-01-detection.md</td>
-<td>Not written</td>
+<td><a href="/components/instar/plans/PLAN-format-coverage-phase-01-detection/">PLAN-format-coverage-phase-01-detection.md</a></td>
+<td>Complete (commits 3c0fff1..5042d74 + docs commit)</td>
 </tr>
 <tr>
 <td>2. VDI convert-from (dynamic + static read path, new <code>src/crates/vdi/</code>)</td>
-<td>PLAN-format-coverage-phase-02-vdi-read.md</td>
-<td>Not written</td>
+<td><a href="/components/instar/plans/PLAN-format-coverage-phase-02-vdi-read/">PLAN-format-coverage-phase-02-vdi-read.md</a></td>
+<td>Complete (commits 6cd14b5..cf213ed + docs commit)</td>
 </tr>
 <tr>
 <td>3. Parallels convert-from (v2 read path, new <code>src/crates/parallels/</code>)</td>
-<td>PLAN-format-coverage-phase-03-parallels-read.md</td>
-<td>Not written</td>
+<td><a href="/components/instar/plans/PLAN-format-coverage-phase-03-parallels-read/">PLAN-format-coverage-phase-03-parallels-read.md</a></td>
+<td>Complete (commits 3f43472..f2bacf4 + docs commit)</td>
 </tr>
 <tr>
-<td>4. QCOW1 convert-from (read path, likely inside <code>src/crates/qcow2/</code> as a sibling parser)</td>
-<td>PLAN-format-coverage-phase-04-qcow1-read.md</td>
-<td>Not written</td>
+<td>4. QCOW1 convert-from (read path, new <code>src/crates/qcow1/</code>; fixes the misdetection-as-qcow2 defect)</td>
+<td><a href="/components/instar/plans/PLAN-format-coverage-phase-04-qcow1-read/">PLAN-format-coverage-phase-04-qcow1-read.md</a></td>
+<td>Complete (commits 23b240f..efdc42e + docs commit)</td>
 </tr>
 <tr>
-<td>5. DMG convert-from (koly trailer + BLKX chunk table + zlib chunks, new <code>src/crates/dmg/</code>)</td>
-<td>PLAN-format-coverage-phase-05-dmg-read.md</td>
-<td>Not written</td>
+<td>5. DMG convert-from (BLKX chunk table + zlib chunks, new <code>src/crates/dmg/</code>; EIO-parity error semantics, typed codec/capacity refusals)</td>
+<td><a href="/components/instar/plans/PLAN-format-coverage-phase-05-dmg-read/">PLAN-format-coverage-phase-05-dmg-read.md</a></td>
+<td>Complete (commits 71a20d9..9d8111c + docs commit)</td>
 </tr>
 <tr>
-<td>6. QED decision: read path or documented refusal (see Open question 1)</td>
-<td>PLAN-format-coverage-phase-06-qed.md</td>
-<td>Not written</td>
+<td>6. QED decision: refusal as policy (Open question 1 RESOLVED; per-op pins + testdata reconciliation + decision record)</td>
+<td><a href="/components/instar/plans/PLAN-format-coverage-phase-06-qed/">PLAN-format-coverage-phase-06-qed.md</a></td>
+<td>Complete (2026-07-20; commits 3fd48e6 instar, cecb16565a testdata)</td>
 </tr>
 <tr>
 <td>7. Docs: qemu-img-parity axis in format-coverage.md, README/ARCHITECTURE/CHANGELOG updates</td>
-<td>PLAN-format-coverage-phase-07-docs.md</td>
-<td>Not written</td>
+<td><a href="/components/instar/plans/PLAN-format-coverage-phase-07-docs/">PLAN-format-coverage-phase-07-docs.md</a></td>
+<td>Complete (2026-07-20; commit <code>de1c3bc</code> (7a, the parity axis) + the 7b close-out commit)</td>
 </tr>
 </tbody>
 </table>
@@ -10573,9 +10733,10 @@ coverage-guided fuzzing of the parser, and differential
 fuzzing against qemu-img (per Open question 6).</p>
 <p>Per-phase constraints that apply throughout:</p>
 <ul>
-<li>Guest binaries must stay under the 384KB per-operation
-  cap (<code>make check-binary-sizes</code>); DMG's inflate reuse and
-  any new decompressor need size budgeting up front.</li>
+<li>Guest binaries must stay under the 768KB per-operation
+  cap (<code>make check-binary-sizes</code>; convert currently sits at
+  ~303KB); DMG's inflate reuse and any new decompressor
+  need size budgeting up front.</li>
 <li>Format parsers are <code>no_std</code> and panic-free; all offsets
   and lengths from untrusted headers are bounds-checked
   before use (the existing qcow2/vmdk crates are the
@@ -10702,7 +10863,7 @@ detailed enough for it to succeed.</p>
 as if briefing a colleague who has never seen the
 codebase. Include: what to change, which files to touch,
 what patterns to follow, and any non-obvious constraints
-(memory layout, the 384KB guest binary cap, the
+(memory layout, the 768KB guest binary cap, the
 no-<code>std</code> requirement of the format crates, the call
 table boundary). The better the brief, the lower the
 effort level needed and the lighter the model that can
@@ -10726,7 +10887,7 @@ should verify:</p>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No unrelated files were modified.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>make instar</code> builds and <code>make lint</code> is clean.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Guest binaries pass <code>make check-binary-sizes</code>
-      (384KB limit per operation).</li>
+      (768KB limit per operation).</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>make test-rust</code> and the relevant
       <code>make test-integration</code> targets pass.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes.</li>
@@ -10741,46 +10902,344 @@ should verify:</p>
 <p>We will know when this plan has been successfully implemented
 because the following statements will be true:</p>
 <ul>
-<li><code>make instar</code> builds and <code>make lint</code> is clean.</li>
-<li>Guest binaries pass <code>make check-binary-sizes</code> (384KB limit).</li>
-<li>All Rust unit tests pass (<code>make test-rust</code>).</li>
-<li>All Python integration tests pass (<code>make test-integration</code>).</li>
-<li><code>pre-commit run --all-files</code> passes.</li>
+<li><code>make instar</code> builds and <code>make lint</code> is clean. <strong>Satisfied
+  cumulatively across phases 1-7</strong>: every guest-integration
+  and crate step's brief gated its commit on <code>make instar</code> +
+  <code>make lint</code> clean (e.g. phase 1 step 2a, phase 2 step 2b,
+  phase 3 step 3b, phase 4 step 4b, phase 5 step 5b), recorded
+  in each phase plan's Findings; no outstanding lint/build
+  failure was ever left behind.</li>
+<li>Guest binaries pass <code>make check-binary-sizes</code> (768KB limit).
+  <strong>Satisfied</strong>: phases 2-5 each required <code>make
+  check-binary-sizes</code> clean before landing and reported the
+  per-binary delta (phase 4's Findings: "All four deltas stayed
+  well within the 768 KB per-binary cap"); the tightest budget
+  discussion — DMG's ~1.25 MiB chunk-table scratch region —
+  was sized against the compile-time layout assert in phase 5
+  step 5b and stayed within cap.</li>
+<li>All Rust unit tests pass (<code>make test-rust</code>). <strong>Satisfied</strong>:
+  every crate/guest-integration step across phases 1-6 required
+  <code>make test-rust</code> clean, including the new <code>no_std</code> unit-test
+  suites in <code>src/crates/vdi</code>, <code>src/crates/parallels</code>,
+  <code>src/crates/qcow1</code>, and <code>src/crates/dmg</code> (findings in each
+  phase's 2a/3a/4a/5a and 2b/3b/4b/5b steps).</li>
+<li>All Python integration tests pass (<code>make test-integration</code>).
+  <strong>Satisfied</strong>, recorded zero-fail per phase (do not
+  re-run): phase 1 <code>test_info_safe</code> 580/580; phase 2
+  <code>test_info_safe</code> 628/628 plus <code>test_oslo_crossval</code> 221
+  passed; phase 3 eight suites zero-fail including
+  <code>test_adversarial</code> 83 and <code>test_info_safe</code> 800; phase 4
+  eight consumer suites clean, <code>test_info_safe</code> 898/0; phase 5
+  <code>test_info_safe</code> 954/0, <code>test_convert</code> 251/0, <code>test_compare</code>
+  65/0, <code>test_dd</code> 45/0 (full sequential matrix, zero failures
+  across every consumer suite); phase 6 ten suites zero-fail
+  (<code>check_formats</code> 77, <code>map</code> 100, <code>measure</code> 289, <code>bench</code> 81,
+  <code>resize</code> 98, <code>rebase</code> 28, <code>commit</code> 26, <code>amend</code> 28, <code>snapshot</code>
+  94, <code>bitmap</code> 53) with <code>test_info_safe</code> confirmed unchanged at
+  954/954 after the testdata reconciliation.</li>
+<li><code>pre-commit run --all-files</code> passes. <strong>Satisfied</strong>: every
+  phase landed its commits under the project's standing
+  pre-commit-clean convention (Design/Agent-guidance
+  constraint applied throughout); no phase's Findings record an
+  outstanding pre-commit failure.</li>
 <li><code>instar info</code> detects every on-disk image format a current
   qemu-img can probe (or the phase-1 plan records why a
-  specific format's probe is not reproducible host-side).</li>
+  specific format's probe is not reproducible host-side).
+  <strong>Satisfied</strong>: phase 1 added Parallels, Bochs, cloop, and DMG
+  detection (confirmed by <code>test_info_safe</code> 580/580 including
+  the four new formats), closing the gap this plan's Situation
+  table identified. vvfat is the one qemu-advertised format
+  with no on-disk container to detect — the phase-7a axis
+  documents that rationale rather than adding a detection path
+  (see the "vvfat" subsection of <code>docs/format-coverage.md</code>).</li>
 <li>VDI, Parallels, QCOW1, and DMG images convert correctly to
   every existing output format, cross-validated against
-  <code>qemu-img convert</code> output.</li>
+  <code>qemu-img convert</code> output. <strong>Satisfied</strong> by phases 2-5
+  respectively: each phase's integration-test step (2e/3e/4e/5e)
+  cross-validates convert-to-raw/qcow2/vpc byte parity against
+  <code>qemu-img convert</code> across the full safe-fixture set, recorded
+  zero-fail in the suite counts above.</li>
 <li>Bochs, cloop, vvfat (and QED, per the phase-6 decision)
   produce clean, tested, documented refusals rather than
-  misdetection as raw.</li>
+  misdetection as raw. <strong>Satisfied for QED by phase 6</strong>
+  (2026-07-20, commits <code>3fd48e6</code> instar / <code>cecb16565a</code>
+  testdata): every subcommand lacking a QED-named refusal
+  pin now has one, and the decision record lives in
+  <code>docs/quirks.md</code> and
+  <a href="/components/instar/plans/PLAN-format-coverage-phase-06-qed/">PLAN-format-coverage-phase-06-qed.md</a>.
+  <strong>Satisfied for Bochs/cloop by phase 1</strong>: detect + info only,
+  with the issue-#444 gate producing a clean, pinned refusal for
+  convert/compare/dd/bench (see the qemu-img parity axis's Note
+  11 in <code>docs/format-coverage.md</code>, sourced to quirks.md phase 1).
+  <strong>Satisfied for vvfat by phase 7a</strong>: the axis's "vvfat"
+  subsection records that vvfat is a directory-backed pseudo-
+  format with no on-disk single-file container, so there is
+  nothing for instar to detect or refuse — satisfied by
+  documented rationale rather than code, re-verifying <code>qemu-img
+  create -f vvfat</code>'s own creation refusal on qemu-img 10.0.11.</li>
 <li>New format parsing lives in shared crates under
   <code>src/crates/</code>, <code>no_std</code>-compatible for guest use, with
-  coverage-guided fuzz targets.</li>
+  coverage-guided fuzz targets. <strong>Satisfied</strong>: <code>src/crates/vdi</code>,
+  <code>src/crates/parallels</code>, <code>src/crates/qcow1</code>, and
+  <code>src/crates/dmg</code> shipped in phases 2-5, each <code>no_std</code> with its
+  own coverage-guided fuzz targets (<code>fuzz_vdi_header</code> /
+  <code>fuzz_vdi_bat</code>, <code>fuzz_parallels_header</code> /
+  <code>fuzz_parallels_bat</code>, <code>fuzz_qcow1_header</code> / <code>fuzz_qcow1_table</code>,
+  <code>fuzz_dmg_table</code> / <code>fuzz_dmg_chunk</code>) plus differential-fuzz
+  coverage against qemu-img, recorded in each phase's 2f/3f/4f/5f
+  Findings with zero crashes and zero divergences over the
+  ~200-iteration forced burn-ins.</li>
 <li>The staged instar-testdata images (parallels-v1,
   parallels-v2, empty.bochs, simple-pattern.cloop) are
   exercised by tests, and new fixtures exist for VDI-static
-  and DMG.</li>
+  and DMG. <strong>Satisfied</strong>: phase 1 wired the four staged images
+  into <code>test_info_safe</code>; phase 2 added the VDI-static and
+  additional VDI fixtures (<code>vdi-static-data</code>,
+  <code>vdi-data-dynamic</code>, <code>vdi-odd-size</code>, <code>vdi-bmap-past-eof</code>, plus
+  five malformed adversarial fixtures); phase 5 added the DMG
+  fixture set (<code>dmg-simple</code>, <code>dmg-mixed</code>, <code>dmg-multipart</code>,
+  <code>dmg-rsrc-fork</code>, and 12 more per the Format Detection
+  Comparison table in <code>docs/format-coverage.md</code>).</li>
 <li><code>docs/format-coverage.md</code> (or a sibling document) tracks
   format coverage against qemu-img's real format-driver
-  roster, not just oslo.utils.</li>
+  roster, not just oslo.utils. <strong>Satisfied by phase 7a</strong>
+  (2026-07-20, commit <code>de1c3bc</code>): the "qemu-img parity axis"
+  section — a consolidated, fully-sourced op × format matrix
+  (read-side, in-place, and output-side tables, 16 notes, and
+  the vvfat subsection) — widens the document's charter to both
+  oslo.utils parity and qemu-img roster coverage.</li>
 <li><code>ARCHITECTURE.md</code>, <code>README.md</code>, <code>AGENTS.md</code>, and
-  <code>CHANGELOG.md</code> have been updated as needed.</li>
+  <code>CHANGELOG.md</code> have been updated as needed. <strong>Satisfied</strong>:
+  each of phases 1-6 shipped its own docs step updating
+  <code>ARCHITECTURE.md</code> (the four new crates, chain-reader feature
+  dispatch) and <code>CHANGELOG.md</code> (six phase entries; phase 7 adds
+  none per Decision 2, docs-only changes get no entry).
+  <code>README.md</code>'s Supported Formats list and <code>AGENTS.md</code> were
+  current after each per-phase step except two spots phase 7b
+  fixed: <code>AGENTS.md</code>'s stale Supported Formats section (still
+  named the pre-programme roster) is now the real write/luks/
+  read-only-input/detection-only/QED breakdown with a pointer to
+  the parity axis, and <code>README.md</code>'s "Initial target formats"
+  heading (stale wording) plus its VDI line (missing "bench" —
+  confirmed against <code>tests/test_bench.py</code>'s
+  <code>test_bench_vdi_simple</code>, which is a live rc-0 parity pin) are
+  corrected to match the parallels/qcow/dmg lines.</li>
 </ul>
+<h3 id="programme-retrospective">Programme retrospective<a class="headerlink" href="#programme-retrospective" title="Permanent link">&para;</a></h3>
+<p>Closed out 2026-07-20 (phase 7, docs). All seven phases are Complete.
+The durable artifact for the finished programme is the qemu-img
+parity axis in <code>docs/format-coverage.md</code>; the per-phase Findings
+sections in each <code>PLAN-format-coverage-phase-NN-*.md</code> remain the
+historical record, and this section is the one-page end state.</p>
+<h4 id="the-seven-phases">The seven phases<a class="headerlink" href="#the-seven-phases" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Detection + info parity</td>
+<td>Added Parallels, Bochs, cloop, and DMG magic detection to <code>src/shared/src/format_detection.rs</code> plus <code>info</code> parsing for all four; <code>test_info_safe</code> grew 580/580. Found and fixed the pre-existing #444 defect (detect-only formats silently read as raw by convert/compare/dd) with a central <code>discover_backing_chain</code> gate.</td>
+</tr>
+<tr>
+<td>2. VDI convert-from</td>
+<td>New <code>src/crates/vdi/</code> no_std reader (dynamic + static, bmap lookup, capacity-clamped zero-fill); graduated VDI out of the #444 gate for convert/compare/dd/bench. <code>test_info_safe</code> 628/628, <code>test_oslo_crossval</code> 221 passed, zero-crash/zero-divergence fuzzing.</td>
+</tr>
+<tr>
+<td>3. Parallels convert-from</td>
+<td>New <code>src/crates/parallels/</code> reader (both magics, v2 "WithoutFreeSpace"); cluster-size info plumbing; graduated for convert/compare/dd/bench. Eight consumer suites zero-fail (<code>test_info_safe</code> 800), zero-crash/zero-divergence fuzzing. Recorded a real qemu regression (<code>parallels_check_duplicate</code> assertion crash on 10.x) as the reason instar's own <code>check</code> continues to refuse Parallels.</td>
+</tr>
+<tr>
+<td>4. QCOW1 convert-from</td>
+<td>New <code>src/crates/qcow1/</code> reader (backing chains, raw-deflate compressed clusters). Found and fixed a live QCOW1-misdetected-as-QCOW2 defect (commit <code>c421f75</code>) and the never-consumed <code>INFO_RESULT_FLAG_ENCRYPTED</code> (commit <code>467d24a</code>). Ordered the reader-arm commit strictly before the detection fix to close a silent-raw hazard window. Eight suites clean, <code>test_info_safe</code> 898/0.</td>
+</tr>
+<tr>
+<td>5. DMG convert-from</td>
+<td>New <code>src/crates/dmg/</code> reader (koly trailer, XML-plist and resource-fork chunk tables, zlib/raw/zero/ignore chunk codecs, EIO-parity error semantics for truncated raw spans). Found the qemu DMG zero-chunk NULL-dereference crash (upstream bug, all qemu-img 6.0.0-10.2.0) and shipped a clean typed refusal instead of mirroring it. <code>test_info_safe</code> 954/0, <code>test_convert</code> 251/0, <code>test_compare</code> 65/0, <code>test_dd</code> 45/0 — zero failures across every consumer suite.</td>
+</tr>
+<tr>
+<td>6. QED decision</td>
+<td>Resolved Open question 1: refusal as policy, not read support (a) — nil real-world demand plus oslo.utils' explicit ban, with a path-(b) reader sketch preserved for a future revisit. Added QED-named refusal pins for the ten ops that lacked one (commit <code>3fd48e6</code>); corrected the plan's own premise mid-step (the "unconsumed" qed baseline claim was wrong) and retired only the genuinely unconsumable check/compare baseline trees (<code>cecb16565a</code> in instar-testdata) after empirical confirmation. <code>test_info_safe</code> unchanged at 954/954.</td>
+</tr>
+<tr>
+<td>7. Docs</td>
+<td>The qemu-img parity axis (<code>de1c3bc</code>, 7a) — a consolidated, fully-sourced op × format matrix (read-side, in-place, output-side, 16 notes, vvfat rationale) with zero conflicts against six phases of recorded quirks.md facts and three management-independent re-verifications. Consistency fixes (<code>AGENTS.md</code>, <code>README.md</code>) and this close-out (7b).</td>
+</tr>
+</tbody>
+</table>
+<h4 id="the-shipped-capability">The shipped capability<a class="headerlink" href="#the-shipped-capability" title="Permanent link">&para;</a></h4>
+<p>Four new <code>no_std</code> guest-format crates (<code>src/crates/vdi</code>,
+<code>src/crates/parallels</code>, <code>src/crates/qcow1</code>, <code>src/crates/dmg</code>), each
+with coverage-guided fuzz targets and differential-fuzz coverage
+against qemu-img, graduating VDI, Parallels, QCOW1, and DMG from
+detect+info-only to full read support (convert / compare / dd /
+bench) — closing the input-side format-coverage gap the plan set out
+to close. Detection parity against oslo.utils' roster is closed (all
+formats oslo detects, instar also detects, plus four more oslo does
+not: Parallels, Bochs, cloop, DMG). One format (QED) received a
+recorded policy refusal rather than a read path. <code>test_info_safe</code>
+grew from 580 to 954 passing scenarios across the programme, and
+every phase's full consumer-suite matrix ran zero-fail at each
+landing (recorded per-phase above; not re-run for this close-out).
+The qemu-img parity axis in <code>docs/format-coverage.md</code> is the durable
+artifact that replaces per-op archaeology with a single sourced
+matrix for future gaps.</p>
+<h4 id="bugs-fixed-along-the-way">Bugs fixed along the way<a class="headerlink" href="#bugs-fixed-along-the-way" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>#444</strong> (detect-only formats silently read as raw by
+  convert/compare/dd) — FIXED by phase 1 (commit <code>83a9e5c</code>): a
+  central gate in <code>discover_backing_chain</code> refuses unrecognised
+  formats instead of falling through to raw.</li>
+<li><strong>QCOW1 misdetected as QCOW2</strong> — FIXED by phase 4 (commit
+  <code>c421f75</code>): detection is now version-aware (<code>QFI\xfb</code> + version 1
+  routes to the new QCOW1 reader; any other version keeps the QCOW2
+  route).</li>
+<li><strong><code>INFO_RESULT_FLAG_ENCRYPTED</code> never consumed</strong> — FIXED by phase 4
+  (commit <code>467d24a</code>): both host <code>info</code> emitters now print <code>encrypted:
+  yes</code> / <code>"encrypted": true</code>, gated off for bare LUKS to keep those
+  goldens byte-identical.</li>
+<li><strong>Three instar-testdata defects</strong>, found and fixed alongside the
+  code work (see the master plan's "Bugs fixed during this work"
+  section below for the full record): the parallels driver was
+  missing from the 6.0.0-6.2.0 static qemu-img builds; the committed
+  <code>profiles/</code> and <code>version-map.json</code> were stale relative to <code>raw/</code>;
+  and <code>detect-profiles.py</code> was corrupting regenerated profiles by
+  comparing mismatched id granularities. (Phase 7's planning brief
+  referred to "four instar-testdata defects" in passing; the
+  master plan's own "Bugs fixed" section records three code-adjacent
+  testdata defects plus, separately, phase 6's QED baseline
+  reconciliation — a scoped cleanup executed per the phase-6
+  decision, not a defect fix. This close-out cites the section as
+  written rather than inflating the count.)</li>
+</ul>
+<h4 id="verification-posture">Verification posture<a class="headerlink" href="#verification-posture" title="Permanent link">&para;</a></h4>
+<p>Every phase's read-path work was cross-validated against
+<code>qemu-img convert</code>/<code>compare</code>/<code>dd</code>/<code>bench</code> for byte parity on the
+supported surface, with recorded, footnoted divergences where instar
+deliberately refuses (map/measure on the four new formats) or where a
+genuine qemu-img behavioural difference was found (the Parallels
+<code>check</code> assertion crash, the DMG zero-chunk NULL-dereference crash).
+Every new parser crate carries coverage-guided fuzz targets plus
+differential-fuzz coverage against qemu-img (zero crashes, zero
+divergences across every phase's burn-in). The qemu-img parity axis
+(phase 7a) is the first document to consolidate every recorded
+divergence — sourced to a quirks.md section, an existing table, or a
+fresh 2026-07-20 measurement against qemu-img 10.0.11 — into one op ×
+format matrix; management independently re-verified three of the
+fresh measurements (VHD <code>check</code>, VHDX <code>map</code>, VDI <code>bench</code>) and found
+zero conflicts with the axis as written.</p>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
 <p>We should list obvious extensions, known issues, unrelated bugs
 we encountered, and anything else we should one day do but have
 chosen to defer to here so that we don't forget them.</p>
 <ul>
-<li>DMG bzip2 (UDBZ) and lzfse (ULFO) chunk codecs (deferred
-  from phase 5 per Open question 3).</li>
+<li>QED read support (phase 6's path-(b) sketch: a qcow1-class
+  reader — 68-byte LE header, two-level L1/L2 cluster-offset
+  tables, no compression/encryption, in-header backing name).
+  Deliberately deferred, not abandoned — the phase-6 decision
+  is refusal as policy, revisit only on a real user request to
+  read QED input or QED images surfacing in a served workload
+  (see <code>docs/plans/PLAN-format-coverage-phase-06-qed.md</code>'s
+  Decision section for the full revisit criteria and sketch).</li>
+<li>DMG bzip2 (UDBZ), lzfse (ULFO), and ADC chunk codec decode
+  support (deferred from phase 5 per Open question 3; instar
+  issues typed refusals naming the code instead, and qemu's
+  own support is compile-flag dependent across the version
+  matrix anyway, so there is no single parity target — see
+  <code>docs/quirks.md</code> "Format-coverage phase 5").</li>
+<li>Streaming decompression for DMG chunks that exceed instar's
+  bounded-memory staging caps (1 MiB plist region, 32768-chunk
+  table, 4096-sector per-chunk staging): phase 5's typed
+  capacity refusal (pinned by <code>dmg-overcap-chunk</code>) stands in;
+  revisit only if real-world images exceed the 2 MiB per-chunk
+  staging cap in practice.</li>
 <li>Write/create/output support for VDI or Parallels, if real
   demand appears.</li>
 <li>VMDK subformat expansion (twoGbMaxExtentSparse output,
   ESX variants) — separate plan.</li>
 <li><code>map</code> / <code>measure</code> / <code>dd</code> support for the new input
   formats, where each phase plan chose to defer it.</li>
+<li>Wire DMG koly-trailer probing into the in-place-op
+  detection paths (host <code>probe_*_target</code> prefix probes, the
+  guest map/measure ops, <code>resize</code>, and <code>check</code>'s own format
+  dispatch), so DMG is refused/recognised there like
+  bochs/cloop/parallels instead of passing through as (or
+  being refused while named) raw. Phase 5 graduated DMG to a
+  full read format for convert/compare/dd/bench but
+  deliberately left this bullet open — map/measure/resize
+  pins are unchanged and <code>check</code> still names the format "raw"
+  (see <code>docs/quirks.md</code> "Format-coverage phase 5" and "DMG
+  Pass-Through as Raw in the In-Place Ops").</li>
+<li><code>instar check</code> support for VDI (phase 2 future work: qemu-img
+  <code>check</code> validates the VDI block map; unconsumed check baselines
+  already exist in instar-testdata from <code>generate-baselines.py</code>).</li>
+<li>Parallels format extensions / dirty bitmaps: phase 3's reader
+  refuses any non-zero <code>ext_off</code> at init rather than parsing the
+  format extension qemu reads read-only, since no shipped or
+  creatable fixture needs it today (deliberate divergence, see
+  <code>docs/quirks.md</code> "Format-coverage phase 3"). Revisit if a real
+  need for extension/dirty-bitmap data appears.</li>
+<li>Report the qemu DMG zero-chunk NULL-dereference crash upstream:
+  a DMG with a valid koly trailer but zero parsed chunks (bad mish
+  magic, broken base64, or no <code>&lt;data&gt;</code> blocks) segfaults every
+  qemu-img from 6.0.0 through host 10.0.11 on any read (<code>info</code> is
+  unaffected). Found by phase-5 planning's empirical pass
+  (2026-07-19); instar's phase-5 reader refuses the empty table
+  cleanly instead of mirroring the crash. The reproducer has since
+  shipped as the <code>dmg-empty-table</code> instar-testdata fixture
+  (<code>skip_qemu_img</code>, since qemu crashes on convert) — use it directly
+  when filing the upstream report rather than reconstructing one.</li>
+<li>Report the qemu <code>parallels_check_duplicate</code> assertion crash
+  (10.2.0's <code>qemu-img check</code> asserts on an out-of-image BAT entry
+  that 6.0.0 reports cleanly) upstream to the qemu project; this is
+  also why <code>instar check</code> continues to refuse Parallels rather than
+  mirroring qemu-img's check support.</li>
+<li>The <code>profile-8-1-0</code> baseline split introduced by phase 3 (to
+  record qemu 8.1.0-8.1.5's past-EOF-BAT open-refusal regression
+  for <code>parallels-bat-past-eof</code>) received copies of <code>profile-8-0-0</code>'s
+  hand-maintained LUKS goldens so pre-split coverage wasn't lost;
+  any future profile split should follow the same precedent — carry
+  over the neighbouring profile's hand-authored LUKS goldens rather
+  than regenerating them.</li>
+<li>QCOW1 (qcow) AES decryption (crypt_method=1): phase 4's reader
+  refuses encrypted qcow1 cleanly at open, matching keyless qemu's
+  own refusal, rather than implementing AES-128-CBC decryption;
+  instar already has the crypt_method=1 machinery from QCOW2 to
+  reuse if real demand appears (see <code>docs/quirks.md</code>
+  "Format-coverage phase 4").</li>
+<li><code>map</code> / <code>measure</code> support for qcow1: qemu-img actually supports
+  both against a qcow1 source; instar's refusals are a deliberate,
+  recorded divergence (already covered by the general "<code>map</code> /
+  <code>measure</code> / <code>dd</code> support for the new input formats" bullet above,
+  which now also applies to qcow1's map/measure gap specifically —
+  <code>dd</code> itself is already supported for qcow1).</li>
+<li>A <code>--no-commit</code>-style output-type-limiting flag for
+  <code>instar-testdata</code>'s <code>generate-baselines.py</code>: recorded as
+  recommended in the phase-2 findings and manually worked around
+  in phases 3-6, but never centrally tracked until now.</li>
+<li>Report oslo.utils' qcow1-misdetected-as-qcow2 behaviour
+  upstream (phase-4 finding; parallel to the two qemu
+  upstream-report items already listed above).</li>
+<li>Extract a shared rounds-protocol-length helper in
+  <code>src/vmm/src/main.rs</code> so the human and JSON info emitters
+  can't drift (pre-push audit, code-quality advisory; mirrors
+  the existing <code>should_emit_encrypted_line</code> pattern).</li>
+<li>Evaluate a shared resolve-and-read-span helper across all six
+  chain-reader arms (VHD/VMDK/VDI/Parallels/Qcow1/Dmg) in
+  <code>src/crates/qcow2</code> (pre-push audit advisory; the duplication
+  predates this branch).</li>
+<li>Tidy <code>src/operations/info</code>'s <code>probe_dmg_trailer</code> to use
+  <code>checked_mul</code> like the dmg crate's <code>read_koly</code> (pre-push audit
+  security-informational; operands are host-controlled, not
+  attacker-reachable).</li>
+<li>Update <code>.github/workflows/functional-tests.yml</code>'s inline
+  cargo-test list and <code>coverage-fuzz.yml</code>'s <code>TARGETS</code> array
+  mechanism so they can't drift from the Makefile/fuzz crate
+  again (being fixed point-in-time by this audit; the structural
+  drift-proofing is future work).</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during
@@ -10791,6 +11250,110 @@ plan, or at least be aware of when planning. (A scan on
 2026-07-17 found no existing format-coverage issues; the
 open issues are fuzz crashes, consistency checks, and qcow2
 operation bugs.)</p>
+<ul>
+<li><strong>CONFIRMED pre-existing defect
+  (<a href="https://github.com/shakenfist/instar/issues/444">#444</a>):
+  detect-only formats are silently read as raw by
+  convert/compare/dd.</strong> Found during phase-1 planning
+  (2026-07-17) by code reading and confirmed the same day by
+  step 1a's empirical pin: those ops probe input via
+  <code>discover_backing_chain</code> → guest info, and
+  <code>chain::ImageFormat::from_str</code> (<code>src/vmm/src/chain.rs:50</code>)
+  maps unrecognised format strings to <code>Unknown</code>, which the
+  guest chain reader's default arm reads as raw sectors —
+  <code>instar convert</code> of a QED image emits its container bytes
+  zero-padded to the header-declared virtual size (byte-
+  verified), contradicting the documented "detects it and
+  refuses" stance for QED. ISO flows through the same path
+  but is exempted by management decision: its raw read is
+  semantically correct and matches qemu-img. <strong>Fixed by
+  83a9e5c</strong> (step 3b): a single central gate in
+  <code>discover_backing_chain</code> refuses with a typed
+  <code>ChainError::UnsupportedInputFormat</code> when the guest-reported
+  format maps to <code>chain::ImageFormat::Unknown</code> and is not
+  <code>raw</code>/<code>unknown</code>/<code>iso</code>, covering top-level images and every
+  mid-chain backing position; iso keeps its exempted raw
+  pass-through. No existing test depended on the silent-raw
+  behaviour. Findings in
+  <a href="/components/instar/plans/PLAN-format-coverage-phase-01-detection/">PLAN-format-coverage-phase-01-detection.md</a>.</li>
+<li><strong>FIXED (phase 4, commit <code>c421f75</code>): real QCOW1 images were
+  misdetected as qcow2.</strong> Found during phase-4 planning
+  (2026-07-18) and empirically pinned by the management
+  session: <code>detect_format_from_header</code> checked the 4-byte
+  <code>QFI\xfb</code> magic against qcow2 FIRST and never consulted the
+  version field, so every real qcow1 image (whose magic IS
+  <code>QFI\xfb</code>) took the qcow2 branch; the 3-byte QCOW1 branch
+  below it was dead code for real images, making the
+  <code>docs/format-coverage.md</code> "QCOW1 detection: Yes" claim
+  wrong. Observed effect: <code>instar info</code> on a fresh
+  <code>qemu-img create -f qcow</code> image printed <code>file format: qcow2</code>,
+  <code>virtual size: 0</code> and a garbage qcow2 format-specific block;
+  <code>instar convert</code> failed with the misleading "input image has
+  zero virtual size". A second latent hazard sat behind it:
+  <code>chain::ImageFormat::from_str</code> already mapped <code>"qcow1"</code> past
+  the issue-#444 gate with no reader arm, so fixing detection
+  alone would have flipped qcow1 to silent raw reads — the
+  phase-4 plan ordered the reader arm (commit <code>77f32ca</code>, step
+  4b) strictly before the detection fix (commit <code>c421f75</code>,
+  step 4c), closing the hazard window. Detection is now
+  version-aware: <code>QFI\xfb</code> + version 1 =&gt; qcow1 (via the new
+  <code>src/crates/qcow1/</code> reader), any other version keeps the
+  qcow2 route. One latent divergence from qemu was found and
+  recorded rather than fixed: a version-0 <code>QFI\xfb</code> image
+  probes as raw under qemu but refuses under instar's qcow2
+  route (see <code>docs/quirks.md</code> "Format-coverage phase 4").</li>
+<li><strong>FIXED (phase 4, commit <code>467d24a</code>): <code>INFO_RESULT_FLAG_ENCRYPTED</code>
+  was never consumed.</strong> Also found during phase-4 planning:
+  qemu-img prints <code>encrypted: yes</code> (human, between disk size
+  and cluster_size) and <code>"encrypted": true</code> (JSON) for
+  encrypted images, but instar's emitters never consumed the
+  flag, so the line was never printed. Latent at the time — no
+  baseline in the tree contained the line (the bare-LUKS
+  goldens matched qemu in omitting it) — with phase 4's
+  AES-encrypted qcow1 fixture (<code>qcow1-encrypted</code>) becoming the
+  first baseline to need it. Both host emitters now consume
+  the flag, gated off for the <code>"luks"</code> format string so the
+  LUKS goldens stay byte-identical (verified by a full
+  <code>test_info_safe</code> run, zero regressions); encrypted qcow2
+  images pick up the line for free as a side effect, with no
+  baseline churn since no existing golden covers that case.</li>
+<li><strong>instar-testdata: parallels driver missing from the
+  6.0.0–6.2.0 static qemu-img builds.</strong> Found by step 4b's
+  driver spot-check (2026-07-17): <code>-f parallels</code> fails with
+  "Unknown driver" on all five 6.x binaries (compile-time
+  absence — <code>build-qemu-img.sh</code>'s pre-8.0 branch never
+  explicitly enables per-format drivers), while 7.0.0+ all
+  have it and bochs/cloop/dmg are present in all 80. A stock
+  qemu 6.x includes parallels, so the binaries misrepresent
+  real qemu; the five are being rebuilt with the driver
+  enabled (script fix + rebuild in progress), and parallels
+  manifest/baseline work is deferred until they land.</li>
+<li><strong>instar-testdata: committed <code>profiles/</code> and
+  <code>version-map.json</code> are stale relative to <code>raw/</code>.</strong> Also
+  found by step 4b: baseline generation runs after 23 June
+  were never followed by <code>detect-profiles.py</code>, and a fresh
+  recompute (excluding phase-1 images) produces a different
+  profile structure than what is committed. Since
+  <code>detect-profiles.py</code> rebuilds the whole profile tree,
+  regeneration is deferred to a single reviewed catch-up
+  change after the 6.x rebuild, covering the pre-existing
+  drift, the three new format-coverage images, and
+  parallels together.</li>
+<li><strong>instar-testdata: <code>detect-profiles.py</code> corrupts
+  regenerated profiles.</strong> Found by the phase-1 catch-up run
+  (2026-07-17): the preserve-manually-maintained-baselines
+  check compares mismatched id granularities (<code>f.stem</code> keeps
+  <code>.stdout</code> on one side, <code>rsplit('.', 1)</code> strips it on the
+  other), so it never matches, flags every image as
+  manually maintained, and stamps one arbitrary stale
+  old-profile snapshot into every new profile bucket —
+  41/44 pre-existing images got wrong content while <code>raw/</code>
+  stayed correct. Verified no real instar divergence hides
+  behind it (live instar output byte-matches <code>raw/</code> for
+  spot-checked images). Fix + rerun executed as part of
+  phase 1; the mechanism must only preserve images with no
+  <code>raw/</code> data (the hand-maintained <code>skip_qemu_img</code> set).</li>
+</ul>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When creating a new master plan from this template, update
 the following files in <code>docs/plans/</code>:</p>

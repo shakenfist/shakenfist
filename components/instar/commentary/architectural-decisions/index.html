@@ -10221,8 +10221,8 @@ allowlist as a QCOW2 backing file.</p>
 <hr />
 <h2 id="decision-6-no_std-format-crates-with-feature-flags">Decision 6: <code>no_std</code> format crates with feature flags<a class="headerlink" href="#decision-6-no_std-format-crates-with-feature-flags" title="Permanent link">&para;</a></h2>
 <p><strong>The choice:</strong> Format parsing crates (<code>qcow2</code>, <code>vmdk</code>, <code>vhd</code>, <code>vhdx</code>,
-<code>luks</code>, <code>raw</code>) are <code>no_std</code> libraries with optional features behind
-Cargo feature flags.</p>
+<code>luks</code>, <code>raw</code>, <code>vdi</code>, <code>parallels</code>, <code>qcow1</code>, <code>dmg</code>) are <code>no_std</code>
+libraries with optional features behind Cargo feature flags.</p>
 <p><strong>Why <code>no_std</code>?</strong> These crates run inside the bare-metal guest, which
 has no standard library. They must compile without <code>std</code>. This also
 means they cannot use <code>Vec</code>, <code>String</code>, <code>HashMap</code>, or <code>std::io</code> -- all

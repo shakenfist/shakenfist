@@ -10493,17 +10493,17 @@ chain config.</p>
 <tr>
 <td>7</td>
 <td><code>Qcow1</code></td>
-<td>QCOW version 1</td>
+<td>QCOW version 1 — full read support (convert/compare/dd/bench) as of PLAN-format-coverage phase 4</td>
 </tr>
 <tr>
 <td>8</td>
 <td><code>Vdi</code></td>
-<td>VDI (VirtualBox)</td>
+<td>VDI (VirtualBox) — full read support (convert/compare/dd/bench) as of PLAN-format-coverage phase 2</td>
 </tr>
 <tr>
 <td>9</td>
 <td><code>Qed</code></td>
-<td>QED (deprecated)</td>
+<td>QED (read-refused by policy, not because qemu deprecates it — see <code>docs/quirks.md</code> "Format-coverage phase 6")</td>
 </tr>
 <tr>
 <td>10</td>
@@ -10514,6 +10514,31 @@ chain config.</p>
 <td>11</td>
 <td><code>Luks</code></td>
 <td>LUKS encrypted container</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>VmdkDescriptor</code></td>
+<td>VMDK monolithicFlat descriptor file (text; content lives in a separate flat extent file)</td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>Parallels</code></td>
+<td>Parallels Disk Image, both magics — full read support (convert/compare/dd/bench) as of PLAN-format-coverage phase 3</td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>Bochs</code></td>
+<td>Bochs growing disk image — detection and info only, no read path</td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>Cloop</code></td>
+<td>cloop compressed loopback image — detection and info only, no read path</td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>Dmg</code></td>
+<td>Apple UDIF disk image — full read support (convert/compare/dd/bench) as of PLAN-format-coverage phase 5</td>
 </tr>
 </tbody>
 </table>

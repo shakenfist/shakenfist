@@ -10,31 +10,27 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/instar/">
+        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-format-coverage-phase-04-qcow1-read/">
       
       
-        <link rel="prev" href="../development/plans/PLAN-consistency-audits-v2/">
-      
-      
-        <link rel="next" href="amend/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Introduction - Shaken Fist</title>
+        <title>Format coverage phase 4: QCOW1 convert-from (read path) - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
   
@@ -74,9 +70,9 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -101,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#instar-documentation" class="md-skip">
+        <a href="#format-coverage-phase-4-qcow1-convert-from-read-path" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +113,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -137,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Introduction
+              Format coverage phase 4: QCOW1 convert-from (read path)
             
           </span>
         </div>
@@ -253,7 +249,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -283,7 +279,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href="../../../.." class="md-nav__link">
         
   
   
@@ -310,7 +306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manifesto/" class="md-nav__link">
+      <a href="../../../../manifesto/" class="md-nav__link">
         
   
   
@@ -334,20 +330,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -368,7 +362,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -386,7 +380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../../overview/" class="md-nav__link">
         
   
   
@@ -461,7 +455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/" class="md-nav__link">
+      <a href="../../../cloudgood/" class="md-nav__link">
         
   
   
@@ -489,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/technology-primer/" class="md-nav__link">
+      <a href="../../../cloudgood/technology-primer/" class="md-nav__link">
         
   
   
@@ -517,7 +511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/fundamentals/" class="md-nav__link">
+      <a href="../../../cloudgood/fundamentals/" class="md-nav__link">
         
   
   
@@ -545,7 +539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/virtualization-history/" class="md-nav__link">
+      <a href="../../../cloudgood/virtualization-history/" class="md-nav__link">
         
   
   
@@ -573,7 +567,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/memory-mapped-devices/" class="md-nav__link">
+      <a href="../../../cloudgood/memory-mapped-devices/" class="md-nav__link">
         
   
   
@@ -601,7 +595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/instance-video/" class="md-nav__link">
+      <a href="../../../cloudgood/instance-video/" class="md-nav__link">
         
   
   
@@ -629,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/virtual-networking/" class="md-nav__link">
+      <a href="../../../cloudgood/virtual-networking/" class="md-nav__link">
         
   
   
@@ -657,7 +651,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/networking-shakenfist/" class="md-nav__link">
+      <a href="../../../cloudgood/networking-shakenfist/" class="md-nav__link">
         
   
   
@@ -685,7 +679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/neutron-linuxbridge/" class="md-nav__link">
+      <a href="../../../cloudgood/neutron-linuxbridge/" class="md-nav__link">
         
   
   
@@ -713,7 +707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cloudgood/neutron-legacy/" class="md-nav__link">
+      <a href="../../../cloudgood/neutron-legacy/" class="md-nav__link">
         
   
   
@@ -796,7 +790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agent-python/" class="md-nav__link">
+      <a href="../../../agent-python/" class="md-nav__link">
         
   
   
@@ -824,7 +818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agent-python/developer-guide/" class="md-nav__link">
+      <a href="../../../agent-python/developer-guide/" class="md-nav__link">
         
   
   
@@ -852,7 +846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agent-python/protocol/" class="md-nav__link">
+      <a href="../../../agent-python/protocol/" class="md-nav__link">
         
   
   
@@ -935,7 +929,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clingwrap/" class="md-nav__link">
+      <a href="../../../clingwrap/" class="md-nav__link">
         
   
   
@@ -963,7 +957,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clingwrap/command-types/" class="md-nav__link">
+      <a href="../../../clingwrap/command-types/" class="md-nav__link">
         
   
   
@@ -991,7 +985,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clingwrap/configuration/" class="md-nav__link">
+      <a href="../../../clingwrap/configuration/" class="md-nav__link">
         
   
   
@@ -1019,7 +1013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clingwrap/examples/" class="md-nav__link">
+      <a href="../../../clingwrap/examples/" class="md-nav__link">
         
   
   
@@ -1047,7 +1041,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clingwrap/installation/" class="md-nav__link">
+      <a href="../../../clingwrap/installation/" class="md-nav__link">
         
   
   
@@ -1130,7 +1124,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/index.md" class="md-nav__link">
+      <a href="../../../development/index.md" class="md-nav__link">
         
   
   
@@ -1158,7 +1152,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/automated-pr-review/" class="md-nav__link">
+      <a href="../../../development/automated-pr-review/" class="md-nav__link">
         
   
   
@@ -1186,7 +1180,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/ci-review-automation/" class="md-nav__link">
+      <a href="../../../development/ci-review-automation/" class="md-nav__link">
         
   
   
@@ -1214,7 +1208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/code-review-tracking/" class="md-nav__link">
+      <a href="../../../development/code-review-tracking/" class="md-nav__link">
         
   
   
@@ -1242,7 +1236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/release-automation/" class="md-nav__link">
+      <a href="../../../development/release-automation/" class="md-nav__link">
         
   
   
@@ -1317,7 +1311,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
         
   
   
@@ -1345,7 +1339,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
         
   
   
@@ -1386,20 +1380,18 @@
                 
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
         
           
           <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
@@ -1420,7 +1412,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1435,37 +1427,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Introduction
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
         
   
   
@@ -1481,37 +1446,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1524,7 +1458,7 @@
   
   
     <li class="md-nav__item">
-      <a href="amend/" class="md-nav__link">
+      <a href="../../amend/" class="md-nav__link">
         
   
   
@@ -1552,7 +1486,7 @@
   
   
     <li class="md-nav__item">
-      <a href="bitmap/" class="md-nav__link">
+      <a href="../../bitmap/" class="md-nav__link">
         
   
   
@@ -1580,7 +1514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="commit/" class="md-nav__link">
+      <a href="../../commit/" class="md-nav__link">
         
   
   
@@ -1608,7 +1542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="create/" class="md-nav__link">
+      <a href="../../create/" class="md-nav__link">
         
   
   
@@ -1636,7 +1570,7 @@
   
   
     <li class="md-nav__item">
-      <a href="dd/" class="md-nav__link">
+      <a href="../../dd/" class="md-nav__link">
         
   
   
@@ -1664,7 +1598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="map/" class="md-nav__link">
+      <a href="../../map/" class="md-nav__link">
         
   
   
@@ -1692,7 +1626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="measure/" class="md-nav__link">
+      <a href="../../measure/" class="md-nav__link">
         
   
   
@@ -1720,7 +1654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="rebase/" class="md-nav__link">
+      <a href="../../rebase/" class="md-nav__link">
         
   
   
@@ -1748,7 +1682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="resize/" class="md-nav__link">
+      <a href="../../resize/" class="md-nav__link">
         
   
   
@@ -1776,7 +1710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="snapshot/" class="md-nav__link">
+      <a href="../../snapshot/" class="md-nav__link">
         
   
   
@@ -1804,7 +1738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="openstack-announcement-email/" class="md-nav__link">
+      <a href="../../openstack-announcement-email/" class="md-nav__link">
         
   
   
@@ -1832,7 +1766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="chain-discovery/" class="md-nav__link">
+      <a href="../../chain-discovery/" class="md-nav__link">
         
   
   
@@ -1860,7 +1794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="chain-config/" class="md-nav__link">
+      <a href="../../chain-config/" class="md-nav__link">
         
   
   
@@ -1888,7 +1822,7 @@
   
   
     <li class="md-nav__item">
-      <a href="configuration/" class="md-nav__link">
+      <a href="../../configuration/" class="md-nav__link">
         
   
   
@@ -1916,7 +1850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="format-detection-safety/" class="md-nav__link">
+      <a href="../../format-detection-safety/" class="md-nav__link">
         
   
   
@@ -1944,7 +1878,7 @@
   
   
     <li class="md-nav__item">
-      <a href="format-coverage/" class="md-nav__link">
+      <a href="../../format-coverage/" class="md-nav__link">
         
   
   
@@ -1972,7 +1906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="security/" class="md-nav__link">
+      <a href="../../security/" class="md-nav__link">
         
   
   
@@ -2000,7 +1934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="bench/" class="md-nav__link">
+      <a href="../../bench/" class="md-nav__link">
         
   
   
@@ -2028,7 +1962,7 @@
   
   
     <li class="md-nav__item">
-      <a href="testing/" class="md-nav__link">
+      <a href="../../testing/" class="md-nav__link">
         
   
   
@@ -2056,7 +1990,7 @@
   
   
     <li class="md-nav__item">
-      <a href="output-formats/" class="md-nav__link">
+      <a href="../../output-formats/" class="md-nav__link">
         
   
   
@@ -2084,7 +2018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="quirks/" class="md-nav__link">
+      <a href="../../quirks/" class="md-nav__link">
         
   
   
@@ -2112,7 +2046,7 @@
   
   
     <li class="md-nav__item">
-      <a href="usage/" class="md-nav__link">
+      <a href="../../usage/" class="md-nav__link">
         
   
   
@@ -2140,7 +2074,7 @@
   
   
     <li class="md-nav__item">
-      <a href="security-audits/" class="md-nav__link">
+      <a href="../../security-audits/" class="md-nav__link">
         
   
   
@@ -2168,7 +2102,7 @@
   
   
     <li class="md-nav__item">
-      <a href="technology-primer/" class="md-nav__link">
+      <a href="../../technology-primer/" class="md-nav__link">
         
   
   
@@ -2196,7 +2130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="rust-rationale/" class="md-nav__link">
+      <a href="../../rust-rationale/" class="md-nav__link">
         
   
   
@@ -2271,7 +2205,7 @@
   
   
     <li class="md-nav__item">
-      <a href="commentary/" class="md-nav__link">
+      <a href="../../commentary/" class="md-nav__link">
         
   
   
@@ -2299,7 +2233,7 @@
   
   
     <li class="md-nav__item">
-      <a href="commentary/architectural-decisions/" class="md-nav__link">
+      <a href="../../commentary/architectural-decisions/" class="md-nav__link">
         
   
   
@@ -2327,7 +2261,7 @@
   
   
     <li class="md-nav__item">
-      <a href="commentary/reading-order/" class="md-nav__link">
+      <a href="../../commentary/reading-order/" class="md-nav__link">
         
   
   
@@ -2410,7 +2344,7 @@
   
   
     <li class="md-nav__item">
-      <a href="crates/guest-protocol/" class="md-nav__link">
+      <a href="../../crates/guest-protocol/" class="md-nav__link">
         
   
   
@@ -2493,7 +2427,7 @@
   
   
     <li class="md-nav__item">
-      <a href="image_notes/cirros-qcow2/" class="md-nav__link">
+      <a href="../../image_notes/cirros-qcow2/" class="md-nav__link">
         
   
   
@@ -2521,7 +2455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="image_notes/" class="md-nav__link">
+      <a href="../../image_notes/" class="md-nav__link">
         
   
   
@@ -2549,7 +2483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="image_notes/qcow2-v2/" class="md-nav__link">
+      <a href="../../image_notes/qcow2-v2/" class="md-nav__link">
         
   
   
@@ -2577,7 +2511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="image_notes/virtualpc-vhd/" class="md-nav__link">
+      <a href="../../image_notes/virtualpc-vhd/" class="md-nav__link">
         
   
   
@@ -2660,7 +2594,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -2688,7 +2622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-distro-matrix-ci/" class="md-nav__link">
+      <a href="../PLAN-distro-matrix-ci/" class="md-nav__link">
         
   
   
@@ -2716,7 +2650,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-release-v0.2/" class="md-nav__link">
+      <a href="../PLAN-release-v0.2/" class="md-nav__link">
         
   
   
@@ -2744,7 +2678,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-release/" class="md-nav__link">
+      <a href="../PLAN-release/" class="md-nav__link">
         
   
   
@@ -2772,7 +2706,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-audit/" class="md-nav__link">
+      <a href="../PLAN-audit/" class="md-nav__link">
         
   
   
@@ -2800,7 +2734,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-coverage-fuzzing/" class="md-nav__link">
+      <a href="../PLAN-coverage-fuzzing/" class="md-nav__link">
         
   
   
@@ -2828,7 +2762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-fuzz-autofix/" class="md-nav__link">
+      <a href="../PLAN-fuzz-autofix/" class="md-nav__link">
         
   
   
@@ -2856,7 +2790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-convert-followups/" class="md-nav__link">
+      <a href="../PLAN-convert-followups/" class="md-nav__link">
         
   
   
@@ -2884,7 +2818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-measure/" class="md-nav__link">
+      <a href="../PLAN-measure/" class="md-nav__link">
         
   
   
@@ -2912,7 +2846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-create/" class="md-nav__link">
+      <a href="../PLAN-create/" class="md-nav__link">
         
   
   
@@ -2940,7 +2874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-resize/" class="md-nav__link">
+      <a href="../PLAN-resize/" class="md-nav__link">
         
   
   
@@ -2968,7 +2902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-rebase-commit/" class="md-nav__link">
+      <a href="../PLAN-rebase-commit/" class="md-nav__link">
         
   
   
@@ -2996,7 +2930,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-map/" class="md-nav__link">
+      <a href="../PLAN-map/" class="md-nav__link">
         
   
   
@@ -3024,7 +2958,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-snapshot/" class="md-nav__link">
+      <a href="../PLAN-snapshot/" class="md-nav__link">
         
   
   
@@ -3052,7 +2986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-check-repair/" class="md-nav__link">
+      <a href="../PLAN-check-repair/" class="md-nav__link">
         
   
   
@@ -3080,7 +3014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-fuzzing-bugs/" class="md-nav__link">
+      <a href="../PLAN-fuzzing-bugs/" class="md-nav__link">
         
   
   
@@ -3108,7 +3042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-bug-fixes/" class="md-nav__link">
+      <a href="../PLAN-bug-fixes/" class="md-nav__link">
         
   
   
@@ -3136,7 +3070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-amend/" class="md-nav__link">
+      <a href="../PLAN-amend/" class="md-nav__link">
         
   
   
@@ -3164,7 +3098,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-dd/" class="md-nav__link">
+      <a href="../PLAN-dd/" class="md-nav__link">
         
   
   
@@ -3192,7 +3126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-bitmap/" class="md-nav__link">
+      <a href="../PLAN-bitmap/" class="md-nav__link">
         
   
   
@@ -3220,7 +3154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-bench/" class="md-nav__link">
+      <a href="../PLAN-bench/" class="md-nav__link">
         
   
   
@@ -3248,7 +3182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-bench-refcount-growth/" class="md-nav__link">
+      <a href="../PLAN-bench-refcount-growth/" class="md-nav__link">
         
   
   
@@ -3276,7 +3210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
+      <a href="../PLAN-qcow2-write-infrastructure/" class="md-nav__link">
         
   
   
@@ -3304,7 +3238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="plans/PLAN-format-coverage/" class="md-nav__link">
+      <a href="../PLAN-format-coverage/" class="md-nav__link">
         
   
   
@@ -3387,7 +3321,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/building-with-docker/" class="md-nav__link">
+      <a href="../../prototypes/building-with-docker/" class="md-nav__link">
         
   
   
@@ -3415,7 +3349,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/data-transfer-comparison/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-comparison/" class="md-nav__link">
         
   
   
@@ -3443,7 +3377,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/data-transfer-direct-memory/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-direct-memory/" class="md-nav__link">
         
   
   
@@ -3471,7 +3405,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/kvm/" class="md-nav__link">
+      <a href="../../prototypes/kvm/" class="md-nav__link">
         
   
   
@@ -3499,7 +3433,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/kvm-hello-world2/" class="md-nav__link">
+      <a href="../../prototypes/kvm-hello-world2/" class="md-nav__link">
         
   
   
@@ -3527,7 +3461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/kvm-hello-world/" class="md-nav__link">
+      <a href="../../prototypes/kvm-hello-world/" class="md-nav__link">
         
   
   
@@ -3555,7 +3489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/performance-counters/" class="md-nav__link">
+      <a href="../../prototypes/performance-counters/" class="md-nav__link">
         
   
   
@@ -3583,7 +3517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/data-transfer-other/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-other/" class="md-nav__link">
         
   
   
@@ -3611,7 +3545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/data-transfer-virtio-block/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-virtio-block/" class="md-nav__link">
         
   
   
@@ -3639,7 +3573,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/virtio-block/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block/" class="md-nav__link">
         
   
   
@@ -3667,7 +3601,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/virtio-block2/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block2/" class="md-nav__link">
         
   
   
@@ -3695,7 +3629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/virtio-block3/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block3/" class="md-nav__link">
         
   
   
@@ -3723,7 +3657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/virtio-block4/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block4/" class="md-nav__link">
         
   
   
@@ -3751,7 +3685,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/virtio-block5/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block5/" class="md-nav__link">
         
   
   
@@ -3779,7 +3713,7 @@
   
   
     <li class="md-nav__item">
-      <a href="prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
         
   
   
@@ -3862,7 +3796,7 @@
   
   
     <li class="md-nav__item">
-      <a href="qcow2/qcow2-compression/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-compression/" class="md-nav__link">
         
   
   
@@ -3890,7 +3824,7 @@
   
   
     <li class="md-nav__item">
-      <a href="qcow2/qcow2-encryption/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-encryption/" class="md-nav__link">
         
   
   
@@ -3918,7 +3852,7 @@
   
   
     <li class="md-nav__item">
-      <a href="qcow2/qcow2-format/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-format/" class="md-nav__link">
         
   
   
@@ -3946,7 +3880,7 @@
   
   
     <li class="md-nav__item">
-      <a href="qcow2/qcow2-implementation-notes/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-implementation-notes/" class="md-nav__link">
         
   
   
@@ -3974,7 +3908,7 @@
   
   
     <li class="md-nav__item">
-      <a href="qcow2/qcow2-l1l2-tables/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-l1l2-tables/" class="md-nav__link">
         
   
   
@@ -4002,7 +3936,7 @@
   
   
     <li class="md-nav__item">
-      <a href="qcow2/qcow2-refcount/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-refcount/" class="md-nav__link">
         
   
   
@@ -4030,7 +3964,7 @@
   
   
     <li class="md-nav__item">
-      <a href="qcow2/qcow2-snapshots/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-snapshots/" class="md-nav__link">
         
   
   
@@ -4058,7 +3992,7 @@
   
   
     <li class="md-nav__item">
-      <a href="qcow2/qcow2-write-planner/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-write-planner/" class="md-nav__link">
         
   
   
@@ -4141,7 +4075,7 @@
   
   
     <li class="md-nav__item">
-      <a href="raw/raw-format/" class="md-nav__link">
+      <a href="../../raw/raw-format/" class="md-nav__link">
         
   
   
@@ -4224,7 +4158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="vmdk/vmdk-compression/" class="md-nav__link">
+      <a href="../../vmdk/vmdk-compression/" class="md-nav__link">
         
   
   
@@ -4252,7 +4186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="vmdk/vmdk-extents/" class="md-nav__link">
+      <a href="../../vmdk/vmdk-extents/" class="md-nav__link">
         
   
   
@@ -4280,7 +4214,7 @@
   
   
     <li class="md-nav__item">
-      <a href="vmdk/vmdk-format/" class="md-nav__link">
+      <a href="../../vmdk/vmdk-format/" class="md-nav__link">
         
   
   
@@ -4308,7 +4242,7 @@
   
   
     <li class="md-nav__item">
-      <a href="vmdk/vmdk-grain-tables/" class="md-nav__link">
+      <a href="../../vmdk/vmdk-grain-tables/" class="md-nav__link">
         
   
   
@@ -4399,7 +4333,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/" class="md-nav__link">
+      <a href="../../../kerbside/" class="md-nav__link">
         
   
   
@@ -4427,7 +4361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/configuration/" class="md-nav__link">
+      <a href="../../../kerbside/configuration/" class="md-nav__link">
         
   
   
@@ -4455,7 +4389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/console-sources/" class="md-nav__link">
+      <a href="../../../kerbside/console-sources/" class="md-nav__link">
         
   
   
@@ -4483,7 +4417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/schema/" class="md-nav__link">
+      <a href="../../../kerbside/schema/" class="md-nav__link">
         
   
   
@@ -4511,7 +4445,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/proxy-architecture/" class="md-nav__link">
+      <a href="../../../kerbside/proxy-architecture/" class="md-nav__link">
         
   
   
@@ -4586,7 +4520,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/" class="md-nav__link">
+      <a href="../../../kerbside/plans/" class="md-nav__link">
         
   
   
@@ -4614,7 +4548,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
         
   
   
@@ -4642,7 +4576,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-host-subject/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-host-subject/" class="md-nav__link">
         
   
   
@@ -4670,7 +4604,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-consistency-audit/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit/" class="md-nav__link">
         
   
   
@@ -4698,7 +4632,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
   
@@ -4726,7 +4660,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
         
   
   
@@ -4754,7 +4688,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
   
@@ -4782,7 +4716,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
         
   
   
@@ -4810,7 +4744,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
   
@@ -4838,7 +4772,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
         
   
   
@@ -4866,7 +4800,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
         
   
   
@@ -4894,7 +4828,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
         
   
   
@@ -4922,7 +4856,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
         
   
   
@@ -4950,7 +4884,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
         
   
   
@@ -4978,7 +4912,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
   
@@ -5006,7 +4940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
         
   
   
@@ -5034,7 +4968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
         
   
   
@@ -5062,7 +4996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
         
   
   
@@ -5090,7 +5024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
         
   
   
@@ -5118,7 +5052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
         
   
   
@@ -5146,7 +5080,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
         
   
   
@@ -5174,7 +5108,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
         
   
   
@@ -5202,7 +5136,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
         
   
   
@@ -5285,7 +5219,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/spice/console-vv-extensions/" class="md-nav__link">
+      <a href="../../../kerbside/spice/console-vv-extensions/" class="md-nav__link">
         
   
   
@@ -5313,7 +5247,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/spice/scancodes/" class="md-nav__link">
+      <a href="../../../kerbside/spice/scancodes/" class="md-nav__link">
         
   
   
@@ -5341,7 +5275,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/spice/capabilities/" class="md-nav__link">
+      <a href="../../../kerbside/spice/capabilities/" class="md-nav__link">
         
   
   
@@ -5369,7 +5303,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/spice/channel-protocols/" class="md-nav__link">
+      <a href="../../../kerbside/spice/channel-protocols/" class="md-nav__link">
         
   
   
@@ -5397,7 +5331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/spice/compression-protocols/" class="md-nav__link">
+      <a href="../../../kerbside/spice/compression-protocols/" class="md-nav__link">
         
   
   
@@ -5425,7 +5359,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/spice/spice-link-protocol/" class="md-nav__link">
+      <a href="../../../kerbside/spice/spice-link-protocol/" class="md-nav__link">
         
   
   
@@ -5453,7 +5387,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/spice/protocol-overview/" class="md-nav__link">
+      <a href="../../../kerbside/spice/protocol-overview/" class="md-nav__link">
         
   
   
@@ -5481,7 +5415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/spice/usb-redirection/" class="md-nav__link">
+      <a href="../../../kerbside/spice/usb-redirection/" class="md-nav__link">
         
   
   
@@ -5509,7 +5443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../kerbside/spice/vd-agent-protocol/" class="md-nav__link">
+      <a href="../../../kerbside/spice/vd-agent-protocol/" class="md-nav__link">
         
   
   
@@ -5600,7 +5534,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/" class="md-nav__link">
+      <a href="../../../occystrap/" class="md-nav__link">
         
   
   
@@ -5628,7 +5562,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/command-reference/" class="md-nav__link">
+      <a href="../../../occystrap/command-reference/" class="md-nav__link">
         
   
   
@@ -5656,7 +5590,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/docker-tarball-formats/" class="md-nav__link">
+      <a href="../../../occystrap/docker-tarball-formats/" class="md-nav__link">
         
   
   
@@ -5684,7 +5618,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/installation/" class="md-nav__link">
+      <a href="../../../occystrap/installation/" class="md-nav__link">
         
   
   
@@ -5712,7 +5646,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/performance/" class="md-nav__link">
+      <a href="../../../occystrap/performance/" class="md-nav__link">
         
   
   
@@ -5740,7 +5674,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/pipeline/" class="md-nav__link">
+      <a href="../../../occystrap/pipeline/" class="md-nav__link">
         
   
   
@@ -5768,7 +5702,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/tar-format-selection/" class="md-nav__link">
+      <a href="../../../occystrap/tar-format-selection/" class="md-nav__link">
         
   
   
@@ -5796,7 +5730,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/use-cases/" class="md-nav__link">
+      <a href="../../../occystrap/use-cases/" class="md-nav__link">
         
   
   
@@ -5871,7 +5805,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/" class="md-nav__link">
+      <a href="../../../occystrap/plans/" class="md-nav__link">
         
   
   
@@ -5899,7 +5833,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
         
   
   
@@ -5927,7 +5861,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-info-check/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
         
   
   
@@ -5955,7 +5889,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
         
   
   
@@ -5983,7 +5917,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
         
   
   
@@ -6011,7 +5945,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
         
   
   
@@ -6039,7 +5973,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
         
   
   
@@ -6067,7 +6001,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
         
   
   
@@ -6095,7 +6029,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
         
   
   
@@ -6123,7 +6057,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
         
   
   
@@ -6151,7 +6085,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
         
   
   
@@ -6179,7 +6113,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
         
   
   
@@ -6207,7 +6141,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
         
   
   
@@ -6235,7 +6169,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
         
   
   
@@ -6263,7 +6197,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
         
   
   
@@ -6291,7 +6225,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
         
   
   
@@ -6319,7 +6253,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
         
   
   
@@ -6347,7 +6281,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
         
   
   
@@ -6375,7 +6309,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
         
   
   
@@ -6403,7 +6337,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
         
   
   
@@ -6431,7 +6365,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
         
   
   
@@ -6522,7 +6456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/" class="md-nav__link">
+      <a href="../../../ryll/" class="md-nav__link">
         
   
   
@@ -6550,7 +6484,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/portability/" class="md-nav__link">
+      <a href="../../../ryll/portability/" class="md-nav__link">
         
   
   
@@ -6578,7 +6512,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/development-macos/" class="md-nav__link">
+      <a href="../../../ryll/development-macos/" class="md-nav__link">
         
   
   
@@ -6606,7 +6540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/channel-diagnostics-audit/" class="md-nav__link">
+      <a href="../../../ryll/channel-diagnostics-audit/" class="md-nav__link">
         
   
   
@@ -6634,7 +6568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/configuration/" class="md-nav__link">
+      <a href="../../../ryll/configuration/" class="md-nav__link">
         
   
   
@@ -6662,7 +6596,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/control-socket-protocol/" class="md-nav__link">
+      <a href="../../../ryll/control-socket-protocol/" class="md-nav__link">
         
   
   
@@ -6690,7 +6624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/installation/" class="md-nav__link">
+      <a href="../../../ryll/installation/" class="md-nav__link">
         
   
   
@@ -6718,7 +6652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/TOKIO-WEDGING/" class="md-nav__link">
+      <a href="../../../ryll/TOKIO-WEDGING/" class="md-nav__link">
         
   
   
@@ -6746,7 +6680,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/libvirt-spice-recommendations/" class="md-nav__link">
+      <a href="../../../ryll/libvirt-spice-recommendations/" class="md-nav__link">
         
   
   
@@ -6774,7 +6708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/macos-metrics-verification/" class="md-nav__link">
+      <a href="../../../ryll/macos-metrics-verification/" class="md-nav__link">
         
   
   
@@ -6802,7 +6736,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/multi-mode-parity/" class="md-nav__link">
+      <a href="../../../ryll/multi-mode-parity/" class="md-nav__link">
         
   
   
@@ -6830,7 +6764,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/releasing/" class="md-nav__link">
+      <a href="../../../ryll/releasing/" class="md-nav__link">
         
   
   
@@ -6858,7 +6792,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/web-frontend/" class="md-nav__link">
+      <a href="../../../ryll/web-frontend/" class="md-nav__link">
         
   
   
@@ -6886,7 +6820,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/troubleshooting/" class="md-nav__link">
+      <a href="../../../ryll/troubleshooting/" class="md-nav__link">
         
   
   
@@ -6961,7 +6895,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/" class="md-nav__link">
+      <a href="../../../ryll/plans/" class="md-nav__link">
         
   
   
@@ -6989,7 +6923,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-initial/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-initial/" class="md-nav__link">
         
   
   
@@ -7017,7 +6951,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-capture/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-capture/" class="md-nav__link">
         
   
   
@@ -7045,7 +6979,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-packaging/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-packaging/" class="md-nav__link">
         
   
   
@@ -7073,7 +7007,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-usb-redir/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-usb-redir/" class="md-nav__link">
         
   
   
@@ -7101,7 +7035,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-cursor-rendering/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-cursor-rendering/" class="md-nav__link">
         
   
   
@@ -7129,7 +7063,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-bug-reports/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-bug-reports/" class="md-nav__link">
         
   
   
@@ -7157,7 +7091,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-usb-ui/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-usb-ui/" class="md-nav__link">
         
   
   
@@ -7185,7 +7119,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-webdav/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-webdav/" class="md-nav__link">
         
   
   
@@ -7213,7 +7147,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
         
   
   
@@ -7241,7 +7175,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
   
@@ -7269,7 +7203,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
         
   
   
@@ -7297,7 +7231,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
         
   
   
@@ -7325,7 +7259,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
         
   
   
@@ -7353,7 +7287,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
         
   
   
@@ -7381,7 +7315,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-supply-chain-scanning/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-supply-chain-scanning/" class="md-nav__link">
         
   
   
@@ -7409,7 +7343,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-supply-chain-followups/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-supply-chain-followups/" class="md-nav__link">
         
   
   
@@ -7437,7 +7371,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
         
   
   
@@ -7465,7 +7399,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
         
   
   
@@ -7493,7 +7427,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
         
   
   
@@ -7521,7 +7455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-android-apk/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-android-apk/" class="md-nav__link">
         
   
   
@@ -7549,7 +7483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
         
   
   
@@ -7577,7 +7511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
   
@@ -7605,7 +7539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
         
   
   
@@ -7633,7 +7567,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-notifications/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-notifications/" class="md-nav__link">
         
   
   
@@ -7661,7 +7595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
         
   
   
@@ -7689,7 +7623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-connection-properties/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-connection-properties/" class="md-nav__link">
         
   
   
@@ -7717,7 +7651,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-display-window-sizing/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-display-window-sizing/" class="md-nav__link">
         
   
   
@@ -7745,7 +7679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-web-frontend/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-web-frontend/" class="md-nav__link">
         
   
   
@@ -7773,7 +7707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
         
   
   
@@ -7801,7 +7735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-crate-release/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-crate-release/" class="md-nav__link">
         
   
   
@@ -7829,7 +7763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-session-001-feedback/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-session-001-feedback/" class="md-nav__link">
         
   
   
@@ -7857,7 +7791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-video-keeping-up/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-video-keeping-up/" class="md-nav__link">
         
   
   
@@ -7885,7 +7819,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
         
   
   
@@ -7913,7 +7847,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-ci-platform-matrix/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-ci-platform-matrix/" class="md-nav__link">
         
   
   
@@ -7941,7 +7875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
   
@@ -7969,7 +7903,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ryll/plans/PLAN-self-hosted-runners/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-self-hosted-runners/" class="md-nav__link">
         
   
   
@@ -8020,7 +7954,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../features/" class="md-nav__link">
+      <a href="../../../../features/" class="md-nav__link">
         
   
   
@@ -8094,7 +8028,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -8129,7 +8063,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../community/" class="md-nav__link">
+      <a href="../../../../community/" class="md-nav__link">
         
   
   
@@ -8203,7 +8137,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/usage/" class="md-nav__link">
+      <a href="../../../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -8231,7 +8165,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/authentication/" class="md-nav__link">
+      <a href="../../../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -8259,7 +8193,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/ansible/" class="md-nav__link">
+      <a href="../../../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -8287,7 +8221,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../../../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -8315,7 +8249,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/affinity/" class="md-nav__link">
+      <a href="../../../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -8343,7 +8277,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/consoles/" class="md-nav__link">
+      <a href="../../../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -8371,7 +8305,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/events/" class="md-nav__link">
+      <a href="../../../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -8399,7 +8333,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/objects/" class="md-nav__link">
+      <a href="../../../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -8427,7 +8361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/metadata/" class="md-nav__link">
+      <a href="../../../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -8556,7 +8490,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/admin/" class="md-nav__link">
         
   
   
@@ -8584,7 +8518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -8612,7 +8546,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -8640,7 +8574,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -8668,7 +8602,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -8696,7 +8630,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/blobs/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -8724,7 +8658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -8752,7 +8686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/instances/" class="md-nav__link">
         
   
   
@@ -8780,7 +8714,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/label/" class="md-nav__link">
         
   
   
@@ -8808,7 +8742,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/networks/" class="md-nav__link">
         
   
   
@@ -8836,7 +8770,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -8864,7 +8798,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -8892,7 +8826,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/upload/" class="md-nav__link">
         
   
   
@@ -8928,7 +8862,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../../../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
   
@@ -8956,7 +8890,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/authentication/" class="md-nav__link">
         
   
   
@@ -8984,7 +8918,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../../../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -9012,7 +8946,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/mypy/" class="md-nav__link">
+      <a href="../../../../developer_guide/mypy/" class="md-nav__link">
         
   
   
@@ -9040,7 +8974,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/network_dispatcher/" class="md-nav__link">
+      <a href="../../../../developer_guide/network_dispatcher/" class="md-nav__link">
         
   
   
@@ -9068,7 +9002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/release_process/" class="md-nav__link">
+      <a href="../../../../developer_guide/release_process/" class="md-nav__link">
         
   
   
@@ -9096,7 +9030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/standards/" class="md-nav__link">
+      <a href="../../../../developer_guide/standards/" class="md-nav__link">
         
   
   
@@ -9124,7 +9058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/state_machine/" class="md-nav__link">
+      <a href="../../../../developer_guide/state_machine/" class="md-nav__link">
         
   
   
@@ -9152,7 +9086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../../../../developer_guide/updating_docs/" class="md-nav__link">
         
   
   
@@ -9180,7 +9114,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/workflow/" class="md-nav__link">
+      <a href="../../../../developer_guide/workflow/" class="md-nav__link">
         
   
   
@@ -9262,7 +9196,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/" class="md-nav__link">
+      <a href="../../../../plans/" class="md-nav__link">
         
   
   
@@ -9290,7 +9224,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -9318,7 +9252,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -9400,7 +9334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/installation/" class="md-nav__link">
+      <a href="../../../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -9428,7 +9362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -9456,7 +9390,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/authentication/" class="md-nav__link">
+      <a href="../../../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -9484,7 +9418,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/database/" class="md-nav__link">
+      <a href="../../../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -9512,7 +9446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/events/" class="md-nav__link">
+      <a href="../../../../operator_guide/events/" class="md-nav__link">
         
   
   
@@ -9540,7 +9474,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/exception_tracking/" class="md-nav__link">
+      <a href="../../../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -9568,7 +9502,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/load_balancing/" class="md-nav__link">
+      <a href="../../../../operator_guide/load_balancing/" class="md-nav__link">
         
   
   
@@ -9596,7 +9530,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/locks/" class="md-nav__link">
+      <a href="../../../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -9624,7 +9558,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/logging/" class="md-nav__link">
+      <a href="../../../../operator_guide/logging/" class="md-nav__link">
         
   
   
@@ -9652,7 +9586,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -9680,7 +9614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/power_states/" class="md-nav__link">
+      <a href="../../../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -9708,7 +9642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -9736,7 +9670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/threads/" class="md-nav__link">
+      <a href="../../../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -9764,7 +9698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -9819,10 +9753,297 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#status-complete-2026-07-18" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Status: Complete (2026-07-18)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Situation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-actual-current-state-qcow1-is-misdetected-as-qcow2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The actual current state: qcow1 is misdetected as qcow2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qcow1-format-facts-all-empirically-verified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QCOW1 format facts (all empirically verified)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#codebase-deltas-beyond-the-phase-23-template" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Codebase deltas beyond the phase-2/3 template
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detection-fix-is-the-graduation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detection fix is the graduation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parser-placement-new-srccratesqcow1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parser placement: new src/crates/qcow1/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reader-arm-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reader arm shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#info-arm-naming-and-the-encrypted-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Info arm, naming, and the encrypted line
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixtures-and-baselines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixtures and baselines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fuzzing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fuzzing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#out-of-scope-for-this-phase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of scope for this phase
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-level-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-level guidance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-step-4a-qcow1-crate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings: step 4a — qcow1 crate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-step-4b-guest-reader-arm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings: step 4b — guest reader arm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-step-4c-detection-fix-info-naming-encrypted-emitters-pins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings: step 4c — detection fix, info, naming, encrypted emitters, pins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-step-4d-fixtures-baselines-and-manifestoslo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings: step 4d — fixtures, baselines, and manifest/oslo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-step-4e-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings: step 4e — integration tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-step-4f-fuzzing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings: step 4f — fuzzing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-management-session-review-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification (management-session review checklist)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hand-off-to-later-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hand-off to later phases
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
       
     </span>
   </a>
@@ -9850,535 +10071,845 @@
   
 
 
-<h1 id="instar-documentation">Instar Documentation<a class="headerlink" href="#instar-documentation" title="Permanent link">&para;</a></h1>
-<p>A safe, sandboxed disk image format converter.</p>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Instar replaces unsafe calls to <code>qemu-img</code> with a safer, sandboxed approach.
-Image format conversions are performed within a KVM execution context,
-providing strong isolation from the host system. You can read the
-<a href="/components/instar/openstack-announcement-email/">announcement email I sent to the OpenStack mailing lists</a>
-if you're interested in my line of reasoning at the time.</p>
-<p>The primary goal of <code>instar</code> is to be a safe drop in replacement for qemu-img.
-The current focus is on <code>qemu-img info</code>, <code>qemu-img check</code>, <code>qemu-img compare</code>,
-and <code>qemu-img convert</code> sub-commands, as the most painful parts in terms of
-observed security exploits, but that will expand over time.
-We therefore have a test suite of images that we run against both tools,
-and any difference in output is considered a bug to be fixed -- if you
-observe such a difference please report it as a GitHub issue at
-<a href="https://github.com/shakenfist/instar">https://github.com/shakenfist/instar</a>. Obviously, providing an image which
-demonstrates your concern, even if that image would otherwise be considered
-malicious, is extremely helpful in fixing the bug and ensuring that we don't
-regress later.</p>
-<p>Along the pathway to complete equivalence, we have found a few examples of
-<code>qemu-img</code> behaviour that we found counter intuitive. These are documented
-on <a href="/components/instar/quirks/">our quirks page</a>, and you can suppress <code>qemu-img</code>
-equivalence with the <code>--ignore-quirks</code> flag to <code>instar</code>.</p>
-<p>Confused about how <code>instar</code> does these things? Perhaps read the
-<a href="/components/instar/technology-primer/">technology primer</a>.</p>
-<hr />
-<h1 id="main-implementation-documentation">Main Implementation Documentation<a class="headerlink" href="#main-implementation-documentation" title="Permanent link">&para;</a></h1>
-<h2 id="instar-specific-features">Instar-Specific Features<a class="headerlink" href="#instar-specific-features" title="Permanent link">&para;</a></h2>
-<p>Features unique to instar that do not exist in qemu-img.</p>
+<h1 id="format-coverage-phase-4-qcow1-convert-from-read-path">Format coverage phase 4: QCOW1 convert-from (read path)<a class="headerlink" href="#format-coverage-phase-4-qcow1-convert-from-read-path" title="Permanent link">&para;</a></h1>
+<p>Master plan: <a href="/components/instar/plans/PLAN-format-coverage/">PLAN-format-coverage.md</a></p>
+<h2 id="status-complete-2026-07-18">Status: Complete (2026-07-18)<a class="headerlink" href="#status-complete-2026-07-18" title="Permanent link">&para;</a></h2>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before responding to questions or discussion points in this
+document, explore the instar codebase thoroughly. Read relevant
+source files, understand existing patterns (VMM structure, guest
+operation layout, shared crate conventions, call table ABI,
+format parsing, test infrastructure), and ground your answers in
+what the code actually does today. Do not speculate about the
+codebase when you could read it instead. Where a question touches
+on external concepts (QCOW2, VMDK, VHD/VHDX, LUKS, KVM, virtio,
+disk image formats), research as needed to give a confident
+answer. Flag any uncertainty explicitly rather than guessing.</p>
+<p>I prefer one commit per logical change, and at minimum one
+commit per phase. Do not batch unrelated changes into a
+single commit. Each commit should be self-contained: it
+should build, pass tests, and have a clear commit message
+explaining what changed and why.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>QCOW1 ("qcow" v1, qemu's original deprecated format) is
+nominally detect + info only. <strong>This plan deliberately
+references
+<a href="/components/instar/plans/PLAN-format-coverage-phase-02-vdi-read/">PLAN-format-coverage-phase-02-vdi-read.md</a>
+and
+<a href="/components/instar/plans/PLAN-format-coverage-phase-03-parallels-read/">PLAN-format-coverage-phase-03-parallels-read.md</a>
+for everything structural</strong> — the chain-reader pattern, the
+bench <code>read_family</code> allowlist, the fixture/baseline/oslo
+workflow, and the fuzzing shapes. Only QCOW1-specific facts
+and deltas follow. Research was done 2026-07-18 by two
+grounding passes (codebase survey + empirical verification
+against qemu <code>block/qcow.c</code> for 6.0.0/7.0.0/master and the
+static qemu-img matrix binaries 6.0.0 / 7.0.0 / 8.1.0 /
+8.2.0 / 9.0.0 / 10.2.0 plus host 10.0.11), with the
+load-bearing current-state claims re-pinned empirically by
+the management session.</p>
+<h3 id="the-actual-current-state-qcow1-is-misdetected-as-qcow2">The actual current state: qcow1 is misdetected as qcow2<a class="headerlink" href="#the-actual-current-state-qcow1-is-misdetected-as-qcow2" title="Permanent link">&para;</a></h3>
+<p>The survey's initial reading — that qcow1 flows past the
+issue-#444 gate and is silently read as raw — is wrong in
+practice. Management-session empirical pin (2026-07-18):</p>
+<ul>
+<li><code>detect_format_from_header</code>
+  (<code>src/shared/src/format_detection.rs:129-137</code>) checks the
+  4-byte BE magic against <code>QCOW2_MAGIC = 0x514649fb</code> FIRST
+  and never consults the version field. A real qcow1
+  image's magic IS <code>QFI\xfb</code>, so <strong>every real qcow1 image
+  detects as Qcow2</strong>. The 3-byte <code>QCOW1_MAGIC</code> branch below
+  it only matches "QFI" + a 4th byte that is not 0xfb —
+  dead code for real images. The
+  <code>docs/format-coverage.md:26</code> claim that instar detects
+  QCOW1 is therefore wrong.</li>
+<li>Consequently <code>instar info</code> on a fresh
+  <code>qemu-img create -f qcow</code> image prints <code>file format:
+  qcow2</code>, <code>virtual size: 0</code> and a garbage qcow2
+  format-specific block (<code>compat: 0.10</code>) — the qcow2 header
+  parser rejects version 1 and info emits defaults.
+  <code>instar convert</code> then fails with the misleading
+  <code>Error: "input image has zero virtual size"</code>. Not silent
+  raw output, but wrong info and a wrong error.</li>
+<li><strong>The silent-raw hazard is real but latent</strong>:
+  <code>chain::ImageFormat::from_str</code> already maps <code>"qcow1"</code> to
+  a real <code>Qcow1</code> variant (<code>src/vmm/src/chain.rs:58</code>, with
+  <code>supports_backing() == true</code> at <code>:73</code>), so the #444 gate
+  would NOT refuse it, and the guest chain reader's <code>_ =&gt;
+  read_raw_sectors</code> default arm
+  (<code>src/crates/qcow2/src/lib.rs:7379</code>) would read container
+  bytes as raw. The moment detection is made version-aware
+  without a reader arm in place, the hazard goes live.
+  <strong>Ordering constraint: the reader arm (4b) must land
+  before the detection fix (4c).</strong></li>
+<li>A second latent parity gap found while pinning:
+  <code>INFO_RESULT_FLAG_ENCRYPTED</code> (<code>src/vmm/src/main.rs:323</code>)
+  is declared but <strong>never consumed by either info emitter</strong>
+  — instar never prints qemu's <code>encrypted: yes</code> human line
+  or JSON <code>"encrypted": true</code>. No fixture in the whole
+  baseline tree currently produces the line (verified by
+  grep, including the hand-maintained LUKS goldens, which
+  match qemu in having no encrypted line for bare LUKS
+  containers), so the gap is unexercised today — but the
+  qcow1 AES fixture will be the first baseline to need it.</li>
+</ul>
+<h3 id="qcow1-format-facts-all-empirically-verified">QCOW1 format facts (all empirically verified)<a class="headerlink" href="#qcow1-format-facts-all-empirically-verified" title="Permanent link">&para;</a></h3>
+<p>Header: 48 bytes, all scalars <strong>big-endian</strong>. <code>qemu-img
+create -f qcow</code> defaults: cluster_bits=12, l2_bits=9;
+create <strong>with a backing file</strong> switches to cluster_bits=9
+(512-byte clusters), l2_bits=12. <code>mtime</code> is always 0 —
+create and convert are byte-deterministic.</p>
 <table>
 <thead>
 <tr>
-<th>Document</th>
-<th>Description</th>
+<th>Offset</th>
+<th>Field</th>
+<th>Notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="/components/instar/configuration/">Configuration Guide</a></td>
-<td>Command-line flags, config files, quirk control</td>
+<td>0</td>
+<td>magic u32</td>
+<td><code>QFI\xfb</code> (0x514649fb) — same as qcow2; version distinguishes</td>
 </tr>
 <tr>
-<td><a href="/components/instar/chain-discovery/">Chain Discovery</a></td>
-<td><code>instar info --chain</code> - secure backing chain discovery</td>
+<td>4</td>
+<td>version u32</td>
+<td>must be 1</td>
 </tr>
 <tr>
-<td><a href="/components/instar/chain-config/">Chain Config Protocol</a></td>
-<td>Chain config structure layout and VMM-to-guest data flow</td>
+<td>8</td>
+<td>backing_file_offset u64</td>
+<td>file offset of backing file name</td>
 </tr>
 <tr>
-<td><a href="/components/instar/measure/">Measure</a></td>
-<td><code>instar measure</code> - predict file size for a target format</td>
+<td>16</td>
+<td>backing_file_size u32</td>
+<td>name length; &gt; 1023 refused</td>
 </tr>
 <tr>
-<td><a href="/components/instar/create/">Create</a></td>
-<td><code>instar create</code> - create a new empty disk image</td>
+<td>20</td>
+<td>mtime u32</td>
+<td>always 0 on create; unused</td>
 </tr>
 <tr>
-<td><a href="/components/instar/resize/">Resize</a></td>
-<td><code>instar resize</code> - change a disk image's virtual size</td>
+<td>24</td>
+<td>size u64</td>
+<td>virtual size in bytes</td>
 </tr>
 <tr>
-<td><a href="/components/instar/rebase/">Rebase</a></td>
-<td><code>instar rebase</code> - change an overlay's backing-file reference</td>
+<td>32</td>
+<td>cluster_bits u8</td>
+<td>accepted range [9, 16]</td>
 </tr>
 <tr>
-<td><a href="/components/instar/commit/">Commit</a></td>
-<td><code>instar commit</code> - merge an overlay's data into its backing</td>
+<td>33</td>
+<td>l2_bits u8</td>
+<td>accepted range [6, 13]</td>
 </tr>
 <tr>
-<td><a href="/components/instar/map/">Map</a></td>
-<td><code>instar map</code> - emit the allocation map of a disk image</td>
+<td>34</td>
+<td>padding u16</td>
+<td></td>
 </tr>
 <tr>
-<td><a href="/components/instar/snapshot/">Snapshot</a></td>
-<td><code>instar snapshot</code> - manage internal qcow2 snapshots</td>
+<td>36</td>
+<td>crypt_method u32</td>
+<td>0=none, 1=AES-128-CBC, &gt;=2 refused</td>
 </tr>
 <tr>
-<td><a href="/components/instar/amend/">Amend</a></td>
-<td><code>instar amend</code> - change qcow2 image options (compat version, lazy_refcounts)</td>
-</tr>
-<tr>
-<td><a href="/components/instar/dd/">Dd</a></td>
-<td><code>instar dd</code> — windowed block copy (qemu-img dd compatible)</td>
-</tr>
-<tr>
-<td><a href="/components/instar/bitmap/">Bitmap</a></td>
-<td><code>instar bitmap</code> - manage qcow2 persistent dirty bitmaps</td>
-</tr>
-<tr>
-<td><a href="/components/instar/bench/">Bench</a></td>
-<td><code>instar bench</code> - benchmark the sandboxed I/O path</td>
+<td>40</td>
+<td>l1_table_offset u64</td>
+<td><strong>never validated</strong> (0 / unaligned / past-EOF all tolerated at open)</td>
 </tr>
 </tbody>
 </table>
-<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
+<p>Open-time validation (identical 6.0.0 → master, zero
+drift; each error prefixed <code>qemu-img: Could not open
+'FILE':</code>, exit 1):</p>
+<ol>
+<li>bad magic → "Image not in qcow format"; version != 1 →
+   "qcow (v1) does not support qcow version N" (v2/v3
+   append "Try the 'qcow2' driver instead.").</li>
+<li>cluster_bits outside [9,16] → "Cluster size must be
+   between 512 and 64k".</li>
+<li>l2_bits outside [6,13] → "L2 table size must be between
+   512 and 64k".</li>
+<li>size &lt;= 1 → "Image size is too small (must be at least
+   2 bytes)"; oversized → "Image too large" (the bound is
+   the L1-size arithmetic in <code>qcow_open</code>, dependent on
+   cluster_bits + l2_bits — step 4a derives it from
+   qcow.c and step 4d pins the empirical boundary the way
+   phase 3 pinned the parallels tracks cap).</li>
+<li>crypt_method &gt;= 2 → "invalid encryption method in qcow
+   header". crypt_method == 1 (AES): <code>info</code> works
+   (metadata-only) and adds the encrypted line; any
+   data-reading op fails at open with "Parameter
+   'encrypt.key-secret' is required for cipher".</li>
+<li>backing_file_size &gt; 1023 → "Backing file name too
+   long".</li>
+</ol>
+<p>Probing nuance: without <code>-f</code>, qemu routes <code>QFI\xfb</code> by
+magic+version — version 1 → qcow driver, version 2/3 →
+qcow2 driver; a broken-magic file probes as raw. Forced
+<code>-f qcow</code> is required to exercise the qcow driver's own
+validation strings on malformed fixtures.</p>
+<p>Read/lookup math (verified structurally on a populated
+image):</p>
+<ul>
+<li>Two-level table: <code>l1_index = offset &gt;&gt; (l2_bits +
+  cluster_bits)</code>; <code>l2_index = (offset &gt;&gt; cluster_bits) &amp;
+  (l2_size - 1)</code>. L1 and L2 entries are u64 BE; entry 0 =
+  unallocated (<strong>backing file if present, else zeros</strong> —
+  unlike VDI/Parallels, unallocated must fall through the
+  chain).</li>
+<li>Uncompressed L2 entry = absolute file byte offset of the
+  cluster.</li>
+<li>Bit 63 set = compressed: <code>coffset = entry &amp;
+  ((1 &lt;&lt; (63 - cluster_bits)) - 1)</code>; <code>csize_bytes =
+  (entry &gt;&gt; (63 - cluster_bits)) &amp; ((1 &lt;&lt; cluster_bits) -
+  1)</code> — size is in BYTES (byte-packed, may be unaligned).
+  Verified example: entry <code>0x81d0000000002000</code> at
+  cluster_bits=12 → coffset 0x2000, csize 58.</li>
+<li>Compressed clusters are <strong>raw DEFLATE</strong> (windowBits -12,
+  NO zlib wrapper — <code>zlib.decompress</code> fails on them,
+  <code>decompressobj(-12)</code> succeeds). Do not reuse the qcow2
+  two-try zlib-first helper; qcow1 is raw-deflate-only.</li>
+<li>Backing files: header stores ONLY the name (no format
+  field); qemu resolves the backing format by probing at
+  open. Relative names resolve against the overlay's
+  directory. <code>-F qcow</code> is an accepted backing-format hint
+  (including for qcow2 overlays over qcow1 backings).
+  Read-through and overlay-masking byte-verified.</li>
+<li>Past-EOF / truncation: data cluster past EOF, L2 table
+  past EOF, file truncated mid-cluster, truncated L1/L2 —
+  ALL zero-fill (rc=0), never an error, <strong>identical on
+  6.0.0/8.1.0/8.2.0/10.2.0 — no parallels-style 8.1.x
+  refusal window</strong>.</li>
+<li>Odd sizes: <code>create</code> rounds the size up to the next
+  512-multiple (1048577 → 1049088 stored); odd sizes never
+  reach the header via qemu tooling. (Behaviour of a
+  byte-patched odd header size is unpinned — 4d pins it.)</li>
+</ul>
+<p>info output:</p>
+<ul>
+<li>Human: image / file format <code>qcow</code> / virtual size / disk
+  size / [<code>encrypted: yes</code> when AES, between disk size and
+  cluster_size] / <code>cluster_size: N</code> — cluster_size IS
+  printed for qcow (unlike parallels; no suppression
+  needed). <code>backing file:</code> line when present. NO
+  format-specific block. The 8.0.0+ child-node block drift
+  is the generic one the profile system already captures.</li>
+<li>JSON: core keys incl. <code>cluster-size</code> (always) and
+  <code>dirty-flag</code>; <code>encrypted: true</code> when AES;
+  <code>backing-filename</code>/<code>full-backing-filename</code> (no
+  backing-format key). <code>children</code> key from 8.0.0.</li>
+<li><strong>No deprecation warning</strong> on create or read, any
+  version, either stream.</li>
+</ul>
+<p>Other subcommands (version-stable): <code>check</code> → "This image
+format does not support checks" <strong>rc=63</strong> — parity with
+instar's not-supported exit for once (qemu's wording lacks
+the "(fmt)" parenthetical instar prints; pin, don't chase).
+<code>map</code> and <code>measure</code> (of a qcow1 source) WORK in qemu —
+instar keeps its refusals (recorded divergence,
+fuzzer-gated, master-plan future work). <code>dd</code> and <code>bench</code>
+read qcow1 fine. <code>qemu-img convert -c -O qcow</code> <strong>writes a
+valid compressed image but exits 1 with empty stderr</strong> — a
+qemu quirk the fixture generator must tolerate (validate by
+roundtrip, not rc). <code>measure -O qcow</code> (as target) is
+refused by qemu; irrelevant to instar.</p>
+<p>oslo.utils (git master, executed live): detects qcow1 as
+<strong><code>qcow2</code></strong> (magic-only, ignores version) with the CORRECT
+virtual size (size u64 sits at offset 24 in both formats);
+<code>safety_check()</code> raises <code>SafetyCheckFailed</code>;
+<code>get_inspector('qcow')</code> is None.</p>
+<h3 id="codebase-deltas-beyond-the-phase-23-template">Codebase deltas beyond the phase-2/3 template<a class="headerlink" href="#codebase-deltas-beyond-the-phase-23-template" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Naming</strong>: instar currently emits <code>"qcow1"</code>
+  (<code>format_to_str</code>, <code>src/operations/info/src/main.rs:625</code>;
+  chain Display <code>chain.rs:103</code>) where qemu-img and oslo say
+  <code>"qcow"</code>. Byte-parity baselines force the rename: emit
+  <code>"qcow"</code>, accept both <code>"qcow"</code> and <code>"qcow1"</code> in
+  <code>from_str</code>. <code>instar-testdata/scripts/generate-baselines.py</code>
+  whitelists use <code>'qcow'</code> in the check/compare lists but
+  <code>'qcow1'</code> in the measure/info source lists — align to
+  <code>'qcow'</code>.</li>
+<li>Info has NO qcow1 arm — qcow1 falls into the wildcard
+  <code>_ =&gt;</code> arm (<code>src/operations/info/src/main.rs:594-609</code>)
+  which reports file size as virtual size. A real arm must
+  parse size, cluster_bits, backing file, crypt_method.
+  <code>send_info_result</code> already carries
+  <code>backing_file</code>/<code>external_data_file</code> params
+  (<code>src/shared/src/lib.rs:837</code>), and the host backing-chain
+  machinery (<code>discover_backing_chain</code>,
+  <code>validate_backing_path</code>, per-position format re-probe) is
+  fully generic — a format-less backing reference is
+  already handled (each chain position is independently
+  probed), so reporting the name is all that's missing.</li>
+<li>Chain reader integration points as of phase 3:
+  features + optional deps in <code>src/crates/qcow2/Cargo.toml</code>;
+  <code>ChainStates</code> (<code>lib.rs:7537</code>), <code>init_chain_states</code>
+  (<code>:7567</code>), <code>read_chain_virtual_cluster</code> dispatch
+  (<code>:6521</code>; Vdi one-lookup-per-chunk arm <code>:7160</code>, Parallels
+  per-cluster-walk arm <code>:7229</code>); <code>read_offset_sectors</code> cfg
+  gate (<code>:2838</code>); Makefile test line (<code>Makefile:514</code>);
+  consumer features in convert/compare/bench/rebase
+  Cargo.tomls; bench <code>read_family</code>
+  (<code>src/operations/bench/src/main.rs:265</code>) — <strong>next free
+  family number is 7</strong>.</li>
+<li>Decompression: qcow2 and vmdk each use <code>miniz_oxide</code> 0.9
+  (<code>no_std</code>, behind their <code>decompress</code> features). qcow1
+  needs raw-deflate-only inflation in the reader arm
+  (which lives in the qcow2 crate, so qcow2's existing
+  miniz dependency is reachable there).</li>
+<li>Encryption refusal precedent: the qcow2
+  LUKS-without-passphrase guest-side refusal
+  (<code>src/operations/convert/src/main.rs:351</code>,
+  <code>debug_print</code> + <code>send_complete(false)</code>).</li>
+</ul>
+<h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
+<h3 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h3>
+<p>convert, compare, dd, and bench gain qcow1 input, including
+backing chains and compressed clusters. check stays
+not-supported (rc 63 — actual parity with qemu here). map
+and measure stay refusals — a recorded divergence (qemu
+supports both on qcow1), fuzzer-gated like vdi/parallels,
+already on the master plan's future-work list. Encrypted
+(AES, crypt_method=1) qcow1 is refused cleanly by the
+reader — parity in effect, since keyless qemu also refuses;
+AES decryption (instar has the machinery from qcow2
+crypt_method=1) is future work. No write/create/output
+support.</p>
+<h3 id="detection-fix-is-the-graduation">Detection fix is the graduation<a class="headerlink" href="#detection-fix-is-the-graduation" title="Permanent link">&para;</a></h3>
+<p>Make detection version-aware: <code>QFI\xfb</code> + version 1 →
+Qcow1; version anything-else keeps the current qcow2 route
+(whose open-time version check produces the refusal — the
+same division of labour qemu's probes use). Because
+<code>chain.rs</code> already maps qcow1 past the #444 gate, this
+detection change alone flips qcow1 from
+"misdetected-as-qcow2, accidentally refused" to
+"read by the new arm" — there is no separate gate lift.
+It lands in 4c, strictly after 4b's reader arm exists.
+The dead 3-byte-magic branch is removed in the same
+commit.</p>
+<h3 id="parser-placement-new-srccratesqcow1">Parser placement: new <code>src/crates/qcow1/</code><a class="headerlink" href="#parser-placement-new-srccratesqcow1" title="Permanent link">&para;</a></h3>
+<p>Deviation from the master plan's "likely inside
+<code>src/crates/qcow2/</code> as a sibling parser" note, for
+consistency with the vdi/parallels precedent: own crate,
+own unit tests, own fuzz targets, feature-gated optional
+dep of the qcow2 crate (<code>qcow1-input = ["dep:qcow1",
+"decompress"]</code> — decompress because the arm inflates
+compressed clusters). The crate parses the header with
+qemu's exact RO rules and exposes
+<code>Qcow1State::init</code>/<code>block_lookup</code> in the
+VdiState/ParallelsState shape, extended with a
+<code>Compressed { host_offset, csize }</code> lookup result and
+with init refusing <code>crypt_method != 0</code>.</p>
+<h3 id="reader-arm-shape">Reader arm shape<a class="headerlink" href="#reader-arm-shape" title="Permanent link">&para;</a></h3>
+<p>The arm combines three precedents:</p>
+<ul>
+<li><strong>Per-cluster walk</strong> (Parallels arm): qcow1 clusters go
+  down to 512 bytes — far smaller than chunk sizes — so
+  one-lookup-per-chunk is wrong.</li>
+<li><strong>Backing fall-through</strong> (Qcow2 arm): unallocated
+  clusters must descend to the next chain device, NOT
+  zero-fill. qcow1 is the first non-qcow2 format with
+  backing support; 4b must study how the Qcow2 arm signals
+  unallocated to the chain walker and mirror it exactly.</li>
+<li><strong>Capacity-clamped zero-fill</strong> (VDI/Parallels arms) for
+  allocated-but-past-EOF and straddling reads — qemu
+  zero-fills all truncation shapes on every version.</li>
+</ul>
+<p>Compressed clusters: read <code>csize</code> bytes from the (possibly
+unaligned) host offset via the byte-accurate path, inflate
+as RAW deflate (windowBits -12; miniz flags WITHOUT the
+zlib-header bit — not the qcow2 two-try helper), then copy
+the requested span. Inflate failure is a clean guest
+failure.</p>
+<h3 id="info-arm-naming-and-the-encrypted-line">Info arm, naming, and the encrypted line<a class="headerlink" href="#info-arm-naming-and-the-encrypted-line" title="Permanent link">&para;</a></h3>
+<p>The info op gains a real Qcow1 arm: virtual_size = header
+size verbatim; cluster_size = 1 &lt;&lt; cluster_bits (emitted
+normally — qemu prints it for qcow; no suppression);
+backing file name passed through <code>send_info_result</code>
+(bounds-checked read of backing_file_offset/size);
+<code>FLAG_ENCRYPTED</code> when crypt_method != 0. The emitted format
+string becomes <code>"qcow"</code> everywhere (with <code>"qcow1"</code> kept as
+an accepted input alias).</p>
+<p>New encrypted-line emitters, driven by the
+never-yet-consumed <code>INFO_RESULT_FLAG_ENCRYPTED</code>: human
+<code>encrypted: yes</code> between disk size and cluster_size; JSON
+<code>"encrypted": true</code> with placement pinned from qemu JSON
+output. Guards: no existing baseline contains the line, but
+the LUKS info parser DOES set the flag and qemu prints no
+encrypted line for bare LUKS containers (the goldens
+confirm) — so the emitter must be gated to keep the LUKS
+goldens byte-identical (pin qemu's actual per-format rule
+and mirror it; a full <code>test_info_safe</code> run is the
+acceptance gate). If encrypted qcow2 gets the line for free
+(qemu prints it there), record it in findings — it is a
+pre-existing instar gap this fixes with no baseline churn.</p>
+<h3 id="fixtures-and-baselines">Fixtures and baselines<a class="headerlink" href="#fixtures-and-baselines" title="Permanent link">&para;</a></h3>
+<p>Deterministic <code>generate-qcow1-fixtures.py</code> in
+instar-testdata (create/convert are byte-deterministic;
+mtime always 0; the compressed fixture's <code>convert -c</code> step
+must tolerate qemu's exit-1-despite-valid-output quirk and
+validate by roundtrip instead). Safe:</p>
+<ul>
+<li><code>qcow1-data</code> — convert of a sparse patterned raw
+  (default 4 KiB clusters), scattered allocation.</li>
+<li><code>qcow1-compressed</code> — <code>convert -c</code> twin of qcow1-data
+  (compressed clusters; compare-identical to its twin).</li>
+<li><code>qcow1-backing</code> — overlay + base pair with a relative
+  backing name; create-with-backing naturally uses
+  cluster_bits=9, so this doubles as the small-cluster
+  (512-byte) walk coverage.</li>
+<li><code>qcow1-encrypted</code> — crypt_method byte-patched to 1.
+  Safe for info baselines (qemu info works and prints the
+  encrypted line); data ops expect refusal on both sides.</li>
+<li><code>qcow1-past-eof</code> — one data-cluster offset patched far
+  past EOF; zero-fills on every qemu version (no 8.1.x
+  window).</li>
+</ul>
+<p>Malformed (skip_qemu_img, expected_error from the verified
+strings, validated with forced <code>-f qcow</code> since probing
+would fall back elsewhere): <code>qcow1-bad-cluster-bits</code> (17),
+<code>qcow1-bad-l2-bits</code> (14), <code>qcow1-huge-size</code> (at the
+empirically-pinned "Image too large" boundary),
+<code>qcow1-crypt-invalid</code> (crypt_method=2),
+<code>qcow1-backing-name-too-long</code> (backing_file_size=1024).</p>
+<p>4d also pins two open edges for the record (fixtures only
+if version-stable): a byte-patched odd header size, and
+qemu's probe routing for <code>QFI\xfb</code> with version 0 / 99
+(documents the detection-parity edge for the version-aware
+split).</p>
+<p>Baselines: info for the five safe images (+ the backing
+base if manifested), restricted manifest, <code>--no-commit</code>;
+detect-profiles with <code>--no-commit --output-type</code> and the
+integrity spot-check (phase-2/3 lessons). Oslo:
+KNOWN_FORMAT_DIVERGENCES ('qcow', 'qcow2') per safe
+fixture; virtual sizes AGREE (offset-24 coincidence) so no
+vsize entries — verify live; malformed set →
+OSLO_SKIP_IMAGES; handle the safety_check exception per the
+test's existing flow.</p>
+<h3 id="fuzzing">Fuzzing<a class="headerlink" href="#fuzzing" title="Permanent link">&para;</a></h3>
+<p><code>fuzz_qcow1_header</code> + <code>fuzz_qcow1_table</code> (two-level walk +
+compressed-entry decode invariants — host offset/csize
+bounds). Differential: FORMATS += 'qcow' (qemu's create
+name); plain creates (no encryption — both sides refuse,
+no signal); optionally a compressed variant via
+<code>convert -c</code> if the harness tolerates the rc=1 quirk
+cleanly, else log-and-skip; gate op_map ('raw', 'vdi',
+'parallels', 'qcow') and op_measure ('vdi', 'parallels',
+'qcow'). ~200-iteration forced burn-in, zero divergences
+expected, isolated replay for any hit.</p>
+<h2 id="out-of-scope-for-this-phase">Out of scope for this phase<a class="headerlink" href="#out-of-scope-for-this-phase" title="Permanent link">&para;</a></h2>
+<ul>
+<li>AES decryption of encrypted qcow1 (future work; refusal
+  is behavioural parity with keyless qemu).</li>
+<li>map/measure support for qcow1 (recorded divergence —
+  qemu supports both; master-plan future-work item).</li>
+<li>qcow1 write/create/output; <code>convert -c -O qcow</code> output
+  parity (instar does not write qcow).</li>
+<li>Fixing oslo's qcow1→qcow2 misdetection upstream
+  (recorded; divergence entries absorb it).</li>
+</ul>
+<h2 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h2>
+<p>Steps mirror phases 2/3; briefs give only the QCOW1 deltas
+and assume the implementing agent reads the phase-3 plan's
+corresponding step (and the referenced commits) first.</p>
 <table>
 <thead>
 <tr>
-<th>Document</th>
-<th>Description</th>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="/components/instar/output-formats/">Output Formats</a></td>
-<td>qemu-img output formats (human, JSON) and version profiles</td>
+<td>4a</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>New <code>src/crates/qcow1/</code> crate modelled on <code>src/crates/parallels/</code> (read it + its 3a brief first). BE header per this plan's table. <code>Qcow1Header::parse</code> enforcing qemu's exact RO rules: magic 0x514649fb + version == 1; cluster_bits in [9,16]; l2_bits in [6,13]; size &gt;= 2; the "Image too large" bound derived from qcow_open's L1-size arithmetic (read qemu block/qcow.c 7.0.0 — the l1_size computation and its INT_MAX-class cap; encode the same arithmetic symbolically and unit-test the boundary; 4d pins it empirically like phase 3's tracks cap, so reference the constant/logic in one place); crypt_method &lt;= 1 at parse (&gt;= 2 refused, matching qemu); backing_file_size &lt;= 1023; l1_table_offset deliberately NOT validated (qemu has none — 0/unaligned/past-EOF tolerated; reads later zero-fill). Store cluster_size = 1 &lt;&lt; cluster_bits, l2_size = 1 &lt;&lt; l2_bits, virtual_size = size verbatim, backing_file_offset/size, crypt_method. <code>Qcow1State::init</code>/<code>block_lookup</code> in the ParallelsState signature shape: init refuses crypt_method != 0 (reader-level refusal; parse stays lenient for info's benefit); two-level lookup per the Situation math via the shared cached-sector macro (entries are u64 BE — check whether a <code>read_u64_be_cached</code> exists in shared; add it following the macro pattern if not); L1 entry 0 or L2 entry 0 or index out of range → Unallocated; bit 63 → <code>Compressed { host_offset = entry &amp; ((1 &lt;&lt; (63 - cluster_bits)) - 1), csize = (entry &gt;&gt; (63 - cluster_bits)) &amp; ((1 &lt;&lt; cluster_bits) - 1) }</code> (unit-test the empirical example: entry 0x81d0000000002000, cluster_bits 12 → 0x2000/58); else Allocated at the absolute byte offset + in-cluster offset, all checked arithmetic. Unit tests: every validation boundary accept/reject, the populated-image lookup example (l1[0]=0x1000, L2[0..15]=0x2000..0x11000), compressed decode, crypt refusal at init but parse-ok, backing-name length, no-l1-validation tolerance. no_std, panic-free, workspace member; make test-rust/lint/instar clean.</td>
 </tr>
 <tr>
-<td><a href="/components/instar/quirks/">qemu-img Quirks</a></td>
-<td>Known differences between <code>instar</code> and qemu-img output</td>
+<td>4b</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Guest integration mirroring 3b (read the Parallels arm at qcow2 lib.rs:7229 and 3b's brief first). <code>qcow1-input = ["dep:qcow1", "decompress"]</code> feature in src/crates/qcow2/Cargo.toml; <code>ChainStates.qcow1_states</code>; <code>init_chain_states</code> arm (cache-slot reuse; init failure — including the crypt refusal — propagates like the other formats). Reader arm: per-cluster walk (clusters can be 512 B, smaller than any chunk); <strong>Unallocated falls through to the backing device exactly as the Qcow2 arm does — study how that arm signals unallocated to the chain walker and mirror it; do NOT zero-fill like the Vdi/Parallels arms. Report the mechanism in your findings</strong> (first non-qcow2 backing format). Allocated: capacity-clamped zero-fill for past-EOF/straddle (qemu zero-fills all truncation shapes on all versions), then the aligned/unaligned read split; note uncompressed L2 entries are absolute byte offsets. Compressed: read csize bytes from the possibly-unaligned host offset (read_offset_sectors — widen its cfg gate to include qcow1-input), inflate RAW deflate only (miniz_oxide without TINFL_FLAG_PARSE_ZLIB_HEADER — do NOT reuse qcow2's zlib-first two-try helper), copy the span; inflate failure = clean guest failure. Enable the feature in convert/compare/bench/rebase Cargo.tomls (rebase newly pulls miniz via decompress — report the binary delta) and extend the Makefile qcow2 test features line. Unit tests per the 3b set plus: unallocated-descends-to-backing (multi-device mock — follow the Qcow2 arm's existing chain tests), a compressed cluster (real raw-deflate blob), 512-byte-cluster walk across a chunk, past-EOF clamp, straddle. Behaviour unchanged this step (detection still routes real qcow1 images to the qcow2 parser); suites stay green. make instar/check-binary-sizes/test-rust/lint clean; report all binary deltas.</td>
 </tr>
 <tr>
-<td><a href="/components/instar/image_notes/README/">Image Notes</a></td>
-<td>Test images and the quirks they exposed</td>
-</tr>
-</tbody>
-</table>
-<h2 id="testing-and-coverage">Testing and Coverage<a class="headerlink" href="#testing-and-coverage" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/testing/">Integration Testing</a></td>
-<td>Test suite comparing instar output against qemu-img</td>
+<td>4c</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Detection fix + info + naming + encrypted emitters + pins, as separate commits in this order. Commit 1 (info + naming): real Qcow1 arm in src/operations/info/src/main.rs (replace the wildcard fall-through for Qcow1): virtual_size = header size verbatim, cluster_size = 1 &lt;&lt; cluster_bits, backing file name (bounds-checked read at backing_file_offset/size, pass through send_info_result; set the has-backing flag the way the host expects — read how discover_backing_chain consumes it), FLAG_ENCRYPTED when crypt_method != 0; format_to_str Qcow1 =&gt; "qcow\0"; chain.rs from_str accepts "qcow" AND "qcow1", Display =&gt; "qcow". Commit 2 (encrypted emitters): consume INFO_RESULT_FLAG_ENCRYPTED in BOTH host emitters — human <code>encrypted: yes</code> between disk size and cluster_size, JSON <code>"encrypted": true</code> with key placement pinned from real qemu <code>info --output=json</code> on an AES qcow1; the LUKS info parser sets the flag but qemu prints NO encrypted line for bare LUKS (the hand-maintained goldens confirm) — pin qemu's actual rule and gate the emitter so the LUKS goldens stay byte-identical; full test_info_safe run must pass with zero regressions; if encrypted qcow2 images now also gain the line, that is a pre-existing-gap fix — record it (no fixture covers it, so no baseline churn). Commit 3 (detection = graduation; REQUIRES 4b merged): version-aware split in detect_format_from_header — QFI\xfb + version u32 BE <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/4" title="GitHub User: 4">@4</a> == 1 =&gt; Qcow1, else the existing Qcow2 route; delete the dead 3-byte-magic branch (keep constants coherent); bench read_family <code>Qcow1 =&gt; Some(7)</code> + doc-comment update. Commit 4 (pins): convert/compare/dd smoke parity vs qemu-img on a locally created qcow image (fixtures may not have landed; create with the host binary); backing-chain smoke (overlay reads through base); check → rc 63 clean (instar's message includes the format name, qemu's does not — record wording, don't chase); map/measure refusals recorded (divergence vs qemu documented in the test comments); encrypted image: info succeeds with the new line, convert refuses cleanly (record message); confirm the old misdetection behaviour (qcow2 garbage info) is gone. Run the touched suites + full test_info_safe.</td>
 </tr>
 <tr>
-<td><a href="/components/instar/testing/#differential-fuzzing">Differential Fuzzing</a></td>
-<td>Randomised instar vs qemu-img comparison</td>
+<td>4d</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Testdata + manifest, mirroring 3d (read its brief + findings first; --no-commit posture, --output-type surgical scope, integrity spot-check; NEVER commit in instar-testdata). scripts/generate-qcow1-fixtures.py emitting the ten fixtures per Design; the compressed fixture's <code>convert -c -O qcow</code> step exits 1 despite writing a valid image (verified qemu quirk, all versions) — tolerate rc=1 and validate by roundtrip md5 instead; validate every safe fixture on 6.0.0 AND 10.2.0 (info + convert md5 agreement) and every malformed one refused by 10.2.0 with the expected string under forced <code>-f qcow</code> (record what unforced probing does with each). Build qcow1-huge-size at the empirically-pinned "Image too large" boundary (find smallest-refused like phase 3's tracks-cap correction; if 4a's symbolic bound disagrees, fix the crate constant in lock-step and report). Pin the two open edges (odd patched header size; probe routing for version 0/99) across 6.0.0/8.2.0/10.2.0 and report — add fixtures only if version-stable. Generate info baselines (restricted manifest) + detect-profiles + spot-check. Update generate-baselines.py measure/info source whitelists from 'qcow1' to 'qcow'. In instar: manifest entries for all ten (backing pair follows the existing backing-fixture precedent — find one in the manifest first), oslo updates per Design (verify live in a venv that instar 'qcow' vs oslo 'qcow2' diverges and vsizes agree; handle the SafetyCheckFailed per the test's flow; malformed → OSLO_SKIP_IMAGES).</td>
 </tr>
 <tr>
-<td><a href="/components/instar/format-coverage/">Format Coverage</a></td>
-<td>Comparison with oslo.utils format_inspector, plus the qemu-img parity axis: a consolidated op × format matrix tracking coverage against qemu-img's real format-driver roster</td>
-</tr>
-</tbody>
-</table>
-<h2 id="understanding-the-codebase">Understanding the Codebase<a class="headerlink" href="#understanding-the-codebase" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/commentary/index/">Commentary Index</a></td>
-<td>Lions-style annotated walkthrough of the codebase</td>
+<td>4e</td>
+<td>medium</td>
+<td>opus</td>
+<td>none</td>
+<td>Integration tests mirroring 3e (read its brief + the phase-3 test commits first): convert-to-raw parity for all safe qcow1 fixtures; qcow2 + vpc conversions for qcow1-data (flatten-compare); compressed twin compare-identical to qcow1-data and converts byte-identically; backing-chain tests (qcow1 overlay through base — copy the base into the tmpdir per the backing-path restriction; plus a qcow2 overlay created with <code>-F qcow</code> over a qcow1 backing); windowed dd crossing an allocation hole (qemu-img dd count is absolute-from-offset-0); compare identical + differing pairs; encrypted fixture: info parity (first baseline with the encrypted line), convert/dd refuse cleanly both sides; adversarial refusals for the five malformed ids (convert/compare/dd non-zero clean, no hang) — NOTE the info-leniency posture differs from vdi/parallels: instar's new info arm parses more than magic+version, so decide and PIN per-fixture what info does on each malformed image (qemu info under forced -f refuses them; unforced probing may not) and document; small-cluster end-to-end via qcow1-backing. Full eight-suite runs (convert, compare, dd, adversarial, info_safe, oslo, bench, rebase — consumer-suite rule). Isolated re-run before believing any failure (KVM-contention pattern).</td>
 </tr>
 <tr>
-<td><a href="/components/instar/commentary/reading-order/">Reading Order</a></td>
-<td>Which files to read, in what sequence, and what to look for</td>
+<td>4f</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Fuzzing mirroring 3f (read its brief + the phase-3 fuzz commit first): fuzz_qcow1_header + fuzz_qcow1_table (drive both compressed and uncompressed entries from fuzz bytes; assert the Compressed host_offset/csize and Allocated offset invariants), fuzz Cargo wiring, make fuzz-build + 60s local runs each (exec/s reported, crashes blocking). Differential: FORMATS += 'qcow'; generate_image branch (plain <code>qemu-img create -f qcow</code>; no encryption; optionally a compressed variant via <code>convert -c</code> tolerating the rc=1 quirk if the harness stays clean — else log-and-skip with a comment); gate op_map ('raw','vdi','parallels','qcow') and op_measure ('vdi','parallels','qcow') citing this plan; ~200-iteration forced burn-in, zero divergences expected, isolated replay for any hit.</td>
 </tr>
 <tr>
-<td><a href="/components/instar/commentary/architectural-decisions/">Architectural Decisions</a></td>
-<td>The <em>why</em> behind every major design choice</td>
+<td>4g</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Docs + close-out mirroring 3g (read its brief first): format-coverage.md — new qcow input-table row, CORRECT the wrong ":26 QCOW1 detection Yes" claim (it was misdetected as qcow2 until this phase), fixture inventory, narrative; quirks.md phase-4 section (misdetection fix + version-aware split; "qcow" naming with "qcow1" alias; encrypted-line emitters and the LUKS gating; backing fall-through; raw-deflate compressed clusters; past-EOF zero-fill parity; map/measure divergence vs qemu; check-wording note; qemu's convert -c rc=1 quirk; oslo qcow1→qcow2 misdetection); README (qcow read-only input); CHANGELOG; ARCHITECTURE (crates/qcow1); master plan row 4 Complete + Bugs entries (the misdetection defect incl. garbage info/misleading convert error, and the never-consumed encrypted flag — both found 2026-07-18 during phase-4 planning, empirically pinned) + future-work (qcow1 AES decryption; map/measure already listed); index.md; this file Status Complete + fill Findings from the step reports. Consistency grep for stale "qcow1" claims.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="design-decisions">Design Decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/rust-rationale/">Why Rust</a></td>
-<td>Memory safety, bare-metal support, rust-vmm ecosystem</td>
-</tr>
-<tr>
-<td><a href="/components/instar/format-detection-safety/">Format Detection Safety</a></td>
-<td>Why auto-detection is safe in instar's KVM sandbox</td>
-</tr>
-</tbody>
-</table>
-<h2 id="platform-analysis">Platform Analysis<a class="headerlink" href="#platform-analysis" title="Permanent link">&para;</a></h2>
-<p>Analysis of how major virtualization platforms use qemu-img and handle disk images.</p>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/usage/">Usage Analysis</a></td>
-<td>How oVirt, Proxmox, and OpenStack use qemu-img</td>
-</tr>
-<tr>
-<td><a href="/components/instar/security/">Security Vulnerabilities</a></td>
-<td>CVE analysis for image handling across platforms</td>
-</tr>
-<tr>
-<td><a href="/components/instar/security-audits/">Security Audits</a></td>
-<td>Audit results, unsafe code review, and standing security properties</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h1 id="disk-image-format-specifications">Disk Image Format Specifications<a class="headerlink" href="#disk-image-format-specifications" title="Permanent link">&para;</a></h1>
-<h2 id="qcow2-format">QCOW2 Format<a class="headerlink" href="#qcow2-format" title="Permanent link">&para;</a></h2>
-<p>Comprehensive documentation for the qemu Copy-On-Write version 2 format,
-derived from qemu source code analysis.</p>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/qcow2/qcow2-format/">Format Specification</a></td>
-<td>Header structure, feature flags, constants</td>
-</tr>
-<tr>
-<td><a href="/components/instar/qcow2/qcow2-l1l2-tables/">L1/L2 Tables</a></td>
-<td>Address translation, cluster types, extended L2</td>
-</tr>
-<tr>
-<td><a href="/components/instar/qcow2/qcow2-refcount/">Reference Counting</a></td>
-<td>Refcount tables, variable widths, COW semantics</td>
-</tr>
-<tr>
-<td><a href="/components/instar/qcow2/qcow2-snapshots/">Snapshots</a></td>
-<td>Snapshot table format, operations, VM state</td>
-</tr>
-<tr>
-<td><a href="/components/instar/qcow2/qcow2-write-planner/">Write Planner and Executor</a></td>
-<td>Shared in-place write infrastructure: step-program ABI, envelope, allocate-on-write, copy-on-write, refcount growth, crash ordering</td>
-</tr>
-<tr>
-<td><a href="/components/instar/qcow2/qcow2-compression/">Compression</a></td>
-<td>ZLIB/ZSTD implementation, compressed entries</td>
-</tr>
-<tr>
-<td><a href="/components/instar/qcow2/qcow2-encryption/">Encryption</a></td>
-<td>LUKS header, key slots, IV generation</td>
-</tr>
-<tr>
-<td><a href="/components/instar/qcow2/qcow2-implementation-notes/">Implementation Notes</a></td>
-<td>Common pitfalls, validation, external refs</td>
-</tr>
-</tbody>
-</table>
-<h2 id="raw-format">Raw Format<a class="headerlink" href="#raw-format" title="Permanent link">&para;</a></h2>
-<p>Documentation for raw disk images - the simplest format with no metadata.</p>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/raw/raw-format/">Format Specification</a></td>
-<td>Structure, sparse files, tools, performance</td>
-</tr>
-</tbody>
-</table>
-<h2 id="vmdk-format">VMDK Format<a class="headerlink" href="#vmdk-format" title="Permanent link">&para;</a></h2>
-<p>Documentation for VMware Virtual Machine Disk format.</p>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/vmdk/vmdk-format/">Format Specification</a></td>
-<td>Header structures, magic numbers, disk types</td>
-</tr>
-<tr>
-<td><a href="/components/instar/vmdk/vmdk-extents/">Extent Types</a></td>
-<td>Descriptor format, flat vs sparse, multi-extent</td>
-</tr>
-<tr>
-<td><a href="/components/instar/vmdk/vmdk-grain-tables/">Grain Tables</a></td>
-<td>Address translation, GD/GT structure, COW</td>
-</tr>
-<tr>
-<td><a href="/components/instar/vmdk/vmdk-compression/">Compression</a></td>
-<td>DEFLATE compression, streamOptimized format</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h1 id="prototype-and-research-documentation">Prototype and Research Documentation<a class="headerlink" href="#prototype-and-research-documentation" title="Permanent link">&para;</a></h1>
-<p>The content below documents the prototyping and research phase of instar
-development. These documents are retained for historical context and may
-be useful for understanding design decisions, but the main implementation
-has evolved beyond these prototypes.</p>
-<h2 id="prototypes">Prototypes<a class="headerlink" href="#prototypes" title="Permanent link">&para;</a></h2>
-<p>Experimental implementations exploring secure isolated execution.</p>
-<table>
-<thead>
-<tr>
-<th>Prototype</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/prototypes/kvm-hello-world/">KVM Hello World</a></td>
-<td>Minimal bare-metal KVM guest proof-of-concept</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/kvm-hello-world2/">KVM Hello World 2</a></td>
-<td>Using vm-memory crate for safer memory management</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/virtio-block/">Virtio-Block</a></td>
-<td>Virtio-block device emulation with file copy</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/virtio-block2/">Virtio-Block2</a></td>
-<td>Virtio-block with protobuf messaging</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/virtio-block3/">Virtio-Block3</a></td>
-<td>Virtio-block with configurable sector sizes</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/virtio-block4/">Virtio-Block4</a></td>
-<td>Virtio-block with performance statistics</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/virtio-block5/">Virtio-Block5</a></td>
-<td>Virtio-block with ioeventfd/irqfd optimizations</td>
-</tr>
-<tr>
-<td><a href="/components/instar/../prototypes/virtio-block6/README/">Virtio-Block6</a></td>
-<td>Sparse/dynamic output file support</td>
-</tr>
-<tr>
-<td><a href="/components/instar/../prototypes/pluggable/README/">Pluggable</a></td>
-<td>Modular operation architecture with shared infrastructure</td>
-</tr>
-<tr>
-<td><a href="/components/instar/../prototypes/pluggable2/README/">Pluggable2</a></td>
-<td>Separate binary loading for operations (minimal attack surface)</td>
-</tr>
-<tr>
-<td><a href="/components/instar/../prototypes/info/README/">Info</a></td>
-<td>Image format detection (<code>qemu-img info</code> equivalent)</td>
-</tr>
-</tbody>
-</table>
-<h2 id="kvm-virtualization-research">KVM Virtualization Research<a class="headerlink" href="#kvm-virtualization-research" title="Permanent link">&para;</a></h2>
-<p>Documentation for building custom VMMs using the Linux KVM API.</p>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/prototypes/kvm/">KVM API Guide</a></td>
-<td>KVM ioctls, memory setup, x86-64 long mode, VM exits</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/performance-counters/">Performance Counters</a></td>
-<td>KVM statistics, perf events, resource limiting</td>
-</tr>
-</tbody>
-</table>
-<h2 id="guest-data-transfer-research">Guest Data Transfer Research<a class="headerlink" href="#guest-data-transfer-research" title="Permanent link">&para;</a></h2>
-<p>Methods for transferring data into and out of bare-metal KVM guests.</p>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/prototypes/data-transfer-comparison/">Comparison</a></td>
-<td>Trade-offs, rust-vmm crates, and recommendations</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/data-transfer-direct-memory/">Direct Memory</a></td>
-<td>Shared memory regions, coalesced I/O, completion signaling</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/data-transfer-virtio-vsock/">Virtio-vsock</a></td>
-<td>Socket-based communication with CID addressing</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/data-transfer-virtio-block/">Virtio-block</a></td>
-<td>Block device interface for sector-based transfers</td>
-</tr>
-<tr>
-<td><a href="/components/instar/prototypes/data-transfer-other/">Other Mechanisms</a></td>
-<td>Custom MMIO device, Port I/O, ioeventfd, virtio-fs, VFIO, hypercalls</td>
-</tr>
-</tbody>
-</table>
-<h2 id="development-tools">Development Tools<a class="headerlink" href="#development-tools" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/prototypes/building-with-docker/">Building with Docker</a></td>
-<td>Build prototypes using Docker CLI without VSCode</td>
-</tr>
-</tbody>
-</table>
-<h2 id="rust-crate-ecosystem">Rust Crate Ecosystem<a class="headerlink" href="#rust-crate-ecosystem" title="Permanent link">&para;</a></h2>
-<p>The <a href="https://github.com/rust-vmm/community">rust-vmm</a> project provides
-production-tested virtualization components used by Firecracker, crosvm, and
-Cloud Hypervisor. These crates reduce virtio implementation effort by 70%+.</p>
-<table>
-<thead>
-<tr>
-<th>Crate</th>
-<th>Side</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://crates.io/crates/kvm-ioctls">kvm-ioctls</a></td>
-<td>VMM</td>
-<td>Safe KVM API wrappers</td>
-</tr>
-<tr>
-<td><a href="https://crates.io/crates/vm-memory">vm-memory</a></td>
-<td>VMM</td>
-<td>Guest memory abstraction</td>
-</tr>
-<tr>
-<td><a href="https://crates.io/crates/virtio-queue">virtio-queue</a></td>
-<td>VMM</td>
-<td>Virtqueue implementation</td>
-</tr>
-<tr>
-<td><a href="https://github.com/rust-vmm/vm-virtio">virtio-blk</a></td>
-<td>VMM</td>
-<td>Block device parsing</td>
-</tr>
-<tr>
-<td><a href="https://crates.io/crates/virtio-vsock">virtio-vsock</a></td>
-<td>VMM</td>
-<td>Vsock packet handling</td>
-</tr>
-<tr>
-<td><a href="https://crates.io/crates/virtio-drivers">virtio-drivers</a></td>
-<td>Guest</td>
-<td><code>no_std</code> virtio drivers</td>
-</tr>
-</tbody>
-</table>
-<p>See <a href="/components/instar/prototypes/data-transfer-comparison/#rust-crate-ecosystem">Comparison</a> for details
-on how these crates affect implementation complexity.</p>
-<h2 id="shared-crates">Shared Crates<a class="headerlink" href="#shared-crates" title="Permanent link">&para;</a></h2>
-<p>Reusable Rust crates for the <code>instar</code> project.</p>
-<table>
-<thead>
-<tr>
-<th>Document</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="/components/instar/crates/guest-protocol/">guest-protocol</a></td>
-<td>Protocol Buffers messaging for guest-VMM communication</td>
-</tr>
-</tbody>
-</table>
-<h3 id="format-parsing-crates-srccrates">Format Parsing Crates (<code>src/crates/</code>)<a class="headerlink" href="#format-parsing-crates-srccrates" title="Permanent link">&para;</a></h3>
-<p>These <code>no_std</code> crates provide canonical format parsing implementations
-shared across all guest operations, eliminating code duplication:</p>
-<table>
-<thead>
-<tr>
-<th>Crate</th>
-<th>Description</th>
-<th>Used by</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>qcow2</code></td>
-<td>QCOW2 header parsing, L1/L2 cluster lookup, decompression (feature-gated), refcount reading, backing file extraction</td>
-<td>info, check, compare, convert</td>
-</tr>
-<tr>
-<td><code>raw</code></td>
-<td>MBR/GPT partition table detection</td>
-<td>info</td>
-</tr>
-<tr>
-<td><code>vmdk</code></td>
-<td>VMDK4 binary header parsing, descriptor I/O and text parsing, grain directory/table reading, streamOptimized footer/marker handling, write helpers</td>
-<td>info, check, convert</td>
-</tr>
-<tr>
-<td><code>vhd</code></td>
-<td>VHD/VPC footer and dynamic header parsing, BAT reading with sector-cached lookups, block-level data access, write helpers (footer, dynamic header, geometry)</td>
-<td>info, check, compare, convert</td>
-</tr>
-<tr>
-<td><code>vhdx</code></td>
-<td>VHDX header/region table/metadata parsing with CRC-32C validation, GUID-based metadata lookup, 64-bit BAT reading with interleaved SB entries, output builders (file identifier, headers, region table, metadata, BAT)</td>
-<td>check, compare, convert</td>
-</tr>
-</tbody>
-</table>
+<p>Sequencing: 4a → 4b → 4c strictly (the detection fix must
+not land before the reader arm — see Situation); 4d
+parallel with 4a-4c (fixtures need only qemu-img; its
+instar-side manifest/oslo edits land after 4c); 4e after
+4c + 4d; 4f after 4c; 4g last.</p>
+<h2 id="findings-step-4a-qcow1-crate">Findings: step 4a — qcow1 crate<a class="headerlink" href="#findings-step-4a-qcow1-crate" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>src/crates/qcow1/</code> landed as planned: <code>Qcow1Header::parse</code> enforces
+  qemu's exact RO open rules (magic <code>0x514649fb</code> + version == 1,
+  <code>cluster_bits</code> in [9,16], <code>l2_bits</code> in [6,13], <code>size &gt;= 2</code>,
+  <code>crypt_method &lt;= 1</code> at parse time — <code>&gt;= 2</code> refused, matching qemu;
+  <code>&gt;= 2</code> is still permitted to construct a <code>Qcow1Header</code> for the info
+  arm's own separate leniency posture where relevant — <code>backing_file_size
+  &lt;= 1023</code>, and <code>l1_table_offset</code> deliberately unvalidated, mirroring
+  qemu's own lack of a check there (0 / unaligned / past-EOF are all
+  tolerated at open and only surface at read time). The "Image too
+  large" bound was derived symbolically from <code>qcow_open</code>'s L1-size
+  arithmetic (<code>l1_size &gt; INT_MAX/8</code> for the default cluster_bits=12/
+  l2_bits=9 geometry) and unit-tested at the boundary; step 4d's
+  empirical fixture sweep confirmed the derived boundary
+  (562949951324160 accepted, 562949951324161 refused) exactly, so
+  <strong>no lock-step correction was needed this phase</strong>, unlike phase 3's
+  off-by-681 tracks-cap correction.</li>
+<li><code>Qcow1State::init</code>/<code>block_lookup</code> follow the <code>ParallelsState</code> shape:
+  <code>init</code> additionally refuses <code>crypt_method != 0</code> (a reader-level
+  refusal on top of <code>parse</code>'s more lenient acceptance, so <code>info</code> can
+  still report on encrypted images while data ops cannot open them).
+  The two-level L1/L2 lookup uses a new <code>read_u64_be_cached</code> helper
+  added to the shared cached-sector macro family (entries are u64 BE,
+  unlike Parallels' u32 LE BAT entries); L1 entry 0, L2 entry 0, or an
+  out-of-range index all resolve to <code>Unallocated</code>. Bit 63 marks a
+  compressed cluster: <code>host_offset = entry &amp; ((1 &lt;&lt; (63 -
+  cluster_bits)) - 1)</code>, <code>csize = (entry &gt;&gt; (63 - cluster_bits)) &amp; ((1
+  &lt;&lt; cluster_bits) - 1)</code> (byte-granular, may be unaligned) — the
+  empirical example (<code>entry = 0x81d0000000002000</code>, <code>cluster_bits =
+  12</code> → <code>host_offset = 0x2000</code>, <code>csize = 58</code>) is a permanent unit
+  test. <code>mtime</code> is parsed but unused, matching the empirical
+  always-0 observation (create/convert are byte-deterministic).</li>
+<li>Unit tests cover every validation boundary (accept/reject at exact
+  limits for cluster_bits, l2_bits, size, crypt_method,
+  backing_file_size), the populated-image lookup example, the
+  compressed-entry decode example, the crypt-refused-at-init-but-
+  parse-ok split, and the no-l1-validation tolerance. <code>no_std</code>,
+  panic-free, workspace member; <code>make test-rust</code>/<code>lint</code>/<code>instar</code>
+  clean.</li>
+</ul>
+<h2 id="findings-step-4b-guest-reader-arm">Findings: step 4b — guest reader arm<a class="headerlink" href="#findings-step-4b-guest-reader-arm" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The <code>qcow1-input</code> feature (<code>= ["dep:qcow1", "decompress"]</code>) landed
+  in <code>src/crates/qcow2/Cargo.toml</code>, with <code>ChainStates.qcow1_states</code>
+  and an <code>init_chain_states</code> arm following the existing Vdi/Parallels
+  cache-slot-reuse pattern.</li>
+<li><strong>Backing fall-through mechanism</strong> (the phase's one genuinely new
+  architectural piece): the QCOW1 arm signals "unallocated, recurse
+  into the backing device" to the chain walker using the <em>exact same</em>
+  sub-span mechanism the existing QCOW2 arm already uses for its own
+  backing chains — an unallocated L1/L2 entry does not zero-fill
+  locally; it emits a sub-span descriptor that the chain walker
+  resolves by re-invoking the read against the next device in the
+  chain (the backing image, if present, else zeros at the chain's
+  base). This is a direct code-reuse of the QCOW2 arm's own
+  unallocated-signalling path, not a new mechanism invented for
+  QCOW1 — QCOW1 is simply the first <em>non-QCOW2</em> format to plug into
+  it, since VDI and Parallels have no backing-file concept at all
+  and their arms zero-fill unconditionally.</li>
+<li>The reader walks per-cluster (not one-lookup-per-chunk like the VDI
+  arm), because QCOW1 clusters go down to 512 bytes — smaller than
+  chunk sizes in convert/compare/bench/rebase. Compressed clusters
+  read <code>csize</code> bytes from the (possibly unaligned) host offset via
+  <code>read_offset_sectors</code> (its cfg gate was widened to include
+  <code>qcow1-input</code>), inflate with <code>miniz_oxide</code> flags <em>without</em> the
+  zlib-header-parsing bit (raw DEFLATE only — confirmed this is a
+  distinct code path from the QCOW2 crate's zlib-first two-try
+  helper, not a shared one), then copy the requested span; inflate
+  failure is a clean guest failure, never a panic.
+  Allocated-but-past-EOF and straddling reads use the same
+  capacity-clamped zero-fill shape as the VDI/Parallels arms.</li>
+<li>The feature was enabled in convert/compare/bench/rebase
+  <code>Cargo.toml</code>s and the Makefile's qcow2 test features line was
+  extended. Binary deltas (from <code>make check-binary-sizes</code>):
+  convert/compare/bench each grew ~+2.9 KB; rebase grew +19.5 KB,
+  since it newly links <code>miniz_oxide</code> via the <code>decompress</code> feature for
+  the first time (the other three consumers already linked it via
+  QCOW2/VMDK compressed-cluster support). <code>info</code> also grew from the
+  new QCOW1 header parser (landed in step 4c, measured together).
+  All four deltas stayed well within the 768 KB per-binary cap.</li>
+<li>Unit tests cover the VDI/Parallels-equivalent set plus:
+  unallocated-descends-to-backing (a multi-device mock following the
+  QCOW2 arm's existing chain test pattern), a real raw-deflate
+  compressed cluster, a 512-byte-cluster walk crossing a chunk
+  boundary, past-EOF clamp, and a straddling read. Detection still
+  routed real qcow1 images through the QCOW2 parser at this point (by
+  design — the ordering constraint from the Situation section), so
+  behaviour was unchanged and all three existing suites stayed green
+  through this step.</li>
+</ul>
+<h2 id="findings-step-4c-detection-fix-info-naming-encrypted-emitters-pins">Findings: step 4c — detection fix, info, naming, encrypted emitters, pins<a class="headerlink" href="#findings-step-4c-detection-fix-info-naming-encrypted-emitters-pins" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Landed as four separate commits in the planned order: <code>3aa7f50</code>
+  (info arm + naming), <code>467d24a</code> (encrypted-line emitters), <code>c421f75</code>
+  (the detection graduation itself), <code>a0f757b</code> (empirical pins).
+  Commit <code>c421f75</code> — the actual fix for the misdetection defect — was
+  correctly sequenced <em>after</em> <code>77f32ca</code> (step 4b's reader arm),
+  closing the silent-raw-read hazard window the Situation section
+  flagged: at no point in the commit history did a version-aware
+  detector exist without a real QCOW1 reader arm behind it.</li>
+<li>The info arm replaces the previous wildcard fall-through for QCOW1
+  with a real parser: <code>virtual_size</code> = header size truncated down to
+  the nearest 512-byte multiple (matching qemu's <code>total_sectors * 512</code>
+  rule, the opposite of VDI's round-up), <code>cluster_size = 1 &lt;&lt;
+  cluster_bits</code> (emitted normally — qemu does print cluster_size for
+  qcow, unlike parallels, so no suppression mechanism was needed
+  here), a bounds-checked backing-file-name read passed through
+  <code>send_info_result</code>, and <code>FLAG_ENCRYPTED</code> set whenever
+  <code>crypt_method != 0</code>.</li>
+<li>The encrypted-line emitters were pinned against real qemu
+  <code>info --output=json</code> output on an AES QCOW1 image: human <code>encrypted:
+  yes</code> between the disk-size and <code>cluster_size:</code> lines, JSON
+  <code>"encrypted": true</code> positioned after <code>actual-size</code> and before
+  <code>dirty-flag</code>. Gating on the <code>"luks"</code> format string specifically
+  (not a generic "has a passphrase-shaped format" check) was
+  necessary and sufficient to keep the LUKS goldens byte-identical —
+  confirmed by a full <code>test_info_safe</code> run with zero regressions
+  before this commit was accepted. Encrypted QCOW2 images gained the
+  line automatically as a side effect (recorded as a pre-existing-gap
+  fix, no baseline churn, since no fixture's golden covers that case).</li>
+<li>The detection split deletes the dead 3-byte-magic branch in the
+  same commit that adds the version check, keeping the constant table
+  coherent (no orphaned <code>QCOW1_MAGIC</code> constant left unused). The
+  bench <code>read_family</code> allowlist gained <code>Qcow1 =&gt; Some(7)</code> (confirmed
+  as the next free family number, per the Situation survey).</li>
+<li>Empirical pins (commit <code>a0f757b</code>): convert/compare/dd smoke parity
+  against a locally-created qcow1 image; a backing-chain smoke test
+  (overlay reads through base, confirming the 4b mechanism end-to-end
+  before fixtures landed); <code>check</code> exits 63 cleanly (the wording
+  difference from qemu's own refusal message — qemu's lacks the
+  <code>"(qcow)"</code> parenthetical instar always includes — was recorded, not
+  chased, since it is coincidental parity rather than a byte-pinned
+  contract); <code>map</code>/<code>measure</code> refusals recorded as a divergence from
+  qemu, which supports both; the encrypted fixture's <code>info</code> succeeds
+  with the new line while <code>convert</code> refuses cleanly at open; and the
+  pre-fix misdetection behaviour (qcow2-shaped garbage info) was
+  confirmed gone by direct comparison against the old code path.</li>
+</ul>
+<h2 id="findings-step-4d-fixtures-baselines-and-manifestoslo">Findings: step 4d — fixtures, baselines, and manifest/oslo<a class="headerlink" href="#findings-step-4d-fixtures-baselines-and-manifestoslo" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>instar-testdata/scripts/generate-qcow1-fixtures.py</code> produced all
+  twelve fixtures deterministically (create/convert are
+  byte-deterministic; <code>mtime</code> always 0 means no UUID-style patching
+  step was needed beyond each fixture's specific header byte-patch):
+  seven safe (<code>qcow1-data</code>, <code>qcow1-compressed</code>, <code>qcow1-backing-base</code>,
+  <code>qcow1-backing</code>, <code>qcow1-encrypted</code>, <code>qcow1-past-eof</code>,
+  <code>qcow1-odd-size</code>) and five malformed (<code>qcow1-bad-cluster-bits</code>,
+  <code>qcow1-bad-l2-bits</code>, <code>qcow1-huge-size</code>, <code>qcow1-crypt-invalid</code>,
+  <code>qcow1-backing-name-too-long</code>).</li>
+<li>The compressed fixture's generation step tolerates qemu's
+  <code>convert -c -O qcow</code> exit-1-despite-valid-output quirk (verified on
+  every spot-checked version) by validating via roundtrip md5 instead
+  of exit code — the same pattern the differential fuzzer's
+  compressed-variant path uses.</li>
+<li>The <code>qcow1-huge-size</code> boundary fixture confirms step 4a's
+  symbolically-derived "Image too large" cap needed <strong>no</strong> empirical
+  correction this phase: 562949951324160 opens cleanly and
+  562949951324161 is the smallest value 10.2.0 refuses (<code>"Image too
+  large"</code>), matching the <code>INT_MAX/8</code> L1-entry arithmetic exactly —
+  unlike phase 3's tracks cap, which needed a lock-step fix after
+  fixture validation found the planning-stage arithmetic off by 681.</li>
+<li>Both open edges the plan asked to pin for the record turned out
+  version-stable and got fixtures: <code>qcow1-odd-size</code> (header size
+  byte-patched to 1048577; truncate-down to 1048576 confirmed
+  identical on 6.0.0/8.2.0/10.2.0) and the version-0/99 probe-routing
+  behaviour (documented in <code>docs/quirks.md</code> rather than fixtured,
+  since it is a probe-routing curiosity with no data-safety angle,
+  not a read-path behaviour a fixture would exercise).</li>
+<li><strong>No new baseline profile bucket was needed</strong> — unlike phase 3's
+  <code>parallels-bat-past-eof</code>, which forced a <code>profile-8-1-0</code> split for
+  qemu's 8.1.0-8.1.5 past-EOF-BAT open-refusal regression, QCOW1's
+  past-EOF behaviour (<code>qcow1-past-eof</code>) is zero-fill on <strong>every</strong>
+  spot-checked qemu version with no regression window at all, so the
+  existing seven profiles absorbed all twelve fixtures' baselines
+  without any split or <code>test_info_safe</code> skip-mechanism engagement
+  beyond what phase 3 already generalised.</li>
+<li>Every safe fixture was validated on both 6.0.0 and 10.2.0 (info +
+  convert md5 agreement); every malformed fixture was confirmed
+  refused by 10.2.0 with its expected error string under forced
+  <code>-f qcow</code> (unforced probing behaves differently per fixture and was
+  recorded, not relied on).</li>
+<li><code>instar-testdata/scripts/generate-baselines.py</code>'s measure/info
+  source whitelists were realigned from <code>'qcow1'</code> to <code>'qcow'</code> to
+  match the check/compare lists, which already used <code>'qcow'</code>.</li>
+<li>Manifest entries for all twelve fixtures landed with
+  <code>qcow1-backing</code>/<code>qcow1-backing-base</code> following the existing
+  backing-fixture precedent (base referenced by relative path,
+  <code>-F qcow</code> hint). Oslo <code>KNOWN_FORMAT_DIVERGENCES</code> entries record
+  <code>('qcow', 'qcow2')</code> for every safe fixture, confirmed live: oslo
+  detects qcow1 by magic alone (ignoring version, the same class of
+  bug this phase fixed in instar) and reports the <em>correct</em> virtual
+  size for every fixture except <code>qcow1-odd-size</code>, where oslo reads
+  the header <code>size</code> field verbatim (1048577) with no truncation —
+  the one fixture needing a <code>KNOWN_VSIZE_DIVERGENCES</code> entry. The five
+  malformed fixtures joined <code>OSLO_SKIP_IMAGES</code>, and the
+  <code>SafetyCheckFailed</code> exception oslo raises (no <code>get_inspector('qcow')</code>
+  exists) is handled per the test's existing flow.</li>
+</ul>
+<h2 id="findings-step-4e-integration-tests">Findings: step 4e — integration tests<a class="headerlink" href="#findings-step-4e-integration-tests" title="Permanent link">&para;</a></h2>
+<ul>
+<li>All eight consumer suites ran clean: <code>test_info_safe</code> 898 passed/0
+  failed, <code>test_oslo_crossval</code> 267/0, <code>test_convert</code> 242/0,
+  <code>test_compare</code> 62/0, <code>test_dd</code> 43/0, <code>test_adversarial</code> 88/0,
+  <code>test_bench</code> 79/0, <code>test_rebase</code> 28/0 — plus a dedicated
+  <code>qcow1_smoke</code> set of 12 tests. Zero failures across the board,
+  confirming the consumer-suite rule (the qcow2 crate changed again)
+  needed no bisection this phase.</li>
+<li><strong>Malformed-image <code>info</code> posture, pinned per-fixture as planned</strong>:
+  unlike VDI and Parallels, whose lenient <code>info</code> parsers only check
+  magic/version and report best-effort nonzero fields on malformed
+  input, QCOW1's new <code>info</code> arm validates the same fields the reader
+  does (<code>cluster_bits</code>, <code>l2_bits</code>, <code>size</code>, <code>crypt_method</code>,
+  backing-name length) and falls back to an <strong>empty default</strong> (virtual
+  size 0) on any failure. All five malformed fixtures were pinned to
+  this exact behaviour: <code>info</code> exit 0, format <code>"qcow"</code>, virtual size
+  0 — a deliberate, tested posture difference from VDI/Parallels
+  rather than an oversight, now documented in <code>docs/quirks.md</code> so a
+  future phase doesn't assume all detect-then-refuse formats behave
+  identically on malformed input. <code>convert</code>/<code>compare</code>/<code>dd</code> then refuse
+  cleanly on the zero virtual size for all five, with no hangs.</li>
+<li>Backing-chain coverage included both the qcow1-over-qcow1 pair
+  (<code>qcow1-backing</code> over <code>qcow1-backing-base</code>, copied into the tmpdir
+  per the existing backing-path restriction) and a QCOW2 overlay
+  created with <code>-F qcow</code> over a qcow1 backing, confirming the
+  cross-format backing-chain machinery (already generic per the
+  Situation survey) needed no changes beyond reporting the backing
+  format name.</li>
+<li>The compressed twin (<code>qcow1-compressed</code>) compares identical to
+  <code>qcow1-data</code> and converts to the same raw md5; the encrypted
+  fixture (<code>qcow1-encrypted</code>) is the first baseline in the whole tree
+  to carry the <code>encrypted: yes</code> / <code>"encrypted": true</code> info line, with
+  <code>convert</code>/<code>dd</code> refusing cleanly on both sides (instar at open,
+  keyless qemu with its own key-secret error).</li>
+</ul>
+<h2 id="findings-step-4f-fuzzing">Findings: step 4f — fuzzing<a class="headerlink" href="#findings-step-4f-fuzzing" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>fuzz_qcow1_header</code> and <code>fuzz_qcow1_table</code> (two-level walk +
+  compressed-entry decode invariants) both ran crash-free in local
+  60-second sessions: 1.3M exec/s for the header target, 98k exec/s
+  for the (heavier, table-walking) table target.</li>
+<li>The differential fuzzer gained <code>'qcow'</code> in <code>FORMATS</code> (qemu's create
+  name) with a plain-create path (no encryption — both sides would
+  refuse identically, so an encrypted variant carries no differential
+  signal) and gates <code>op_map</code> (<code>'raw', 'vdi', 'parallels', 'qcow'</code>) and
+  <code>op_measure</code> (<code>'vdi', 'parallels', 'qcow'</code>) to skip the two
+  recorded divergent operations, citing this plan in comments.</li>
+<li>A ~200-iteration forced burn-in against the differential harness
+  produced zero divergences, matching the same clean-burn-in result
+  every prior format-coverage phase has reported.</li>
+</ul>
+<h2 id="verification-management-session-review-checklist">Verification (management-session review checklist)<a class="headerlink" href="#verification-management-session-review-checklist" title="Permanent link">&para;</a></h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The files that were supposed to change actually
+      changed (read them, don't trust the summary).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No unrelated files were modified; instar-testdata
+      changes are reviewed by the management session before
+      the operator-authorised commit to its main.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>make instar</code> builds and <code>make lint</code> is clean.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Guest binaries pass <code>make check-binary-sizes</code>
+      (rebase newly links miniz — check its delta
+      specifically).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>make test-rust</code>, <code>make fuzz-build</code>, and the eight
+      integration suites pass (consumer-suite rule: the
+      qcow2 crate changed again).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> All safe qcow1 fixtures convert byte-identically to
+      qemu-img, including the compressed twin, the backing
+      chain, and past-EOF zero-fill.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Real qcow1 images now detect as "qcow" (misdetection
+      gone); info output matches qemu baselines including
+      the encrypted line; LUKS goldens byte-unchanged.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> check exits 63 cleanly; map/measure refusals pinned
+      as recorded divergences; encrypted convert refuses
+      cleanly.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Differential fuzzer includes qcow with a clean
+      burn-in.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Commit messages follow project conventions.</li>
+</ul>
+<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<p>Phase 4 is complete when:</p>
+<ul>
+<li>instar convert, compare, dd, and bench accept qcow1 with
+  byte parity against qemu-img across the fixture set,
+  including compressed clusters, backing chains,
+  small (512 B) clusters, and past-EOF zero-fill.</li>
+<li>Real qcow1 images detect as "qcow" (version-aware split;
+  misdetection-as-qcow2 fixed) and info output is
+  byte-parity including cluster_size, backing file, and
+  the new encrypted line — with the LUKS goldens
+  unchanged.</li>
+<li>Encrypted qcow1 is refused cleanly by data ops; the five
+  malformed fixtures are refused cleanly; the safe
+  fixtures are CI-exercised with info baselines.</li>
+<li><code>src/crates/qcow1/</code> exists, no_std, panic-free, with
+  unit + fuzz coverage; the differential fuzzer includes
+  qcow.</li>
+<li>map/measure divergence vs qemu and the check-wording
+  difference are pinned and documented.</li>
+<li>Docs and the master plan record the new state.</li>
+</ul>
+<h2 id="hand-off-to-later-phases">Hand-off to later phases<a class="headerlink" href="#hand-off-to-later-phases" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Phase 5 (DMG) inherits: the encrypted/flag emitter now
+  exists; the per-cluster walk and backing fall-through
+  arm shapes; the detection-fix-after-reader ordering
+  lesson (DMG's trailer probe has the same
+  hazard-goes-live-on-detection property).</li>
+<li>Phase 6 (QED) should note qcow1's check-parity accident
+  (qemu refuses checks on qcow1 too) when pinning QED
+  subcommand behaviour.</li>
+<li>Future work recorded on the master plan: qcow1 AES
+  decryption; map/measure for the new input formats.</li>
+</ul>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step of this plan, back brief the
+operator: confirm the scope (convert/compare/dd/bench;
+check stays rc-63; map/measure stay refusals as recorded
+divergences; encrypted qcow1 refused), the detection-fix
+ordering constraint (reader arm first — the silent-raw
+hazard is latent until detection changes), the "qcow"
+naming decision, the encrypted-line emitter and its LUKS
+gating, and that instar-testdata changes are
+management-reviewed before the authorised commit to its
+main.</p>
 
 
 
@@ -10399,7 +10930,7 @@ shared across all guest operations, eliminating code duplication:</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/index.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/index.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-format-coverage-phase-04-qcow1-read.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-format-coverage-phase-04-qcow1-read.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-format-coverage-phase-04-qcow1-read/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
@@ -10440,10 +10971,10 @@ shared across all guest operations, eliminating code duplication:</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
