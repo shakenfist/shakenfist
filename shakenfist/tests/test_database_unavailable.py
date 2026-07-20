@@ -131,6 +131,44 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
             mariadb.get_node_by_fqdn, 'sf-1')
 
 
+class GrpcCallMethodNameTestCase(base.ShakenFistTestCase):
+    # The wire method name is read from the private ``_method`` attribute of
+    # grpcio's multicallable so the retry path can re-resolve a fresh bound
+    # method by name. That attribute's type differs across grpcio releases and
+    # stub flavours -- older unregistered multicallables expose ``bytes``,
+    # current registered multicallables (our generated stubs use
+    # ``_registered_method=True``) expose ``str``. Both must work; assuming
+    # ``bytes`` and calling ``.decode()`` unconditionally crashed every gRPC
+    # database call with ``AttributeError`` against current grpcio.
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def _assert_retry_reresolves(
+            self, wire_method, mock_stub, mock_reset, mock_time):
+        # First attempt fails DEADLINE_EXCEEDED (which rebuilds the channel),
+        # so the retry must re-resolve the method by name off a fresh stub --
+        # the code path that depends on parsing ``_method``.
+        failing = mock.MagicMock(
+            side_effect=FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED))
+        failing._method = wire_method
+        succeeding = mock.MagicMock(return_value='ok')
+        mock_stub.return_value.GetNode = succeeding
+
+        self.assertEqual(
+            'ok', mariadb._grpc_call(failing, mock.MagicMock()))
+        # The retry resolved GetNode by name from the fresh stub and called it.
+        succeeding.assert_called_once()
+
+    def test_method_name_from_bytes(self):
+        self._assert_retry_reresolves(
+            b'/shakenfist.protos.DatabaseService/GetNode')
+
+    def test_method_name_from_str(self):
+        # The regression: current grpcio hands us a ``str`` here.
+        self._assert_retry_reresolves(
+            '/shakenfist.protos.DatabaseService/GetNode')
+
+
 class CheckDaemonStateTestCase(base.ShakenFistTestCase):
     NODE_UUID = '11111111-1111-1111-1111-111111111111'
 
