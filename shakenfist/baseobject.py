@@ -74,18 +74,19 @@ def _maintain_version_cache(max_cache_age):
     target_states = [DatabaseBackedObject.STATE_INITIAL,
                      DatabaseBackedObject.STATE_CREATED,
                      'degraded']
-    for node_uuid_str in mariadb.get_all_node_uuids():
-        node_data = mariadb.get_node(uuid.UUID(node_uuid_str))
-        if not node_data:
+    # One bulk RPC returns {node_uuid, fqdn, timestamp, metrics} per node,
+    # replacing the previous per-node get_node (used only for fqdn) plus a
+    # per-node get_node_metrics fan-out. Nodes without a metrics row are simply
+    # absent here, exactly as the old loop skipped them.
+    for d in mariadb.get_all_node_metrics():
+        if not d.get('metrics'):
             continue
-        node_fqdn = node_data.fqdn
+        node_uuid_str = str(d['node_uuid'])
+        node_fqdn = d['fqdn']
 
         state = mariadb.get_state(
             ObjectType.NODE, node_uuid_str)
         if not state or state.value not in target_states:
-            continue
-        d = mariadb.get_node_metrics(node_uuid_str)
-        if not d:
             continue
 
         d['metrics']['metrics_age'] = \

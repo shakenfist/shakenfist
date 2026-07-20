@@ -95,6 +95,11 @@ logger_class = 'shakenfist.external_api.gunicorn_config.SFGunicornLogger'
 
 
 def post_fork(server, worker):
+    # gunicorn overwrites the process title, so proctitle sniffing would not
+    # work here -- set the caller identity explicitly, per worker.
+    from shakenfist.util.caller_identity import set_caller_identity
+    set_caller_identity('api')
+
     try:
         from shakenfist import eventlog_drainer
         eventlog_drainer.start('sf-api')

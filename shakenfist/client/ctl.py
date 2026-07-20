@@ -141,6 +141,8 @@ from shakenfist.util.grpc_channel import make_database_channel  # noqa
 @click.option('--verbose/--no-verbose', default=False)
 @click.pass_context
 def cli(ctx: click.Context, verbose: Optional[bool] = None) -> None:
+    from shakenfist.util.caller_identity import set_caller_identity
+    set_caller_identity('ctl')
     if verbose:
         LOG.setLevel(logging.DEBUG)
 

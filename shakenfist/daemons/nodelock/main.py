@@ -48,6 +48,8 @@ def main():
     # must be applied explicitly.
     apply_log_level('nodelock')
     setproctitle.setproctitle('sf-nodelock')
+    from shakenfist.util.caller_identity import set_caller_identity
+    set_caller_identity('nodelock')
 
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
