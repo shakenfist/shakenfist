@@ -12,8 +12,9 @@ from shakenfist.tests import base
 
 
 class _FakeNode:
-    def __init__(self, state_value):
+    def __init__(self, state_value, uuid='node-uuid'):
         self._state = state_value
+        self.uuid = uuid
         self.events = []
 
     @property
@@ -190,3 +191,48 @@ class ApplyResultTestCase(base.ShakenFistTestCase):
         self.assertFalse(changed)
         self.assertEqual('created', node._state)
         self.assertEqual([], node.events)
+
+
+def _row(extra):
+    return mock.Mock(extra=extra)
+
+
+class ErroredNodeAffectedTypesTestCase(base.ShakenFistTestCase):
+    def test_newest_event_with_affected_types_wins(self):
+        node = _FakeNode(Node.STATE_ERROR)
+        rows = [
+            _row({'affected_types': ['instance', 'blob']}),
+            _row({'affected_types': ['upload']}),
+        ]
+        with mock.patch.object(
+                node_health.mariadb, 'get_object_events',
+                return_value=rows) as p:
+            affected = node_health.errored_node_affected_types(node)
+        self.assertEqual({ObjectType.INSTANCE, ObjectType.BLOB}, affected)
+        p.assert_called_once_with(
+            ObjectType.NODE, node.uuid, event_type=EVENT_TYPE_AUDIT)
+
+    def test_rows_without_affected_types_are_skipped(self):
+        node = _FakeNode(Node.STATE_ERROR)
+        rows = [
+            _row(None),
+            _row({'something_else': 1}),
+            _row({'affected_types': ['blob']}),
+        ]
+        with mock.patch.object(
+                node_health.mariadb, 'get_object_events', return_value=rows):
+            affected = node_health.errored_node_affected_types(node)
+        self.assertEqual({ObjectType.BLOB}, affected)
+
+    def test_no_matching_event_returns_none(self):
+        node = _FakeNode(Node.STATE_ERROR)
+        with mock.patch.object(
+                node_health.mariadb, 'get_object_events', return_value=[]):
+            self.assertIsNone(node_health.errored_node_affected_types(node))
+
+    def test_no_affected_types_anywhere_returns_none(self):
+        node = _FakeNode(Node.STATE_ERROR)
+        rows = [_row(None), _row({'other': True})]
+        with mock.patch.object(
+                node_health.mariadb, 'get_object_events', return_value=rows):
+            self.assertIsNone(node_health.errored_node_affected_types(node))

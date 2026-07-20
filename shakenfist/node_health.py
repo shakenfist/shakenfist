@@ -14,6 +14,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import blob
 from shakenfist import instance
+from shakenfist import mariadb
 from shakenfist import upload
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -145,3 +146,28 @@ def apply_result(node: Node, result: NodeHealthResult) -> bool:
     # follow-imports mypy uses for this module; the setter does exist.
     node.state = Node.STATE_ERROR  # type: ignore[misc]
     return True
+
+
+def errored_node_affected_types(node: Node) -> set[ObjectType] | None:
+    """The object types a node's resource-health failure affected.
+
+    Reads the diagnosis apply_result() recorded, from the most recent
+    resource-health audit event on the node, and returns the affected object
+    types. Returns None when no such event is found -- the blast radius is
+    unknown, so the caller (the cluster cascade, phase 3) does nothing and
+    retries on a later pass.
+
+    get_object_events() returns events newest-first, so the first row carrying
+    an affected_types payload is the current diagnosis; apply_result() writes
+    one such event on each transition into error. This is the read side of the
+    event-log contract phase 2 established (nodes have no free-form attribute
+    store, so the diagnosis lives in the event log).
+    """
+    for row in mariadb.get_object_events(
+            ObjectType.NODE, node.uuid, event_type=EVENT_TYPE_AUDIT):
+        affected = (row.extra or {}).get('affected_types')
+        if affected is not None:
+            # ObjectType's custom __new__ (string, proto_id) confuses mypy;
+            # the functional call is the standard value->member lookup.
+            return {ObjectType(t) for t in affected}  # type: ignore[call-arg]
+    return None
