@@ -548,9 +548,20 @@ class Monitor(daemon.Daemon):
         # storage-dependency health every NODE_HEALTH_CHECK_INTERVAL and, on
         # failure, marks the node errored. Sleeps in one-second slices so it
         # stops promptly when the daemon aborts.
+        #
+        # The gauge is created once here (re-registering a Gauge name raises)
+        # and exposes on the resources metrics port that _run_inner already
+        # started -- the scrapeable companion to the audit event apply_result
+        # records, so a dead-storage node is visible to Prometheus, not only
+        # in a node's event history.
+        health_gauge = Gauge(
+            'node_resource_health',
+            "1 if all of this node's storage-dependency health checks pass, "
+            'else 0')
         while daemon.check_abort_path(self.abort_path):
             try:
                 result = node_health.evaluate(checks, types_by_identity)
+                health_gauge.set(1.0 if result.healthy else 0.0)
                 n = Node.from_db(config.NODE_NAME)
                 if n:
                     node_health.apply_result(n, result)

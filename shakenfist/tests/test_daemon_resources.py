@@ -1,8 +1,10 @@
 import os
 import shutil
 import tempfile
+from unittest import mock
 
 from shakenfist.daemons.resources import main as resources_main
+from shakenfist.node_health import NodeHealthResult
 from shakenfist.tests import base
 
 
@@ -163,3 +165,39 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'memory_reserved_mb': 9216,
             },
             resources_main._compute_reservations(16, 24, True, 2, 2, 1.0, 8.0, 65536))
+
+
+class HealthGaugeTestCase(base.ShakenFistTestCase):
+    """The node-health thread exposes node_resource_health, tracking the
+    evaluate() result each cycle."""
+
+    def _run_one_cycle(self, result):
+        m = resources_main.Monitor.__new__(resources_main.Monitor)
+        m.abort_path = '/nonexistent-abort-path'
+        gauge = mock.MagicMock()
+        with mock.patch.object(
+                resources_main, 'Gauge', return_value=gauge), \
+                mock.patch.object(
+                    resources_main.node_health, 'evaluate',
+                    return_value=result), \
+                mock.patch.object(
+                    resources_main.Node, 'from_db', return_value=None), \
+                mock.patch.object(
+                    resources_main.daemon, 'check_abort_path',
+                    side_effect=[True, False, False]):
+            # One loop iteration, then the inner and outer abort checks return
+            # False so the thread body exits.
+            m._run_health_checks(checks=[], types_by_identity={})
+        return gauge
+
+    def test_gauge_one_when_healthy(self):
+        gauge = self._run_one_cycle(
+            NodeHealthResult(healthy=True, failed=[], affected_types=set(),
+                             reason='all resource health checks passed'))
+        gauge.set.assert_called_with(1.0)
+
+    def test_gauge_zero_when_unhealthy(self):
+        gauge = self._run_one_cycle(
+            NodeHealthResult(healthy=False, failed=[], affected_types=set(),
+                             reason='resource health check failed'))
+        gauge.set.assert_called_with(0.0)
