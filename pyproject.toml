@@ -153,7 +153,6 @@ dependencies = [
     "typing-inspection==0.4.2",
     "uv==0.11.29",
     "iso8601==2.1.0",
-    "pydantic_core==2.46.4",
     # END_OF_INDIRECT_DEPS
 ]
 
