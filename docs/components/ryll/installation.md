@@ -81,6 +81,17 @@ on your `PATH`.
 
 Note that `--capture` mode is not available on Windows builds.
 
+## pip (Python, Linux only)
+
+`pip install ryll` (or `pip install shakenfist-client[vdi]`) installs a
+per-architecture manylinux wheel with the compiled ryll GUI binary
+already embedded — no runtime download, no cache, works offline
+immediately after install. Wheels are published for Linux
+`x86_64`/`aarch64` with glibc >= 2.28; other platforms should use one
+of the packages above. See the
+[README](/components/ryll/../README/#installing-via-pip) for the runtime system
+library requirements.
+
 ## Building from source
 
 If no pre-built package is available for your platform, you can build

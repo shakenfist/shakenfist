@@ -447,6 +447,27 @@ the main repository small. The location is resolved in order:
 1. `INSTAR_TESTDATA_PATH` environment variable
 2. `../instar-testdata` (sibling directory)
 
+### Binary fixtures are git-LFS backed
+
+Every binary fixture in `instar-testdata` (`*.qcow2`, `*.raw`, `*.vhd`,
+`*.vhdx`, `*.vmdk`, `*-backing`, the bundled `qemu-img` binaries) is tracked
+with **git-LFS**. A checkout whose LFS objects have not been materialised
+leaves each fixture on disk as a ~131-byte pointer file, and the whole suite
+then fails with `file format: unknown` for every image — a failure that
+looks like a mass instar regression but is really a testdata problem. If you
+clone `instar-testdata` by hand, run `git lfs pull` after cloning; a working
+tree with real images (the fixture starts with its true magic, e.g. `QFI\xfb`
+for qcow2) rather than pointer text is required.
+
+CI does this through **`tools/ci/prepare-testdata.sh`** — the single,
+LFS-aware testdata-prep helper shared by `functional-tests.yml`,
+`coverage-fuzz.yml`, and `test-drift-fix.yml`. It clones or updates the
+cached checkout, runs `git lfs pull`, and then **guards** against the pointer
+failure mode: it inspects known canary fixtures and hard-fails the job with
+an explicit "infrastructure problem, not a test regression" message if any is
+still a pointer, so a git-LFS outage can never be silently misattributed to
+instar (see GitHub issue #451 for the incident this guards against).
+
 ## Expected Output Overrides
 
 For malicious images where running `qemu-img` would be dangerous, store the

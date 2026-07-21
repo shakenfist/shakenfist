@@ -321,6 +321,7 @@ nav:
                 - "CI platform matrix": components/ryll/plans/PLAN-ci-platform-matrix.md
                 - "Stream caps and flap diagnostics": components/ryll/plans/PLAN-stream-caps-and-flap.md
                 - "Self-hosted runner migration": components/ryll/plans/PLAN-self-hosted-runners.md
+                - "Pip-installable ryll": components/ryll/plans/PLAN-pip-distribution.md
     - Features: features.md
     - Release notes:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
