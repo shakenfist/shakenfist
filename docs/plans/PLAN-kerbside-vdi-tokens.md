@@ -20,7 +20,7 @@ and their working branches are:
 | Repository | Branch | Role |
 |------------|--------|------|
 | shakenfist/shakenfist | `vdi-console-tokens` | Token minting, signing key, pubkey publication |
-| shakenfist/client-python | `vdi-console-tokens` | New API client methods, CLI surface, viewer launch |
+| shakenfist/client-python | `vdi-console-tokens-client` | New API client methods, CLI surface, viewer launch |
 | shakenfist/kerbside | `sf-vdi-tokens` | Token exchange endpoint, scrape changes |
 | shakenfist/ryll | `vdi-console-tokens` | pip-installable viewer so the CLI can launch a session |
 
@@ -377,9 +377,10 @@ Recommendations are recorded inline.
 | 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Done |
 | 4. Client, CLI, and viewer launch | client-python | PLAN-vdi-console-tokens.md (in that repo, branch `vdi-console-tokens-client`) | Done |
 | 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch `sf-vdi-tokens`) | Done |
-| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Not started |
-| 7. Functional tests and CI | all | PLAN-kerbside-vdi-tokens-phase-07-ci.md | Not started |
+| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Done |
+| 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Done |
 | 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Not started |
+| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Not started |
 
 ### Phase 0: Decisions and token format
 
@@ -509,20 +510,21 @@ on the venv's PATH, the way kerbside's pip install ships
 - The SF half of this phase (node cert-subject publication)
   lands on the SF branch with its own phase plan section.
 
-### Phase 7: Functional tests and CI
+### Phase 7: Functional test — SF mint path
 
-- SF: a `cluster_ci_tests` functional test asserting the
-  minting path (ownership gate, JSON shape, verifiable
-  signature against the published pubkey) without needing a
-  kerbside deployment.
-- Kerbside: extend the functional lanes with an SF lane —
-  deploy a single-node SF (getsf) in CI, point a kerbside at
-  it, and drive the full flow: mint token via client, exchange
-  for `.vv`, connect through the proxy, assert session
-  audit/teardown. Scope risk lives here; the phase plan should
-  budget for it explicitly.
-- Adversarial coverage in CI: replayed token, expired token,
-  cross-namespace mint attempt.
+Narrowed to the SF-side mint test; the kerbside functional lane
+moved to phase 9 (see below and the phase-7 plan in kerbside for
+the grounding).
+
+- SF: a `cluster_ci_tests` functional test
+  (`deploy/shakenfist_ci/cluster_ci_tests/test_vdi_tokens.py`)
+  asserting the minting path (ownership gate, JSON shape,
+  verifiable signature against the published pubkey) without
+  needing a kerbside deployment. Calls the REST endpoints via
+  `_request_url` so it is independent of the client PR's merge
+  order, and skips cleanly when `KERBSIDE_URL` is unprovisioned
+  (it is process-cached at SF start, so it is set for real by
+  phase 9's deployment; the test then activates).
 
 ### Phase 8: Documentation
 
@@ -537,6 +539,28 @@ on the venv's PATH, the way kerbside's pip install ships
   selection chain and the `[vdi]` extra.
 - ryll: README install section (pip alongside the existing
   build-from-source instructions).
+
+### Phase 9: Full cross-repo end-to-end (post-merge, real SF)
+
+Runs once the four PRs are on `develop`, so kerbside CI can
+install SF and the client at HEAD. Absorbs the kerbside
+exchange/proxy lane that phase 7 originally intended: a
+direct-qemu-style exchange against a static console is
+infeasible because kerbside only trusts `type: shakenfist`
+sources for token verification and the maintenance loop reaps
+any console a live scrape did not yield — so a real SF (not a
+static or hand-seeded console) is required.
+
+- Deploy a single-node SF (getsf) in CI, provision `KERBSIDE_URL`
+  (deploy-time, since it is process-cached) and a signing key,
+  point a kerbside at it, and drive the full flow: mint token via
+  client, exchange for `.vv`, connect through the proxy, assert
+  session audit/teardown.
+- Adversarial coverage against the live app: replayed token,
+  expired token, wrong audience, unknown kid, cross-namespace
+  mint attempt.
+- The SF mint path (phase 7's `test_vdi_tokens.py`) activates
+  here too, once `KERBSIDE_URL` is provisioned.
 
 ## Dependencies on other plans
 
