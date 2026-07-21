@@ -182,7 +182,7 @@ plan file.
 | 1. Config keys + CPU/RAM reservation math | PLAN-per-host-resource-reservations-phase-01-config-cpu-ram.md | Complete |
 | 2. Disk reservation model (metric + consumers) | PLAN-per-host-resource-reservations-phase-02-disk-metric.md | Complete |
 | 3. Ansible templating and default computation | PLAN-per-host-resource-reservations-phase-03-ansible-templating.md | Complete |
-| 4. Docs, plan index, and cleanup | PLAN-per-host-resource-reservations-phase-04-docs-cleanup.md | Not started |
+| 4. Docs, plan index, and cleanup | PLAN-per-host-resource-reservations-phase-04-docs-cleanup.md | Complete |
 
 Phases 1 and 2 are server-side and independently committable (each builds and
 passes unit tests). Phase 3 is deploy-side and has no unit-test coupling to 1/2.

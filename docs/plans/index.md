@@ -159,7 +159,7 @@ The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on th
 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 1: Config keys + CPU/RAM math](PLAN-per-host-resource-reservations-phase-01-config-cpu-ram.md) | Complete | New `NODE_*` reservation keys; flat per-node CPU (threads) / RAM math, dropping the infra-role branch |
 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 2: Disk reservation model](PLAN-per-host-resource-reservations-phase-02-disk-metric.md) | Complete | Per-node disk floor at the instances/blobs allocation points; publish `disk_reservation_gb` and convert `MINIMUM_FREE_DISK` consumers |
 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 3: Ansible templating](PLAN-per-host-resource-reservations-phase-03-ansible-templating.md) | Complete | Per-host defaults templated into `/etc/sf/config`; stop `set-config`'ing reservations; inventory override |
-| [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 4: Docs and cleanup](PLAN-per-host-resource-reservations-phase-04-docs-cleanup.md) | Not started | Operator docs, plan index, optional `sf-ctl unset-config` |
+| [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | [Phase 4: Docs and cleanup](PLAN-per-host-resource-reservations-phase-04-docs-cleanup.md) | Complete | Operator docs, plan index, `sf-ctl unset-config` + inert-row retirement |
 
 ### Status Definitions
 
