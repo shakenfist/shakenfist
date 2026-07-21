@@ -483,15 +483,23 @@ def _grpc_call(method: Any, request: Any) -> Any:
         grpc.StatusCode.UNAVAILABLE,
         grpc.StatusCode.DEADLINE_EXCEEDED,
     }
-    # grpcio's ``_UnaryUnaryMultiCallable`` (returned by ``stub.X``) uses
-    # ``__slots__`` and exposes no ``__name__``; the wire method name lives
-    # in ``self._method`` as bytes shaped like
-    # ``b'/shakenfist.protos.DatabaseService/GetNodeByFqdn'``. Take the part
-    # after the last ``/`` -- that matches the attribute name set on the
-    # stub in the generated ``_pb2_grpc`` module, so ``getattr(stub, name)``
-    # resolves cleanly on the retry path.
+    # grpcio's multicallable (returned by ``stub.X``) uses ``__slots__`` and
+    # exposes no ``__name__``; the wire method name lives in ``self._method``
+    # shaped like ``/shakenfist.protos.DatabaseService/GetNodeByFqdn``. Its
+    # type varies across grpcio releases and stub flavours: the older
+    # unregistered multicallable stored it as ``bytes``, while the current
+    # registered multicallable (our generated stubs pass
+    # ``_registered_method=True``) stores it as ``str``. Normalise to ``str``
+    # before splitting -- calling ``.decode()`` unconditionally raised
+    # ``AttributeError: 'str' object has no attribute 'decode'`` against
+    # current grpcio, breaking every gRPC database call. Take the part after
+    # the last ``/`` -- that matches the attribute name set on the stub in the
+    # generated ``_pb2_grpc`` module, so ``getattr(stub, name)`` resolves
+    # cleanly on the retry path.
     raw_method = getattr(method, '_method', b'') or b''
-    method_name = raw_method.decode().rsplit('/', 1)[-1] or None
+    if isinstance(raw_method, bytes):
+        raw_method = raw_method.decode()
+    method_name = raw_method.rsplit('/', 1)[-1] or None
 
     last_error: BaseException = grpc.RpcError()
     for attempt in range(GRPC_RETRIES):
