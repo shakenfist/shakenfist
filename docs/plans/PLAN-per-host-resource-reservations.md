@@ -155,12 +155,18 @@ Resolved during phase 1 detailed planning:
   identity (node.py, database tier, API, schema) and keep being published; only
   their use in reservation math is removed. The `infra_role` local is dropped.
 
-Remaining, to settle during implementation (see phase files):
+Also resolved during phase 2 detailed planning:
 
-1. **Which `MINIMUM_FREE_DISK` consumers evaluate a remote node** (need the
-   published metric) **vs the local node** (can read `config` directly)?
-   Resolved by reading each call site in phase 2.
-2. **Stale `cluster_config` cleanup** — leave the `RAM_SYSTEM_RESERVATION` row
+- **`MINIMUM_FREE_DISK` consumers, local vs remote:** scheduler
+  `_has_sufficient_disk` / `summarize_resources` and the blob-placement helper
+  `nodes_by_free_disk_descending` (used by `blob.py` and the cluster rebalance)
+  judge remote nodes → read the candidate's published `disk_reservation_gb`;
+  `node_blob_op._ensure_local` judges the local node → reads `config`. See
+  phase 2.
+
+Remaining:
+
+1. **Stale `cluster_config` cleanup** — leave the `RAM_SYSTEM_RESERVATION` row
    inert, or build `sf-ctl unset-config`? Deferred to Future work unless the
    dead key in `show-config` proves annoying.
 
@@ -244,9 +250,18 @@ Use `isolation: "worktree"` for risky steps.
 
 ### Bugs fixed during this work
 
-_(To be filled in as encountered. Scan the shakenfist GitHub issue tracker for
-open issues touching reservations, scheduling headroom, or `MINIMUM_FREE_DISK`
-before starting phase 1.)_
+- **Local blob-replication disk check reserved bytes, not GB**
+  (`operations/node_blob_op.py:123`, found during phase 2 planning). The
+  `_ensure_local` guard compared `disk_free_blobs − b.size` (both bytes) against
+  `MINIMUM_FREE_DISK` (20, meant GB), so it effectively reserved ~20 *bytes*
+  before pulling a local replica — the free-disk floor was almost never
+  enforced on that path. Every other consumer divides free space by `GiB`
+  first. Phase 2 fixes it by reserving `NODE_DISK_RESERVATION_GB * GiB` bytes.
+  This makes the local path meaningfully stricter than before — an intentional
+  behaviour change, called out in the phase-2 commit.
+
+_(Scan the shakenfist GitHub issue tracker for other open issues touching
+reservations, scheduling headroom, or `MINIMUM_FREE_DISK`.)_
 
 ### Documentation index maintenance
 
