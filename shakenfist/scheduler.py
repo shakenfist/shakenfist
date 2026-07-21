@@ -113,20 +113,19 @@ class Scheduler:
 
     def _schedulable_threads(self, node):
         # Scheduling is denominated in schedulable threads -- the thread
-        # count left after the resources daemon subtracts the reserved
-        # cores for the operating system and (on network or database
-        # nodes) cluster-wide daemons. Admission, load ordering and
+        # count left after the resources daemon subtracts the node's
+        # per-host thread reservation for the operating system and
+        # host-level system services. Admission, load ordering and
         # summarize_resources() must all size a node through this helper
         # so they cannot disagree. Returns (threads, from_fallback).
         #
         # Metrics rows written by an older resources daemon lack
         # cpu_schedulable. For those we approximate the reservation the
-        # node will publish once its daemon restarts, using the role
-        # flags (which old rows do carry) and assuming two threads per
-        # reserved core. Using the raw thread count instead would make a
-        # not-yet-upgraded node look bigger and idler than an identical
-        # upgraded one, and it would absorb entire bursts during a
-        # rolling upgrade.
+        # node will publish once its daemon restarts by subtracting this
+        # node's own thread reservation. We cannot know a remote node's
+        # exact per-host value, and there is no longer an infra-role bump,
+        # so we use the local config value; this fallback is transient and
+        # stops the moment that node's daemon republishes cpu_schedulable.
         metrics = self.metrics[node]
         threads = metrics.get('cpu_schedulable')
         if threads:
@@ -136,18 +135,15 @@ class Scheduler:
         if not cpu_max:
             return 0, True
 
-        reserved_cores = config.CPU_SYSTEM_RESERVATION
-        if metrics.get('is_network_node') or metrics.get('is_database_node'):
-            reserved_cores += config.CPU_INFRA_ROLE_RESERVATION
-        return max(1, cpu_max - reserved_cores * 2), True
+        return max(1, cpu_max - config.NODE_CPU_RESERVATION_THREADS), True
 
     def _memory_reserved_mb(self, node):
-        # The resources daemon publishes the node's total memory
-        # reservation (operating system plus any infra-role component).
+        # The resources daemon publishes the node's per-host memory
+        # reservation (operating system plus host-level system services).
         # Metrics rows written by an older resources daemon lack it and
-        # fall back to the system reservation alone.
+        # fall back to this node's own configured RAM reservation.
         return self.metrics[node].get(
-            'memory_reserved_mb', config.RAM_SYSTEM_RESERVATION * 1024)
+            'memory_reserved_mb', int(config.NODE_RAM_RESERVATION_GB * 1024))
 
     def _has_sufficient_cpu(self, log_ctx, cpus, node):
         cpu_base, from_fallback = self._schedulable_threads(node)

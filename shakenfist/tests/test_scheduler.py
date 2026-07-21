@@ -15,7 +15,8 @@ fake_config = SFConfig(
     SCHEDULER_CACHE_TIMEOUT=30,
     CPU_OVERCOMMIT_RATIO=16.0,
     RAM_OVERCOMMIT_RATIO=1.5,
-    RAM_SYSTEM_RESERVATION=5.0,
+    NODE_RAM_RESERVATION_GB=5.0,
+    NODE_CPU_RESERVATION_THREADS=2,
     NETWORK_NODE_IP='10.0.0.1',
 )
 
@@ -346,9 +347,8 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
     def test_missing_cpu_schedulable_falls_back_to_synthetic(self):
         # Metrics rows written by an older resources daemon lack the
         # reservation-aware cpu_schedulable field; those nodes get a
-        # synthetic reservation approximated from their role flags (one
-        # core, two threads, for these plain hypervisors), per-node,
-        # without error.
+        # synthetic reservation by subtracting the configured per-node
+        # thread reservation (2 threads here), per-node, without error.
         self.mock_mariadb.set_node_metrics_same()
         self.mock_mariadb.update_node_metrics('node2', {
             'cpu_max': 12, 'cpu_load_1': 4.0})
@@ -365,17 +365,22 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
         self.assertSetEqual(
             self._node_uuids_set('node3', 'node4'), set(nodes))
 
-    def test_old_dialect_infra_node_not_favoured(self):
-        # A not-yet-upgraded infra-role node must not look bigger and
-        # idler than an identical upgraded one: the synthetic fallback
-        # applies the role-aware reservation to old-dialect rows, so
-        # both size to 8 schedulable threads and share a bucket.
+    def test_old_dialect_fallback_ignores_infra_role(self):
+        # The synthetic fallback no longer applies a role-aware bump: it
+        # subtracts the flat per-node thread reservation regardless of the
+        # role flags an old-dialect row carries. So an old-dialect
+        # infra-role node and an old-dialect plain node with identical
+        # cpu_max size identically (max(1, 12 - 2) = 10 schedulable
+        # threads) and share a bucket -- the infra node is neither
+        # favoured nor penalised. (Under the retired role-aware fallback
+        # the infra node would have sized to 8 threads, normalised load
+        # 2.0 / 8 = 0.25 -> bucket 1, splitting it from the plain node's
+        # 2.0 / 10 = 0.20 -> bucket 0.)
         self.mock_mariadb.set_node_metrics_same()
         self.mock_mariadb.update_node_metrics('node2', {
-            'cpu_max': 12, 'cpu_schedulable': 8, 'cpu_load_1': 2.5,
-            'is_database_node': True})
+            'cpu_max': 12, 'cpu_load_1': 2.0, 'is_database_node': True})
         self.mock_mariadb.update_node_metrics('node3', {
-            'cpu_max': 12, 'cpu_load_1': 2.5, 'is_database_node': True})
+            'cpu_max': 12, 'cpu_load_1': 2.0})
         self.mock_mariadb.update_node_metrics('node4', {
             'cpu_max': 12, 'cpu_load_1': 12.0})
 
@@ -393,7 +398,7 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
         # A metrics baseline that passes every admission stage, built on
         # the same shapes the LowResourceTestCase tests use. The fake
         # config pins CPU_OVERCOMMIT_RATIO=16.0 and
-        # RAM_SYSTEM_RESERVATION=5.0.
+        # NODE_RAM_RESERVATION_GB=5.0.
         metrics = {
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -459,7 +464,7 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
 
     def test_ram_check_falls_back_to_config_reservation(self):
         # Without a published memory_reserved_mb the check falls back to
-        # RAM_SYSTEM_RESERVATION (5 GB in the fake config).
+        # NODE_RAM_RESERVATION_GB (5 GB in the fake config).
         self.mock_mariadb.set_node_metrics_same(self._baseline(
             memory_available=5*1024+1024))
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
@@ -534,17 +539,14 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
         for n, per_node in resources['per_node'].items():
             metrics = s.metrics[n]
             # The expected base must mirror _schedulable_threads(): the
-            # published value when present, otherwise the role-aware
-            # synthetic reservation (two threads per reserved core).
+            # published value when present, otherwise the synthetic
+            # reservation subtracting the flat per-node thread reservation
+            # (NODE_CPU_RESERVATION_THREADS=2), with no infra-role bump.
             expected_base = metrics.get('cpu_schedulable')
             if not expected_base:
-                reserved_cores = 1
-                if (metrics.get('is_network_node') or
-                        metrics.get('is_database_node')):
-                    reserved_cores += 1
-                expected_base = max(
-                    1, metrics.get('cpu_max', 0) - reserved_cores * 2)
-            expected_reserved = metrics.get('memory_reserved_mb', 5.0 * 1024)
+                expected_base = max(1, metrics.get('cpu_max', 0) - 2)
+            expected_reserved = metrics.get(
+                'memory_reserved_mb', int(5.0 * 1024))
 
             self.assertEqual(expected_base, per_node['cpu_schedulable'])
             self.assertEqual(expected_reserved, per_node['memory_reserved_mb'])

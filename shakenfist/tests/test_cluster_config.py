@@ -63,7 +63,7 @@ class DirectGetAllClusterConfigTestCase(base.ShakenFistTestCase):
             result=_MockResult(rows=[
                 ('AUTH_SECRET_SEED', 'secret123'),
                 ('DNS_SERVER', '8.8.8.8'),
-                ('RAM_SYSTEM_RESERVATION', 5),
+                ('RAM_OVERCOMMIT_RATIO', 5),
             ]))
         mock_engine.return_value = _MockEngine(conn)
 
@@ -71,7 +71,7 @@ class DirectGetAllClusterConfigTestCase(base.ShakenFistTestCase):
         self.assertEqual(result, {
             'AUTH_SECRET_SEED': 'secret123',
             'DNS_SERVER': '8.8.8.8',
-            'RAM_SYSTEM_RESERVATION': 5,
+            'RAM_OVERCOMMIT_RATIO': 5,
         })
 
     @mock.patch('shakenfist.mariadb._get_engine')

@@ -212,8 +212,8 @@ class SFConfig(BaseSettings):
         description=(
             'How many vCPUs to admit per schedulable logical CPU (thread). '
             'The schedulable thread count is published by the resources '
-            'daemon and excludes the cores reserved by '
-            'CPU_SYSTEM_RESERVATION and CPU_INFRA_ROLE_RESERVATION. The '
+            'daemon and excludes the threads reserved by '
+            'NODE_CPU_RESERVATION_THREADS. The '
             'default was measured on a CI-dominated cluster; the historic '
             'default of 16 assumed many mostly-idle instances and in '
             'practice never rejected a node.'
@@ -227,31 +227,33 @@ class SFConfig(BaseSettings):
             'of shared pages.'
         )
     )
-    RAM_SYSTEM_RESERVATION: float = Field(
+    NODE_RAM_RESERVATION_GB: float = Field(
         2.0,
-        description='How much RAM is reserved for the OS.'
-    )
-    RAM_INFRA_ROLE_RESERVATION: float = Field(
-        4.0,
         description=(
-            'How much additional RAM (in GB) is reserved on nodes carrying '
-            'a cluster-wide infrastructure role, that is a network node or '
-            'a database node.'
+            'How much RAM (in GB) is reserved for the operating system and '
+            'host-level system services on this node. This is a single '
+            'absolute per-node value; Ansible templates it per host '
+            '(folding in any historical infra-role bump) and an operator '
+            'may override it from the inventory.'
         )
     )
-    CPU_SYSTEM_RESERVATION: int = Field(
-        1,
+    NODE_CPU_RESERVATION_THREADS: int = Field(
+        2,
         description=(
-            'How many physical CPU cores (not threads) are reserved for '
-            'operating system tasks on every hypervisor.'
+            'How many hardware threads (not physical cores) are reserved '
+            'for the operating system and host-level system services on '
+            'this node. This is a single absolute per-node value; Ansible '
+            'templates it per host and an operator may override it from '
+            'the inventory.'
         )
     )
-    CPU_INFRA_ROLE_RESERVATION: int = Field(
-        1,
+    NODE_DISK_RESERVATION_GB: float = Field(
+        20.0,
         description=(
-            'How many additional physical CPU cores (not threads) are '
-            'reserved on nodes carrying a cluster-wide infrastructure '
-            'role, that is a network node or a database node.'
+            'How much free disk (in GB) to keep on every filesystem the '
+            'resources daemon tracks on this node. A single absolute '
+            'per-node value that Ansible templates per host and an '
+            'operator may override from the inventory.'
         )
     )
     MINIMUM_FREE_DISK: int = Field(
