@@ -375,16 +375,8 @@ class Monitor(daemon.Daemon):
                         ni.delete()
 
                 # Cleanup any blob locations (use Node.blobs property)
-                for blob_uuid in n.blobs:
-                    self.pet_watchdog()
-                    b = Blob.from_db(blob_uuid)
-                    if not b:
-                        continue
-                    eventlog.add_event_multi(
-                        EVENT_TYPE_AUDIT, [n, b],
-                        'deleting blob location as hosting node has been deleted')
-                    b.remove_location(n.fqdn)
-                    b.request_replication()
+                self._drop_blob_locations(
+                    n, 'deleting blob location as hosting node has been deleted')
 
                 # Clean up any lingering queue tasks. Drain in batches of
                 # 100 -- this only runs once per deleted node, so a
@@ -473,19 +465,26 @@ class Monitor(daemon.Daemon):
                 i.error = reason
 
         if ObjectType.BLOB in affected:
-            for blob_uuid in n.blobs:
-                self.pet_watchdog()
-                b = Blob.from_db(blob_uuid)
-                if not b:
-                    continue
-                eventlog.add_event_multi(
-                    EVENT_TYPE_AUDIT, [n, b],
-                    'dropping blob location as hosting node storage is '
-                    'unhealthy')
-                b.remove_location(n.fqdn)
-                b.request_replication()
+            self._drop_blob_locations(
+                n, 'dropping blob location as hosting node storage is '
+                'unhealthy')
 
         self._cascaded_error_nodes.add(str(n.uuid))
+
+    def _drop_blob_locations(self, n, reason):
+        # Drop every blob replica hosted on node n and ask the replicator to
+        # re-establish the copies elsewhere. Shared by the deleted-node cleanup
+        # and the errored-node cascade -- the only difference between the two
+        # callers is the audit reason string. A blob deleted between reading
+        # n.blobs and processing it is skipped.
+        for blob_uuid in n.blobs:
+            self.pet_watchdog()
+            b = Blob.from_db(blob_uuid)
+            if not b:
+                continue
+            eventlog.add_event_multi(EVENT_TYPE_AUDIT, [n, b], reason)
+            b.remove_location(n.fqdn)
+            b.request_replication()
 
     def _run_inner(self):
         last_defer_message = 0

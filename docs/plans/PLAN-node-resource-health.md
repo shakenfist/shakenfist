@@ -366,6 +366,16 @@ Sequencing notes:
   operator-only recovery too manual, a hysteresis-guarded auto-clear
   (N consecutive healthy probes → `error → created`) could be added —
   but only with anti-flap protection, as its own decision.
+- **Functional (cluster_ci) coverage.** The unit suite exercises the
+  probe, evaluator, cascade and `clear-node-error` directly, but there
+  is no `cluster_ci` test that forces a node's storage read-only, waits
+  for `STATE_ERROR`, runs `sf-ctl clear-node-error`, or scrapes the
+  `node_resource_health` gauge. The harness already supports both
+  (`_node_exec`, and the metrics-scrape pattern in
+  `test_database_tier.py`), so this is achievable, but deliberately
+  deferred: forcing a real storage fault on a shared CI cluster is
+  invasive (the same reason the sf-api drain test in `test_health.py`
+  is deferred). Add it when a dedicated/disposable CI node is available.
 
 ## Success criteria
 

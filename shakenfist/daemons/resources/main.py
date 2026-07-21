@@ -551,7 +551,7 @@ class Monitor(daemon.Daemon):
         #
         # The gauge is created once here (re-registering a Gauge name raises)
         # and exposes on the resources metrics port that _run_inner already
-        # started -- the scrapeable companion to the audit event apply_result
+        # started -- the scrapeable companion to the health event apply_result
         # records, so a dead-storage node is visible to Prometheus, not only
         # in a node's event history.
         health_gauge = Gauge(

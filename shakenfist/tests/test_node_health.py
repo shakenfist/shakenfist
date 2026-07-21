@@ -5,7 +5,7 @@ from shakenfist import instance
 from shakenfist import node_health
 from shakenfist import resource_health
 from shakenfist import upload
-from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_HEALTH
 from shakenfist.node import Node
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
@@ -167,7 +167,7 @@ class ApplyResultTestCase(base.ShakenFistTestCase):
         self.assertEqual(Node.STATE_ERROR, node._state)
         self.assertEqual(1, len(node.events))
         eventtype, message, extra = node.events[0]
-        self.assertEqual(EVENT_TYPE_AUDIT, eventtype)
+        self.assertEqual(EVENT_TYPE_HEALTH, eventtype)
         self.assertIn('/s/instances', message)
         self.assertEqual(['instance'], extra['affected_types'])
         self.assertEqual('/s/instances', extra['failed'][0]['path'])
@@ -210,7 +210,7 @@ class ErroredNodeAffectedTypesTestCase(base.ShakenFistTestCase):
             affected = node_health.errored_node_affected_types(node)
         self.assertEqual({ObjectType.INSTANCE, ObjectType.BLOB}, affected)
         p.assert_called_once_with(
-            ObjectType.NODE, node.uuid, event_type=EVENT_TYPE_AUDIT)
+            ObjectType.NODE, node.uuid, event_type=EVENT_TYPE_HEALTH)
 
     def test_rows_without_affected_types_are_skipped(self):
         node = _FakeNode(Node.STATE_ERROR)
@@ -236,3 +236,68 @@ class ErroredNodeAffectedTypesTestCase(base.ShakenFistTestCase):
         with mock.patch.object(
                 node_health.mariadb, 'get_object_events', return_value=rows):
             self.assertIsNone(node_health.errored_node_affected_types(node))
+
+    def test_non_dict_extra_is_skipped_not_raised(self):
+        # A malformed row (extra is a list, or affected_types is not a
+        # sequence) must be skipped rather than raise: this runs inside the
+        # cluster maintenance loop.
+        node = _FakeNode(Node.STATE_ERROR)
+        rows = [
+            _row(['not', 'a', 'dict']),
+            _row({'affected_types': 'blob'}),
+            _row({'affected_types': ['blob']}),
+        ]
+        with mock.patch.object(
+                node_health.mariadb, 'get_object_events', return_value=rows):
+            affected = node_health.errored_node_affected_types(node)
+        self.assertEqual({ObjectType.BLOB}, affected)
+
+    def test_unknown_object_type_value_is_skipped_not_raised(self):
+        # An unknown type name (e.g. a type renamed across a version skew)
+        # must not raise; the recognised siblings still come back.
+        node = _FakeNode(Node.STATE_ERROR)
+        rows = [_row({'affected_types': ['instance', 'bogus-type']})]
+        with mock.patch.object(
+                node_health.mariadb, 'get_object_events', return_value=rows):
+            affected = node_health.errored_node_affected_types(node)
+        self.assertEqual({ObjectType.INSTANCE}, affected)
+
+    def test_all_unknown_types_returns_empty_set_not_none(self):
+        # The diagnosis row was found, so the blast radius is known -- it just
+        # resolves to nothing actionable. Empty set (not None) stops the
+        # cascade retrying forever.
+        node = _FakeNode(Node.STATE_ERROR)
+        rows = [_row({'affected_types': ['bogus-type']})]
+        with mock.patch.object(
+                node_health.mariadb, 'get_object_events', return_value=rows):
+            affected = node_health.errored_node_affected_types(node)
+        self.assertEqual(set(), affected)
+
+
+class BuildForThisNodeTestCase(base.ShakenFistTestCase):
+    def test_wires_config_knobs_into_checks(self):
+        # build_for_this_node() is the only caller the resources daemon uses;
+        # verify it reads the right config attributes and resolves paths under
+        # STORAGE_PATH. A spy on PathCheck captures the per-check arguments.
+        seen = []
+
+        def _spy(identity, *, write_interval, timeout):
+            seen.append((identity, write_interval, timeout))
+            return _ok(identity)
+
+        with mock.patch.object(node_health, 'config') as c, \
+                mock.patch.object(node_health, 'PathCheck', _spy):
+            c.NODE_IS_HYPERVISOR = True
+            c.STORAGE_PATH = '/srv/shakenfist'
+            c.NODE_HEALTH_WRITE_INTERVAL = 300
+            c.NODE_HEALTH_PROBE_TIMEOUT = 30
+            checks, types_by_identity = node_health.build_for_this_node()
+
+        identities = {i for i, _, _ in seen}
+        self.assertEqual(
+            {'/srv/shakenfist/instances', '/srv/shakenfist/image_cache',
+             '/srv/shakenfist/blobs', '/srv/shakenfist/uploads'},
+            identities)
+        # Every check got the configured interval and timeout.
+        self.assertTrue(all(wi == 300 and to == 30 for _, wi, to in seen))
+        self.assertEqual(len(seen), len(checks))

@@ -131,6 +131,31 @@ class CascadeErroredNodeTestCase(base.ShakenFistTestCase):
         # Nothing to drain, so the guard set is what stops a re-read.
         self.assertIn(str(n.uuid), m._cascaded_error_nodes)
 
+    @mock.patch('shakenfist.daemons.cluster.main.eventlog')
+    @mock.patch('shakenfist.daemons.cluster.main.Blob')
+    @mock.patch('shakenfist.daemons.cluster.main.node_health')
+    @mock.patch('shakenfist.daemons.cluster.main.instance')
+    def test_blob_deleted_mid_cascade_is_skipped(
+            self, mock_instance, mock_node_health, mock_blob, mock_eventlog):
+        # A blob deleted between reading n.blobs and processing it (from_db
+        # returns None) must be skipped cleanly, not raise.
+        n = _FakeNode(blobs=['blob-gone', 'blob-live'])
+        mock_instance.healthy_instances_on_node.return_value = []
+        mock_node_health.errored_node_affected_types.return_value = {
+            ObjectType.BLOB}
+        b_live = mock.MagicMock()
+        mock_blob.from_db.side_effect = [None, b_live]
+
+        m = _make_monitor()
+        m._cascade_errored_node(n)
+
+        # Only the surviving blob was touched; the missing one did not raise
+        # and produced no event.
+        b_live.remove_location.assert_called_once_with('sf-6')
+        b_live.request_replication.assert_called_once_with()
+        self.assertEqual(1, mock_eventlog.add_event_multi.call_count)
+        self.assertIn(str(n.uuid), m._cascaded_error_nodes)
+
     @mock.patch('shakenfist.daemons.cluster.main.node_health')
     @mock.patch('shakenfist.daemons.cluster.main.instance')
     def test_already_cascaded_is_a_noop(

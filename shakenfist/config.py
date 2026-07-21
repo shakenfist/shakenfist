@@ -506,6 +506,10 @@ class SFConfig(BaseSettings):
         3600 * 24 * 30,
         description='How long to retain prune events.'
     )
+    MAX_HEALTH_EVENT_AGE: int = Field(
+        3600 * 24 * 90,
+        description='How long to retain node resource-health events.'
+    )
     MAX_HISTORIC_EVENT_AGE: int = Field(
         3600 * 24 * 90,
         description='How long to retain historic events.'

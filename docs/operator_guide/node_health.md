@@ -80,7 +80,7 @@ mechanics:
 - the node's blob copies stop counting as replicas, so the replicator
   rebuilds them to `BLOB_REPLICATION_FACTOR` on other nodes.
 
-The diagnosis is recorded as an audit event on the node, naming the
+The diagnosis is recorded as a `health` event on the node, naming the
 failed path, the object types that depend on it, and the failure detail
 (for example `timeout` for a hung mount, or `readonly` for a read-only
 remount). If metrics are enabled, the `node_resource_health` gauge on

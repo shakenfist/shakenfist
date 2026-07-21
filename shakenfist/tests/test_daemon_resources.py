@@ -201,3 +201,41 @@ class HealthGaugeTestCase(base.ShakenFistTestCase):
             NodeHealthResult(healthy=False, failed=[], affected_types=set(),
                              reason='resource health check failed'))
         gauge.set.assert_called_with(0.0)
+
+    def test_apply_result_called_when_node_present(self):
+        # The wiring that actually errors a node in production: Node.from_db
+        # returns this node, so apply_result must be invoked with it.
+        m = resources_main.Monitor.__new__(resources_main.Monitor)
+        m.abort_path = '/nonexistent-abort-path'
+        result = NodeHealthResult(
+            healthy=False, failed=[], affected_types=set(),
+            reason='resource health check failed')
+        fake_node = mock.MagicMock()
+        with mock.patch.object(resources_main, 'Gauge'), \
+                mock.patch.object(resources_main.node_health, 'evaluate',
+                                  return_value=result), \
+                mock.patch.object(resources_main.Node, 'from_db',
+                                  return_value=fake_node), \
+                mock.patch.object(resources_main.node_health,
+                                  'apply_result') as mock_apply, \
+                mock.patch.object(resources_main.daemon, 'check_abort_path',
+                                  side_effect=[True, False, False]):
+            m._run_health_checks(checks=[], types_by_identity={})
+        mock_apply.assert_called_once_with(fake_node, result)
+
+    def test_evaluate_exception_is_swallowed(self):
+        # A raise inside the cycle (for example a probe failure) must be
+        # swallowed via ignore_exception, not propagated out of the thread.
+        m = resources_main.Monitor.__new__(resources_main.Monitor)
+        m.abort_path = '/nonexistent-abort-path'
+        with mock.patch.object(resources_main, 'Gauge'), \
+                mock.patch.object(resources_main.node_health, 'evaluate',
+                                  side_effect=RuntimeError('boom')), \
+                mock.patch.object(resources_main.Node, 'from_db',
+                                  return_value=None), \
+                mock.patch.object(resources_main.util_exceptions,
+                                  'ignore_exception') as mock_ignore, \
+                mock.patch.object(resources_main.daemon, 'check_abort_path',
+                                  side_effect=[True, False, False]):
+            m._run_health_checks(checks=[], types_by_identity={})
+        self.assertEqual(1, mock_ignore.call_count)
