@@ -127,6 +127,7 @@ Here's a simple feature matrix listing when a feature was introduced:
 | Security groups                                   |             | Yes     |             |
 | Text console                                      | v0.1        |         |             |
 | VDI                                               | v0.1        |         |             |
+| VDI console proxy (Kerbside tokens)               | v0.8        |         |             |
 | User data                                         | v0.1        |         |             |
 | Keypairs                                          | v0.1        |         |             |
 | Virtual networks allow overlapping IP allocations | v0.1        |         |             |

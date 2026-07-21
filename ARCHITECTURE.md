@@ -641,6 +641,16 @@ can opt out of polling with `wait=False` to receive the op handle directly.
 Two client methods `get_cluster_operation_chain` and
 `list_cluster_operations_for_target` expose the discovery endpoints.
 
+**VDI console proxy endpoints.** `GET /instances/<ref>/vdiconsoleproxy`
+(`external_api/instance.py`, `InstanceVDIProxyConsoleHelperEndpoint`) mints a
+short lived Ed25519 JWT and returns `{url, expires_at}` where `url` is
+`<KERBSIDE_URL>/sf-console.vv?token=<jwt>`. It returns 404 when the Kerbside
+integration is unconfigured, 406 unless the instance is `created`, 409 unless
+the console is SPICE, and 500 when no signing key exists. `GET
+/admin/vditokenpubkey` (`external_api/admin.py`,
+`AdminVDITokenPublicKeyEndpoint`) publishes the public verification keys. See
+the VDI console token trust model under [Security Model](#security-model).
+
 ### Networking
 
 Shaken Fist uses VXLAN mesh networking:
@@ -802,6 +812,14 @@ Key configuration sources:
 - MariaDB `cluster_config` table - Cluster-wide configuration
 - Environment variables (highest priority)
 
+The Kerbside VDI console proxy integration is configured here too:
+`KERBSIDE_URL` (empty by default, which disables the integration; it is both
+the returned console URL base and the token audience) and
+`KERBSIDE_TOKEN_DURATION` (token lifetime in seconds, default 300). These are
+Shaken Fist cluster settings and are distinct from the Kerbside proxy
+daemon's own `KERBSIDE_`-prefixed environment. The signing key itself is
+stored in `cluster_config` as `KERBSIDE_JWT_SIGNING_KEY`.
+
 ### Node Identity
 
 Each node has a real UUID (not FQDN-based) stored in MariaDB. The UUID is
@@ -898,3 +916,23 @@ The develop branch uses:
 - JWT-based authentication
 - RBAC with admin/user roles
 - Network isolation via VXLAN
+
+### VDI console token trust model
+
+The Kerbside VDI console proxy integration uses **offline signature
+verification**. Shaken Fist is the sole signer: `sf-api` mints short lived
+Ed25519 (`EdDSA`) JWTs describing the instance, namespace, audience, expiry,
+and a single-use `jti`. The Kerbside proxy is a pure verifier — it holds only
+the public key (fetched from `GET /admin/vditokenpubkey`) and never any
+private material, so a compromised proxy cannot mint valid tokens. There is
+no callback to `sf-api` on the connection hot path.
+
+The private signing key lives in a single `cluster_config` row,
+`KERBSIDE_JWT_SIGNING_KEY`, with custody parallel to `AUTH_SECRET_SEED`. The
+row holds a newest-first, two-key window of Ed25519 keypairs; rotation
+(`sf-ctl rotate-kerbside-signing-key`) prepends a fresh key and trims to two,
+so tokens signed by the previous key stay verifiable until the next rotation.
+`shakenfist/util/vdi_tokens.py` is the only module that parses the row.
+Per-node `spice_server_cert_subject` (published by `shakenfist/node.py`) is
+consumed by Kerbside as the enforced backend `host_subject`. See
+`docs/operator_guide/vdi_console_tokens.md` for the operator runbook.

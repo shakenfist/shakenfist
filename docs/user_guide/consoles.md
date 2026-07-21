@@ -95,6 +95,52 @@ And example video specification would be:
 --videospec model=qxl,memory=65536,vdi=spiceconcurrent
 ```
 
+## Proxied VDI console
+
+Since v0.8, if your cluster operator has enabled the Kerbside integration
+you can open a SPICE console without direct network access to the hypervisor
+node. Instead of connecting to the "vdi port" yourself, Shaken Fist mints a
+short lived, signed token and hands your viewer a proxy URL; the
+[Kerbside](/components/kerbside/) proxy validates the token and relays the
+SPICE session to the correct hypervisor for you.
+
+The seamless way to use this is the client's `vdiconsole` command, which
+mints the token and launches a viewer in one step:
+
+```bash
+sf-client instance vdiconsole c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
+```
+
+For the viewer to launch automatically on Linux, install the client with the
+`vdi` extra, which pulls in the [ryll](/components/ryll/) SPICE viewer:
+
+```bash
+pip install 'shakenfist-client[vdi]'
+```
+
+Without the extra (or on platforms ryll does not cover) the command still
+works — it writes a `virt-viewer` configuration file you can open with your
+own SPICE client.
+
+A proxied console has a few requirements:
+
+* the instance must be in the `created` state;
+* its video specification must select a SPICE console — that is, the `vdi`
+  value starts with `spice` (`spice`, `spiceconcurrent`, or `spicedebug`),
+  not `vnc`; and
+* your operator must have set `KERBSIDE_URL` on the cluster.
+
+The minted token is single-use and short lived (about five minutes by
+default), so open the console promptly after requesting it; if it expires,
+just run the command again.
+
+If the operator has **not** enabled the integration (`KERBSIDE_URL` is
+unset), the proxy mint returns an error and the client falls back to the
+direct `virt-viewer` configuration file described above, which needs direct
+network access to the hypervisor. Operators can read how to turn the
+integration on in the
+[VDI console tokens operator guide](/operator_guide/vdi_console_tokens/).
+
 ## Screen captures
 
 Since v0.78, Shaken Fist also provides an API for collecting screen captures of

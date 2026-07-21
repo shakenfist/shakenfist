@@ -379,7 +379,7 @@ Recommendations are recorded inline.
 | 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch `sf-vdi-tokens`) | Done |
 | 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Done |
 | 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Done |
-| 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Not started |
+| 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Done |
 | 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Not started |
 
 ### Phase 0: Decisions and token format
@@ -527,6 +527,10 @@ the grounding).
   phase 9's deployment; the test then activates).
 
 ### Phase 8: Documentation
+
+Done. The detailed plan of record for this phase is
+`PLAN-kerbside-vdi-tokens-phase-08-docs.md` (authored in the kerbside repo
+alongside phases 5–7). The four repos' doc PRs are independent.
 
 - SF: user guide (how to open a proxied console), operator
   guide (enabling `KERBSIDE_URL`, key rotation runbook),

@@ -181,6 +181,12 @@ are:
 | `loki_base_url`, `loki_tenant`, `loki_auth_header` | Optional log shipping to an operator-provided Loki. See [Logging](logging.md). |
 | `extra_config` | A JSON list of additional cluster configuration settings, for example `[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]`. Optional. |
 
+To offer users proxied graphical consoles via Kerbside, set `KERBSIDE_URL`
+(and optionally `KERBSIDE_TOKEN_DURATION`) through `extra_config`, then
+bootstrap and rotate the signing key as described in the
+[VDI console tokens operator guide](vdi_console_tokens.md). This is a manual,
+opt-in integration; it stays disabled while `KERBSIDE_URL` is unset.
+
 ## Run the playbook
 
 The examples share a single playbook, `examples/_shared/site.yml`, which maps
