@@ -459,6 +459,35 @@ class Node(dbo):
             self.add_event(EVENT_TYPE_AUDIT, 'node is no longer degraded')
             self.state = self.STATE_CREATED
 
+    def set_lifecycle_state(self, target):
+        """Set a node lifecycle state for the sentinel start/stop handshake,
+        unless the node is in resource-health STATE_ERROR.
+
+        A resource-health error (node_health.apply_result, set when the node's
+        storage fails) is sticky: it clears only via the operator
+        (sf-ctl clear-node-error), so a service restart or graceful shutdown
+        must not walk it back to a schedulable state. Without this guard the
+        sentinels would set degraded/created on start and stopped/stopping on
+        stop, silently re-opening a dead-storage node to scheduling on every
+        restart -- the sf-6 failure, where the dead blob NVMe also crash-looped
+        sf-queues and triggered restarts. error->stopped and error->stopping
+        are not even valid transitions, so this also avoids raising on the
+        shutdown path.
+
+        This reads the live state then sets, so a probe that errors the node in
+        the same instant could still be overwritten; that window self-corrects
+        within one health-check interval (the health thread re-errors a node it
+        finds unhealthy). Returns True if the state was set.
+        """
+        if self.state.value == self.STATE_ERROR:
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                'kept node in resource-health error rather than setting '
+                f'{target}; error clears only via sf-ctl clear-node-error')
+            return False
+        self.state = target
+        return True
+
     def get_daemon_state(self, daemon):
         if daemon not in self.VALID_DAEMONS:
             raise NoSuchDaemon(

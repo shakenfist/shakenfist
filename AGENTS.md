@@ -250,8 +250,8 @@ reusable, timeout-guarded path-check primitive (a hung `hard`-NFS mount
 blocks rather than erroring, so the deadline is the unhealthy signal).
 `shakenfist/node_health.py` maps a node's role to the object types it
 hosts, runs each type's declared `health_dependencies` paths, and marks
-the node `STATE_ERROR` via an audit event carrying the affected object
-types. `sf-resources` runs this on its own thread (not the metrics
+the node `STATE_ERROR` via a `health` event (`EVENT_TYPE_HEALTH`, a
+channel separate from the audit log) carrying the affected object types. `sf-resources` runs this on its own thread (not the metrics
 loop); `sf-cluster` reads the affected types back
 (`node_health.errored_node_affected_types`) and cascades — erroring
 instances and re-replicating blobs — mirroring the deleted-node path but
