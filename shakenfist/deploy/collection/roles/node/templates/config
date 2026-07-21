@@ -25,6 +25,11 @@ SHAKENFIST_NODE_IS_NETWORK_NODE=False
 SHAKENFIST_FLOATING_NETWORK="{{ floating_network_ipblock }}"
 SHAKENFIST_NETWORK_NODE_IP="{{ network_node_ip }}"
 
+# Per-host resource reservations.
+SHAKENFIST_NODE_RAM_RESERVATION_GB={{ node_ram_reservation_gb }}
+SHAKENFIST_NODE_CPU_RESERVATION_THREADS={{ node_cpu_reservation_threads }}
+SHAKENFIST_NODE_DISK_RESERVATION_GB={{ node_disk_reservation_gb }}
+
 # Database service configuration
 {% if node_is_database_node %}
 SHAKENFIST_NODE_IS_DATABASE_NODE=True
