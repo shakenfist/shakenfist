@@ -144,18 +144,23 @@ Resolved with the operator:
   logging keeps working).
 - **CPU default** — assume 2 threads/core.
 
+Resolved during phase 1 detailed planning:
+
+- **Scheduler legacy metrics fallback** (`scheduler.py` ~139-142): the scheduler
+  already reads node-published metrics as its primary path; the config keys
+  survive only in the rolling-upgrade fallback. Re-express both the CPU and RAM
+  fallbacks against the new keys, drop the infra-role branch and the
+  `reserved_cores * 2` (the new key is in threads). See phase 1.
+- **`is_network_node` / `is_database_node` metrics** are load-bearing node
+  identity (node.py, database tier, API, schema) and keep being published; only
+  their use in reservation math is removed. The `infra_role` local is dropped.
+
 Remaining, to settle during implementation (see phase files):
 
-1. **Scheduler legacy metrics fallback** (`scheduler.py` ~139-142, the
-   `reserved_cores * 2` path for stale metric rows): drop it, or re-express
-   against the new key? Decision belongs to phase 1.
-2. **Are `is_network_node` / `is_database_node` metrics consumed anywhere other
-   than reservation math?** If not they can be dropped; if so, keep publishing
-   them. Phase 1 audit.
-3. **Which `MINIMUM_FREE_DISK` consumers evaluate a remote node** (need the
+1. **Which `MINIMUM_FREE_DISK` consumers evaluate a remote node** (need the
    published metric) **vs the local node** (can read `config` directly)?
    Resolved by reading each call site in phase 2.
-4. **Stale `cluster_config` cleanup** — leave the `RAM_SYSTEM_RESERVATION` row
+2. **Stale `cluster_config` cleanup** — leave the `RAM_SYSTEM_RESERVATION` row
    inert, or build `sf-ctl unset-config`? Deferred to Future work unless the
    dead key in `show-config` proves annoying.
 
