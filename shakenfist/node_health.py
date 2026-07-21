@@ -136,12 +136,16 @@ def apply_result(node: Node, result: NodeHealthResult) -> bool:
     Concurrency: this runs on the resources daemon's health thread and takes
     no nodelock -- deliberately, because a hung probe must never block on the
     lock the metrics loop holds. It shares node.state with set_daemon_state()
-    (which runs the degraded reconcile). The state setter validates every
-    transition, and error precedence is enforced there: set_daemon_state()
-    skips its degraded reconcile for an errored node (node.py), so a resource
-    health error is not downgraded to schedulable. The check-then-set here is
-    therefore safe without a lock -- the only writer that could overwrite
-    error already yields to it.
+    (the degraded reconcile) and the sentinel lifecycle writes, which now skip
+    an errored node they observe (node.py set_daemon_state / set_lifecycle_
+    state). That closes the common case, but state writes are last-writer-wins
+    (mariadb.set_state is an unconditional upsert, not a compare-and-swap), so
+    a writer that read a non-error state just before this call set error can
+    still overwrite it with a valid transition such as error->degraded. That
+    window is not eliminated here; it self-corrects within one health-check
+    interval, because the health thread re-errors a node it still finds
+    unhealthy. A fully race-free fix would need a conditional state write or a
+    single guarded precedence point that every writer routes through.
     """
     if result.healthy:
         return False
