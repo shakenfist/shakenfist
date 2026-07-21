@@ -563,6 +563,16 @@
       changed_when: true
       loop: "{{ extra_config | from_json }}"
 
+    # Retire the pre-rename, now-inert RAM_SYSTEM_RESERVATION cluster_config
+    # row. Reservations are now per-node NODE_* keys set via /etc/sf/config, so
+    # this key is no longer read. Deleting an already-absent key is a no-op
+    # (rowcount 0), so this is idempotent. Safe to remove in a future release.
+    - name: Retire the inert RAM_SYSTEM_RESERVATION cluster config row
+      ansible.builtin.command: >-
+        /srv/shakenfist/venv/bin/sf-ctl unset-config RAM_SYSTEM_RESERVATION
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: false
+
     - name: Verify the cluster configuration
       ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl verify-config
       delegate_to: "{{ cluster_db_host }}"

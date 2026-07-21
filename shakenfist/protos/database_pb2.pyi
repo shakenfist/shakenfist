@@ -790,6 +790,25 @@ class SetClusterConfigRequest(_message.Message):
 Global___SetClusterConfigRequest: _TypeAlias = SetClusterConfigRequest  # noqa: Y015
 
 @_typing.final
+class DeleteClusterConfigRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    KEY_NAME_FIELD_NUMBER: _builtins.int
+    key_name: _builtins.str
+    def __init__(
+        self,
+        *,
+        key_name: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["key_name", b"key_name"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteClusterConfigRequest: _TypeAlias = DeleteClusterConfigRequest  # noqa: Y015
+
+@_typing.final
 class EventBatchObject(_message.Message):
     """Event Storage (MariaDB)
     Batch write path for events plus their per-object references.

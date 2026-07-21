@@ -52,6 +52,7 @@ class DatabaseServiceStub:
     GetClusterConfig: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterConfigRequest, _database_pb2.ClusterConfigReply]
     """Cluster Config"""
     SetClusterConfig: _grpc.UnaryUnaryMultiCallable[_database_pb2.SetClusterConfigRequest, _database_pb2.StatusReply]
+    DeleteClusterConfig: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterConfigRequest, _database_pb2.StatusReply]
     RecordEventBatch: _grpc.UnaryUnaryMultiCallable[_database_pb2.RecordEventBatchRequest, _database_pb2.StatusReply]
     """Event Storage (MariaDB)
     Direct write path for batches of events; replaces the sf-eventlog
@@ -348,6 +349,7 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     GetClusterConfig: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterConfigRequest, _database_pb2.ClusterConfigReply]  # type: ignore[assignment]
     """Cluster Config"""
     SetClusterConfig: _aio.UnaryUnaryMultiCallable[_database_pb2.SetClusterConfigRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteClusterConfig: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterConfigRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     RecordEventBatch: _aio.UnaryUnaryMultiCallable[_database_pb2.RecordEventBatchRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Event Storage (MariaDB)
     Direct write path for batches of events; replaces the sf-eventlog
@@ -747,6 +749,13 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     def SetClusterConfig(
         self,
         request: _database_pb2.SetClusterConfigRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteClusterConfig(
+        self,
+        request: _database_pb2.DeleteClusterConfigRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 

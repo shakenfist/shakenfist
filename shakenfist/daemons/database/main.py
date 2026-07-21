@@ -508,6 +508,24 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def DeleteClusterConfig(
+        self,
+        request: database_pb2.DeleteClusterConfigRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a single cluster config key."""
+        try:
+            self.monitor.counters['delete_cluster_config'].inc()
+            mariadb._direct_delete_cluster_config(
+                request.key_name)
+            return database_pb2.StatusReply(
+                success=True, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteClusterConfig failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     # Object State Operations (MariaDB)
     # These operations provide access to MariaDB state storage for all daemons.
     # The database service uses direct MariaDB access; all other daemons call
@@ -5017,6 +5035,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',
+            'delete_cluster_config',
             'record_event_batch', 'prune_events',
             'get_object_events', 'delete_object_events',
             # MariaDB state operations

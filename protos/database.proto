@@ -28,6 +28,7 @@ service DatabaseService {
   // Cluster Config
   rpc GetClusterConfig (ClusterConfigRequest) returns (ClusterConfigReply) {}
   rpc SetClusterConfig (SetClusterConfigRequest) returns (StatusReply) {}
+  rpc DeleteClusterConfig (DeleteClusterConfigRequest) returns (StatusReply) {}
 
   // Event Storage (MariaDB)
   // Direct write path for batches of events; replaces the sf-eventlog
@@ -499,6 +500,10 @@ message ClusterConfigReply {
 message SetClusterConfigRequest {
   string key_name = 1;
   string value_json = 2;  // JSON-encoded config value
+}
+
+message DeleteClusterConfigRequest {
+  string key_name = 1;
 }
 
 // Event Storage (MariaDB)

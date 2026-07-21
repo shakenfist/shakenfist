@@ -239,6 +239,14 @@ def set_config(flag: str, value: Optional[str],
     mariadb.set_cluster_config(flag, converted_value)
 
 
+@click.command(name='unset-config')
+@click.argument('flag')
+def unset_config(flag: str) -> None:
+    """Delete a cluster-wide configuration value."""
+    click.echo(f'Unsetting {flag}')
+    mariadb.delete_cluster_config(flag)
+
+
 @click.command()
 def verify_config() -> None:
     sf_config.verify_config()
@@ -500,6 +508,7 @@ OBJECT_TYPES_WITH_STATE = [
 cli.add_command(bootstrap_system_key)
 cli.add_command(show_config)
 cli.add_command(set_config)
+cli.add_command(unset_config)
 cli.add_command(verify_config)
 cli.add_command(ensure_mariadb_schema)
 cli.add_command(ensure_kerbside_signing_key)

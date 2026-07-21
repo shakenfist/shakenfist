@@ -177,6 +177,30 @@ class PublicClusterConfigRoutingTestCase(base.ShakenFistTestCase):
         mock_grpc.assert_called_once_with('DNS_SERVER', '8.8.8.8')
         mock_direct.assert_not_called()
 
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_delete_cluster_config')
+    @mock.patch('shakenfist.mariadb._grpc_delete_cluster_config')
+    def test_delete_routes_to_direct_when_mariadb_host_set(
+            self, mock_grpc, mock_direct, mock_use_service):
+        mock_use_service.return_value = False
+
+        mariadb.delete_cluster_config('DNS_SERVER')
+
+        mock_direct.assert_called_once_with('DNS_SERVER')
+        mock_grpc.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_delete_cluster_config')
+    @mock.patch('shakenfist.mariadb._grpc_delete_cluster_config')
+    def test_delete_routes_to_grpc_otherwise(
+            self, mock_grpc, mock_direct, mock_use_service):
+        mock_use_service.return_value = True
+
+        mariadb.delete_cluster_config('DNS_SERVER')
+
+        mock_grpc.assert_called_once_with('DNS_SERVER')
+        mock_direct.assert_not_called()
+
 
 class DirectDeleteClusterConfigTestCase(base.ShakenFistTestCase):
     """Tests for _direct_delete_cluster_config."""
