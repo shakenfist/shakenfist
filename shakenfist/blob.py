@@ -901,8 +901,10 @@ class Blob(dbo):
                              current_transfers, allow_excess, targets))
             if targets > 0:
                 blob_size_gb = int(int(self.size) / GiB)
+                # The helper compares against each node's own reservation-aware
+                # headroom, so we only require room for the blob itself here.
                 nodes = nodes_by_free_disk_descending(
-                    minimum=blob_size_gb + config.MINIMUM_FREE_DISK,
+                    minimum=blob_size_gb,
                     intention='blobs')
 
                 # Don't copy to locations which already have the blob

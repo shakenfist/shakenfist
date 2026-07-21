@@ -813,7 +813,22 @@ def _sort_by_key(d):
         yield from d[k]
 
 
-def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
+def nodes_by_free_disk_descending(minimum=None, maximum=-1, intention=None):
+    """Rank active nodes by reservation-aware free-disk headroom, descending.
+
+    Each node publishes its own disk reservation as the ``disk_reservation_gb``
+    metric, so this helper subtracts that node's per-host reservation from its
+    raw free disk to compute headroom (falling back to the config default only
+    for a stale metrics row mid-upgrade). ``minimum`` and ``maximum`` are
+    compared against that headroom, so callers pass headroom-relative bounds and
+    must not fold a reservation into them.
+
+    Headroom is negative on a node whose free disk has fallen below its own
+    reservation. ``minimum=None`` (the default) imposes no lower bound, so
+    callers hunting low-disk nodes -- the blob rebalancer -- still see those
+    critically-full nodes; a caller placing data passes ``minimum`` >= the size
+    it needs so those nodes are skipped.
+    """
     by_disk = defaultdict(list)
     if not intention:
         intention = ''
@@ -827,14 +842,16 @@ def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
         else:
             metrics = {}
 
-        disk_free_gb = int(
-            int(metrics.get('disk_free%s' % intention, '0')) / GiB)
+        reservation = metrics.get(
+            'disk_reservation_gb', config.NODE_DISK_RESERVATION_GB)
+        headroom_gb = int(
+            int(metrics.get('disk_free%s' % intention, '0')) / GiB) - reservation
 
-        if disk_free_gb < minimum:
+        if minimum is not None and headroom_gb < minimum:
             continue
-        if maximum != -1 and disk_free_gb > maximum:
+        if maximum != -1 and headroom_gb > maximum:
             continue
 
-        by_disk[disk_free_gb].append(n.fqdn)
+        by_disk[headroom_gb].append(n.fqdn)
 
     return list(_sort_by_key(by_disk))

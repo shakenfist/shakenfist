@@ -218,14 +218,19 @@ class Scheduler:
                 if not disk['size'] is None:
                     requested_disk += int(disk['size'])
 
+        # The candidate node publishes its own disk reservation as a metric, so
+        # a remote evaluator honours that node's per-host floor (falling back to
+        # our config default only for a stale metrics row mid-upgrade).
+        reservation = self.metrics[node].get(
+            'disk_reservation_gb', config.NODE_DISK_RESERVATION_GB)
         disk_free = int(self.metrics[node].get('disk_free_instances', '0')) / GiB
-        disk_free -= config.MINIMUM_FREE_DISK
+        disk_free -= reservation
         if requested_disk > disk_free:
             reason = {
                 'reason': 'insufficient disk',
                 'requested_disk_gb': requested_disk,
                 'disk_free_gb': disk_free,
-                'minimum_free_disk_gb': config.MINIMUM_FREE_DISK,
+                'minimum_free_disk_gb': reservation,
             }
             log_ctx.with_fields({'node': node, **reason}).debug(
                 'Node has insufficient disk')
@@ -614,10 +619,14 @@ class Scheduler:
             resources['total']['ram_available'] += max(
                 0, resources['per_node'][n]['ram_available'])
 
-            # Disk
+            # Disk. Each node publishes its own reservation as a metric, so we
+            # subtract the candidate node's per-host floor (falling back to our
+            # config default only for a stale metrics row mid-upgrade).
+            reservation = self.metrics[n].get(
+                'disk_reservation_gb', config.NODE_DISK_RESERVATION_GB)
             disk_free = int(self.metrics[n].get(
                 'disk_free_instances', '0')) / GiB
-            disk_free -= config.MINIMUM_FREE_DISK
+            disk_free -= reservation
             resources['per_node'][n]['disk_available'] = disk_free
 
             # Instance count

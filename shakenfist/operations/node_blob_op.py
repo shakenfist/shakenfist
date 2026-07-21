@@ -5,6 +5,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import GiB
 from shakenfist import mariadb
 from shakenfist.schema.operations import node_blob_op as schema
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
@@ -120,8 +121,14 @@ class NodeBlobOp(BaseClusterOperation):
         else:
             metrics = {}
 
+        # This is the local node, so we reserve its own configured floor. NOTE:
+        # disk_free_blobs and b.size are both in bytes, so the reservation must
+        # be converted to bytes too. Historically this compared bytes against
+        # NODE_DISK_RESERVATION_GB's predecessor (a GB number), effectively
+        # reserving ~20 bytes -- the floor was almost never enforced here.
+        reservation_bytes = config.NODE_DISK_RESERVATION_GB * GiB
         if (int(metrics.get('disk_free_blobs', 0)) - int(b.size) <
-                config.MINIMUM_FREE_DISK):
+                reservation_bytes):
             b.add_event(
                 EVENT_TYPE_AUDIT, 'cannot replicate blob, insufficient space')
             return

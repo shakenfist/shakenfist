@@ -260,7 +260,8 @@ class Monitor(daemon.Daemon):
             retval.update({
                 'disk_total': total,
                 'disk_free': minimum,
-                'disk_used': used
+                'disk_used': used,
+                'disk_reservation_gb': config.NODE_DISK_RESERVATION_GB
             })
 
             # NOTE(mikal): these are _counters_ -- that is, like gauges in

@@ -187,13 +187,20 @@ class Monitor(daemon.Daemon):
                     in_use_blobs[b.uuid] += 1
 
         # Inspect current state of blobs, the actual changes are done below outside
-        # the read only cache. We define being low on disk has having less than three
-        # times the minimum amount of disk. This is so we start to rearrange blobs
-        # before scheduling starts to fail.
+        # the read only cache. We define being low on disk as having less than two
+        # reservations of headroom left (the helper already subtracts each node's
+        # own reservation, so a headroom band of 2x the reservation is equivalent
+        # to raw free disk below 3x the reservation at the default reservation --
+        # preserving the historical "three times the minimum" trigger). This is a
+        # rebalancing heuristic, so keying the band off this daemon's own default
+        # reservation is acceptable. We omit a lower bound (minimum=None) so a
+        # node that has already dropped below its own reservation -- negative
+        # headroom, the most urgent to relieve -- is still caught. We rearrange
+        # blobs before scheduling fails.
         overreplicated = {}
         underreplicated = []
         low_disk_nodes = nodes_by_free_disk_descending(
-            minimum=0, maximum=(config.MINIMUM_FREE_DISK * 3),
+            maximum=(2 * config.NODE_DISK_RESERVATION_GB),
             intention='blobs')
 
         # We count fetches currently requested (or under way) as having completed

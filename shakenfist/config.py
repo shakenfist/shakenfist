@@ -256,10 +256,6 @@ class SFConfig(BaseSettings):
             'operator may override from the inventory.'
         )
     )
-    MINIMUM_FREE_DISK: int = Field(
-        20,
-        description='Shaken Fist attempts to leave this amount of disk free.'
-    )
 
     # Network Options
     FLOATING_NETWORK: str = Field(
