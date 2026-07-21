@@ -6736,6 +6736,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pip-python-linux-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pip (Python, Linux only)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#building-from-source" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8021,6 +8032,34 @@
     
   
     Self-hosted runner migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-pip-distribution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pip-installable ryll
   
 
     
@@ -9907,6 +9946,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pip-python-linux-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pip (Python, Linux only)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#building-from-source" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9989,6 +10039,15 @@ published), extract it, and run <code>ryll.exe</code>:</p>
 <p>To make it available system-wide, move <code>ryll.exe</code> to a directory
 on your <code>PATH</code>.</p>
 <p>Note that <code>--capture</code> mode is not available on Windows builds.</p>
+<h2 id="pip-python-linux-only">pip (Python, Linux only)<a class="headerlink" href="#pip-python-linux-only" title="Permanent link">&para;</a></h2>
+<p><code>pip install ryll</code> (or <code>pip install shakenfist-client[vdi]</code>) installs a
+per-architecture manylinux wheel with the compiled ryll GUI binary
+already embedded — no runtime download, no cache, works offline
+immediately after install. Wheels are published for Linux
+<code>x86_64</code>/<code>aarch64</code> with glibc &gt;= 2.28; other platforms should use one
+of the packages above. See the
+<a href="/components/ryll/../README/#installing-via-pip">README</a> for the runtime system
+library requirements.</p>
 <h2 id="building-from-source">Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">&para;</a></h2>
 <p>If no pre-built package is available for your platform, you can build
 ryll from source. See the <a href="/components/ryll/../README/">README</a> for build instructions

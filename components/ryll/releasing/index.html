@@ -6866,6 +6866,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pypi-trusted-publishers-and-the-release-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyPI Trusted Publishers and the release environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#host-tools" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6959,6 +6970,28 @@
     <span class="md-ellipsis">
       
         crates.io publish fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#release-stuck-waiting-for-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release stuck waiting for approval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypi-wheel-publish-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyPI wheel publish fails
       
     </span>
   </a>
@@ -8127,6 +8160,34 @@
     
   
     Self-hosted runner migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-pip-distribution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pip-installable ryll
   
 
     
@@ -10003,6 +10064,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pypi-trusted-publishers-and-the-release-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyPI Trusted Publishers and the release environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#host-tools" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10103,6 +10175,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#release-stuck-waiting-for-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release stuck waiting for approval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pypi-wheel-publish-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyPI wheel publish fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#homebrew-tap-update-fails" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10177,11 +10271,17 @@ which:</p>
   Windows, running the test suite on each.</li>
 <li>Produces <code>.deb</code>, <code>.rpm</code>, macOS <code>.tar.gz</code>, and Windows <code>.zip</code>
   artifacts.</li>
+<li>Builds the per-arch <code>ryll</code> PyPI wheel natively for <code>x86_64</code> and
+  <code>aarch64</code> (no QEMU).</li>
+<li>Sigstore-signs the release tag (keyless, OIDC), gated on the
+  <code>release</code> environment's manual approval.</li>
 <li>Publishes all four workspace crates to crates.io in dependency
   order: <code>shakenfist-spice-protocol</code> → <code>shakenfist-spice-compression</code>
   → <code>shakenfist-spice-usbredir</code> → <code>ryll</code>.</li>
 <li>Creates a GitHub Release with auto-generated notes and all
   artifacts attached.</li>
+<li>Publishes the <code>ryll</code> wheels to TestPyPI, then to PyPI, both via
+  OIDC Trusted Publishers.</li>
 <li>Updates <code>shakenfist/homebrew-tap</code> with the new version and the
   SHA256 of the macOS tarball.</li>
 </ul>
@@ -10213,6 +10313,48 @@ Settings → Rules → Rulesets (or the older Settings → Tags):</p>
   update step fails; the GitHub Release and crates.io publishes
   still succeed.</li>
 </ul>
+<p>No secret is needed for the <code>ryll</code> PyPI wheel: it publishes via
+OIDC Trusted Publishers instead (see below).</p>
+<h3 id="pypi-trusted-publishers-and-the-release-environment">PyPI Trusted Publishers and the <code>release</code> environment<a class="headerlink" href="#pypi-trusted-publishers-and-the-release-environment" title="Permanent link">&para;</a></h3>
+<p>The <code>ryll</code> wheel publishes to TestPyPI and then PyPI using OIDC
+Trusted Publishers — no API tokens are stored in the repo. This
+is one-time setup per PyPI account, mirroring how kerbside's
+<code>kerbside-proxy</code> wheel is published (see that repo's
+<code>RELEASE-SETUP.md</code>).</p>
+<ol>
+<li><strong>TestPyPI trusted publisher.</strong> Log in to
+   <a href="https://test.pypi.org">test.pypi.org</a>, go to the <code>ryll</code>
+   project's <strong>Settings → Publishing</strong> (or add a <em>pending</em>
+   publisher first if the project does not exist yet on
+   TestPyPI), and add a publisher with:</li>
+<li><strong>Owner:</strong> <code>shakenfist</code></li>
+<li><strong>Repository name:</strong> <code>ryll</code></li>
+<li><strong>Workflow name:</strong> <code>release.yml</code></li>
+<li><strong>Environment name:</strong> <code>release</code></li>
+<li><strong>PyPI trusted publisher.</strong> Repeat the same steps on
+   <a href="https://pypi.org">pypi.org</a> for the real <code>ryll</code> project, with
+   the identical Owner/Repository/Workflow/Environment values.
+   The two are independent entries — TestPyPI and PyPI each need
+   their own trusted-publisher registration even though the
+   workflow and environment names match.</li>
+<li><strong><code>release</code> GitHub environment.</strong> Under repo <strong>Settings →
+   Environments</strong>, create an environment named <code>release</code> with
+   <strong>Required reviewers</strong> set to the maintainers who may approve
+   releases. This environment gates the <code>sign-tag</code> job, and
+   <code>sign-tag</code> in turn gates <em>every</em> publishing job —
+   <code>publish-crates</code>, <code>github-release</code>, <code>update-homebrew</code>, and the
+   <code>ryll</code> PyPI lane (<code>publish-ryll-testpypi</code> →
+   <code>publish-ryll-pypi</code>) — so nothing publishes anywhere, and the
+   release tag is not Sigstore-signed, until a required reviewer
+   approves the run in GitHub's UI.</li>
+</ol>
+<p>Without the <code>release</code> environment configured, the workflow run
+stalls waiting for an environment that can never be approved.
+Without the trusted-publisher registrations, <code>sign-tag</code> still
+succeeds but <code>publish-ryll-testpypi</code>/<code>publish-ryll-pypi</code> fail
+with a "publisher not found" error; the <code>.deb</code>/<code>.rpm</code>/tarball/zip
+artifacts, GitHub Release, and crates.io publishes are unaffected
+since they only depend on <code>sign-tag</code>, not on the PyPI publishers.</p>
 <h3 id="host-tools">Host tools<a class="headerlink" href="#host-tools" title="Permanent link">&para;</a></h3>
 <p>Both scripts orchestrate from the operator's host. The
 workspace test compile in phase 1 is delegated to <code>make test</code>,
@@ -10289,6 +10431,18 @@ this PR is the audit trail for the version bump itself.</p>
 <li>Watch the triggered release workflow via <code>gh run watch</code> and
    open the GitHub Release page when it completes.</li>
 </ol>
+<p>The pushed tag runs <code>check-version</code>, then builds the <code>.deb</code>/
+<code>.rpm</code>/tarball/zip artifacts and the per-arch <code>ryll</code> PyPI wheels
+(<code>build-ryll-wheels</code>, natively on <code>x86_64</code> and <code>aarch64</code>, no
+QEMU) in parallel. Once all builds succeed, the workflow pauses
+at <code>sign-tag</code> for approval on the <code>release</code> environment — this is
+where <code>gh run watch</code> will sit until a required reviewer approves
+the run. On approval, <code>sign-tag</code> Sigstore-signs and force-pushes
+the tag, then <code>publish-crates</code> and <code>github-release</code> run, followed
+by the staged PyPI publish (<code>publish-ryll-testpypi</code> →
+<code>publish-ryll-pypi</code>, both <code>skip-existing</code> so a re-run after a
+partial failure does not hard-error on a file already published),
+and finally <code>update-homebrew</code>.</p>
 <h2 id="artifacts-produced">Artifacts produced<a class="headerlink" href="#artifacts-produced" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -10324,6 +10478,11 @@ this PR is the audit trail for the version bump itself.</p>
 <td><code>shakenfist-spice-protocol</code>, <code>shakenfist-spice-compression</code>, <code>shakenfist-spice-usbredir</code>, <code>ryll</code></td>
 <td>Source crates</td>
 </tr>
+<tr>
+<td>PyPI (TestPyPI, then PyPI)</td>
+<td><code>ryll-{version}-py3-none-manylinux_2_28_x86_64.whl</code>, <code>ryll-{version}-py3-none-manylinux_2_28_aarch64.whl</code></td>
+<td>Embedded GUI binary (maturin <code>bindings = "bin"</code>); Linux <code>x86_64</code>/<code>aarch64</code>, glibc &gt;= 2.28</td>
+</tr>
 </tbody>
 </table>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
@@ -10358,6 +10517,32 @@ try to re-publish <code>0.2.0</code>.</p>
   maintained by <code>cargo release</code>; if you have added new
   workspace-member dependencies, make sure they follow the same
   pattern.</li>
+</ul>
+<h3 id="release-stuck-waiting-for-approval">Release stuck waiting for approval<a class="headerlink" href="#release-stuck-waiting-for-approval" title="Permanent link">&para;</a></h3>
+<p><code>sign-tag</code> (and everything downstream of it) will not run until
+a required reviewer approves the workflow run on the <code>release</code>
+environment. If <code>gh run watch</code> appears to hang after the build
+jobs finish, check the environment approval, not the workflow. If
+the <code>release</code> environment does not exist yet, the run stalls
+indefinitely — see "PyPI Trusted Publishers and the <code>release</code>
+environment" above.</p>
+<h3 id="pypi-wheel-publish-fails">PyPI wheel publish fails<a class="headerlink" href="#pypi-wheel-publish-fails" title="Permanent link">&para;</a></h3>
+<p><code>publish-ryll-testpypi</code> and <code>publish-ryll-pypi</code> use OIDC Trusted
+Publishers, not a stored token, so failures are almost always
+configuration, not credentials:</p>
+<ul>
+<li>"Publisher not found" — the trusted-publisher entry on
+  test.pypi.org or pypi.org does not match the workflow's Owner /
+  Repository / Workflow name / Environment name exactly (case
+  sensitive). Re-check the entry against the current
+  <code>release.yml</code>.</li>
+<li>A partial failure (e.g. the <code>x86_64</code> wheel uploads but
+  <code>aarch64</code> fails) is safe to re-run: both jobs pass
+  <code>skip-existing: true</code>, so a re-run only uploads what is
+  missing.</li>
+<li>Neither PyPI job failing affects <code>publish-crates</code>,
+  <code>github-release</code>, or <code>update-homebrew</code> — they only depend on
+  <code>sign-tag</code>, not on the PyPI publish succeeding.</li>
 </ul>
 <h3 id="homebrew-tap-update-fails">Homebrew tap update fails<a class="headerlink" href="#homebrew-tap-update-fails" title="Permanent link">&para;</a></h3>
 <p>If <code>HOMEBREW_TAP_TOKEN</code> is missing or expired the tap update

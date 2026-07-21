@@ -2265,6 +2265,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Test Data Location">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#binary-fixtures-are-git-lfs-backed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Binary fixtures are git-LFS backed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -8444,6 +8461,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-pip-distribution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pip-installable ryll
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -10508,6 +10553,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Test Data Location">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#binary-fixtures-are-git-lfs-backed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Binary fixtures are git-LFS backed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -11184,6 +11246,24 @@ the main repository small. The location is resolved in order:</p>
 <li><code>INSTAR_TESTDATA_PATH</code> environment variable</li>
 <li><code>../instar-testdata</code> (sibling directory)</li>
 </ol>
+<h3 id="binary-fixtures-are-git-lfs-backed">Binary fixtures are git-LFS backed<a class="headerlink" href="#binary-fixtures-are-git-lfs-backed" title="Permanent link">&para;</a></h3>
+<p>Every binary fixture in <code>instar-testdata</code> (<code>*.qcow2</code>, <code>*.raw</code>, <code>*.vhd</code>,
+<code>*.vhdx</code>, <code>*.vmdk</code>, <code>*-backing</code>, the bundled <code>qemu-img</code> binaries) is tracked
+with <strong>git-LFS</strong>. A checkout whose LFS objects have not been materialised
+leaves each fixture on disk as a ~131-byte pointer file, and the whole suite
+then fails with <code>file format: unknown</code> for every image — a failure that
+looks like a mass instar regression but is really a testdata problem. If you
+clone <code>instar-testdata</code> by hand, run <code>git lfs pull</code> after cloning; a working
+tree with real images (the fixture starts with its true magic, e.g. <code>QFI\xfb</code>
+for qcow2) rather than pointer text is required.</p>
+<p>CI does this through <strong><code>tools/ci/prepare-testdata.sh</code></strong> — the single,
+LFS-aware testdata-prep helper shared by <code>functional-tests.yml</code>,
+<code>coverage-fuzz.yml</code>, and <code>test-drift-fix.yml</code>. It clones or updates the
+cached checkout, runs <code>git lfs pull</code>, and then <strong>guards</strong> against the pointer
+failure mode: it inspects known canary fixtures and hard-fails the job with
+an explicit "infrastructure problem, not a test regression" message if any is
+still a pointer, so a git-LFS outage can never be silently misattributed to
+instar (see GitHub issue #451 for the incident this guards against).</p>
 <h2 id="expected-output-overrides">Expected Output Overrides<a class="headerlink" href="#expected-output-overrides" title="Permanent link">&para;</a></h2>
 <p>For malicious images where running <code>qemu-img</code> would be dangerous, store the
 expected output in <code>tests/expected_outputs/</code>:</p>
