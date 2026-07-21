@@ -598,6 +598,12 @@ class Monitor(daemon.Daemon):
         # and drives metrics -- a stall here would time out other nodelock
         # waiters. The checks are built once from this node's capabilities.
         health_checks, health_types = node_health.build_for_this_node()
+        # Provision each probed directory once, here, before the probe thread
+        # starts -- so a not-yet-created subdir (e.g. uploads on a node that
+        # has never received an upload) is never misread as a MISSING fault,
+        # and an ENOENT during probing unambiguously means the store vanished.
+        for check in health_checks:
+            check.ensure_present()
         threading.Thread(
             target=self._run_health_checks, name='node-health',
             args=(health_checks, health_types), daemon=True).start()

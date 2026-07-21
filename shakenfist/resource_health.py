@@ -80,6 +80,17 @@ class HealthCheck(abc.ABC):
         a HealthResult with a non-OK status, not an exception.
         """
 
+    def ensure_present(self) -> None:
+        """Provision anything this check needs to exist, once, before probing.
+
+        A no-op by default. Kept off the probe path (check()) so that check()
+        only ever detects, never provisions -- otherwise a probe that
+        recreated a missing resource could mask its disappearance. A subclass
+        whose resource can be legitimately absent-but-benign (e.g. a storage
+        subdir that is created lazily) creates it here at daemon startup, so a
+        later absence is unambiguously a fault.
+        """
+
 
 class DeadlineProbe:
     """Run a callable under a wall-clock deadline, and never launch a
@@ -155,9 +166,10 @@ class PathCheck(HealthCheck):
 
     - A cheap ``statvfs`` on every call. Its raising OSError means the store
       is gone (the sf-6 case: a shut-down filesystem EIOs even on statvfs);
-      the ST_RDONLY mount flag means it was remounted read-only. A plain
-      ENOENT is treated separately -- an absent subdir is not a fault, it is
-      created (a dead store fails that create) and then write-probed.
+      the ST_RDONLY mount flag means it was remounted read-only. A subdir
+      that is simply not provisioned yet would also raise ENOENT here, so
+      ``ensure_present`` creates it once before probing begins -- the probe
+      itself only detects, it never provisions.
     - An authoritative write of a ``_heartbeat`` timestamp (with fsync) no
       more often than ``write_interval`` seconds. This is the real
       writability test -- os.makedirs(exist_ok=True) on an existing
@@ -184,6 +196,16 @@ class PathCheck(HealthCheck):
         # The absolute path: two checks on the same path de-duplicate.
         return self._path
 
+    def ensure_present(self) -> None:
+        # Create the probed directory if absent. Some probed subdirs are made
+        # lazily (uploads on a node that has never received an upload; the
+        # instances dir before the first instance boots), so without this a
+        # not-yet-provisioned path would be misread as a MISSING fault. Runs
+        # once at daemon startup, not on the probe path -- so once probing
+        # begins an ENOENT means the store genuinely vanished. A dead store
+        # fails loudly here at startup rather than silently later.
+        os.makedirs(self._path, exist_ok=True)
+
     def check(self) -> HealthResult:
         now = time.time()
         do_write = (now - self._last_write) >= self._write_interval
@@ -203,23 +225,12 @@ class PathCheck(HealthCheck):
         return result
 
     def _probe_once(self, do_write: bool) -> HealthResult:
-        # Runs in the DeadlineProbe daemon thread; must not raise.
+        # Runs in the DeadlineProbe daemon thread; must not raise. The probe
+        # only detects, never provisions: absent directories are created once
+        # by ensure_present() before probing starts, so an ENOENT here means
+        # the store genuinely went away, not that a subdir was never made.
         try:
             st = os.statvfs(self._path)
-        except FileNotFoundError:
-            # The directory does not exist yet. That is not a storage fault:
-            # some probed subdirs are created lazily (for example uploads on a
-            # node that has never received an upload -- Upload maps to every
-            # node per E3's conservative mapping). Create it rather than
-            # depend on another daemon loop's makedirs side effect. A genuinely
-            # dead store fails the create with EIO and is reported MISSING; an
-            # absent-but-healthy dir is created and the write tier below then
-            # proves it is actually writable.
-            try:
-                os.makedirs(self._path, exist_ok=True)
-                st = os.statvfs(self._path)
-            except OSError as e:
-                return HealthResult(self._path, HealthStatus.MISSING, str(e))
         except OSError as e:
             return HealthResult(self._path, HealthStatus.MISSING, str(e))
 

@@ -102,27 +102,28 @@ class PathCheckTestCase(base.ShakenFistTestCase):
         self.assertEqual(resource_health.HealthStatus.MISSING, result.status)
         self.assertIn('Input/output error', result.detail)
 
-    def test_absent_directory_is_created_and_passes(self):
-        # A not-yet-provisioned subdir (ENOENT) is benign: it is created and
-        # reported healthy, not errored like a dead store.
+    def test_ensure_present_creates_absent_directory(self):
+        # ensure_present() provisions a not-yet-created subdir at startup, so
+        # the probe never sees a benign ENOENT.
         with tempfile.TemporaryDirectory() as d:
             target = os.path.join(d, 'uploads')
             self.assertFalse(os.path.exists(target))
-            result = resource_health.PathCheck(target).check()
-            self.assertEqual(resource_health.HealthStatus.OK, result.status)
+            check = resource_health.PathCheck(target)
+            check.ensure_present()
             self.assertTrue(os.path.isdir(target))
+            # And it then probes healthy.
+            self.assertEqual(
+                resource_health.HealthStatus.OK, check.check().status)
 
-    def test_absent_directory_on_dead_store_is_missing(self):
-        # If the directory is absent because the parent store is dead, the
-        # create fails with EIO and the node is (correctly) reported unhealthy.
-        check = resource_health.PathCheck('/does/not/matter')
-        with mock.patch('os.statvfs',
-                        side_effect=FileNotFoundError(2, 'No such file')), \
-                mock.patch('os.makedirs',
-                           side_effect=OSError(5, 'Input/output error')):
+    def test_missing_when_directory_absent_after_provisioning(self):
+        # Once probing has begun, an ENOENT means the store vanished (not a
+        # not-yet-provisioned subdir), so it is a MISSING fault -- the probe
+        # does not silently recreate it.
+        check = resource_health.PathCheck('/does/not/exist/at/all')
+        with mock.patch('os.makedirs') as mock_makedirs:
             result = check.check()
         self.assertEqual(resource_health.HealthStatus.MISSING, result.status)
-        self.assertIn('Input/output error', result.detail)
+        mock_makedirs.assert_not_called()
 
     def test_readonly_when_st_rdonly_set(self):
         check = resource_health.PathCheck('/does/not/matter')

@@ -135,11 +135,20 @@ revived.
 | `MAX_HEALTH_EVENT_AGE` | `90 days` | Retention for the `health` diagnosis event. Must exceed the longest time a node is expected to sit errored — the cluster cascade reads the blast radius back from this event, so pruning it while a node is still errored would strand the cascade after a cluster-daemon restart. |
 
 The checked paths are `STORAGE_PATH`-relative subdirectories and are not
-individually configurable; they follow the object types a node hosts. A
-subdirectory that does not exist yet (for example `uploads` on a node that
-has never received an upload) is created by the probe, not treated as a
-failure; only an I/O error, a read-only remount, or a hung mount marks the
-node errored.
+individually configurable; they follow the object types a node hosts. Each
+is created once when the resources daemon starts (a subdirectory such as
+`uploads` may not exist yet on a node that has never received an upload), so
+during probing an I/O error, a read-only remount, a hung mount, or a
+vanished directory all mark the node errored.
+
+One case is deliberately **not** detected: if `STORAGE_PATH` is a network
+mount that is *cleanly* unmounted (rather than failing with an I/O error or
+hanging), the mount point reverts to a writable local directory and the
+probe cannot tell it apart from healthy shared storage. Shaken Fist targets
+the failure modes a dead or hung store actually produces (I/O errors,
+read-only remounts, hangs); use a `hard` mount, which hangs rather than
+silently detaching, and monitor the mount separately if this matters to your
+deployment.
 
 ## See also
 
