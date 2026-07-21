@@ -155,7 +155,9 @@ class PathCheck(HealthCheck):
 
     - A cheap ``statvfs`` on every call. Its raising OSError means the store
       is gone (the sf-6 case: a shut-down filesystem EIOs even on statvfs);
-      the ST_RDONLY mount flag means it was remounted read-only.
+      the ST_RDONLY mount flag means it was remounted read-only. A plain
+      ENOENT is treated separately -- an absent subdir is not a fault, it is
+      created (a dead store fails that create) and then write-probed.
     - An authoritative write of a ``_heartbeat`` timestamp (with fsync) no
       more often than ``write_interval`` seconds. This is the real
       writability test -- os.makedirs(exist_ok=True) on an existing
@@ -204,6 +206,20 @@ class PathCheck(HealthCheck):
         # Runs in the DeadlineProbe daemon thread; must not raise.
         try:
             st = os.statvfs(self._path)
+        except FileNotFoundError:
+            # The directory does not exist yet. That is not a storage fault:
+            # some probed subdirs are created lazily (for example uploads on a
+            # node that has never received an upload -- Upload maps to every
+            # node per E3's conservative mapping). Create it rather than
+            # depend on another daemon loop's makedirs side effect. A genuinely
+            # dead store fails the create with EIO and is reported MISSING; an
+            # absent-but-healthy dir is created and the write tier below then
+            # proves it is actually writable.
+            try:
+                os.makedirs(self._path, exist_ok=True)
+                st = os.statvfs(self._path)
+            except OSError as e:
+                return HealthResult(self._path, HealthStatus.MISSING, str(e))
         except OSError as e:
             return HealthResult(self._path, HealthStatus.MISSING, str(e))
 

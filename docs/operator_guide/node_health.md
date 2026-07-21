@@ -132,9 +132,14 @@ revived.
 | `NODE_HEALTH_CHECK_INTERVAL` | `60` | Seconds between health evaluations. Bounds detection latency for a fully-dead path. |
 | `NODE_HEALTH_WRITE_INTERVAL` | `300` | Seconds between authoritative write heartbeats. Catches write-only failures; kept long to limit writes to flash. |
 | `NODE_HEALTH_PROBE_TIMEOUT` | `30` | Deadline for a single probe. A probe that overruns is treated as unhealthy — this is how a hung `hard`-NFS mount is caught. |
+| `MAX_HEALTH_EVENT_AGE` | `90 days` | Retention for the `health` diagnosis event. Must exceed the longest time a node is expected to sit errored — the cluster cascade reads the blast radius back from this event, so pruning it while a node is still errored would strand the cascade after a cluster-daemon restart. |
 
 The checked paths are `STORAGE_PATH`-relative subdirectories and are not
-individually configurable; they follow the object types a node hosts.
+individually configurable; they follow the object types a node hosts. A
+subdirectory that does not exist yet (for example `uploads` on a node that
+has never received an upload) is created by the probe, not treated as a
+failure; only an I/O error, a read-only remount, or a hung mount marks the
+node errored.
 
 ## See also
 

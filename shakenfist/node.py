@@ -435,11 +435,20 @@ class Node(dbo):
         # spurious call (state didn't actually change) is a cheap no-op, so
         # we no longer need a "changed" check before running this.
         degraded = self.get_degraded_daemons()
-        degraded_or_stopping = [
-            self.STATE_DEGRADED, self.STATE_STOPPING, self.STATE_STOPPED]
+        # Node states whose degraded-reconcile must be skipped. STATE_ERROR is
+        # here so a resource-health error (node_health.apply_result, set when a
+        # node's storage fails) is not silently downgraded to degraded -- which
+        # is a schedulable ACTIVE_STATE -- the moment a daemon on the failed
+        # node reports stopped. The sf-6 blob-NVMe failure also crash-looped
+        # sf-queues, so without this the node would flap error<->degraded and
+        # keep receiving instances. A resource-health error clears only via the
+        # operator (sf-ctl clear-node-error), never here.
+        no_reconcile = [
+            self.STATE_DEGRADED, self.STATE_STOPPING, self.STATE_STOPPED,
+            self.STATE_ERROR]
         node_state = self.state.value
 
-        if node_state not in degraded_or_stopping and degraded:
+        if node_state not in no_reconcile and degraded:
             self.add_event(
                 EVENT_TYPE_AUDIT,
                 'node is not stopping or stopped, but a daemon is not running '

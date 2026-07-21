@@ -508,7 +508,12 @@ class SFConfig(BaseSettings):
     )
     MAX_HEALTH_EVENT_AGE: int = Field(
         3600 * 24 * 90,
-        description='How long to retain node resource-health events.'
+        description=(
+            'How long to retain node resource-health events. This must exceed '
+            'the longest time a node is expected to sit in the error state: '
+            'the diagnosis the cluster cascade reads back lives in this event, '
+            'so pruning it while the node is still errored would strand the '
+            'cascade after a cluster-daemon restart.')
     )
     MAX_HISTORIC_EVENT_AGE: int = Field(
         3600 * 24 * 90,

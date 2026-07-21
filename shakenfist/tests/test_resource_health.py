@@ -102,6 +102,28 @@ class PathCheckTestCase(base.ShakenFistTestCase):
         self.assertEqual(resource_health.HealthStatus.MISSING, result.status)
         self.assertIn('Input/output error', result.detail)
 
+    def test_absent_directory_is_created_and_passes(self):
+        # A not-yet-provisioned subdir (ENOENT) is benign: it is created and
+        # reported healthy, not errored like a dead store.
+        with tempfile.TemporaryDirectory() as d:
+            target = os.path.join(d, 'uploads')
+            self.assertFalse(os.path.exists(target))
+            result = resource_health.PathCheck(target).check()
+            self.assertEqual(resource_health.HealthStatus.OK, result.status)
+            self.assertTrue(os.path.isdir(target))
+
+    def test_absent_directory_on_dead_store_is_missing(self):
+        # If the directory is absent because the parent store is dead, the
+        # create fails with EIO and the node is (correctly) reported unhealthy.
+        check = resource_health.PathCheck('/does/not/matter')
+        with mock.patch('os.statvfs',
+                        side_effect=FileNotFoundError(2, 'No such file')), \
+                mock.patch('os.makedirs',
+                           side_effect=OSError(5, 'Input/output error')):
+            result = check.check()
+        self.assertEqual(resource_health.HealthStatus.MISSING, result.status)
+        self.assertIn('Input/output error', result.detail)
+
     def test_readonly_when_st_rdonly_set(self):
         check = resource_health.PathCheck('/does/not/matter')
         fake = mock.Mock()

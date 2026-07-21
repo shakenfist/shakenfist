@@ -132,6 +132,16 @@ def apply_result(node: Node, result: NodeHealthResult) -> bool:
     uses EVENT_TYPE_HEALTH, a channel distinct from the audit action log, so
     errored_node_affected_types() can read it back regardless of how many
     audit events the cascade has since written against the node.
+
+    Concurrency: this runs on the resources daemon's health thread and takes
+    no nodelock -- deliberately, because a hung probe must never block on the
+    lock the metrics loop holds. It shares node.state with set_daemon_state()
+    (which runs the degraded reconcile). The state setter validates every
+    transition, and error precedence is enforced there: set_daemon_state()
+    skips its degraded reconcile for an errored node (node.py), so a resource
+    health error is not downgraded to schedulable. The check-then-set here is
+    therefore safe without a lock -- the only writer that could overwrite
+    error already yields to it.
     """
     if result.healthy:
         return False
