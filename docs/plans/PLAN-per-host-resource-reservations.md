@@ -219,10 +219,14 @@ Use `isolation: "worktree"` for risky steps.
 - The four old reservation Fields and `MINIMUM_FREE_DISK` are gone; the three
   new `NODE_*` keys exist, are read as ordinary `config.X` values, and are never
   written to `cluster_config`.
-- For every existing node, the deployed reservation is **numerically identical**
-  to today's (the change is behaviour-neutral except where a host_var override
-  is set) — verified by inspecting `/etc/sf/config` and node metrics on a plain
-  hypervisor, an infra-role node, and the overridden node.
+- Each node's deployed reservation reproduces today's **intended** value
+  (system baseline + infra-role bump), verified by inspecting `/etc/sf/config`
+  and node metrics on a plain hypervisor, an infra-role node, and an overridden
+  node. Note this is not a strict numeric no-op (see phase 3's honest
+  accounting): RAM becomes each node's own 10% rather than the old cluster-wide
+  single value (a correction, differs on heterogeneous-RAM clusters), and CPU
+  uses the accepted 2-threads/core approximation (over-reserves ~1 thread on
+  non-hyperthreaded nodes). Disk is identical at the default.
 - The disk reservation is enforced against all resources-daemon-tracked paths,
   sourced per-node from a published metric.
 - Unit tests cover the reservation math (CPU threads, RAM, disk floor) and the
