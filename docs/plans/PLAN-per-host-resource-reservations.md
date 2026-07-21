@@ -173,7 +173,7 @@ plan file.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Config keys + CPU/RAM reservation math | PLAN-per-host-resource-reservations-phase-01-config-cpu-ram.md | Not started |
+| 1. Config keys + CPU/RAM reservation math | PLAN-per-host-resource-reservations-phase-01-config-cpu-ram.md | Complete |
 | 2. Disk reservation model (metric + consumers) | PLAN-per-host-resource-reservations-phase-02-disk-metric.md | Not started |
 | 3. Ansible templating and default computation | PLAN-per-host-resource-reservations-phase-03-ansible-templating.md | Not started |
 | 4. Docs, plan index, and cleanup | PLAN-per-host-resource-reservations-phase-04-docs-cleanup.md | Not started |
