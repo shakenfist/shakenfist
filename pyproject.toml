@@ -151,7 +151,7 @@ dependencies = [
     "wrapt==2.2.2",
     "psutil==7.2.2",
     "typing-inspection==0.4.2",
-    "uv==0.11.29",
+    "uv==0.11.30",
     "iso8601==2.1.0",
     # END_OF_INDIRECT_DEPS
 ]
