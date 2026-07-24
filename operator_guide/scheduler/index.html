@@ -9642,6 +9642,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../node_health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node Resource Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../power_states/" class="md-nav__link">
         
   
@@ -9894,7 +9922,10 @@ a placement decision can be reconstructed after the fact (see
 <a href="#diagnosing-a-placement-decision">Diagnosing a placement decision</a>).</p>
 <ol>
 <li><strong>Hypervisor check</strong> -- only nodes reporting
-   <code>is_hypervisor</code> are candidates.</li>
+   <code>is_hypervisor</code> are candidates. Nodes that are not "active"
+   (those in <code>error</code> or <code>missing</code>) are excluded before this stage,
+   so a node whose storage has failed stops receiving instances
+   (see <a href="../node_health/">Node resource health</a>).</li>
 <li><strong>Queue health</strong> -- nodes with more than 20 waiting queue jobs
    are excluded; they are not keeping up.</li>
 <li><strong>Per-instance vCPU limit</strong> -- the request must fit libvirt's

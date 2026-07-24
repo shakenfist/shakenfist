@@ -9734,6 +9734,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operator_guide/node_health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node Resource Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operator_guide/power_states/" class="md-nav__link">
         
   
@@ -9943,7 +9971,7 @@
 <ol>
 <li><strong><a href="PLAN-network-facade/">Network operations facade</a></strong> — complete. Landed via the <code>network-facade</code> branch.</li>
 <li><strong>Retire etcd</strong> — <em>(absorbed into <a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a> phase 0; the standalone <code>PLAN-remove-etcd.md</code> has been removed.)</em> Inspection confirmed the etcd data drain is complete (the <code>DATA_MIGRATIONS</code> dict is empty), but the supporting machinery — <code>shakenfist/etcd.py</code>, <code>etcd3gw</code>, the etcd proto stubs, the drain test files, <code>is_etcd_master</code>, the migration-era <code>sf-ctl</code> aliases — is still in tree. Phase 0 of the BYO-MariaDB plan deletes it as a single sweep. The <code>etcd_master</code> ansible group name rename stays with <code>PLAN-remove-primary</code> phase 7 as a deploy-scope concern.</li>
-<li><strong><a href="PLAN-health-checks/">Health checks, readiness, and graceful drain</a></strong> — <strong>complete.</strong> A precondition for the BYO load-balancer story in remove-primary being operationally honest. Delivered sf-api <code>/livez</code>/<code>/readyz</code>/<code>/healthz</code> with SIGTERM drain, dependency-aware <code>grpc.health.v1</code> on sf-database, systemd <code>WATCHDOG</code> liveness on the worker/elected daemons (which also closes the cluster-lock proof-of-life gap), and operator LB/upgrade docs. Landed on the <code>health-checks</code> branch.</li>
+<li><strong><a href="PLAN-health-checks/">Health checks, readiness, and graceful drain</a></strong> — <strong>complete.</strong> A precondition for the BYO load-balancer story in remove-primary being operationally honest. Delivered sf-api <code>/livez</code>/<code>/readyz</code>/<code>/healthz</code> with SIGTERM drain, dependency-aware <code>grpc.health.v1</code> on sf-database, systemd <code>WATCHDOG</code> liveness on the worker/elected daemons (which also closes the cluster-lock proof-of-life gap), and operator LB/upgrade docs. Landed on the <code>health-checks</code> branch. <strong><a href="PLAN-node-resource-health/">Node resource health</a></strong> is a <em>sibling</em> (complete) on a different axis — it drives <code>node.state</code> from the health of the storage/resource dependencies a node's hosted object types declare, so a dead disk or hung NFS mount takes a node out of scheduling. It was not sequenced against the BYO thread; it grew out of the sf-6 blob-NVMe incident and landed independently on the <code>node-resource-health</code> branch.</li>
 <li><strong><a href="PLAN-remove-primary/">Remove the primary node</a></strong> — the BYO-infrastructure scope reduction. Phase 7 finishes the deployer-level <code>etcd_master</code> → <code>database_node</code> rename, by which point the drain code itself is long gone. Naturally followed by a wipe-and-redeploy of Mikal's production cluster against the new shape.</li>
 <li><strong><a href="PLAN-byo-mariadb/">BYO MariaDB and <code>sf-database</code> as a tier</a></strong> — lifted out of remove-primary because it grew into its own master plan. Removes MariaDB-server install from the deployer entirely, reshapes <code>sf-database</code> into a deployer-chosen tier of equal stateless instances reached via client-side gRPC load balancing (not leader election), and carves schema/migration execution out of daemon startup into an operator-run <code>sf-ctl ensure-mariadb-schema</code> command. Can land in parallel with remove-primary's remaining phases; its phase 1 also performs the scope-shift edit to remove-primary itself.</li>
 </ol>
@@ -10124,6 +10152,12 @@
 <td>Phase 4: Operator documentation</td>
 <td>Complete</td>
 <td><code>load_balancing.md</code> HAProxy/nginx-FOSS/ALB probe configs; rolling-upgrade-with-drain in <code>upgrades.md</code>; live <code>ci_drain_check.sh</code> (in the actions repo) wired into functional-tests</td>
+</tr>
+<tr>
+<td><a href="PLAN-node-resource-health/">Node resource health</a></td>
+<td>Phases 1-4: Checks, evaluator, cascade, docs</td>
+<td>Complete</td>
+<td>Timeout-guarded path check; sf-resources marks a dead-storage node <code>error</code> (stops scheduling, discounts blob replicas) and exposes a <code>node_resource_health</code> gauge; cluster-daemon cascade errors instances + re-replicates blobs; <code>sf-ctl clear-node-error</code> recovery and operator docs. Decisions ratified inline (no separate phase-0 doc).</td>
 </tr>
 <tr>
 <td><a href="PLAN-remove-primary/">Remove the primary node</a></td>

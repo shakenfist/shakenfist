@@ -9794,6 +9794,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operator_guide/node_health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node Resource Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operator_guide/power_states/" class="md-nav__link">
         
   
@@ -10175,6 +10203,11 @@ done because the <code>error</code> transition is a queue job and happens someti
 Instances in the <code>error</code> state are not removed like those in the <code>deleted</code> state,
 as we assume a caller must acknowledge an error occurred. To remove them, delete
 the instance in <code>error</code> state.</p>
+<p>The state model also permits a <code>creating</code> or <code>created</code> instance to move directly
+to <code>error</code>, and any of the <code>*-error</code> transition states to move on to <code>delete-wait</code>
+or <code>deleted</code> as well as to <code>error</code>. An instance in <code>error</code> (or one of the
+transition states) may likewise be sent to <code>delete-wait</code> or <code>deleted</code> when the
+caller deletes it.</p>
 <p>The following transitions are possible (note that hyphens have been replaced with
 underscores in some state names due to limitations in the diagram renderer):</p>
 <pre class="mermaid"><code>stateDiagram-v2
@@ -10195,15 +10228,25 @@ underscores in some state names due to limitations in the diagram renderer):</p>
   creating --&gt; delete_wait
   creating --&gt; deleted
   creating --&gt; creating_error
+  creating --&gt; error
 
   created --&gt; delete_wait
   created --&gt; deleted
   created --&gt; created_error
+  created --&gt; error
 
   initial_error --&gt; error
+  initial_error --&gt; delete_wait
+  initial_error --&gt; deleted
   preflight_error --&gt; error
+  preflight_error --&gt; delete_wait
+  preflight_error --&gt; deleted
   creating_error --&gt; error
+  creating_error --&gt; delete_wait
+  creating_error --&gt; deleted
   created_error --&gt; error
+  created_error --&gt; delete_wait
+  created_error --&gt; deleted
   delete_wait_error --&gt; error
 
   error --&gt; delete_wait
@@ -10278,43 +10321,71 @@ underscores in some state names due to limitations in the diagram renderer):</p>
   deleted --&gt; [*]</code></pre>
 <h2 id="nodes">Nodes<a class="headerlink" href="#nodes" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>created</code>: on first check in, a node is created in the "created" state.</li>
+<li><code>initial</code>: the first state for a node. A UUID has been allocated and a
+  placeholder database entry created, but the node has not yet completed its
+  first check in. A node is promoted to <code>created</code> once its daemons report in.</li>
+<li><code>created</code>: the node has checked in and is available for scheduling.</li>
 <li><code>stopping</code>: the node is gracefully shutting down.</li>
 <li><code>stopped</code>: the node has gracefully shut down.</li>
-<li><code>deleted</code>: the node was manually evacuated and removed. Note that the <code>node</code>
-  object is the only object type to never hard delete, although a <code>node</code> cannot
-  be undeleted.</li>
+<li><code>deleted</code>: the node was manually evacuated and removed. The <code>node</code> object is
+  the only object type that is never hard deleted. Unlike every other object, a
+  <code>node</code> can also be returned from <code>deleted</code> to <code>created</code>: you delete a node to
+  force the instances hosted on it to be marked as gone, then, once the hardware
+  is repaired, return the node to service.</li>
 <li><code>missing</code>: the node has not checked in within the NODE_CHECKIN_MAXIMUM deadline.</li>
-<li><code>error</code>: the node has not check in for ten times NODE_CHECKIN_MAXIMUM, and all
-  instances on this node have been declared to be in an error state. The <code>node</code>
-  object is the only object which can return from an <code>error</code> state to other states.</li>
+<li><code>degraded</code>: one of the node's daemons is self-reporting as not running. A
+  degraded node is still a scheduling candidate.</li>
+<li><code>error</code>: a resource the node depends on has failed -- for example its blob or
+  instance storage is unreadable, remounted read-only, or a hung NFS mount (see
+  <a href="../../operator_guide/node_health/">Node resource health</a>). An errored node is
+  not a scheduling candidate, and its blob replicas stop counting toward
+  replication targets. Resource-health errors never clear automatically; an
+  operator runs <code>sf-ctl clear-node-error</code> once the underlying problem is fixed.
+  The <code>node</code> object is the only object which can return from an <code>error</code> state to
+  other states.</li>
 </ul>
 <p>The following transitions are possible:</p>
 <pre class="mermaid"><code>stateDiagram-v2
-  [*] --&gt; created
-  [*] --&gt; error
-  [*] --&gt; missing
+  [*] --&gt; initial
+
+  initial --&gt; created
+  initial --&gt; error
+  initial --&gt; missing
+  initial --&gt; degraded
 
   created --&gt; deleted
   created --&gt; error
   created --&gt; missing
   created --&gt; stopping
+  created --&gt; degraded
 
   stopping --&gt; stopped
   stopping --&gt; deleted
   stopping --&gt; error
   stopping --&gt; created
+  stopping --&gt; degraded
 
   stopped --&gt; created
   stopped --&gt; deleted
   stopped --&gt; error
+  stopped --&gt; degraded
+
+  degraded --&gt; created
+  degraded --&gt; deleted
+  degraded --&gt; error
+  degraded --&gt; missing
+  degraded --&gt; stopping
 
   error --&gt; created
   error --&gt; deleted
+  error --&gt; degraded
 
   missing --&gt; created
   missing --&gt; deleted
-  missing --&gt; error</code></pre>
+  missing --&gt; error
+  missing --&gt; degraded
+
+  deleted --&gt; created</code></pre>
 <h2 id="upload">Upload<a class="headerlink" href="#upload" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>created</code>: the upload has data associated with it.</li>
