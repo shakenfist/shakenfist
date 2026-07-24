@@ -21,6 +21,25 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
+def _resilient_job(job_func, *args):
+    """Wrap a scheduled task so a failure cannot starve the scheduler.
+
+    schedule.Job.run() only sets last_run and reschedules after job_func
+    returns, so a job which raises is left permanently overdue: it sorts
+    first in run_pending() and its exception aborts the tick before any
+    other due job runs, killing every scheduled task forever (github
+    issue 3490). Catching here means a failing task is logged and all
+    jobs always reschedule.
+    """
+    def wrapper():
+        try:
+            job_func(*args)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'cleaner scheduled task {job_func.__name__}', e)
+    return wrapper
+
+
 class Monitor(daemon.Daemon):
     def _maintain_blobs(self):
         # Find orphaned and deleted blobs still on disk
@@ -142,11 +161,11 @@ class Monitor(daemon.Daemon):
                     b.drop_node_location(config.NODE_NAME)
 
     def _run_inner(self):
-        schedule.every(1).minutes.do(
-            scheduled_tasks.update_power_states, self.pet_watchdog)
-        schedule.every(5).minutes.do(
-            scheduled_tasks.remove_stale_uploads_for_this_node)
-        schedule.every(5).minutes.do(observe_local_blobs)
+        schedule.every(1).minutes.do(_resilient_job(
+            scheduled_tasks.update_power_states, self.pet_watchdog))
+        schedule.every(5).minutes.do(_resilient_job(
+            scheduled_tasks.remove_stale_uploads_for_this_node))
+        schedule.every(5).minutes.do(_resilient_job(observe_local_blobs))
 
         last_defer_message = 0
 

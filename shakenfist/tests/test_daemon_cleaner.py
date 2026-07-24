@@ -1,4 +1,7 @@
+import datetime
 from unittest import mock
+
+import schedule
 
 from shakenfist import instance
 from shakenfist.config import BaseSettings
@@ -215,6 +218,52 @@ class CleanerCrashedInstanceTestCase(CleanerTestCase):
         db_state = self.mock_mariadb.get_mariadb_state(
             ObjectType.INSTANCE, instance_uuids['crashed'])
         self.assertEqual(instance.Instance.STATE_DELETED, db_state['value'])
+
+
+class ResilientJobTestCase(base.ShakenFistTestCase):
+    """A raising scheduled task must not starve the cleaner's scheduler.
+
+    schedule.Job.run() only reschedules after job_func returns, so an
+    unwrapped raising job stays permanently overdue, sorts first in
+    run_pending(), and aborts every tick before any other job runs
+    (github issue 3490).
+    """
+
+    def test_failing_job_does_not_starve_others(self):
+        ran = []
+
+        def failing():
+            ran.append('failing')
+            raise ValueError('badly formed hexadecimal UUID string')
+
+        def healthy():
+            ran.append('healthy')
+
+        sched = schedule.Scheduler()
+        sched.every(5).minutes.do(cleaner_main._resilient_job(failing))
+        sched.every(1).minutes.do(cleaner_main._resilient_job(healthy))
+
+        # Force both jobs due, with the failing job sorting first --
+        # exactly the wedged state from the issue.
+        past = datetime.datetime.now() - datetime.timedelta(hours=1)
+        sched.jobs[0].next_run = past
+        sched.jobs[1].next_run = past + datetime.timedelta(minutes=1)
+
+        sched.run_pending()
+
+        # Both jobs ran despite the first raising...
+        self.assertEqual(['failing', 'healthy'], ran)
+
+        # ... and both were rescheduled into the future, so neither is
+        # permanently overdue.
+        now = datetime.datetime.now()
+        for job in sched.jobs:
+            self.assertGreater(job.next_run, now)
+
+    def test_resilient_job_passes_arguments(self):
+        recorded = []
+        cleaner_main._resilient_job(recorded.append, 'petted')()
+        self.assertEqual(['petted'], recorded)
 
 
 class CleanerWatchdogTestCase(base.ShakenFistTestCase):
