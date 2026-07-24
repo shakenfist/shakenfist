@@ -173,7 +173,13 @@ class Blob(dbo):
         if isinstance(object_uuid, uuid.UUID):
             db_uuid = object_uuid
         else:
-            db_uuid = uuid.UUID(object_uuid)
+            try:
+                db_uuid = uuid.UUID(object_uuid)
+            except ValueError:
+                # A name that is not UUID shaped cannot be in the database,
+                # so it is a miss under from_db()'s not-found contract --
+                # callers such as storage scanners pass filenames here.
+                return None
         data = mariadb.get_blob(db_uuid)
         if not data:
             return None

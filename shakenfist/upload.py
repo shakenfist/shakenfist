@@ -84,7 +84,13 @@ class Upload(dbo):
     @classmethod
     def _db_get(cls, object_uuid: str) -> UploadData | None:
         """Get upload static values from MariaDB instead of etcd."""
-        data = mariadb.get_upload(uuid.UUID(object_uuid))
+        try:
+            db_uuid = uuid.UUID(object_uuid)
+        except ValueError:
+            # A name that is not UUID shaped cannot be in the database,
+            # so it is a miss under from_db()'s not-found contract.
+            return None
+        data = mariadb.get_upload(db_uuid)
         if not data:
             return None
 

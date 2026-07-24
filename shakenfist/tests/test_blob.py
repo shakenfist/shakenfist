@@ -369,3 +369,16 @@ class ObserveLocalBlobsTestCase(base.ShakenFistTestCase):
 
         mock_from_db.assert_called_once_with(
             blob_uuid, suppress_failure_audit=True)
+
+
+class BlobFromDbMalformedUuidTestCase(base.ShakenFistTestCase):
+    """A lookup by a non-UUID name is a miss, not a ValueError.
+
+    from_db() has a not-found contract and storage scanners pass raw
+    filenames to it; an unexpected name must not raise (github issue
+    3490).
+    """
+
+    def test_from_db_malformed_uuid_returns_none(self):
+        self.assertIsNone(
+            blob.Blob.from_db('_heartbeat', suppress_failure_audit=True))

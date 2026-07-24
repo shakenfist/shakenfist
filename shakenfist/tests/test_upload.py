@@ -346,3 +346,12 @@ class RemoveStaleUploadsTestCase(base.ShakenFistTestCase):
 
         self.assertTrue(os.path.exists(heartbeat))
         self.assertFalse(os.path.exists(stale))
+
+
+class UploadFromDbMalformedUuidTestCase(base.ShakenFistTestCase):
+    """A lookup by a non-UUID name is a miss, not a ValueError (github
+    issue 3490)."""
+
+    def test_from_db_malformed_uuid_returns_none(self):
+        self.assertIsNone(
+            upload.Upload.from_db('_heartbeat', suppress_failure_audit=True))
