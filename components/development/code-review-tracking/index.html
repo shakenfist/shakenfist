@@ -10057,9 +10057,16 @@ local clone of this repository and passes through to the script.</p>
   fnmatch patterns matched against repo-relative paths (<code>*</code> matches
   across directory separators; an empty or absent <code>include</code> means
   all tracked files). The tracking machinery (<code>.vscode/*</code>,
-  <code>REVIEWS.md</code>) is always excluded. Generated and vendored code
-  should be excluded here; whether unit tests are in scope is a
-  per-repo decision.</li>
+  <code>REVIEWS.md</code>) is always excluded. Scope should cover both the
+  executable artifacts (source code in every language the repo
+  uses, plus shell scripts) and the prose that documents them
+  (READMEs, <code>ARCHITECTURE</code>/<code>AGENTS</code>, and <code>docs/</code> guides): prose
+  drifts out of sync just as quietly as code and benefits from the
+  same periodic re-reading. Generated and vendored code should be
+  excluded, as should ephemeral working documents like a
+  <code>docs/plans/</code> archive -- point-in-time records of intended work,
+  not living artifacts, and numerous enough to swamp the queue.
+  Whether unit tests are in scope is a per-repo decision.</li>
 </ul>
 <h2 id="adopting-a-repository">Adopting a repository<a class="headerlink" href="#adopting-a-repository" title="Permanent link">&para;</a></h2>
 <ol>
@@ -10099,12 +10106,21 @@ local clone of this repository and passes through to the script.</p>
    superset -- PRs, merge queue, status checks -- and also
    satisfies this.)</p>
 <ol>
-<li>Write <code>.vscode/review-scope.toml</code>, for example:</li>
+<li>Write <code>.vscode/review-scope.toml</code>. Cover code and docs across
+   the languages the repo uses, and exclude generated, vendored, and
+   ephemeral files. For example (ryll's config; adjust the language
+   patterns to the repo):</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Which files are subject to whole-file review.</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">include</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span><span class="w">                 </span><span class="c1"># empty: all tracked files</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">&#39;*_pb2.py&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;vendor/*&#39;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Source in every language the repo uses, plus shell scripts and</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># the Markdown documentation.</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">include</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">&#39;*.rs&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.sh&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.py&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;*.md&#39;</span><span class="p">]</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># docs/plans/ is a point-in-time archive, not living artifacts.</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">&#39;docs/plans/*&#39;</span><span class="p">]</span>
 </code></pre></div>
+<p>An empty <code>include</code> means all tracked files, which is a fine
+   starting point for a small repo -- but then lean on <code>exclude</code> to
+   keep generated code (<code>*_pb2.py</code>), vendored trees (<code>vendor/*</code>), and
+   ephemeral archives out of the queue.</p>
 <ol>
 <li>
 <p>Add a thin wrapper (e.g. <code>tools/review-tracking.sh</code>, copied
