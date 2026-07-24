@@ -42,9 +42,16 @@ local clone of this repository and passes through to the script.
   fnmatch patterns matched against repo-relative paths (`*` matches
   across directory separators; an empty or absent `include` means
   all tracked files). The tracking machinery (`.vscode/*`,
-  `REVIEWS.md`) is always excluded. Generated and vendored code
-  should be excluded here; whether unit tests are in scope is a
-  per-repo decision.
+  `REVIEWS.md`) is always excluded. Scope should cover both the
+  executable artifacts (source code in every language the repo
+  uses, plus shell scripts) and the prose that documents them
+  (READMEs, `ARCHITECTURE`/`AGENTS`, and `docs/` guides): prose
+  drifts out of sync just as quietly as code and benefits from the
+  same periodic re-reading. Generated and vendored code should be
+  excluded, as should ephemeral working documents like a
+  `docs/plans/` archive -- point-in-time records of intended work,
+  not living artifacts, and numerous enough to swamp the queue.
+  Whether unit tests are in scope is a per-repo decision.
 
 ## Adopting a repository
 
@@ -85,13 +92,23 @@ local clone of this repository and passes through to the script.
    superset -- PRs, merge queue, status checks -- and also
    satisfies this.)
 
-4. Write `.vscode/review-scope.toml`, for example:
+4. Write `.vscode/review-scope.toml`. Cover code and docs across
+   the languages the repo uses, and exclude generated, vendored, and
+   ephemeral files. For example (ryll's config; adjust the language
+   patterns to the repo):
 
    ```toml
-   # Which files are subject to whole-file review.
-   include = []                 # empty: all tracked files
-   exclude = ['*_pb2.py', 'vendor/*']
+   # Source in every language the repo uses, plus shell scripts and
+   # the Markdown documentation.
+   include = ['*.rs', '*.sh', '*.py', '*.md']
+   # docs/plans/ is a point-in-time archive, not living artifacts.
+   exclude = ['docs/plans/*']
    ```
+
+   An empty `include` means all tracked files, which is a fine
+   starting point for a small repo -- but then lean on `exclude` to
+   keep generated code (`*_pb2.py`), vendored trees (`vendor/*`), and
+   ephemeral archives out of the queue.
 
 5. Add a thin wrapper (e.g. `tools/review-tracking.sh`, copied
    from ryll) that locates a local clone of this repository --
