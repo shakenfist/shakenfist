@@ -7,6 +7,8 @@
 # - _persist_pydantic_upgrade() override in Upload
 # - mariadb upload functions
 
+import os
+import tempfile
 from typing import Any
 from unittest import mock
 from uuid import UUID
@@ -14,10 +16,16 @@ from uuid import UUID
 from pydantic import ValidationError
 import testtools
 
+from shakenfist.config import BaseSettings
 from shakenfist.schema.object_state import State
 from shakenfist.schema.upload import UploadData
 from shakenfist.tests import base
 from shakenfist import upload
+
+
+class FakeConfig(BaseSettings):
+    NODE_NAME: str = 'abigcomputer'
+    STORAGE_PATH: str = '/srv/shakenfist'
 
 
 class UploadDataTestCase(base.ShakenFistTestCase):
@@ -304,3 +312,37 @@ class MariaDBUploadFunctionsTestCase(base.ShakenFistTestCase):
 
         self.assertTrue(result)
         mock_grpc.assert_called_once_with(data)
+
+
+class RemoveStaleUploadsTestCase(base.ShakenFistTestCase):
+    """remove_stale_uploads_for_this_node() must only garbage collect
+    UUID-named files.
+
+    It deletes anything without a database record and has no age check,
+    so without a name filter it would permanently race the resource
+    health check by deleting its _heartbeat sentinel (github issue
+    3490).
+    """
+
+    @mock.patch('shakenfist.upload.mariadb.get_uploads', return_value=[])
+    def test_heartbeat_sentinel_survives_but_stale_upload_removed(
+            self, mock_get_uploads):
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+
+        upload_dir = os.path.join(tempdir.name, 'uploads')
+        os.makedirs(upload_dir)
+
+        heartbeat = os.path.join(upload_dir, '_heartbeat')
+        stale = os.path.join(
+            upload_dir, '12345678-1234-4321-8234-123456789012')
+        for path in [heartbeat, stale]:
+            with open(path, 'w') as f:
+                f.write('...')
+
+        with mock.patch('shakenfist.upload.config',
+                        FakeConfig(STORAGE_PATH=tempdir.name)):
+            upload.remove_stale_uploads_for_this_node()
+
+        self.assertTrue(os.path.exists(heartbeat))
+        self.assertFalse(os.path.exists(stale))

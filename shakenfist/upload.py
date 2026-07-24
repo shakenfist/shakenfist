@@ -16,6 +16,7 @@ from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import general as util_general
 
 
 LOG, _ = logs.setup(__name__)
@@ -178,6 +179,12 @@ def remove_stale_uploads_for_this_node() -> None:
     os.makedirs(upload_path, exist_ok=True)
 
     for upload_uuid in os.listdir(upload_path):
+        # Upload files are named for their UUID. Anything else (such as
+        # the resource health _heartbeat sentinel) is not an upload and
+        # must not be garbage collected.
+        if not util_general.valid_uuid4(upload_uuid):
+            continue
+
         if upload_uuid not in uploads_on_this_node:
             LOG.with_fields({
                 'upload': upload_uuid
