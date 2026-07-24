@@ -105,10 +105,11 @@ configuration name ends in `_KEY`, `sf-ctl show-config` redacts it by
 default; never pass `--show-secrets` where the output could be logged, and
 never print or event private key material.
 
-The key is created lazily: the first token mint auto-generates it if it is
-absent. To bootstrap it ahead of first use — for example so you can publish
-the public key to Kerbside before anyone opens a console — run the
-idempotent:
+The key is **not** created automatically: it must be provisioned explicitly
+before the first console is opened. Until it exists, the `vdiconsoleproxy`
+endpoint returns HTTP 500 naming the command to run below — minting never
+self-bootstraps a key. Create it — for example so you can publish the public
+key to Kerbside before anyone opens a console — with the idempotent:
 
 ```bash
 sf-ctl ensure-kerbside-signing-key
@@ -169,6 +170,15 @@ published key.
     token lifetime between rotations guarantees every in-flight token was
     signed by a key that is still published. Rotating twice in quick
     succession can strand live sessions.
+
+!!! note
+
+    Run the signing-key commands (`ensure-kerbside-signing-key`,
+    `rotate-kerbside-signing-key`) one at a time. Both perform an unlocked
+    read-modify-write of the `KERBSIDE_JWT_SIGNING_KEY` cluster config, so two
+    running concurrently could lose one write and strand a key that should
+    still be published. These are manual, infrequent operator actions, so
+    serialising them is trivial — just don't fire two at once.
 
 A safe cadence is therefore: rotate, wait for Kerbside to refresh its
 published keys and for at least `KERBSIDE_TOKEN_DURATION` to elapse, then

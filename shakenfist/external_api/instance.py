@@ -1525,16 +1525,22 @@ class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
                 f'instance {instance_from_db.uuid} is not ready '
                 f'({instance_from_db.state.value})')
 
-        if not instance_from_db.video['vdi'].startswith('spice'):
+        video = instance_from_db.video
+        if not video or not video.get('vdi', '').startswith('spice'):
             return sf_api.error(
                 409, 'instance does not have a SPICE console')
 
         namespace = instance_from_db.namespace
 
+        # The proxy URL base and the token audience must be byte-identical:
+        # Kerbside compares the audience by exact string match, so normalise a
+        # possibly trailing-slashed KERBSIDE_URL once and use it for both.
+        base = config.KERBSIDE_URL.rstrip('/')
+
         try:
             minted = vdi_tokens.mint_console_token(
                 str(instance_from_db.uuid), namespace,
-                audience=config.KERBSIDE_URL, issuer=config.ZONE,
+                audience=base, issuer=config.ZONE,
                 duration=config.KERBSIDE_TOKEN_DURATION)
         except vdi_tokens.SigningKeyError:
             return sf_api.error(
@@ -1542,7 +1548,6 @@ class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
                 'kerbside signing key is not configured, run sf-ctl '
                 'ensure-kerbside-signing-key')
 
-        base = config.KERBSIDE_URL.rstrip('/')
         url = f'{base}/sf-console.vv?token={minted["token"]}'
 
         instance_from_db.add_event(
