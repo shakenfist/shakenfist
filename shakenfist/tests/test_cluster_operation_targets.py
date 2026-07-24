@@ -543,11 +543,13 @@ HOTPLUG_NODE_UUID = 'bbbb3333-3333-4333-8333-333333333333'
 class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
     """Unit-level regression for the hot-plug triple-target bug.
 
-    This test mocks mariadb.create_cluster_operation_target so it
-    only proves the schema's target_fields declaration and the
-    enqueue_cluster_operation() call-site fan-out are correct. It
-    does NOT exercise the actual database UNIQUE constraint --
-    see HotPlugTargetWriteIntegrationTestCase below for that.
+    This test mocks mariadb.create_and_enqueue_cluster_operation so
+    it only proves the schema's target_fields declaration and the
+    enqueue_cluster_operation() call-site fan-out are correct: the
+    three targets must reach the atomic enqueue via its ``targets``
+    argument. It does NOT exercise the actual database UNIQUE
+    constraint -- see HotPlugTargetWriteIntegrationTestCase below
+    for that.
 
     Originally added for commit 8923391c. Kept for fast feedback;
     the integration test catches the deeper bug.
@@ -573,7 +575,8 @@ class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
 
     def test_hot_plug_enqueue_writes_three_target_rows(self):
         """Three cluster_operation_targets rows must be written: instance,
-        network, and interface. This locks in that the original CI failure
+        network, and interface. They now travel in the atomic enqueue's
+        ``targets`` argument. This locks in that the original CI failure
         from commit 8923391c cannot regress.
         """
         from shakenfist.schema.operations.node_inst_net_iface_op import (
@@ -589,24 +592,19 @@ class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
             PRIORITY.user_waiting,
         )
 
-        self.assertEqual(3, self.mock_create_target.call_count)
-        target_types = {
-            call.kwargs['target_object_type']
-            for call in self.mock_create_target.call_args_list
-        }
+        targets = self.mock_create_and_enqueue.call_args.kwargs['targets']
+        self.assertEqual(3, len(targets))
         self.assertEqual(
             {ObjectType.INSTANCE, ObjectType.NETWORK, ObjectType.INTERFACE},
-            target_types,
+            {object_type for object_type, _ in targets},
         )
-        target_uuids = {
-            call.kwargs['target_uuid']
-            for call in self.mock_create_target.call_args_list
-        }
         self.assertEqual(
             {HOTPLUG_INSTANCE_UUID, HOTPLUG_NETWORK_UUID,
              HOTPLUG_INTERFACE_UUID},
-            target_uuids,
+            {target_uuid for _, target_uuid in targets},
         )
+        # The retired non-atomic per-row writer must not be used.
+        self.mock_create_target.assert_not_called()
 
 
 class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
@@ -862,12 +860,27 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
             create_and_enqueue, model_tasks)
         from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 
-        # The op + state + work-queue write is its own MariaDB
-        # transaction; here we only care about the target writes,
-        # so stub it out as success.
+        # The real atomic function writes the target rows in the same
+        # transaction as the op/state/work-queue rows (whose tables
+        # this fixture does not build). We stub that function and have
+        # the stub persist just the ``targets`` it is handed, through
+        # the real direct target writer against this fixture's SQLite
+        # engine, so the composite UNIQUE constraint is exercised on
+        # the exact three targets the enqueue call-site forwards.
+        def _persist_targets(*args, **kwargs):
+            for target_object_type, target_uuid in (
+                    kwargs.get('targets') or []):
+                self._mariadb._direct_create_cluster_operation_target(
+                    operation_uuid=kwargs['op_uuid'],
+                    operation_type=kwargs['operation_type'],
+                    target_object_type=target_object_type,
+                    target_uuid=target_uuid,
+                    created_at=kwargs['created_at'])
+            return True
+
         with mock.patch(
                 'shakenfist.mariadb.create_and_enqueue_cluster_operation',
-                return_value=True):
+                side_effect=_persist_targets):
             _, op_uuid = create_and_enqueue(
                 HOTPLUG_NODE_UUID,
                 HOTPLUG_INSTANCE_UUID,
@@ -1178,15 +1191,23 @@ class DirectListClusterOperationsForTargetTestCase(
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
         )
+        # cluster_operations.uuid is a Uuid() column exactly as in
+        # production. An earlier version of this fixture used String(36)
+        # here, which stored the dashed UUID form and so happened to
+        # match the dashed String in cluster_operation_targets on a
+        # naive JOIN -- masking the production bug where the Uuid()
+        # column's storage form has no dashes and the JOIN never
+        # matched. Using the real type makes these tests a faithful
+        # regression guard for _direct_list_cluster_operations_for_target.
         self._ops_table = sa.Table(
             'cluster_operations',
             self._metadata,
-            sa.Column('uuid', sa.String(36), primary_key=True),
+            sa.Column('uuid', sa.Uuid(), primary_key=True),
             sa.Column('operation_type', sa.String(64), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
-            sa.Column('node_uuid', sa.String(36), nullable=True),
-            sa.Column('instance_uuid', sa.String(36), nullable=True),
-            sa.Column('network_uuid', sa.String(36), nullable=True),
+            sa.Column('node_uuid', sa.Uuid(), nullable=True),
+            sa.Column('instance_uuid', sa.Uuid(), nullable=True),
+            sa.Column('network_uuid', sa.Uuid(), nullable=True),
             sa.Column('priority', sa.String(32), nullable=True),
             sa.Column('metadata_json', sa.JSON(), nullable=False),
         )
@@ -1217,11 +1238,14 @@ class DirectListClusterOperationsForTargetTestCase(
 
     def _insert_op(self, op_uuid, op_type, created_at,
                    metadata=None):
+        from uuid import UUID
         if metadata is None:
             metadata = {}
         with self._engine.begin() as conn:
             conn.execute(self._ops_table.insert().values(
-                uuid=op_uuid,
+                # A Uuid() column binds UUID objects, not strings --
+                # production passes UUID objects here too.
+                uuid=UUID(op_uuid),
                 operation_type=op_type,
                 created_at=created_at,
                 node_uuid=None,

@@ -2471,6 +2471,1692 @@ Verified check-clean and read-back-parity against pinned qemu-img
 snapshot-bearing iterations (0 divergences) by `scripts/cow-soak.py`;
 `tests/helpers/snapshot_readback.py` is the reusable read-back oracle.
 
+## Format-coverage phase 1: Parallels, Bochs, cloop, DMG detection
+
+Phase 1 of `PLAN-format-coverage.md` added content-based detection and
+info parity for Parallels, Bochs, cloop, and DMG. The five entries below
+record the deliberate divergences this introduced, plus the closure of a
+pre-existing consumer defect the phase surfaced along the way. See
+[docs/plans/PLAN-format-coverage-phase-01-detection.md](/components/instar/plans/PLAN-format-coverage-phase-01-detection/)
+for the full design and findings.
+
+### DMG Detection: Content-Based Trailer Probing vs qemu's Filename Extension
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu-img's DMG probe is almost entirely extension-based: it recognises a
+file as DMG chiefly by the `.dmg` filename suffix, not by content. A
+file containing a byte-perfect UDIF koly trailer but named without a
+`.dmg` suffix probes as `raw` under qemu-img.
+
+instar instead detects DMG the same way it already detects fixed VHD:
+by content. When the header probe returns Raw, instar scans the file's
+final 1024 bytes for the `koly` magic (mirroring qemu's own
+`dmg_find_koly_offset` candidate window, `[len-1023, len-512]`) and, if
+found, reports `dmg` regardless of filename.
+
+#### Why This Matters
+
+Reporting "this raw-looking file is actually a compressed UDIF
+container" is precisely the class of fact instar's safety-detection
+charter exists to surface — the same stance already taken for ISO 9660
+(see "ISO 9660 Detection vs RAW" above). Extension-based detection
+would make instar's format report dependent on how a file happens to be
+named, which is not a security-relevant signal.
+
+#### instar Behavior
+
+**Always** (no flag toggles this): instar reports `dmg` for any file
+whose final bytes carry a valid koly trailer, independent of filename.
+For fixtures actually named `*.dmg` (the phase-1 baseline fixture,
+`dmg-simple`), both tools agree. The divergence is confined to misnamed
+files: a koly-bearing file without a `.dmg` suffix reports `dmg` under
+instar and `raw` under qemu-img. Unlike the other safe quirks in this
+document, `--unsafe-quirks` does **not** change DMG detection — instar
+never adopts qemu's extension probe, matching the design decision
+recorded as OQ2 in the phase-1 plan.
+
+### cloop Full-Magic Match vs qemu's Prefix-Match Truncation
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu's cloop probe compares `min(strlen(magic), buf_size)` bytes of the
+83-byte V2.0 shell-script magic against the file's leading bytes. A
+file shorter than 83 bytes whose available bytes are a prefix of the
+magic still probes as `cloop` under qemu-img — the comparison degrades
+to "how many bytes do we have" rather than "is the full magic present."
+
+instar requires the complete 83-byte magic (`len >= 83` and an exact
+match); a truncated file that qemu-img would call `cloop` detects as
+`raw` (or falls through to the partition-table gate) under instar.
+
+#### Why This Matters
+
+This is a degenerate edge case — only files truncated mid-magic are
+affected, which in practice means a corrupted or incomplete cloop
+image, not a legitimate one. qemu's prefix-match behaviour arguably
+over-detects; instar's stricter full-match requirement is the more
+conservative reading of the same magic string, not a loss of format
+identification accuracy for any real cloop image (the shortest real
+cloop file must carry the full 83-byte header to be valid anyway).
+
+#### instar Behavior
+
+**Default and only behavior**: instar always requires the full 83-byte
+magic. There is no flag to relax this to qemu's prefix-match rule.
+
+### DMG Info: Trailer-Only Report vs qemu's Chunk-Table Open Requirement
+
+**Classification: Safe Quirk** (adversarial fixtures only)
+
+#### Observed Behavior
+
+`qemu-img info` on a DMG must fully *open* the image, which requires
+parsing a valid BLKX chunk table (from the rsrc-fork or XML plist
+region referenced by the koly trailer). A DMG with a structurally valid
+koly trailer but no parseable chunk table fails to open, and
+`qemu-img info` errors out.
+
+instar's `info` support parses only the koly trailer — it does not
+walk the chunk table, even after phase 5 gave convert/compare/dd/
+bench a full chunk-table reader (see "Format-coverage phase 5" below)
+— so it reports format name and virtual size directly from the
+trailer's `SectorCount` field, successfully, even when the chunk
+table is missing or empty. This is a deliberate scope boundary, not
+an oversight: `info` never needed the chunk table, and phase 5 did
+not add one to it.
+
+#### Why This Matters
+
+For every well-formed DMG (a real UDIF image with a working chunk
+table), both tools agree. The divergence is confined to the
+`dmg-no-chunk-table` adversarial fixture (`RsrcForkLength` and
+`XMLLength` both zero): `qemu-img info` errors, instar reports `dmg`
+with the trailer's declared virtual size. This fixture carries
+`skip_qemu_img: true` in `tests/manifest.json` precisely because no
+qemu-img baseline exists to compare against.
+
+#### instar Behavior
+
+**Default behavior**: instar reports whatever the koly trailer alone
+can support, without requiring the chunk table to be present or valid.
+This is intentionally more permissive than qemu-img for `info`
+specifically — instar's sandboxed architecture means there is no
+safety cost to reporting a best-effort trailer-derived size for a
+container it cannot fully open, unlike qemu-img's open-then-read model.
+
+### Detect-Only Format Refusal in convert / compare / dd (#444)
+
+**Classification: closes an Unsafe Quirk** (was silently mimicking
+qemu-img's raw-fallback behaviour; now refuses instead)
+
+#### Observed Behavior (before the fix)
+
+`instar convert`, `compare`, and `dd` discover their input's format via
+a guest-side `info` probe, then map the reported format string to a
+`chain::ImageFormat`. Any format instar detects but has no read path
+for (`qed`, `vdi` and `parallels` at the time, and — after this phase
+— `bochs`, `cloop`, `dmg`) collapsed to `ImageFormat::Unknown`, and the
+chain reader's default arm read `Unknown` images as **raw bytes** —
+emitting the container's bytes zero-padded to the header-declared
+virtual size, with no error and no indication anything was wrong. This
+was tracked as [#444](https://github.com/shakenfist/instar/issues/444),
+confirmed by phase 1 step 1a's empirical pin (see the phase plan's
+Findings section), and fixed by step 3b. `vdi` gained a full read path
+in phase 2 and `parallels` in phase 3; neither is part of this refused
+set any longer — see "Format-coverage phase 2" and "Format-coverage
+phase 3" below.
+
+#### instar Behavior (after the fix)
+
+`discover_backing_chain` now refuses centrally — covering the top-level
+image and every mid-chain backing position identically — whenever the
+guest-reported format string is detected but maps to `Unknown` and is
+not `raw`, `unknown`, or `iso`. The typed error names the format,
+e.g.:
+
+```
+convert: input format 'bochs' is detected but not supported for
+reading (detection and info only)
+```
+
+This closed the hole for `qed` (previously silently read as raw,
+contradicting its documented "detected, refused" stance) as well as
+the four newly detected formats. `vdi` and `parallels` were in the
+same set at the time this phase landed; phase 2 graduated `vdi` and
+phase 3 graduated `parallels` to full read paths instead, so neither
+appears among the refused formats any longer (see "Format-coverage
+phase 2" and "Format-coverage phase 3" below). There is no flag to
+disable this refusal — unlike `instar info`, convert/compare/dd have
+no `--unsafe-quirks` path at all, so the refusal is unconditional.
+
+#### The ISO exemption and the info-vs-consumer asymmetry
+
+**iso is deliberately exempt** and keeps its raw pass-through
+everywhere: unlike qed/bochs/cloop/dmg — where a raw interpretation
+misrepresents the content (container metadata plus zero padding, not
+the virtual disk) — an ISO's container bytes *are* its virtual disk
+content, so reading it as raw is semantically correct. qemu-img
+(which has no ISO driver at all) converts ISOs as raw routinely;
+refusing them would be a parity regression on a common workflow, not
+a safety fix. `vdi` and `parallels` were in the same "raw would
+misrepresent it" group as the others until phase 2 and phase 3
+respectively, which gave them full readers instead of a refusal —
+see "Format-coverage phase 2" and "Format-coverage phase 3" below.
+
+This produces an asymmetry worth noting explicitly: standalone `instar
+info` on an ISO reports `iso` by default (secure mode) and `raw` only
+with `--unsafe-quirks` (see "ISO 9660 Detection vs RAW" above). But
+`discover_backing_chain` always probes via `info` in secure mode
+internally — regardless of any flag convert/compare/dd don't even
+accept — so it always sees `"iso"`, and then explicitly declines to
+refuse it. In other words, convert/compare/dd behave *as if* they were
+always in `--unsafe-quirks` mode for ISO specifically, while every
+other detect-only format is refused unconditionally in every mode.
+This is intentional (see the phase-1 plan's post-1a management review
+decision) and is pinned by tests asserting the exact ISO pass-through
+byte sizes (`convert` 393216, `dd` 376832).
+
+### DMG Pass-Through as Raw in the In-Place Ops (phase-1 accepted behaviour, retained through phase 5)
+
+**Classification: Safe Quirk** (accepted, tracked for future work)
+
+#### Observed Behavior
+
+The koly-trailer probe added in phase 1 is wired only into the guest
+`info` op, as the phase-1 plan specified. The in-place single-image ops
+— `resize`, `map`, `measure`, and the other guest ops that detect via
+`detect_format_from_header` directly rather than through the `info`
+chain — never see the trailer probe, so they detect a DMG (valid or
+adversarial) as `Raw` and pass it through as a raw disk image, exactly
+as they would for any other undetected file. Parallels, Bochs, and
+cloop are unaffected for these in-place ops — they are header-detected
+at offset 0, which *is* wired into `detect_format_from_header`, so
+`resize`/`map`/`measure` refuse all three correctly. Bochs and cloop
+still refuse in every op; `parallels`'s convert/compare/dd/bench
+refusal was lifted in phase 3, which gave it a full reader instead —
+see "Format-coverage phase 3" below for the current per-op picture.
+
+#### Why This Matters
+
+This mirrors qemu-img's own treatment of a misnamed DMG (qemu's
+extension-based probe also fails to recognise it, so qemu-img reads it
+as raw too), and the data-copying consumers that actually matter for
+safety — convert, compare, dd — already refuse DMG via the #444 gate
+above (they route through `info`, which does run the trailer probe).
+Only the single-image in-place ops are affected, and only for DMG.
+
+#### instar Behavior
+
+**Accepted for phase 1 and unchanged by phase 5, pinned by tests**
+(`test_dmg_{resized,measured,reads}_as_raw`): resize, map, and measure
+treat a DMG the same as any other raw-detected file. Phase 5
+(PLAN-format-coverage-phase-05-dmg-read.md) graduated DMG to a full
+chunk-table reader for convert/compare/dd/bench — see
+"Format-coverage phase 5" below — but deliberately did **not** wire
+the koly probe into these in-place ops or their host prefix probes;
+their raw pass-through is explicitly retained, not merely left over.
+Wiring the koly trailer probe into the host in-place-op prefix probes
+and the guest map/measure detection paths remains master-plan future
+work (`docs/plans/PLAN-format-coverage.md`, "Future work"). `check`
+has the same retained-raw-pass-through shape for a different reason —
+it refuses DMG outright (exit 63) rather than reading it, but still
+names the format "raw" because its own dispatch never runs the koly
+probe either; see "Format-coverage phase 5" below.
+
+## Format-coverage phase 2: VDI convert-from (read path)
+
+Phase 2 of `PLAN-format-coverage.md` graduated VDI (VirtualBox Disk
+Image) from detect + info only to a full read format for convert,
+compare, and dd, via a new `src/crates/vdi/` parser crate wired into
+the qcow2 crate's chain reader (the same pattern VHD and VHDX use).
+The five entries below record the deliberate qemu-parity choices this
+introduced and the divergences that remain. See
+[docs/plans/PLAN-format-coverage-phase-02-vdi-read.md](/components/instar/plans/PLAN-format-coverage-phase-02-vdi-read/)
+for the full design and findings.
+
+### Odd `disk_size` Rounds Up to 512 (qemu Parity, oslo Divergence)
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu's `vdi_open` does not reject a `disk_size` that is not a multiple
+of 512 (VBoxManage-created images can have one); it rounds the value
+up to the next 512-byte boundary in memory and reports the rounded
+size everywhere, including `qemu-img info`'s `virtual size` field.
+
+#### Why This Matters
+
+instar's reader and its `info` parser (`parse_vdi_header`) must agree
+with qemu's rounded value, not the header's raw bytes, to stay
+byte-identical against the qemu-img baselines. oslo.utils'
+`VDIInspector` does not round — it reports the raw `disk_size` — so
+this is also a genuine oslo divergence, not just an internal
+consistency question.
+
+#### instar Behavior
+
+**Always** (no flag toggles this): instar rounds `disk_size` up to 512
+at open, both for the reader's virtual-size view and for `info`'s
+reported size, matching qemu exactly. Pinned by the `vdi-odd-size`
+fixture (`disk_size` patched to 1048577, rounds to 1049088) with a
+byte-parity convert test and a `KNOWN_VSIZE_DIVERGENCES` entry in
+`tests/test_oslo_crossval.py` recording the oslo/qemu split.
+
+### Past-EOF Block Reads Zero-Fill, Never Error
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu's VDI driver never validates the on-disk file length against the
+header's declared geometry. A block-map entry pointing past the end
+of the file opens fine, `qemu-img map` reports it as ordinary data,
+and `qemu-img convert` exits 0 with that block read as all-zero — a
+straddling block (starts in-file, extends past EOF) zero-fills only
+the missing tail.
+
+#### Why This Matters
+
+A reader that instead errored on a past-EOF block would refuse images
+qemu-img converts successfully — a parity regression, not a safety
+improvement, since the sandboxed read of a header-consistent VDI
+carries no additional risk from an undersized backing file.
+
+#### instar Behavior
+
+**Always**: the chain reader's VDI arm zero-fills any portion of an
+allocated read at or past the device capacity, including the straddle
+case, mirroring qemu exactly. Pinned by the `vdi-bmap-past-eof`
+fixture (one block-map entry ~256 MiB past EOF) with a byte-parity
+convert test against `qemu-img convert`.
+
+### `image_type` Leniency and `block_extra` Is Ignored
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu does not validate the VDI header's `image_type` field at all:
+values 0, 3, and 4 all open and behave identically to the documented
+"dynamic" type (1); only type 2 ("static") gets different handling,
+and even that difference is just that a static image's block map
+happens to be the identity map written at creation time — the read
+path is the same block-map walk either way. Similarly, `block_extra`
+is parsed by qemu but never used in any offset computation.
+
+#### Why This Matters
+
+Rejecting an unrecognised `image_type` would refuse images qemu-img
+opens without complaint. Since a static image's identity block map is
+just ordinary block-map data, no special-casing is needed or correct.
+
+#### instar Behavior
+
+**Always**: `VdiHeader::parse` accepts any `image_type` value and the
+reader never special-cases type 2 — the block-map walk is identical
+for dynamic and static images. `block_extra` is parsed but never
+included in offset arithmetic. Pinned by unit tests in
+`src/crates/vdi/src/lib.rs` and the `vdi-static-data` fixture's
+byte-parity convert test.
+
+### `check` Still Refuses VDI; `qemu-img check` Does Not (Future Work)
+
+**Classification: Safe Quirk** (documented gap, not a defect)
+
+#### Observed Behavior
+
+qemu-img's VDI driver supports `qemu-img check`, which validates the
+block map (duplicate/overlapping entries, out-of-range values). instar
+`check` links format crates directly rather than through the chain
+reader that gained VDI support in this phase, and has no VDI arm.
+
+#### instar Behavior
+
+**Unchanged by this phase**: `instar check vdi-simple` exits 63 with
+`This image format (vdi) does not support checks`, exactly as before
+VDI's convert/compare/dd graduation — check was never in this phase's
+scope (see the phase plan's "Out of scope" section). instar-testdata
+already carries unconsumed VDI check baselines from `generate-baselines.py`
+(qemu-img generates them because its own driver supports the
+operation); wiring instar's `check` up to consume them is recorded as
+master-plan future work.
+
+### Malformed VDI: `compare` Reports a Mismatch, `info` Stays Lenient
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+The five malformed VDI adversarial fixtures (bad version, unaligned
+block-map offset, wrong block size, non-NULL parent UUID, too many
+blocks) each violate one of qemu's twelve `vdi_open` validation rules;
+qemu-img refuses all five at open. instar's new reader refuses them
+identically — but *how* each op surfaces that refusal differs, because
+`info` uses a separate, more lenient parser than the reader.
+
+#### Why This Matters
+
+`convert` and `dd` surface the reader's init failure as a normal
+operation error on stderr. `compare`, however, treats a source it
+cannot open as a content mismatch rather than a hard error: comparing
+a malformed VDI against any other file reports a non-zero-exit
+mismatch on stdout, not "Images are identical" — proving compare is
+not silently falling back to a raw read of the malformed container.
+`info`'s header parser (`parse_vdi_header`) is intentionally out of
+scope for the reader graduation — it still reports whatever
+detection-level fields (format name, a plausible virtual size) the
+raw header bytes yield, and exits 0, even for images the reader itself
+refuses. This mirrors the same info-stays-lenient stance phase 1
+established for malformed DMGs (see above).
+
+#### instar Behavior
+
+**Always**: `convert`/`dd` exit non-zero with a clean error;
+`compare` exits non-zero reporting a mismatch; `info` exits 0 with
+best-effort header fields. Pinned by `TestAdversarialVdiManifest` in
+`tests/test_adversarial.py`, which asserts exit codes and non-empty
+output for all four ops across the five malformed fixtures without
+pinning instar's exact error string (only qemu-img's error strings are
+version-stable enough to pin).
+
+## Format-coverage phase 3: Parallels convert-from (read path)
+
+Phase 3 of `PLAN-format-coverage.md` graduated Parallels from detect +
+info only to a full read format for convert, compare, dd, and bench,
+via a new `src/crates/parallels/` parser crate wired into the qcow2
+crate's chain reader (the same pattern VDI, VHD, and VHDX use). Both
+magics — the legacy `WithoutFreeSpace` (v1) and the newer
+`WithouFreSpacExt` (v2/ext) — are supported. The entries below record
+the deliberate qemu-parity choices this introduced and the
+divergences that remain. See
+[docs/plans/PLAN-format-coverage-phase-03-parallels-read.md](/components/instar/plans/PLAN-format-coverage-phase-03-parallels-read/)
+for the full design and findings.
+
+### Per-Magic `off_multiplier` and the v1 32-bit `nb_sectors` Mask
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu's Parallels BAT entries mean different things depending on the
+magic: under `WithoutFreeSpace` (v1) a BAT entry is a *sector* number
+(`off_multiplier == 1`); under `WithouFreSpacExt` (v2/ext) it is a
+*cluster* index (`off_multiplier == tracks`). The two encodings can
+address identical file content — verified byte-level on the fixture
+pair (v2 BAT `[1,2,3,4]` and v1 BAT `[0x80,0x100,0x180,0x200]` with
+`tracks=128` decode to the same host offsets). Separately, `nb_sectors`
+(virtual size in sectors) is a 64-bit header field, but qemu masks it
+to the low 32 bits when the magic is v1 and reads it full-width under
+v2 — byte-patch verified: the same field value reports 2 MiB under the
+v1 magic and 2 TiB under the v2 magic.
+
+#### Why This Matters
+
+Getting `off_multiplier` or the mask wrong per magic silently
+misreads every allocated cluster in a v1 image (or reports a garbage
+virtual size) without erroring — a correctness bug, not a crash, so
+it needs explicit per-magic coverage rather than relying on the v2
+path to catch it.
+
+#### instar Behavior
+
+**Always**: `ParallelsHeader::parse` stores `off_multiplier` (1 for
+v1, `tracks` for v2/ext) and masks `nb_sectors` to 32 bits only under
+the v1 magic; `virtual_size = masked_nb_sectors * 512`. Pinned by
+per-magic unit tests in `src/crates/parallels/src/lib.rs` (the
+BAT-decoding equivalence and the mask-under-v1-vs-v2 cases) and by the
+`parallels-data-v1`/`parallels-data-v2` fixture pair, which are the
+same image content under both magics and BAT encodings — `compare`
+between them reports identical, and both convert byte-identically to
+qemu-img's raw output.
+
+### Past-EOF and Truncated Reads Zero-Fill — Except qemu's 8.1.x Open-Time Regression
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu's Parallels driver never validates the on-disk file length
+against the header's declared BAT/geometry. Out-of-image BAT entries,
+a straddling cluster (starts in-file, extends past EOF), a truncated
+BAT, and even a 30-byte file all read as zeros wherever bytes are
+missing, with `qemu-img convert` exiting 0 — verified identical on
+6.0.0/7.0.0/10.2.0. The one drift across the matrix: qemu 8.1.0
+through 8.1.5 refuse a past-EOF BAT entry **at open** ("Offset ... in
+BAT[n] entry is larger than file size"), a regression window closed
+again in 8.2.0.
+
+#### Why This Matters
+
+A reader that errored on a past-EOF cluster would refuse images
+qemu-img converts successfully on every version except the narrow
+8.1.x window — a parity regression, not a safety improvement, since
+the sandboxed read of a header-consistent Parallels image carries no
+extra risk from an undersized backing file. Faithfully recording the
+8.1.x refusal (rather than papering over it) keeps the baseline
+matrix honest about the one version range where instar and qemu
+genuinely disagree.
+
+#### instar Behavior
+
+**Always**: the chain reader's Parallels arm zero-fills any portion
+of an allocated read at or past the device capacity, including the
+straddle case, uniformly across all qemu versions — instar does not
+special-case the 8.1.x behaviour. Pinned by the `parallels-bat-past-eof`
+fixture with a byte-parity convert test. The 8.1.0-8.1.5 open
+refusals are recorded faithfully in the instar-testdata baseline
+matrix via a dedicated `profile-8-1-0` bucket (split out from the
+neighbouring profile so the two refusing versions don't corrupt a
+shared baseline); `tests/test_info_safe.py` gained a general
+mechanism (commit `30ecf77`) that skips scenario generation whenever
+a profile's baseline meta records a non-zero qemu-img return code —
+there is no output parity to assert when qemu itself refused the
+image, and the mechanism is not Parallels-specific, so any future
+per-profile refusal drift is handled the same way.
+
+### `inuse`-Dirty Images and Ignored Header Fields Read Normally
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu refuses a read/write open of a Parallels image whose `inuse`
+field (offset 44) is `0x746f6e59` ("opened uncleanly"), but a
+**read-only** open succeeds and converts correctly. Separately,
+`data_off` (offset 48, the write-path allocation frontier) is parsed
+by qemu but never participates in any read-path offset computation —
+byte-patch verified: garbage `data_off` values are harmless to reads.
+
+#### Why This Matters
+
+instar always opens Parallels images read-only, so refusing on
+`inuse` would reject images qemu-img itself can read (via `-O raw`
+without `-rw`) — a pure parity regression. `data_off` needing no
+special handling means the reader can parse and discard it without
+risk of a latent bug in unreachable code.
+
+#### instar Behavior
+
+**Always**: `ParallelsHeader::parse` never refuses on `inuse`, and the
+field plays no role in `ParallelsState::init`/`block_lookup`;
+`data_off` is parsed but never used in offset math. Pinned by the
+`parallels-inuse` fixture (a `parallels-data-v2` copy with `inuse` set
+dirty), which converts byte-identically to its clean twin.
+
+### `ext_off != 0` Refused — Deliberate Divergence from qemu's Extension Parsing
+
+**Classification: Safe Quirk** (documented divergence, not a defect)
+
+#### Observed Behavior
+
+A non-zero `ext_off` (offset 56) points qemu at a format extension
+(currently used for dirty-bitmap metadata) that it parses read-only
+and refuses only on a bad extension magic. instar's reader refuses
+**any** non-zero `ext_off` at init, regardless of what the extension
+contains — including a hypothetical valid one qemu would open
+successfully.
+
+#### Why This Matters
+
+This is instar choosing not to implement extension parsing rather
+than a parity bug: no shipped or creatable fixture has `ext_off` set
+to a valid extension (`qemu-img create -f parallels` never writes
+one), the extension adds no data to the read path phase 3 needs, and
+silently ignoring an unparsed extension would risk misreading an
+image whose extension actually matters once one exists. Refusing
+cleanly is the safe default until a real need for extension support
+appears.
+
+#### instar Behavior
+
+**Always**: any non-zero `ext_off` is refused at
+`ParallelsHeader::parse` time, with no attempt to read or validate
+the extension's own magic. Pinned by unit tests and by the
+`parallels-ext-bad-magic` fixture (qemu also refuses this specific
+fixture, on its bad extension magic, so the fixture pins the refusal
+path without yet exercising the valid-extension divergence — there is
+no fixture for that case by design). Recorded as master-plan future
+work: Parallels format extensions / dirty bitmaps.
+
+### `cluster_size` Reported Internally by `info`, Suppressed in Both Emitters
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+`qemu-img info` prints no `cluster_size` and no format-specific block
+at all for Parallels — only the generic 8.0 child-node fields. But
+the chain reader's chunking relies on `ChainDeviceInfo.cluster_size`
+to keep chunks from straddling non-contiguous clusters, and Parallels'
+cluster size (`tracks << 9`) is user-settable via `-o cluster_size` at
+creation, so it cannot be hardcoded.
+
+#### Why This Matters
+
+VDI worked for free here because qemu (and instar's VDI parser)
+already report `cluster_size` for VDI. Parallels needed a new
+mechanism: compute the value for internal use without changing
+user-visible `info` output, which the existing byte-identical-output
+contract with qemu-img requires.
+
+#### instar Behavior
+
+**Always**: the guest `info` op's `parse_parallels_header` now also
+reads `tracks` (offset 28) and sets `result.cluster_size = tracks <<
+9` internally; the host emitters (`print_info_result` and
+`print_info_result_json`, `src/vmm/src/main.rs`) suppress
+`cluster_size` for the `"parallels"` format string specifically, in
+both human and JSON output — the same format-gated suppression
+mechanism phase 1 used for the dirty-flag JSON field. The suppression
+is format-gated, not value-gated, so a real nonzero `tracks` value
+stays hidden exactly as qemu's own silence does. Verified by a full
+`test_info_safe` run passing byte-identical against the qemu-img
+baselines (zero regressions) plus the small-cluster
+`parallels-cluster-4k` fixture, which pins that chunk boundaries never
+cross the populated cluster size end-to-end.
+
+### `check` Still Refuses Parallels; qemu's Own Check Crashes on Newer Versions
+
+**Classification: Safe Quirk** (documented gap, not a defect)
+
+#### Observed Behavior
+
+`qemu-img check` supports the Parallels driver, validating the BAT
+for duplicate/out-of-range entries. But on 10.2.0, `qemu-img check`
+**asserts and crashes** (the `parallels_check_duplicate` assertion) on
+an out-of-image BAT entry that 6.0.0 reports cleanly — a real qemu
+regression, not a theoretical one.
+
+#### instar Behavior
+
+**Unchanged by this phase**: `instar check parallels-v2` exits 63 with
+`This image format (parallels) does not support checks`, identically
+to VDI's stance and to Parallels' own pre-phase-3 behaviour — check
+was out of scope for this phase (see the phase plan's "Out of scope"
+section), and instar's own format dispatch has no Parallels arm to
+lift even though the host gate for other ops was lifted by
+graduation. Given qemu's own check is crash-prone on adversarial
+Parallels input on current versions, the refusal is the conservative,
+correct stance rather than a coverage gap to close blindly; the qemu
+`parallels_check_duplicate` assertion is recorded as master-plan
+future work to report upstream.
+
+### Tracks Cap Corrected to 4186127 (Planning Research Was Off by 681)
+
+**Classification: Safe Quirk** (internal correction, no behaviour change to ship)
+
+#### Observed Behavior
+
+qemu refuses to open a Parallels image whose `tracks` (sectors per
+cluster) exceeds `INT32_MAX / 513`. The phase plan's initial research
+computed this as 4185446; step 3d's empirical fixture validation
+found the real boundary is 4186127 — `tracks=4185447` opens cleanly
+and `tracks=4186128` is the smallest value qemu refuses ("Invalid
+image: Too big cluster").
+
+#### Why This Matters
+
+An off-by-681 cap would make instar refuse a narrow band of
+`tracks` values (4185447–4186127) that qemu itself opens fine — a
+pure parity regression that only an empirical fixture sweep, not
+integer arithmetic alone, catches.
+
+#### instar Behavior
+
+**Always**: `PARALLELS_TRACKS_MAX` in `src/crates/parallels/src/lib.rs`
+is `4_186_127`, corrected by commit `8dbf89f` from step 3a's original
+value once step 3d's fixture validation pinned the real boundary; the
+crate's boundary unit tests reference the constant symbolically and
+needed no rewrite. Pinned by the `parallels-huge-tracks` fixture
+(`tracks` patched to 4186128, the smallest refused value).
+
+## Format-coverage phase 4: QCOW1 convert-from (read path)
+
+Phase 4 of `PLAN-format-coverage.md` graduated QCOW1 ("qcow", qemu's
+original deprecated format, magic `QFI\xfb` + version 1) from a
+misdetected-as-QCOW2 dead end to a full read format for convert,
+compare, dd, and bench, via a new `src/crates/qcow1/` parser crate
+wired into the qcow2 crate's chain reader (the same pattern VDI,
+Parallels, VHD, and VHDX use) — commits `23b240f` (crate), `77f32ca`
+(reader arm), `3aa7f50`/`467d24a`/`c421f75`/`a0f757b` (info, naming,
+emitters, detection split, pins), `7b3762f` (fixtures/oslo), `efdc42e`
+(integration matrix), `dbb5ff2` (fuzz). QCOW1 is the first non-QCOW2
+format with backing-chain support. See
+[docs/plans/PLAN-format-coverage-phase-04-qcow1-read.md](/components/instar/plans/PLAN-format-coverage-phase-04-qcow1-read/)
+for the full design and findings.
+
+### QCOW1 Was Misdetected as QCOW2 — Fixed
+
+**Classification: closes an Unsafe Quirk** (was producing garbage
+`info` output and a misleading convert error; also corrects a wrong
+claim this document previously made)
+
+#### Observed Behavior (before the fix)
+
+`detect_format_from_header` (`src/shared/src/format_detection.rs`)
+checked the 4-byte big-endian magic against `QCOW2_MAGIC =
+0x514649fb` first and never consulted the version field. A real
+QCOW1 image's magic **is** `QFI\xfb` — identical to QCOW2's, version
+distinguishes them — so every real QCOW1 image detected as `Qcow2`.
+The dead-code 3-byte `QCOW1_MAGIC` branch below it only matched
+`"QFI"` plus a fourth byte that was *not* `0xfb`, which no real QCOW1
+image has. `instar info` on a fresh `qemu-img create -f qcow` image
+printed `file format: qcow2`, `virtual size: 0`, and a garbage
+QCOW2-shaped `compat: 0.10` block; `instar convert` then failed with
+the misleading `Error: "input image has zero virtual size"` — not a
+silent raw read, but wrong info and a wrong error. This document
+previously (incorrectly) listed QCOW1 detection as "Yes" in the
+Format Detection Comparison table; that claim was wrong until this
+phase.
+
+A second, latent hazard sat behind the misdetection:
+`chain::ImageFormat::from_str` already mapped `"qcow1"` to a real
+`Qcow1` variant with `supports_backing() == true`, so the #444
+detect-only-format gate (see above) would **not** have refused it —
+the guest chain reader's `_ => read_raw_sectors` default arm would
+have read the container's bytes as raw the moment detection became
+version-aware without a reader arm in place. This is why the reader
+arm (step 4b) had to land strictly before the detection fix (step
+4c) — see the phase plan's Situation section.
+
+#### instar Behavior (after the fix)
+
+**Always**: detection is now version-aware — `QFI\xfb` + version u32
+BE at offset 4 `== 1` routes to `Qcow1`; any other version keeps the
+existing QCOW2 route (whose own open-time version check produces the
+refusal for QCOW2-driver-incompatible versions, the same division of
+labour qemu's own probes use). The dead 3-byte-magic branch was
+removed in the same commit (`c421f75`). One latent divergence from
+qemu was found and recorded, not fixed: a `QFI\xfb` image with
+version 0 probes as **raw** under qemu (its QCOW2 probe requires
+version >= 2, its qcow probe requires version == 1, so version 0
+satisfies neither and qemu's generic probe falls through to raw),
+but instar routes any non-1 version to the QCOW2 driver, which
+refuses version 0 — so instar refuses an image qemu would read as
+raw. Version 99 is not a divergence: both instar and qemu refuse it
+via the QCOW2 driver's own version check. No fixture exists for the
+version-0 case (it is a probe-routing curiosity, not a data-safety
+issue); the pin was verified against the qemu-img matrix during step
+4c.
+
+### Naming: `"qcow"`, Not `"qcow1"` — With `"qcow1"` Kept as an Input Alias
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu-img and oslo.utils both call this format `"qcow"` (the `-f
+qcow` driver name); instar previously emitted `"qcow1"` in both
+`format_to_str` (`src/operations/info/src/main.rs`) and
+`chain::ImageFormat`'s `Display` impl (`src/vmm/src/chain.rs`) —
+harmless while QCOW1 was detect+info only and no byte-parity
+baseline existed, but the new QCOW1 info baselines require exact
+`"qcow"` to match qemu-img's `file format:` line and JSON `format`
+key.
+
+#### instar Behavior
+
+**Always**: instar now emits `"qcow"` everywhere a format string is
+reported (human and JSON `info` output, JSON backing-format
+reporting). `chain::ImageFormat::from_str` accepts **both** `"qcow"`
+and `"qcow1"` as input aliases (so any config or script still using
+the old string keeps working), but `Display` and every emitter only
+ever produce `"qcow"`. Two related emitter-parity fixes landed in the
+same pass: the JSON `backing-filename-format` field is now suppressed
+for `"qcow"` backing (the format stores no backing-format field in
+its header — qemu probes it at open instead — so reporting one would
+be fabricated), and `"qcow"` joined the protocol-length 512-rounding
+sets alongside the other formats whose child-node file length qemu
+rounds to a sector boundary.
+`instar-testdata/scripts/generate-baselines.py`'s check/compare
+allowlists already used `'qcow'`; its measure/info source
+allowlists, which had drifted to `'qcow1'`, were aligned to
+`'qcow'` in step 4d.
+
+### `encrypted:` Info Line — New Emitters, Gated Off for LUKS
+
+**Classification: Safe Quirk** (pre-existing gap fix; QCOW1 is the
+first fixture to exercise it)
+
+#### Observed Behavior
+
+`INFO_RESULT_FLAG_ENCRYPTED` (`src/vmm/src/main.rs`) has existed
+since before this phase but was never consumed by either host
+emitter — instar never printed qemu's `encrypted: yes` human line or
+JSON `"encrypted": true`, for *any* format, because no baseline in
+the whole tree needed it (verified by grep; the hand-maintained LUKS
+goldens match qemu in omitting the line for bare LUKS containers).
+The QCOW1 AES fixture (`qcow1-encrypted`, crypt_method=1) is the
+first baseline in the tree to require it.
+
+#### Why This Matters
+
+Consuming the flag naively for every format would have broken the
+LUKS goldens, since qemu prints no `encrypted:` line for bare LUKS
+containers even though instar's LUKS info parser does set the flag —
+the emitter had to be gated per-format to keep those goldens
+byte-identical, not just wired up.
+
+#### instar Behavior
+
+**Always**: both emitters now consume `INFO_RESULT_FLAG_ENCRYPTED`.
+The human emitter prints `encrypted: yes` between the disk size and
+`cluster_size:` lines; the JSON emitter adds `"encrypted": true`
+positioned after `actual-size` and before `dirty-flag`, matching
+qemu's real `info --output=json` field order on an AES QCOW1 image.
+The line is **gated off for the `"luks"` format string** specifically
+— qemu prints no encrypted line for bare LUKS, and the hand-maintained
+LUKS goldens pin that — verified by a full `test_info_safe` run with
+zero regressions before the emitter change landed. Encrypted QCOW2
+images (crypt_method=1 AES, or LUKS-wrapping) also gain the line now
+that the consumption is general rather than QCOW1-specific; this is a
+**pre-existing gap fix with no baseline churn**, since no existing
+fixture's golden covers an encrypted-QCOW2 info baseline. The QCOW1
+info parser itself sets the flag whenever `crypt_method != 0`;
+`crypt_method == 1` (AES) is the only value that reaches the flag,
+since `crypt_method >= 2` is refused at parse time.
+
+### Backing Fall-Through: QCOW1 is the First Non-QCOW2 Backing Format
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+Every prior read-only format's chain-reader arm (VDI, Parallels)
+zero-fills unallocated regions directly, because none of them
+support backing files. QCOW1 does: an unallocated L1 or L2 entry
+(entry value 0) must fall through to the **next device in the
+backing chain** — the base image, if present, else zeros — exactly
+like QCOW2's own backing semantics. `qemu-img create -f qcow -b
+...` and its overlay reads were byte-verified to match this rule
+during phase-4 research.
+
+#### Why This Matters
+
+Zero-filling unallocated QCOW1 clusters unconditionally (the
+VDI/Parallels arms' approach) would silently discard base-image data
+on any QCOW1-over-something overlay — a correctness bug specific to
+the one format in this batch that actually supports backing files.
+
+#### instar Behavior
+
+**Always**: the QCOW1 reader arm (in `src/crates/qcow2/`, behind the
+`qcow1-input` feature) mirrors the existing QCOW2 arm's mechanism for
+signalling "unallocated, recurse into the backing device" to the
+chain walker, rather than reusing the VDI/Parallels arm's zero-fill
+shape — the same sub-span recursion the QCOW2 arm already uses for
+its own backing chains, now shared by QCOW1. The reader also walks
+**per-cluster**, not one-lookup-per-chunk like the VDI arm: QCOW1
+clusters go down to 512 bytes (`create -f qcow -b ...` defaults to
+512-byte clusters, `cluster_bits=9`), far smaller than typical chunk
+sizes, so a single chunk can span many clusters. Pinned by the
+`qcow1-backing`/`qcow1-backing-base` fixture pair (relative backing
+name, `-F qcow` hint, two overlay clusters masking the base, every
+other offset reading through) which doubles as the small-cluster
+walk coverage.
+
+### Compressed Clusters Are Raw DEFLATE, Not zlib
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+QCOW1's bit-63 compressed L2 entries (`coffset = entry & ((1 << (63
+- cluster_bits)) - 1)`, `csize = (entry >> (63 - cluster_bits)) &
+((1 << cluster_bits) - 1)`, byte-granular size) decompress with
+**raw DEFLATE** (`windowBits -12`, no zlib header/trailer) —
+`zlib.decompress` fails on them, `decompressobj(-12)` succeeds. This
+is *not* the same as QCOW2 compressed clusters, which try zlib
+framing first and fall back.
+
+#### Why This Matters
+
+Reusing QCOW2's zlib-first two-try decompression helper on QCOW1
+data would either misdecompress or spuriously fail every compressed
+QCOW1 cluster; the two formats' compressed-cluster encodings look
+similar (DEFLATE-family) but are not byte-compatible framings.
+
+#### instar Behavior
+
+**Always**: the QCOW1 reader arm inflates compressed clusters via
+`miniz_oxide` with the zlib-header-parsing flag *off* — raw
+DEFLATE only, matching qemu's `qcow_decompress_cluster` — never the
+QCOW2 crate's zlib-first helper. Inflate failure is a clean guest
+failure, not a panic. Pinned by the `qcow1-compressed` fixture (a
+`convert -c` twin of `qcow1-data`), which compares identical to its
+uncompressed twin and round-trips to the same raw md5; the fixture
+generator tolerates qemu's `convert -c -O qcow` exit-1-despite-valid-
+output quirk (see below) by validating via roundtrip instead of exit
+code.
+
+### Odd Header Sizes Truncate Down (Opposite of VDI's Round-Up)
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu's `qcow_open` computes `total_sectors = size / 512` (integer
+division) and uses `total_sectors * 512` as the effective virtual
+size wherever the header's `size` field is not a multiple of 512 —
+an odd size **truncates down**. Byte-patch verified and
+version-stable (6.0.0 through 10.2.0): `size = 1048577` reports and
+converts as `1048576`. This is the opposite of VDI's rule (an odd
+`disk_size` rounds **up** to the next 512-byte multiple).
+
+#### Why This Matters
+
+A reader that rounded QCOW1 sizes up (following the VDI precedent
+uncritically) would report and convert one sector's worth of extra
+data qemu never exposes — silent size drift on a header a real tool
+would never produce via `create`, but which a byte-patched or
+hand-authored image can carry.
+
+#### instar Behavior
+
+**Always**: the QCOW1 parser truncates the header `size` down to the
+nearest 512-byte boundary before treating it as virtual size,
+matching qemu exactly. Pinned by the `qcow1-odd-size` fixture (`size`
+byte-patched to 1048577; instar and qemu both report/convert
+1048576). oslo.utils diverges here — it reads the header `size` field
+verbatim (1048577) with no truncation, recorded as a genuine vsize
+divergence in `docs/format-coverage.md`'s oslo cross-validation
+table.
+
+### Past-EOF Zero-Fill, Except a Truncated L1/L2 Table Read
+
+**Classification: Safe Quirk** (with one unpinned adversarial corner)
+
+#### Observed Behavior
+
+qemu zero-fills any portion of a DATA cluster read that lands past
+EOF or in a truncated file, on every qemu version — unlike Parallels,
+there is no 8.1.x-style regression window here; this behaviour is
+version-stable 6.0.0 through 10.2.0. Separately, qemu also
+zero-fills a read that lands in a **truncated or past-EOF L1/L2
+TABLE** (not just a data cluster) — the table lookup itself silently
+reads zeros for the missing bytes rather than erroring.
+
+#### Why This Matters
+
+instar's reader matches qemu for the DATA-cluster case, which is the
+one every safe and malformed fixture exercises. The TABLE case is a
+narrower, more adversarial corner: it requires a file truncated
+partway through the L1 or L2 metadata itself, which no shipped
+`qemu-img` tooling produces and no phase-4 fixture constructs.
+
+#### instar Behavior
+
+**Data clusters, always**: the QCOW1 reader arm zero-fills any
+allocated-but-past-EOF or straddling read, capacity-clamped exactly
+like the VDI/Parallels arms. Pinned by the `qcow1-past-eof` fixture
+(one data cluster's L2 entry redirected ~4 GiB past EOF; the other
+clusters stay intact).
+
+**Truncated L1/L2 table reads**: instar's reader returns a **clean
+failure** rather than zero-filling — a documented divergence from
+qemu's more permissive table-read behaviour. No fixture pins this
+corner; it carries the same unpinned posture as the equivalent
+truncated-table-read corners already recorded for VDI and Parallels
+(their block-map/BAT reads have the same instar-refuses-qemu-
+zero-fills shape). Revisit only if a real adversarial-table fixture
+need appears.
+
+### Malformed QCOW1 Images: `info` Falls Back to an Empty Default (Diverges from VDI/Parallels' Leniency)
+
+**Classification: Safe Quirk** (documented posture difference, not
+a defect)
+
+#### Observed Behavior
+
+VDI and Parallels' `info` parsers are lenient on malformed input by
+design: they check only the magic/version and report best-effort
+nonzero fields even when a malformed field (block size, tracks,
+BAT/catalog size) would cause the *reader* to refuse. QCOW1's new
+`info` arm is stricter: it validates `cluster_bits`, `l2_bits`,
+`size`, `crypt_method`, and the backing-name length — the same rules
+the reader enforces — and falls back to an **empty default** (virtual
+size 0) on any validation failure, rather than reporting whatever
+partial fields it could still read.
+
+#### Why This Matters
+
+This is a deliberate, pinned posture choice rather than an oversight:
+all five malformed QCOW1 fixtures still detect correctly (`format:
+qcow`, exit 0) but report virtual size 0, and `convert`/`dd` then
+refuse cleanly on the zero-size input rather than attempting a read
+that the reader would refuse anyway. The behaviour is consistent and
+tested, just a different leniency posture from VDI/Parallels — worth
+calling out explicitly so a future phase doesn't assume all
+detect-then-refuse formats behave identically on malformed input.
+
+#### instar Behavior
+
+**Always, pinned in `test_adversarial`**: all five malformed QCOW1
+fixtures (`qcow1-bad-cluster-bits`, `qcow1-bad-l2-bits`,
+`qcow1-huge-size`, `qcow1-crypt-invalid`,
+`qcow1-backing-name-too-long`) get `info` exit 0, format `"qcow"`,
+virtual size 0 — the info arm's parse validates the same fields the
+reader does and falls back to the empty default on failure.
+`convert`/`compare`/`dd` then refuse cleanly on the zero virtual
+size, never hanging or misreading.
+
+### `check`, `map`, and `measure`: a Wording Coincidence and Two Recorded Divergences
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+`instar check` on a QCOW1 image exits 63 with "This image format
+(qcow) does not support checks" — and, unlike the Parallels case
+(where qemu's own check crashes on newer versions), this is **actual
+parity with qemu**: qemu's own qcow driver refuses `qemu-img check`
+outright on every version (it has no qcow1 check implementation),
+just with a shorter message that omits the `"(qcow)"` parenthetical
+instar's generic not-supported wording always includes. `map` and
+`measure` remain refusals in instar, but qemu-img actually **supports
+both** on qcow1 sources — a deliberate divergence, not an accident,
+recorded as master-plan future work alongside the existing VDI and
+Parallels map/measure gaps.
+
+#### instar Behavior
+
+**Unchanged by this phase**: `check` exits 63 (the wording difference
+is cosmetic and not worth chasing — only qemu-img's own error strings
+are pinned as version-stable, per the established policy for
+malformed-fixture messages elsewhere in this document). `map` and
+`measure` stay clean refusals on qcow1 input, fuzzer-gated like the
+VDI/Parallels refusals, tracked as future work rather than this
+phase's scope.
+
+### Two External-Tool Oddities: qemu's `convert -c` Exit Code and oslo's qcow1→qcow2 Detection
+
+**Classification: Safe Quirk** (both are properties of the external
+tools, not instar defects)
+
+#### Observed Behavior
+
+`qemu-img convert -c -O qcow` writes a **valid** compressed qcow1
+image but **exits 1 with empty stderr**, on every qemu version
+spot-checked — a real qemu quirk on the *output* side (instar does
+not write qcow, so this never affects instar's own behaviour
+directly, only the testdata fixture generator that has to create the
+`qcow1-compressed` fixture using qemu-img). Separately, oslo.utils
+(git master) detects qcow1 as `"qcow2"` purely by magic — it never
+consults the version field, matching instar's own pre-fix bug almost
+exactly — with the *virtual size* agreeing regardless (the `size` u64
+field sits at the same offset 24 in both formats' headers), and
+`safety_check()` raises `SafetyCheckFailed` since there is no
+`get_inspector('qcow')`.
+
+#### Why This Matters
+
+Both are worth recording so a future differential-fuzz or baseline
+regeneration doesn't misread rc=1 or oslo's qcow2 report as a new
+instar regression.
+
+#### instar Behavior
+
+**Fixture generation and differential fuzzing tolerate rc 0/1** for
+`qemu-img convert -c -O qcow` and verify the output independently
+(roundtrip md5 / re-read), rather than gating on the exit code.
+**oslo cross-validation** records `KNOWN_FORMAT_DIVERGENCES` entries
+(`'qcow'`, `'qcow2'`) for every safe QCOW1 fixture and handles the
+`SafetyCheckFailed` exception per the existing test flow, with no
+`KNOWN_VSIZE_DIVERGENCES` entry needed for the safe fixtures (only
+`qcow1-odd-size` diverges on vsize, per the odd-size section above)
+— confirmed live against real oslo.utils during step 4d.
+
+## Format-coverage phase 5: DMG convert-from (read path)
+
+Phase 5 of `PLAN-format-coverage.md` graduated DMG (Apple UDIF,
+detect + info only since phase 1) to a full read format for convert,
+compare, dd, and bench, via a new `src/crates/dmg/` parser crate
+wired into the qcow2 crate's chain reader (the same pattern VDI,
+Parallels, and QCOW1 use) — commits `f53817f` (plan), `e77b30b`
+(plan correction), `71a20d9` (5a crate), `ba78d35` (5b reader arm),
+`ede8fd4` (5c graduation), `9033505` (5c pins), `a0ea960` (5d
+manifest/oslo), `8904592` (5f fuzz), `9d8111c` (5e integration
+matrix). DMG is the fifth format-coverage read path and the first
+whose error model *inverts* every prior phase's zero-fill posture.
+See
+[docs/plans/PLAN-format-coverage-phase-05-dmg-read.md](/components/instar/plans/PLAN-format-coverage-phase-05-dmg-read/)
+for the full design and findings.
+
+### EIO Parity: DMG Reads ERROR Where Every Other Format Zero-Fills
+
+**Classification: Safe Quirk** (a deliberate posture inversion, not
+an inconsistency — matches qemu exactly)
+
+#### Observed Behavior
+
+Every prior read-only format in this document (VDI, Parallels,
+QCOW1) treats an unallocated or past-EOF region as **zero-fill**: a
+block-map miss, a discarded entry, or a read that lands past the
+declared capacity all resolve to zeros, matching qemu. DMG is the
+opposite. qemu's `block/dmg.c` binary-searches a sector into its
+chunk table and, when no chunk covers it, **fails the read** rather
+than returning zeros — and the same applies to a raw chunk whose
+bytes lie past EOF (a short `pread` becomes an I/O error) and to
+truncated compressed data. This covers three distinct gap shapes:
+a between-chunk hole in the mish table, a chunk dropped at open
+(an unsupported codec, in qemu's build — see below), and the
+tail of the virtual disk beyond mish coverage when the koly
+trailer's `SectorCount` exceeds it (see the koly-wins section
+below). All three are read ERRORS on real qemu, verified across
+the static/host qemu-img matrix.
+
+#### Why This Matters
+
+Reusing the VDI/Parallels/QCOW1 arms' zero-fill shape for DMG would
+have been a **silent data-integrity divergence from qemu**, not a
+harmless simplification: a caller comparing instar's converted
+output against `qemu-img convert` would see instar quietly
+synthesise zeros for guest sectors that qemu-img explicitly refuses
+to produce at all. Because DMG's chunk table is attacker-shaped
+input (a plist string-scan and a lenient base64 decoder — see
+below), an image can trivially manufacture gaps.
+
+#### instar Behavior
+
+**Always, prominently commented in the reader arm** (per the plan's
+explicit instruction to comment this inversion): a sector covered by
+no chunk (gap, dropped/refused chunk, or the koly-wins tail), a raw
+span whose bytes are unavailable (past EOF or truncated), or a zlib
+span with truncated compressed data all make the reader return
+`false` — the same clean-failure signal QCOW1's truncated-table
+corner uses, propagated up through `convert`/`compare`/`dd`/`bench`
+as a non-zero exit — never zeros. Overlapping chunks are **not**
+treated as an error: qemu's binary search deterministically resolves
+to whichever chunk the search lands on first, and instar's sorted-
+table walk matches that behaviour exactly (no shipped fixture
+exercises an overlap; it is a recorded corner, matching the
+established policy elsewhere in this document for un-fixtured
+adversarial shapes). Pinned by the `dmg-gap` fixture: `info`
+succeeds on both instar and qemu at virtual size 8192 bytes (a koly
+`SectorCount` of 16 against 8 sectors of real mish coverage), while
+`convert`/`dd` FAIL cleanly on **both** sides — qemu with an I/O
+error on the uncovered tail, instar with its own clean gap refusal —
+an error-parity fixture, deliberately never a byte-parity one.
+
+### The qemu Zero-Chunk NULL-Deref Crash — instar Refuses Cleanly Instead
+
+**Classification: closes what would otherwise be an Unsafe Quirk**
+(instar does not mirror qemu's crash; a candidate upstream report)
+
+#### Observed Behavior
+
+An image with a structurally valid koly trailer but **zero parsed
+chunks** — a corrupted mish magic inside an otherwise well-formed
+`<data>` block, a base64 blob that decodes to garbage, or a plist
+with no `<data>` blocks at all — makes qemu's `dmg_open` build an
+empty `sectors[]` table. `info` never touches this table and
+succeeds normally (rc 0), but **any read dereferences the NULL
+table pointer and SIGSEGVs**, verified universal: static qemu-img
+6.0.0, static 10.2.0, and host 10.0.11 all crash with rc 139 on
+`convert`. This is distinct from a simpler-looking case that is
+**not** the crash: `dmg-no-chunk-table` (both `RsrcForkLength` and
+`XMLLength` are zero, so qemu has no chunk-table *source* at all)
+never reaches table-build and fails with a clean `EINVAL` at open on
+every version — qemu's ordinary, non-crashing refusal path. The
+actual crash requires a *source* that parses successfully down to
+zero chunks, which the plan's step-5d correction identified and
+shipped as the dedicated `dmg-empty-table` fixture (a well-formed
+XML plist whose single `<data>` block decodes with a corrupted mish
+magic).
+
+#### Why This Matters
+
+instar's sandboxed guest reads untrusted disk images by design; a
+crash-on-read defect in the reference tool is exactly the class of
+input instar's KVM isolation exists to survive without imitating.
+Mirroring qemu's crash would have been actively worse than refusing
+cleanly — a caller feeding instar a `dmg-empty-table`-shaped image
+should get a clean non-zero exit, not a segfault.
+
+#### instar Behavior
+
+**Always**: `DmgState::init` refuses at reader init the moment the
+assembled chunk table has zero entries (`DmgRefusal::EmptyChunkTable`
+in `src/crates/dmg/src/lib.rs`), before any read is attempted —
+convert/compare/dd/bench all fail cleanly and immediately, with no
+crash on any input. Pinned by `dmg-empty-table` (`skip_qemu_img`,
+since qemu crashes on convert and no baseline can exist) and kept
+distinct in the manifest and in `test_adversarial.py` from
+`dmg-no-chunk-table`'s ordinary EINVAL shape. Recorded as
+master-plan future work: reporting the qemu NULL-deref crash
+upstream (`docs/plans/PLAN-format-coverage.md`, "Future work").
+
+### Bounded-Memory Capacity Caps: A Documented Divergence from qemu's Larger Legal Range
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu's own per-chunk limits allow a compressed chunk up to 64 MiB
+(`DMG_LENGTHS_MAX`) and an uncompressed span up to 64 MiB
+(`DMG_SECTORCOUNTS_MAX`, 131072 sectors; zero/ignore chunks are
+exempt from this cap). instar's guest sandbox has a fixed, much
+smaller scratch budget, so those qemu-legal sizes cannot always be
+staged. instar layers its own, smaller, typed caps distinct from
+qemu's: the staged plist/resource-fork region is capped at 1 MiB
+(real plists are KBs; qemu's own cap is 16 MiB), the chunk table at
+32768 entries (~1 MiB of scratch, covering ~32 GiB of default
+1 MiB-chunk UDZO output), and per-chunk staging at 4096 sectors
+(2 MiB) for the uncompressed side. hdiutil's default UDZO chunk size
+is 1 MiB, so real-world images fit with 2x headroom.
+
+#### Why This Matters
+
+A chunk that is entirely legal under qemu's own rules can still
+exceed instar's staging budget — a genuine, unavoidable capacity
+divergence rather than a bug, and one that needed an explicit
+fixture so it reads as "documented" rather than "silently wrong."
+
+#### instar Behavior
+
+**Always**: a chunk whose `comp_len` or `sector_count` fits under
+qemu's own limits but exceeds instar's smaller staging caps gets a
+typed refusal (`dmg: chunk exceeds staging cap`) distinct from both
+qemu's own cap-refusal messages and instar's codec refusals. Pinned
+by `dmg-overcap-chunk` (one zlib chunk, `sector_count` 8192 = 4 MiB
+uncompressed — under qemu's 131072-sector cap but over instar's
+4096-sector cap): **qemu converts it fine on every version** (md5
+`dd8d16c0893059dd98d1a3bf1f8675bd`), while instar refuses typed —
+`skip_qemu_img` in the manifest, with an explicit divergence note.
+Separately, `dmg-chunk-len-over` (comp_len 64 MiB + 1) and
+`dmg-sc-over` (sector_count 131073) exceed *qemu's own* limits and
+are refused by both tools — qemu at open with the exact recorded
+strings ("length 67108865 for chunk 0 is larger than max
+(67108864)"; "sector count 131073 for chunk 0 is larger than max
+(131072)"), instar at reader init with its own typed message; these
+two are ordinary cross-tool refusal parity, not a capacity
+divergence.
+
+### Codec Support: Typed Refusals vs qemu's Build-Dependent Bzip2/lzfse/ADC
+
+**Classification: Safe Quirk** (a deliberate scope decision — no
+single qemu parity target exists for these codecs anyway)
+
+#### Observed Behavior
+
+DMG chunk codec support is compile-flag dependent across the qemu-img
+matrix: bzip2 (UDBZ, `0x80000006`) decodes only on static 6.0.0 and
+host 10.0.11; every other static build in the matrix (8.2.0, 10.2.0,
+...) lacks the module, opens with a "dmg-bzip2 module is missing"
+warning (from 7.2.0 on; 6.0.0 emits none), and the chunk is dropped
+from the table, producing a gap that reads EIO. lzfse (ULFO,
+`0x80000007`) has no working module anywhere in the tested matrix —
+always dropped, always EIO. ADC (`0x80000004`) is enum-named in
+qemu's source but **never implemented** by any qemu version — always
+dropped, always EIO, with a generic "unknown type 80000004" warning
+from 7.2.0 on. zstd (`0x80000008`) and any other unrecognised type
+code follow the same drop-then-EIO shape.
+
+#### Why This Matters
+
+Because qemu's own codec support is build-dependent, there is no
+single "qemu converts this" oracle to byte-match for bzip2/lzfse/ADC
+chunks — implementing decode support for any of them would still
+diverge from *some* qemu build in the matrix. The plan's chosen scope
+(zero/raw/ignore/zlib only, with typed refusals for the rest) sidesteps
+that by making the divergence explicit and self-describing rather than
+mimicking one arbitrary qemu build's behaviour.
+
+#### instar Behavior
+
+**Always**: an unsupported or unknown chunk type gets a typed refusal
+at reader init naming the exact code (`dmg: unsupported chunk codec
+0x80000006` for bzip2, `0x80000007` for lzfse, `0x80000004` for ADC,
+and so on for any other unrecognised code), rather than qemu's
+drop-then-gap-then-EIO shape. Comment (`0x7ffffffe`) and terminator
+(`0xffffffff`) entries are still dropped silently, matching qemu.
+Pinned by `dmg-codec-bzip2`, `dmg-codec-lzfse`, and `dmg-codec-adc`
+(all `skip_qemu_img`, with the per-version build-dependence recorded
+honestly in each fixture's manifest description rather than
+asserting one qemu build as the oracle). bzip2/lzfse/ADC decode
+support is recorded as master-plan future work.
+
+### Chunk-Table Source: Both the XML-Plist and the Old Resource-Fork Paths, with Lenient (glib-Parity) Base64
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+qemu supports chunk-table discovery from **either** of two koly-
+referenced regions: the modern XML plist (`XMLOffset`/`XMLLength`)
+or the older Mac OS resource fork
+(`RsrcForkOffset`/`RsrcForkLength`) — path selection is
+`RsrcForkLength != 0` first, else `XMLLength != 0`, else `EINVAL`.
+Plist parsing is **not** real XML parsing: qemu `strstr`s every
+`<data>…</data>` span and base64-decodes each block with glib's
+**lenient** decoder, which silently skips invalid characters rather
+than erroring; the only well-formedness requirement is a matching
+`</data>` — no `<key>blkx</key>` or plist schema validation at all. A
+decoded block is accepted as a mish table only if it carries the
+mish magic and is at least 244 bytes (the 204-byte header plus one
+40-byte entry); everything else — including a block whose base64 was
+mostly garbage — is silently ignored, not an error.
+
+#### Why This Matters
+
+Real-world DMGs from both eras exist, so read parity requires
+supporting both table sources, not just the modern one. The lenient
+base64 semantics matter for parity on real (and adversarial) images:
+a strict base64 decoder would reject blocks qemu accepts, and would
+accept blocks (or reject them) differently than qemu on hand-crafted
+adversarial input — mismatching qemu's actual attack surface.
+
+#### instar Behavior
+
+**Always**: `src/crates/dmg/` implements both chunk-table paths —
+the XML-plist `<data>` string scan plus a byte-for-byte port of
+glib's lenient base64 (invalid characters skipped, never erroring;
+a missing `</data>` is the one case that is "malformed XML" and
+refused), and the older resource-fork walk (`u32 rsrc_data_offset`,
+`u32 count`, then `[u32 size][mish]` resources). Pinned by
+`dmg-rsrc-fork` (the resource-fork path, no XML) alongside
+`dmg-simple`/`dmg-mixed`/`dmg-multipart` (the XML-plist path) — all
+four are byte-parity convert fixtures.
+
+### koly `SectorCount` Always Wins for Virtual Size
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+The koly trailer's `SectorCount` field is the sole source of the
+reported and converted virtual size — the mish chunk table's actual
+sector coverage is irrelevant to sizing. When `SectorCount` exceeds
+what the assembled chunk table covers, the uncovered tail is not
+truncated or resized away; it becomes exactly the gap shape the EIO
+Parity section above describes, read as an error rather than
+silently shrinking the disk to the mish-covered extent.
+
+#### Why This Matters
+
+A reader that derived virtual size from mish coverage instead of the
+trailer would silently under-report DMGs whose SectorCount is
+legitimately larger than any single mish block's range (e.g. a
+disk with declared-but-unwritten trailing space) — a data-shape
+divergence from qemu, not just a sizing cosmetic.
+
+#### instar Behavior
+
+**Always**: virtual size is `SectorCount * 512`, computed from the
+koly trailer alone (reusing the phase-1 shared trailer helpers), with
+no cross-check against mish coverage at size-computation time. Pinned
+by `dmg-gap`, which deliberately declares a SectorCount larger than
+its single mish block's coverage: `info` reports the trailer-derived
+8192-byte virtual size successfully on both tools, while `convert`
+fails on the uncovered tail on both tools (see the EIO Parity section
+above).
+
+### Probe Divergence Extended to convert: The Extensionless-DMG Divergence
+
+**Classification: Safe Quirk** (extends the phase-1 detection
+divergence into a real convert-time behavioural difference)
+
+#### Observed Behavior
+
+Phase 1 already recorded that qemu-img's DMG probe is almost
+entirely `.dmg`-filename-extension based, while instar detects DMG
+by content (the koly-trailer scan) regardless of filename (see
+"DMG Detection: Content-Based Trailer Probing vs qemu's Filename
+Extension" above). Before phase 5, this divergence was purely a
+detection-report difference, since convert/compare/dd refused all
+detected-but-unsupported formats via the #444 gate either way. Now
+that DMG has a real read path, the divergence has a real behavioural
+consequence: a copy of a valid DMG renamed without its `.dmg` suffix
+is a **different converted output** on the two tools. Under qemu-img
+(no `-f` given), the missing extension makes the probe fall through
+to raw, and `convert` emits the container's raw bytes — koly
+trailer, XML plist, and all — as if it were the virtual disk.
+Under instar, the koly-trailer scan still finds the trailer
+regardless of filename, so `convert` emits the real, decoded guest
+disk content.
+
+#### Why This Matters
+
+This is the sharpest illustration in the whole DMG phase of *why*
+instar's detection charter is content-based rather than extension-
+based (see the phase-1 rationale) — an extension is not a
+security-relevant signal, and two tools disagreeing about what a
+byte-identical file actually *is* is exactly the class of ambiguity
+a sandboxed converter should resolve in the more conservative
+direction (treating it as the format its content proves it to be).
+
+#### instar Behavior
+
+**Always, pinned by a dedicated test**
+(`test_convert_dmg_extensionless_divergence`): both behaviours are
+recorded, not just instar's — the test copies `dmg-simple` to an
+extensionless filename, runs `qemu-img convert` with no `-f` (raw
+pass-through of the 11776-byte container) and `instar convert` (the
+real 4 MiB decoded disk), and asserts both succeed with their
+respective, deliberately different outputs. No flag makes instar
+adopt qemu's extension probe for DMG, consistent with the phase-1
+decision (OQ2) that `--unsafe-quirks` does not touch DMG detection.
+
+### `check` Names the Format "(raw)", Not "(dmg)"
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+Unlike VDI, Parallels, and QCOW1 — whose `check` refusal message
+names the real format (`"(vdi)"`, `"(parallels)"`, `"(qcow)"`) because
+those formats are header-detected at offset 0, which *is* wired into
+`detect_format_from_header` — `check`'s own format dispatch has no
+DMG arm and never runs the koly-trailer probe (that probe lives only
+in the `info` op's guest chain, as established in phase 1). So
+`instar check` on a DMG image sees the UDIF container as `Raw` and
+refuses with `This image format (raw) does not support checks`,
+exit 63 — a message naming the *wrong* format, unlike every other
+graduated format in this document.
+
+#### Why This Matters
+
+This looks like a defect at first glance (the exit code and general
+"not supported" shape are right, but the parenthetical names raw
+instead of dmg), except that qemu-img's own `check` on the exact
+same DMG **also** exits 63 with "does not support checks" — so the
+exit-code and refusal-class parity is genuine; only the specific
+wording differs, and qemu's message happens to omit a format name
+entirely. Chasing exact wording here would require wiring the koly
+probe into `check`'s dispatch for a cosmetic message-text gain with
+no functional difference, which is out of scope for this phase (see
+the retained-pass-through section above).
+
+#### instar Behavior
+
+**Unchanged, pinned by `TestCheckDmgRefusal`**: `check` on a DMG
+image (with or without `--output json`) exits 63 with `This image
+format (raw) does not support checks` — genuine rc parity with
+qemu-img's own dmg-check refusal, with only the named format
+differing, a documented consequence of `check` not being a
+chain-discovery consumer (see "DMG Pass-Through as Raw in the
+In-Place Ops" above, which covers `check` alongside `map`/`measure`/
+`resize`). Real DMG check support is future work.
+
+### `dmg-sectorcount-negative`: A Pre-Existing Unknown-Format Pass-Through, Now Pinned
+
+**Classification: Safe Quirk** (a pre-existing, deliberately
+exempted corner, newly pinned rather than newly introduced)
+
+#### Observed Behavior
+
+A koly trailer whose `SectorCount` has its top bit set (a negative
+value when read signed) makes the shared trailer helper's detection
+collapse to `unknown` rather than `dmg` — `dmg_sector_count` treats a
+negative total as "not a DMG after all," so `discover_backing_chain`
+never routes this image through the DMG reader at all. Because
+`unknown`/raw-shaped detections are the deliberate exemption the
+issue-#444 gate already carves out (see "Detect-Only Format Refusal
+in convert / compare / dd (#444)" above), `dmg-sectorcount-negative`
+passes straight through as a raw read of its small container — no
+gate refusal, no DMG reader involvement at all.
+
+#### Why This Matters
+
+This behaviour predates phase 5 (the detection collapse is phase-1
+logic), but phase 5's graduation of DMG to a real read format makes
+it worth pinning explicitly: without a test, a future change to the
+#444 gate or the DMG reader's init path could accidentally start
+routing this fixture through the DMG reader (which would then need
+its own opinion about a negative SectorCount) without anyone
+noticing the behavioural change.
+
+#### instar Behavior
+
+**Unchanged, newly pinned**: `dmg-sectorcount-negative` reads as raw
+pass-through on both `convert` and `dd` — the unknown-format
+exemption applies exactly as it does for any other raw-shaped
+detection, with no DMG-specific code path ever entered. `info` still
+reports whatever the trailer helper's `unknown`-collapsed view
+produces (unchanged from phase 1). This is treated as an accepted,
+pre-existing corner of the #444 gate's design, not a phase-5 defect.
+
+### Typed Refusal Strings Are Guest-Side Debug Output, Not the User-Facing Failure
+
+**Classification: Safe Quirk** (consistent with the VDI-era
+precedent for adversarial pins)
+
+#### Observed Behavior
+
+Every DMG-specific refusal string this section describes (e.g.
+`dmg: unsupported chunk codec 0x80000006`, `dmg: chunk exceeds
+staging cap`, `dmg: empty chunk table`) is written via the guest's
+debug-print channel at the point of refusal — it is diagnostic
+output, not the message a caller actually receives. The user-facing
+failure for every one of these fixtures is the generic "convert
+operation failed" wrapper the host CLI already emits for any guest-
+side refusal, regardless of the specific reason.
+
+#### Why This Matters
+
+This is the same shape already established for VDI's adversarial
+pins: asserting on the specific debug string would couple tests to
+an internal implementation detail that is not part of instar's
+actual CLI contract, while asserting on rc + clean termination
+matches what a real caller can observe and rely on.
+
+#### instar Behavior
+
+**Always, consistent across every DMG adversarial fixture**: the
+typed guest-side strings are recorded as documentation in each
+fixture's `expected_error` field in `tests/manifest.json` (so the
+exact reason is discoverable and pinned at the source level), while
+the adversarial test assertions themselves check rc and clean
+termination — no hang, no crash, no partial output — per the
+VDI-precedent posture, not string-matching the debug text.
+
+### Scratch Design: Per-Device Slots, Any Chain Position, and Bit-63 Cache Keying
+
+**Classification: Safe Quirk** (an implementation-detail note, not a
+qemu-parity divergence)
+
+#### Observed Behavior
+
+Each DMG device in a chain gets a fixed `DMG_REQUIRED_SCRATCH`
+(~3.25 MiB: a 1.25 MiB persistent chunk table plus a 2 MiB transient
+plist/decode region) slot carved from the caller's reserved scratch
+region. `convert` reuses its existing staging buffer for the
+transient init suffix, so the net addition to convert's memory
+layout is only the persistent 1.25 MiB table region, not the full
+3.25 MiB. `compare` reserves two such slots (one per side of the
+comparison, since either side may be a DMG). `bench` and `rebase`
+only need the write-only overlay-scratch shape, since neither reads
+two DMG sides at once. DMG has no backing-file field of its own — a
+DMG image is always a chain-leaf — but the DMG *reader* itself is
+usable at ANY position within a mixed-format chain, proven by a
+`qcow2 -F dmg` overlay-over-DMG test whose converted output converges
+byte-for-byte with qemu-img's own `-b ... -F dmg` chain. The
+decompressed-chunk staging cache is keyed by the chunk's host file
+offset with bit 63 OR'd in
+(`cache_key = host_offset | (1u64 << 63)`) — safe because every real
+file offset is well under 2^63, so tagging with the top bit yields a
+key space that can never collide with the qcow2/vmdk staging cache's
+own offset-keyed entries.
+
+#### Why This Matters
+
+This is purely an implementation note (no qemu-parity claim is being
+made here), documented because it is a nontrivial memory-budget and
+correctness design that a future consumer of the DMG reader (or a
+sixth format-coverage phase) needs to understand before adding
+another per-device scratch consumer to the same reserved region.
+
+#### instar Behavior
+
+**Internal to the reader arm, not user-visible**: the scratch layout
+and bit-63 cache-keying scheme are implemented in
+`src/crates/qcow2/src/lib.rs` (the chain-reader integration) and
+`src/crates/dmg/src/lib.rs` (the parser crate itself), with the
+convert memory-layout compile-time assertion
+(`src/operations/convert/src/main.rs`) extended to account for the
+new region. Binary size grew by roughly +9.5 KB per DMG-enabled
+guest operation (convert now sits at roughly 41% of the 768 KB
+per-operation cap, per `make check-binary-sizes`).
+
+## Format-coverage phase 6: QED read-refusal as policy
+
+Phase 6 of `PLAN-format-coverage.md` resolved the master plan's Open
+question 1 — does QED get a read path, like VDI/Parallels/QCOW1/DMG in
+phases 2-5, or a principled, documented, fully-tested refusal? — by
+choosing refusal as deliberate policy, not a read path. Step 6a added
+QED-named refusal pins for every op that lacked one (check, map,
+measure, bench, resize, rebase, commit, amend, snapshot, bitmap;
+convert/compare/dd/oslo were already pinned) and reconciled a stale,
+unconsumed testdata baseline set; step 6b is this documentation
+record. Commits: `3fd48e6` (pins, instar), `cecb16565a` (baseline
+retirement, instar-testdata main). See
+[docs/plans/PLAN-format-coverage-phase-06-qed.md](/components/instar/plans/PLAN-format-coverage-phase-06-qed/)
+for the full decision record and findings.
+
+### QED Read-Refusal Is Deliberate Policy, Not a Parity Gap
+
+**Classification: Safe Quirk** (a recorded scope decision, not a
+defect)
+
+#### Observed Behavior
+
+Every prior format-coverage phase (2-5) graduated a detect-only format
+to a full read path. QED does not get one. `instar info` reads QED
+correctly (byte-parity with qemu-img, human and JSON); every other
+subcommand refuses it cleanly with a typed message and no file
+modification, verified by byte-hash after every mutating op. The
+per-op audit behind this decision (recorded in the phase-6 plan's
+Situation section) found **zero dangerous cases**: no raw
+pass-through, no crash, no silent-wrong output for any of the fifteen
+subcommands.
+
+#### Why This Matters
+
+Three grounded facts justify refusal over a read path:
+
+1. **Nil demand.** QED was a short-lived qcow2 alternative that never
+   saw wide deployment; no user demand for reading QED archives has
+   surfaced during five phases of format work.
+2. **oslo.utils bans QED outright.** `format_inspector.detect_file_format`
+   returns a real `QEDInspector`, whose safety check then raises
+   `SafetyCheckFailed: ... banned` ("This file format is not
+   allowed") — a stronger ecosystem statement than the DMG/VDI/
+   Parallels/QCOW1 case, where oslo merely *lacks* an inspector and
+   instar deliberately reads what oslo cannot. For QED, oslo has an
+   inspector and refuses by policy; instar's refusal aligns with that
+   stance rather than filling a gap oslo doesn't have.
+3. **The refusal is already complete and safe.** The audit's
+   zero-dangerous-cases result means finishing the job costs only
+   test pins and documentation, not new parser code.
+
+**Revisit criteria**, recorded so the decision is cheap to reverse: a
+real user request to read QED input, or QED images surfacing in a
+workload instar serves. The phase-6 plan preserves a path-(b) sketch
+(a qcow1-class reader — 68-byte LE header, two-level L1/L2 tables, no
+compression/encryption) as the starting point if that day comes.
+
+#### instar Behavior
+
+**Always**: `info` supports QED; every other subcommand refuses it.
+The per-op refusal/divergence table:
+
+| Op | qemu-img on QED | instar on QED | Notes |
+|----|------------------|----------------|-------|
+| info | Supported (rc 0) | Supported (rc 0), byte-parity | Only fully-supported op |
+| convert | Supported (rc 0) | Refused (issue-#444 chain gate) | "input format 'qed' is detected but not supported for reading (detection and info only)"; mid-chain backing position also refused |
+| compare | Supported (rc 0) | Refused (chain gate) | Same message shape as convert |
+| dd | Supported (rc 0) | Refused (chain gate) | Same message shape as convert |
+| bench | Supported (rc 0) | Refused (chain gate) | Same underlying gate as convert, but with no `"bench:"` message prefix — a deviation from the other three ops, and empty stdout |
+| check | Supported (rc 0) | Refused, exit 63 | "This image format (qed) does not support checks" — check's own probe DOES see QED's offset-0 magic, so (unlike DMG) it names the real format |
+| map | Supported (rc 0) | Refused, exit 1 | "source format unrecognised" |
+| measure | Supported (rc 0) | Refused, exit 1 | "source image is unsupported format" |
+| resize | Supported (rc 0) | Refused | "format Qed is not supported for in-place resize" — divergence, qemu's QED driver resizes fine |
+| rebase | Supported (rc 0) | Refused | "format 'Qed' does not support rebase (qcow2 and vmdk only)" — divergence, qemu rebases QED overlays fine |
+| commit | Supported (rc 0) | Refused | "format 'qed' does not support commit (qcow2 and vmdk only)" — divergence, qemu commits QED overlays fine |
+| amend | Refused (rc 1) | Refused | qemu: "Format driver 'qed' does not support option amendment"; instar: "only qcow2 images can be amended" — not a divergence |
+| snapshot | Refused (rc 1) | Refused | qemu: "Operation not supported"; instar: "snapshot: source is not qcow2" — not a divergence |
+| bitmap | Refused (rc 1) | Refused | qemu: "Operation not supported" (no persistent-bitmap store); instar: "not a qcow2 image" — not a divergence |
+
+The convert/compare/dd/bench/check/map/measure/resize/rebase/commit
+rows are genuine divergences — qemu-img performs these successfully on
+QED (all rc 0, empirically verified against qemu-img 10.0.11), instar
+refuses by policy, in the same recorded-divergence class as the
+map/measure scope refusals phases 2-5 chose for VDI/Parallels/QCOW1/
+DMG. Only the amend/snapshot/bitmap rows are **not** divergences:
+qemu-img itself refuses those on QED (no amend driver, no internal
+snapshots, no persistent-bitmap store), so there instar's refusal
+matches qemu's own posture.
+
+### Cosmetic Refusal Inconsistencies, Pinned As-Is
+
+**Classification: Safe Quirk**
+
+#### Observed Behavior
+
+Two wording/exit-code inconsistencies exist across the QED refusal
+surface, both pre-existing and orthogonal to this phase's scope:
+
+- `resize` and `rebase` render the Rust `Debug` spelling `"Qed"`
+  (capital Q) in their refusal messages, while `commit`, `check`, and
+  the chain-gate messages use lowercase `"qed"`.
+- `check` exits 63 ("This image format (qed) does not support
+  checks"), matching qemu-img's own check-refusal exit code for
+  unsupported formats; every other QED refusal in the table above
+  exits 1.
+
+#### Why This Matters
+
+Normalising these would touch shared refusal-message code paths used
+by every other format's equivalent refusals, for a purely cosmetic,
+zero-user-value gain — explicitly out of scope for phase 6 (see the
+phase plan's "Out of scope" section).
+
+#### instar Behavior
+
+**Unchanged, pinned as-is with comments** in the step-6a test suites:
+`resize`/`rebase`'s `"Qed"` spelling and `check`'s 63-vs-1 exit code
+are asserted verbatim, not normalised.
+
+### The qemu-Deprecation Claim Was Wrong — Corrected
+
+**Classification: closes a stale documentation claim** (not a code
+behaviour change)
+
+#### Observed Behavior
+
+Earlier drafts of `docs/plans/PLAN-format-coverage.md` (and other
+repository docs) described QED as "(deprecated)" in qemu-img. Phase 6's
+empirical research found this to be **false**: QED has no entry in any
+`deprecated.rst`/`removed-features.rst`, no runtime warning on any op
+or qemu version, and `qemu-img create -f qed` still succeeds on
+10.2.0. qemu-img reads, writes, checks, maps, measures, and benches
+QED normally on every version in the matrix (all rc 0, convert md5
+version-stable).
+
+#### Why This Matters
+
+The refusal decision is instar's own scope choice (nil demand +
+alignment with oslo.utils' explicit ban), not a response to qemu
+sunsetting the format. Documenting QED as "deprecated" would have
+implied a removal timeline that does not exist and misattributed the
+rationale for instar's refusal.
+
+#### instar Behavior
+
+**Documentation only**: the master plan's Open question 1 carries a
+dated RESOLVED addendum correcting the framing (the original question
+text itself is left as historical record); other repository docs that
+called QED "(deprecated)" without qualification have been corrected
+by this phase to state plainly that qemu does not deprecate it. QED
+detection and refusal behaviour is unchanged by this correction — it
+is a documentation-accuracy fix, not a functional one.
+
 ## Future Additions
 
 Additional quirks will be documented here as they are discovered during

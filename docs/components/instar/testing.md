@@ -37,6 +37,9 @@ defeats the security purpose of instar.
 
 Tests for the `instar check` operation:
 - **Format detection**: Verifies check correctly identifies QCOW2, VMDK, VHD formats
+- **Per-format refusal**: `TestCheckVdiRefusal`, `TestCheckParallelsRefusal`,
+  `TestCheckDmgRefusal`, and `TestCheckQedRefusal` verify `check` refuses each
+  read-only-input format with the correct exit code and message
 - **Corrupt images**: Tests against deliberately corrupt format headers (VMDK, VHDX, VHD)
 - **QCOW2 structural validation**: Uses 4 script-generated corrupt QCOW2 images:
   - Clean baseline (should pass with 0 errors)
@@ -128,7 +131,10 @@ identical stdout and matching exit codes with `qemu-img compare`.
 ### Convert Tests (`test_convert.py`)
 
 Tests for the `instar convert` operation (QCOW2 to raw), cross-validated
-against `qemu-img convert`:
+against `qemu-img convert`. Per-format convert matrices cover VDI
+(`TestConvertVdiToRaw`), Parallels (`TestConvertParallelsToRaw`), QCOW1
+(`TestConvertQcow1ToRaw`), and DMG (`TestConvertDmgToRaw`) input; QCOW1
+also gets a dedicated smoke test module, `tests/test_qcow1_smoke.py`.
 
 **Basic conversion (`TestConvertBasicQcow2ToRaw`):**
 - Empty QCOW2 image to raw
@@ -441,6 +447,27 @@ the main repository small. The location is resolved in order:
 1. `INSTAR_TESTDATA_PATH` environment variable
 2. `../instar-testdata` (sibling directory)
 
+### Binary fixtures are git-LFS backed
+
+Every binary fixture in `instar-testdata` (`*.qcow2`, `*.raw`, `*.vhd`,
+`*.vhdx`, `*.vmdk`, `*-backing`, the bundled `qemu-img` binaries) is tracked
+with **git-LFS**. A checkout whose LFS objects have not been materialised
+leaves each fixture on disk as a ~131-byte pointer file, and the whole suite
+then fails with `file format: unknown` for every image — a failure that
+looks like a mass instar regression but is really a testdata problem. If you
+clone `instar-testdata` by hand, run `git lfs pull` after cloning; a working
+tree with real images (the fixture starts with its true magic, e.g. `QFI\xfb`
+for qcow2) rather than pointer text is required.
+
+CI does this through **`tools/ci/prepare-testdata.sh`** — the single,
+LFS-aware testdata-prep helper shared by `functional-tests.yml`,
+`coverage-fuzz.yml`, and `test-drift-fix.yml`. It clones or updates the
+cached checkout, runs `git lfs pull`, and then **guards** against the pointer
+failure mode: it inspects known canary fixtures and hard-fails the job with
+an explicit "infrastructure problem, not a test regression" message if any is
+still a pointer, so a git-LFS outage can never be silently misattributed to
+instar (see GitHub issue #451 for the incident this guards against).
+
 ## Expected Output Overrides
 
 For malicious images where running `qemu-img` would be dangerous, store the
@@ -635,7 +662,7 @@ fuzzing (Phase 3) cannot reach.
 
 ### Fuzz targets
 
-32 targets across the parser and planner crates, organized in
+40 targets across the parser and planner crates, organized in
 `src/fuzz/`:
 
 | Target | Crate | Type |
@@ -653,6 +680,14 @@ fuzzing (Phase 3) cannot reach.
 | `fuzz_vhdx_metadata` | vhdx | CallTable |
 | `fuzz_raw_partition` | raw | Buffer-based |
 | `fuzz_luks_header` | luks | Buffer-based |
+| `fuzz_vdi_header` | vdi | Buffer-based |
+| `fuzz_vdi_bat` | vdi | CallTable |
+| `fuzz_parallels_header` | parallels | Buffer-based |
+| `fuzz_parallels_bat` | parallels | CallTable |
+| `fuzz_qcow1_header` | qcow1 | Buffer-based |
+| `fuzz_qcow1_table` | qcow1 | CallTable |
+| `fuzz_dmg_table` | dmg | CallTable |
+| `fuzz_dmg_chunk` | dmg | CallTable |
 | `fuzz_measure_calc` | measure | Buffer-based |
 | `fuzz_measure_scan` | all parsers | CallTable |
 | `fuzz_create_emitters` | create | Buffer-based |

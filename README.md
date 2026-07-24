@@ -31,6 +31,11 @@ operator-provided [Loki](https://grafana.com/oss/loki/), or log locally to the
 systemd journal if you prefer your own log agent. See
 [`docs/operator_guide/logging.md`](docs/operator_guide/logging.md).
 
+Shaken Fist monitors the storage each node depends on and takes a node with
+failed storage (a dead disk or a hung NFS mount) out of scheduling
+automatically. See
+[`docs/operator_guide/node_health.md`](docs/operator_guide/node_health.md).
+
 ## Claude Code Skills
 
 This repository includes Claude Code skills in `.claude/skills/` to assist with

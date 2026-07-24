@@ -213,6 +213,90 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
         self.assertIn(INNER_INTERFACE, reply.add_floating_ip_reply.error_text)
         self.assertIn(NETWORK_UUID, reply.add_floating_ip_reply.error_text)
 
+    def test_add_brings_veth_pair_up(self):
+        # The floating veth pair is an address anchor and historically
+        # worked admin-DOWN via a kernel subtlety (local routes persist
+        # on DOWN interfaces). Both ends are now explicitly brought up.
+        recorder = self.patch_commands(results={' -C ': ('', '', 1)})
+        self._patch_utils()
+
+        self.job._add_floating_ip(self._request())
+
+        self.assertEqual([
+            ('ip', 'link', 'set', FLOATING_INTERFACE, 'up'),
+        ], recorder.find(f'link set {FLOATING_INTERFACE} up'))
+        self.assertEqual([
+            ('ip', 'netns', 'exec', NETWORK_UUID, 'ip', 'link', 'set',
+             INNER_INTERFACE, 'up'),
+        ], recorder.find(f'link set {INNER_INTERFACE} up'))
+
+    def test_add_announces_with_gratuitous_arp(self):
+        # Floating addresses are recycled between networks with distinct
+        # egress veth MACs, so the add announces the new mapping with a
+        # gratuitous ARP out the egress veth (derived from the vxid).
+        recorder = self.patch_commands(results={' -C ': ('', '', 1)})
+        self._patch_utils()
+
+        request = self._request()
+        request.vxid = 0xc1bc81
+        with mock.patch(
+                'shakenfist.daemons.privexec.main.shutil.which',
+                return_value='/usr/sbin/arping'):
+            reply = self.job._add_floating_ip(request)
+
+        self.assertEqual([
+            ('ip', 'netns', 'exec', NETWORK_UUID, '/usr/sbin/arping',
+             '-c', '2', '-U', '-i', 'egr-c1bc81-i', '-S', '192.168.10.44',
+             '192.168.10.44'),
+        ], recorder.find('arping'))
+        self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
+                         reply.add_floating_ip_reply.error)
+
+    def test_add_skips_gratuitous_arp_without_vxid(self):
+        # A zero vxid means the caller predates the field; the add works
+        # exactly as before, without an announcement.
+        recorder = self.patch_commands(results={' -C ': ('', '', 1)})
+        self._patch_utils()
+
+        reply = self.job._add_floating_ip(self._request())
+
+        self.assertEqual([], recorder.find('arping'))
+        self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
+                         reply.add_floating_ip_reply.error)
+
+    def test_add_gratuitous_arp_failure_is_best_effort(self):
+        # Reachability usually works without the announcement, so a
+        # failed arping must not fail the float add.
+        self.patch_commands(
+            results={' -C ': ('', '', 1),
+                     'arping': ('', 'arping boom', 1)})
+        self._patch_utils()
+
+        request = self._request()
+        request.vxid = 0xc1bc81
+        with mock.patch(
+                'shakenfist.daemons.privexec.main.shutil.which',
+                return_value='/usr/sbin/arping'):
+            reply = self.job._add_floating_ip(request)
+
+        self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
+                         reply.add_floating_ip_reply.error)
+
+    def test_add_gratuitous_arp_skipped_when_arping_missing(self):
+        recorder = self.patch_commands(results={' -C ': ('', '', 1)})
+        self._patch_utils()
+
+        request = self._request()
+        request.vxid = 0xc1bc81
+        with mock.patch(
+                'shakenfist.daemons.privexec.main.shutil.which',
+                return_value=None):
+            reply = self.job._add_floating_ip(request)
+
+        self.assertEqual([], recorder.find('arping'))
+        self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
+                         reply.add_floating_ip_reply.error)
+
 
 class RemoveFloatingIPTestCase(PrivExecFloatingIPTestCase):
     def _request(self):

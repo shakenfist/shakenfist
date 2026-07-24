@@ -592,6 +592,77 @@ class NodeSetDaemonStateTestCase(base.ShakenFistTestCase):
             NoSuchDaemonState, n.set_daemon_state,
             'api', 'bogus-state')
 
+    @mock.patch('shakenfist.mariadb.set_node_daemon_state')
+    def test_error_node_with_degraded_daemon_stays_error(
+            self, mock_set):
+        """A resource-health error must not be downgraded to degraded (which
+        is schedulable) when a daemon on the failed node reports stopped."""
+        n = self._make_node()
+        n.add_event = mock.MagicMock()
+        with mock.patch.object(
+                Node, 'get_degraded_daemons', return_value=['queues']), \
+                mock.patch.object(
+                    Node, 'state', new_callable=mock.PropertyMock) as mock_state:
+            mock_state.return_value = mock.Mock(value=Node.STATE_ERROR)
+            n.set_daemon_state('queues', Node.DAEMON_STATE_STOPPED)
+        # The node state was read but never reassigned to degraded.
+        self.assertNotIn(
+            mock.call(Node.STATE_DEGRADED), mock_state.mock_calls)
+
+    @mock.patch('shakenfist.mariadb.set_node_daemon_state')
+    def test_created_node_with_degraded_daemon_goes_degraded(
+            self, mock_set):
+        """The normal reconcile is unchanged: a created node with a degraded
+        daemon still transitions to degraded."""
+        n = self._make_node()
+        n.add_event = mock.MagicMock()
+        with mock.patch.object(
+                Node, 'get_degraded_daemons', return_value=['queues']), \
+                mock.patch.object(
+                    Node, 'state', new_callable=mock.PropertyMock) as mock_state:
+            mock_state.return_value = mock.Mock(value=Node.STATE_CREATED)
+            n.set_daemon_state('queues', Node.DAEMON_STATE_STOPPED)
+        self.assertIn(
+            mock.call(Node.STATE_DEGRADED), mock_state.mock_calls)
+
+
+class NodeSetLifecycleStateTestCase(base.ShakenFistTestCase):
+    """set_lifecycle_state() must not walk a resource-health error back to a
+    schedulable state on a sentinel start/stop handshake."""
+
+    def _make_node(self):
+        n = Node.__new__(Node)
+        n._Node__fqdn = TEST_FQDN
+        n._Node__ip = TEST_IP
+        n._Node__attributes = None
+        n._Node__attributes_loaded = False
+        n._DatabaseBackedObject__uuid = TEST_UUID
+        n._DatabaseBackedObject__version = Node.current_version
+        n._DatabaseBackedObject__in_memory_only = False
+        n.add_event = mock.MagicMock()
+        return n
+
+    def test_errored_node_is_not_moved(self):
+        n = self._make_node()
+        with mock.patch.object(
+                Node, 'state', new_callable=mock.PropertyMock) as mock_state:
+            mock_state.return_value = mock.Mock(value=Node.STATE_ERROR)
+            result = n.set_lifecycle_state(Node.STATE_CREATED)
+        self.assertFalse(result)
+        self.assertNotIn(
+            mock.call(Node.STATE_CREATED), mock_state.mock_calls)
+        n.add_event.assert_called_once()
+
+    def test_non_errored_node_is_moved(self):
+        n = self._make_node()
+        with mock.patch.object(
+                Node, 'state', new_callable=mock.PropertyMock) as mock_state:
+            mock_state.return_value = mock.Mock(value=Node.STATE_STOPPED)
+            result = n.set_lifecycle_state(Node.STATE_CREATED)
+        self.assertTrue(result)
+        self.assertIn(
+            mock.call(Node.STATE_CREATED), mock_state.mock_calls)
+
 
 class NodeInstanceManagementTestCase(base.ShakenFistTestCase):
     """Tests for instance add/remove on nodes."""

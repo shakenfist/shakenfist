@@ -117,6 +117,106 @@ ORPHAN_EVENTS_PRUNED = Counter(
 MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
 
 
+# ---------------------------------------------------------------------------
+# Read-through cache for immutable static object values.
+#
+# Restores the etcd-era principle "objects are cacheable, attributes are not":
+# each public get_<type>() returns a frozen Pydantic model of static columns
+# only (mutable fields come from separate get_<type>_attributes()), so caching
+# the whole result is safe. Keyed by (object_type, key) -> (monotonic expiry,
+# frozen model). Process-global under a dedicated lock so the sf-database
+# daemon's 64 worker threads share one cache rather than holding 64 disjoint
+# thread-local copies.
+#
+# Correctness rests on three rules, enforced here and by the wiring in the
+# public get_/update_/delete_ functions:
+#   * Only present rows are cached -- never a miss -- so a create-after-lookup
+#     or delete-then-lookup can never be masked by a negative entry.
+#   * Every public update_<type>/delete_<type> evicts (object_type, key). The
+#     lazy online-upgrade persist routes through the public update_<type>, so
+#     the cache self-heals after an upgrade.
+#   * Every entry is TTL-bounded, which is the only bound on staleness from a
+#     write made by another process (no local eviction hook fires there).
+# See PLAN-database-load-reduction-phase-02-static-cache.md.
+# ---------------------------------------------------------------------------
+_OBJECT_CACHE: dict[tuple[str, str], tuple[float, Any]] = {}
+_OBJECT_CACHE_LOCK = threading.Lock()
+
+
+def _object_cache_key(object_type: str, key: Any) -> tuple[str, str]:
+    """Normalise a cache key to (object_type, str(key)).
+
+    Readers pass a UUID (get_instance) while writers may pass a UUID or a
+    string (delete_instance via _ensure_uuid, or a namespace name). Keying on
+    str() makes those forms collide correctly, so an evict always finds the
+    entry a get created.
+    """
+    return (object_type, str(key))
+
+
+OBJECT_CACHE_HITS = Counter(
+    'database_object_cache_hits_total',
+    'Static-object reads served from the in-process cache.',
+    ['object_type']
+)
+OBJECT_CACHE_MISSES = Counter(
+    'database_object_cache_misses_total',
+    'Static-object reads that missed the in-process cache.',
+    ['object_type']
+)
+OBJECT_CACHE_EVICTIONS = Counter(
+    'database_object_cache_evictions_total',
+    'Static-object cache entries evicted by an update or delete.',
+    ['object_type']
+)
+
+
+def _object_cache_get(object_type: str, key: Any) -> Any:
+    """Return a cached static model for (object_type, key), or None.
+
+    Never returns an expired entry; an expired entry is dropped on access.
+    Callers treat None as "not cached" and fall through to the database.
+    """
+    cache_key = _object_cache_key(object_type, key)
+    now = time.monotonic()
+    hit = None
+    with _OBJECT_CACHE_LOCK:
+        entry = _OBJECT_CACHE.get(cache_key)
+        if entry is not None:
+            expiry, model = entry
+            if expiry > now:
+                hit = model
+            else:
+                del _OBJECT_CACHE[cache_key]
+    if hit is not None:
+        OBJECT_CACHE_HITS.labels(object_type=object_type).inc()
+        return hit
+    OBJECT_CACHE_MISSES.labels(object_type=object_type).inc()
+    return None
+
+
+def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
+    """Cache a present static model for ttl seconds. No-op when ttl <= 0.
+
+    Must never be called with model is None -- misses are not cached, so a
+    later create or a delete-then-read is never masked by a stale entry.
+    """
+    if ttl <= 0 or model is None:
+        return
+    with _OBJECT_CACHE_LOCK:
+        _OBJECT_CACHE[_object_cache_key(object_type, key)] = (
+            time.monotonic() + ttl, model)
+
+
+def _object_cache_evict(object_type: str, key: Any) -> None:
+    """Drop any cached entry for (object_type, key). Safe if absent."""
+    with _OBJECT_CACHE_LOCK:
+        present = _OBJECT_CACHE.pop(
+            _object_cache_key(object_type, key), None) is not None
+    if present:
+        OBJECT_CACHE_EVICTIONS.labels(object_type=object_type).inc()
+
+
 class _UUIDEncoder(json.JSONEncoder):
     """JSON encoder that converts UUID objects to strings."""
 
@@ -383,15 +483,23 @@ def _grpc_call(method: Any, request: Any) -> Any:
         grpc.StatusCode.UNAVAILABLE,
         grpc.StatusCode.DEADLINE_EXCEEDED,
     }
-    # grpcio's ``_UnaryUnaryMultiCallable`` (returned by ``stub.X``) uses
-    # ``__slots__`` and exposes no ``__name__``; the wire method name lives
-    # in ``self._method`` as bytes shaped like
-    # ``b'/shakenfist.protos.DatabaseService/GetNodeByFqdn'``. Take the part
-    # after the last ``/`` -- that matches the attribute name set on the
-    # stub in the generated ``_pb2_grpc`` module, so ``getattr(stub, name)``
-    # resolves cleanly on the retry path.
+    # grpcio's multicallable (returned by ``stub.X``) uses ``__slots__`` and
+    # exposes no ``__name__``; the wire method name lives in ``self._method``
+    # shaped like ``/shakenfist.protos.DatabaseService/GetNodeByFqdn``. Its
+    # type varies across grpcio releases and stub flavours: the older
+    # unregistered multicallable stored it as ``bytes``, while the current
+    # registered multicallable (our generated stubs pass
+    # ``_registered_method=True``) stores it as ``str``. Normalise to ``str``
+    # before splitting -- calling ``.decode()`` unconditionally raised
+    # ``AttributeError: 'str' object has no attribute 'decode'`` against
+    # current grpcio, breaking every gRPC database call. Take the part after
+    # the last ``/`` -- that matches the attribute name set on the stub in the
+    # generated ``_pb2_grpc`` module, so ``getattr(stub, name)`` resolves
+    # cleanly on the retry path.
     raw_method = getattr(method, '_method', b'') or b''
-    method_name = raw_method.decode().rsplit('/', 1)[-1] or None
+    if isinstance(raw_method, bytes):
+        raw_method = raw_method.decode()
+    method_name = raw_method.rsplit('/', 1)[-1] or None
 
     last_error: BaseException = grpc.RpcError()
     for attempt in range(GRPC_RETRIES):
@@ -4514,7 +4622,8 @@ def _direct_prune_orphan_events() -> int:
 # the MAX_{TYPE}_EVENT_AGE settings. Order is informational only;
 # stage A's batched DELETEs are independent across event_types.
 _PRUNABLE_EVENT_TYPES = (
-    'audit', 'mutate', 'status', 'usage', 'resources', 'prune', 'historic'
+    'audit', 'mutate', 'status', 'usage', 'resources', 'prune', 'health',
+    'historic'
 )
 
 
@@ -5849,9 +5958,15 @@ def get_upload(upload_uuid: UUID) -> Optional[UploadData]:
     Returns:
         An UploadData object, or None if not found.
     """
+    cached: Optional[UploadData] = _object_cache_get('upload', upload_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_upload(upload_uuid)
-    return _direct_get_upload(upload_uuid)
+        row = _grpc_get_upload(upload_uuid)
+    else:
+        row = _direct_get_upload(upload_uuid)
+    _object_cache_put('upload', upload_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_uploads(
@@ -5883,8 +5998,11 @@ def delete_upload(upload_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_upload(upload_uuid)
-    return _direct_delete_upload(upload_uuid)
+        result = _grpc_delete_upload(upload_uuid)
+    else:
+        result = _direct_delete_upload(upload_uuid)
+    _object_cache_evict('upload', upload_uuid)
+    return result
 
 
 def update_upload(data: UploadData) -> bool:
@@ -5899,8 +6017,11 @@ def update_upload(data: UploadData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_upload(data)
-    return _direct_update_upload(data)
+        result = _grpc_update_upload(data)
+    else:
+        result = _direct_update_upload(data)
+    _object_cache_evict('upload', data.uuid)
+    return result
 
 
 # =============================================================================
@@ -5935,9 +6056,15 @@ def get_blob(blob_uuid: UUID) -> Optional[BlobData]:
     Returns:
         A BlobData object, or None if not found.
     """
+    cached: Optional[BlobData] = _object_cache_get('blob', blob_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_blob(blob_uuid)
-    return _direct_get_blob(blob_uuid)
+        row = _grpc_get_blob(blob_uuid)
+    else:
+        row = _direct_get_blob(blob_uuid)
+    _object_cache_put('blob', blob_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_all_blob_uuids() -> list[str]:
@@ -5961,8 +6088,11 @@ def delete_blob(blob_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_blob(blob_uuid)
-    return _direct_delete_blob(blob_uuid)
+        result = _grpc_delete_blob(blob_uuid)
+    else:
+        result = _direct_delete_blob(blob_uuid)
+    _object_cache_evict('blob', blob_uuid)
+    return result
 
 
 def update_blob(data: BlobData) -> bool:
@@ -5977,8 +6107,11 @@ def update_blob(data: BlobData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_blob(data)
-    return _direct_update_blob(data)
+        result = _grpc_update_blob(data)
+    else:
+        result = _direct_update_blob(data)
+    _object_cache_evict('blob', data.uuid)
+    return result
 
 
 def get_active_blob_uuids() -> list[str]:
@@ -7339,9 +7472,15 @@ def get_dnsmasq(dnsmasq_uuid: UUID) -> Optional[DnsMasqData]:
     Returns:
         A DnsMasqData object, or None if not found.
     """
+    cached: Optional[DnsMasqData] = _object_cache_get('dnsmasq', dnsmasq_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_dnsmasq(dnsmasq_uuid)
-    return _direct_get_dnsmasq(dnsmasq_uuid)
+        row = _grpc_get_dnsmasq(dnsmasq_uuid)
+    else:
+        row = _direct_get_dnsmasq(dnsmasq_uuid)
+    _object_cache_put('dnsmasq', dnsmasq_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_dnsmasqs(
@@ -7372,8 +7511,11 @@ def delete_dnsmasq(dnsmasq_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_dnsmasq(dnsmasq_uuid)
-    return _direct_delete_dnsmasq(dnsmasq_uuid)
+        result = _grpc_delete_dnsmasq(dnsmasq_uuid)
+    else:
+        result = _direct_delete_dnsmasq(dnsmasq_uuid)
+    _object_cache_evict('dnsmasq', dnsmasq_uuid)
+    return result
 
 
 def update_dnsmasq(data: DnsMasqData) -> bool:
@@ -7388,8 +7530,11 @@ def update_dnsmasq(data: DnsMasqData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_dnsmasq(data)
-    return _direct_update_dnsmasq(data)
+        result = _grpc_update_dnsmasq(data)
+    else:
+        result = _direct_update_dnsmasq(data)
+    _object_cache_evict('dnsmasq', data.uuid)
+    return result
 
 
 # =============================================================================
@@ -10162,9 +10307,15 @@ def get_node(node_uuid: UUID) -> Optional[NodeData]:
     Returns:
         A NodeData object, or None if not found.
     """
+    cached: Optional[NodeData] = _object_cache_get('node', node_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_node(node_uuid)
-    return _direct_get_node(node_uuid)
+        row = _grpc_get_node(node_uuid)
+    else:
+        row = _direct_get_node(node_uuid)
+    _object_cache_put('node', node_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_node_by_fqdn(fqdn: str) -> Optional[NodeData]:
@@ -10202,8 +10353,11 @@ def delete_node(node_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_node(node_uuid)
-    return _direct_delete_node(node_uuid)
+        result = _grpc_delete_node(node_uuid)
+    else:
+        result = _direct_delete_node(node_uuid)
+    _object_cache_evict('node', node_uuid)
+    return result
 
 
 def update_node(data: NodeData) -> bool:
@@ -10216,8 +10370,11 @@ def update_node(data: NodeData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_node(data)
-    return _direct_update_node(data)
+        result = _grpc_update_node(data)
+    else:
+        result = _direct_update_node(data)
+    _object_cache_evict('node', data.uuid)
+    return result
 
 
 def create_node_attributes(
@@ -10876,8 +11033,11 @@ def create_namespace(name: str, version: int) -> bool:
         True if created, False if already exists or error.
     """
     if _use_database_service():
-        return _grpc_create_namespace(name, version)
-    return _direct_create_namespace(name, version)
+        result = _grpc_create_namespace(name, version)
+    else:
+        result = _direct_create_namespace(name, version)
+    _object_cache_evict('namespace', name)
+    return result
 
 
 def get_namespace(name: str) -> Optional[NamespaceData]:
@@ -10889,9 +11049,15 @@ def get_namespace(name: str) -> Optional[NamespaceData]:
     Returns:
         A NamespaceData object, or None if not found.
     """
+    cached: Optional[NamespaceData] = _object_cache_get('namespace', name)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_namespace(name)
-    return _direct_get_namespace(name)
+        row = _grpc_get_namespace(name)
+    else:
+        row = _direct_get_namespace(name)
+    _object_cache_put('namespace', name, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_all_namespace_names() -> list[str]:
@@ -10915,8 +11081,11 @@ def delete_namespace(name: str) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_namespace(name)
-    return _direct_delete_namespace(name)
+        result = _grpc_delete_namespace(name)
+    else:
+        result = _direct_delete_namespace(name)
+    _object_cache_evict('namespace', name)
+    return result
 
 
 def create_namespace_attributes(data: NamespaceAttributesData) -> bool:
@@ -11798,9 +11967,15 @@ def get_artifact(artifact_uuid: UUID) -> Optional[ArtifactData]:
     Returns:
         An ArtifactData object, or None if not found.
     """
+    cached: Optional[ArtifactData] = _object_cache_get('artifact', artifact_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_artifact(artifact_uuid)
-    return _direct_get_artifact(artifact_uuid)
+        row = _grpc_get_artifact(artifact_uuid)
+    else:
+        row = _direct_get_artifact(artifact_uuid)
+    _object_cache_put('artifact', artifact_uuid, row, config.OBJECT_CACHE_TTL_MUTABLE)
+    return row
 
 
 def get_all_artifacts() -> list[ArtifactData]:
@@ -11841,8 +12016,11 @@ def update_artifact(data: ArtifactData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_artifact(data)
-    return _direct_update_artifact(data)
+        result = _grpc_update_artifact(data)
+    else:
+        result = _direct_update_artifact(data)
+    _object_cache_evict('artifact', data.uuid)
+    return result
 
 
 def delete_artifact(artifact_uuid: UUID) -> bool:
@@ -11855,8 +12033,11 @@ def delete_artifact(artifact_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_artifact(artifact_uuid)
-    return _direct_delete_artifact(artifact_uuid)
+        result = _grpc_delete_artifact(artifact_uuid)
+    else:
+        result = _direct_delete_artifact(artifact_uuid)
+    _object_cache_evict('artifact', artifact_uuid)
+    return result
 
 
 # =============================================================================
@@ -12985,9 +13166,17 @@ def get_network_interface(
     Returns:
         A NetworkInterfaceData object, or None if not found.
     """
+    cached: Optional[NetworkInterfaceData] = _object_cache_get(
+        'networkinterface', ni_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_network_interface(ni_uuid)
-    return _direct_get_network_interface(ni_uuid)
+        row = _grpc_get_network_interface(ni_uuid)
+    else:
+        row = _direct_get_network_interface(ni_uuid)
+    _object_cache_put(
+        'networkinterface', ni_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
+    return row
 
 
 def get_network_interfaces_by_instance(
@@ -13059,8 +13248,11 @@ def delete_network_interface(ni_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_network_interface(ni_uuid)
-    return _direct_delete_network_interface(ni_uuid)
+        result = _grpc_delete_network_interface(ni_uuid)
+    else:
+        result = _direct_delete_network_interface(ni_uuid)
+    _object_cache_evict('networkinterface', ni_uuid)
+    return result
 
 
 def update_network_interface(data: NetworkInterfaceData) -> bool:
@@ -13075,8 +13267,11 @@ def update_network_interface(data: NetworkInterfaceData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_network_interface(data)
-    return _direct_update_network_interface(data)
+        result = _grpc_update_network_interface(data)
+    else:
+        result = _direct_update_network_interface(data)
+    _object_cache_evict('networkinterface', data.uuid)
+    return result
 
 
 def create_network_interface_attributes(
@@ -14189,9 +14384,15 @@ def get_network(net_uuid: UUID) -> Optional[NetworkData]:
     Returns:
         A NetworkData object, or None if not found.
     """
+    cached: Optional[NetworkData] = _object_cache_get('network', net_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_network(net_uuid)
-    return _direct_get_network(net_uuid)
+        row = _grpc_get_network(net_uuid)
+    else:
+        row = _direct_get_network(net_uuid)
+    _object_cache_put('network', net_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
+    return row
 
 
 def get_all_networks() -> list[NetworkData]:
@@ -14230,8 +14431,11 @@ def delete_network(net_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_network(net_uuid)
-    return _direct_delete_network(net_uuid)
+        result = _grpc_delete_network(net_uuid)
+    else:
+        result = _direct_delete_network(net_uuid)
+    _object_cache_evict('network', net_uuid)
+    return result
 
 
 def create_network_attributes(
@@ -14803,9 +15007,17 @@ def get_agent_operation(
     Returns:
         An AgentOperationData object, or None if not found.
     """
+    cached: Optional[AgentOperationData] = _object_cache_get(
+        'agentoperation', aop_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_agent_operation(aop_uuid)
-    return _direct_get_agent_operation(aop_uuid)
+        row = _grpc_get_agent_operation(aop_uuid)
+    else:
+        row = _direct_get_agent_operation(aop_uuid)
+    _object_cache_put(
+        'agentoperation', aop_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
+    return row
 
 
 def delete_agent_operation(aop_uuid: UUID) -> bool:
@@ -14818,8 +15030,11 @@ def delete_agent_operation(aop_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_agent_operation(aop_uuid)
-    return _direct_delete_agent_operation(aop_uuid)
+        result = _grpc_delete_agent_operation(aop_uuid)
+    else:
+        result = _direct_delete_agent_operation(aop_uuid)
+    _object_cache_evict('agentoperation', aop_uuid)
+    return result
 
 
 def create_agent_operation_attributes(
@@ -16032,9 +16247,15 @@ def get_instance(
     Returns:
         An InstanceData object, or None if not found.
     """
+    cached: Optional[InstanceData] = _object_cache_get('instance', inst_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_instance(inst_uuid)
-    return _direct_get_instance(inst_uuid)
+        row = _grpc_get_instance(inst_uuid)
+    else:
+        row = _direct_get_instance(inst_uuid)
+    _object_cache_put('instance', inst_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
+    return row
 
 
 def get_all_instances() -> list[InstanceData]:
@@ -16083,8 +16304,11 @@ def delete_instance(inst_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_instance(inst_uuid)
-    return _direct_delete_instance(inst_uuid)
+        result = _grpc_delete_instance(inst_uuid)
+    else:
+        result = _direct_delete_instance(inst_uuid)
+    _object_cache_evict('instance', inst_uuid)
+    return result
 
 
 def create_instance_attributes(
@@ -16576,16 +16800,31 @@ def _direct_list_cluster_operations_for_target(
 
     try:
         with engine.connect() as conn:
-            stmt = sa.select(ops_table).select_from(
-                targets_table.join(
-                    ops_table,
-                    targets_table.c.operation_uuid == ops_table.c.uuid
+            # Two steps rather than a single JOIN.
+            # cluster_operation_targets.operation_uuid is a String(36)
+            # holding the dashed UUID form, but cluster_operations.uuid
+            # is a Uuid() column whose stored representation differs
+            # (no dashes / native), so a column-to-column JOIN on the two
+            # never matches and the query silently returned nothing.
+            # Selecting the operation_uuids first and passing them through
+            # an IN clause routes each value through the Uuid type's bind
+            # processor, which converts it to the column's storage form so
+            # the comparison matches.
+            target_rows = conn.execute(
+                sa.select(targets_table.c.operation_uuid).where(
+                    sa.and_(
+                        targets_table.c.target_object_type
+                        == target_object_type,
+                        targets_table.c.target_uuid == target_uuid
+                    )
                 )
-            ).where(
-                sa.and_(
-                    targets_table.c.target_object_type == target_object_type,
-                    targets_table.c.target_uuid == target_uuid
-                )
+            ).fetchall()
+            if not target_rows:
+                return []
+
+            op_uuids = [UUID(r.operation_uuid) for r in target_rows]
+            stmt = sa.select(ops_table).where(
+                ops_table.c.uuid.in_(op_uuids)
             ).order_by(ops_table.c.created_at.desc())
             result = conn.execute(stmt).fetchall()
             return [_cluster_operation_row_to_dict(row) for row in result]
@@ -16619,10 +16858,11 @@ def _direct_create_and_enqueue_cluster_operation(
         metadata: dict[str, Any],
         created_at: float,
         queue_name: str,
-        delay: float = 0.0) -> bool:
+        delay: float = 0.0,
+        targets: Optional[list[tuple[ObjectType, str]]] = None) -> bool:
     """Atomically create a cluster operation and enqueue its work item.
 
-    Writes three rows in a single MariaDB transaction:
+    Writes the following rows in a single MariaDB transaction:
 
     1. A cluster_operations row with the full operation metadata
        and the same indexed-column extraction as
@@ -16636,6 +16876,15 @@ def _direct_create_and_enqueue_cluster_operation(
        {'operation_type': operation_type,
         'operation_uuid': str(op_uuid)} -- the same shape
        phase 5's from_db() consumer will read via Dequeue.
+    4. One cluster_operation_targets row per entry in ``targets``
+       (each an ``(ObjectType, target_uuid)`` pair). Writing these
+       in the same transaction as the op is what makes a by-target
+       query (has_pending_cluster_operation, is_okay gating, the
+       /clusteroperations listing) see the op the instant it is
+       enqueued -- previously the target rows were written by a
+       separate, non-transactional loop in the schema layer, so a
+       reader in the gap saw an enqueued op with no target rows and
+       concluded, wrongly, that nothing targeted the object.
 
     This is the only function in mariadb.py that writes to more
     than one table in a single transaction. The existing
@@ -16655,6 +16904,7 @@ def _direct_create_and_enqueue_cluster_operation(
     cluster_ops_table = _get_cluster_operations_table()
     states_table = _get_object_states_table()
     queue_table = _get_work_queue_table()
+    targets_table = _get_cluster_operation_targets_table()
 
     scheduled_at = created_at + delay
     work_item = {
@@ -16703,6 +16953,16 @@ def _direct_create_and_enqueue_cluster_operation(
                 created_at=created_at,
             )
             conn.execute(queue_stmt)
+
+            for target_object_type, target_uuid in (targets or []):
+                target_stmt = sa.insert(targets_table).values(
+                    operation_uuid=str(op_uuid),
+                    operation_type=operation_type,
+                    target_object_type=target_object_type,
+                    target_uuid=target_uuid,
+                    created_at=created_at,
+                )
+                conn.execute(target_stmt)
 
             conn.commit()
             return True
@@ -16916,10 +17176,20 @@ def _grpc_create_and_enqueue_cluster_operation(
         metadata: dict[str, Any],
         created_at: float,
         queue_name: str,
-        delay: float = 0.0) -> bool:
+        delay: float = 0.0,
+        targets: Optional[list[tuple[ObjectType, str]]] = None) -> bool:
     """Atomic create+enqueue via the database microservice."""
     try:
         stub = _get_database_stub()
+        target_msgs = [
+            database_pb2.CreateAndEnqueueClusterOperationTarget(
+                target_object_type=cast(
+                    shakenfist_enums_pb2.ObjectType.ValueType,
+                    target_object_type.proto_id),
+                target_uuid=target_uuid,
+            )
+            for target_object_type, target_uuid in (targets or [])
+        ]
         request = (
             database_pb2
             .CreateAndEnqueueClusterOperationRequest(
@@ -16929,6 +17199,7 @@ def _grpc_create_and_enqueue_cluster_operation(
                 queue_name=queue_name,
                 delay=delay,
                 metadata_json=_json_dumps(metadata),
+                targets=target_msgs,
             )
         )
         reply = _grpc_call(
@@ -17336,12 +17607,14 @@ def create_and_enqueue_cluster_operation(
         metadata: dict[str, Any],
         created_at: float,
         queue_name: str,
-        delay: float = 0.0) -> bool:
+        delay: float = 0.0,
+        targets: Optional[list[tuple[ObjectType, str]]] = None) -> bool:
     """Atomically create a cluster operation and enqueue its job.
 
     Writes the cluster_operations header, an object_states row
-    (state='queued'), and a work_queue row in a single MariaDB
-    transaction.
+    (state='queued'), a work_queue row, and one
+    cluster_operation_targets row per entry in ``targets`` -- all in
+    a single MariaDB transaction.
 
     Audit events are NOT written by this function; callers should
     emit them via shakenfist.eventlog.add_event_multi() after this
@@ -17349,12 +17622,11 @@ def create_and_enqueue_cluster_operation(
 
     Note: this is the low-level transactional primitive. The
     schema-layer helper shakenfist/schema/operations/util.py:
-    enqueue_cluster_operation() should normally be preferred --
-    it adds automatic cluster_operation_targets registration
-    based on each schema's ``target_fields`` ClassVar. Calling
-    this function directly bypasses that registration and
-    should only be done when the caller has its own reason to
-    skip it (e.g. internal bookkeeping migrations).
+    enqueue_cluster_operation() should normally be preferred -- it
+    derives the ``targets`` list from each schema's ``target_fields``
+    ClassVar and passes it here so the target rows are written
+    atomically with the operation. Callers using this function
+    directly own the ``targets`` argument themselves.
 
     Args:
         op_uuid: The operation's UUID (str or UUID).
@@ -17364,6 +17636,9 @@ def create_and_enqueue_cluster_operation(
         queue_name: Target work queue name, e.g.
             '{target}-clusteroperation-{priority}'.
         delay: Seconds to defer the job (default 0).
+        targets: Optional list of ``(ObjectType, target_uuid)`` pairs
+            recording every object this operation targets. Written to
+            cluster_operation_targets in the same transaction.
 
     Returns:
         True on success. False if the operation uuid already
@@ -17373,10 +17648,10 @@ def create_and_enqueue_cluster_operation(
     if _use_database_service():
         return _grpc_create_and_enqueue_cluster_operation(
             u, operation_type, metadata, created_at,
-            queue_name, delay)
+            queue_name, delay, targets)
     return _direct_create_and_enqueue_cluster_operation(
         u, operation_type, metadata, created_at,
-        queue_name, delay)
+        queue_name, delay, targets)
 
 
 def set_cluster_operation_error(

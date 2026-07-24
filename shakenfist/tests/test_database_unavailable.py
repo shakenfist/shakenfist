@@ -8,6 +8,7 @@ found", and the hot paths that intentionally shrug off an unreachable
 database must catch it explicitly.
 """
 
+import uuid
 from unittest import mock
 
 import grpc
@@ -130,18 +131,130 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
             mariadb.get_node_by_fqdn, 'sf-1')
 
 
+class GrpcCallMethodNameTestCase(base.ShakenFistTestCase):
+    # The wire method name is read from the private ``_method`` attribute of
+    # grpcio's multicallable so the retry path can re-resolve a fresh bound
+    # method by name. That attribute's type differs across grpcio releases and
+    # stub flavours -- older unregistered multicallables expose ``bytes``,
+    # current registered multicallables (our generated stubs use
+    # ``_registered_method=True``) expose ``str``. Both must work; assuming
+    # ``bytes`` and calling ``.decode()`` unconditionally crashed every gRPC
+    # database call with ``AttributeError`` against current grpcio.
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def _assert_retry_reresolves(
+            self, wire_method, mock_stub, mock_reset, mock_time):
+        # First attempt fails DEADLINE_EXCEEDED (which rebuilds the channel),
+        # so the retry must re-resolve the method by name off a fresh stub --
+        # the code path that depends on parsing ``_method``.
+        failing = mock.MagicMock(
+            side_effect=FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED))
+        failing._method = wire_method
+        succeeding = mock.MagicMock(return_value='ok')
+        mock_stub.return_value.GetNode = succeeding
+
+        self.assertEqual(
+            'ok', mariadb._grpc_call(failing, mock.MagicMock()))
+        # The retry resolved GetNode by name from the fresh stub and called it.
+        succeeding.assert_called_once()
+
+    def test_method_name_from_bytes(self):
+        self._assert_retry_reresolves(
+            b'/shakenfist.protos.DatabaseService/GetNode')
+
+    def test_method_name_from_str(self):
+        # The regression: current grpcio hands us a ``str`` here.
+        self._assert_retry_reresolves(
+            '/shakenfist.protos.DatabaseService/GetNode')
+
+
 class CheckDaemonStateTestCase(base.ShakenFistTestCase):
-    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
-    @mock.patch('shakenfist.daemons.daemon.Node.this_node',
-                side_effect=exceptions.DatabaseUnavailable('down'))
-    def test_unavailable_database_is_skipped(
-            self, mock_this_node, mock_set_abort):
+    NODE_UUID = '11111111-1111-1111-1111-111111111111'
+
+    def _daemon(self):
+        # Build a bare Daemon without running __init__ (which sets a
+        # process title, installs signal handlers, etc). check_daemon_state
+        # only needs these attributes.
         d = daemon.Daemon.__new__(daemon.Daemon)
         d.daemon_name = 'queues'
         d.abort_path = '/run/sf/queues.abort'
+        d._last_daemon_state_check = 0.0
+        return d
 
-        d.check_daemon_state()
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state',
+                side_effect=exceptions.DatabaseUnavailable('down'))
+    def test_unavailable_database_is_skipped(
+            self, mock_get_state, mock_set_abort):
+        with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
+            self._daemon().check_daemon_state()
         mock_set_abort.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.Node.this_node')
+    @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state',
+                return_value=mock.Mock(value=daemon.Node.DAEMON_STATE_RUNNING))
+    def test_does_not_fetch_the_node_object(
+            self, mock_get_state, mock_this_node, mock_set_abort):
+        # The whole point of phase 1: reach the daemon-state row directly by
+        # UUID, never via Node.this_node() (which costs a get_node round trip).
+        with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
+            self._daemon().check_daemon_state()
+        mock_this_node.assert_not_called()
+        mock_get_state.assert_called_once_with(
+            uuid.UUID(self.NODE_UUID), 'queues')
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state')
+    def test_abort_set_on_stopping_and_stopped(
+            self, mock_get_state, mock_set_abort):
+        for state in (daemon.Node.DAEMON_STATE_STOPPING,
+                      daemon.Node.DAEMON_STATE_STOPPED):
+            mock_set_abort.reset_mock()
+            mock_get_state.return_value = mock.Mock(value=state)
+            with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
+                self._daemon().check_daemon_state()
+            mock_set_abort.assert_called_once()
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state')
+    def test_no_abort_on_running_or_missing(
+            self, mock_get_state, mock_set_abort):
+        for row in (mock.Mock(value=daemon.Node.DAEMON_STATE_RUNNING), None):
+            mock_get_state.return_value = row
+            with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
+                self._daemon().check_daemon_state()
+            mock_set_abort.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state',
+                return_value=None)
+    def test_missing_node_uuid_is_skipped(
+            self, mock_get_state, mock_set_abort):
+        with mock.patch.object(daemon.config, 'NODE_UUID', None):
+            self._daemon().check_daemon_state()
+        mock_get_state.assert_not_called()
+        mock_set_abort.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.mariadb.get_node_daemon_state',
+                return_value=mock.Mock(value=daemon.Node.DAEMON_STATE_RUNNING))
+    def test_read_is_rate_limited(self, mock_get_state, mock_set_abort):
+        d = self._daemon()
+        with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
+            # First call reads (last-check timestamp starts at 0.0).
+            d.check_daemon_state()
+            self.assertEqual(1, mock_get_state.call_count)
+
+            # A second call within the interval must not touch the database.
+            d.check_daemon_state()
+            self.assertEqual(1, mock_get_state.call_count)
+
+            # Once the interval has elapsed, the read happens again.
+            d._last_daemon_state_check -= (daemon.DAEMON_STATE_POLL_INTERVAL + 1)
+            d.check_daemon_state()
+            self.assertEqual(2, mock_get_state.call_count)
 
 
 class ClusterLockAcquireTestCase(base.ShakenFistTestCase):

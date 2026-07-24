@@ -4,6 +4,7 @@ import json
 from unittest import mock
 
 from shakenfist.tests import base
+from shakenfist.util import caller_identity
 from shakenfist.util import grpc_channel
 from shakenfist.util.grpc_channel import _DEFAULT_OPTIONS
 
@@ -134,3 +135,47 @@ class MakeDatabaseChannelServiceConfigTestCase(base.ShakenFistTestCase):
             'sf-database. Do not re-add without an async or '
             'deadlock-safe server-side health implementation.',
         )
+
+
+class CallerMetadataInterceptorTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        original = caller_identity.get_caller_daemon()
+        self.addCleanup(caller_identity.set_caller_identity, original)
+
+    def _details(self, metadata=None):
+        return grpc_channel._ClientCallDetails(
+            '/svc/Method', 30, metadata, None, None)
+
+    def test_appends_caller_metadata_and_preserves_fields(self):
+        caller_identity.set_caller_identity('queues')
+        captured = {}
+
+        def continuation(details, request):
+            captured['metadata'] = list(details.metadata)
+            captured['timeout'] = details.timeout
+            captured['method'] = details.method
+            return 'resp'
+
+        interceptor = grpc_channel._CallerMetadataInterceptor()
+        result = interceptor.intercept_unary_unary(
+            continuation, self._details(), 'req')
+
+        self.assertEqual('resp', result)
+        md = dict(captured['metadata'])
+        self.assertEqual('queues', md['caller-daemon'])
+        self.assertIn('caller-node', md)
+        # Non-metadata call details are carried through unchanged.
+        self.assertEqual(30, captured['timeout'])
+        self.assertEqual('/svc/Method', captured['method'])
+
+    def test_preserves_existing_metadata(self):
+        def continuation(details, request):
+            return list(details.metadata)
+
+        interceptor = grpc_channel._CallerMetadataInterceptor()
+        md = dict(interceptor.intercept_unary_unary(
+            continuation, self._details([('x', 'y')]), 'req'))
+
+        self.assertEqual('y', md['x'])
+        self.assertIn('caller-daemon', md)

@@ -35,11 +35,13 @@ def main():
     util_exceptions.install_exception_tracking()
     daemon.clear_abort_path(ABORT_PATH)
     setproctitle.setproctitle('sf-sentinel-first')
+    from shakenfist.util.caller_identity import set_caller_identity
+    set_caller_identity('sentinel-first')
     LOG.info('Started')
 
     n = Node.from_db(config.NODE_NAME)
     n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_RUNNING)
-    n.state = Node.STATE_DEGRADED
+    n.set_lifecycle_state(Node.STATE_DEGRADED)
     send_systemd_ready()
 
     while daemon.check_abort_path(ABORT_PATH):
@@ -51,7 +53,7 @@ def main():
     send_systemd_stopping()
 
     n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_STOPPED)
-    n.state = Node.STATE_STOPPED
+    n.set_lifecycle_state(Node.STATE_STOPPED)
     LOG.info('Stopped')
 
     daemon.force_clean_exit()

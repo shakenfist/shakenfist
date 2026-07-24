@@ -5,6 +5,7 @@ import signal
 import socket
 import threading
 import time
+import uuid
 from logging.handlers import SysLogHandler
 from math import inf
 
@@ -26,6 +27,7 @@ from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_all_background_node_queues
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util.caller_identity import set_caller_identity
 from shakenfist.util import libvirt as util_libvirt
 
 
@@ -36,6 +38,15 @@ LOG, _ = logs.setup(__name__)
 # this cadence so a base-class daemon idling on its 0.2s tick does not emit a
 # notification on every tick.
 WATCHDOG_PET_INTERVAL = 10
+
+
+# Seconds between database reads of this daemon's own state in
+# check_daemon_state(). The read is rate-limited to this cadence (rather than
+# running on every 0.2s idle tick) because it only notices an externally
+# written stop request; local SIGTERM shutdown is handled by exit_gracefully()
+# and the abort_path check in idle(), which are unaffected. See
+# PLAN-database-load-reduction-phase-01-idle-loop.md.
+DAEMON_STATE_POLL_INTERVAL = 2
 
 
 DAEMON_NAMES = {
@@ -212,6 +223,9 @@ def health_check_api():
 class Daemon:
     def __init__(self, name):
         self.daemon_name = name
+        # Record this daemon's name process-globally so the sf-database gRPC
+        # client interceptor can attribute each call to it.
+        set_caller_identity(name)
 
         procname = process_name(name)
         setproctitle.setproctitle(procname)
@@ -229,6 +243,7 @@ class Daemon:
         self.last_stability = None
         self.last_stability_log = 0
         self._last_watchdog = 0.0
+        self._last_daemon_state_check = 0.0
 
     def _resolve_node_uuid(self):
         """Populate config.NODE_UUID if not already set.
@@ -334,16 +349,31 @@ class Daemon:
             set_abort_path(self.abort_path, 'from exit_gracefully')
 
     def check_daemon_state(self):
-        # This runs every 0.2 seconds via idle() in every daemon, so an
-        # unreachable database must not propagate from here -- we just
-        # can't check right now, and will again shortly.
+        # Callers hit this on every 0.2s idle tick, but the database read only
+        # needs to notice an externally written stop request (local SIGTERM is
+        # handled by exit_gracefully() + the abort_path check in idle()), so we
+        # rate-limit it to DAEMON_STATE_POLL_INTERVAL. The timestamp is advanced
+        # before the read so a database outage is polled at that cadence rather
+        # than hammered every tick.
+        now = time.time()
+        if now - self._last_daemon_state_check < DAEMON_STATE_POLL_INTERVAL:
+            return
+        self._last_daemon_state_check = now
+
+        # Read this daemon's own state row directly by node UUID. The UUID is
+        # resolved into config.NODE_UUID at startup (_resolve_node_uuid), so we
+        # avoid a get_node round trip just to reach a daemon-state accessor. An
+        # unreachable database must not propagate from here -- we just can't
+        # check right now, and will again shortly.
+        node_uuid = config.NODE_UUID
+        if not node_uuid:
+            return
         try:
-            n = Node.this_node(suppress_failure_audit=True)
-            if not n:
-                return
-            daemon_state = n.get_daemon_state(self.daemon_name).value
+            row = mariadb.get_node_daemon_state(
+                uuid.UUID(node_uuid), self.daemon_name)
         except DatabaseUnavailable:
             return
+        daemon_state = row.value if row is not None else None
         if daemon_state in [Node.DAEMON_STATE_STOPPED,
                             Node.DAEMON_STATE_STOPPING]:
             set_abort_path(self.abort_path, 'from check_daemon_state')

@@ -32,6 +32,8 @@ def main():
     util_exceptions.install_exception_tracking()
     daemon.clear_abort_path(ABORT_PATH)
     setproctitle.setproctitle('sf-sentinel-last')
+    from shakenfist.util.caller_identity import set_caller_identity
+    set_caller_identity('sentinel-last')
     LOG.info('Started')
 
     n = Node.from_db(config.NODE_NAME)
@@ -44,8 +46,10 @@ def main():
     # only other path back to created is the cluster daemon's
     # missing-node recovery, which never fires while checkins stay
     # fresh. Being the last daemon to start also makes this the final
-    # state write in any restart interleaving.
-    n.state = Node.STATE_CREATED
+    # state write in any restart interleaving. set_lifecycle_state leaves a
+    # resource-health-errored node errored rather than re-opening it to
+    # scheduling on restart (operator-only recovery).
+    n.set_lifecycle_state(Node.STATE_CREATED)
     send_systemd_ready()
 
     while daemon.check_abort_path(ABORT_PATH):
@@ -56,7 +60,7 @@ def main():
     LOG.info('Stopping')
     send_systemd_stopping()
     n.set_daemon_state('sentinel-last', Node.DAEMON_STATE_STOPPED)
-    n.state = Node.STATE_STOPPING
+    n.set_lifecycle_state(Node.STATE_STOPPING)
     LOG.info('Stopped')
 
     daemon.force_clean_exit()

@@ -82,11 +82,36 @@ jobs:
           # here silently created duplicate pins that only diverged -- and
           # broke resolution -- once Renovate bumped one spelling (see the
           # duplicate PRs #3398/#3399 for typing-extensions).
+          # NOTE(mikal): a direct dependency pinned with extras (e.g.
+          # "gunicorn[gevent]==...") must also count as pinned, or we add a
+          # bare duplicate pin ("gunicorn==..."). Renovate collapses such
+          # duplicates into a single update and patches only one of them,
+          # which leaves the two pins disagreeing and makes dependency
+          # resolution unsatisfiable (see PR #3462 for gunicorn v26).
+          #
+          # NOTE(mikal): some packages have their exact version chosen by a
+          # parent's "==" pin (e.g. pydantic X.Y.Z depends on
+          # pydantic-core==A.B.C). Pinning such a package here as an indirect
+          # dependency lets Renovate bump it out from under its parent, which
+          # makes dependency resolution unsatisfiable (see PR #3469 for
+          # pydantic-core 2.47.0 against pydantic 2.13.4). Never pin these;
+          # the parent determines them. Names are compared in PEP 503
+          # canonical form (lowercase, dashes).
+          never_pin="pydantic-core"
+
           for depver in $(${GITHUB_WORKSPACE}/ci-venv/bin/pip freeze --local); do
             dep=$(echo ${depver} | sed 's/==.*//')
             depre=$(echo ${dep} | sed -E 's/[-_.]+/[-_.]/g')
+            depcanon=$(echo ${dep} | tr '[:upper:]' '[:lower:]' | sed -E 's/[-_.]+/-/g')
 
-            if [ $(egrep -ic "\"${depre}==" pyproject.toml) -lt 1 ]; then
+            case " ${never_pin} " in
+              *" ${depcanon} "*)
+                echo "Skipping ${dep}: version is determined by a parent pin."
+                continue
+                ;;
+            esac
+
+            if [ $(egrep -ic "\"${depre}(\[[a-z0-9,_.-]+\])?==" pyproject.toml) -lt 1 ]; then
               sed -i "s/    # END_OF_INDIRECT_DEPS/    \"${depver}\",\n    # END_OF_INDIRECT_DEPS/" pyproject.toml
             fi
           done

@@ -26,11 +26,17 @@ which:
   Windows, running the test suite on each.
 - Produces `.deb`, `.rpm`, macOS `.tar.gz`, and Windows `.zip`
   artifacts.
+- Builds the per-arch `ryll` PyPI wheel natively for `x86_64` and
+  `aarch64` (no QEMU).
+- Sigstore-signs the release tag (keyless, OIDC), gated on the
+  `release` environment's manual approval.
 - Publishes all four workspace crates to crates.io in dependency
   order: `shakenfist-spice-protocol` → `shakenfist-spice-compression`
   → `shakenfist-spice-usbredir` → `ryll`.
 - Creates a GitHub Release with auto-generated notes and all
   artifacts attached.
+- Publishes the `ryll` wheels to TestPyPI, then to PyPI, both via
+  OIDC Trusted Publishers.
 - Updates `shakenfist/homebrew-tap` with the new version and the
   SHA256 of the macOS tarball.
 
@@ -66,6 +72,51 @@ Two secrets must be configured in the ryll repo settings:
   to `shakenfist/homebrew-tap`). Without it, the Homebrew tap
   update step fails; the GitHub Release and crates.io publishes
   still succeed.
+
+No secret is needed for the `ryll` PyPI wheel: it publishes via
+OIDC Trusted Publishers instead (see below).
+
+### PyPI Trusted Publishers and the `release` environment
+
+The `ryll` wheel publishes to TestPyPI and then PyPI using OIDC
+Trusted Publishers — no API tokens are stored in the repo. This
+is one-time setup per PyPI account, mirroring how kerbside's
+`kerbside-proxy` wheel is published (see that repo's
+`RELEASE-SETUP.md`).
+
+1. **TestPyPI trusted publisher.** Log in to
+   [test.pypi.org](https://test.pypi.org), go to the `ryll`
+   project's **Settings → Publishing** (or add a *pending*
+   publisher first if the project does not exist yet on
+   TestPyPI), and add a publisher with:
+   - **Owner:** `shakenfist`
+   - **Repository name:** `ryll`
+   - **Workflow name:** `release.yml`
+   - **Environment name:** `release`
+2. **PyPI trusted publisher.** Repeat the same steps on
+   [pypi.org](https://pypi.org) for the real `ryll` project, with
+   the identical Owner/Repository/Workflow/Environment values.
+   The two are independent entries — TestPyPI and PyPI each need
+   their own trusted-publisher registration even though the
+   workflow and environment names match.
+3. **`release` GitHub environment.** Under repo **Settings →
+   Environments**, create an environment named `release` with
+   **Required reviewers** set to the maintainers who may approve
+   releases. This environment gates the `sign-tag` job, and
+   `sign-tag` in turn gates *every* publishing job —
+   `publish-crates`, `github-release`, `update-homebrew`, and the
+   `ryll` PyPI lane (`publish-ryll-testpypi` →
+   `publish-ryll-pypi`) — so nothing publishes anywhere, and the
+   release tag is not Sigstore-signed, until a required reviewer
+   approves the run in GitHub's UI.
+
+Without the `release` environment configured, the workflow run
+stalls waiting for an environment that can never be approved.
+Without the trusted-publisher registrations, `sign-tag` still
+succeeds but `publish-ryll-testpypi`/`publish-ryll-pypi` fail
+with a "publisher not found" error; the `.deb`/`.rpm`/tarball/zip
+artifacts, GitHub Release, and crates.io publishes are unaffected
+since they only depend on `sign-tag`, not on the PyPI publishers.
 
 ### Host tools
 
@@ -155,6 +206,19 @@ The script will:
 6. Watch the triggered release workflow via `gh run watch` and
    open the GitHub Release page when it completes.
 
+The pushed tag runs `check-version`, then builds the `.deb`/
+`.rpm`/tarball/zip artifacts and the per-arch `ryll` PyPI wheels
+(`build-ryll-wheels`, natively on `x86_64` and `aarch64`, no
+QEMU) in parallel. Once all builds succeed, the workflow pauses
+at `sign-tag` for approval on the `release` environment — this is
+where `gh run watch` will sit until a required reviewer approves
+the run. On approval, `sign-tag` Sigstore-signs and force-pushes
+the tag, then `publish-crates` and `github-release` run, followed
+by the staged PyPI publish (`publish-ryll-testpypi` →
+`publish-ryll-pypi`, both `skip-existing` so a re-run after a
+partial failure does not hard-error on a file already published),
+and finally `update-homebrew`.
+
 ## Artifacts produced
 
 | Platform | Artifact | Contents |
@@ -164,6 +228,7 @@ The script will:
 | macOS (Apple Silicon) | `ryll-{version}-aarch64-apple-darwin.tar.gz` | Binary |
 | Windows | `ryll-{version}-x86_64-pc-windows-msvc.zip` | Binary (no `--capture`) |
 | crates.io | `shakenfist-spice-protocol`, `shakenfist-spice-compression`, `shakenfist-spice-usbredir`, `ryll` | Source crates |
+| PyPI (TestPyPI, then PyPI) | `ryll-{version}-py3-none-manylinux_2_28_x86_64.whl`, `ryll-{version}-py3-none-manylinux_2_28_aarch64.whl` | Embedded GUI binary (maturin `bindings = "bin"`); Linux `x86_64`/`aarch64`, glibc >= 2.28 |
 
 ## Troubleshooting
 
@@ -204,6 +269,35 @@ Common causes:
   maintained by `cargo release`; if you have added new
   workspace-member dependencies, make sure they follow the same
   pattern.
+
+### Release stuck waiting for approval
+
+`sign-tag` (and everything downstream of it) will not run until
+a required reviewer approves the workflow run on the `release`
+environment. If `gh run watch` appears to hang after the build
+jobs finish, check the environment approval, not the workflow. If
+the `release` environment does not exist yet, the run stalls
+indefinitely — see "PyPI Trusted Publishers and the `release`
+environment" above.
+
+### PyPI wheel publish fails
+
+`publish-ryll-testpypi` and `publish-ryll-pypi` use OIDC Trusted
+Publishers, not a stored token, so failures are almost always
+configuration, not credentials:
+
+- "Publisher not found" — the trusted-publisher entry on
+  test.pypi.org or pypi.org does not match the workflow's Owner /
+  Repository / Workflow name / Environment name exactly (case
+  sensitive). Re-check the entry against the current
+  `release.yml`.
+- A partial failure (e.g. the `x86_64` wheel uploads but
+  `aarch64` fails) is safe to re-run: both jobs pass
+  `skip-existing: true`, so a re-run only uploads what is
+  missing.
+- Neither PyPI job failing affects `publish-crates`,
+  `github-release`, or `update-homebrew` — they only depend on
+  `sign-tag`, not on the PyPI publish succeeding.
 
 ### Homebrew tap update fails
 

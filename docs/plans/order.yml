@@ -14,6 +14,7 @@
 - PLAN-queue-performance.md: Queue performance and coalescing
 - PLAN-recurring-operations.md: Recurring cluster operations framework
 - PLAN-health-checks.md: Health checks, readiness, and graceful drain for SF daemons
+- PLAN-node-resource-health.md: Node resource health — declarative dependency checks feeding node state
 - PLAN-remove-primary.md: Remove the primary node and adopt a BYO-infrastructure deployer
 - PLAN-remove-apache-lb.md: Remove the Apache load balancer from the deployer
 - PLAN-remove-syslog-forwarding.md: Remove syslog forwarding and ship logs to Loki
@@ -30,3 +31,5 @@
 - PLAN-qemu-futures.md: Owning more of the QEMU stack — QMP, and one day maybe libvirt's job too
 - PLAN-artifact-ux-rework.md: Rework the artifact, blob, label, upload, and snapshot user interface
 - PLAN-kerbside-vdi-tokens.md: VDI console access via Kerbside signed tokens
+- PLAN-cluster-op-visibility.md: Truthful cluster operation visibility
+- PLAN-database-load-reduction.md: Reduce steady-state MariaDB load from the sf-database tier

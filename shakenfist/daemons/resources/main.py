@@ -2,6 +2,7 @@ import math
 import os
 import platform
 import re
+import threading
 import time
 
 import psutil
@@ -12,6 +13,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist import instance
+from shakenfist import node_health
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -541,6 +543,36 @@ class Monitor(daemon.Daemon):
                 self.last_logged_resources = time.time()
             return retval
 
+    def _run_health_checks(self, checks, types_by_identity):
+        # Runs in its own daemon thread (see _run_inner). Evaluates the node's
+        # storage-dependency health every NODE_HEALTH_CHECK_INTERVAL and, on
+        # failure, marks the node errored. Sleeps in one-second slices so it
+        # stops promptly when the daemon aborts.
+        #
+        # The gauge is created once here (re-registering a Gauge name raises)
+        # and exposes on the resources metrics port that _run_inner already
+        # started -- the scrapeable companion to the health event apply_result
+        # records, so a dead-storage node is visible to Prometheus, not only
+        # in a node's event history.
+        health_gauge = Gauge(
+            'node_resource_health',
+            "1 if all of this node's storage-dependency health checks pass, "
+            'else 0')
+        while daemon.check_abort_path(self.abort_path):
+            try:
+                result = node_health.evaluate(checks, types_by_identity)
+                health_gauge.set(1.0 if result.healthy else 0.0)
+                n = Node.from_db(config.NODE_NAME)
+                if n:
+                    node_health.apply_result(n, result)
+            except Exception as e:
+                util_exceptions.ignore_exception('node health check', e)
+
+            for _ in range(max(1, config.NODE_HEALTH_CHECK_INTERVAL)):
+                if not daemon.check_abort_path(self.abort_path):
+                    break
+                time.sleep(1)
+
     def _run_inner(self):
         gauges = {
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
@@ -559,6 +591,22 @@ class Monitor(daemon.Daemon):
 
         n.python_version = platform.python_version_tuple()
         n.python_implementation = platform.python_implementation()
+
+        # Node resource health runs in its own thread, not this loop: a probe
+        # can block up to the timeout the first time a path hangs (a hard NFS
+        # mount blocks rather than erroring), and this loop holds the nodelock
+        # and drives metrics -- a stall here would time out other nodelock
+        # waiters. The checks are built once from this node's capabilities.
+        health_checks, health_types = node_health.build_for_this_node()
+        # Provision each probed directory once, here, before the probe thread
+        # starts -- so a not-yet-created subdir (e.g. uploads on a node that
+        # has never received an upload) is never misread as a MISSING fault,
+        # and an ENOENT during probing unambiguously means the store vanished.
+        for check in health_checks:
+            check.ensure_present()
+        threading.Thread(
+            target=self._run_health_checks, name='node-health',
+            args=(health_checks, health_types), daemon=True).start()
 
         last_metrics = 0
         last_billing = 0

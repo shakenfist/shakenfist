@@ -254,6 +254,17 @@ Read the diff (`git diff develop...HEAD`) and verify:
   `docs/operator_guide/` for new operator-visible
   behaviour, and `docs/developer_guide/` for new internal
   patterns.
+- State machine docs match the code: if the diff changes any
+  object's `state_targets` map (a state added or removed, or a
+  transition added or removed), verify
+  `docs/developer_guide/state_machine.md` still matches. Each
+  object's state list and its mermaid diagram must reflect
+  exactly the states and transitions in the corresponding
+  `state_targets` dict — including the creation transition
+  (the `None` key) and any recovery edges. This audit is
+  worth a quick pass even when the diff does not touch
+  `state_targets`, as the diagrams have drifted from the maps
+  before.
 - Plan files in `docs/plans/` are up to date — completed
   phases marked complete, deferred items listed, and the
   *Plan Status* table in `docs/plans/index.md` reflects

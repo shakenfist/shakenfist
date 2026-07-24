@@ -944,16 +944,16 @@ class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
             self, mock_by_type, mock_api_request, mock_orphan):
         """Orchestrator returns sum of all stage totals.
 
-        With seven event_types each returning 10, plus api-request 20,
-        plus orphan 30, the total should be (7 * 10) + 20 + 30 = 120.
+        With eight event_types each returning 10, plus api-request 20,
+        plus orphan 30, the total should be (8 * 10) + 20 + 30 = 130.
         """
         total = mariadb._direct_prune_events()
 
-        # Seven per-type calls + one api-request + one orphan.
-        self.assertEqual(7, mock_by_type.call_count)
+        # Eight per-type calls + one api-request + one orphan.
+        self.assertEqual(8, mock_by_type.call_count)
         mock_api_request.assert_called_once()
         mock_orphan.assert_called_once()
-        self.assertEqual(120, total)
+        self.assertEqual(130, total)
 
     @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=0)
@@ -1004,8 +1004,8 @@ class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
         total_second_cycle = mariadb._direct_prune_events()
 
         mock_orphan.assert_called_once()
-        # 7 per-type (each = 1) + 0 api-request + 1 orphan = 8
-        self.assertEqual(8, total_second_cycle)
+        # 8 per-type (each = 1) + 0 api-request + 1 orphan = 9
+        self.assertEqual(9, total_second_cycle)
 
 
 # ---------------------------------------------------------------------------

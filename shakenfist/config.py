@@ -42,8 +42,8 @@ def load_cluster_config() -> None:
     Falls back silently on any failure so that fresh-install
     nodes with no database daemon yet can still start.
 
-    Built inline to avoid circular imports (database.py and
-    mariadb.py both import config.py).
+    Built inline to avoid a circular import (mariadb.py imports
+    config.py, so the bootstrap channel cannot route through it).
     """
     mariadb_host = os.getenv('SHAKENFIST_MARIADB_HOST')
     if mariadb_host:
@@ -179,6 +179,24 @@ class SFConfig(BaseSettings):
     # Scheduler Options
     SCHEDULER_CACHE_TIMEOUT: int = Field(
         5, description='How long the scheduler should cache things for.'
+    )
+    OBJECT_CACHE_TTL_IMMUTABLE: int = Field(
+        300,
+        description=(
+            'Seconds to cache the static values of objects that have no '
+            'post-creation writer (instance, network, networkinterface, '
+            'agentoperation). Only cross-process deletion can make these '
+            'stale, so the TTL can be long. 0 disables this cache tier.'
+        )
+    )
+    OBJECT_CACHE_TTL_MUTABLE: int = Field(
+        30,
+        description=(
+            'Seconds to cache the static values of objects whose row can be '
+            'rewritten by an online version upgrade (node, blob, artifact, '
+            'upload, dnsmasq, namespace). Kept short to bound cross-process '
+            'upgrade staleness. 0 disables this cache tier.'
+        )
     )
     SCHEDULER_TARGET_LOAD: float = Field(
         0.75,
@@ -506,6 +524,15 @@ class SFConfig(BaseSettings):
         3600 * 24 * 30,
         description='How long to retain prune events.'
     )
+    MAX_HEALTH_EVENT_AGE: int = Field(
+        3600 * 24 * 90,
+        description=(
+            'How long to retain node resource-health events. This must exceed '
+            'the longest time a node is expected to sit in the error state: '
+            'the diagnosis the cluster cascade reads back lives in this event, '
+            'so pruning it while the node is still errored would strand the '
+            'cascade after a cluster-daemon restart.')
+    )
     MAX_HISTORIC_EVENT_AGE: int = Field(
         3600 * 24 * 90,
         description='How long to retain historic events.'
@@ -622,6 +649,34 @@ class SFConfig(BaseSettings):
     STORAGE_PATH: str = Field(
         '/srv/shakenfist',
         description='Where on disk instances are stored.'
+    )
+
+    NODE_HEALTH_CHECK_INTERVAL: int = Field(
+        60,
+        description=(
+            'How often, in seconds, sf-resources evaluates the health of the '
+            'storage paths this node depends on. Bounds detection latency for '
+            'a fully-dead path (the cheap statvfs check runs every '
+            'evaluation).'
+        )
+    )
+    NODE_HEALTH_WRITE_INTERVAL: int = Field(
+        300,
+        description=(
+            'How often, in seconds, the node health check writes an '
+            'authoritative heartbeat (write plus fsync) to each monitored '
+            'path. This catches write-only failures a read cannot, and leaves '
+            'a forensic last-seen-live timestamp.'
+        )
+    )
+    NODE_HEALTH_PROBE_TIMEOUT: int = Field(
+        30,
+        description=(
+            'Deadline, in seconds, for a single node health probe. A probe '
+            'that does not return in time is treated as unhealthy -- this is '
+            'how a hung hard-NFS mount (which blocks rather than erroring) is '
+            'detected.'
+        )
     )
 
     LIBVIRT_USER: str = Field(

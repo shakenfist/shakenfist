@@ -21,7 +21,7 @@ Shaken Fist runs several daemons on each cluster node:
 | `sf-cluster` | Cluster maintenance | - |
 | `sf-net` | Network daemon | - |
 | `sf-queues` | Job queue processing | - |
-| `sf-resources` | Resource tracking | - |
+| `sf-resources` | Resource tracking; also drives `node.state` from storage health (node resource health) | - |
 | `sf-transfers` | Blob transfers | - |
 | `sf-privexec` | Privileged execution | - |
 
@@ -92,6 +92,31 @@ unreachable. Schema currency is a refuse-to-start precondition enforced at
 startup, not a runtime health signal.
 See [`docs/operator_guide/database.md`](docs/operator_guide/database.md) —
 "MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.
+
+#### Static object value cache
+
+The database client in `mariadb.py` carries a small read-through cache for
+immutable static object values, restoring the etcd-era principle "objects are
+cacheable, attributes are not". Each public `get_<type>()` returns a frozen
+Pydantic model of static columns only (mutable fields — states, metadata,
+attributes, IPAM, daemon states — come from separate `get_<type>_attributes()`
+readers and are never cached). The cache sits above the direct/gRPC branch, so
+it serves both compute nodes (avoiding a gRPC round trip) and the `sf-database`
+daemon's own worker threads (avoiding a SQL query); it is a single
+process-global dict keyed `(object_type, uuid)` under a lock.
+
+Correctness rests on three rules: only present rows are cached (never a miss,
+so a create-after-lookup or delete-then-lookup is never masked); every public
+`update_<type>`/`delete_<type>` evicts, and because the lazy online-upgrade
+persist routes through the public `update_<type>`, the cache self-heals after
+an upgrade; and every entry is TTL-bounded, which is the only bound on
+staleness from a write made by another process. Two tiers set the TTL —
+`OBJECT_CACHE_TTL_IMMUTABLE` (default 300 s) for types with no post-creation
+writer (instance, network, networkinterface, agentoperation) and
+`OBJECT_CACHE_TTL_MUTABLE` (default 30 s) for the upgradeable types (node,
+blob, artifact, upload, dnsmasq, namespace). Setting either to 0 disables that
+tier. Effectiveness is visible in the `database_object_cache_{hits,misses,
+evictions}_total` counters and in reduced `database_get_<type>_total` rates.
 
 #### sf-api HTTP health surface
 
@@ -181,6 +206,24 @@ intervention is needed.
 See [`docs/operator_guide/locks.md`](docs/operator_guide/locks.md) for
 the full lease-expiry and lock-steal protocol.
 
+#### Node resource health
+
+Alongside heartbeat (`missing`) and daemon self-report (`degraded`),
+`sf-resources` evaluates whether the storage a node depends on is
+healthy and drives `node.state` from the result. Each object type
+declares the paths it depends on (`Instance` → `instances`,
+`image_cache`, `blobs`; `Blob` → `blobs`; `Upload` → `uploads`);
+`sf-resources` probes the union for the types this node hosts, on a
+dedicated thread so a hung `hard`-NFS mount (which blocks rather than
+returning `EIO`) trips the probe's timeout instead of stalling the
+daemon. A failure moves the node to `error`, which stops scheduling
+onto it and discounts its blob replicas; the `sf-cluster` daemon then
+cascades from a surviving node — erroring the node's instances and
+re-replicating its blobs, gated on which object type was affected.
+Node error never clears automatically (`sf-ctl clear-node-error` is the
+operator recovery). See
+[`docs/operator_guide/node_health.md`](docs/operator_guide/node_health.md).
+
 #### SQL Filter-Pushdown Discipline
 
 Object iteration uses one indexed SQL query per call rather than the older pattern of materialising all rows
@@ -230,9 +273,11 @@ loop treats it as unhealthy and waits.
 The database gRPC channel uses HTTP/2 keepalive (ping every 10s, 5s
 timeout) to detect stale connections before they cause failures. The
 database gRPC server uses a 20-thread pool to handle concurrent requests
-from all daemons. The database client in `database.py` uses the
-`_retry_database` decorator for exponential backoff retries on transient
-failures. All gRPC failures are logged at ERROR level.
+from all daemons. The database client in `mariadb.py` (`_grpc_call`)
+retries `UNAVAILABLE` and `DEADLINE_EXCEEDED` failures, rebuilding the
+channel on a wedged subchannel but keeping it on a refused connection so
+`round_robin` can serve the retry from a surviving gateway. All gRPC
+failures are logged at ERROR level.
 
 `get_objects_by_state()` returns `None` on non-retryable errors (distinct
 from `[]` for no matches). All object iterators handle this by falling back

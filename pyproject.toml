@@ -51,7 +51,7 @@ dependencies = [
 
     "greenlet==3.5.3",                    # mit
     "gevent==26.5.0",                     # mit
-    "gunicorn[gevent]==25.3.0",           # mit
+    "gunicorn[gevent]==26.0.0",           # mit
 
     "flask==3.1.3",                       # bsd
     "Flask-RESTful==0.3.10",              # bsd
@@ -136,8 +136,8 @@ dependencies = [
     "jsonschema==4.26.0",
     "jsonschema-specifications==2025.9.1",
     "netaddr==1.3.0",
-    "oslo.concurrency==7.6.0",
-    "oslo.config==10.5.0",
+    "oslo.concurrency==7.6.1",
+    "oslo.config==10.6.0",
     "oslo.i18n==6.9.0",
     "oslo.utils==10.1.1",
     "packaging==26.2",
@@ -150,10 +150,9 @@ dependencies = [
     "stevedore==5.9.0",
     "tzdata==2026.3",
     "wrapt==2.2.2",
-    "gunicorn==25.3.0",
     "psutil==7.2.2",
     "typing-inspection==0.4.2",
-    "uv==0.11.29",
+    "uv==0.11.30",
     "iso8601==2.1.0",
     # END_OF_INDIRECT_DEPS
 ]
@@ -202,9 +201,9 @@ test = [
     "python-subunit==1.4.6",    # apache2 -- pinned <1.4.5, 1.4.5+
                                 #            requires testtools>=2.7
     "flake8==7.3.0",            # mit
-    "tox==4.56.4",              # mit
+    "tox==4.57.1",              # mit
     "mkdocs==1.6.1",            # bsd
-    "mkdocs-material==9.7.6",   # mit
+    "mkdocs-material==9.7.7",   # mit
     "testscenarios==0.6.2",     # bsd
     "mypy==2.3.0",             # mit
     "mypy-protobuf==5.1.0",     # apache2

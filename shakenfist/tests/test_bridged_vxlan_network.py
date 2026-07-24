@@ -117,6 +117,12 @@ class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
         self.mock_ensure_vxlan_mesh = mock.patch(
             'shakenfist.network.bridged_vxlan_network.'
             'util_concurrency.ensure_vxlan_mesh').start()
+        # Default: the vxlan device already exists on this node, so the
+        # materialise-before-render path is not taken.
+        self.mock_check_for_interface = mock.patch(
+            'shakenfist.network.bridged_vxlan_network.'
+            'util_network.check_for_interface',
+            return_value=True).start()
         self.addCleanup(mock.patch.stopall)
         # Default: nothing added or removed.
         self.mock_ensure_vxlan_mesh.return_value = ([], [])
@@ -179,6 +185,61 @@ class BridgedVXLanNetworkApplyEnsureMeshTestCase(base.ShakenFistTestCase):
             EVENT_TYPE_MUTATE, 'remove mesh elements',
             extra={'removed': ['10.0.0.8']})
 
+    def test_apply_ensure_mesh_materialises_missing_device_on_hypervisor(
+            self):
+        """A missing vxlan device is created before the mesh render.
+
+        Previously the privexec mesh handler treated a missing device
+        as a benign no-op, leaving the mesh unrendered until the
+        maintain loop's full recreate path noticed.
+        """
+        _patch_network_node_config(self, NODE_IS_NETWORK_NODE=False)
+        self.mock_check_for_interface.return_value = False
+
+        network = _make_network_mock()
+        network.subst_dict.return_value = {
+            'vx_bridge': 'br-vxlan-00002a',
+            'vx_interface': 'vxlan-00002a',
+        }
+        network.mesh_desired_node_ips.return_value = {'10.0.0.1'}
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        with mock.patch.object(
+                bvn, '_apply_create_on_hypervisor') as mock_create_hyp, \
+            mock.patch.object(
+                bvn, '_apply_create_on_network_node') as mock_create_nn:
+            bvn._apply_ensure_mesh()
+
+        mock_create_hyp.assert_called_once_with()
+        mock_create_nn.assert_not_called()
+        self.mock_ensure_vxlan_mesh.assert_called_once()
+        network.add_event.assert_any_call(
+            EVENT_TYPE_AUDIT,
+            'vxlan device missing, creating before mesh render',
+            extra={'vx_interface': 'vxlan-00002a'})
+
+    def test_apply_ensure_mesh_materialises_missing_device_on_network_node(
+            self):
+        self.mock_check_for_interface.return_value = False
+
+        network = _make_network_mock()
+        network.subst_dict.return_value = {
+            'vx_bridge': 'br-vxlan-00002a',
+            'vx_interface': 'vxlan-00002a',
+        }
+        network.mesh_desired_node_ips.return_value = {'10.0.0.2'}
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        with mock.patch.object(
+                bvn, '_apply_create_on_hypervisor') as mock_create_hyp, \
+            mock.patch.object(
+                bvn, '_apply_create_on_network_node') as mock_create_nn:
+            bvn._apply_ensure_mesh()
+
+        mock_create_nn.assert_called_once_with()
+        mock_create_hyp.assert_not_called()
+        self.mock_ensure_vxlan_mesh.assert_called_once()
+
     def test_apply_ensure_mesh_emits_both_events(self):
         network = _make_network_mock()
         bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
@@ -223,7 +284,7 @@ class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):
 
     def test_apply_add_floating_ip_invokes_privexec(self):
         network = _make_network_mock(
-            uuid='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+            uuid='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', vxid=42)
         bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
 
         bvn._apply_add_floating_ip('203.0.113.5', '10.0.0.5')
@@ -231,7 +292,7 @@ class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):
         network.get_lock.assert_not_called()
         self.mock_add_floating_ip.assert_called_once_with(
             'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-            '203.0.113.5', '10.0.0.5')
+            '203.0.113.5', '10.0.0.5', vxid=42)
         # The apply layer does NOT emit events; that is the dispatcher's job.
         network.add_event.assert_not_called()
 

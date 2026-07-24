@@ -79,6 +79,7 @@ both ends of the traffic through the proxy. This would allow:
 
 ## Documentation Index
 
+- [Installation](/components/ryll/installation/) - Pre-built packages, pip, and building from source
 - [Binary Portability](/components/ryll/portability/) - How to share built binaries
 - [Channel Diagnostics Audit](/components/ryll/channel-diagnostics-audit/) - Per-channel observability checklist
 - [Configuration](/components/ryll/configuration/) - CLI options and .vv file format

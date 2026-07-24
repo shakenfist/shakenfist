@@ -91,6 +91,36 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         mock_conn.commit.assert_called_once()
 
     @mock.patch('shakenfist.mariadb._get_engine')
+    def test_targets_written_in_same_transaction(
+            self, mock_get_engine):
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_get_engine.return_value = mock_engine
+
+        from uuid import UUID
+        from shakenfist.schema.object_types import ObjectType
+        result = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'node_inst_net_iface_op',
+                _make_metadata(),
+                1000.0,
+                'node-clusteroperation-user_waiting',
+                targets=[
+                    (ObjectType.INSTANCE, INSTANCE_UUID_STR),
+                    (ObjectType.NETWORK, NETWORK_UUID_STR),
+                ],
+            )
+        )
+
+        self.assertTrue(result)
+        # Three base inserts (cluster_operations, object_states,
+        # work_queue) plus one insert per target, all before a
+        # single commit -- the atomicity that makes an enqueued op
+        # and its target rows visible together.
+        self.assertEqual(mock_conn.execute.call_count, 5)
+        mock_conn.commit.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
     def test_duplicate_cluster_operation_rolls_back(
             self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
