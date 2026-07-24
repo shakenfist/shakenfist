@@ -71,13 +71,20 @@ EVENT_TYPE_USAGE = 'usage'
 EVENT_TYPE_RESOURCES = 'resources'
 EVENT_TYPE_PRUNE = 'prune'
 
+# Node resource-health verdicts. A dedicated channel, separate from the audit
+# action log, so that node_health can reliably read back the most recent
+# diagnosis regardless of how many audit events (for example the cluster
+# cascade's per-instance and per-blob action events) have since been written
+# against the same node.
+EVENT_TYPE_HEALTH = 'health'
+
 # Use only for events which pre-date the type system
 EVENT_TYPE_HISTORIC = 'historic'
 
 # All event types
 EVENT_TYPES = [EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE, EVENT_TYPE_STATUS,
                EVENT_TYPE_USAGE, EVENT_TYPE_RESOURCES, EVENT_TYPE_PRUNE,
-               EVENT_TYPE_HISTORIC]
+               EVENT_TYPE_HEALTH, EVENT_TYPE_HISTORIC]
 
 # Blob hashing algorithms
 BLOB_HASH_ALGORITHMS = ['sha1', 'sha256', 'sha512', 'xxh128']

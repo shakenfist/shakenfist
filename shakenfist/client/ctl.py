@@ -130,6 +130,7 @@ config = sf_config.config
 # These imports _must_ occur after the extra config setup has run.
 from shakenfist import exceptions                          # noqa
 from shakenfist import mariadb                             # noqa
+from shakenfist.constants import EVENT_TYPE_AUDIT          # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
 from shakenfist.schema.object_state import State           # noqa
@@ -340,6 +341,37 @@ def deregister_daemon(daemon: tuple[str, ...]) -> None:
     click.echo(f'Node is now in state {n.state.value}.')
 
 
+@click.command(name='clear-node-error')
+@click.option('--node-name', default=None,
+              help='Node to clear (defaults to NODE_NAME from config)')
+def clear_node_error(node_name: Optional[str]) -> None:
+    """Return a node from the error state to created.
+
+    Node resource-health errors never clear automatically -- a marginal
+    disk must not flap the node in and out of service -- so an operator
+    runs this once the underlying storage is confirmed healthy. If the
+    failure persists, sf-resources re-errors the node within one check
+    interval.
+
+    This returns only the node to service; any instances that were errored
+    when the node failed stay terminal for the operator to snapshot or
+    delete.
+    """
+    node_name = node_name or config.NODE_NAME
+    n = Node.from_db(node_name)
+    if not n:
+        raise click.ClickException(f'Node "{node_name}" not found.')
+
+    if n.state.value != Node.STATE_ERROR:
+        raise click.ClickException(
+            f'Node "{node_name}" is in state {n.state.value}, not error; '
+            'nothing to clear.')
+
+    n.add_event(EVENT_TYPE_AUDIT, 'operator cleared node error state')
+    n.state = Node.STATE_CREATED  # type: ignore[misc]
+    click.echo(f'Node "{node_name}" is now in state {n.state.value}.')
+
+
 @click.command()
 @click.argument('daemon')
 def stop(daemon: str) -> None:
@@ -439,5 +471,6 @@ cli.add_command(ensure_mariadb_schema)
 cli.add_command(initialise_node)
 cli.add_command(register_daemon)
 cli.add_command(deregister_daemon)
+cli.add_command(clear_node_error)
 cli.add_command(stop)
 cli.add_command(gateway_health)

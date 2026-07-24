@@ -138,6 +138,12 @@ Instances in the `error` state are not removed like those in the `deleted` state
 as we assume a caller must acknowledge an error occurred. To remove them, delete
 the instance in `error` state.
 
+The state model also permits a `creating` or `created` instance to move directly
+to `error`, and any of the `*-error` transition states to move on to `delete-wait`
+or `deleted` as well as to `error`. An instance in `error` (or one of the
+transition states) may likewise be sent to `delete-wait` or `deleted` when the
+caller deletes it.
+
 The following transitions are possible (note that hyphens have been replaced with
 underscores in some state names due to limitations in the diagram renderer):
 
@@ -160,15 +166,25 @@ stateDiagram-v2
   creating --> delete_wait
   creating --> deleted
   creating --> creating_error
+  creating --> error
 
   created --> delete_wait
   created --> deleted
   created --> created_error
+  created --> error
 
   initial_error --> error
+  initial_error --> delete_wait
+  initial_error --> deleted
   preflight_error --> error
+  preflight_error --> delete_wait
+  preflight_error --> deleted
   creating_error --> error
+  creating_error --> delete_wait
+  creating_error --> deleted
   created_error --> error
+  created_error --> delete_wait
+  created_error --> deleted
   delete_wait_error --> error
 
   error --> delete_wait
@@ -258,45 +274,73 @@ stateDiagram-v2
 
 ## Nodes
 
-* `created`: on first check in, a node is created in the "created" state.
+* `initial`: the first state for a node. A UUID has been allocated and a
+  placeholder database entry created, but the node has not yet completed its
+  first check in. A node is promoted to `created` once its daemons report in.
+* `created`: the node has checked in and is available for scheduling.
 * `stopping`: the node is gracefully shutting down.
 * `stopped`: the node has gracefully shut down.
-* `deleted`: the node was manually evacuated and removed. Note that the `node`
-  object is the only object type to never hard delete, although a `node` cannot
-  be undeleted.
+* `deleted`: the node was manually evacuated and removed. The `node` object is
+  the only object type that is never hard deleted. Unlike every other object, a
+  `node` can also be returned from `deleted` to `created`: you delete a node to
+  force the instances hosted on it to be marked as gone, then, once the hardware
+  is repaired, return the node to service.
 * `missing`: the node has not checked in within the NODE_CHECKIN_MAXIMUM deadline.
-* `error`: the node has not check in for ten times NODE_CHECKIN_MAXIMUM, and all
-  instances on this node have been declared to be in an error state. The `node`
-  object is the only object which can return from an `error` state to other states.
+* `degraded`: one of the node's daemons is self-reporting as not running. A
+  degraded node is still a scheduling candidate.
+* `error`: a resource the node depends on has failed -- for example its blob or
+  instance storage is unreadable, remounted read-only, or a hung NFS mount (see
+  [Node resource health](../operator_guide/node_health.md)). An errored node is
+  not a scheduling candidate, and its blob replicas stop counting toward
+  replication targets. Resource-health errors never clear automatically; an
+  operator runs `sf-ctl clear-node-error` once the underlying problem is fixed.
+  The `node` object is the only object which can return from an `error` state to
+  other states.
 
 The following transitions are possible:
 
 ``` mermaid
 stateDiagram-v2
-  [*] --> created
-  [*] --> error
-  [*] --> missing
+  [*] --> initial
+
+  initial --> created
+  initial --> error
+  initial --> missing
+  initial --> degraded
 
   created --> deleted
   created --> error
   created --> missing
   created --> stopping
+  created --> degraded
 
   stopping --> stopped
   stopping --> deleted
   stopping --> error
   stopping --> created
+  stopping --> degraded
 
   stopped --> created
   stopped --> deleted
   stopped --> error
+  stopped --> degraded
+
+  degraded --> created
+  degraded --> deleted
+  degraded --> error
+  degraded --> missing
+  degraded --> stopping
 
   error --> created
   error --> deleted
+  error --> degraded
 
   missing --> created
   missing --> deleted
   missing --> error
+  missing --> degraded
+
+  deleted --> created
 ```
 
 ## Upload

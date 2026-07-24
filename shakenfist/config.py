@@ -524,6 +524,15 @@ class SFConfig(BaseSettings):
         3600 * 24 * 30,
         description='How long to retain prune events.'
     )
+    MAX_HEALTH_EVENT_AGE: int = Field(
+        3600 * 24 * 90,
+        description=(
+            'How long to retain node resource-health events. This must exceed '
+            'the longest time a node is expected to sit in the error state: '
+            'the diagnosis the cluster cascade reads back lives in this event, '
+            'so pruning it while the node is still errored would strand the '
+            'cascade after a cluster-daemon restart.')
+    )
     MAX_HISTORIC_EVENT_AGE: int = Field(
         3600 * 24 * 90,
         description='How long to retain historic events.'
@@ -625,6 +634,34 @@ class SFConfig(BaseSettings):
     STORAGE_PATH: str = Field(
         '/srv/shakenfist',
         description='Where on disk instances are stored.'
+    )
+
+    NODE_HEALTH_CHECK_INTERVAL: int = Field(
+        60,
+        description=(
+            'How often, in seconds, sf-resources evaluates the health of the '
+            'storage paths this node depends on. Bounds detection latency for '
+            'a fully-dead path (the cheap statvfs check runs every '
+            'evaluation).'
+        )
+    )
+    NODE_HEALTH_WRITE_INTERVAL: int = Field(
+        300,
+        description=(
+            'How often, in seconds, the node health check writes an '
+            'authoritative heartbeat (write plus fsync) to each monitored '
+            'path. This catches write-only failures a read cannot, and leaves '
+            'a forensic last-seen-live timestamp.'
+        )
+    )
+    NODE_HEALTH_PROBE_TIMEOUT: int = Field(
+        30,
+        description=(
+            'Deadline, in seconds, for a single node health probe. A probe '
+            'that does not return in time is treated as unhealthy -- this is '
+            'how a hung hard-NFS mount (which blocks rather than erroring) is '
+            'detected.'
+        )
     )
 
     LIBVIRT_USER: str = Field(

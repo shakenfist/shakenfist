@@ -17,6 +17,7 @@ from shakenfist import mariadb
 from shakenfist import instance
 from shakenfist import ipam
 from shakenfist import namespace
+from shakenfist import node_health
 from shakenfist.network import network
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.network import interface
@@ -34,6 +35,7 @@ from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_all_node_queues
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.upload import remove_abandoned_uploads
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
@@ -48,6 +50,10 @@ class Monitor(daemon.Daemon):
         super().__init__(name)
         self.lock = None
         self.is_elected = False
+        # Nodes whose STATE_ERROR cascade (phase 3) has already run, so a
+        # persistently-errored node is not re-processed every maintenance
+        # pass. Entries are dropped when the node is next seen out of error.
+        self._cascaded_error_nodes = set()
         start_http_server(config.CLUSTER_METRICS_PORT)
 
     def _await_election(self):
@@ -334,6 +340,11 @@ class Monitor(daemon.Daemon):
                     'state': n.state.value
                 }).debug('Considering node status')
 
+            # Drop the cascade guard for any node not currently errored, so a
+            # node that recovers and later re-fails is cascaded afresh.
+            if n.state.value != Node.STATE_ERROR:
+                self._cascaded_error_nodes.discard(str(n.uuid))
+
             # Find nodes which are now missing or have returned from being missing
             if n.state.value in [Node.STATE_INITIAL, Node.STATE_CREATING,
                                  Node.STATE_CREATED, Node.STATE_DEGRADED]:
@@ -364,16 +375,8 @@ class Monitor(daemon.Daemon):
                         ni.delete()
 
                 # Cleanup any blob locations (use Node.blobs property)
-                for blob_uuid in n.blobs:
-                    self.pet_watchdog()
-                    b = Blob.from_db(blob_uuid)
-                    if not b:
-                        continue
-                    eventlog.add_event_multi(
-                        EVENT_TYPE_AUDIT, [n, b],
-                        'deleting blob location as hosting node has been deleted')
-                    b.remove_location(n.fqdn)
-                    b.request_replication()
+                self._drop_blob_locations(
+                    n, 'deleting blob location as hosting node has been deleted')
 
                 # Clean up any lingering queue tasks. Drain in batches of
                 # 100 -- this only runs once per deleted node, so a
@@ -421,8 +424,67 @@ class Monitor(daemon.Daemon):
 
                         mariadb.resolve_work_item(queue_name, jobname)
 
+            elif n.state.value == Node.STATE_ERROR:
+                self._cascade_errored_node(n)
+
         # And we're done
         LOG.info('Cluster maintenance loop complete')
+
+    def _cascade_errored_node(self, n):
+        # React to a node that phase 2 (sf-resources) marked STATE_ERROR
+        # because its storage is unhealthy. Mirrors the deleted-node cleanup
+        # above, but *errors* the hosted instances rather than deleting them
+        # (an errored instance is terminal-but-snapshottable, left for the
+        # operator), and both cascades are gated on which object type the
+        # failure actually affected (an uploads-only failure marks the node
+        # error but must not kill instances or drop blob replicas).
+        #
+        # Runs here, on the surviving cluster maintenance node, not on the
+        # (possibly dying) affected node, which does only the one fast
+        # self-mark in phase 2.
+        if str(n.uuid) in self._cascaded_error_nodes:
+            return
+
+        affected = node_health.errored_node_affected_types(n)
+        if affected is None:
+            # Blast radius unknown (no diagnosis event yet); do nothing and
+            # retry next pass without recording the node as cascaded.
+            return
+
+        if ObjectType.INSTANCE in affected:
+            for i in instance.healthy_instances_on_node(n):
+                self.pet_watchdog()
+                reason = (
+                    'erroring instance as hosting node storage is unhealthy')
+                n.add_event(
+                    EVENT_TYPE_AUDIT, reason, extra={'instance_uuid': i.uuid})
+                i.add_event(EVENT_TYPE_AUDIT, reason)
+                # The error setter requires the object already be in an error
+                # state, so move state before setting error.
+                i.state = i.state.value + '-error'
+                i.error = reason
+
+        if ObjectType.BLOB in affected:
+            self._drop_blob_locations(
+                n, 'dropping blob location as hosting node storage is '
+                'unhealthy')
+
+        self._cascaded_error_nodes.add(str(n.uuid))
+
+    def _drop_blob_locations(self, n, reason):
+        # Drop every blob replica hosted on node n and ask the replicator to
+        # re-establish the copies elsewhere. Shared by the deleted-node cleanup
+        # and the errored-node cascade -- the only difference between the two
+        # callers is the audit reason string. A blob deleted between reading
+        # n.blobs and processing it is skipped.
+        for blob_uuid in n.blobs:
+            self.pet_watchdog()
+            b = Blob.from_db(blob_uuid)
+            if not b:
+                continue
+            eventlog.add_event_multi(EVENT_TYPE_AUDIT, [n, b], reason)
+            b.remove_location(n.fqdn)
+            b.request_replication()
 
     def _run_inner(self):
         last_defer_message = 0

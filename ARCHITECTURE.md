@@ -21,7 +21,7 @@ Shaken Fist runs several daemons on each cluster node:
 | `sf-cluster` | Cluster maintenance | - |
 | `sf-net` | Network daemon | - |
 | `sf-queues` | Job queue processing | - |
-| `sf-resources` | Resource tracking | - |
+| `sf-resources` | Resource tracking; also drives `node.state` from storage health (node resource health) | - |
 | `sf-transfers` | Blob transfers | - |
 | `sf-privexec` | Privileged execution | - |
 
@@ -205,6 +205,24 @@ intervention is needed.
 
 See [`docs/operator_guide/locks.md`](docs/operator_guide/locks.md) for
 the full lease-expiry and lock-steal protocol.
+
+#### Node resource health
+
+Alongside heartbeat (`missing`) and daemon self-report (`degraded`),
+`sf-resources` evaluates whether the storage a node depends on is
+healthy and drives `node.state` from the result. Each object type
+declares the paths it depends on (`Instance` → `instances`,
+`image_cache`, `blobs`; `Blob` → `blobs`; `Upload` → `uploads`);
+`sf-resources` probes the union for the types this node hosts, on a
+dedicated thread so a hung `hard`-NFS mount (which blocks rather than
+returning `EIO`) trips the probe's timeout instead of stalling the
+daemon. A failure moves the node to `error`, which stops scheduling
+onto it and discounts its blob replicas; the `sf-cluster` daemon then
+cascades from a surviving node — erroring the node's instances and
+re-replicating its blobs, gated on which object type was affected.
+Node error never clears automatically (`sf-ctl clear-node-error` is the
+operator recovery). See
+[`docs/operator_guide/node_health.md`](docs/operator_guide/node_health.md).
 
 #### SQL Filter-Pushdown Discipline
 

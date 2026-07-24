@@ -4622,7 +4622,8 @@ def _direct_prune_orphan_events() -> int:
 # the MAX_{TYPE}_EVENT_AGE settings. Order is informational only;
 # stage A's batched DELETEs are independent across event_types.
 _PRUNABLE_EVENT_TYPES = (
-    'audit', 'mutate', 'status', 'usage', 'resources', 'prune', 'historic'
+    'audit', 'mutate', 'status', 'usage', 'resources', 'prune', 'health',
+    'historic'
 )
 
 

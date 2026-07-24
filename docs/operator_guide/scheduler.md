@@ -17,7 +17,10 @@ a placement decision can be reconstructed after the fact (see
 [Diagnosing a placement decision](#diagnosing-a-placement-decision)).
 
 1. **Hypervisor check** -- only nodes reporting
-   `is_hypervisor` are candidates.
+   `is_hypervisor` are candidates. Nodes that are not "active"
+   (those in `error` or `missing`) are excluded before this stage,
+   so a node whose storage has failed stops receiving instances
+   (see [Node resource health](node_health.md)).
 2. **Queue health** -- nodes with more than 20 waiting queue jobs
    are excluded; they are not keeping up.
 3. **Per-instance vCPU limit** -- the request must fit libvirt's

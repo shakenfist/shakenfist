@@ -17,6 +17,27 @@ from click.testing import CliRunner
 from shakenfist.tests import base
 
 
+class _FakeStateNode:
+    """A node whose state property round-trips through a setter, so a command
+    can read state.value, assign state, then read it back (a MagicMock cannot
+    round-trip an assigned string through .value)."""
+
+    def __init__(self, state_value):
+        self._state = state_value
+        self.events = []
+
+    @property
+    def state(self):
+        return mock.Mock(value=self._state)
+
+    @state.setter
+    def state(self, value):
+        self._state = value
+
+    def add_event(self, eventtype, message, **kwargs):
+        self.events.append((eventtype, message))
+
+
 # Create a mock config that satisfies verify_config requirements
 class MockConfig:
     STORAGE_PATH = '/tmp/sf-test'
@@ -655,6 +676,66 @@ class NodeCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_node.set_daemon_state.assert_called_once()
+
+    @mock.patch('shakenfist.client.ctl.config')
+    @mock.patch('shakenfist.client.ctl.Node.from_db')
+    def test_clear_node_error_success(self, mock_from_db, mock_config):
+        from shakenfist.client.ctl import clear_node_error
+
+        node = _FakeStateNode('error')
+        mock_from_db.return_value = node
+
+        result = self.runner.invoke(
+            clear_node_error, ['--node-name', 'sf-6'])
+
+        self.assertEqual(result.exit_code, 0)
+        mock_from_db.assert_called_once_with('sf-6')
+        self.assertEqual('created', node._state)
+        self.assertEqual(1, len(node.events))
+        self.assertIn('created', result.output)
+
+    @mock.patch('shakenfist.client.ctl.config')
+    @mock.patch('shakenfist.client.ctl.Node.from_db')
+    def test_clear_node_error_uses_config_default(
+            self, mock_from_db, mock_config):
+        from shakenfist.client.ctl import clear_node_error
+
+        mock_config.NODE_NAME = 'config-node'
+        mock_from_db.return_value = _FakeStateNode('error')
+
+        result = self.runner.invoke(clear_node_error)
+
+        self.assertEqual(result.exit_code, 0)
+        mock_from_db.assert_called_once_with('config-node')
+
+    @mock.patch('shakenfist.client.ctl.config')
+    @mock.patch('shakenfist.client.ctl.Node.from_db')
+    def test_clear_node_error_not_in_error(self, mock_from_db, mock_config):
+        from shakenfist.client.ctl import clear_node_error
+
+        node = _FakeStateNode('created')
+        mock_from_db.return_value = node
+
+        result = self.runner.invoke(
+            clear_node_error, ['--node-name', 'sf-1'])
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn('not error', result.output)
+        self.assertEqual('created', node._state)
+        self.assertEqual([], node.events)
+
+    @mock.patch('shakenfist.client.ctl.config')
+    @mock.patch('shakenfist.client.ctl.Node.from_db')
+    def test_clear_node_error_node_not_found(self, mock_from_db, mock_config):
+        from shakenfist.client.ctl import clear_node_error
+
+        mock_from_db.return_value = None
+
+        result = self.runner.invoke(
+            clear_node_error, ['--node-name', 'nope'])
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn('not found', result.output)
 
 
 class GatewayHealthCommandTestCase(base.ShakenFistTestCase):
