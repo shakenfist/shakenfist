@@ -21,6 +21,25 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
+def _resilient_job(job_func, *args):
+    """Wrap a scheduled task so a failure cannot starve the scheduler.
+
+    schedule.Job.run() only sets last_run and reschedules after job_func
+    returns, so a job which raises is left permanently overdue: it sorts
+    first in run_pending() and its exception aborts the tick before any
+    other due job runs, killing every scheduled task forever (github
+    issue 3490). Catching here means a failing task is logged and all
+    jobs always reschedule.
+    """
+    def wrapper():
+        try:
+            job_func(*args)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'cleaner scheduled task {job_func.__name__}', e)
+    return wrapper
+
+
 class Monitor(daemon.Daemon):
     def _maintain_blobs(self):
         # Find orphaned and deleted blobs still on disk
@@ -43,14 +62,18 @@ class Monitor(daemon.Daemon):
                 self.pet_watchdog()
 
                 entpath = str(entpath)
-                if entpath.endswith('/_version'):
-                    continue
-
                 if not os.path.isfile(entpath):
                     continue
 
-                st = os.stat(entpath)
+                # Blob files are named for their UUID, with a .partial
+                # suffix during transfer. Anything else in the store
+                # (_version markers, the resource health _heartbeat
+                # sentinel) is not ours to garbage collect.
                 blob_uuid = entpath.split('/')[-1].replace('.partial', '')
+                if not util_general.valid_uuid4(blob_uuid):
+                    continue
+
+                st = os.stat(entpath)
 
                 # If we've had this file for more than two cleaner delays...
                 if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
@@ -61,7 +84,6 @@ class Monitor(daemon.Daemon):
                         os.unlink(entpath)
 
                     else:
-                        blob_uuid = entpath.split('/')[-1]
                         if (blob_uuid not in active_blob_uuids
                                 or blob_uuid not in all_node_blobs):
                             LOG.with_fields({'blob': blob_uuid}).debug(
@@ -86,6 +108,15 @@ class Monitor(daemon.Daemon):
             self.pet_watchdog()
             entpath = os.path.join(cache_path, ent)
 
+            # Image cache entries are named for the UUID of their source
+            # blob plus a format extension; skip anything else, such as
+            # the resource health _heartbeat sentinel. This filter must
+            # come before the broken symlink check so a dangling
+            # non-object entry is skipped, not deleted.
+            blob_uuid = ent.split('.')[0]
+            if not util_general.valid_uuid4(blob_uuid):
+                continue
+
             # Broken symlinks will report an error here that we have to catch
             try:
                 st = os.stat(entpath)
@@ -93,14 +124,17 @@ class Monitor(daemon.Daemon):
                 if e.errno == errno.ENOENT:
                     LOG.with_fields({
                         'blob': ent}).warning('Deleting broken symlinked image cache entry')
-                    os.unlink(entpath)
+                    try:
+                        os.unlink(entpath)
+                    except FileNotFoundError:
+                        # The entry vanished between listdir and here.
+                        pass
                     continue
                 else:
                     raise e
 
             # If we haven't seen this file in use for more than two cleaner delays...
             if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
-                blob_uuid = ent.split('.')[0]
                 b = Blob.from_db(blob_uuid)
                 if not b:
                     LOG.with_fields({
@@ -142,11 +176,11 @@ class Monitor(daemon.Daemon):
                     b.drop_node_location(config.NODE_NAME)
 
     def _run_inner(self):
-        schedule.every(1).minutes.do(
-            scheduled_tasks.update_power_states, self.pet_watchdog)
-        schedule.every(5).minutes.do(
-            scheduled_tasks.remove_stale_uploads_for_this_node)
-        schedule.every(5).minutes.do(observe_local_blobs)
+        schedule.every(1).minutes.do(_resilient_job(
+            scheduled_tasks.update_power_states, self.pet_watchdog))
+        schedule.every(5).minutes.do(_resilient_job(
+            scheduled_tasks.remove_stale_uploads_for_this_node))
+        schedule.every(5).minutes.do(_resilient_job(observe_local_blobs))
 
         last_defer_message = 0
 

@@ -1,4 +1,9 @@
+import datetime
+import os
+import tempfile
 from unittest import mock
+
+import schedule
 
 from shakenfist import instance
 from shakenfist.config import BaseSettings
@@ -85,6 +90,7 @@ class FakeConfig(BaseSettings):
     NODE_NAME: str = 'abigcomputer'
     STORAGE_PATH: str = '/srv/shakenfist'
     LOGLEVEL_CLEANER: str = 'debug'
+    CLEANER_DELAY: int = 3600
 
 
 fake_config = FakeConfig()
@@ -215,6 +221,148 @@ class CleanerCrashedInstanceTestCase(CleanerTestCase):
         db_state = self.mock_mariadb.get_mariadb_state(
             ObjectType.INSTANCE, instance_uuids['crashed'])
         self.assertEqual(instance.Instance.STATE_DELETED, db_state['value'])
+
+
+class MaintainBlobsSentinelTestCase(base.ShakenFistTestCase):
+    """_maintain_blobs must neither delete nor crash on the resource
+    health _heartbeat sentinel, even one that has gone stale because its
+    store stopped being writable (github issue 3490)."""
+
+    @mock.patch('shakenfist.daemons.cleaner.main.mariadb')
+    @mock.patch('shakenfist.daemons.cleaner.main.node')
+    def test_stale_heartbeat_sentinels_survive(self, mock_node, mock_mariadb):
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+
+        blob_dir = os.path.join(tempdir.name, 'blobs')
+        cache_dir = os.path.join(tempdir.name, 'image_cache')
+        os.makedirs(blob_dir)
+        os.makedirs(cache_dir)
+
+        blob_heartbeat = os.path.join(blob_dir, '_heartbeat')
+        cache_heartbeat = os.path.join(cache_dir, '_heartbeat')
+        for path in [blob_heartbeat, cache_heartbeat]:
+            with open(path, 'w') as f:
+                f.write('1\n')
+            # Much older than 2 * CLEANER_DELAY: a stale sentinel on an
+            # unhealthy store.
+            os.utime(path, (0, 0))
+
+        mock_mariadb.get_active_blob_uuids.return_value = []
+        fake_node = mock.MagicMock()
+        fake_node.blobs = []
+        mock_node.Node.from_db.return_value = fake_node
+
+        m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
+        m.pet_watchdog = mock.MagicMock()
+
+        with mock.patch('shakenfist.daemons.cleaner.main.config',
+                        FakeConfig(STORAGE_PATH=tempdir.name)):
+            m._maintain_blobs()
+
+        self.assertTrue(os.path.exists(blob_heartbeat))
+        self.assertTrue(os.path.exists(cache_heartbeat))
+
+    @mock.patch('shakenfist.daemons.cleaner.main.Blob')
+    @mock.patch('shakenfist.daemons.cleaner.main.mariadb')
+    @mock.patch('shakenfist.daemons.cleaner.main.node')
+    def test_stale_uuid_named_files_still_deleted(
+            self, mock_node, mock_mariadb, mock_blob):
+        """The UUID-shape filter must not stop legitimate garbage
+        collection: stale orphans, partial transfers and dangling
+        UUID-named symlinks are still removed; only non-object names
+        are exempt."""
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+
+        blob_dir = os.path.join(tempdir.name, 'blobs')
+        cache_dir = os.path.join(tempdir.name, 'image_cache')
+        shard = os.path.join(blob_dir, 'ab')
+        os.makedirs(shard)
+        os.makedirs(cache_dir)
+
+        orphan = os.path.join(shard, '12345678-1234-4321-8234-123456789012')
+        partial = os.path.join(
+            shard, '87654321-4321-1234-8234-210987654321.partial')
+        cache_orphan = os.path.join(
+            cache_dir, 'abcdefab-1234-4321-8234-123456789012.qcow2')
+        for path in [orphan, partial, cache_orphan]:
+            with open(path, 'w') as f:
+                f.write('...')
+            os.utime(path, (0, 0))
+
+        # A dangling image cache symlink with a non-object name must
+        # survive; a UUID-named one is still cleaned up.
+        dangling_kept = os.path.join(cache_dir, '_stale_probe')
+        dangling_removed = os.path.join(
+            cache_dir, '99999999-9999-4999-8999-999999999999.qcow2')
+        os.symlink(os.path.join(tempdir.name, 'nonexistent'), dangling_kept)
+        os.symlink(os.path.join(tempdir.name, 'nonexistent'), dangling_removed)
+
+        mock_mariadb.get_active_blob_uuids.return_value = []
+        fake_node = mock.MagicMock()
+        fake_node.blobs = []
+        mock_node.Node.from_db.return_value = fake_node
+        mock_blob.from_db.return_value = None
+
+        m = cleaner_main.Monitor.__new__(cleaner_main.Monitor)
+        m.pet_watchdog = mock.MagicMock()
+
+        with mock.patch('shakenfist.daemons.cleaner.main.config',
+                        FakeConfig(STORAGE_PATH=tempdir.name)):
+            m._maintain_blobs()
+
+        self.assertFalse(os.path.exists(orphan))
+        self.assertFalse(os.path.exists(partial))
+        self.assertFalse(os.path.exists(cache_orphan))
+        self.assertFalse(os.path.lexists(dangling_removed))
+        self.assertTrue(os.path.lexists(dangling_kept))
+
+
+class ResilientJobTestCase(base.ShakenFistTestCase):
+    """A raising scheduled task must not starve the cleaner's scheduler.
+
+    schedule.Job.run() only reschedules after job_func returns, so an
+    unwrapped raising job stays permanently overdue, sorts first in
+    run_pending(), and aborts every tick before any other job runs
+    (github issue 3490).
+    """
+
+    def test_failing_job_does_not_starve_others(self):
+        ran = []
+
+        def failing():
+            ran.append('failing')
+            raise ValueError('badly formed hexadecimal UUID string')
+
+        def healthy():
+            ran.append('healthy')
+
+        sched = schedule.Scheduler()
+        sched.every(5).minutes.do(cleaner_main._resilient_job(failing))
+        sched.every(1).minutes.do(cleaner_main._resilient_job(healthy))
+
+        # Force both jobs due, with the failing job sorting first --
+        # exactly the wedged state from the issue.
+        past = datetime.datetime.now() - datetime.timedelta(hours=1)
+        sched.jobs[0].next_run = past
+        sched.jobs[1].next_run = past + datetime.timedelta(minutes=1)
+
+        sched.run_pending()
+
+        # Both jobs ran despite the first raising...
+        self.assertEqual(['failing', 'healthy'], ran)
+
+        # ... and both were rescheduled into the future, so neither is
+        # permanently overdue.
+        now = datetime.datetime.now()
+        for job in sched.jobs:
+            self.assertGreater(job.next_run, now)
+
+    def test_resilient_job_passes_arguments(self):
+        recorded = []
+        cleaner_main._resilient_job(recorded.append, 'petted')()
+        self.assertEqual(['petted'], recorded)
 
 
 class CleanerWatchdogTestCase(base.ShakenFistTestCase):

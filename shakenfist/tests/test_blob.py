@@ -7,6 +7,8 @@
 # - _persist_pydantic_upgrade() override in Blob
 # - mariadb blob functions
 
+import os
+import tempfile
 from typing import Any
 from unittest import mock
 from uuid import UUID
@@ -14,10 +16,15 @@ from uuid import UUID
 from pydantic import ValidationError
 import testtools
 
+from shakenfist.config import BaseSettings
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.object_state import State
 from shakenfist.tests import base
 from shakenfist import blob
+
+
+class FakeConfig(BaseSettings):
+    STORAGE_PATH: str = '/srv/shakenfist'
 
 
 class BlobDataTestCase(base.ShakenFistTestCase):
@@ -328,3 +335,50 @@ class GetActiveBlobUuidsTestCase(base.ShakenFistTestCase):
         self.assertEqual(result, ['uuid-1', 'uuid-2', 'uuid-3'])
         mock_get_by_state.assert_called_once_with(
             ObjectType.BLOB, ['initial', 'created'])
+
+
+class ObserveLocalBlobsTestCase(base.ShakenFistTestCase):
+    """observe_local_blobs() must only treat UUID-named files as blobs.
+
+    The blob store also contains _version markers, .partial transfers,
+    and the resource health _heartbeat sentinel; the sentinel wedged the
+    cleaner's scheduler cluster-wide when it was parsed as a blob UUID
+    (github issue 3490).
+    """
+
+    @mock.patch('shakenfist.blob.Blob.from_db', return_value=None)
+    def test_non_uuid_names_are_skipped(self, mock_from_db):
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+
+        blob_dir = os.path.join(tempdir.name, 'blobs')
+        shard = os.path.join(blob_dir, 'ab')
+        os.makedirs(shard)
+
+        blob_uuid = '12345678-1234-4321-8234-123456789012'
+        for path in [os.path.join(blob_dir, '_heartbeat'),
+                     os.path.join(shard, '_version'),
+                     os.path.join(shard, f'{blob_uuid}.partial'),
+                     os.path.join(shard, blob_uuid)]:
+            with open(path, 'w') as f:
+                f.write('...')
+
+        with mock.patch('shakenfist.blob.config',
+                        FakeConfig(STORAGE_PATH=tempdir.name)):
+            blob.observe_local_blobs()
+
+        mock_from_db.assert_called_once_with(
+            blob_uuid, suppress_failure_audit=True)
+
+
+class BlobFromDbMalformedUuidTestCase(base.ShakenFistTestCase):
+    """A lookup by a non-UUID name is a miss, not a ValueError.
+
+    from_db() has a not-found contract and storage scanners pass raw
+    filenames to it; an unexpected name must not raise (github issue
+    3490).
+    """
+
+    def test_from_db_malformed_uuid_returns_none(self):
+        self.assertIsNone(
+            blob.Blob.from_db('_heartbeat', suppress_failure_audit=True))

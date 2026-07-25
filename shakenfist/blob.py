@@ -173,7 +173,13 @@ class Blob(dbo):
         if isinstance(object_uuid, uuid.UUID):
             db_uuid = object_uuid
         else:
-            db_uuid = uuid.UUID(object_uuid)
+            try:
+                db_uuid = uuid.UUID(object_uuid)
+            except ValueError:
+                # A name that is not UUID shaped cannot be in the database,
+                # so it is a miss under from_db()'s not-found contract --
+                # callers such as storage scanners pass filenames here.
+                return None
         data = mariadb.get_blob(db_uuid)
         if not data:
             return None
@@ -1216,14 +1222,16 @@ def observe_local_blobs() -> int:
         for path_entry in p.glob('**/*'):
             entpath = str(path_entry)
 
-            # Skip version files and partial transfers
-            if entpath.endswith('/_version') or entpath.endswith('.partial'):
-                continue
-
             if not os.path.isfile(entpath):
                 continue
 
+            # Blob files are named for their UUID. Anything else in the
+            # store (_version markers, .partial transfers, the resource
+            # health _heartbeat sentinel) is not a blob.
             blob_uuid = entpath.split('/')[-1]
+            if not util_general.valid_uuid4(blob_uuid):
+                continue
+
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b and b.state.value == Blob.STATE_CREATED:
                 # Calling observe() updates the BLOB_LOCATION reference
