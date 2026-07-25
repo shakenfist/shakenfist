@@ -4562,6 +4562,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#sf_token_jtis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sf_token_jtis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sf_token_keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sf_token_keys
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4839,6 +4861,118 @@
     
   
     Host subject phase 2: kerbside adoption, CI proof, docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 6: cluster-wide scrape and host_subject
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 8: documentation
   
 
     
@@ -5315,6 +5449,34 @@
     
   
     Rust SPICE proxy (kerbside-proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shaken Fist VDI console tokens (kerbside side)
   
 
     
@@ -10057,6 +10219,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#sf_token_jtis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sf_token_jtis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sf_token_keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sf_token_keys
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -10462,6 +10646,61 @@
 </tr>
 </tbody>
 </table>
+<h3 id="sf_token_jtis">sf_token_jtis<a class="headerlink" href="#sf_token_jtis" title="Permanent link">&para;</a></h3>
+<p>Single-use tracking for Shaken Fist VDI console JWTs (the
+<code>/sf-console.vv</code> exchange). A row is inserted once a token's signature
+verifies; a jti already present means the token is being replayed.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>jti</td>
+<td>string</td>
+<td>Primary key, uuid4 hex from the token's <code>jti</code> claim</td>
+</tr>
+<tr>
+<td>expiry</td>
+<td>float</td>
+<td>Token expiration time (epoch seconds, matches the <code>exp</code> claim)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sf_token_keys">sf_token_keys<a class="headerlink" href="#sf_token_keys" title="Permanent link">&para;</a></h3>
+<p>Cached Shaken Fist signing public keys, one row per <code>shakenfist</code> source,
+so <code>/sf-console.vv</code> verifies tokens offline without calling Shaken Fist
+except on an unknown-kid cache miss.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>source</td>
+<td>string</td>
+<td>Primary key, source name (no FK; sources are reloaded from YAML)</td>
+</tr>
+<tr>
+<td>keys_json</td>
+<td>text</td>
+<td>Shaken Fist's <code>public_view</code> key payload, verbatim JSON</td>
+</tr>
+<tr>
+<td>fetched_at</td>
+<td>float</td>
+<td>Time the keys were last fetched (epoch seconds)</td>
+</tr>
+</tbody>
+</table>
 <h2 id="relationships">Relationships<a class="headerlink" href="#relationships" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>sources → consoles</strong>: One source provides many consoles</li>
@@ -10470,6 +10709,8 @@
 <li><strong>consoletokens → proxychannels</strong>: Active channels reference their auth token</li>
 <li><strong>consoles → auditevents</strong>: Audit events record console access (no FK to
   preserve audit history when consoles are deleted)</li>
+<li><strong>sources → sf_token_keys</strong>: Each <code>shakenfist</code> source's cached signing
+  keys, keyed by source name (no FK; sources are reloaded from YAML)</li>
 </ul>
 <h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
 <ul>
@@ -10477,6 +10718,10 @@
   preserve audit history even when sources or consoles are deleted.</li>
 <li>Timestamps in <code>consoletokens</code> use epoch seconds for easy expiration checks.</li>
 <li>The <code>proxychannels</code> table is used for connection tracking and cleanup.</li>
+<li><code>sf_token_jtis</code> and <code>sf_token_keys</code> support offline verification of
+  Shaken Fist's Ed25519-signed VDI console JWTs at <code>/sf-console.vv</code>: the
+  jti table blocks replay, the keys table avoids calling Shaken Fist on
+  the exchange path except when an unknown <code>kid</code> forces a refetch.</li>
 </ul>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>

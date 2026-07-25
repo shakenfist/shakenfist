@@ -4820,6 +4820,118 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 6: cluster-wide scrape and host_subject
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 8: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -5276,6 +5388,34 @@
     
   
     Rust SPICE proxy (kerbside-proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shaken Fist VDI console tokens (kerbside side)
   
 
     
@@ -10053,9 +10193,17 @@ this file is configured via the <code>SOURCES_PATH</code> setting.</p>
 <p>Kerbside handles different source types in different ways:</p>
 <ul>
 <li>
-<p><strong>Shaken Fist and oVirt</strong>: These sources are queried regularly (once a minute)
-  for a list of available consoles. The consoles are stored in the database and
-  presented in the Kerbside administrative interface.</p>
+<p><strong>oVirt</strong>: These sources are queried regularly (once a minute) for a list of
+  available consoles. The consoles are stored in the database and presented in
+  the Kerbside administrative interface.</p>
+</li>
+<li>
+<p><strong>Shaken Fist</strong>: Shaken Fist sources are also scraped regularly, but under a
+  <code>system</code> credential the scrape covers the whole cluster rather than a single
+  namespace. Access then goes through a token exchange rather than opening a
+  console straight from the scraped table: Shaken Fist mints a short-lived,
+  Ed25519-signed token that Kerbside verifies entirely offline at
+  <code>/sf-console.vv</code>. See the <a href="#shaken-fist">Shaken Fist</a> section below.</p>
 </li>
 <li>
 <p><strong>OpenStack</strong>: OpenStack sources are handled differently. Rather than periodic
@@ -10070,6 +10218,40 @@ this file is configured via the <code>SOURCES_PATH</code> setting.</p>
 example the VDI proxy could be used to combine virtual machines from two
 OpenStack clusters together seamlessly.</p>
 <h2 id="shaken-fist">Shaken Fist<a class="headerlink" href="#shaken-fist" title="Permanent link">&para;</a></h2>
+<p>Shaken Fist sources are periodically scraped for their available consoles, but
+both the scrape and the console-access flow differ from the other scraped
+source (oVirt), so they are described here in full.</p>
+<p><strong>Cluster-wide scrape.</strong> When the source's <code>username</code> is <code>system</code>, Kerbside
+scrapes the <em>entire</em> cluster in one pass: every namespace's instances are
+enumerated, so all of the cluster's SPICE consoles become reachable through a
+single source. With any other <code>username</code>, only that namespace's instances are
+scraped. Each pass also refreshes the cluster's node list so a console can be
+associated with the hypervisor currently hosting it. An instance is only kept
+when it is in the <code>created</code> state and its VDI video model is a SPICE variant.</p>
+<p><strong>Token exchange.</strong> Unlike oVirt, a Shaken Fist console is not opened directly
+from the scraped table. Shaken Fist mints a short-lived, Ed25519-signed JWT and
+hands the viewer an exchange URL of the form
+<code>&lt;KERBSIDE_URL&gt;/sf-console.vv?token=&lt;jwt&gt;</code>. Kerbside verifies that JWT
+<em>entirely offline</em> against the cluster's signing public keys, which it caches
+when the source is initialized (and refetches exactly once if it sees an
+unknown key id, so a signing-key rotation is tolerated). Verification checks
+the signature, the audience (<code>aud</code>), and the expiry (<code>exp</code>), and enforces
+single use by recording the token's <code>jti</code> so a replayed token is rejected — no
+callback to Shaken Fist happens on this path. Only once the token verifies does
+Kerbside look the scraped console up, confirm that the console's source matches
+the source whose key verified the token, and issue the usual Kerbside console
+token and virt-viewer (<code>.vv</code>) file. The audience Kerbside accepts is set by
+<code>SF_CONSOLE_TOKEN_AUDIENCE</code> (or, when unset, derived from <code>PUBLIC_FQDN</code>) and
+must equal Shaken Fist's <code>KERBSIDE_URL</code> exactly; see
+<a href="/components/kerbside/configuration/">Configuration</a>.</p>
+<p><strong>Backend certificate pinning.</strong> At scrape time each console's <code>host_subject</code>
+is pinned from the hypervisor node's published SPICE server certificate subject
+(<code>spice_server_cert_subject</code>), so the proxy's backend TLS leg can verify it is
+talking to the expected hypervisor. A node that publishes no subject (an older
+cluster, or a node without a cert) leaves <code>host_subject</code> unset, and the proxy
+skips host-subject enforcement for that backend rather than refusing it. The
+optional <code>synthesize_host_subject</code> knob (below) lets an operator on the stock
+<code>cn=hostname</code> PKI turn enforcement on before the node-side change is deployed.</p>
 <p>The following options are used to configure a Shaken Fist console source
 (<code>type: shakenfist</code>).</p>
 <table>
@@ -10094,7 +10276,7 @@ OpenStack clusters together seamlessly.</p>
 </tr>
 <tr>
 <td>username</td>
-<td>The Shaken Fist namespace to authenticate to</td>
+<td>The Shaken Fist namespace to authenticate to; use <code>system</code> to scrape the whole cluster</td>
 </tr>
 <tr>
 <td>password</td>
@@ -10104,11 +10286,16 @@ OpenStack clusters together seamlessly.</p>
 <td>ca_cert</td>
 <td>Required: the SSL CA public key certificate to validate API and VDI connections against</td>
 </tr>
+<tr>
+<td>synthesize_host_subject</td>
+<td>Optional (default false): when a node publishes no <code>spice_server_cert_subject</code>, synthesize <code>CN=&lt;node&gt;</code> so the proxy still enforces the backend host subject. Only correct on a stock <code>cn=hostname</code> PKI — a mismatch would wrongly reject the backend — so it is off by default.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Note</strong>: The CA certificate is verified against the cluster's advertised
-certificate during initialization. If they don't match, the source will be
-marked as errored.</p>
+certificate during initialization, and the cluster's VDI token signing keys are
+fetched at the same time. If the CA certificates do not match, or the signing
+keys cannot be fetched, the source is marked as errored.</p>
 <h2 id="ovirt">oVirt<a class="headerlink" href="#ovirt" title="Permanent link">&para;</a></h2>
 <p>The following options are used to configure an oVirt console source
 (<code>type: ovirt</code>).</p>

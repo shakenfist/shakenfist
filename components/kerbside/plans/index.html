@@ -4767,6 +4767,118 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 6: cluster-wide scrape and host_subject
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 8: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -5223,6 +5335,34 @@
     
   
     Rust SPICE proxy (kerbside-proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-kerbside-vdi-tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shaken Fist VDI console tokens (kerbside side)
   
 
     
@@ -9970,6 +10110,13 @@ repo root. For pre-push audits of our own work see
 <td>Restore hypervisor certificate subject pinning on the proxy's backend TLS leg, lost in the Rust proxy cutover: enforce spice-common host-subject matching semantics in ryll's shakenfist-spice-protocol verifier, adopt it in kerbside, and prove both accept and refuse paths in the direct-qemu CI lane</td>
 <td>Complete</td>
 <td><a href="/components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/">phase 1</a> (done, ryll PR #166), <a href="/components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/">phase 2</a> (done, kerbside PR #114)</td>
+</tr>
+<tr>
+<td>2026-07-19</td>
+<td><a href="/components/kerbside/plans/PLAN-kerbside-vdi-tokens/">Shaken Fist VDI console tokens</a></td>
+<td>Cross-repo plan (master in shakenfist's docs/plans/): per-instance console authorisation via short-lived Ed25519-signed tokens minted by Shaken Fist and validated offline by kerbside; kerbside side adds an <code>/sf-console.vv</code> exchange endpoint mirroring the Nova flow, a jti replay table, cluster-wide scraping, and host_subject for SF consoles</td>
+<td>In progress</td>
+<td><a href="/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/">phase 5</a> (done), <a href="/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/">phase 6</a> (done), <a href="/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/">phase 7</a> (done, SF mint-path test; kerbside exchange lane moved to phase 9), <a href="/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/">phase 8</a> (done); phase 9 (post-merge cross-repo e2e + kerbside exchange lane) tracked here as it starts (0-4 done in shakenfist / ryll / client-python)</td>
 </tr>
 </tbody>
 </table>

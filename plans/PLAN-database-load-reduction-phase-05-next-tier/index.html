@@ -4688,6 +4688,118 @@
   
   
     <li class="md-nav__item">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 6: cluster-wide scrape and host_subject
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 8: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -5144,6 +5256,34 @@
     
   
     Rust SPICE proxy (kerbside-proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/kerbside/plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shaken Fist VDI console tokens (kerbside side)
   
 
     
@@ -9973,9 +10113,14 @@ each is a standalone GitHub issue rather than a single monolithic phase:</p>
 <li><strong>#3500 — transfers idle polling (~20/s).</strong> <code>GetBlobTransfersForNode</code>
   polls at a fixed rate even with no pending transfers. Fix: back off / wake
   on enqueue.</li>
-<li><strong>#3501 — cluster IPAM re-reads (~14/s steady, ~48/s burst).</strong> IPAM is
-  mutable so it cannot use the phase 2 static cache; fix is loop
-  restructuring / event-driven invalidation in the cluster sweep.</li>
+<li><strong>#3501 — cluster IPAM re-reads (~14/s steady, ~48/s burst).</strong> Diagnosed as
+  the immutable-tier cache pattern, not loop surgery: the record <code>get_ipam</code>
+  returns is the static block definition
+  (<code>uuid</code>/<code>namespace</code>/<code>network_uuid</code>/<code>ipblock</code>/<code>version</code>); the mutable
+  allocations live in the separate <code>ipam_reservations</code> table, and <code>update_ipam</code>
+  exists only to persist version upgrades. Fix: wire <code>get_ipam</code> through the
+  phase 2 object cache at the immutable TTL, evicting on <code>update_ipam</code>/
+  <code>delete_ipam</code>.</li>
 <li><strong>#3502 — cluster sweep attribute/reference re-reads (~10/s, lowest).</strong>
   Mutable reads re-hydrated per-check; fix is batching within the sweep.</li>
 </ul>

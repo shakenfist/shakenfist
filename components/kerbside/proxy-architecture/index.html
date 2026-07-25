@@ -5037,6 +5037,118 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 6: cluster-wide scrape and host_subject
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 8: documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
@@ -5493,6 +5605,34 @@
     
   
     Rust SPICE proxy (kerbside-proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shaken Fist VDI console tokens (kerbside side)
   
 
     
@@ -10525,6 +10665,11 @@ subject against it using spice-common matching semantics, substituting for
 hostname verification, so a mis-issued or substituted backend certificate is
 rejected. When the console has no <code>host_subject</code>, the CA chain is the only
 identity check. The rustls <code>ring</code> crypto provider is installed at startup.</p>
+<p>For Shaken Fist consoles the enforced <code>host_subject</code> is not configured on the
+proxy: it is pinned at scrape time from the hosting node's published SPICE
+server certificate subject (<code>spice_server_cert_subject</code>), and carried through
+to the proxy in the <code>AuthorizeConnection</code> <code>Target</code>. See
+<a href="/components/kerbside/console-sources/">Console Sources</a>.</p>
 <h2 id="connection-state-machine">Connection State Machine<a class="headerlink" href="#connection-state-machine" title="Permanent link">&para;</a></h2>
 <p>Each accepted connection runs this sequence (<code>session.rs</code>, <code>backend.rs</code>,
 <code>relay.rs</code>):</p>
@@ -10585,6 +10730,22 @@ timeout each end the connection deterministically rather than leaking a task.</p
 resolves the decrypted ticket against the database and returns a <code>Target</code> or
 <code>Denied</code>. The proxy enforces the decision and never reaches the database on
 its own.</p>
+<p>Two different tokens exist for a Shaken Fist console, and they live on
+different surfaces:</p>
+<ul>
+<li>The <strong>HTTP JWT bearer</strong> is the Ed25519-signed token Shaken Fist mints and a
+  viewer presents at the <code>/sf-console.vv</code> exchange endpoint on the Python API.
+  The API verifies it <em>offline</em> against the cluster's cached signing public
+  keys (signature, <code>aud</code>, <code>exp</code>) and enforces single use through a <code>jti</code> replay
+  table (<code>sf_token_jtis</code>) — a replayed token is rejected. The Rust proxy never
+  sees this JWT; the exchange happens entirely on the Python side, which then
+  issues an ordinary Kerbside console token and <code>.vv</code> file.</li>
+<li>The <strong>on-wire SPICE ticket</strong> is what the proxy actually authorizes. It
+  arrives RSA-encrypted inside the SPICE link handshake, is decrypted, and is
+  resolved by the control plane via <code>AuthorizeConnection</code>. The proxy enforces
+  only this decision; the JWT exchange has already completed before any SPICE
+  connection is made.</li>
+</ul>
 <h3 id="audit-logging">Audit Logging<a class="headerlink" href="#audit-logging" title="Permanent link">&para;</a></h3>
 <p>State-changing events (channel created/removed, firewall verdicts, session
 termination) are recorded as audit events through the control-plane RPCs

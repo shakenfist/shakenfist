@@ -4473,6 +4473,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#shaken-fist-console-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shaken Fist console tokens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#control-plane-grpc-service" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4811,6 +4822,118 @@
     
   
     Host subject phase 2: kerbside adoption, CI proof, docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 6: cluster-wide scrape and host_subject
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside VDI tokens phase 8: documentation
   
 
     
@@ -5287,6 +5410,34 @@
     
   
     Rust SPICE proxy (kerbside-proxy)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shaken Fist VDI console tokens (kerbside side)
   
 
     
@@ -9996,6 +10147,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#shaken-fist-console-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shaken Fist console tokens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#control-plane-grpc-service" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10233,6 +10395,27 @@ discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 <td>VDI_INSECURE_PORT</td>
 <td>Integer (default 5901)</td>
 <td>The port the VDI proxy will serve insecure SPICE sessions over. These insecure sessions are only used to redirect the user to the secure port.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="shaken-fist-console-tokens">Shaken Fist console tokens<a class="headerlink" href="#shaken-fist-console-tokens" title="Permanent link">&para;</a></h2>
+<p>These settings govern the Shaken Fist console token exchange served at
+<code>/sf-console.vv</code>, where Kerbside verifies a short-lived Ed25519-signed JWT
+minted by Shaken Fist entirely offline. See
+<a href="/components/kerbside/console-sources/">Console Sources</a> for the full flow.</p>
+<table>
+<thead>
+<tr>
+<th>Configuration Option</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SF_CONSOLE_TOKEN_AUDIENCE</td>
+<td>String (default empty)</td>
+<td>The <code>aud</code> claim Kerbside requires on a Shaken Fist console token. Empty derives it as <code>https://&lt;PUBLIC_FQDN&gt;</code> (see PUBLIC_FQDN above). This value must equal Shaken Fist's own <code>KERBSIDE_URL</code> exactly — it is simultaneously the token audience and the base of the exchange URL — so set it explicitly whenever the public URL differs in scheme, port, or path. Note that <code>KERBSIDE_URL</code> is Shaken Fist cluster config, distinct from this Kerbside proxy setting.</td>
 </tr>
 </tbody>
 </table>
