@@ -381,4 +381,3 @@ nav:
        - "Python Versions": operator_guide/python_versions.md
        - "Threads": operator_guide/threads.md
        - "Upgrades": "operator_guide/upgrades.md"
-       - "VDI console tokens": operator_guide/vdi_console_tokens.md
