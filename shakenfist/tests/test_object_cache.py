@@ -120,6 +120,31 @@ class ObjectCacheWiringTestCase(base.ShakenFistTestCase):
         self.assertEqual(3, mock_get.call_count)
 
     @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    @mock.patch('shakenfist.mariadb._direct_get_ipam')
+    def test_ipam_reader_caches_then_writers_evict(self, mock_get, _mock_use):
+        # The static IPAM record is immutable (block definition), so get_ipam
+        # is cached; update_ipam (version-upgrade persist) and delete_ipam must
+        # evict. See issue #3501.
+        model = mock.Mock(uuid=self.uuid)
+        mock_get.return_value = model
+
+        self.assertIs(model, mariadb.get_ipam(self.uuid))
+        self.assertIs(model, mariadb.get_ipam(self.uuid))
+        self.assertEqual(1, mock_get.call_count)
+
+        with mock.patch('shakenfist.mariadb._direct_update_ipam',
+                        return_value=True):
+            mariadb.update_ipam(model)
+        mariadb.get_ipam(self.uuid)
+        self.assertEqual(2, mock_get.call_count)
+
+        with mock.patch('shakenfist.mariadb._direct_delete_ipam',
+                        return_value=True):
+            mariadb.delete_ipam(self.uuid)
+        mariadb.get_ipam(self.uuid)
+        self.assertEqual(3, mock_get.call_count)
+
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
     @mock.patch('shakenfist.mariadb._direct_get_blob', return_value=None)
     def test_missing_row_is_not_cached(self, mock_get, _mock_use):
         # A None result must not be cached, or a later create would be masked.
