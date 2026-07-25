@@ -10,6 +10,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
+from shakenfist.daemons.daemon import IdlePollBackoff
 from shakenfist import mariadb
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
@@ -201,6 +202,10 @@ class Job(util_concurrency.Job):
             # runtime). The first entry is highest priority -- the MariaDB
             # query honours that order via FIELD().
             util_concurrency.set_thread_name('net-dispatcher')
+            # Adaptive backoff so an idle dispatcher stops issuing ~5 empty
+            # Dequeue/s per node; snaps back to fast polling on any work. See
+            # issue #3499.
+            poll_backoff = IdlePollBackoff()
             while daemon.check_abort_path(self.abort_path):
                 try:
                     # One round trip claims up to BATCH_SIZE items in
@@ -216,9 +221,17 @@ class Job(util_concurrency.Job):
                             util_concurrency.set_thread_name('idle')
                             LOG.debug('This network thread is now idle')
                             was_previously_idle = True
-                        time.sleep(0.2)
+                        # Sleep the backoff interval in short chunks so
+                        # shutdown stays responsive even at the cap.
+                        remaining = poll_backoff.next_empty_interval()
+                        while (remaining > 0
+                               and daemon.check_abort_path(self.abort_path)):
+                            chunk = min(0.2, remaining)
+                            time.sleep(chunk)
+                            remaining -= chunk
                         continue
 
+                    poll_backoff.reset()
                     if was_previously_idle:
                         util_concurrency.set_thread_name('net-dispatcher')
                         was_previously_idle = False
