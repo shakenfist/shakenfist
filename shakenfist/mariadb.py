@@ -418,6 +418,15 @@ def _use_database_service() -> bool:
 
 GRPC_TIMEOUT = 30
 GRPC_RETRIES = 3
+# UNAVAILABLE attempts fail fast (no deadline is consumed waiting), so they
+# can afford more patience than the deadline-bounded codes. Six attempts
+# with the escalating GRPC_RETRY_DELAY sleeps give ~7.5s of total backoff,
+# which outlasts the client channel's 5s reconnect-backoff cap (see
+# util/grpc_channel.py): a brief moment with no READY backend -- the
+# database-tier rolling restart, or a transient network blip hitting both
+# gateways -- is ridden out instead of amplified into a cluster-wide
+# DatabaseUnavailable storm (#3430).
+GRPC_UNAVAILABLE_RETRIES = 6
 GRPC_RETRY_DELAY = 0.5
 
 
@@ -455,6 +464,17 @@ def _grpc_call(method: Any, request: Any) -> Any:
     between attempts to shed a wedged subchannel; on UNAVAILABLE it
     keeps the channel so round_robin can serve the retry from a
     surviving peer (see the per-code reasoning at the retry site).
+
+    The retry budget is split by cost: a DEADLINE_EXCEEDED attempt
+    blocks for the full GRPC_TIMEOUT before failing, so those are
+    capped at GRPC_RETRIES to bound the caller's worst-case wall time.
+    UNAVAILABLE (and closed-channel) attempts fail fast, so the loop
+    allows up to GRPC_UNAVAILABLE_RETRIES total attempts -- enough
+    patience, with the escalating sleeps, to outlast the channel's 5s
+    reconnect-backoff cap and ride out a brief window with no READY
+    backend rather than storm DatabaseUnavailable cluster-wide during
+    the database-tier rolling restart (#3430).
+
     Once retries are exhausted, raises exceptions.DatabaseUnavailable
     rather than the underlying RpcError; non-retryable RpcErrors are
     raised as-is on the first attempt.
@@ -502,7 +522,9 @@ def _grpc_call(method: Any, request: Any) -> Any:
     method_name = raw_method.rsplit('/', 1)[-1] or None
 
     last_error: BaseException = grpc.RpcError()
-    for attempt in range(GRPC_RETRIES):
+    attempt = 0
+    slow_failures = 0
+    for attempt in range(GRPC_UNAVAILABLE_RETRIES):
         try:
             if attempt > 0 and method_name:
                 stub = _get_database_stub()
@@ -512,7 +534,14 @@ def _grpc_call(method: Any, request: Any) -> Any:
             last_error = e
             if e.code() not in retryable_codes:
                 raise
-            if attempt < GRPC_RETRIES - 1:
+            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                # Each of these burned the full GRPC_TIMEOUT before failing;
+                # cap them separately so the fast-failing UNAVAILABLE budget
+                # cannot stretch the caller's worst case to minutes.
+                slow_failures += 1
+                if slow_failures >= GRPC_RETRIES:
+                    break
+            if attempt < GRPC_UNAVAILABLE_RETRIES - 1:
                 # Whether to rebuild the channel depends on *why* we failed.
                 # DEADLINE_EXCEEDED is the wedged-subchannel signature: the
                 # transport accepted the call but cygrpc never routed it (see
@@ -539,7 +568,7 @@ def _grpc_call(method: Any, request: Any) -> Any:
                     f'gRPC {method_name or "call"} failed with '
                     f'{e.code().name}, retrying'
                     f'{" with a fresh channel" if rebuild else ""} '
-                    f'(attempt {attempt + 1} of {GRPC_RETRIES})')
+                    f'(attempt {attempt + 1} of {GRPC_UNAVAILABLE_RETRIES})')
                 time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
                 if rebuild:
                     _reset_database_stub()
@@ -547,22 +576,24 @@ def _grpc_call(method: Any, request: Any) -> Any:
             if 'closed channel' not in str(e):
                 raise
             last_error = e
-            if attempt < GRPC_RETRIES - 1:
+            if attempt < GRPC_UNAVAILABLE_RETRIES - 1:
                 LOG.warning(
                     f'gRPC {method_name or "call"} invoked on a channel '
                     f'closed by a concurrent retry, retrying with a fresh '
-                    f'channel (attempt {attempt + 1} of {GRPC_RETRIES})')
+                    f'channel (attempt {attempt + 1} of '
+                    f'{GRPC_UNAVAILABLE_RETRIES})')
                 time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
                 _reset_database_stub()
 
+    attempts_made = attempt + 1
     LOG.error(
-        f'gRPC {method_name or "call"} failed after {GRPC_RETRIES} attempts')
+        f'gRPC {method_name or "call"} failed after {attempts_made} attempts')
     # Raise a non-RpcError so the client wrappers below, which translate
     # RpcError into "object not found" return values, let an exhausted
     # outage propagate to the caller instead (issue 3373).
     raise exceptions.DatabaseUnavailable(
         f'database service unreachable: gRPC {method_name or "call"} '
-        f'failed after {GRPC_RETRIES} attempts') from last_error
+        f'failed after {attempts_made} attempts') from last_error
 
 
 # =============================================================================
