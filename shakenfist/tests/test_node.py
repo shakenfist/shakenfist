@@ -17,9 +17,11 @@ import tempfile
 from unittest import mock
 from uuid import UUID
 
+from cryptography.x509.oid import NameOID
 from pydantic import ValidationError
 import testtools
 
+from shakenfist import node as node_module
 from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
 from shakenfist.node import Node
@@ -99,6 +101,7 @@ class NodeAttributesDataTestCase(base.ShakenFistTestCase):
         data = NodeAttributesData(uuid=TEST_UUID)
         self.assertEqual(data.last_seen, 0.0)
         self.assertIsNone(data.installed_version)
+        self.assertIsNone(data.spice_server_cert_subject)
         self.assertFalse(data.is_etcd_master)
         self.assertFalse(data.is_hypervisor)
         self.assertFalse(data.is_network_node)
@@ -126,6 +129,31 @@ class NodeAttributesDataTestCase(base.ShakenFistTestCase):
         # their scheduled removal.
         self.assertIn('is_etcd_master', dumped)
         self.assertIn('is_eventlog_node', dumped)
+
+    def test_spice_server_cert_subject_round_trip(self):
+        """The SPICE cert subject round-trips through the model."""
+        data = NodeAttributesData(uuid=TEST_UUID)
+        self.assertIsNone(data.spice_server_cert_subject)
+        data.spice_server_cert_subject = 'C=US,O=Shaken Fist,CN=hv1'
+        dumped = data.model_dump()
+        self.assertEqual(
+            dumped['spice_server_cert_subject'], 'C=US,O=Shaken Fist,CN=hv1')
+
+    def test_spice_server_cert_subject_proto_round_trip(self):
+        """The SPICE cert subject survives the proto conversion, and its
+        optionality (None vs a value) is preserved via the has_ flag."""
+        from shakenfist import mariadb
+
+        with_subject = NodeAttributesData(
+            uuid=TEST_UUID, spice_server_cert_subject='CN=hv1')
+        back = mariadb._node_attrs_from_proto(
+            mariadb._node_attrs_to_proto(with_subject))
+        self.assertEqual(back.spice_server_cert_subject, 'CN=hv1')
+
+        without = NodeAttributesData(uuid=TEST_UUID)
+        back = mariadb._node_attrs_from_proto(
+            mariadb._node_attrs_to_proto(without))
+        self.assertIsNone(back.spice_server_cert_subject)
 
     def test_daemon_states_dict(self):
         """Test daemon_states as a nested dict."""
@@ -1194,6 +1222,49 @@ class NodeObserveThisNodeTestCase(base.ShakenFistTestCase):
         self.assertFalse(attrs.is_etcd_master)
         mock_save_attrs.assert_called_once()
 
+    @mock.patch(
+        'shakenfist.node.read_spice_server_cert_subject',
+        return_value='CN=node1.example.com')
+    @mock.patch('shakenfist.node.Node._save_attributes')
+    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
+    @mock.patch('shakenfist.node.mariadb.create_node_attributes')
+    @mock.patch('shakenfist.node.add_event')
+    @mock.patch(
+        'shakenfist.baseobject.get_minimum_object_version',
+        return_value=Node.current_version)
+    @mock.patch(
+        'shakenfist.mariadb.get_state',
+        return_value=State(
+            value='created', update_time=1234567890.0))
+    @mock.patch('shakenfist.node.mariadb.get_node')
+    @mock.patch('shakenfist.node.Node._load_persisted_uuid')
+    @mock.patch('shakenfist.node.config')
+    def test_observe_records_spice_cert_subject(
+            self, mock_config, mock_load_uuid,
+            mock_get_node, mock_get_state, mock_get_min,
+            mock_add_event, mock_create_attrs,
+            mock_get_attrs, mock_save_attrs, mock_read_subject):
+        """observe_this_node records the SPICE cert subject and names it
+        among the fields it persists."""
+        mock_config.NODE_NAME = TEST_FQDN
+        mock_config.NODE_MESH_IP = TEST_IP
+        mock_config.NODE_IS_HYPERVISOR = True
+        mock_config.NODE_IS_NETWORK_NODE = False
+        mock_load_uuid.return_value = TEST_UUID_STR
+
+        mock_get_node.return_value = NodeData(
+            uuid=TEST_UUID_STR, fqdn=TEST_FQDN,
+            ip=TEST_IP, version=Node.current_version)
+        attrs = NodeAttributesData(uuid=TEST_UUID)
+        mock_get_attrs.return_value = attrs
+
+        Node.observe_this_node()
+
+        self.assertEqual(
+            attrs.spice_server_cert_subject, 'CN=node1.example.com')
+        _, kwargs = mock_save_attrs.call_args
+        self.assertIn('spice_server_cert_subject', kwargs['fields'])
+
     @mock.patch('shakenfist.node.Node._persist_uuid')
     @mock.patch('shakenfist.node.Node._save_attributes')
     @mock.patch('shakenfist.node.mariadb.get_node_attributes')
@@ -1253,3 +1324,87 @@ class NodeObserveThisNodeTestCase(base.ShakenFistTestCase):
 
         mock_persist_uuid.assert_called_once()
         mock_save_attrs.assert_called_once()
+
+
+def _make_spice_cert(name_attrs):
+    """Build a self-signed certificate whose subject carries exactly the
+    given (oid, value) attributes in order, and return its PEM bytes."""
+    import datetime
+
+    from cryptography import x509 as _x509
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+
+    key = ed25519.Ed25519PrivateKey.generate()
+    subject = _x509.Name(
+        [_x509.NameAttribute(oid, value) for oid, value in name_attrs])
+    cert = (
+        _x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(_x509.random_serial_number())
+        .not_valid_before(datetime.datetime(2020, 1, 1))
+        .not_valid_after(datetime.datetime(2030, 1, 1))
+        .sign(key, None))
+    return cert.public_bytes(serialization.Encoding.PEM)
+
+
+class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
+    """Tests for reading the SPICE server certificate subject."""
+
+    def _subject_for(self, name_attrs):
+        pem = _make_spice_cert(name_attrs)
+        with tempfile.NamedTemporaryFile(
+                suffix='.pem', delete=False) as f:
+            f.write(pem)
+            path = f.name
+        self.addCleanup(os.unlink, path)
+        with mock.patch('shakenfist.node.SPICE_SERVER_CERT_PATH', path):
+            return node_module.read_spice_server_cert_subject()
+
+    def test_renders_attributes_in_certificate_order(self):
+        """The subject is rendered in the certificate's attribute order
+        with OpenSSL short names, matching the verifier's expectation."""
+        subject = self._subject_for([
+            (NameOID.COUNTRY_NAME, 'US'),
+            (NameOID.ORGANIZATION_NAME, 'Shaken Fist'),
+            (NameOID.COMMON_NAME, 'hv1'),
+        ])
+        self.assertEqual(subject, 'C=US,O=Shaken Fist,CN=hv1')
+
+    def test_common_name_only(self):
+        """The stock SF PKI mints a CN-only certificate."""
+        subject = self._subject_for([(NameOID.COMMON_NAME, 'sf-1')])
+        self.assertEqual(subject, 'CN=sf-1')
+
+    def test_escapes_comma_and_backslash_in_values(self):
+        subject = self._subject_for([
+            (NameOID.ORGANIZATION_NAME, 'Acme, Inc'),
+            (NameOID.COMMON_NAME, 'hv'),
+        ])
+        self.assertEqual(subject, 'O=Acme\\, Inc,CN=hv')
+
+    def test_unnameable_attribute_disables_pinning(self):
+        """A subject attribute with no accepted short name yields None so
+        we never emit a partial (and therefore mismatching) subject."""
+        subject = self._subject_for([
+            (NameOID.COMMON_NAME, 'hv1'),
+            (NameOID.SERIAL_NUMBER, '12345'),
+        ])
+        self.assertIsNone(subject)
+
+    def test_missing_certificate_returns_none(self):
+        with mock.patch(
+                'shakenfist.node.SPICE_SERVER_CERT_PATH',
+                '/nonexistent/server-cert.pem'):
+            self.assertIsNone(node_module.read_spice_server_cert_subject())
+
+    def test_unparseable_certificate_returns_none(self):
+        with tempfile.NamedTemporaryFile(
+                suffix='.pem', delete=False) as f:
+            f.write(b'not a certificate')
+            path = f.name
+        self.addCleanup(os.unlink, path)
+        with mock.patch('shakenfist.node.SPICE_SERVER_CERT_PATH', path):
+            self.assertIsNone(node_module.read_spice_server_cert_subject())

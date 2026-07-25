@@ -573,6 +573,21 @@ class SFConfig(BaseSettings):
             'virtual networks.'
         )
     )
+    KERBSIDE_URL: str = Field(
+        '',
+        description=(
+            "The kerbside deployment's public base URL, for example "
+            'https://kerbside.example.com. An empty value disables the VDI '
+            'console proxy integration. This value is also the token '
+            'audience.'
+        )
+    )
+    KERBSIDE_TOKEN_DURATION: int = Field(
+        300,
+        description=(
+            'Lifetime in seconds of a minted Kerbside VDI console token.'
+        )
+    )
 
     #################
     # Node Specific #

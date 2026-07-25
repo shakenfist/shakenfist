@@ -45,6 +45,16 @@ all the instances running and stop accepting new work.
     print(json.dumps(n, indent=4, sort_keys=True))
     ```
 
+???+ note
+
+    Since v0.8, hypervisor nodes publish a `spice_server_cert_subject`
+    attribute — the subject parsed from the node's SPICE server certificate,
+    for example `C=US,O=Shaken Fist,CN=hv1`. The Kerbside VDI console proxy
+    consumes this as the enforced backend `host_subject`. Nodes without a
+    readable SPICE server certificate publish nothing, which leaves
+    host-subject enforcement disabled for that backend. See the
+    [VDI console tokens operator guide](/operator_guide/vdi_console_tokens/).
+
 ## Other network information
 
 We can also request other information for a network. For example, we can list the

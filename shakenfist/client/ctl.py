@@ -136,6 +136,7 @@ from shakenfist.node import Node                           # noqa
 from shakenfist.schema.object_state import State           # noqa
 from shakenfist.schema.object_types import ObjectType      # noqa
 from shakenfist.util.grpc_channel import make_database_channel  # noqa
+from shakenfist.util import vdi_tokens                     # noqa
 
 
 @click.group()
@@ -280,6 +281,39 @@ def ensure_mariadb_schema() -> None:
                        f"(version {r['end_version']})")
 
     click.echo('MariaDB schema verified.')
+
+
+@click.command(name='ensure-kerbside-signing-key')
+def ensure_kerbside_signing_key() -> None:
+    """Ensure the Kerbside VDI console token signing key exists.
+
+    Idempotent: safe to run repeatedly. The first invocation generates
+    and stores a fresh signing key; every later invocation simply
+    reports the existing active key id without changing anything.
+    Never prints private key material.
+    """
+    material = vdi_tokens.ensure_signing_key()
+    active_kid = material['active_kid']
+    key_count = len(material['keys'])
+    click.echo(f'Active kid: {active_kid}')
+    click.echo(f'Published keys: {key_count}')
+
+
+@click.command(name='rotate-kerbside-signing-key')
+def rotate_kerbside_signing_key() -> None:
+    """Rotate the Kerbside VDI console token signing key.
+
+    Generates a fresh signing key and makes it active, keeping the
+    previous key published so tokens already in flight still verify.
+    Rotating twice in quick succession drops the third-oldest key,
+    making any tokens it signed unverifiable. Never prints private key
+    material.
+    """
+    material = vdi_tokens.rotate_signing_key()
+    active_kid = material['active_kid']
+    key_count = len(material['keys'])
+    click.echo(f'New active kid: {active_kid}')
+    click.echo(f'Published keys: {key_count}')
 
 
 @click.command()
@@ -468,6 +502,8 @@ cli.add_command(show_config)
 cli.add_command(set_config)
 cli.add_command(verify_config)
 cli.add_command(ensure_mariadb_schema)
+cli.add_command(ensure_kerbside_signing_key)
+cli.add_command(rotate_kerbside_signing_key)
 cli.add_command(initialise_node)
 cli.add_command(register_daemon)
 cli.add_command(deregister_daemon)

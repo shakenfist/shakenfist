@@ -562,12 +562,21 @@ functionality in the Shaken Fist client.
   the `/instances/{instance_ref}/vdiconsolehelper` API call described below to
   download a `virt-viewer` configuration file and then connect with `virt-viewer`.
   See the example below for more details.
+* Proxied VDI console: since v0.8, if the cluster operator has enabled the
+  Kerbside integration, use the `/instances/{instance_ref}/vdiconsoleproxy` API
+  call below to mint a short lived signed token and receive a proxy URL of the
+  form `<KERBSIDE_URL>/sf-console.vv?token=<jwt>`. The user's viewer redeems this
+  URL against the Kerbside proxy, which validates the token offline and relays
+  the SPICE session, so no direct network access to the hypervisor is needed. See
+  the [VDI console tokens operator guide](/operator_guide/vdi_console_tokens/) for
+  how the integration is enabled and operated.
 
 ???+ tip "REST API calls"
 
     * [GET /instances/{instance_ref}/consoledata](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__consoledata): Fetch read only serial console data for an instance
     * [DELETE /instances/{instance_ref}/consoledata](https://openapi.shakenfist.com/#/instances/delete_instances__instance_ref__consoledata): Clear the read only serial console for an instance.
     * [GET /instances/{instance_ref}/vdiconsolehelper](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__vdiconsolehelper): Generate and return a `virt-viewer` configuration file for connecting to the interactive VDI console for the instance (if configured).
+    * [GET /instances/{instance_ref}/vdiconsoleproxy](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__vdiconsoleproxy): Mint a short lived Kerbside VDI console token and return a proxy URL (`{url, expires_at}`) for the SPICE console of the instance. Returns 404 if the Kerbside integration is not configured, 406 if the instance is not in the `created` state, 409 if the instance does not have a SPICE console, and 500 if no signing key is configured.
 
 ??? example "Python API client: connect seamlessly to a VDI console using virt-viewer"
 

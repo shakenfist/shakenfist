@@ -289,6 +289,21 @@ The `post_worker_init` hook in `gunicorn_config.py` installs a SIGTERM
 handler that calls `health.begin_drain()` (flipping `/readyz` to 503) and
 then waits `API_DRAIN_GRACE` seconds before the normal worker shutdown.
 
+### VDI console token mint path
+
+Shaken Fist mints short lived Ed25519 JWTs for the Kerbside VDI console
+proxy. `shakenfist/external_api/instance.py`
+(`InstanceVDIProxyConsoleHelperEndpoint`, `GET
+/instances/<ref>/vdiconsoleproxy`) mints a token and returns a proxy URL;
+`shakenfist/util/vdi_tokens.py` owns all key handling (mint, ensure, rotate,
+public view); `shakenfist/external_api/admin.py`
+(`AdminVDITokenPublicKeyEndpoint`, `GET /admin/vditokenpubkey`) publishes the
+public verification keys. The signing key lives in a single `cluster_config`
+row, `KERBSIDE_JWT_SIGNING_KEY` (two-key rotation window). The `sf-ctl`
+`ensure-kerbside-signing-key` / `rotate-kerbside-signing-key` subcommands
+bootstrap and rotate it. Operator runbook:
+`docs/operator_guide/vdi_console_tokens.md`.
+
 ### Key Directories
 
 - `shakenfist/` - Core package

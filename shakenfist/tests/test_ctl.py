@@ -565,6 +565,72 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         mock_mariadb.ensure_schema.assert_called_once()
         self.assertIn('verified', result.output.lower())
 
+    @mock.patch('shakenfist.client.ctl.vdi_tokens')
+    def test_ensure_kerbside_signing_key_creates(self, mock_vdi_tokens):
+        from shakenfist.client.ctl import ensure_kerbside_signing_key
+
+        mock_vdi_tokens.ensure_signing_key.return_value = {
+            'active_kid': 'abcd1234',
+            'keys': [{'kid': 'abcd1234', 'private_pem': 'PRIVATE-1',
+                      'public_pem': 'PUBLIC-1', 'created': 1}],
+        }
+
+        result = self.runner.invoke(ensure_kerbside_signing_key)
+
+        self.assertEqual(result.exit_code, 0)
+        mock_vdi_tokens.ensure_signing_key.assert_called_once()
+        self.assertIn('abcd1234', result.output)
+        self.assertIn('1', result.output)
+        self.assertNotIn('PRIVATE', result.output)
+
+    @mock.patch('shakenfist.client.ctl.vdi_tokens')
+    def test_ensure_kerbside_signing_key_idempotent(self, mock_vdi_tokens):
+        from shakenfist.client.ctl import ensure_kerbside_signing_key
+
+        mock_vdi_tokens.ensure_signing_key.return_value = {
+            'active_kid': 'abcd1234',
+            'keys': [{'kid': 'abcd1234', 'private_pem': 'PRIVATE-1',
+                      'public_pem': 'PUBLIC-1', 'created': 1}],
+        }
+
+        first = self.runner.invoke(ensure_kerbside_signing_key)
+        second = self.runner.invoke(ensure_kerbside_signing_key)
+
+        self.assertEqual(first.exit_code, 0)
+        self.assertEqual(second.exit_code, 0)
+        self.assertIn('abcd1234', first.output)
+        self.assertIn('abcd1234', second.output)
+        self.assertEqual(mock_vdi_tokens.ensure_signing_key.call_count, 2)
+        # The command itself never writes; ensure_signing_key() is the
+        # idempotent primitive and it is up to it (tested separately in
+        # test_vdi_tokens.py) to avoid a second write.
+        mock_vdi_tokens.rotate_signing_key.assert_not_called()
+        self.assertNotIn('PRIVATE', first.output)
+        self.assertNotIn('PRIVATE', second.output)
+
+    @mock.patch('shakenfist.client.ctl.vdi_tokens')
+    def test_rotate_kerbside_signing_key_changes_active_kid(
+            self, mock_vdi_tokens):
+        from shakenfist.client.ctl import rotate_kerbside_signing_key
+
+        mock_vdi_tokens.rotate_signing_key.return_value = {
+            'active_kid': 'newkid99',
+            'keys': [
+                {'kid': 'newkid99', 'private_pem': 'PRIVATE-NEW',
+                 'public_pem': 'PUBLIC-NEW', 'created': 2},
+                {'kid': 'abcd1234', 'private_pem': 'PRIVATE-1',
+                 'public_pem': 'PUBLIC-1', 'created': 1},
+            ],
+        }
+
+        result = self.runner.invoke(rotate_kerbside_signing_key)
+
+        self.assertEqual(result.exit_code, 0)
+        mock_vdi_tokens.rotate_signing_key.assert_called_once()
+        self.assertIn('newkid99', result.output)
+        self.assertIn('2', result.output)
+        self.assertNotIn('PRIVATE', result.output)
+
 
 class NodeCommandsTestCase(base.ShakenFistTestCase):
     """Tests for node-related CLI commands."""

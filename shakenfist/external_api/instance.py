@@ -56,6 +56,7 @@ from shakenfist.artifact import SNAPSHOT_URL
 from shakenfist.artifact import UPLOAD_URL
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
+from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import agentoperation as api_agentoperation
@@ -66,6 +67,7 @@ from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import general as util_general
+from shakenfist.util import vdi_tokens
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -1484,6 +1486,80 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
             vvconfig, mimetype='application/x-virt-viewer')
         resp.status_code = 200
         return resp
+
+
+instance_vdiconsoleproxy_get_example = """{
+    "url": "https://kerbside.example.com/sf-console.vv?token=eyJhbGciOiJFZERTQSIs...",
+    "expires_at": 1789000300
+}"""
+
+
+class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances',
+        ('Mint a short lived Kerbside VDI console token and return a '
+         'proxy URL for the SPICE console of this instance.'),
+        [
+            ('instance_ref', 'query', 'uuidorname',
+             'The instance to mint a VDI console proxy token for.', True)
+        ],
+        [(200, 'A Kerbside proxy URL and the token expiry time.',
+          instance_vdiconsoleproxy_get_example),
+         (404, 'Instance not found, or kerbside integration is not '
+          'configured.', None),
+         (406, 'Instance is not ready.', None),
+         (409, 'Instance does not have a SPICE console.', None),
+         (500, 'Kerbside signing key is not configured.', None)]))
+    @api_base.verify_token
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.log_token_use
+    def get(self, instance_ref=None, instance_from_db=None):
+        if not config.KERBSIDE_URL:
+            return sf_api.error(
+                404, 'kerbside integration is not configured')
+
+        if instance_from_db.state.value != dbo.STATE_CREATED:
+            return sf_api.error(
+                406,
+                f'instance {instance_from_db.uuid} is not ready '
+                f'({instance_from_db.state.value})')
+
+        video = instance_from_db.video
+        if not video or not video.get('vdi', '').startswith('spice'):
+            return sf_api.error(
+                409, 'instance does not have a SPICE console')
+
+        namespace = instance_from_db.namespace
+
+        # The proxy URL base and the token audience must be byte-identical:
+        # Kerbside compares the audience by exact string match, so normalise a
+        # possibly trailing-slashed KERBSIDE_URL once and use it for both.
+        base = config.KERBSIDE_URL.rstrip('/')
+
+        try:
+            minted = vdi_tokens.mint_console_token(
+                str(instance_from_db.uuid), namespace,
+                audience=base, issuer=config.ZONE,
+                duration=config.KERBSIDE_TOKEN_DURATION)
+        except vdi_tokens.SigningKeyError:
+            return sf_api.error(
+                500,
+                'kerbside signing key is not configured, run sf-ctl '
+                'ensure-kerbside-signing-key')
+
+        url = f'{base}/sf-console.vv?token={minted["token"]}'
+
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'vdi console proxy token minted',
+            extra={
+                'jti': minted['jti'],
+                'kid': minted['kid'],
+                'namespace': namespace,
+                'expires_at': minted['expires_at']
+            })
+
+        return {'url': url, 'expires_at': minted['expires_at']}
 
 
 class InstanceAgentPutEndpoint(api_base.Resource):

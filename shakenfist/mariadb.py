@@ -286,7 +286,7 @@ BLOB_HASHES_VERSION = 2
 BLOB_TRANSFERS_VERSION = 2
 BLOB_ATTRIBUTES_VERSION = 1
 NODES_VERSION = 2
-NODE_ATTRIBUTES_VERSION = 3
+NODE_ATTRIBUTES_VERSION = 4
 NAMESPACES_VERSION = 2
 NAMESPACE_ATTRIBUTES_VERSION = 2
 ARTIFACTS_VERSION = 3
@@ -9133,6 +9133,10 @@ def _get_node_attributes_table() -> sa.Table:
                     nullable=True
                 ),
                 sa.Column(
+                    'spice_server_cert_subject', sa.String(1024),
+                    nullable=True
+                ),
+                sa.Column(
                     'is_etcd_master', sa.Boolean(),
                     nullable=False, default=False
                 ),
@@ -9267,6 +9271,23 @@ def _ensure_node_attributes_schema(
                 'BOOLEAN NOT NULL DEFAULT FALSE'))
             conn.commit()
         current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 4:
+        # v4: record each node's SPICE server certificate subject so
+        # kerbside can pin the backend TLS leg. Safe to run repeatedly --
+        # ADD COLUMN IF NOT EXISTS is a no-op when the column already
+        # exists (e.g. fresh deployments where create_all included it).
+        LOG.info(
+            f'Upgrading {table_name} table to version 4 '
+            '(add spice_server_cert_subject column)')
+        with engine.connect() as conn:
+            conn.execute(sa.text(
+                'ALTER TABLE node_attributes '
+                'ADD COLUMN IF NOT EXISTS spice_server_cert_subject '
+                'VARCHAR(1024) NULL'))
+            conn.commit()
+        current_ver = 4
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -9635,6 +9656,9 @@ def _direct_get_node_attributes(
                 uuid=result.uuid,
                 last_seen=result.last_seen,
                 installed_version=result.installed_version,
+                spice_server_cert_subject=(
+                    result.spice_server_cert_subject
+                ),
                 is_etcd_master=result.is_etcd_master,
                 is_hypervisor=result.is_hypervisor,
                 is_network_node=result.is_network_node,
@@ -9691,6 +9715,7 @@ def _node_attributes_column_values(
     all_values: Dict[str, Any] = {
         'last_seen': data.last_seen,
         'installed_version': data.installed_version,
+        'spice_server_cert_subject': data.spice_server_cert_subject,
         'is_etcd_master': data.is_etcd_master,
         'is_hypervisor': data.is_hypervisor,
         'is_network_node': data.is_network_node,
@@ -10137,6 +10162,12 @@ def _node_attrs_to_proto(
         has_installed_version=(
             data.installed_version is not None
         ),
+        spice_server_cert_subject=(
+            data.spice_server_cert_subject or ''
+        ),
+        has_spice_server_cert_subject=(
+            data.spice_server_cert_subject is not None
+        ),
         is_etcd_master=data.is_etcd_master,
         is_hypervisor=data.is_hypervisor,
         is_network_node=data.is_network_node,
@@ -10193,6 +10224,10 @@ def _node_attrs_from_proto(
         installed_version=(
             d.installed_version
             if d.has_installed_version else None
+        ),
+        spice_server_cert_subject=(
+            d.spice_server_cert_subject
+            if d.has_spice_server_cert_subject else None
         ),
         is_etcd_master=d.is_etcd_master,
         is_hypervisor=d.is_hypervisor,

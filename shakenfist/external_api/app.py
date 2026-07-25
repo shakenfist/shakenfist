@@ -203,7 +203,8 @@ class Root(api_base.Resource):
              '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
              '<p>Machine searchable API capabilities:</p><ul>'
 
-             '<li>admin: cluster-cacert, cluster-resources</li>'
+             '<li>admin: cluster-cacert, cluster-resources, '
+             'vdi-token-pubkey</li>'
              '<li>agent-operations: agentoperations-crud, instance-agentoperations, '
              'instance-agentoperations-all, agentoperations-put-with-mode</li>'
              '<li>artifacts: artifact-metadata, artifact-upload-types, '
@@ -215,6 +216,7 @@ class Root(api_base.Resource):
              'cluster-operation-chain, cluster-operations-by-target</li>'
              '<li>events: events-by-type</li>'
              '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
+             'vdi-console-proxy, '
              'instance-put-blob, instance-execute, instance-get, instance-screenshot, '
              'get-instance-namespace, hot-plug-interface, '
              'include-queued-agent-operations, instance-clusteroperations</li>'
@@ -261,6 +263,8 @@ api.add_resource(Readyz, '/healthz', endpoint='healthz')
 
 api.add_resource(api_admin.AdminLocksEndpoint, '/admin/locks')
 api.add_resource(api_admin.AdminClusterCaCertificateEndpoint, '/admin/cacert')
+api.add_resource(api_admin.AdminVDITokenPublicKeyEndpoint,
+                 '/admin/vditokenpubkey')
 api.add_resource(api_admin.AdminResourcesEndpoint, '/admin/resources')
 
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_ref>')
@@ -351,6 +355,8 @@ api.add_resource(api_instance.InstanceConsoleDataEndpoint,
                  '/instances/<instance_ref>/consoledata')
 api.add_resource(api_instance.InstanceVDIConsoleHelperEndpoint,
                  '/instances/<instance_ref>/vdiconsolehelper')
+api.add_resource(api_instance.InstanceVDIProxyConsoleHelperEndpoint,
+                 '/instances/<instance_ref>/vdiconsoleproxy')
 api.add_resource(api_instance.InstanceAgentPutEndpoint,
                  '/instances/<instance_ref>/agent/put')
 api.add_resource(api_instance.InstanceAgentGetEndpoint,
