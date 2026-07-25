@@ -9902,6 +9902,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -10555,6 +10583,14 @@ functionality in the Shaken Fist client.</p>
   the <code>/instances/{instance_ref}/vdiconsolehelper</code> API call described below to
   download a <code>virt-viewer</code> configuration file and then connect with <code>virt-viewer</code>.
   See the example below for more details.</li>
+<li>Proxied VDI console: since v0.8, if the cluster operator has enabled the
+  Kerbside integration, use the <code>/instances/{instance_ref}/vdiconsoleproxy</code> API
+  call below to mint a short lived signed token and receive a proxy URL of the
+  form <code>&lt;KERBSIDE_URL&gt;/sf-console.vv?token=&lt;jwt&gt;</code>. The user's viewer redeems this
+  URL against the Kerbside proxy, which validates the token offline and relays
+  the SPICE session, so no direct network access to the hypervisor is needed. See
+  the <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a> for
+  how the integration is enabled and operated.</li>
 </ul>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
@@ -10562,6 +10598,7 @@ functionality in the Shaken Fist client.</p>
 <li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__consoledata">GET /instances/{instance_ref}/consoledata</a>: Fetch read only serial console data for an instance</li>
 <li><a href="https://openapi.shakenfist.com/#/instances/delete_instances__instance_ref__consoledata">DELETE /instances/{instance_ref}/consoledata</a>: Clear the read only serial console for an instance.</li>
 <li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__vdiconsolehelper">GET /instances/{instance_ref}/vdiconsolehelper</a>: Generate and return a <code>virt-viewer</code> configuration file for connecting to the interactive VDI console for the instance (if configured).</li>
+<li><a href="https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__vdiconsoleproxy">GET /instances/{instance_ref}/vdiconsoleproxy</a>: Mint a short lived Kerbside VDI console token and return a proxy URL (<code>{url, expires_at}</code>) for the SPICE console of the instance. Returns 404 if the Kerbside integration is not configured, 406 if the instance is not in the <code>created</code> state, 409 if the instance does not have a SPICE console, and 500 if no signing key is configured.</li>
 </ul>
 </details>
 <details class="example">

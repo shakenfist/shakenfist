@@ -2233,6 +2233,10 @@
          <lastmod>2026-07-25</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/operator_guide/vdi_console_tokens/</loc>
+         <lastmod>2026-07-25</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/operator_guide/networking/overview/</loc>
          <lastmod>2026-07-25</lastmod>
     </url>
@@ -2382,6 +2386,18 @@
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-health-checks/</loc>
+         <lastmod>2026-07-25</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-kerbside-vdi-tokens-phase-01-signing-key/</loc>
+         <lastmod>2026-07-25</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint/</loc>
+         <lastmod>2026-07-25</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-kerbside-vdi-tokens/</loc>
          <lastmod>2026-07-25</lastmod>
     </url>
     <url>

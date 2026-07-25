@@ -8415,6 +8415,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#proxied-vdi-console" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proxied VDI console
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#screen-captures" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9883,6 +9894,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9954,6 +9993,17 @@
     <span class="md-ellipsis">
       
         Interactive VDI console
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proxied-vdi-console" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proxied VDI console
       
     </span>
   </a>
@@ -10065,6 +10115,41 @@ issues but is otherwise too noisy for normal use.</p>
 <p>And example video specification would be:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>--videospec model=qxl,memory=65536,vdi=spiceconcurrent
 </code></pre></div>
+<h2 id="proxied-vdi-console">Proxied VDI console<a class="headerlink" href="#proxied-vdi-console" title="Permanent link">&para;</a></h2>
+<p>Since v0.8, if your cluster operator has enabled the Kerbside integration
+you can open a SPICE console without direct network access to the hypervisor
+node. Instead of connecting to the "vdi port" yourself, Shaken Fist mints a
+short lived, signed token and hands your viewer a proxy URL; the
+<a href="/components/kerbside/">Kerbside</a> proxy validates the token and relays the
+SPICE session to the correct hypervisor for you.</p>
+<p>The seamless way to use this is the client's <code>vdiconsole</code> command, which
+mints the token and launches a viewer in one step:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>vdiconsole<span class="w"> </span>c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
+</code></pre></div>
+<p>For the viewer to launch automatically on Linux, install the client with the
+<code>vdi</code> extra, which pulls in the <a href="/components/ryll/">ryll</a> SPICE viewer:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;shakenfist-client[vdi]&#39;</span>
+</code></pre></div>
+<p>Without the extra (or on platforms ryll does not cover) the command still
+works — it writes a <code>virt-viewer</code> configuration file you can open with your
+own SPICE client.</p>
+<p>A proxied console has a few requirements:</p>
+<ul>
+<li>the instance must be in the <code>created</code> state;</li>
+<li>its video specification must select a SPICE console — that is, the <code>vdi</code>
+  value starts with <code>spice</code> (<code>spice</code>, <code>spiceconcurrent</code>, or <code>spicedebug</code>),
+  not <code>vnc</code>; and</li>
+<li>your operator must have set <code>KERBSIDE_URL</code> on the cluster.</li>
+</ul>
+<p>The minted token is single-use and short lived (about five minutes by
+default), so open the console promptly after requesting it; if it expires,
+just run the command again.</p>
+<p>If the operator has <strong>not</strong> enabled the integration (<code>KERBSIDE_URL</code> is
+unset), the proxy mint returns an error and the client falls back to the
+direct <code>virt-viewer</code> configuration file described above, which needs direct
+network access to the hypervisor. Operators can read how to turn the
+integration on in the
+<a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</p>
 <h2 id="screen-captures">Screen captures<a class="headerlink" href="#screen-captures" title="Permanent link">&para;</a></h2>
 <p>Since v0.78, Shaken Fist also provides an API for collecting screen captures of
 the console. This works for either serial consoles or graphical consoles, its
@@ -10072,7 +10157,7 @@ literally the same was whatever would have been displayed on the monitor if the
 instance was a physical machine.</p>
 <p>You can take a screen capture of an instance using the python command line client
 like this:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>screenshot<span class="w"> </span>...uuid...
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>screenshot<span class="w"> </span>...uuid...
 </code></pre></div>
 
 

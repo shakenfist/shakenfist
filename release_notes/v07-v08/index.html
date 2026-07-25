@@ -10088,6 +10088,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -10429,6 +10457,13 @@
   utilization of the cluster to admin users.</li>
 <li>You can now POST to <code>/instance/...instanceref.../interfaces</code> as described
   above to hot plug new network interfaces into an existing instance.</li>
+<li>There is now an API call (<code>GET /instances/...instanceref.../vdiconsoleproxy</code>)
+  which mints a short lived, Ed25519-signed token and returns a Kerbside proxy
+  URL for an instance's SPICE console, so users can reach a graphical console
+  without direct network access to the hypervisor. The public verification keys
+  are published to admins at <code>GET /admin/vditokenpubkey</code>. This integration is
+  disabled until the operator sets <code>KERBSIDE_URL</code>; see the
+  <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>

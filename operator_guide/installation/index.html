@@ -9916,6 +9916,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -10260,6 +10288,11 @@ are:</p>
 </tr>
 </tbody>
 </table>
+<p>To offer users proxied graphical consoles via Kerbside, set <code>KERBSIDE_URL</code>
+(and optionally <code>KERBSIDE_TOKEN_DURATION</code>) through <code>extra_config</code>, then
+bootstrap and rotate the signing key as described in the
+<a href="../vdi_console_tokens/">VDI console tokens operator guide</a>. This is a manual,
+opt-in integration; it stays disabled while <code>KERBSIDE_URL</code> is unset.</p>
 <h2 id="run-the-playbook">Run the playbook<a class="headerlink" href="#run-the-playbook" title="Permanent link">&para;</a></h2>
 <p>The examples share a single playbook, <code>examples/_shared/site.yml</code>, which maps
 your inventory groups onto the collection's roles, computes the cluster-wide

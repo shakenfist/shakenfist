@@ -9874,6 +9874,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -10014,6 +10042,16 @@ all the instances running and stop accepting new work.</p>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_nodes</span><span class="p">()</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
+</details>
+<details class="note" open="open">
+<summary>Note</summary>
+<p>Since v0.8, hypervisor nodes publish a <code>spice_server_cert_subject</code>
+attribute — the subject parsed from the node's SPICE server certificate,
+for example <code>C=US,O=Shaken Fist,CN=hv1</code>. The Kerbside VDI console proxy
+consumes this as the enforced backend <code>host_subject</code>. Nodes without a
+readable SPICE server certificate publish nothing, which leaves
+host-subject enforcement disabled for that backend. See the
+<a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</p>
 </details>
 <h2 id="other-network-information">Other network information<a class="headerlink" href="#other-network-information" title="Permanent link">&para;</a></h2>
 <p>We can also request other information for a network. For example, we can list the

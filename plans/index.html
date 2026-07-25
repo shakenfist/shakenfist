@@ -9867,6 +9867,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI console tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -10686,6 +10714,12 @@
 <td>Master plan</td>
 <td>Stub</td>
 <td>Rework the upload/blob/artifact/label/snapshot surface to remove usability sharp edges (ambiguous name resolution, blob-UUID juggling, underpowered labels, instance-costumed snapshots); adopts #3271, #1634, #1167, #592, #877, #1386, #833, #422</td>
+</tr>
+<tr>
+<td><a href="PLAN-kerbside-vdi-tokens/">Kerbside VDI console tokens</a></td>
+<td>Master plan</td>
+<td>In Progress</td>
+<td>Cross-repo (shakenfist / client-python / kerbside / ryll): per-instance console authorisation via short-lived Ed25519-signed tokens minted by a new vdiconsoleproxy endpoint and validated offline by Kerbside; cluster signing key in <code>cluster_config</code>, pubkey published API-side, kerbside exchange endpoint mirrors the Nova token flow; pip-installable ryll so <code>sf-client instance vdiconsole</code> lands the user in a session seamlessly</td>
 </tr>
 <tr>
 <td><a href="PLAN-cluster-op-visibility/">Cluster op visibility</a></td>
