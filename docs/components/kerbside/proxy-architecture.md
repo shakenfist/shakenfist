@@ -62,6 +62,12 @@ hostname verification, so a mis-issued or substituted backend certificate is
 rejected. When the console has no `host_subject`, the CA chain is the only
 identity check. The rustls `ring` crypto provider is installed at startup.
 
+For Shaken Fist consoles the enforced `host_subject` is not configured on the
+proxy: it is pinned at scrape time from the hosting node's published SPICE
+server certificate subject (`spice_server_cert_subject`), and carried through
+to the proxy in the `AuthorizeConnection` `Target`. See
+[Console Sources](/components/kerbside/console-sources/).
+
 ## Connection State Machine
 
 Each accepted connection runs this sequence (`session.rs`, `backend.rs`,
@@ -135,6 +141,22 @@ Tickets are validated by the control plane, not the proxy: `AuthorizeConnection`
 resolves the decrypted ticket against the database and returns a `Target` or
 `Denied`. The proxy enforces the decision and never reaches the database on
 its own.
+
+Two different tokens exist for a Shaken Fist console, and they live on
+different surfaces:
+
+- The **HTTP JWT bearer** is the Ed25519-signed token Shaken Fist mints and a
+  viewer presents at the `/sf-console.vv` exchange endpoint on the Python API.
+  The API verifies it *offline* against the cluster's cached signing public
+  keys (signature, `aud`, `exp`) and enforces single use through a `jti` replay
+  table (`sf_token_jtis`) — a replayed token is rejected. The Rust proxy never
+  sees this JWT; the exchange happens entirely on the Python side, which then
+  issues an ordinary Kerbside console token and `.vv` file.
+- The **on-wire SPICE ticket** is what the proxy actually authorizes. It
+  arrives RSA-encrypted inside the SPICE link handshake, is decrypted, and is
+  resolved by the control plane via `AuthorizeConnection`. The proxy enforces
+  only this decision; the JWT exchange has already completed before any SPICE
+  connection is made.
 
 ### Audit Logging
 

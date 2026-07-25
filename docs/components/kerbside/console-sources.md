@@ -15,9 +15,16 @@ this file is configured via the `SOURCES_PATH` setting.
 
 Kerbside handles different source types in different ways:
 
-- **Shaken Fist and oVirt**: These sources are queried regularly (once a minute)
-  for a list of available consoles. The consoles are stored in the database and
-  presented in the Kerbside administrative interface.
+- **oVirt**: These sources are queried regularly (once a minute) for a list of
+  available consoles. The consoles are stored in the database and presented in
+  the Kerbside administrative interface.
+
+- **Shaken Fist**: Shaken Fist sources are also scraped regularly, but under a
+  `system` credential the scrape covers the whole cluster rather than a single
+  namespace. Access then goes through a token exchange rather than opening a
+  console straight from the scraped table: Shaken Fist mints a short-lived,
+  Ed25519-signed token that Kerbside verifies entirely offline at
+  `/sf-console.vv`. See the [Shaken Fist](#shaken-fist) section below.
 
 - **OpenStack**: OpenStack sources are handled differently. Rather than periodic
   scraping, OpenStack uses on-demand authentication. When a user requests a
@@ -32,6 +39,44 @@ OpenStack clusters together seamlessly.
 
 ## Shaken Fist
 
+Shaken Fist sources are periodically scraped for their available consoles, but
+both the scrape and the console-access flow differ from the other scraped
+source (oVirt), so they are described here in full.
+
+**Cluster-wide scrape.** When the source's `username` is `system`, Kerbside
+scrapes the *entire* cluster in one pass: every namespace's instances are
+enumerated, so all of the cluster's SPICE consoles become reachable through a
+single source. With any other `username`, only that namespace's instances are
+scraped. Each pass also refreshes the cluster's node list so a console can be
+associated with the hypervisor currently hosting it. An instance is only kept
+when it is in the `created` state and its VDI video model is a SPICE variant.
+
+**Token exchange.** Unlike oVirt, a Shaken Fist console is not opened directly
+from the scraped table. Shaken Fist mints a short-lived, Ed25519-signed JWT and
+hands the viewer an exchange URL of the form
+`<KERBSIDE_URL>/sf-console.vv?token=<jwt>`. Kerbside verifies that JWT
+*entirely offline* against the cluster's signing public keys, which it caches
+when the source is initialized (and refetches exactly once if it sees an
+unknown key id, so a signing-key rotation is tolerated). Verification checks
+the signature, the audience (`aud`), and the expiry (`exp`), and enforces
+single use by recording the token's `jti` so a replayed token is rejected — no
+callback to Shaken Fist happens on this path. Only once the token verifies does
+Kerbside look the scraped console up, confirm that the console's source matches
+the source whose key verified the token, and issue the usual Kerbside console
+token and virt-viewer (`.vv`) file. The audience Kerbside accepts is set by
+`SF_CONSOLE_TOKEN_AUDIENCE` (or, when unset, derived from `PUBLIC_FQDN`) and
+must equal Shaken Fist's `KERBSIDE_URL` exactly; see
+[Configuration](/components/kerbside/configuration/).
+
+**Backend certificate pinning.** At scrape time each console's `host_subject`
+is pinned from the hypervisor node's published SPICE server certificate subject
+(`spice_server_cert_subject`), so the proxy's backend TLS leg can verify it is
+talking to the expected hypervisor. A node that publishes no subject (an older
+cluster, or a node without a cert) leaves `host_subject` unset, and the proxy
+skips host-subject enforcement for that backend rather than refusing it. The
+optional `synthesize_host_subject` knob (below) lets an operator on the stock
+`cn=hostname` PKI turn enforcement on before the node-side change is deployed.
+
 The following options are used to configure a Shaken Fist console source
 (`type: shakenfist`).
 
@@ -40,13 +85,15 @@ The following options are used to configure a Shaken Fist console source
 | source | The name of the source (used as an identifier) |
 | type | The type of the source: `shakenfist` |
 | url | The API URL for the Shaken Fist cluster |
-| username | The Shaken Fist namespace to authenticate to |
+| username | The Shaken Fist namespace to authenticate to; use `system` to scrape the whole cluster |
 | password | The API key/password to authenticate with |
 | ca_cert | Required: the SSL CA public key certificate to validate API and VDI connections against |
+| synthesize_host_subject | Optional (default false): when a node publishes no `spice_server_cert_subject`, synthesize `CN=<node>` so the proxy still enforces the backend host subject. Only correct on a stock `cn=hostname` PKI — a mismatch would wrongly reject the backend — so it is off by default. |
 
 **Note**: The CA certificate is verified against the cluster's advertised
-certificate during initialization. If they don't match, the source will be
-marked as errored.
+certificate during initialization, and the cluster's VDI token signing keys are
+fetched at the same time. If the CA certificates do not match, or the signing
+keys cannot be fetched, the source is marked as errored.
 
 ## oVirt
 
