@@ -40,6 +40,21 @@ _DEFAULT_OPTIONS: list[tuple[str, Any]] = [
     # otherwise see localhost / mesh-IP database calls routed through
     # the proxy and rejected with 503.
     ('grpc.enable_http_proxy', 0),
+    # Cap the subchannel reconnect backoff. gRPC's default backoff grows
+    # from 1s by 1.6x per failed dial to a 120s ceiling, so a subchannel
+    # that failed while its gateway restarted can sit in TRANSIENT_FAILURE
+    # for up to two minutes after that gateway has recovered -- round_robin
+    # does not redial it early while another backend is READY. That left a
+    # window where the serial database-tier roll took the *other* gateway
+    # down while clients had still not redialled the first, producing
+    # "connections to all backends failing" DatabaseUnavailable storms for
+    # 1-2 minutes per deploy (#3430). With the cap at 5s a recovered
+    # gateway is redialled promptly, and the deploy roll's settle
+    # (sf_database_roll_settle_seconds, default 10s -- see the node role's
+    # register.yml) fully covers the reconnect window. That settle must
+    # always stay longer than this cap.
+    ('grpc.initial_reconnect_backoff_ms', 1000),
+    ('grpc.max_reconnect_backoff_ms', 5000),
     # No healthCheckConfig here, deliberately. Client-side health
     # checking opens a grpc.health.v1.Health/Watch stream on every
     # subchannel, and the synchronous HealthServicer on sf-database
