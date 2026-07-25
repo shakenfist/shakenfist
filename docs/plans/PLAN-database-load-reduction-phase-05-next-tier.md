@@ -51,9 +51,14 @@ each is a standalone GitHub issue rather than a single monolithic phase:
 * **#3500 — transfers idle polling (~20/s).** `GetBlobTransfersForNode`
   polls at a fixed rate even with no pending transfers. Fix: back off / wake
   on enqueue.
-* **#3501 — cluster IPAM re-reads (~14/s steady, ~48/s burst).** IPAM is
-  mutable so it cannot use the phase 2 static cache; fix is loop
-  restructuring / event-driven invalidation in the cluster sweep.
+* **#3501 — cluster IPAM re-reads (~14/s steady, ~48/s burst).** Diagnosed as
+  the immutable-tier cache pattern, not loop surgery: the record `get_ipam`
+  returns is the static block definition
+  (`uuid`/`namespace`/`network_uuid`/`ipblock`/`version`); the mutable
+  allocations live in the separate `ipam_reservations` table, and `update_ipam`
+  exists only to persist version upgrades. Fix: wire `get_ipam` through the
+  phase 2 object cache at the immutable TTL, evicting on `update_ipam`/
+  `delete_ipam`.
 * **#3502 — cluster sweep attribute/reference re-reads (~10/s, lowest).**
   Mutable reads re-hydrated per-check; fix is batching within the sweep.
 
