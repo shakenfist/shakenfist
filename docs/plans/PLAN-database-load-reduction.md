@@ -274,7 +274,7 @@ so the phase plans do not reopen them:
 | 2. Static object value caching | [PLAN-database-load-reduction-phase-02-static-cache.md](PLAN-database-load-reduction-phase-02-static-cache.md) | Complete |
 | 3. Consolidate the gRPC client stacks | PLAN-database-load-reduction-phase-03-client-consolidation.md | Complete |
 | 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Complete |
-| 5. Next-tier reductions | PLAN-database-load-reduction-phase-05-next-tier.md | Not started |
+| 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Planned (issues #3499-#3502 filed; ratchet pending) |
 
 Phase summaries:
 
@@ -350,14 +350,26 @@ the peer SAN) rather than duplicate it. Detailed design,
 including the label-cardinality resolution of open question 4,
 is in the phase 4 plan file.
 
-**Phase 5 — next-tier reductions.** With per-caller data
-from phase 4, attack the remaining table: `dequeue` (38/s,
-likely adaptive backoff in the queues/transfers daemon
-loops), `get_ipam` (34/s), `get_existing_locks` (19/s),
-`get_blob_transfers_for_node` (19/s). This phase's plan is
-written after phase 4 has been deployed for long enough to
-have real attribution numbers; the reductions here are
-diagnosed, not guessed.
+**Phase 5 — next-tier reductions, diagnosed and ratcheted.**
+Phase 4 has now been deployed on `sfcbr` for several days,
+so the targets are diagnosed from 24h per-caller data. That
+data corrected the guess: total steady-state load is ~174/s
+(down from ~527/s), and the floor is dominated not by
+`GetIPAM` (which averages ~14/s but bursts to ~48/s under
+load) but by fixed-rate idle polling — `Dequeue` (38.8/s:
+net + queues), `GetExistingLocks` (19.2/s: queues) and
+`GetBlobTransfersForNode` (19.5/s: transfers), ~78/s of
+workload-independent cost. The phase splits in two: the
+individual reductions are filed as issues #3499 (queue-poll
+backoff, highest), #3500 (transfer-poll backoff), #3501
+(cluster IPAM re-reads) and #3502 (cluster sweep re-reads),
+to be fixed and reviewed separately; and phase 5's own
+deliverable is a ratchet — teaching the nightly infra report
+precompute (in the 33fl ops repo) to mine per-caller
+sf-database load, encode the honest 24h baseline, and flag
+regressions so the gains cannot silently rot. Detail,
+including the baseline-honesty argument, is in the phase 5
+plan file.
 
 ## Agent guidance
 
