@@ -1,0 +1,104 @@
+# Phase 5 — next-tier reductions, diagnosed and ratcheted
+
+Master plan: [PLAN-database-load-reduction.md](PLAN-database-load-reduction.md)
+
+**Status: Planned.** Phase 4 attribution has now been deployed on `sfcbr`
+for several days, so the next-tier targets are diagnosed from real
+per-caller data rather than guessed. This phase splits into two threads:
+(a) the individual reductions, filed as GitHub issues so they can be fixed
+opportunistically and owned separately; and (b) a durable ratchet — teaching
+the nightly infra report to mine per-caller sf-database load so these signals
+are watched going forward and cannot silently regress.
+
+## What the attribution data actually said
+
+Measured on the Prometheus at `maui.home.stillhq.com:9099` against the
+`database_requests_total{operation, caller_daemon}` counter added in phase 4
+(#3473). Total steady-state sf-database load is **~174/s over 24h** (down from
+the ~527/s that started this whole effort — phases 1-2 removed ~two thirds).
+
+A 1h snapshot initially made `GetIPAM` look like the dominant cost (~48/s,
+~22% of that window). The 24h average corrected this: `GetIPAM` is
+workload-correlated and *bursts* under load but averages only ~14/s at rest.
+The real steady-state floor is **fixed-rate polling that runs even when the
+cluster is completely idle**:
+
+| Operation | 24h steady | Caller(s) | Nature |
+|-----------|-----------|-----------|--------|
+| Dequeue | 38.8/s | net 19.6, queues 19.2 | fixed-rate poll |
+| GetExistingLocks | 19.2/s | queues | lock-check paired with each dequeue |
+| GetBlobTransfersForNode | 19.5/s | transfers | fixed-rate poll |
+| **idle-poll subtotal** | **~78/s** | | **~45% of load, workload-independent** |
+| GetIPAM | 14.4/s (peaks ~48) | cluster | workload-correlated burst |
+| GetInstanceAttributes | 15.0/s | spread (cluster 4.2) | mutable |
+| GetReferencesFrom | 9.1/s | cluster 5.8, api 3.2 | mutable |
+
+The lesson — recorded here deliberately — is that the ratchet baseline must be
+taken from a 24h (or longer) window, never a single busy hour, or it both
+overstates bursty operations and would enshrine reducible idle-poll cost as
+the defended floor.
+
+## Thread A — the reductions (filed as issues)
+
+Each next-tier reduction is a separate change in a different daemon loop, so
+each is a standalone GitHub issue rather than a single monolithic phase:
+
+* **#3499 — queue-worker idle polling (~58/s, highest).** `Dequeue` +
+  `GetExistingLocks` fire as a lockstep pair on every fixed tick in the
+  `queues` daemon, and `net` polls `Dequeue` the same way. Fix: adaptive
+  backoff on empty dequeue, with a latency cap. Backing off the dequeue
+  collapses the paired lock check too.
+* **#3500 — transfers idle polling (~20/s).** `GetBlobTransfersForNode`
+  polls at a fixed rate even with no pending transfers. Fix: back off / wake
+  on enqueue.
+* **#3501 — cluster IPAM re-reads (~14/s steady, ~48/s burst).** IPAM is
+  mutable so it cannot use the phase 2 static cache; fix is loop
+  restructuring / event-driven invalidation in the cluster sweep.
+* **#3502 — cluster sweep attribute/reference re-reads (~10/s, lowest).**
+  Mutable reads re-hydrated per-check; fix is batching within the sweep.
+
+These are deliberately *not* bundled into this phase's PR. #3499 and #3500 are
+behaviour changes (backoff trades a little first-task latency for a large load
+reduction) and each deserves its own review. The correct order by
+value-per-risk is #3499, then #3500, then #3501, then #3502.
+
+## Thread B — the ratchet (this phase's actual deliverable)
+
+Fixing the four issues above is necessary but not sufficient: without a
+standing check, load creeps back as new loops are added. Phase 5's own work is
+to make per-caller sf-database load a mined, watched signal, consistent with
+the existing practice of moving hand-computation into the nightly report
+precompute.
+
+* **Where.** The nightly infra report precompute
+  (`tools/infra-report-precompute.py` in the private `33fl` ops repo, not this
+  repo). This phase's code change lands there; this plan documents the intent
+  and the honest baseline it must encode.
+* **What it computes.** Per `(operation, caller_daemon)` 24h-averaged QPS from
+  `database_requests_total`, plus the cluster total, straight from the same
+  Prometheus the numbers above came from.
+* **What it flags.** Any caller/operation that climbs materially above the
+  recorded baseline, and specifically any regression on the four operations
+  the issues target — so a fix that lands and then rots is caught, and a new
+  fixed-rate poll added elsewhere shows up as a new high-rate `(operation,
+  caller_daemon)` pair.
+* **Baseline honesty.** The ratchet records today's 24h numbers as the
+  starting baseline *and* the expected post-fix floors for #3499/#3500, so it
+  defends the improved target rather than the current wasteful number. Until a
+  fix lands, its operation sits at "known-reducible", not "healthy".
+
+## Success criteria
+
+1. The nightly report emits a per-caller sf-database load section with the 24h
+   baseline and flags regressions against it.
+2. The four reduction issues are filed with attributed numbers and a repro
+   query (done: #3499-#3502).
+3. When #3499/#3500 land, the report's flagged "known-reducible" items clear
+   and the defended floor drops accordingly — verifiable in the nightly output
+   rather than by ad-hoc PromQL.
+
+## Out of scope
+
+The individual daemon-loop fixes (#3499-#3502) — tracked separately. mTLS and
+OpenTelemetry span propagation, which reuse phase 4's caller-identity plumbing,
+remain their own plans.
