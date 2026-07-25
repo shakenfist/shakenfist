@@ -49,6 +49,19 @@ WATCHDOG_PET_INTERVAL = 10
 DAEMON_STATE_POLL_INTERVAL = 2
 
 
+# Adaptive backoff for the idle dequeue loops (the queues and net
+# dispatchers). Those loops slept a flat IDLE_POLL_FAST_SECONDS whenever a
+# dequeue came back empty, so a completely idle cluster still issued ~5
+# Dequeue calls per second per node. IdlePollBackoff grows the empty-poll
+# sleep geometrically towards IDLE_POLL_MAX_SECONDS and snaps back to the
+# fast interval the moment any work is found, so a burst is still drained at
+# full speed and only the idle->work transition pays the extra latency. See
+# PLAN-database-load-reduction-phase-05-next-tier.md and issue #3499.
+IDLE_POLL_FAST_SECONDS = 0.2
+IDLE_POLL_MAX_SECONDS = 2.0
+IDLE_POLL_BACKOFF_FACTOR = 2.0
+
+
 DAEMON_NAMES = {
     'api': 'sf-api',
     'checksums': 'sf-checksums',
@@ -218,6 +231,35 @@ def health_check_api():
     except requests.exceptions.RequestException as e:
         LOG.warning(f'api daemon is unhealthy ({e})!')
         return False
+
+
+class IdlePollBackoff:
+    """Adaptive sleep for idle dequeue loops.
+
+    Call reset() whenever a poll finds work (returns to fast polling) and
+    next_empty_interval() whenever a poll comes back empty (returns the sleep
+    to use this time and grows the next one, capped at the maximum). The first
+    empty poll still sleeps the fast interval, so a brief lull is cheap; only a
+    sustained idle period reaches the cap.
+    """
+
+    def __init__(self, fast=IDLE_POLL_FAST_SECONDS,
+                 maximum=IDLE_POLL_MAX_SECONDS,
+                 factor=IDLE_POLL_BACKOFF_FACTOR):
+        self._fast = fast
+        self._max = maximum
+        self._factor = factor
+        self._current = fast
+
+    def reset(self):
+        """A poll found work; return to the fast polling interval."""
+        self._current = self._fast
+
+    def next_empty_interval(self):
+        """A poll was empty; return this sleep and grow the next one."""
+        interval = self._current
+        self._current = min(self._current * self._factor, self._max)
+        return interval
 
 
 class Daemon:
@@ -407,7 +449,11 @@ class Daemon:
             self._last_watchdog = now
 
     def idle(self, seconds):
-        for _ in range(int(seconds / 0.2)):
+        # round(), not int(): the loop sleeps in 0.2s chunks, and truncating
+        # dropped fractional chunks (idle(0.8) slept 0.6s) -- harmless for the
+        # integer callers but wrong for the adaptive backoff intervals, which
+        # are fractional multiples of 0.2.
+        for _ in range(max(1, round(seconds / 0.2))):
             time.sleep(0.2)
             self.check_daemon_state()
             self.pet_watchdog()
