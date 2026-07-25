@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-database-load-reduction/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-database-load-reduction-phase-05-next-tier/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Reduce steady-state MariaDB load from the sf-database tier - Shaken Fist</title>
+        <title>Phase 5 — next-tier reductions, diagnosed and ratcheted - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#reduce-steady-state-mariadb-load-from-the-sf-database-tier" class="md-skip">
+        <a href="#phase-5-next-tier-reductions-diagnosed-and-ratcheted" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Reduce steady-state MariaDB load from the sf-database tier
+              Phase 5 — next-tier reductions, diagnosed and ratcheted
             
           </span>
         </div>
@@ -9837,10 +9837,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#what-the-attribution-data-actually-said" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        What the attribution data actually said
       
     </span>
   </a>
@@ -9848,10 +9848,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#thread-a-the-reductions-filed-as-issues" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        Thread A — the reductions (filed as issues)
       
     </span>
   </a>
@@ -9859,10 +9859,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mission-and-problem-statement" class="md-nav__link">
+  <a href="#thread-b-the-ratchet-this-phases-actual-deliverable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mission and problem statement
+        Thread B — the ratchet (this phase's actual deliverable)
       
     </span>
   </a>
@@ -9870,112 +9870,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#decisions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decisions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Open questions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent guidance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Agent guidance">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#execution-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution model
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#planning-effort" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planning effort
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-level-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step-level guidance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#measurement-discipline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Measurement discipline
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
   <a href="#success-criteria" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9985,53 +9879,15 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#out-of-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Future work
+        Out of scope
       
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -10056,545 +9912,143 @@
   
 
 
-<h1 id="reduce-steady-state-mariadb-load-from-the-sf-database-tier">Reduce steady-state MariaDB load from the sf-database tier<a class="headerlink" href="#reduce-steady-state-mariadb-load-from-the-sf-database-tier" title="Permanent link">&para;</a></h1>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the shakenfist codebase thoroughly. Read
-relevant source files, understand existing patterns (object
-lifecycle, state machines, MariaDB storage via the three-layer
-direct/gRPC/public pattern, Pydantic schemas, daemon
-architecture, operation queue system, event logging), and
-ground your answers in what the code actually does today. Do
-not speculate about the codebase when you could read it
-instead. Where a question touches on external concepts
-(gRPC metadata and interceptors, Prometheus label
-cardinality, MariaDB connection behaviour), research as
-needed to give a confident answer. Flag any uncertainty
-explicitly rather than guessing.</p>
-<p>All planning documents should go into <code>docs/plans/</code>.</p>
-<p>Consult <code>ARCHITECTURE.md</code> for the system architecture
-overview, object types, and daemon structure. Consult
-<code>CLAUDE.md</code> for build commands, project conventions, and
-database access patterns. Key references inside the repo
-include <code>shakenfist/daemons/daemon.py</code> (the <code>idle()</code> /
-<code>check_daemon_state()</code> loop this plan targets),
-<code>shakenfist/node.py</code> (Node object and daemon-state
-accessors), <code>shakenfist/baseobject.py</code> (object lifecycle and
-the version cache), <code>shakenfist/mariadb.py</code> (three-layer
-database access pattern and the <code>_use_database_service()</code>
-routing decision at line ~293), and
-<code>shakenfist/daemons/database/main.py</code> (gRPC database daemon
-and its per-operation Prometheus counters).</p>
-<p>When we get to detailed planning, I prefer a separate plan
-file per detailed phase. These separate files should be named
-for the master plan, in the same directory as the master
-plan, and simply have <code>-phase-NN-descriptive</code> appended before
-the <code>.md</code> file extension. Tracking of these sub-phases is
-done via the table in the Execution section below.</p>
-<p>I prefer one commit per logical change, and at minimum one
-commit per phase. Do not batch unrelated changes into a
-single commit. Each commit should be self-contained: it
-should build, pass tests, and have a clear commit message
-explaining what changed and why.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>The sfcbr cluster (six nodes, two of them database nodes)
-shows a steady-state load of roughly 527 operations per
-second against the sf-database gRPC tier, measured from the
-<code>database_*_total</code> Prometheus counters over a quiet ten
-minute window on 2026-07-19. The top of the table:</p>
+<h1 id="phase-5-next-tier-reductions-diagnosed-and-ratcheted">Phase 5 — next-tier reductions, diagnosed and ratcheted<a class="headerlink" href="#phase-5-next-tier-reductions-diagnosed-and-ratcheted" title="Permanent link">&para;</a></h1>
+<p>Master plan: <a href="../PLAN-database-load-reduction/">PLAN-database-load-reduction.md</a></p>
+<p><strong>Status: Planned.</strong> Phase 4 attribution has now been deployed on <code>sfcbr</code>
+for several days, so the next-tier targets are diagnosed from real
+per-caller data rather than guessed. This phase splits into two threads:
+(a) the individual reductions, filed as GitHub issues so they can be fixed
+opportunistically and owned separately; and (b) a durable ratchet — teaching
+the nightly infra report to mine per-caller sf-database load so these signals
+are watched going forward and cannot silently regress.</p>
+<h2 id="what-the-attribution-data-actually-said">What the attribution data actually said<a class="headerlink" href="#what-the-attribution-data-actually-said" title="Permanent link">&para;</a></h2>
+<p>Measured on the Prometheus at <code>maui.home.stillhq.com:9099</code> against the
+<code>database_requests_total{operation, caller_daemon}</code> counter added in phase 4
+(#3473). Total steady-state sf-database load is <strong>~174/s over 24h</strong> (down from
+the ~527/s that started this whole effort — phases 1-2 removed ~two thirds).</p>
+<p>A 1h snapshot initially made <code>GetIPAM</code> look like the dominant cost (~48/s,
+~22% of that window). The 24h average corrected this: <code>GetIPAM</code> is
+workload-correlated and <em>bursts</em> under load but averages only ~14/s at rest.
+The real steady-state floor is <strong>fixed-rate polling that runs even when the
+cluster is completely idle</strong>:</p>
 <table>
 <thead>
 <tr>
-<th>Rate</th>
 <th>Operation</th>
+<th>24h steady</th>
+<th>Caller(s)</th>
+<th>Nature</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>154/s</td>
-<td><code>get_node</code></td>
+<td>Dequeue</td>
+<td>38.8/s</td>
+<td>net 19.6, queues 19.2</td>
+<td>fixed-rate poll</td>
 </tr>
 <tr>
-<td>149/s</td>
-<td><code>get_node_daemon_state</code></td>
+<td>GetExistingLocks</td>
+<td>19.2/s</td>
+<td>queues</td>
+<td>lock-check paired with each dequeue</td>
 </tr>
 <tr>
-<td>38/s</td>
-<td><code>dequeue</code></td>
+<td>GetBlobTransfersForNode</td>
+<td>19.5/s</td>
+<td>transfers</td>
+<td>fixed-rate poll</td>
 </tr>
 <tr>
-<td>34/s</td>
-<td><code>get_ipam</code></td>
+<td><strong>idle-poll subtotal</strong></td>
+<td><strong>~78/s</strong></td>
+<td></td>
+<td><strong>~45% of load, workload-independent</strong></td>
 </tr>
 <tr>
-<td>23/s</td>
-<td><code>get_blob</code></td>
+<td>GetIPAM</td>
+<td>14.4/s (peaks ~48)</td>
+<td>cluster</td>
+<td>workload-correlated burst</td>
 </tr>
 <tr>
-<td>19/s</td>
-<td><code>get_blob_transfers_for_node</code></td>
+<td>GetInstanceAttributes</td>
+<td>15.0/s</td>
+<td>spread (cluster 4.2)</td>
+<td>mutable</td>
 </tr>
 <tr>
-<td>19/s</td>
-<td><code>get_existing_locks</code></td>
-</tr>
-<tr>
-<td>18/s</td>
-<td><code>get_references_from</code></td>
-</tr>
-<tr>
-<td>17/s</td>
-<td><code>get_instance_attributes</code></td>
-</tr>
-<tr>
-<td>10/s</td>
-<td><code>get_object_state</code></td>
+<td>GetReferencesFrom</td>
+<td>9.1/s</td>
+<td>cluster 5.8, api 3.2</td>
+<td>mutable</td>
 </tr>
 </tbody>
 </table>
-<p>The two node operations are 57% of the total, and a code
-trace shows essentially all of that comes from a single
-path. <code>Daemon.idle(seconds)</code>
-(<code>shakenfist/daemons/daemon.py:379</code>) splits every sleep into
-0.2 second sub-ticks and calls <code>check_daemon_state()</code> on
-every tick regardless of the requested sleep length.
-<code>check_daemon_state()</code> (<code>daemon.py:336</code>) then performs two
-database round trips per tick:</p>
-<ol>
-<li><code>Node.this_node()</code> → <code>mariadb.get_node()</code> — a fresh
-   fetch of the node's static row.</li>
-<li><code>n.get_daemon_state(self.daemon_name)</code> →
-   <code>mariadb.get_node_daemon_state()</code> — a fresh fetch of the
-   daemon's own state row (this is how a daemon notices it
-   has been asked to stop).</li>
-</ol>
-<p>Roughly eight daemons per node sit in this loop
-(net, cleaner, queues, sidechannel, resources, cluster,
-transfers, database), so the theoretical ceiling is
-8 daemons × 5 Hz × 6 nodes ≈ 240/s of <em>each</em> operation; the
-measured 154 + 149/s is that picture with some daemons busy
-rather than idle.</p>
-<p>Secondary contributors on the <code>get_node</code> side:
-<code>_maintain_version_cache()</code> (<code>shakenfist/baseobject.py:55</code>)
-does a per-node <code>get_node()</code> on every cache refresh just to
-recover the fqdn (~20/s cluster-wide via the daemons that
-call <code>cluster_stable()</code> with a five second cache age); the
-sentinel daemons' <code>observe_this_node()</code> check-ins are
-negligible (~0.8/s).</p>
-<p>Two architectural facts matter for the fix:</p>
+<p>The lesson — recorded here deliberately — is that the ratchet baseline must be
+taken from a 24h (or longer) window, never a single busy hour, or it both
+overstates bursty operations and would enshrine reducible idle-poll cost as
+the defended floor.</p>
+<h2 id="thread-a-the-reductions-filed-as-issues">Thread A — the reductions (filed as issues)<a class="headerlink" href="#thread-a-the-reductions-filed-as-issues" title="Permanent link">&para;</a></h2>
+<p>Each next-tier reduction is a separate change in a different daemon loop, so
+each is a standalone GitHub issue rather than a single monolithic phase:</p>
 <ul>
-<li><strong>No result caching exists anywhere in the stack.</strong> Not in
-  <code>Node.from_db()</code>, not in the gRPC client in <code>mariadb.py</code>,
-  not server-side in the sf-database servicer methods (which
-  are pure pass-throughs: increment counter, run SQL,
-  marshal reply). The only TTL caches anywhere are the
-  object-version cache in <code>baseobject.py</code> (300s) and the
-  health/readiness flags (5s).</li>
-<li><strong>No invalidation primitive exists.</strong> The etcd watches are
-  gone and nothing replaced them: no pub/sub, no triggers,
-  no streaming RPCs. The gRPC server deliberately serves
-  only unary calls — streaming health <code>Watch</code> deadlocked the
-  synchronous servicer against the single event-dispatch
-  thread and is documented as forbidden
-  (<code>daemons/database/main.py</code> near the health servicer
-  registration).</li>
+<li><strong>#3499 — queue-worker idle polling (~58/s, highest).</strong> <code>Dequeue</code> +
+  <code>GetExistingLocks</code> fire as a lockstep pair on every fixed tick in the
+  <code>queues</code> daemon, and <code>net</code> polls <code>Dequeue</code> the same way. Fix: adaptive
+  backoff on empty dequeue, with a latency cap. Backing off the dequeue
+  collapses the paired lock check too.</li>
+<li><strong>#3500 — transfers idle polling (~20/s).</strong> <code>GetBlobTransfersForNode</code>
+  polls at a fixed rate even with no pending transfers. Fix: back off / wake
+  on enqueue.</li>
+<li><strong>#3501 — cluster IPAM re-reads (~14/s steady, ~48/s burst).</strong> IPAM is
+  mutable so it cannot use the phase 2 static cache; fix is loop
+  restructuring / event-driven invalidation in the cluster sweep.</li>
+<li><strong>#3502 — cluster sweep attribute/reference re-reads (~10/s, lowest).</strong>
+  Mutable reads re-hydrated per-check; fix is batching within the sweep.</li>
 </ul>
-<p>The old etcd design principle was "objects are cacheable,
-attributes of objects are not". The structural split
-survived the MariaDB migration (static values tables vs.
-attribute/state tables), but the caching half of the
-principle was never reimplemented: today we do not even
-cache immutable static object data. <code>NodeData</code> is
-<code>{uuid, fqdn, ip, version}</code> — four effectively constant
-fields being re-fetched 150 times a second.</p>
-<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Reduce steady-state sf-database load to the point where the
-MariaDB instance genuinely does not care about it — a target
-of under 100 operations per second cluster-wide for the
-current sfcbr shape — without weakening correctness
-(shutdown responsiveness, upgrade version gating, or the
-freshness of mutable state), and while restoring the
-objects-cacheable / attributes-not caching principle in a
-form that fits the MariaDB world.</p>
-<p>Explicitly in scope: eliminating redundant reads on hot
-periodic paths, a narrow client-side cache for immutable
-static object values, caller attribution on the existing
-per-operation counters so future regressions are
-diagnosable, and data-driven reduction of the next tier of
-operations (<code>dequeue</code>, <code>get_ipam</code>, <code>get_existing_locks</code>,
-<code>get_blob_transfers_for_node</code>).</p>
-<p>Explicitly out of scope (deferred, see Future work): any
-watch/subscribe change-notification mechanism, and any
-caching of mutable attribute or state data.</p>
-<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
-<p>These were discussed before drafting and are recorded here
-so the phase plans do not reopen them:</p>
-<ol>
-<li><strong>Fix the callers before adding caches.</strong> The dominant
-   load is a 5 Hz poll re-reading data it already has. The
-   first move is to stop issuing those reads, not to make
-   them cheaper.</li>
-<li><strong>Cache only immutable static object values.</strong> With no
-   invalidation channel, mutable data (states, attributes,
-   metadata, daemon states) stays strictly read-through.
-   This is the etcd principle restated for MariaDB.</li>
-<li><strong>Consolidate the gRPC client stacks before
-   instrumenting — which investigation reduced to removing a
-   dead one.</strong> There appeared to be three code paths opening
-   a channel to the sf-database daemon: <code>mariadb.py</code>'s
-   <code>_get_database_stub()</code> / <code>_grpc_call()</code>, <code>database.py</code>'s
-   <code>get_database_client()</code> / <code>_retry_database</code> (locks,
-   cluster config), and <code>config.load_cluster_config()</code>'s
-   inline one-shot at import time. Reading the code showed
-   <code>shakenfist/database.py</code> is <strong>orphaned</strong>: nothing outside
-   its own unit test imports it. The live lock path is
-   <code>locks.py</code> → <code>mariadb.py</code>
-   (<code>acquire_cluster_lock</code> / <code>release_cluster_lock</code> /
-   <code>get_all_cluster_locks</code> / …) → <code>_grpc_call</code>, and the live
-   cluster-config path is <code>mariadb.get_cluster_config()</code> /
-   <code>set_cluster_config()</code> → the same <code>_grpc_call</code>. Commit
-   <code>e48d3257f</code> ("Route cluster locks through the three-layer
-   mariadb API") moved locks off <code>database.py</code> and left its
-   <code>acquire_lock</code> / <code>get_cluster_config</code> / … functions
-   stranded; the only later edits to the file were mechanical
-   (the channel-factory refactor, a config rename). So
-   <code>database.py</code>'s distinct retry decorator and 200ms
-   keepalive are not "a second live policy to reconcile" —
-   they are dead. Consolidation is therefore deleting
-   <code>database.py</code> (and its test), leaving <code>mariadb.py</code>'s
-   <code>_grpc_call</code> as the single live client with the one
-   deliberate exception of the import-time bootstrap
-   one-shot in <code>config.py</code> (which genuinely cannot import a
-   not-yet-initialised <code>config</code> and stays as-is). Phase 4
-   attribution then hangs on exactly one interceptor seam.</li>
-<li><strong>Caller attribution rides gRPC metadata and is
-   mTLS-compatible.</strong> The planned <code>PLAN-embrace-tls.md</code> work
-   will (per its open question 3) validate peer certificates
-   with at most node-or-role granularity SANs; certificates
-   will be per-node, not per-daemon-process. Daemon-level
-   attribution therefore always needs an application-level
-   channel regardless of mTLS. After the phase 3
-   consolidation there is exactly one client stack to
-   instrument — a single interceptor attaching
-   <code>caller-daemon</code> and <code>caller-node</code> metadata keys — and when
-   mTLS lands, the server can additionally cross-check the
-   <code>caller-node</code> claim against the verified peer SAN. mTLS
-   hardens this path rather than replacing it; there is no
-   second attribution mechanism later.</li>
-<li><strong>Watch/subscribe is deferred, not designed here.</strong> The
-   server threading model forbids streaming RPCs today, and
-   the expectation is that phases 1–5 make the remaining
-   poll load unimportant. If that turns out wrong, the
-   sketch in Future work (batched "changed versions since
-   X" unary poll) is the starting point, informed by
-   post-phase-4 per-caller numbers.</li>
-</ol>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<ol>
-<li><strong>Daemon-state poll interval.</strong> Phase 1 decouples the
-   daemon-state read from the 0.2s tick. The provisional
-   interval is 2 seconds (worst-case shutdown latency 2s,
-   well inside the systemd stop timeout, and a 10x load
-   reduction). Confirm nothing depends on sub-second
-   observation of externally-set daemon state — the
-   phase 1 plan must grep for writers of daemon state other
-   than the daemon itself (e.g. <code>sf-ctl</code>, cluster daemon)
-   and check their expectations.</li>
-<li><strong>TTL for the static-values cache.</strong> <em>(Resolved in the
-   phase 2 plan.)</em> Two config-tunable tiers, both TTL-bounded
-   (0 disables): immutable types with no post-creation writer
-   (Instance, Network, NetworkInterface, AgentOperation) at a
-   long TTL (default 300s, bounding only cross-process
-   deletion); upgradeable types (Blob, Node, Artifact,
-   Upload, DnsMasq, Namespace) at a short TTL (default 30s,
-   bounding rare cross-process upgrade-persist). No unbounded
-   "process-lifetime" entries — a cross-process <code>hard_delete</code>
-   would otherwise resurrect a dead object. Misses are never
-   cached; the public <code>update_&lt;type&gt;</code>/<code>delete_&lt;type&gt;</code> hooks
-   invalidate local writes, and because <code>_persist_pydantic_upgrade</code>
-   routes through the public <code>update_&lt;type&gt;</code>, the cache
-   self-heals after an online upgrade.</li>
-<li><strong>Confirm <code>database.py</code> is fully dead before deleting.</strong>
-   Decision 3 concludes it is orphaned. The phase plan's
-   first step must re-verify this against the tip of the
-   branch it executes on: no non-test import of
-   <code>shakenfist.database</code>, no dynamic/string import, no deploy
-   or console-script reference, and the live lock/config
-   paths demonstrably route through <code>mariadb.py</code>. If any live
-   consumer survives, do not delete — fall back to the
-   shared-core extraction (per the phase 3 summary). Also
-   decide whether to keep or delete the <code>is_available()</code> /
-   <code>reset_client()</code> helpers if anything references them
-   (the sweep found none).</li>
-<li><strong>Counter label shape.</strong> <em>(Resolved in the phase 4
-   plan.)</em> Rather than relabel the ~150 existing
-   <code>database_&lt;op&gt;_total</code> counters (invasive, breaks current
-   queries), phase 4 adds one additive counter
-   <code>database_requests_total{operation, caller_daemon}</code>
-   incremented centrally by a server interceptor. <code>caller_node</code>
-   is sent as gRPC metadata (for the mTLS cross-check) but not
-   used as a label — the <code>operation</code> axis (~150) dominates
-   cardinality and there are only ~6 nodes recoverable via
-   <code>context.peer()</code>. Existing dashboards are unaffected; a new
-   panel uses the additive counter.</li>
-<li><strong>Does the queues daemon need a 0.2s dequeue poll?</strong>
-   <code>dequeue</code> at 38/s suggests tight-loop polling by the
-   queues and transfers daemons. Adaptive backoff when the
-   queue is empty (e.g. 0.2s → 2s ramp, reset on work)
-   is the obvious shape, but the phase 5 plan must check
-   coalescing behaviour and CI latency sensitivity first.</li>
-</ol>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1. Stop the idle-loop polls</td>
-<td>PLAN-database-load-reduction-phase-01-idle-loop.md</td>
-<td>Complete</td>
-</tr>
-<tr>
-<td>2. Static object value caching</td>
-<td><a href="../PLAN-database-load-reduction-phase-02-static-cache/">PLAN-database-load-reduction-phase-02-static-cache.md</a></td>
-<td>Complete</td>
-</tr>
-<tr>
-<td>3. Consolidate the gRPC client stacks</td>
-<td>PLAN-database-load-reduction-phase-03-client-consolidation.md</td>
-<td>Complete</td>
-</tr>
-<tr>
-<td>4. Caller attribution on counters</td>
-<td><a href="../PLAN-database-load-reduction-phase-04-attribution/">PLAN-database-load-reduction-phase-04-attribution.md</a></td>
-<td>Complete</td>
-</tr>
-<tr>
-<td>5. Next-tier reductions</td>
-<td><a href="../PLAN-database-load-reduction-phase-05-next-tier/">PLAN-database-load-reduction-phase-05-next-tier.md</a></td>
-<td>Planned (issues #3499-#3502 filed; ratchet pending)</td>
-</tr>
-</tbody>
-</table>
-<p>Phase summaries:</p>
-<p><strong>Phase 1 — stop the idle-loop polls.</strong> Two independent
-changes in <code>daemons/daemon.py</code>: (a) <code>check_daemon_state()</code>
-stops constructing a <code>Node</code> at all — it needs only the node
-UUID, which <code>Daemon._resolve_node_uuid()</code> already places in
-<code>config.NODE_UUID</code> at process startup — eliminating the
-<code>get_node</code> call entirely; (b) the <code>get_node_daemon_state</code>
-read is decoupled from the 0.2s tick and performed at most
-every <code>DAEMON_STATE_POLL_INTERVAL</code> (provisionally 2s),
-while the tick itself continues to provide loop
-responsiveness. Expected effect: ~150/s of <code>get_node</code> and
-~125/s of <code>get_node_daemon_state</code> removed; cluster total
-drops from ~527/s to roughly 250/s. Measured before/after
-via the existing counters. This phase is deliberately
-small and ships alone.</p>
-<p><strong>Phase 2 — static object value caching.</strong> A narrow
-read-through cache for immutable static object values,
-client-side in <code>mariadb.py</code> above the <code>_use_database_service()</code>
-branch so both direct and gRPC callers benefit. A single
-process-global dict keyed <code>(type, uuid)</code> → frozen model under
-a lock, TTL-bounded in two tiers (immutable types at ~300s,
-upgradeable types at ~30s; 0 disables), invalidated on the
-public <code>update_&lt;type&gt;</code>/<code>delete_&lt;type&gt;</code> so it self-heals after
-online upgrades, and never caching misses. Explicitly excludes
-states, attributes, metadata, daemon states, IPAM, queues and
-locks. Also fixes <code>_maintain_version_cache()</code> to source fqdn
-from <code>get_all_node_metrics()</code> rather than per-node <code>get_node()</code>
-calls. Expected effect: remaining steady-state <code>get_node</code> load
-(~20/s) approaches zero, the hot Blob/Node/Instance point
-re-hydration in the scheduler/cluster/resources loops drops,
-and bursty API object hydration gets cheaper. Detailed design,
-including the full invalidation surface and correctness
-invariants, is in the phase 2 plan file.</p>
-<p><strong>Phase 3 — consolidate the gRPC client stacks (remove the
-orphan).</strong> Investigation (recorded in Decision 3 and the
-phase plan) found <code>shakenfist/database.py</code> is dead: no
-non-test importer, superseded by commit <code>e48d3257f</code>. The
-work is therefore to delete <code>shakenfist/database.py</code> and
-<code>shakenfist/tests/test_database.py</code>, fix the now-stale
-reference to <code>database.py</code>'s 200ms keepalive in the
-<code>util/grpc_channel.py</code> docstring, and confirm the delete is
-behaviour-neutral (nothing live changes path). The live
-client stays <code>mariadb.py</code>'s <code>_grpc_call</code> / <code>_get_database_stub</code>;
-the import-time bootstrap one-shot in <code>config.py</code> is left as
-the one deliberate exception. Sole external effect: phase 4
-attribution now has exactly one interceptor seam instead of
-two. CI (which exercises lock contention, cluster config,
-and bootstrap) must stay green. If the phase plan's
-verification instead finds any live consumer of
-<code>database.py</code>, the phase falls back to the original
-extract-a-shared-core design (preserved in git history of
-this plan) rather than a delete.</p>
-<p><strong>Phase 4 — caller attribution on counters.</strong> A single gRPC
-client interceptor on the phase 3 consolidated client
-attaches <code>caller-daemon</code> / <code>caller-node</code> metadata (caller
-daemon from a process-global set at startup, node from
-<code>config.NODE_NAME</code>); a gRPC server interceptor on sf-database
-increments one new additive counter
-<code>database_requests_total{operation, caller_daemon}</code>, leaving
-the ~150 existing <code>database_&lt;op&gt;_total</code> counters — and every
-dashboard/alert on them — untouched. The Grafana dashboard
-(in the separate 33fl repo) gains a per-caller breakdown
-panel. Attribution must be server-side because only three
-daemons expose a scraped metrics endpoint. Designed per
-Decision 4 to compose with the future mTLS work (the
-<code>caller-node</code> metadata is what mTLS later cross-checks against
-the peer SAN) rather than duplicate it. Detailed design,
-including the label-cardinality resolution of open question 4,
-is in the phase 4 plan file.</p>
-<p><strong>Phase 5 — next-tier reductions, diagnosed and ratcheted.</strong>
-Phase 4 has now been deployed on <code>sfcbr</code> for several days,
-so the targets are diagnosed from 24h per-caller data. That
-data corrected the guess: total steady-state load is ~174/s
-(down from ~527/s), and the floor is dominated not by
-<code>GetIPAM</code> (which averages ~14/s but bursts to ~48/s under
-load) but by fixed-rate idle polling — <code>Dequeue</code> (38.8/s:
-net + queues), <code>GetExistingLocks</code> (19.2/s: queues) and
-<code>GetBlobTransfersForNode</code> (19.5/s: transfers), ~78/s of
-workload-independent cost. The phase splits in two: the
-individual reductions are filed as issues #3499 (queue-poll
-backoff, highest), #3500 (transfer-poll backoff), #3501
-(cluster IPAM re-reads) and #3502 (cluster sweep re-reads),
-to be fixed and reviewed separately; and phase 5's own
-deliverable is a ratchet — teaching the nightly infra report
-precompute (in the 33fl ops repo) to mine per-caller
-sf-database load, encode the honest 24h baseline, and flag
-regressions so the gains cannot silently rot. Detail,
-including the baseline-honesty argument, is in the phase 5
-plan file.</p>
-<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
-<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
-<p>All implementation work is done by sub-agents, never in the
-management session. The management session (this
-conversation) is reserved for planning, review, and
-decision-making. This keeps the management context lean and
-avoids drowning it in implementation diffs.</p>
-<p>The workflow is:</p>
-<ol>
-<li><strong>Plan</strong> at high effort in the management session.</li>
-<li><strong>Spawn a sub-agent</strong> for each implementation step with
-   the brief from the plan, at the recommended effort level
-   and model.</li>
-<li><strong>Review</strong> the sub-agent's output in the management
-   session. Check the actual files — the sub-agent's summary
-   describes what it intended, not necessarily what it did.</li>
-<li><strong>Fix or retry</strong> if the output is wrong. Diagnose whether
-   the brief was insufficient (improve it) or the model was
-   too light (upgrade it), then re-run.</li>
-<li><strong>Commit</strong> once the management session is satisfied with
-   the result.</li>
-</ol>
-<p>Use <code>isolation: "worktree"</code> for sub-agents when the change is
-risky or experimental. The worktree is discarded if the
-output is unsatisfactory. For safe, well-understood changes,
-sub-agents can work directly in the main tree.</p>
-<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
-<p>Phase 1 touches the shutdown-signalling path of every daemon
-and should be planned at <strong>high effort</strong> despite the small
-diff — the correctness question (who else writes daemon
-state, and how quickly must a daemon observe it) is subtle.
-Phase 2 involves cache-correctness judgment and should also
-be planned at high effort. Phase 3 turned out to be a dead-code
-removal (the live lock/config path never went through
-<code>database.py</code>), so it is low-risk and can be planned at
-medium effort — but the phase plan's dead-code
-re-verification step is mandatory and gated: if it finds a
-live consumer, the phase reverts to a behaviour-preserving
-shared-core extraction and should then be re-planned at high
-effort. Phase 4 is largely
-mechanical plumbing following existing counter patterns and
-can be planned at medium effort, and now hangs on a single
-consolidated client rather than two. Phase 5 cannot be
-planned until phase 4 data exists.</p>
-<h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
-<p>Each phase plan should include the step table
-(step / effort / model / isolation / brief) per
-<code>PLAN-TEMPLATE.md</code>. Briefs should front-load the research
-already recorded in this master plan — for example, phase 1
-briefs should cite <code>daemon.py:336-385</code>, <code>node.py:291-309</code>
-and <code>config.NODE_UUID</code> resolution directly rather than
-asking the sub-agent to rediscover the call chain.</p>
-<h3 id="measurement-discipline">Measurement discipline<a class="headerlink" href="#measurement-discipline" title="Permanent link">&para;</a></h3>
-<p>Every phase lands with a before/after measurement from the
-<code>database_*_total</code> counters on the sfcbr cluster (the
-33fl Prometheus at maui already scrapes both database
-nodes). Record the numbers in the phase plan when marking
-it complete. If a phase does not move its predicted
-operations, that is a finding to investigate, not a detail
-to skip past.</p>
-<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
-<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
-<p>We will know when this plan has been successfully implemented
-because the following statements will be true:</p>
+<p>These are deliberately <em>not</em> bundled into this phase's PR. #3499 and #3500 are
+behaviour changes (backoff trades a little first-task latency for a large load
+reduction) and each deserves its own review. The correct order by
+value-per-risk is #3499, then #3500, then #3501, then #3502.</p>
+<h2 id="thread-b-the-ratchet-this-phases-actual-deliverable">Thread B — the ratchet (this phase's actual deliverable)<a class="headerlink" href="#thread-b-the-ratchet-this-phases-actual-deliverable" title="Permanent link">&para;</a></h2>
+<p>Fixing the four issues above is necessary but not sufficient: without a
+standing check, load creeps back as new loops are added. Phase 5's own work is
+to make per-caller sf-database load a mined, watched signal, consistent with
+the existing practice of moving hand-computation into the nightly report
+precompute.</p>
 <ul>
-<li>Steady-state sf-database load on the sfcbr cluster is
-  below 100 operations per second, measured over a quiet
-  ten minute window from the <code>database_*_total</code> counters.</li>
-<li><code>get_node</code> and <code>get_node_daemon_state</code> no longer appear
-  in the top five operations by rate.</li>
-<li>Daemon shutdown latency remains within the systemd stop
-  timeout, verified by a rolling restart of a compute node.</li>
-<li>Mutable data (object states, attributes, metadata, daemon
-  states) remains strictly read-through — no cache sits in
-  front of it.</li>
-<li>Per-caller attribution is visible in the shakenfist
-  Grafana dashboard and the counter label design is
-  compatible with the planned mTLS peer-identity model.</li>
-<li>The code passes <code>pre-commit run --all-files</code> (flake8,
-  stestr unit tests, and mypy type checking).</li>
-<li>There are unit tests for the new cache and poll-interval
-  logic, and CI (which exercises full cluster lifecycle)
-  passes.</li>
-<li>Documentation in <code>docs/</code> has been updated —
-  <code>docs/operator_guide/</code> for any new config options, and
-  <code>ARCHITECTURE.md</code> for the caching model.</li>
-<li><code>docs/plans/index.md</code> and <code>docs/plans/order.yml</code> reflect
-  this plan and its phases.</li>
+<li><strong>Where.</strong> The nightly infra report precompute
+  (<code>tools/infra-report-precompute.py</code> in the private <code>33fl</code> ops repo, not this
+  repo). This phase's code change lands there; this plan documents the intent
+  and the honest baseline it must encode.</li>
+<li><strong>What it computes.</strong> Per <code>(operation, caller_daemon)</code> 24h-averaged QPS from
+  <code>database_requests_total</code>, plus the cluster total, straight from the same
+  Prometheus the numbers above came from.</li>
+<li><strong>What it flags.</strong> Any caller/operation that climbs materially above the
+  recorded baseline, and specifically any regression on the four operations
+  the issues target — so a fix that lands and then rots is caught, and a new
+  fixed-rate poll added elsewhere shows up as a new high-rate <code>(operation,
+  caller_daemon)</code> pair.</li>
+<li><strong>Baseline honesty.</strong> The ratchet records today's 24h numbers as the
+  starting baseline <em>and</em> the expected post-fix floors for #3499/#3500, so it
+  defends the improved target rather than the current wasteful number. Until a
+  fix lands, its operation sits at "known-reducible", not "healthy".</li>
 </ul>
-<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Watch/subscribe change notification.</strong> Deferred per
-  Decision 5. If post-phase-5 numbers still justify it, the
-  starting sketch is a batched unary "return object versions
-  changed since X" RPC that many-object consumers poll on a
-  coarse interval, avoiding the forbidden streaming pattern.
-  Any streaming design requires reworking the sf-database
-  servicer threading model first.</li>
-<li><strong>Server-side caching in sf-database.</strong> If a future
-  workload shows hot immutable reads arriving from many
-  processes (where per-process client caches multiply), a
-  server-side cache in the servicer is the next lever. Not
-  needed for the current load shape.</li>
-<li><strong>Client-side load balancing across the database tier</strong>
-  remains the not-yet-landed part of
-  <code>PLAN-byo-mariadb-phase-03-grpc-tier.md</code>; the per-caller
-  attribution from phase 4 will show the current imbalance
-  between the two sf-database instances (measured 2026-07-19:
-  the split flips per operation, sf-1 serving 96/s of
-  daemon-state reads vs sf-2's 53/s).</li>
-</ul>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>None yet. The relevant GitHub tracker should be scanned
-during phase 1 planning for existing issues about database
-load, idle-loop CPU, or daemon shutdown latency.</p>
-<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
-<p>When this plan file lands, add it to <code>docs/plans/index.md</code>
-(Plan Status table, one row per phase) and
-<code>docs/plans/order.yml</code> (master plan only). Phase files are
-linked from the Execution table above and from <code>index.md</code>
-only.</p>
-<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
-<p>Before executing any step of this plan, please back brief
-the operator as to your understanding of the plan and how
-the work you intend to do aligns with that plan.</p>
+<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<ol>
+<li>The nightly report emits a per-caller sf-database load section with the 24h
+   baseline and flags regressions against it.</li>
+<li>The four reduction issues are filed with attributed numbers and a repro
+   query (done: #3499-#3502).</li>
+<li>When #3499/#3500 land, the report's flagged "known-reducible" items clear
+   and the defended floor drops accordingly — verifiable in the nightly output
+   rather than by ad-hoc PromQL.</li>
+</ol>
+<h2 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h2>
+<p>The individual daemon-loop fixes (#3499-#3502) — tracked separately. mTLS and
+OpenTelemetry span propagation, which reuse phase 4's caller-identity plumbing,
+remain their own plans.</p>
 
 
 
@@ -10615,7 +10069,7 @@ the work you intend to do aligns with that plan.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-database-load-reduction.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-database-load-reduction.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-database-load-reduction/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-database-load-reduction-phase-05-next-tier.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-database-load-reduction-phase-05-next-tier.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-database-load-reduction-phase-05-next-tier/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
