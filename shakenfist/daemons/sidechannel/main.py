@@ -46,6 +46,16 @@ MAX_CHUNK_SIZE = 102400
 MAX_OUTSTANDING = 5
 
 
+# Backstop deadline for a single agent operation once its executor has been
+# welcomed by the agent. Normal operations complete in seconds; this only
+# fires when a welcomed agent then never finishes delivering (for example a
+# get-file that stalls mid-transfer while pings keep the socket alive), which
+# would otherwise leave the operation orphaned in the executing state until the
+# caller times out. Deliberately generous -- it is a wedge backstop, not an
+# SLA. See issue #3516.
+AGENT_OPERATION_EXECUTION_TIMEOUT = 900
+
+
 class ConnectionFailed(Exception):
     ...
 
@@ -313,6 +323,28 @@ class SideChannelExecutorJob(SideChannelJob):
             'agent_operation': self.agentop.uuid
         })
 
+    def execute(self):
+        try:
+            super().execute()
+        finally:
+            # An operation is popped from the instance's queue as soon as it
+            # reaches EXECUTING (see Instance.agent_operation_next), so it is
+            # never re-dispatched. If the executor exits for any reason with the
+            # operation still EXECUTING -- a dropped connection or socket error
+            # swallowed by the base execute(), an unexpected exception (e.g. a
+            # database error from Blob.register in the get-file path), or the
+            # execution deadline in _execute_inner -- fail it cleanly here
+            # rather than leaving it orphaned in EXECUTING until the caller
+            # times out. See issues #3516 and #2240.
+            if self.agentop.state.value == AgentOperation.STATE_EXECUTING:
+                self.log.error(
+                    'Executor exited with the operation still executing; '
+                    'marking it errored')
+                self.agentop.state = AgentOperation.STATE_ERROR
+                self.agentop.error = (
+                    'sidechannel executor exited before the operation '
+                    'completed')
+
     def _send_ping(self, sock):
         request = agent_pb2.HypervisorToAgentCommand(
             command_id=sf_random.random_id(),
@@ -502,9 +534,13 @@ class SideChannelExecutorJob(SideChannelJob):
         ]
 
     def _dispatch_get_file(self, command_id, cmd):
+        # INFO, not debug: get-file is a known-flaky path (issues #3516, #2240)
+        # and at the daemon's default INFO level we otherwise have no journal
+        # trace of where a transfer stalled.
         self.log.with_fields({
+            'path': cmd['path'],
             'outstanding_messages': self.outstanding_message_count
-        }).debug('...get file request')
+        }).info('Requesting file from agent')
 
         self._agent_path_for_get = cmd['path']
         self._blob_uuid = str(uuid4())
@@ -523,8 +559,10 @@ class SideChannelExecutorJob(SideChannelJob):
 
     def _handle_stat_result(self, reply):
         self.log.with_fields({
+            'size': reply.stat_result.size,
+            'mode': reply.stat_result.mode,
             'outstanding_messages': self.outstanding_message_count
-        }).debug('...stat result')
+        }).info('Received file stat from agent')
 
         if not self._blob_partial_file:
             self.log.with_fields({
@@ -604,6 +642,13 @@ class SideChannelExecutorJob(SideChannelJob):
             self.num_results += 1
             self.command_count += 1
 
+            # INFO so the successful completion of this known-flaky path is
+            # visible in the journal at the default log level (issue #3516).
+            self.log.with_fields({
+                'transferred': chunk.offset,
+                'content_blob': result.get('content_blob')
+            }).info('Completed file transfer from agent')
+
             self._blob_partial_file = None
             self._blob_uuid = None
             self._stat_result = None
@@ -650,6 +695,21 @@ class SideChannelExecutorJob(SideChannelJob):
                 self.log.info(
                     'Agent did not welcome us within 30 seconds, aborting '
                     'executor for later retry')
+                return
+
+            # Backstop against a welcomed agent that then never finishes the
+            # operation (e.g. a get-file that stalls mid-transfer). Without
+            # this the loop spins forever with the operation stuck EXECUTING,
+            # because pings keep the socket alive so no other deadline fires.
+            # execute()'s finally marks the operation errored on return. See
+            # issue #3516.
+            if (self.welcomed
+                    and time.time() - connected_at
+                    > AGENT_OPERATION_EXECUTION_TIMEOUT):
+                self.log.error(
+                    'Operation did not complete within '
+                    f'{AGENT_OPERATION_EXECUTION_TIMEOUT} seconds, aborting '
+                    'executor')
                 return
 
             if time.time() - self.last_data > 2:
