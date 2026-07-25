@@ -136,6 +136,29 @@ Audit log for console access and protocol events.
 | pid | string | Worker process ID |
 | message | text | Event description |
 
+### sf_token_jtis
+
+Single-use tracking for Shaken Fist VDI console JWTs (the
+`/sf-console.vv` exchange). A row is inserted once a token's signature
+verifies; a jti already present means the token is being replayed.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| jti | string | Primary key, uuid4 hex from the token's `jti` claim |
+| expiry | float | Token expiration time (epoch seconds, matches the `exp` claim) |
+
+### sf_token_keys
+
+Cached Shaken Fist signing public keys, one row per `shakenfist` source,
+so `/sf-console.vv` verifies tokens offline without calling Shaken Fist
+except on an unknown-kid cache miss.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| source | string | Primary key, source name (no FK; sources are reloaded from YAML) |
+| keys_json | text | Shaken Fist's `public_view` key payload, verbatim JSON |
+| fetched_at | float | Time the keys were last fetched (epoch seconds) |
+
 ## Relationships
 
 - **sources → consoles**: One source provides many consoles
@@ -144,6 +167,8 @@ Audit log for console access and protocol events.
 - **consoletokens → proxychannels**: Active channels reference their auth token
 - **consoles → auditevents**: Audit events record console access (no FK to
   preserve audit history when consoles are deleted)
+- **sources → sf_token_keys**: Each `shakenfist` source's cached signing
+  keys, keyed by source name (no FK; sources are reloaded from YAML)
 
 ## Notes
 
@@ -151,6 +176,10 @@ Audit log for console access and protocol events.
   preserve audit history even when sources or consoles are deleted.
 - Timestamps in `consoletokens` use epoch seconds for easy expiration checks.
 - The `proxychannels` table is used for connection tracking and cleanup.
+- `sf_token_jtis` and `sf_token_keys` support offline verification of
+  Shaken Fist's Ed25519-signed VDI console JWTs at `/sf-console.vv`: the
+  jti table blocks replay, the keys table avoids calling Shaken Fist on
+  the exchange path except when an unknown `kid` forces a refetch.
 
 ## Related Documentation
 

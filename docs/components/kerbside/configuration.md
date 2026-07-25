@@ -54,6 +54,17 @@ These settings configure Keystone integration for OpenStack deployments.
 | VDI_SECURE_PORT | Integer (default 5900) | The port the VDI proxy will serve TLS SPICE sessions over. |
 | VDI_INSECURE_PORT | Integer (default 5901) | The port the VDI proxy will serve insecure SPICE sessions over. These insecure sessions are only used to redirect the user to the secure port. |
 
+## Shaken Fist console tokens
+
+These settings govern the Shaken Fist console token exchange served at
+`/sf-console.vv`, where Kerbside verifies a short-lived Ed25519-signed JWT
+minted by Shaken Fist entirely offline. See
+[Console Sources](/components/kerbside/console-sources/) for the full flow.
+
+| Configuration Option | Type | Description |
+|---------------------|------|-------------|
+| SF_CONSOLE_TOKEN_AUDIENCE | String (default empty) | The `aud` claim Kerbside requires on a Shaken Fist console token. Empty derives it as `https://<PUBLIC_FQDN>` (see PUBLIC_FQDN above). This value must equal Shaken Fist's own `KERBSIDE_URL` exactly — it is simultaneously the token audience and the base of the exchange URL — so set it explicitly whenever the public URL differs in scheme, port, or path. Note that `KERBSIDE_URL` is Shaken Fist cluster config, distinct from this Kerbside proxy setting. |
+
 ## Control-plane gRPC service
 
 These settings configure the `KerbsideProxy` gRPC service the daemon hosts over a unix domain socket, which the SPICE proxy consults for connection authorization and channel bookkeeping.

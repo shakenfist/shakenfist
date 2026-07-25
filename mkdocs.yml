@@ -210,6 +210,10 @@ nav:
                 - "Consistency Audit Deferred Work": components/kerbside/plans/PLAN-consistency-audit.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
+                - "Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md
+                - "Kerbside VDI tokens phase 6: cluster-wide scrape and host_subject": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape.md
+                - "Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci.md
+                - "Kerbside VDI tokens phase 8: documentation": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs.md
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
                 - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
@@ -227,6 +231,7 @@ nav:
                 - "Rust proxy phase 7: CI lane + loadtest": components/kerbside/plans/PLAN-rust-proxy-phase-07-ci.md
                 - "Rust proxy phase 8: cutover (Rust is the only proxy)": components/kerbside/plans/PLAN-rust-proxy-phase-08-cutover.md
                 - "Rust SPICE proxy (kerbside-proxy)": components/kerbside/plans/PLAN-rust-proxy.md
+                - "Shaken Fist VDI console tokens (kerbside side)": components/kerbside/plans/PLAN-kerbside-vdi-tokens.md
             - Spice:
                 - "console.vv Extensions and Interpretations": components/kerbside/spice/console-vv-extensions.md
                 - "Keyboard Scancodes": components/kerbside/spice/scancodes.md
