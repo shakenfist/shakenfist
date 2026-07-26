@@ -25,6 +25,18 @@ from shakenfist.util import callstack as util_callstack
 LOG, _ = logs.setup(__name__)
 
 
+def _prune_expired_keys(nonced_keys):
+    # Expired keys must be dropped whenever the keys attribute is
+    # written, not just filtered on read: get_api_token() mints a
+    # short-lived _service_key_* every few minutes per daemon, and
+    # without pruning the stored blob grows without bound until it
+    # crosses gRPC's maximum message size and namespace reads start
+    # failing cluster-wide (issue #3521).
+    now = time.time()
+    return {k: v for k, v in nonced_keys.items()
+            if 'expiry' not in v or v['expiry'] >= now}
+
+
 class Namespace(dbo):
     object_type = ObjectType.NAMESPACE
     initial_version = 6
@@ -176,13 +188,7 @@ class Namespace(dbo):
         if not attrs:
             return {'nonced_keys': {}}
 
-        nonced_keys = dict(attrs.keys.get('nonced_keys', {}))
-        for k in list(nonced_keys.keys()):
-            if 'expiry' in nonced_keys[k]:
-                if time.time() > nonced_keys[k]['expiry']:
-                    del nonced_keys[k]
-
-        return {'nonced_keys': nonced_keys}
+        return {'nonced_keys': _prune_expired_keys(attrs.keys.get('nonced_keys', {}))}
 
     def add_key(self, name, value, expiry=None):
         encoded = str(base64.b64encode(bcrypt.hashpw(value.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
@@ -192,7 +198,7 @@ class Namespace(dbo):
             self._invalidate_attributes()
             attrs = self._ensure_attributes()
             k = dict(attrs.keys)
-            nk = dict(k.get('nonced_keys', {}))
+            nk = _prune_expired_keys(k.get('nonced_keys', {}))
             nk[name] = {'key': encoded, 'nonce': nonce}
             if expiry:
                 nk[name]['expiry'] = expiry
@@ -207,9 +213,9 @@ class Namespace(dbo):
             self._invalidate_attributes()
             attrs = self._ensure_attributes()
             k = dict(attrs.keys)
-            nk = dict(k.get('nonced_keys', {}))
-            if name in nk:
-                del nk[name]
+            nk = _prune_expired_keys(k.get('nonced_keys', {}))
+            if name in nk or len(nk) != len(k.get('nonced_keys', {})):
+                nk.pop(name, None)
                 k['nonced_keys'] = nk
                 attrs.keys = k
                 self._save_attributes(fields=['keys'])
