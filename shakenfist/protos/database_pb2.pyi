@@ -5696,6 +5696,58 @@ class GetNamespaceKeyReply(_message.Message):
 Global___GetNamespaceKeyReply: _TypeAlias = GetNamespaceKeyReply  # noqa: Y015
 
 @_typing.final
+class GetNamespaceKeyByNameRequest(_message.Message):
+    """Point read of a single key by its unique (namespace, name) pair. This
+    is the token validation hot path, so the attributes are joined in and
+    expired keys are returned -- the caller decides what expiry means.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    NAME_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Owning namespace name"""
+    name: _builtins.str
+    """Key name, unique within the namespace"""
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+        name: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "namespace", b"namespace"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceKeyByNameRequest: _TypeAlias = GetNamespaceKeyByNameRequest  # noqa: Y015
+
+@_typing.final
+class GetNamespaceKeyByNameReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    KEY_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def key(self) -> Global___NamespaceKeyJoinedProto: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        key: Global___NamespaceKeyJoinedProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["key", b"key"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["found", b"found", "key", b"key"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceKeyByNameReply: _TypeAlias = GetNamespaceKeyByNameReply  # noqa: Y015
+
+@_typing.final
 class FindNamespaceKeysRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 

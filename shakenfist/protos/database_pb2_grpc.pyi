@@ -246,6 +246,7 @@ class DatabaseServiceStub:
     "<namespace>:<keyname>" name one.
     """
     GetNamespaceKey: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyRequest, _database_pb2.GetNamespaceKeyReply]
+    GetNamespaceKeyByName: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyByNameRequest, _database_pb2.GetNamespaceKeyByNameReply]
     FindNamespaceKeys: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindNamespaceKeysRequest, _database_pb2.FindNamespaceKeysReply]
     DeleteNamespaceKey: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceKeyRequest, _database_pb2.StatusReply]
     DeleteExpiredNamespaceKeys: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteExpiredNamespaceKeysRequest, _database_pb2.DeleteCountReply]
@@ -561,6 +562,7 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     "<namespace>:<keyname>" name one.
     """
     GetNamespaceKey: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyRequest, _database_pb2.GetNamespaceKeyReply]  # type: ignore[assignment]
+    GetNamespaceKeyByName: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyByNameRequest, _database_pb2.GetNamespaceKeyByNameReply]  # type: ignore[assignment]
     FindNamespaceKeys: _aio.UnaryUnaryMultiCallable[_database_pb2.FindNamespaceKeysRequest, _database_pb2.FindNamespaceKeysReply]  # type: ignore[assignment]
     DeleteNamespaceKey: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceKeyRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteExpiredNamespaceKeys: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteExpiredNamespaceKeysRequest, _database_pb2.DeleteCountReply]  # type: ignore[assignment]
@@ -1725,6 +1727,13 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.GetNamespaceKeyRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.GetNamespaceKeyReply, _abc.Awaitable[_database_pb2.GetNamespaceKeyReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetNamespaceKeyByName(
+        self,
+        request: _database_pb2.GetNamespaceKeyByNameRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetNamespaceKeyByNameReply, _abc.Awaitable[_database_pb2.GetNamespaceKeyByNameReply]]: ...
 
     @_abc_1.abstractmethod
     def FindNamespaceKeys(

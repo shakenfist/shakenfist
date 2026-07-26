@@ -313,6 +313,70 @@ class DirectFindNamespaceKeysTestCase(base.ShakenFistTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Point read by (namespace, name) -- the token validation hot path
+# ---------------------------------------------------------------------------
+
+class DirectGetNamespaceKeyByNameTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_get_namespace_key_by_name()."""
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_both_index_columns_are_in_the_where_clause(
+            self, mock_get_engine):
+        """The unique (namespace, name) index serves the lookup."""
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        mariadb._direct_get_namespace_key_by_name('banana', 'keyname')
+
+        self.assertEqual(1, len(conn.executed))
+        sql = str(conn.executed[0])
+        self.assertIn('namespace_keys.namespace = ', sql)
+        self.assertIn('namespace_keys.name = ', sql)
+        self.assertIn('JOIN namespace_key_attributes', sql)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_expiry_is_not_filtered(self, mock_get_engine):
+        """Expiry is check-at-use, so an expired key is still returned."""
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        mariadb._direct_get_namespace_key_by_name('banana', 'keyname')
+
+        sql = str(conn.executed[0])
+        self.assertNotIn('expiry', sql.split('WHERE')[-1])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_row_is_decoded_into_a_model_pair(self, mock_get_engine):
+        conn = _MockConnection(result=_MockResult(rows=[
+            _MockRow(
+                uuid=KEY_UUID_1, namespace='banana', name='keyname',
+                version=1, key='aGFzaC1vbmU=', nonce='nonce-one',
+                expiry=2000.0, scopes='["read"]',
+                provenance='{"source": "oidc"}')
+        ]))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        row = mariadb._direct_get_namespace_key_by_name('banana', 'keyname')
+
+        self.assertIsNotNone(row)
+        static_data, attrs = row
+        self.assertEqual('keyname', static_data.name)
+        self.assertEqual('banana', static_data.namespace)
+        self.assertEqual('nonce-one', attrs.nonce)
+        self.assertEqual(2000.0, attrs.expiry)
+        self.assertEqual(['read'], attrs.scopes)
+        self.assertEqual({'source': 'oidc'}, attrs.provenance)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_missing_row_returns_none(self, mock_get_engine):
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        self.assertIsNone(
+            mariadb._direct_get_namespace_key_by_name('banana', 'nosuch'))
+
+
+# ---------------------------------------------------------------------------
 # Expiry reaping
 # ---------------------------------------------------------------------------
 
@@ -405,6 +469,24 @@ class NamespaceKeyRoutingTestCase(base.ShakenFistTestCase):
     def test_get_routes_to_direct(self, mock_use_svc, mock_direct):
         self.assertEqual(_SAMPLE_KEY, mariadb.get_namespace_key(KEY_UUID_1))
         mock_direct.assert_called_once_with(KEY_UUID_1)
+
+    @mock.patch('shakenfist.mariadb._grpc_get_namespace_key_by_name',
+                return_value=(_SAMPLE_KEY, _SAMPLE_ATTRS))
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_get_by_name_routes_to_grpc(self, mock_use_svc, mock_grpc):
+        self.assertEqual(
+            (_SAMPLE_KEY, _SAMPLE_ATTRS),
+            mariadb.get_namespace_key_by_name('banana', 'keyname'))
+        mock_grpc.assert_called_once_with('banana', 'keyname')
+
+    @mock.patch('shakenfist.mariadb._direct_get_namespace_key_by_name',
+                return_value=(_SAMPLE_KEY, _SAMPLE_ATTRS))
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    def test_get_by_name_routes_to_direct(self, mock_use_svc, mock_direct):
+        self.assertEqual(
+            (_SAMPLE_KEY, _SAMPLE_ATTRS),
+            mariadb.get_namespace_key_by_name('banana', 'keyname'))
+        mock_direct.assert_called_once_with('banana', 'keyname')
 
     @mock.patch('shakenfist.mariadb._grpc_delete_namespace_key',
                 return_value=True)

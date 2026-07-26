@@ -46,6 +46,7 @@ enum ObjectType {
   OBJECT_TYPE_API_REQUESTS = 26;  // "api-requests"
   OBJECT_TYPE_UNKNOWN = 27;  // "unknown"
   OBJECT_TYPE_UNKNOWN_MANAGED_EXECUTABLE = 28;  // "unknown_managed_executable"
+  OBJECT_TYPE_NAMESPACE_KEY = 29;  // "namespace_key"
 }
 
 // ReservationType enum - IPAM reservation types

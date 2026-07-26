@@ -3171,6 +3171,32 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetNamespaceKeyReply(found=False)
 
+    def GetNamespaceKeyByName(
+        self,
+        request: database_pb2.GetNamespaceKeyByNameRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNamespaceKeyByNameReply:
+        """Point read one key by its (namespace, name) pair."""
+        try:
+            self.monitor.counters['get_namespace_key_by_name'].inc()
+            row = mariadb._direct_get_namespace_key_by_name(
+                request.namespace, request.name)
+            if row is None:
+                return database_pb2.GetNamespaceKeyByNameReply(found=False)
+            static_data, attributes = row
+            return database_pb2.GetNamespaceKeyByNameReply(
+                found=True,
+                key=database_pb2.NamespaceKeyJoinedProto(
+                    static_data=mariadb._namespace_key_to_proto(static_data),
+                    attributes=mariadb._namespace_key_attrs_to_proto(
+                        attributes)))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNamespaceKeyByName failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNamespaceKeyByNameReply(found=False)
+
     def FindNamespaceKeys(
         self,
         request: database_pb2.FindNamespaceKeysRequest,
@@ -5267,6 +5293,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_namespace_attributes',
             # MariaDB namespace key operations
             'create_namespace_key', 'get_namespace_key',
+            'get_namespace_key_by_name',
             'find_namespace_keys', 'delete_namespace_key',
             'delete_expired_namespace_keys',
             # MariaDB namespace key attributes operations

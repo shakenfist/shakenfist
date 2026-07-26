@@ -229,6 +229,7 @@ service DatabaseService {
   // "<namespace>:<keyname>" name one.
   rpc CreateNamespaceKey (CreateNamespaceKeyRequest) returns (StatusReply) {}
   rpc GetNamespaceKey (GetNamespaceKeyRequest) returns (GetNamespaceKeyReply) {}
+  rpc GetNamespaceKeyByName (GetNamespaceKeyByNameRequest) returns (GetNamespaceKeyByNameReply) {}
   rpc FindNamespaceKeys (FindNamespaceKeysRequest) returns (FindNamespaceKeysReply) {}
   rpc DeleteNamespaceKey (DeleteNamespaceKeyRequest) returns (StatusReply) {}
   rpc DeleteExpiredNamespaceKeys (DeleteExpiredNamespaceKeysRequest) returns (DeleteCountReply) {}
@@ -1699,6 +1700,19 @@ message GetNamespaceKeyRequest {
 message GetNamespaceKeyReply {
   bool found = 1;
   NamespaceKeyStaticData data = 2;
+}
+
+// Point read of a single key by its unique (namespace, name) pair. This
+// is the token validation hot path, so the attributes are joined in and
+// expired keys are returned -- the caller decides what expiry means.
+message GetNamespaceKeyByNameRequest {
+  string namespace = 1;       // Owning namespace name
+  string name = 2;            // Key name, unique within the namespace
+}
+
+message GetNamespaceKeyByNameReply {
+  bool found = 1;
+  NamespaceKeyJoinedProto key = 2;
 }
 
 message FindNamespaceKeysRequest {

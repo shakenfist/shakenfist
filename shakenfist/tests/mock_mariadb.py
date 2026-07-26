@@ -32,6 +32,8 @@ from shakenfist.schema.network_attributes import NetworkAttributesData
 from shakenfist.schema.network_data import NetworkData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
+from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
+from shakenfist.schema.namespace_key_data import NamespaceKeyData
 from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
@@ -58,6 +60,8 @@ class MockMariaDB():
         self.dnsmasq_objects = {}  # Mock MariaDB DnsMasq object storage
         self.namespace_objects = {}  # Mock MariaDB namespace storage
         self.namespace_attributes = {}  # Mock MariaDB namespace attributes
+        self.namespace_key_objects = {}  # Mock MariaDB namespace key storage
+        self.namespace_key_attributes = {}  # Mock MariaDB namespace key attrs
         self.node_objects = {}  # Mock MariaDB node storage
         self.node_attributes = {}  # Mock MariaDB node attributes
         self.object_references = {}  # Mock MariaDB object references
@@ -358,6 +362,73 @@ class MockMariaDB():
             side_effect=self._mariadb_delete_namespace_attributes)
         self.mariadb_delete_namespace_attributes.start()
         self.test_obj.addCleanup(self.mariadb_delete_namespace_attributes.stop)
+
+        # MariaDB namespace key operations
+        self.mariadb_create_namespace_key = mock.patch(
+            'shakenfist.mariadb.create_namespace_key',
+            side_effect=self._mariadb_create_namespace_key)
+        self.mariadb_create_namespace_key.start()
+        self.test_obj.addCleanup(self.mariadb_create_namespace_key.stop)
+
+        self.mariadb_get_namespace_key = mock.patch(
+            'shakenfist.mariadb.get_namespace_key',
+            side_effect=self._mariadb_get_namespace_key)
+        self.mariadb_get_namespace_key.start()
+        self.test_obj.addCleanup(self.mariadb_get_namespace_key.stop)
+
+        self.mariadb_get_namespace_key_by_name = mock.patch(
+            'shakenfist.mariadb.get_namespace_key_by_name',
+            side_effect=self._mariadb_get_namespace_key_by_name)
+        self.mariadb_get_namespace_key_by_name.start()
+        self.test_obj.addCleanup(self.mariadb_get_namespace_key_by_name.stop)
+
+        self.mariadb_find_namespace_keys = mock.patch(
+            'shakenfist.mariadb.find_namespace_keys',
+            side_effect=self._mariadb_find_namespace_keys)
+        self.mariadb_find_namespace_keys.start()
+        self.test_obj.addCleanup(self.mariadb_find_namespace_keys.stop)
+
+        self.mariadb_delete_namespace_key = mock.patch(
+            'shakenfist.mariadb.delete_namespace_key',
+            side_effect=self._mariadb_delete_namespace_key)
+        self.mariadb_delete_namespace_key.start()
+        self.test_obj.addCleanup(self.mariadb_delete_namespace_key.stop)
+
+        self.mariadb_delete_expired_namespace_keys = mock.patch(
+            'shakenfist.mariadb.delete_expired_namespace_keys',
+            side_effect=self._mariadb_delete_expired_namespace_keys)
+        self.mariadb_delete_expired_namespace_keys.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_expired_namespace_keys.stop)
+
+        # MariaDB namespace key attributes operations
+        self.mariadb_create_namespace_key_attributes = mock.patch(
+            'shakenfist.mariadb.create_namespace_key_attributes',
+            side_effect=self._mariadb_create_namespace_key_attributes)
+        self.mariadb_create_namespace_key_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_create_namespace_key_attributes.stop)
+
+        self.mariadb_get_namespace_key_attributes = mock.patch(
+            'shakenfist.mariadb.get_namespace_key_attributes',
+            side_effect=self._mariadb_get_namespace_key_attributes)
+        self.mariadb_get_namespace_key_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_namespace_key_attributes.stop)
+
+        self.mariadb_update_namespace_key_attributes = mock.patch(
+            'shakenfist.mariadb.update_namespace_key_attributes',
+            side_effect=self._mariadb_update_namespace_key_attributes)
+        self.mariadb_update_namespace_key_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_update_namespace_key_attributes.stop)
+
+        self.mariadb_delete_namespace_key_attributes = mock.patch(
+            'shakenfist.mariadb.delete_namespace_key_attributes',
+            side_effect=self._mariadb_delete_namespace_key_attributes)
+        self.mariadb_delete_namespace_key_attributes.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_namespace_key_attributes.stop)
 
         # MariaDB artifact operations
         self.mariadb_create_artifact = mock.patch(
@@ -1583,6 +1654,160 @@ class MockMariaDB():
             self._trace(f'MockMariaDB.delete_namespace_attributes({name}): deleted')
             return True
         self._trace(f'MockMariaDB.delete_namespace_attributes({name}): not found')
+        return False
+
+    # MariaDB NamespaceKey mock implementations
+
+    def _mariadb_create_namespace_key(self, data: NamespaceKeyData) -> bool:
+        """Mock implementation of mariadb.create_namespace_key()
+
+        The real table has a UNIQUE index on (namespace, name) as well
+        as the uuid primary key, so both collisions fail here too.
+        """
+        key = str(data.uuid)
+        if key in self.namespace_key_objects:
+            self._trace(
+                f'MockMariaDB.create_namespace_key({key}): already exists')
+            return False
+        for existing in self.namespace_key_objects.values():
+            if (existing.namespace == data.namespace
+                    and existing.name == data.name):
+                self._trace(
+                    f'MockMariaDB.create_namespace_key({key}): '
+                    f'duplicate {data.namespace}:{data.name}')
+                return False
+        self.namespace_key_objects[key] = data
+        self._trace(f'MockMariaDB.create_namespace_key({key}): created')
+        return True
+
+    def _mariadb_get_namespace_key(
+            self, key_uuid) -> Optional[NamespaceKeyData]:
+        """Mock implementation of mariadb.get_namespace_key()"""
+        key = str(key_uuid)
+        data = self.namespace_key_objects.get(key)
+        self._trace(f'MockMariaDB.get_namespace_key({key}): {data}')
+        return data
+
+    def _mariadb_get_namespace_key_by_name(self, namespace, name):
+        """Mock implementation of mariadb.get_namespace_key_by_name()
+
+        Returns the joined (static, attributes) pair, or None. Expired
+        keys are returned -- expiry is check-at-use in the caller.
+        """
+        for data in self.namespace_key_objects.values():
+            if data.namespace == namespace and data.name == name:
+                attrs = self.namespace_key_attributes.get(str(data.uuid))
+                if not attrs:
+                    continue
+                self._trace(
+                    f'MockMariaDB.get_namespace_key_by_name'
+                    f'({namespace}, {name}): {data.uuid}')
+                return (data, attrs)
+        self._trace(
+            f'MockMariaDB.get_namespace_key_by_name'
+            f'({namespace}, {name}): not found')
+        return None
+
+    def _mariadb_find_namespace_keys(
+            self, namespace, include_expired=False, now=None):
+        """Mock implementation of mariadb.find_namespace_keys()
+
+        Returns joined (static, attributes) pairs for one namespace,
+        applying the same expiry filter the real accessor pushes into
+        SQL.
+        """
+        if now is None:
+            now = time.time()
+
+        results = []
+        for data in self.namespace_key_objects.values():
+            if data.namespace != namespace:
+                continue
+            attrs = self.namespace_key_attributes.get(str(data.uuid))
+            if not attrs:
+                continue
+            if not include_expired:
+                if attrs.expiry is not None and attrs.expiry <= now:
+                    continue
+            results.append((data, attrs))
+
+        self._trace(
+            f'MockMariaDB.find_namespace_keys({namespace}, '
+            f'include_expired={include_expired}): {len(results)} results')
+        return results
+
+    def _mariadb_delete_namespace_key(self, key_uuid) -> bool:
+        """Mock implementation of mariadb.delete_namespace_key()"""
+        key = str(key_uuid)
+        if key in self.namespace_key_objects:
+            del self.namespace_key_objects[key]
+            self._trace(f'MockMariaDB.delete_namespace_key({key}): deleted')
+            return True
+        self._trace(f'MockMariaDB.delete_namespace_key({key}): not found')
+        return False
+
+    def _mariadb_delete_expired_namespace_keys(self, older_than) -> int:
+        """Mock implementation of mariadb.delete_expired_namespace_keys()"""
+        doomed = [
+            key for key, data in self.namespace_key_objects.items()
+            if (self.namespace_key_attributes.get(key) is not None
+                and self.namespace_key_attributes[key].expiry is not None
+                and self.namespace_key_attributes[key].expiry < older_than)
+        ]
+        for key in doomed:
+            del self.namespace_key_objects[key]
+            del self.namespace_key_attributes[key]
+        self._trace(
+            f'MockMariaDB.delete_expired_namespace_keys({older_than}): '
+            f'{len(doomed)} deleted')
+        return len(doomed)
+
+    def _mariadb_create_namespace_key_attributes(
+            self, data: NamespaceKeyAttributesData) -> bool:
+        """Mock implementation of mariadb.create_namespace_key_attributes()"""
+        key = str(data.uuid)
+        if key in self.namespace_key_attributes:
+            self._trace(
+                f'MockMariaDB.create_namespace_key_attributes({key}): '
+                f'already exists')
+            return False
+        self.namespace_key_attributes[key] = data
+        self._trace(
+            f'MockMariaDB.create_namespace_key_attributes({key}): created')
+        return True
+
+    def _mariadb_get_namespace_key_attributes(
+            self, key_uuid) -> Optional[NamespaceKeyAttributesData]:
+        """Mock implementation of mariadb.get_namespace_key_attributes()"""
+        key = str(key_uuid)
+        data = self.namespace_key_attributes.get(key)
+        self._trace(
+            f'MockMariaDB.get_namespace_key_attributes({key}): {data}')
+        return data
+
+    def _mariadb_update_namespace_key_attributes(
+            self, data: NamespaceKeyAttributesData) -> bool:
+        """Mock implementation of mariadb.update_namespace_key_attributes()"""
+        key = str(data.uuid)
+        if key in self.namespace_key_attributes:
+            self.namespace_key_attributes[key] = data
+            self._trace(
+                f'MockMariaDB.update_namespace_key_attributes({key}): updated')
+            return True
+        self._trace(
+            f'MockMariaDB.update_namespace_key_attributes({key}): not found')
+        return False
+
+    def _mariadb_delete_namespace_key_attributes(self, key_uuid) -> bool:
+        """Mock implementation of mariadb.delete_namespace_key_attributes()"""
+        key = str(key_uuid)
+        if key in self.namespace_key_attributes:
+            del self.namespace_key_attributes[key]
+            self._trace(
+                f'MockMariaDB.delete_namespace_key_attributes({key}): deleted')
+            return True
+        self._trace(
+            f'MockMariaDB.delete_namespace_key_attributes({key}): not found')
         return False
 
     # MariaDB Artifact mock implementations

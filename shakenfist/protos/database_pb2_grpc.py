@@ -744,6 +744,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.GetNamespaceKeyRequest.SerializeToString,
                 response_deserializer=database__pb2.GetNamespaceKeyReply.FromString,
                 _registered_method=True)
+        self.GetNamespaceKeyByName = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetNamespaceKeyByName',
+                request_serializer=database__pb2.GetNamespaceKeyByNameRequest.SerializeToString,
+                response_deserializer=database__pb2.GetNamespaceKeyByNameReply.FromString,
+                _registered_method=True)
         self.FindNamespaceKeys = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/FindNamespaceKeys',
                 request_serializer=database__pb2.FindNamespaceKeysRequest.SerializeToString,
@@ -1912,6 +1917,12 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetNamespaceKeyByName(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def FindNamespaceKeys(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -2964,6 +2975,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetNamespaceKey,
                     request_deserializer=database__pb2.GetNamespaceKeyRequest.FromString,
                     response_serializer=database__pb2.GetNamespaceKeyReply.SerializeToString,
+            ),
+            'GetNamespaceKeyByName': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNamespaceKeyByName,
+                    request_deserializer=database__pb2.GetNamespaceKeyByNameRequest.FromString,
+                    response_serializer=database__pb2.GetNamespaceKeyByNameReply.SerializeToString,
             ),
             'FindNamespaceKeys': grpc.unary_unary_rpc_method_handler(
                     servicer.FindNamespaceKeys,
@@ -7055,6 +7071,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/GetNamespaceKey',
             database__pb2.GetNamespaceKeyRequest.SerializeToString,
             database__pb2.GetNamespaceKeyReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNamespaceKeyByName(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetNamespaceKeyByName',
+            database__pb2.GetNamespaceKeyByNameRequest.SerializeToString,
+            database__pb2.GetNamespaceKeyByNameReply.FromString,
             options,
             channel_credentials,
             insecure,

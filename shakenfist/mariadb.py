@@ -11453,6 +11453,75 @@ def _direct_get_namespace_key(
         return None
 
 
+def _direct_get_namespace_key_by_name(
+        namespace: str, name: str) -> Optional[NamespaceKeyRow]:
+    """Point read one key by its (namespace, name) pair.
+
+    This is the token validation hot path: verify_token() names
+    exactly one key per request via the JWT's "<namespace>:<keyname>"
+    identity string, and needs the nonce (and expiry) to decide. The
+    lookup is served by the uidx_namespace_keys_namespace_name unique
+    index, and the attributes row is joined in so validation costs one
+    round trip rather than two. Expiry is deliberately NOT filtered
+    here -- enforcement is check-at-use in the caller, which wants to
+    tell "no such key" and "expired key" apart.
+
+    Args:
+        namespace: The owning namespace's name.
+        name: The key name, unique within that namespace.
+
+    Returns:
+        A (static, attributes) pair, or None if there is no such key
+        or on error.
+    """
+    engine = _get_engine()
+    table = _get_namespace_keys_table()
+    attrs_table = _get_namespace_key_attributes_table()
+
+    stmt = sa.select(
+        table.c.uuid,
+        table.c.namespace,
+        table.c.name,
+        table.c.version,
+        attrs_table.c.key,
+        attrs_table.c.nonce,
+        attrs_table.c.expiry,
+        attrs_table.c.scopes,
+        attrs_table.c.provenance
+    ).select_from(
+        table.join(attrs_table, attrs_table.c.uuid == table.c.uuid)
+    ).where(
+        sa.and_(table.c.namespace == namespace, table.c.name == name)
+    )
+
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return (
+                NamespaceKeyData(
+                    uuid=row.uuid,
+                    namespace=row.namespace,
+                    name=row.name,
+                    version=row.version
+                ),
+                NamespaceKeyAttributesData(
+                    uuid=row.uuid,
+                    key=row.key,
+                    nonce=row.nonce,
+                    expiry=row.expiry,
+                    scopes=_decode_optional_json_list(row.scopes),
+                    provenance=_decode_optional_json_dict(row.provenance)
+                )
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for namespace_key '
+            f'(namespace={namespace!r}, name={name!r}): {e}')
+        return None
+
+
 def _direct_delete_namespace_key(key_uuid: UUID) -> bool:
     """Delete a NamespaceKey record from MariaDB.
 
@@ -11802,6 +11871,27 @@ def _grpc_get_namespace_key(
         return None
 
 
+def _grpc_get_namespace_key_by_name(
+        namespace: str, name: str) -> Optional[NamespaceKeyRow]:
+    """Point read one key by (namespace, name) via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNamespaceKeyByNameRequest(
+            namespace=namespace, name=name)
+        reply = _grpc_call(stub.GetNamespaceKeyByName, request)
+        if not reply.found:
+            return None
+        return (
+            _namespace_key_from_proto(reply.key.static_data),
+            _namespace_key_attrs_from_proto(reply.key.attributes)
+        )
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetNamespaceKeyByName failed for '
+            f'{namespace}:{name}: {e}')
+        return None
+
+
 def _grpc_delete_namespace_key(key_uuid: UUID) -> bool:
     """Delete a NamespaceKey record via the database microservice."""
     try:
@@ -11948,6 +12038,26 @@ def get_namespace_key(key_uuid: UUID) -> Optional[NamespaceKeyData]:
     if _use_database_service():
         return _grpc_get_namespace_key(key_uuid)
     return _direct_get_namespace_key(key_uuid)
+
+
+def get_namespace_key_by_name(
+        namespace: str, name: str) -> Optional[NamespaceKeyRow]:
+    """Point read one key by its (namespace, name) pair.
+
+    The token validation hot path: one indexed read returning both the
+    static row and its attributes. Expired keys are returned -- expiry
+    enforcement is check-at-use in the caller.
+
+    Args:
+        namespace: The owning namespace's name.
+        name: The key name, unique within that namespace.
+
+    Returns:
+        A (static, attributes) pair, or None if there is no such key.
+    """
+    if _use_database_service():
+        return _grpc_get_namespace_key_by_name(namespace, name)
+    return _direct_get_namespace_key_by_name(namespace, name)
 
 
 def delete_namespace_key(key_uuid: UUID) -> bool:

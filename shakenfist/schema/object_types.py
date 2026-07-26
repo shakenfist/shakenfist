@@ -142,3 +142,8 @@ class ObjectType(str, Enum):
     UNKNOWN = ObjectTypeValue(string='unknown', proto_id=27)
     UNKNOWN_MANAGED_EXECUTABLE = ObjectTypeValue(
         string='unknown_managed_executable', proto_id=28)
+
+    # Authentication objects. NAMESPACE_KEY arrived after the core block
+    # above was written, so its proto_id continues the sequence rather
+    # than sitting alphabetically alongside NAMESPACE.
+    NAMESPACE_KEY = ObjectTypeValue(string='namespace_key', proto_id=29)
