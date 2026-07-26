@@ -1,8 +1,12 @@
+import base64
 import json
 import logging
 import sys
+import time
 from unittest import mock
 from uuid import uuid4
+
+import bcrypt
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -445,6 +449,103 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
                 'status': 404
             },
             resp.get_json())
+
+    # The expiry body parameter is new in the phase which made keys
+    # first class objects. It is additive: absent means no expiry,
+    # which is what every pre-existing client sends.
+
+    def _add_key(self, key_name, key, expiry=None):
+        body = {'key_name': key_name, 'key': key}
+        if expiry is not None:
+            body['expiry'] = expiry
+        return self.client.post(
+            '/auth/namespaces/system/keys',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps(body))
+
+    def test_add_key_accepts_a_future_expiry(self):
+        expiry = time.time() + 3600
+        resp = self._add_key('expiring', 'sekrit', expiry=expiry)
+
+        # This endpoint has always answered with the bare key name.
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('expiring', resp.get_json())
+
+        stored = Namespace.from_db('system').lookup_key('expiring')
+        self.assertEqual(expiry, stored.expiry)
+
+    def test_add_key_without_expiry_stores_none(self):
+        resp = self._add_key('forever', 'sekrit')
+
+        self.assertEqual(200, resp.status_code)
+        self.assertIsNone(
+            Namespace.from_db('system').lookup_key('forever').expiry)
+
+    def test_add_key_rejects_an_expiry_in_the_past(self):
+        resp = self._add_key('stale', 'sekrit', expiry=time.time() - 1)
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('expiry must be in the future',
+                         resp.get_json()['error'])
+
+    def test_add_key_rejects_a_non_numeric_expiry(self):
+        resp = self._add_key('bogus', 'sekrit', expiry='tomorrow')
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('expiry is not a number', resp.get_json()['error'])
+
+    def test_add_key_rejects_a_boolean_expiry(self):
+        # bool is a subclass of int, so "expiry": true would otherwise
+        # sneak past a naive isinstance check and become 1970.
+        resp = self._add_key('boolean', 'sekrit', expiry=True)
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('expiry is not a number', resp.get_json()['error'])
+
+    # The key update endpoint had two bugs which meant it never worked:
+    # it tested membership against the wrong level of the keys dict, and
+    # it handed a namespace name to a helper which expected the object.
+    # Both are fixed, so these tests pin behaviour that has no history.
+
+    def test_update_key_replaces_the_secret(self):
+        self._add_key('rotate-me', 'original')
+        original = Namespace.from_db('system').lookup_key('rotate-me')
+
+        resp = self.client.put(
+            '/auth/namespaces/system/keys/rotate-me',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'key': 'replacement'}))
+        self.assertEqual(200, resp.status_code)
+
+        rotated = Namespace.from_db('system').lookup_key('rotate-me')
+        self.assertNotEqual(original.nonce, rotated.nonce)
+        self.assertTrue(bcrypt.checkpw(
+            'replacement'.encode('utf-8'), base64.b64decode(rotated.key)))
+        self.assertFalse(bcrypt.checkpw(
+            'original'.encode('utf-8'), base64.b64decode(rotated.key)))
+
+    def test_update_key_accepts_an_expiry(self):
+        self._add_key('rotate-me', 'original')
+        expiry = time.time() + 3600
+
+        resp = self.client.put(
+            '/auth/namespaces/system/keys/rotate-me',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'key': 'replacement', 'expiry': expiry}))
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            expiry,
+            Namespace.from_db('system').lookup_key('rotate-me').expiry)
+
+    def test_update_key_rejects_an_unknown_key(self):
+        resp = self.client.put(
+            '/auth/namespaces/system/keys/never-existed',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'key': 'replacement'}))
+
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual('key does not exist', resp.get_json()['error'])
 
 
 class ExternalApiTestCase(base.ShakenFistTestCase):

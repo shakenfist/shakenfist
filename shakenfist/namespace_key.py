@@ -136,6 +136,16 @@ class NamespaceKey(dbo):
         return cls._static_values_to_dict(data)
 
     @classmethod
+    def from_static_data(cls, data: NamespaceKeyData) -> 'NamespaceKey':
+        """Build a key object from a static row already read from the DB.
+
+        For callers which have used one of the joined accessors and so
+        already hold the row -- rehydrating via from_db() would be a
+        second read of something we are looking at.
+        """
+        return cls(cls._static_values_to_dict(data))
+
+    @classmethod
     def from_db_by_name(cls, namespace: str,
                         name: str) -> Optional['NamespaceKey']:
         """Look up a key by its unique (namespace, name) pair.
@@ -149,7 +159,7 @@ class NamespaceKey(dbo):
         if not row:
             return None
         static_data, _ = row
-        return cls(cls._static_values_to_dict(static_data))
+        return cls.from_static_data(static_data)
 
     @classmethod
     def new(cls, namespace: str, name: str, plaintext_secret: str,
@@ -333,6 +343,35 @@ class NamespaceKey(dbo):
         mariadb.delete_namespace_key_attributes(_uuid)
         mariadb.delete_namespace_key(_uuid)
         super().hard_delete()
+
+
+def keys_with_attributes(
+        namespace: str, include_expired: bool = False,
+        now: Optional[float] = None
+) -> list[tuple[NamespaceKey, NamespaceKeyAttributesData]]:
+    """Every key in a namespace, paired with its attributes.
+
+    The find accessor returns each static row joined with its
+    attributes row, so callers which need the secret material get it
+    for free. The alternative -- iterating NamespaceKeys and then
+    reading .key and .nonce -- would cost two extra point reads per
+    key on /auth, which is already doing a bcrypt comparison per key.
+
+    Expired keys are filtered out in SQL unless include_expired is
+    set. Pass ``now`` when the caller owns the clock, so that its
+    expiry decisions and this one cannot disagree.
+
+    Note that this deliberately does not filter on object state. The
+    only thing which soft deletes a key is the expiry sweep, and such
+    a key is by construction already excluded by the expiry filter;
+    user requested removal is a hard delete. Any future soft delete
+    path must revisit that, here and in Namespace.lookup_key().
+    """
+    return [
+        (NamespaceKey.from_static_data(static_data), attrs)
+        for static_data, attrs in mariadb.find_namespace_keys(
+            namespace, include_expired=include_expired, now=now)
+    ]
 
 
 class NamespaceKeys(dbo_iter):

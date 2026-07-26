@@ -1,15 +1,13 @@
 # Copyright 2019 Michael Still and contributors
-import base64
 import secrets
 import string
 import time
 from typing import Optional
 
-import bcrypt
 from shakenfist_utilities import logs  # noreorder
-from shakenfist_utilities import random as sfrandom  # noreorder
 
 from shakenfist import mariadb
+from shakenfist import namespace_key
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.constants import EVENT_TYPE_AUDIT
@@ -23,18 +21,6 @@ from shakenfist.util import callstack as util_callstack
 
 
 LOG, _ = logs.setup(__name__)
-
-
-def _prune_expired_keys(nonced_keys):
-    # Expired keys must be dropped whenever the keys attribute is
-    # written, not just filtered on read: get_api_token() mints a
-    # short-lived _service_key_* every few minutes per daemon, and
-    # without pruning the stored blob grows without bound until it
-    # crosses gRPC's maximum message size and namespace reads start
-    # failing cluster-wide (issue #3521).
-    now = time.time()
-    return {k: v for k, v in nonced_keys.items()
-            if 'expiry' not in v or v['expiry'] >= now}
 
 
 class Namespace(dbo):
@@ -184,41 +170,105 @@ class Namespace(dbo):
 
     @property
     def keys(self):
-        attrs = self._load_attributes()
-        if not attrs:
-            return {'nonced_keys': {}}
+        """This namespace's usable keys, in the historical wire shape.
 
-        return {'nonced_keys': _prune_expired_keys(attrs.keys.get('nonced_keys', {}))}
+        Keys are NamespaceKey objects since phase 2 of the auth
+        federation plan, but the shape returned here is unchanged: a
+        dict of key name to {'key': hash, 'nonce': ..., 'expiry': ...},
+        with expired keys omitted and 'expiry' absent entirely for keys
+        which never expire.
+
+        Two things did change. The read is a single indexed listing of
+        the (namespace, name) index instead of a whole
+        namespace_attributes row load, and the expiry filter is pushed
+        into SQL rather than applied in Python -- so /auth no longer
+        bcrypt compares keys it was always going to reject. The legacy
+        namespace_attributes.keys JSON column is neither read nor
+        written any more; it is vestigial until a later schema version
+        drops it.
+
+        This accessor hands out hashes and nonces because /auth and
+        verify_token need them. Nothing which does not authenticate a
+        request should use it -- external_view() is the operator
+        visible shape.
+        """
+        nonced_keys = {}
+        for key, attrs in namespace_key.keys_with_attributes(
+                self.uuid, now=time.time()):
+            entry = {'key': attrs.key, 'nonce': attrs.nonce}
+            if attrs.expiry is not None:
+                entry['expiry'] = attrs.expiry
+            nonced_keys[key.name] = entry
+
+        return {'nonced_keys': nonced_keys}
+
+    def lookup_key(self, name):
+        """Point read one of this namespace's keys, honouring expiry.
+
+        Token validation names exactly one key per request via the
+        JWT's "<namespace>:<keyname>" identity string, so it gets a
+        single indexed read of the unique (namespace, name) index with
+        the attributes row joined in, rather than a listing.
+
+        Returns the key's attributes, or None if there is no such key
+        or the key has expired. Those two cases are deliberately
+        indistinguishable to the caller, exactly as they were when the
+        whole-blob accessor filtered expired entries out of the dict it
+        returned.
+
+        The expiry comparison happens here rather than in SQL because
+        the point read deliberately returns expired keys so that other
+        callers can tell the two cases apart. It uses this module's
+        clock so that it agrees with the `keys` accessor.
+        """
+        row = mariadb.get_namespace_key_by_name(self.uuid, name)
+        if not row:
+            return None
+
+        _, attrs = row
+        if attrs.expiry is not None and attrs.expiry <= time.time():
+            return None
+        return attrs
 
     def add_key(self, name, value, expiry=None):
-        encoded = str(base64.b64encode(bcrypt.hashpw(value.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
-        nonce = sfrandom.random_id()
+        """Create one of this namespace's keys, or rotate it if it exists.
 
-        with self.get_lock_attr('keys', 'Add key'):
-            self._invalidate_attributes()
-            attrs = self._ensure_attributes()
-            k = dict(attrs.keys)
-            nk = _prune_expired_keys(k.get('nonced_keys', {}))
-            nk[name] = {'key': encoded, 'nonce': nonce}
-            if expiry:
-                nk[name]['expiry'] = expiry
-            k['nonced_keys'] = nk
-            attrs.keys = k
-            self._save_attributes(fields=['keys'])
+        Adding a key whose name is already in use has always silently
+        overwritten it, which is a rotation: a new hash, a new nonce
+        (so outstanding tokens for the old secret stop validating) and
+        the expiry replaced by whatever this call passes, including no
+        expiry at all. NamespaceKey.new() implements exactly that.
 
-        return nonce
+        The whole-blob read-modify-write under a per-namespace cluster
+        lock is gone. Concurrent adds of the same name are now
+        arbitrated by the unique (namespace, name) index, with the
+        loser of the race falling back to the rotation it would have
+        performed anyway.
+
+        Returns the new nonce, as it always has.
+        """
+        key = namespace_key.NamespaceKey.new(
+            self.uuid, name, value, expiry=expiry)
+        return key.nonce
 
     def remove_key(self, name):
-        with self.get_lock_attr('keys', 'Remove key'):
-            self._invalidate_attributes()
-            attrs = self._ensure_attributes()
-            k = dict(attrs.keys)
-            nk = _prune_expired_keys(k.get('nonced_keys', {}))
-            if name in nk or len(nk) != len(k.get('nonced_keys', {})):
-                nk.pop(name, None)
-                k['nonced_keys'] = nk
-                attrs.keys = k
-                self._save_attributes(fields=['keys'])
+        """Remove one of this namespace's keys.
+
+        Key removal has always been immediate and complete: the name
+        becomes available for reuse and outstanding tokens for the key
+        stop validating on their next request. That is a hard delete
+        rather than the soft delete the expiry sweep performs, because
+        a soft deleted key would keep its (namespace, name) row and
+        re-adding the same name would then have to resurrect a deleted
+        object, which objects are not permitted to do.
+
+        Removing a key which does not exist is not an error, matching
+        the previous behaviour.
+        """
+        key = namespace_key.NamespaceKey.from_db_by_name(self.uuid, name)
+        if not key:
+            return
+        key.hard_delete()
 
     @property
     def trust(self):
@@ -250,6 +300,15 @@ class Namespace(dbo):
                 self._save_attributes(fields=['trust'])
 
     def hard_delete(self):
+        # Keys are owned by the namespace and are meaningless without
+        # it, so they go too. This used to happen for free, because the
+        # keys lived in the namespace attributes row.
+        # Every key, whatever its state or expiry -- this is the last
+        # chance to remove them.
+        for key, _ in namespace_key.keys_with_attributes(
+                self.uuid, include_expired=True):
+            key.hard_delete()
+
         mariadb.delete_namespace_attributes(self.uuid)
         mariadb.delete_namespace(self.uuid)
         super().hard_delete()

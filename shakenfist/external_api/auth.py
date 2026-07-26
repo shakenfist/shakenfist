@@ -7,6 +7,7 @@
 #        - and include examples: yes
 #   - Has complete CI coverage: yes
 import base64
+import time
 
 import bcrypt
 import flask
@@ -72,6 +73,43 @@ auth_token_example = """{
 """
 
 
+def _validate_key_name(key_name):
+    """Reject key names reserved for internally minted service keys.
+
+    Namespace creation used to reject only the exact name
+    'service_key' while key creation rejected only the '_service_key'
+    prefix, which meant each path let through what the other blocked.
+    Both patterns are now rejected on both paths (phase 2 Decision 2
+    of the auth federation plan). Returns an error response, or None
+    if the name is acceptable.
+    """
+    if key_name == 'service_key' or key_name.startswith('_service_key'):
+        return sf_api.error(403, 'illegal key name')
+    return None
+
+
+def _validate_key_expiry(expiry):
+    """Validate the optional expiry body parameter.
+
+    Absent means the key never expires, which is what every client
+    sent before this parameter existed. Anything else must be a number
+    of epoch seconds in the future: an expiry in the past would create
+    a key which was unusable the instant it existed, which is far more
+    likely to be a units mistake than an intent.
+
+    Returns (expiry, error_response), exactly one of which is None.
+    """
+    if expiry is None:
+        return None, None
+
+    # bool is a subclass of int, and "expiry": true is not a time.
+    if isinstance(expiry, bool) or not isinstance(expiry, (int, float)):
+        return None, sf_api.error(400, 'expiry is not a number')
+    if expiry <= time.time():
+        return None, sf_api.error(400, 'expiry must be in the future')
+    return float(expiry), None
+
+
 class AuthEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Authenticate and create access token.',
@@ -92,6 +130,9 @@ class AuthEndpoint(api_base.Resource):
             # Must be a string to encode()
             return sf_api.error(400, 'key is not a string')
 
+        # The accessor is an indexed listing of the namespace's keys
+        # with the expiry filter pushed into SQL, so expired keys are
+        # never bcrypt compared here -- they simply are not returned.
         keys = namespace_from_db.keys.get('nonced_keys', {})
         for keyname in keys:
             possible_key = base64.b64decode(keys[keyname]['key'])
@@ -115,7 +156,7 @@ class AuthEndpoint(api_base.Resource):
 
 namespace_get_example = """{
     "name": "system",
-    "key_names": [
+    "keys": [
         "deploy"
     ],
     "metadata": {}
@@ -126,7 +167,7 @@ namespace_list_example = """[
     ...,
     {
         "name": "system",
-        "key_names": [
+        "keys": [
             "deploy"
         ],
         "metadata": {}
@@ -163,8 +204,9 @@ class AuthNamespacesEndpoint(api_base.Resource):
             if not isinstance(key, str):
                 # Must be a string to encode()
                 return sf_api.error(400, 'key is not a string')
-            if key_name == 'service_key':
-                return sf_api.error(403, 'illegal key name')
+            err = _validate_key_name(key_name)
+            if err:
+                return err
             if len(key) > 72:
                 return sf_api.error(422, 'keys cannot be longer than 72 characters')
 
@@ -280,17 +322,23 @@ class AuthNamespaceEndpoint(api_base.Resource):
         return namespace_from_db.external_view()
 
 
-def _namespace_keys_putpost(ns=None, key_name=None, key=None):
+def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None):
+    """Create or rotate a namespace key. ``ns`` is a Namespace object."""
     if not key_name:
         return sf_api.error(400, 'no key name specified')
     if not key:
         return sf_api.error(400, 'no key specified')
-    if key_name.startswith('_service_key'):
-        return sf_api.error(403, 'illegal key name')
+    err = _validate_key_name(key_name)
+    if err:
+        return err
     if len(key) > 72:
         return sf_api.error(422, 'keys cannot be longer than 72 characters')
 
-    ns.add_key(key_name, key)
+    expiry, err = _validate_key_expiry(expiry)
+    if err:
+        return err
+
+    ns.add_key(key_name, key, expiry=expiry)
     return key_name
 
 
@@ -318,20 +366,29 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
         [
             ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
             ('key_name', 'body', 'string', 'The name of the key.', True),
-            ('key', 'body', 'string', 'The authentication key.', True)
+            ('key', 'body', 'string', 'The authentication key.', True),
+            ('expiry', 'body', 'number',
+             'Optional. The time, in seconds since the unix epoch, at which '
+             'this key stops working. Must be in the future. If omitted the '
+             'key never expires.', False)
         ],
         [(200, 'The name of the created key.', 'newkey'),
-         (404, 'Namespace not found.', None)]))
+         (400, 'Expiry is not a number, or is not in the future.', None),
+         (403, 'Illegal key name.', None),
+         (404, 'Namespace not found.', None),
+         (422, 'Keys cannot be longer than 72 characters.', None)]))
     @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
-    def post(self, namespace=None, key_name=None, key=None, namespace_from_db=None):
+    def post(self, namespace=None, key_name=None, key=None, expiry=None,
+             namespace_from_db=None):
         namespace_from_db.add_event(
             EVENT_TYPE_AUDIT, 'create auth key request from REST API',
             extra={'key': key_name})
-        return _namespace_keys_putpost(namespace_from_db, key_name, key)
+        return _namespace_keys_putpost(
+            namespace_from_db, key_name, key, expiry=expiry)
 
 
 class AuthNamespaceKeyEndpoint(api_base.Resource):
@@ -340,31 +397,50 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
         [
             ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
             ('key_name', 'body', 'string', 'The name of the key.', True),
-            ('key', 'body', 'string', 'The authentication key.', True)
+            ('key', 'body', 'string', 'The authentication key.', True),
+            ('expiry', 'body', 'number',
+             'Optional. The time, in seconds since the unix epoch, at which '
+             'this key stops working. Must be in the future. If omitted the '
+             'key never expires, and any expiry it previously had is '
+             'cleared.', False)
         ],
         [(200, 'The name of the updated key.', 'newkey'),
-         (404, 'Namespace or key not found.', None)]))
+         (400, 'Expiry is not a number, or is not in the future.', None),
+         (403, 'Illegal key name.', None),
+         (404, 'Namespace or key not found.', None),
+         (422, 'Keys cannot be longer than 72 characters.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.caller_is_admin
     @requires_namespace_ownership
-    @api_base.requires_namespace_exist_if_specified
+    @arg_is_namespace
     @api_base.log_token_use
-    def put(self, namespace=None, key_name=None, key=None, namespace_from_db=None):
-        if key_name not in namespace_from_db.keys:
+    def put(self, namespace=None, key_name=None, key=None, expiry=None,
+            namespace_from_db=None):
+        # NOTE(mikal): this endpoint used to test membership against the
+        # namespace's keys dict itself rather than its 'nonced_keys'
+        # entry, and then passed the namespace name where a Namespace
+        # object was expected. It also lacked the @arg_is_namespace
+        # decorator which populates that object at all, so it has never
+        # worked. Fixed per phase 2 Decision 4 of the auth federation
+        # plan; there is no client which could depend on the old
+        # behaviour.
+        if key_name not in namespace_from_db.keys.get('nonced_keys', {}):
             return sf_api.error(404, 'key does not exist')
         namespace_from_db.add_event(
             EVENT_TYPE_AUDIT, 'update auth key request from REST API',
             extra={'key': key_name})
-        return _namespace_keys_putpost(namespace, key_name, key)
+        return _namespace_keys_putpost(
+            namespace_from_db, key_name, key, expiry=expiry)
 
     @swag_from(api_base.swagger_helper(
-        'auth', 'Update an authentication key for a namespace.',
+        'auth', 'Delete an authentication key for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
-            ('key_name', 'body', 'string', 'The name of the key.', True),
-            ('key', 'body', 'string', 'The authentication key.', True)
+            ('namespace', 'body', 'string', 'The namespace to remove a key from.', True),
+            ('key_name', 'body', 'string', 'The name of the key.', True)
         ],
-        [(200, 'The name of the updated key.', 'newkey'),
+        [(200, 'Nothing.', None),
+         (400, 'No key name specified.', None),
          (404, 'Namespace or key not found.', None)]))
     @api_base.verify_token
     @requires_namespace_ownership

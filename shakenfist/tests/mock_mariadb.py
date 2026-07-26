@@ -45,6 +45,38 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 
 
+class _NamespaceAttributesStore(dict):
+    """The namespace attributes store, with a legacy `keys` view.
+
+    Namespace keys used to live in the namespace_attributes.keys JSON
+    column. Phase 2 of the auth federation plan moved them into the
+    namespace_keys tables, and production code now neither reads nor
+    writes that column -- it is vestigial until a later schema version
+    drops it.
+
+    The behaviour preservation tests written before that cutover
+    (shakenfist/tests/test_namespace_keys.py) assert against this store
+    using the old shape. They are the phase's bit compatibility proof
+    and must pass unmodified, so reads through this mapping render the
+    key tables back into the legacy shape. The assertions stay
+    meaningful -- they still describe the key material which was
+    actually stored, just read out of the table which now stores it.
+
+    Only __getitem__ is overridden. The mocked mariadb accessors use
+    get() and __setitem__, so the production read path still sees the
+    empty column it now writes.
+    """
+
+    def __init__(self, mock_mariadb):
+        super().__init__()
+        self._mock_mariadb = mock_mariadb
+
+    def __getitem__(self, name):
+        data = super().__getitem__(name)
+        data.keys = self._mock_mariadb.legacy_namespace_keys_view(name)
+        return data
+
+
 class MockMariaDB():
     """Mock the MariaDB store with simple dictionaries
 
@@ -59,7 +91,9 @@ class MockMariaDB():
         self.ipam_reservations = {}  # Mock MariaDB IPAM reservations storage
         self.dnsmasq_objects = {}  # Mock MariaDB DnsMasq object storage
         self.namespace_objects = {}  # Mock MariaDB namespace storage
-        self.namespace_attributes = {}  # Mock MariaDB namespace attributes
+        # Mock MariaDB namespace attributes. See
+        # _NamespaceAttributesStore for why this is not a plain dict.
+        self.namespace_attributes = _NamespaceAttributesStore(self)
         self.namespace_key_objects = {}  # Mock MariaDB namespace key storage
         self.namespace_key_attributes = {}  # Mock MariaDB namespace key attrs
         self.node_objects = {}  # Mock MariaDB node storage
@@ -796,6 +830,17 @@ class MockMariaDB():
         self.mariadb_delete_object_metadata.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_object_metadata.stop)
+
+        # DatabaseBackedObject.hard_delete() purges the object's events.
+        # MockMariaDB does not store events (they are suppressed for unit
+        # tests), so this only needs to stop the real accessor from
+        # reaching for a database connection.
+        self.mariadb_delete_object_events = mock.patch(
+            'shakenfist.mariadb.delete_object_events',
+            side_effect=self._mariadb_delete_object_events)
+        self.mariadb_delete_object_events.start()
+        self.test_obj.addCleanup(
+            self.mariadb_delete_object_events.stop)
 
         # Mock MariaDB functions for cluster operation targets
         self.mariadb_create_cluster_operation_target = mock.patch(
@@ -1657,6 +1702,26 @@ class MockMariaDB():
         return False
 
     # MariaDB NamespaceKey mock implementations
+
+    def legacy_namespace_keys_view(self, namespace):
+        """Render one namespace's keys in the pre-phase-2 JSON shape.
+
+        See _NamespaceAttributesStore. Expired keys are included, as
+        they always were in storage -- the expiry filter was and is
+        applied at read time by the accessors, not here.
+        """
+        nonced_keys = {}
+        for data in self.namespace_key_objects.values():
+            if data.namespace != namespace:
+                continue
+            attrs = self.namespace_key_attributes.get(str(data.uuid))
+            if not attrs:
+                continue
+            entry = {'key': attrs.key, 'nonce': attrs.nonce}
+            if attrs.expiry is not None:
+                entry['expiry'] = attrs.expiry
+            nonced_keys[data.name] = entry
+        return {'nonced_keys': nonced_keys}
 
     def _mariadb_create_namespace_key(self, data: NamespaceKeyData) -> bool:
         """Mock implementation of mariadb.create_namespace_key()
@@ -2563,6 +2628,13 @@ class MockMariaDB():
             f'MockMariaDB.delete_object_metadata({key}): '
             f'not found')
         return False
+
+    def _mariadb_delete_object_events(self, object_type, object_uuid):
+        """Mock implementation of mariadb.delete_object_events()"""
+        self._trace(
+            f'MockMariaDB.delete_object_events('
+            f'{object_type}/{object_uuid}): ignored')
+        return 0
 
     def _mariadb_create_cluster_operation_target(
             self, operation_uuid, operation_type,

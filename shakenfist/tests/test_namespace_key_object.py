@@ -30,6 +30,17 @@ class NamespaceKeyTestCase(base.ShakenFistTestCase):
     def _attributes(self, key):
         return self.mock_mariadb.namespace_key_attributes[str(key.uuid)]
 
+    def _keys_named(self, name, namespace=None):
+        """The stored key objects with a given name.
+
+        Every namespace created by the fixture owns a 'key1', so a
+        global count of namespace_key_objects would conflate the
+        fixture's key with the one under test.
+        """
+        return [d for d in self.mock_mariadb.namespace_key_objects.values()
+                if d.name == name
+                and (namespace is None or d.namespace == namespace)]
+
 
 class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
     def test_new_writes_both_rows_and_is_created(self):
@@ -90,7 +101,7 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
 
         # Same object, new secret material...
         self.assertEqual(first.uuid, second.uuid)
-        self.assertEqual(1, len(self.mock_mariadb.namespace_key_objects))
+        self.assertEqual(1, len(self._keys_named('deploy', 'banana')))
         self.assertNotEqual(original_hash, self._attributes(second).key)
         self.assertNotEqual(original_nonce, self._attributes(second).nonce)
         self.assertTrue(bcrypt.checkpw(
@@ -114,7 +125,7 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
             loser = NamespaceKey.new('banana', 'deploy', 'different')
 
         self.assertEqual(winner.uuid, loser.uuid)
-        self.assertEqual(1, len(self.mock_mariadb.namespace_key_objects))
+        self.assertEqual(1, len(self._keys_named('deploy', 'banana')))
         self.assertEqual(
             attributes_rows, len(self.mock_mariadb.namespace_key_attributes))
         self.assertTrue(bcrypt.checkpw(
@@ -127,7 +138,9 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
         two = NamespaceKey.new('apple', 'deploy', 'sekrit')
 
         self.assertNotEqual(one.uuid, two.uuid)
-        self.assertEqual(2, len(self.mock_mariadb.namespace_key_objects))
+        self.assertEqual(2, len(self._keys_named('deploy')))
+        self.assertEqual(1, len(self._keys_named('deploy', 'banana')))
+        self.assertEqual(1, len(self._keys_named('deploy', 'apple')))
 
     def test_creation_events_carry_no_secret_material(self):
         with mock.patch('shakenfist.eventlog.add_event') as mock_add_event:
@@ -310,9 +323,12 @@ class NamespaceKeysIteratorTestCase(NamespaceKeyTestCase):
         ) as mock_find:
             with mock.patch(
                     'shakenfist.mariadb.get_objects_by_state') as by_state:
-                names = [k.name for k in NamespaceKeys(namespace='banana')]
+                names = sorted(
+                    k.name for k in NamespaceKeys(namespace='banana'))
 
-        self.assertEqual(['deploy'], names)
+        # 'key1' is the fixture's key; the point is that no other
+        # namespace's keys appear.
+        self.assertEqual(['deploy', 'key1'], names)
         mock_find.assert_called_once_with('banana', include_expired=True)
         by_state.assert_not_called()
 
@@ -323,8 +339,11 @@ class NamespaceKeysIteratorTestCase(NamespaceKeyTestCase):
         NamespaceKey.new('banana', 'deploy', 'sekrit')
         NamespaceKey.new('system', '_service_key_abcde', 'sekrit')
 
-        names = [k.name for k in NamespaceKeys(namespace='system')]
-        self.assertEqual(['_service_key_abcde'], names)
+        names = sorted(k.name for k in NamespaceKeys(namespace='system'))
+
+        # Only system's own keys -- banana's 'deploy' must not appear,
+        # which it would if 'system' were treated as a wildcard.
+        self.assertEqual(['_service_key_abcde', 'key1'], names)
 
     def test_expired_keys_can_be_filtered_in_sql(self):
         # An expiry of 1000.0 is comfortably in the past, so the key is
@@ -338,19 +357,21 @@ class NamespaceKeysIteratorTestCase(NamespaceKeyTestCase):
             k.name for k in NamespaceKeys(
                 namespace='banana', include_expired=False))
 
-        self.assertEqual(['expired', 'forever'], everything)
-        self.assertEqual(['forever'], current)
+        # 'key1' is the fixture's key and never expires, so it survives
+        # both listings; 'expired' only survives the unfiltered one.
+        self.assertEqual(['expired', 'forever', 'key1'], everything)
+        self.assertEqual(['forever', 'key1'], current)
 
     def test_deleted_keys_are_filtered_by_state(self):
         NamespaceKey.new('banana', 'live', 'sekrit')
         doomed = NamespaceKey.new('banana', 'doomed', 'sekrit')
         doomed.delete()
 
-        active = [k.name for k in NamespaceKeys(namespace='banana')]
-        self.assertEqual(['live'], active)
+        active = sorted(k.name for k in NamespaceKeys(namespace='banana'))
+        self.assertEqual(['key1', 'live'], active)
 
-        deleted = [k.name for k in NamespaceKeys(
-            namespace='banana', prefilter='deleted')]
+        deleted = sorted(k.name for k in NamespaceKeys(
+            namespace='banana', prefilter='deleted'))
         self.assertEqual(['doomed'], deleted)
 
 
