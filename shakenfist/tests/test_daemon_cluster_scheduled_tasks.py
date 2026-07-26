@@ -4,8 +4,13 @@ from unittest import mock
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons.cluster import scheduled_tasks as st
+from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
+from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 
@@ -17,6 +22,7 @@ NODE_UUID_2 = 'bbbb2222-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 NODE_FQDN_1 = 'sf-1.example.com'
 NODE_FQDN_2 = 'sf-2.example.com'
 OP_UUID_1 = 'cccc3333-cccc-4ccc-8ccc-cccccccccccc'
+KEY_UUID_1 = 'dddd4444-dddd-4ddd-8ddd-dddddddddddd'
 
 
 class FakeBlob:
@@ -352,3 +358,168 @@ class ClusterPruneEventsScheduledTaskTestCase(base.ShakenFistTestCase):
         mock_log_warn.assert_called_once()
         warn_msg = str(mock_log_warn.call_args[0][0])
         self.assertIn('failed', warn_msg.lower())
+
+
+class FakeNamespaceKey:
+    """Minimal fake NamespaceKey for the expiry sweep tests."""
+    object_type = ObjectType.NAMESPACE_KEY
+
+    def __init__(self, name, namespace='banana', state=dbo.STATE_CREATED,
+                 update_time=0.0):
+        self.uuid = f'{namespace}-{name}'
+        self.name = name
+        self.namespace = namespace
+        self._state_value = state
+        self._update_time = update_time
+        self.events = []
+        self.hard_deleted = False
+
+    @property
+    def state(self):
+        return mock.MagicMock(value=self._state_value,
+                              update_time=self._update_time)
+
+    def add_event(self, event_type, message, extra=None):
+        self.events.append((event_type, message, extra))
+
+    def delete(self):
+        self._state_value = dbo.STATE_DELETED
+
+    def hard_delete(self):
+        self.hard_deleted = True
+
+
+def _attrs(expiry):
+    return NamespaceKeyAttributesData(
+        uuid=KEY_UUID_1, key='aGFzaA==', nonce='noncenonce', expiry=expiry)
+
+
+class ReapExpiredNamespaceKeysTestCase(base.ShakenFistTestCase):
+    """The cluster sweep which soft deletes long-expired keys.
+
+    Expiry is enforced check-at-use elsewhere; these tests are only
+    about the tidy up, so they care about which keys get their state
+    moved and which are left alone.
+    """
+
+    def _sweep(self, pairs, grace=3600, now=10000.0):
+        """Run the sweep over one namespace holding ``pairs``."""
+        namespaces = [mock.MagicMock(uuid='banana')]
+        with mock.patch.object(config, 'NAMESPACE_KEY_REAP_GRACE', grace), \
+                mock.patch(
+                    'shakenfist.daemons.cluster.scheduled_tasks.Namespaces',
+                    return_value=namespaces), \
+                mock.patch(
+                    'shakenfist.daemons.cluster.scheduled_tasks.'
+                    'keys_with_attributes',
+                    return_value=pairs) as mock_keys, \
+                mock.patch(
+                    'shakenfist.daemons.cluster.scheduled_tasks.time.time',
+                    return_value=now):
+            st.reap_expired_namespace_keys()
+        return mock_keys
+
+    def test_soft_deletes_a_key_past_the_grace_period(self):
+        # now 10000, grace 3600, so the cutoff is 6400.
+        key = FakeNamespaceKey('stale')
+        self._sweep([(key, _attrs(1000.0))])
+
+        self.assertEqual(dbo.STATE_DELETED, key.state.value)
+
+    def test_leaves_a_key_still_inside_the_grace_period(self):
+        # Expired at 9000, which is after the 6400 cutoff. The key no
+        # longer authenticates, but an operator can still see it.
+        key = FakeNamespaceKey('recent')
+        self._sweep([(key, _attrs(9000.0))])
+
+        self.assertEqual(dbo.STATE_CREATED, key.state.value)
+        self.assertEqual([], key.events)
+
+    def test_ignores_a_key_which_never_expires(self):
+        key = FakeNamespaceKey('forever')
+        self._sweep([(key, _attrs(None))])
+
+        self.assertEqual(dbo.STATE_CREATED, key.state.value)
+
+    def test_skips_a_key_an_earlier_sweep_already_deleted(self):
+        # Otherwise every sweep would re-delete it for the whole
+        # CLEANER_DELAY window before the hard delete lands, spamming
+        # the event log and tripping the state machine.
+        key = FakeNamespaceKey('gone', state=dbo.STATE_DELETED)
+        self._sweep([(key, _attrs(1000.0))])
+
+        self.assertEqual([], key.events)
+
+    def test_records_an_audit_event_carrying_no_secrets(self):
+        key = FakeNamespaceKey('stale')
+        self._sweep([(key, _attrs(1000.0))])
+
+        self.assertEqual(1, len(key.events))
+        event_type, message, extra = key.events[0]
+        self.assertEqual(EVENT_TYPE_AUDIT, event_type)
+        self.assertIn('expired', message)
+        self.assertEqual({'expiry': 1000.0}, extra)
+
+    def test_survives_a_key_deleted_underneath_it(self):
+        key = FakeNamespaceKey('racing')
+        key.delete = mock.Mock(side_effect=InvalidStateException('raced'))
+
+        # Must not raise -- the key is going away either way.
+        self._sweep([(key, _attrs(1000.0))])
+
+    def test_does_nothing_when_reaping_is_disabled(self):
+        key = FakeNamespaceKey('stale')
+        mock_keys = self._sweep([(key, _attrs(1000.0))], grace=0)
+
+        mock_keys.assert_not_called()
+        self.assertEqual(dbo.STATE_CREATED, key.state.value)
+
+
+class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
+    """The sweep only soft deletes; the standard reaper finishes the job."""
+
+    def setUp(self):
+        super().setUp()
+        while not st.DELETED_OBJECTS_QUEUE.empty():
+            st.DELETED_OBJECTS_QUEUE.get(block=False)
+
+    def test_hard_deletes_a_soft_deleted_key_after_cleaner_delay(self):
+        # State last changed at the epoch, so it is comfortably older
+        # than CLEANER_DELAY.
+        key = FakeNamespaceKey('stale', state=dbo.STATE_DELETED,
+                               update_time=0.0)
+        st.DELETED_OBJECTS_QUEUE.put(key)
+
+        st._process_per_deleted_object_queue(execution_limit=5)
+
+        self.assertTrue(key.hard_deleted)
+
+    def test_leaves_a_recently_deleted_key_alone(self):
+        key = FakeNamespaceKey('fresh', state=dbo.STATE_DELETED,
+                               update_time=time.time())
+        st.DELETED_OBJECTS_QUEUE.put(key)
+
+        st._process_per_deleted_object_queue(execution_limit=5)
+
+        self.assertFalse(key.hard_deleted)
+
+    def test_the_reaper_enumerates_namespace_keys_at_all(self):
+        # The sweep only ever soft deletes. If NamespaceKey were not
+        # registered in OBJECT_NAMES_TO_CLASSES then nothing would ever
+        # hard delete the rows, and the sweep would quietly leak them.
+        self.assertIn('namespace_key', OBJECT_NAMES_TO_CLASSES)
+
+        key = FakeNamespaceKey('stale', state=dbo.STATE_DELETED)
+        with mock.patch(
+                'shakenfist.daemons.cluster.scheduled_tasks.'
+                'mariadb.get_objects_by_state',
+                side_effect=lambda objtype, states: (
+                    [KEY_UUID_1]
+                    if objtype == ObjectType.NAMESPACE_KEY else [])), \
+                mock.patch(
+                    'shakenfist.daemons.cluster.scheduled_tasks.'
+                    'get_object_class') as mock_get_class:
+            mock_get_class.return_value.from_db.return_value = key
+            st._fill_per_deleted_object_queue()
+
+        self.assertEqual([key], list(st.DELETED_OBJECTS_QUEUE.queue))

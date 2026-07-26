@@ -356,6 +356,18 @@ class SFConfig(BaseSettings):
             'marks the underlying operation as errored.'
         )
     )
+    NAMESPACE_KEY_REAP_GRACE: int = Field(
+        3600,
+        description=(
+            'How long (in seconds) after a namespace key expires before '
+            'the cluster daemon soft deletes it. An expired key stops '
+            'authenticating immediately regardless of this setting; the '
+            'grace period only delays the tidy up, so that a key which '
+            'has just lapsed is still visible to an operator wondering '
+            'why their automation broke. Set to 0 to disable reaping, '
+            'in which case expired keys are retained forever.'
+        )
+    )
     NODE_CHECKIN_MAXIMUM: int = Field(
         120,
         description=(
