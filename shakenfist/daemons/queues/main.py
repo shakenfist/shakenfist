@@ -19,6 +19,12 @@ from shakenfist.util import exceptions as util_exceptions
 LOG, _ = logs.setup(__name__)
 
 
+# Seconds between stray-lock housekeeping scans. Locks left by a dead process
+# are a slow-changing condition, so this scan (a GetExistingLocks read) is
+# rate-limited rather than run on every poll of the queue loop. See issue #3499.
+STRAY_LOCK_CHECK_INTERVAL = 30
+
+
 def _check_other_daemon(n, daemon_name, override_daemon_name=None):
     health_checks = {
         'gunicorn': daemon.health_check_api,
@@ -116,6 +122,8 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         warned_locks = {}
         last_third_party_health_check = 0
+        last_stray_lock_check = 0.0
+        poll_backoff = daemon.IdlePollBackoff()
 
         while daemon.check_abort_path(self.abort_path):
             try:
@@ -132,26 +140,37 @@ class Monitor(daemon.WorkerPoolDaemon):
                 #
                 # NOTE(mikal): this doesn't really make sense with threads, but
                 # given we want to get rid of locks anyways...
-                existing_locks = sf_locks.get_existing_locks()
-                for lock in existing_locks:
-                    lock_details = existing_locks[lock]
-                    if lock_details.get('node') != config.NODE_NAME:
-                        continue
+                #
+                # Rate-limited: stray locks are slow-changing housekeeping, so
+                # there is no need to re-read every lock on every poll (that was
+                # ~19 GetExistingLocks/s cluster-wide at idle). See issue #3499.
+                if time.time() - last_stray_lock_check > STRAY_LOCK_CHECK_INTERVAL:
+                    existing_locks = sf_locks.get_existing_locks()
+                    for lock in existing_locks:
+                        lock_details = existing_locks[lock]
+                        if lock_details.get('node') != config.NODE_NAME:
+                            continue
 
-                    pid = lock_details.get('pid')
-                    if psutil.pid_exists(pid):
-                        continue
-                    if pid not in warned_locks:
-                        LOG.with_fields(lock_details).warning(
-                            'Lock held by missing process on this node')
-                        warned_locks[pid] = time.time()
-                    elif time.time() - warned_locks[pid] > 30:
-                        LOG.with_fields(lock_details).error(
-                            'Lock held by missing process on this node for more '
-                            'than 30 seconds')
+                        pid = lock_details.get('pid')
+                        if psutil.pid_exists(pid):
+                            continue
+                        if pid not in warned_locks:
+                            LOG.with_fields(lock_details).warning(
+                                'Lock held by missing process on this node')
+                            warned_locks[pid] = time.time()
+                        elif time.time() - warned_locks[pid] > 30:
+                            LOG.with_fields(lock_details).error(
+                                'Lock held by missing process on this node for '
+                                'more than 30 seconds')
+                    last_stray_lock_check = time.time()
 
-                if not self.dequeue_job(workitem.Job):
-                    self.idle(0.2)
+                # Adaptive backoff: poll fast while there is work, back off
+                # towards IDLE_POLL_MAX_SECONDS while idle so an empty cluster
+                # stops issuing ~5 Dequeue/s per node. See issue #3499.
+                if self.dequeue_job(workitem.Job):
+                    poll_backoff.reset()
+                else:
+                    self.idle(poll_backoff.next_empty_interval())
 
             except exceptions.DatabaseUnavailable:
                 # Not an error to be ignored noisily: the database will

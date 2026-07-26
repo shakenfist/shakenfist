@@ -151,7 +151,15 @@ class PathCheckTestCase(base.ShakenFistTestCase):
             check = resource_health.PathCheck(d, write_interval=3600)
             # A realistic epoch: with last_write=0 the first check is always
             # due to write (now >> interval); the second, 5s later, is not.
-            base_t = 100000.0
+            #
+            # Use a stateful clock rather than a positional side_effect list:
+            # check() runs _probe_once (which also calls time.time()) in a
+            # separate DeadlineProbe thread, so the number and interleaving of
+            # time.time() calls across threads is not deterministic. Returning a
+            # single consistent value per check makes the gate deterministic
+            # regardless of how the calls are scheduled.
+            clock = {'t': 100000.0}
+            base_t = clock['t']
             real_open = os.open
             opened = []
 
@@ -161,10 +169,10 @@ class PathCheckTestCase(base.ShakenFistTestCase):
                 return real_open(path, *a, **kw)
 
             with mock.patch('shakenfist.resource_health.time.time',
-                            side_effect=[base_t, base_t,
-                                         base_t + 5, base_t + 5]), \
+                            side_effect=lambda: clock['t']), \
                     mock.patch('os.open', side_effect=counting_open):
                 first = check.check()
+                clock['t'] = base_t + 5
                 second = check.check()
 
             self.assertEqual(resource_health.HealthStatus.OK, first.status)

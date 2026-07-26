@@ -102,9 +102,16 @@ class TransferJob(util_concurrency.Job):
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
+        # Adaptive backoff: poll fast while there are transfers to run, back
+        # off towards IDLE_POLL_MAX_SECONDS while idle so a node with nothing
+        # to transfer stops issuing ~5 GetBlobTransfersForNode/s. See issue
+        # #3500.
+        poll_backoff = daemon.IdlePollBackoff()
+
         while daemon.check_abort_path(self.abort_path):
             self.wait_for_nodelock()
 
+            transfers = []
             try:
                 self.reap_workers()
 
@@ -126,7 +133,11 @@ class Monitor(daemon.WorkerPoolDaemon):
             except Exception as e:
                 util_exceptions.ignore_exception('transfer worker', e)
 
-            self.idle(0.2)
+            if transfers:
+                poll_backoff.reset()
+                self.idle(daemon.IDLE_POLL_FAST_SECONDS)
+            else:
+                self.idle(poll_backoff.next_empty_interval())
 
 
 def main():
