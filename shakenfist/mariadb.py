@@ -13655,9 +13655,20 @@ def get_ipam(ipam_uuid: UUID) -> Optional[IPAMData]:
     Returns:
         An IPAMData object, or None if not found.
     """
+    # The IPAM record read here is the immutable static block definition
+    # (uuid/namespace/network_uuid/ipblock/version); the mutable allocations
+    # live in the ipam_reservations table and are read by other functions. So
+    # this is a phase 2 immutable-tier cache candidate -- update_ipam (the
+    # version-upgrade persist path) and delete_ipam evict it. See issue #3501.
+    cached: Optional[IPAMData] = _object_cache_get('ipam', ipam_uuid)
+    if cached is not None:
+        return cached
     if _use_database_service():
-        return _grpc_get_ipam(ipam_uuid)
-    return _direct_get_ipam(ipam_uuid)
+        row = _grpc_get_ipam(ipam_uuid)
+    else:
+        row = _direct_get_ipam(ipam_uuid)
+    _object_cache_put('ipam', ipam_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
+    return row
 
 
 def delete_ipam(ipam_uuid: UUID) -> bool:
@@ -13670,8 +13681,11 @@ def delete_ipam(ipam_uuid: UUID) -> bool:
         True if deleted, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_delete_ipam(ipam_uuid)
-    return _direct_delete_ipam(ipam_uuid)
+        result = _grpc_delete_ipam(ipam_uuid)
+    else:
+        result = _direct_delete_ipam(ipam_uuid)
+    _object_cache_evict('ipam', ipam_uuid)
+    return result
 
 
 def update_ipam(data: IPAMData) -> bool:
@@ -13686,8 +13700,11 @@ def update_ipam(data: IPAMData) -> bool:
         True if updated, False if not found or error.
     """
     if _use_database_service():
-        return _grpc_update_ipam(data)
-    return _direct_update_ipam(data)
+        result = _grpc_update_ipam(data)
+    else:
+        result = _direct_update_ipam(data)
+    _object_cache_evict('ipam', data.uuid)
+    return result
 
 
 # =============================================================================
