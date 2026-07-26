@@ -14,6 +14,7 @@ from uuid import UUID
 from shakenfist import mariadb
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.schema.namespace_key_data import NamespaceKeyData
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 
 
@@ -107,28 +108,35 @@ class _MockEngine:
 class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
     """Tests for _ensure_namespace_keys_schema() creation and idempotency."""
 
+    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
+                return_value=(0, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=0)
-    def test_fresh_engine_creates_table_and_returns_version_1(
-            self, mock_get_version, mock_set_version):
-        """From version 0 the table is created and lands at v1."""
+    def test_fresh_engine_creates_table_and_migrates_to_version_2(
+            self, mock_get_version, mock_set_version, mock_migrate):
+        """From version 0 the table is created, then migrated to v2."""
         mock_engine = mock.MagicMock()
 
         with mock.patch('sqlalchemy.MetaData.create_all'):
             result = mariadb._ensure_namespace_keys_schema(mock_engine)
 
         self.assertEqual(result['table'], 'namespace_keys')
-        self.assertEqual(result['target_version'], 1)
+        self.assertEqual(result['target_version'], 2)
         self.assertEqual(result['start_version'], 0)
-        self.assertEqual(result['end_version'], 1)
+        self.assertEqual(result['end_version'], 2)
         self.assertTrue(result['migrated'])
-        mock_set_version.assert_called_once_with(
-            mock_engine, 'namespace_keys', 1)
+        self.assertEqual(
+            [mock.call(mock_engine, 'namespace_keys', 1),
+             mock.call(mock_engine, 'namespace_keys', 2)],
+            mock_set_version.call_args_list)
+        mock_migrate.assert_called_once_with(mock_engine)
 
+    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
+                return_value=(0, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=0)
     def test_creation_emits_composite_unique_index_ddl(
-            self, mock_get_version, mock_set_version):
+            self, mock_get_version, mock_set_version, mock_migrate):
         """The (namespace, name) UNIQUE index is created by hand.
 
         The Pydantic marker system cannot express a composite unique
@@ -150,20 +158,41 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
             any('(namespace, name)' in stmt for stmt in executed),
             f'Unique index is not on (namespace, name) in {executed}')
 
+    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
+                return_value=(2, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
-    def test_already_at_version_1_is_noop(
-            self, mock_get_version, mock_set_version):
-        """Table already at v1: no DDL, no version bump, migrated=False."""
+    def test_existing_v1_table_runs_only_the_migration(
+            self, mock_get_version, mock_set_version, mock_migrate):
+        """An upgrading cluster gets the data migration, and no DDL."""
+        mock_engine = mock.MagicMock()
+
+        result = mariadb._ensure_namespace_keys_schema(mock_engine)
+
+        self.assertEqual(result['start_version'], 1)
+        self.assertEqual(result['end_version'], 2)
+        self.assertTrue(result['migrated'])
+        mock_migrate.assert_called_once_with(mock_engine)
+        mock_set_version.assert_called_once_with(
+            mock_engine, 'namespace_keys', 2)
+        mock_engine.connect.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes')
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
+    def test_already_at_version_2_is_noop(
+            self, mock_get_version, mock_set_version, mock_migrate):
+        """Table already at v2: no DDL, no migration, migrated=False."""
         mock_engine = mock.MagicMock()
 
         result = mariadb._ensure_namespace_keys_schema(mock_engine)
 
         self.assertEqual(result['table'], 'namespace_keys')
-        self.assertEqual(result['target_version'], 1)
-        self.assertEqual(result['end_version'], 1)
+        self.assertEqual(result['target_version'], 2)
+        self.assertEqual(result['end_version'], 2)
         self.assertFalse(result['migrated'])
         mock_set_version.assert_not_called()
+        mock_migrate.assert_not_called()
         mock_engine.connect.assert_not_called()
 
 
@@ -202,12 +231,258 @@ class EnsureNamespaceKeyAttributesSchemaTestCase(base.ShakenFistTestCase):
         self.assertFalse(result['migrated'])
         mock_set_version.assert_not_called()
 
-    def test_expected_schema_versions_lists_both_tables_at_1(self):
-        """Both tables are registered in EXPECTED_SCHEMA_VERSIONS at v1."""
+    def test_expected_schema_versions_lists_both_tables(self):
+        """Both tables are registered in EXPECTED_SCHEMA_VERSIONS.
+
+        namespace_keys is at v2 because of the data migration out of the
+        namespace_attributes JSON column; namespace_key_attributes stays
+        at v1 because that migration is gated on the namespace_keys
+        version, not on this table's.
+        """
         self.assertEqual(
-            1, mariadb.EXPECTED_SCHEMA_VERSIONS['namespace_keys'])
+            2, mariadb.EXPECTED_SCHEMA_VERSIONS['namespace_keys'])
         self.assertEqual(
             1, mariadb.EXPECTED_SCHEMA_VERSIONS['namespace_key_attributes'])
+
+
+# ---------------------------------------------------------------------------
+# The one shot migration out of namespace_attributes.keys
+# ---------------------------------------------------------------------------
+
+def _migration_connection(namespace_rows, existing_rows=None):
+    """A connection stub for _migrate_keys_from_namespace_attributes().
+
+    The migration issues two selects (the namespace attribute rows, then
+    the (namespace, name) pairs which already have key rows) and then up
+    to three inserts per key.
+    """
+    conn = _MockConnection()
+    results = [
+        _MockResult(rows=namespace_rows),
+        _MockResult(rows=existing_rows or []),
+    ]
+    results += [_MockResult() for _ in range(64)]
+    conn.execute = mock.Mock(side_effect=results)
+    return conn
+
+
+def _inserts_for(conn, table_name):
+    """The compiled parameters of every insert into one table."""
+    retval = []
+    for call in conn.execute.call_args_list:
+        stmt = call.args[0]
+        if str(stmt).startswith(f'INSERT INTO {table_name} '):
+            retval.append(stmt.compile().params)
+    return retval
+
+
+class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
+    """Tests for _migrate_keys_from_namespace_attributes()."""
+
+    def test_two_keys_become_static_attribute_and_state_rows(self):
+        """Each JSON entry produces three rows, values preserved verbatim."""
+        conn = _migration_connection([
+            _MockRow(name='banana', keys={'nonced_keys': {
+                'first': {'key': 'aGFzaC1vbmU=', 'nonce': 'nonce-one'},
+                'second': {'key': 'aGFzaC10d28=', 'nonce': 'nonce-two',
+                           'expiry': 4242.0},
+            }}),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(2, migrated)
+        self.assertEqual(0, errors)
+
+        # Two selects, then three inserts per key.
+        self.assertEqual(8, conn.execute.call_count)
+
+        statics = _inserts_for(conn, 'namespace_keys')
+        self.assertEqual(2, len(statics))
+        self.assertEqual(['banana', 'banana'],
+                         [s['namespace'] for s in statics])
+        self.assertEqual({'first', 'second'}, {s['name'] for s in statics})
+        self.assertEqual([1, 1], [s['version'] for s in statics])
+        self.assertEqual(2, len({s['uuid'] for s in statics}))
+
+        attrs = _inserts_for(conn, 'namespace_key_attributes')
+        self.assertEqual(2, len(attrs))
+        by_uuid = {a['uuid']: a for a in attrs}
+        for static in statics:
+            attr = by_uuid[static['uuid']]
+            if static['name'] == 'first':
+                self.assertEqual('aGFzaC1vbmU=', attr['key'])
+                self.assertEqual('nonce-one', attr['nonce'])
+                self.assertIsNone(attr['expiry'])
+            else:
+                self.assertEqual('aGFzaC10d28=', attr['key'])
+                self.assertEqual('nonce-two', attr['nonce'])
+                self.assertEqual(4242.0, attr['expiry'])
+            # Phase 3 populates these; the migration must not guess.
+            self.assertIsNone(attr['scopes'])
+            self.assertIsNone(attr['provenance'])
+
+        states = _inserts_for(conn, 'object_states')
+        self.assertEqual(2, len(states))
+        self.assertEqual({str(s['uuid']) for s in statics},
+                         {st['object_uuid'] for st in states})
+        for state in states:
+            self.assertEqual('created', state['state_value'])
+            self.assertEqual(
+                ObjectType.NAMESPACE_KEY, state['object_type'])
+
+    def test_expired_keys_are_migrated_too(self):
+        """Expiry is not a migration policy -- the reaper deals with it."""
+        conn = _migration_connection([
+            _MockRow(name='banana', keys={'nonced_keys': {
+                'ancient': {'key': 'aGFzaA==', 'nonce': 'n', 'expiry': 1.0},
+            }}),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(1, migrated)
+        self.assertEqual(0, errors)
+        self.assertEqual(
+            [1.0], [a['expiry'] for a in
+                    _inserts_for(conn, 'namespace_key_attributes')])
+
+    def test_rerun_migrates_nothing(self):
+        """Keys which already have a row are skipped, so a re-run is a no-op."""
+        conn = _migration_connection(
+            [
+                _MockRow(name='banana', keys={'nonced_keys': {
+                    'first': {'key': 'aGFzaC1vbmU=', 'nonce': 'nonce-one'},
+                    'second': {'key': 'aGFzaC10d28=', 'nonce': 'nonce-two',
+                               'expiry': 4242.0},
+                }}),
+            ],
+            existing_rows=[
+                _MockRow(namespace='banana', name='first'),
+                _MockRow(namespace='banana', name='second'),
+            ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(0, migrated)
+        self.assertEqual(0, errors)
+        # The two selects and nothing else.
+        self.assertEqual(2, conn.execute.call_count)
+
+    def test_rotated_key_is_not_clobbered(self):
+        """A key rotated after migration keeps its post-migration secret.
+
+        The JSON column is still written by the pre-cutover code, so it
+        can hold a stale hash for a key which the tables have since
+        rotated. The migration must not write that stale hash back.
+        """
+        conn = _migration_connection(
+            [
+                _MockRow(name='banana', keys={'nonced_keys': {
+                    'first': {'key': 'c3RhbGU=', 'nonce': 'stale'},
+                }}),
+            ],
+            existing_rows=[_MockRow(namespace='banana', name='first')])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(0, migrated)
+        self.assertEqual(0, errors)
+        self.assertEqual([], _inserts_for(conn, 'namespace_key_attributes'))
+
+    def test_namespace_with_no_keys_is_a_noop(self):
+        """An empty or absent keys column migrates nothing and errors none."""
+        conn = _migration_connection([
+            _MockRow(name='banana', keys={'nonced_keys': {}}),
+            _MockRow(name='sausage', keys={}),
+            _MockRow(name='potato', keys=None),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(0, migrated)
+        self.assertEqual(0, errors)
+        self.assertEqual(2, conn.execute.call_count)
+
+    def test_malformed_keys_column_is_counted_not_raised(self):
+        """A keys column which is not a dict is an error, not an exception."""
+        conn = _migration_connection([
+            _MockRow(name='banana', keys=['not', 'a', 'dict']),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(0, migrated)
+        self.assertEqual(1, errors)
+
+    def test_missing_nonced_keys_is_counted_not_raised(self):
+        """A populated keys dict without nonced_keys is malformed."""
+        conn = _migration_connection([
+            _MockRow(name='banana', keys={'legacy_keys': {'a': 'b'}}),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(0, migrated)
+        self.assertEqual(1, errors)
+
+    def test_malformed_nonced_keys_is_counted_not_raised(self):
+        """nonced_keys which is not a dict is malformed."""
+        conn = _migration_connection([
+            _MockRow(name='banana', keys={'nonced_keys': 'oops'}),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(0, migrated)
+        self.assertEqual(1, errors)
+
+    def test_malformed_entry_is_skipped_and_the_rest_migrate(self):
+        """One broken entry does not stop the namespace's other keys."""
+        conn = _migration_connection([
+            _MockRow(name='banana', keys={'nonced_keys': {
+                'broken': {'nonce': 'no key here'},
+                'alsobroken': 'not even a dict',
+                'good': {'key': 'aGFzaA==', 'nonce': 'n'},
+            }}),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(1, migrated)
+        self.assertEqual(2, errors)
+        self.assertEqual(
+            ['good'],
+            [s['name'] for s in _inserts_for(conn, 'namespace_keys')])
+
+    def test_insert_failure_is_counted_not_raised(self):
+        """A failing insert is logged and counted, and the pass continues."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _MockResult(rows=[
+                _MockRow(name='banana', keys={'nonced_keys': {
+                    'first': {'key': 'aGFzaA==', 'nonce': 'n'},
+                    'second': {'key': 'aGFzaA==', 'nonce': 'n'},
+                }})]),
+            _MockResult(rows=[]),
+            Exception('the database fell over'),
+            _MockResult(), _MockResult(), _MockResult(),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(1, migrated)
+        self.assertEqual(1, errors)
 
 
 # ---------------------------------------------------------------------------

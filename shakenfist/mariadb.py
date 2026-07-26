@@ -25,6 +25,7 @@ import time
 import threading
 from typing import Any, Callable, cast, Dict, List, Optional, TypeVar
 from uuid import UUID
+from uuid import uuid4
 
 import grpc
 from prometheus_client import Counter
@@ -293,10 +294,11 @@ NODES_VERSION = 2
 NODE_ATTRIBUTES_VERSION = 4
 NAMESPACES_VERSION = 2
 NAMESPACE_ATTRIBUTES_VERSION = 2
-# v1: schema creation. The v1->v2 step (added by phase 2 of
-# PLAN-auth-federation) migrates keys out of the
-# namespace_attributes.keys JSON column.
-NAMESPACE_KEYS_VERSION = 1
+# v1: schema creation. v2: data migration out of the
+# namespace_attributes.keys JSON column. namespace_key_attributes rows
+# are written by that same migration, but it is gated on this table's
+# version, so the attributes table stays at v1.
+NAMESPACE_KEYS_VERSION = 2
 NAMESPACE_KEY_ATTRIBUTES_VERSION = 1
 ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
@@ -2814,8 +2816,11 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_node_attributes_schema(engine))
     results.append(_ensure_namespaces_schema(engine))
     results.append(_ensure_namespace_attributes_schema(engine))
-    results.append(_ensure_namespace_keys_schema(engine))
+    # namespace_key_attributes is ensured before namespace_keys because
+    # the namespace_keys v1->v2 data migration writes rows into it, and
+    # on an upgrading cluster both tables are created by this same call.
     results.append(_ensure_namespace_key_attributes_schema(engine))
+    results.append(_ensure_namespace_keys_schema(engine))
     results.append(_ensure_artifacts_schema(engine))
     results.append(_ensure_artifact_attributes_schema(engine))
     results.append(_ensure_artifact_indexes_schema(engine))
@@ -11279,6 +11284,144 @@ def _get_namespace_key_attributes_table() -> sa.Table:
     return _namespace_key_attributes_table
 
 
+def _migrate_keys_from_namespace_attributes(
+    engine: sa.Engine,
+) -> tuple[int, int]:
+    """Copy nonced_keys JSON entries from namespace_attributes into the key tables.
+
+    Each entry of each namespace's ``keys['nonced_keys']`` dict becomes
+    three rows: the static row in namespace_keys, the secret material in
+    namespace_key_attributes, and an object_states row in state
+    'created' so the key is a real object -- without that last row the
+    key is invisible to the object iterators and to the reaper.
+
+    The hash, the nonce and the expiry are copied verbatim; tokens
+    minted before the migration must keep validating afterwards. Scopes
+    and provenance are NULL, which means "unscoped" until phase 3 of
+    PLAN-auth-federation gives them meaning. Expired entries are
+    migrated too: the reaper deletes them on its first pass, so the
+    migration needs no expiry policy of its own.
+
+    Idempotent: keys that already have a row for their (namespace, name)
+    pair are skipped, and the inserts use INSERT ... ON DUPLICATE KEY
+    UPDATE, so re-running on an already-migrated cluster is a no-op. The
+    skip matters as well as the upsert, because unlike the
+    node_daemon_states precedent the natural key here is a secondary
+    unique index rather than the primary key: blindly upserting would
+    both clobber a key rotated since the migration ran and orphan an
+    attributes row under the losing uuid.
+
+    The JSON column is left in place; it is dropped in a later schema
+    bump once nothing reads it.
+
+    Returns ``(migrated, errors)``.
+    """
+    src = _get_namespace_attributes_table()
+    dst = _get_namespace_keys_table()
+    attrs_dst = _get_namespace_key_attributes_table()
+    states = _get_object_states_table()
+    migrated = 0
+    errors = 0
+
+    with engine.connect() as conn:
+        # Note the subscript: ColumnCollection has a keys() method, so
+        # src.c.keys is that method rather than the JSON column.
+        rows = conn.execute(
+            sa.select(src.c.name, src.c['keys'])
+        ).fetchall()
+
+        # The (namespace, name) pairs which already have a key row.
+        existing = {
+            (r.namespace, r.name)
+            for r in conn.execute(
+                sa.select(dst.c.namespace, dst.c.name)).fetchall()
+        }
+
+        for row in rows:
+            keys = row.keys or {}
+            if not isinstance(keys, dict):
+                LOG.warning(
+                    f'Namespace {row.name} has a malformed keys column, '
+                    f'skipped')
+                errors += 1
+                continue
+            if not keys:
+                continue
+
+            nonced_keys = keys.get('nonced_keys')
+            if not isinstance(nonced_keys, dict):
+                LOG.warning(
+                    f'Namespace {row.name} has malformed nonced_keys, '
+                    f'skipped')
+                errors += 1
+                continue
+
+            for key_name, payload in nonced_keys.items():
+                if (not isinstance(payload, dict)
+                        or 'key' not in payload or 'nonce' not in payload):
+                    LOG.warning(
+                        f'Namespace key {row.name}:{key_name} is malformed, '
+                        f'skipped')
+                    errors += 1
+                    continue
+
+                if (row.name, key_name) in existing:
+                    continue
+
+                try:
+                    key_uuid = uuid4()
+
+                    # version is NamespaceKey.current_version. It cannot
+                    # be imported here -- namespace_key.py imports this
+                    # module -- so it is spelled out, and must be bumped
+                    # with the object.
+                    stmt = sa.dialects.mysql.insert(dst).values(
+                        uuid=key_uuid,
+                        namespace=row.name,
+                        name=key_name,
+                        version=1,
+                    )
+                    stmt = stmt.on_duplicate_key_update(version=1)
+                    conn.execute(stmt)
+
+                    attrs_stmt = sa.dialects.mysql.insert(attrs_dst).values(
+                        uuid=key_uuid,
+                        key=payload['key'],
+                        nonce=payload['nonce'],
+                        expiry=payload.get('expiry'),
+                        scopes=None,
+                        provenance=None,
+                    )
+                    attrs_stmt = attrs_stmt.on_duplicate_key_update(
+                        key=payload['key'],
+                        nonce=payload['nonce'],
+                        expiry=payload.get('expiry'),
+                    )
+                    conn.execute(attrs_stmt)
+
+                    state_stmt = sa.dialects.mysql.insert(states).values(
+                        object_uuid=str(key_uuid),
+                        object_type=ObjectType.NAMESPACE_KEY,
+                        state_value='created',
+                        update_time=time.time(),
+                        message=None,
+                    )
+                    state_stmt = state_stmt.on_duplicate_key_update(
+                        state_value='created')
+                    conn.execute(state_stmt)
+
+                    existing.add((row.name, key_name))
+                    migrated += 1
+                except Exception as e:
+                    LOG.warning(
+                        f'Failed to migrate namespace key '
+                        f'{row.name}:{key_name}: {e}')
+                    errors += 1
+        conn.commit()
+
+    return migrated, errors
+
+
 def _ensure_namespace_keys_schema(engine: sa.Engine) -> dict[str, Any]:
     """Ensure the namespace_keys table schema is up to date."""
     table_name = 'namespace_keys'
@@ -11308,12 +11451,20 @@ def _ensure_namespace_keys_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
-    # PLACEHOLDER FOR STEP 2d OF PLAN-auth-federation-phase-02-key-objects.md
-    # The v1->v2 step calls _migrate_keys_from_namespace_attributes(engine),
-    # which fans every namespace_attributes.keys JSON blob out into this
-    # table. It is deliberately not implemented here: this step (2b) ships
-    # the storage layer only, and NAMESPACE_KEYS_VERSION stays at 1 until
-    # the migration lands.
+    if current_ver < 2:
+        # Fan any pre-existing namespace_attributes.keys JSON content out
+        # into this table and namespace_key_attributes. Skipped
+        # automatically on a fresh cluster because there is nothing to
+        # read. Note that this writes namespace_key_attributes rows, so
+        # ensure_schema() must have created that table already.
+        LOG.info(
+            f'Migrating namespace keys JSON into {table_name} (version 2)')
+        migrated, errors = _migrate_keys_from_namespace_attributes(engine)
+        LOG.info(
+            f'{table_name} migration: {migrated} key(s) copied, '
+            f'{errors} error(s)')
+        current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,
@@ -11349,10 +11500,11 @@ def _ensure_namespace_key_attributes_schema(
         current_ver = 1
         _set_table_version(engine, table_name, current_ver)
 
-    # PLACEHOLDER FOR STEP 2d OF PLAN-auth-federation-phase-02-key-objects.md
-    # The v1->v2 step is driven from _ensure_namespace_keys_schema(); this
-    # table's attribute rows are written by the same migration. Keep the
-    # two versions in lock step when 2d lands.
+    # There is deliberately no v1->v2 step here. The migration out of
+    # namespace_attributes.keys writes rows into this table, but it is
+    # gated on the namespace_keys version (see
+    # _ensure_namespace_keys_schema) because a single migration wants a
+    # single version gate. This table's own schema is still at v1.
 
     return {
         'table': table_name,

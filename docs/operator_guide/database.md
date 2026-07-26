@@ -580,6 +580,7 @@ values (immutable data set at creation time):
 | `blobs` | Blob | uuid, modified, fetched_at, version |
 | `nodes` | Node | uuid, fqdn (unique index), ip, version |
 | `namespaces` | Namespace | name (VARCHAR PK), version |
+| `namespace_keys` | NamespaceKey | uuid, namespace, name, version. UNIQUE index on (namespace, name), which also serves the per-namespace listing |
 | `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
 | `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
 | `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
@@ -599,7 +600,8 @@ dedicated attribute tables:
 |-------|-------------|------------|
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
 | `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; for one transition release the legacy `instances` JSON column is dual-written and unioned into reads so rolling upgrade and rollback both see fresh placements |
-| `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON) |
+| `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON). Keys live in `namespace_keys` / `namespace_key_attributes` since the v2 `namespace_keys` migration; the legacy `keys` JSON column is left in place until a later schema bump drops it |
+| `namespace_key_attributes` | NamespaceKey | uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict) |
 | `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
@@ -620,6 +622,31 @@ read-modify-write cycles are reserved for row creation and schema
 upgrades: with concurrent writers on different nodes, an unmasked write
 pushes a stale snapshot of the other columns over any update committed
 since the writer read the row (a cross-attribute lost update).
+
+Namespace keys used to be anonymous entries inside that row's `keys`
+JSON dict. They are now objects in their own right, so that a key can
+carry an expiry, be listed, reaped, and (in a later release) scoped.
+The static row is one per key, and the hash and nonce live in the
+attribute row because rotating a key replaces both.
+
+Version 2 of `namespace_keys` is a one-shot data migration rather than
+a schema change: `sf-ctl ensure-mariadb-schema` reads every
+`namespace_attributes.keys` blob and fans each `nonced_keys` entry out
+into a static row, an attribute row, and an `object_states` row in
+state `created`. Hashes, nonces and expiries are copied verbatim, so
+tokens issued before the upgrade keep working; scopes and provenance
+are NULL. Expired keys are migrated too and removed by the reaper on
+its next pass. The migration is idempotent — keys which already have a
+row are skipped — so it is safe to re-run.
+
+The legacy JSON column is deliberately left untouched by the
+migration, exactly as the `node_daemon_states` migration left
+`node_attributes.daemon_states` in place. One consequence is worth
+knowing before an upgrade: **rolling back to a pre-upgrade release
+revives the JSON column**, which still holds every key that existed
+before the migration, but keys created or rotated after the migration
+exist only in the new tables and will be invisible to the rolled-back
+code.
 
 #### Node Identity and UUID Persistence
 
