@@ -120,8 +120,12 @@
 # the serial:1 roll takes its gateway down while a peer is still mid-reconnect
 # here, that peer momentarily sees no READY backend ("connections to all
 # backends failing"). A short settle after this gateway is SERVING lets those
-# subchannels reconnect before the next restart. Only meaningful when we
-# actually restarted; skipped on an idempotent no-op redeploy. See #3430.
+# subchannels reconnect before the next restart. The client channel caps its
+# reconnect backoff at 5s (grpc.max_reconnect_backoff_ms in
+# shakenfist/util/grpc_channel.py) precisely so this settle covers the whole
+# reconnect window: the default below must always stay longer than that cap.
+# Only meaningful when we actually restarted; skipped on an idempotent no-op
+# redeploy. See #3430.
 - name: Let clients reconnect to the recovered gateway before the next roll
   ansible.builtin.pause:
     seconds: "{{ sf_database_roll_settle_seconds | default(10) }}"

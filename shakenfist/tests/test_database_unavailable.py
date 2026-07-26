@@ -45,6 +45,47 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             exceptions.DatabaseUnavailable,
             mariadb._grpc_call, method, mock.MagicMock())
+        self.assertEqual(mariadb.GRPC_UNAVAILABLE_RETRIES, method.call_count)
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_unavailable_patience_outlasts_reconnect_backoff(
+            self, mock_stub, mock_reset, mock_time):
+        # UNAVAILABLE fails fast, so it gets a larger retry budget than the
+        # old three attempts: a brief window with no READY backend (the
+        # database-tier rolling restart, #3430) must be ridden out, not
+        # amplified into a cluster-wide DatabaseUnavailable storm. Here the
+        # call only succeeds on the fifth attempt -- beyond the deadline
+        # budget of GRPC_RETRIES, within GRPC_UNAVAILABLE_RETRIES.
+        method = mock.MagicMock(
+            side_effect=[FakeRpcError(grpc.StatusCode.UNAVAILABLE)] * 4 +
+            ['ok'])
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        self.assertEqual('ok', mariadb._grpc_call(method, mock.MagicMock()))
+        self.assertEqual(5, method.call_count)
+        mock_reset.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_deadline_exceeded_capped_below_unavailable_budget(
+            self, mock_stub, mock_reset, mock_time):
+        # Every DEADLINE_EXCEEDED attempt blocks for the full GRPC_TIMEOUT
+        # before failing, so those stay capped at GRPC_RETRIES even though
+        # the fast-failing UNAVAILABLE budget is larger -- otherwise the
+        # extended patience would stretch a wedged-subchannel caller's
+        # worst case from ~1.5 to ~3 minutes.
+        method = mock.MagicMock(
+            side_effect=FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED))
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_call, method, mock.MagicMock())
         self.assertEqual(mariadb.GRPC_RETRIES, method.call_count)
 
     @mock.patch('shakenfist.mariadb.time')

@@ -96,6 +96,32 @@ class MakeDatabaseChannelOptionsTestCase(base.ShakenFistTestCase):
         options = mock_ic.call_args[1]['options']
         self.assertEqual(len(options), len(_DEFAULT_OPTIONS))
 
+    @mock.patch('shakenfist.util.grpc_channel.grpc.insecure_channel')
+    def test_reconnect_backoff_capped_below_roll_settle(self, mock_ic):
+        """The reconnect backoff cap must stay below the deploy settle.
+
+        gRPC's default reconnect backoff grows to 120s, which left
+        clients not redialling a recovered gateway until long after the
+        database-tier roll had moved on to stop the next one -- the
+        "connections to all backends failing" deploy storms of #3430.
+        The node role's roll settle (sf_database_roll_settle_seconds,
+        default 10s) only covers the reconnect window because this cap
+        is shorter than it; keep it that way.
+        """
+        mock_ic.return_value = mock.MagicMock()
+        grpc_channel.make_database_channel(['10.0.0.1'], 13005)
+        options = dict(mock_ic.call_args[1]['options'])
+        self.assertEqual(
+            1000, options.get('grpc.initial_reconnect_backoff_ms'))
+        self.assertEqual(
+            5000, options.get('grpc.max_reconnect_backoff_ms'))
+        self.assertLess(
+            options['grpc.max_reconnect_backoff_ms'], 10000,
+            'grpc.max_reconnect_backoff_ms must stay below the deploy '
+            'roll settle (sf_database_roll_settle_seconds, default 10s) '
+            'or the settle no longer guarantees clients have redialled '
+            'a recovered gateway before the next one restarts')
+
 
 class MakeDatabaseChannelServiceConfigTestCase(base.ShakenFistTestCase):
     """grpc.service_config option carries the expected LB config."""

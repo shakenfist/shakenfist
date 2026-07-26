@@ -1064,3 +1064,34 @@ cleanly" success criterion, extended from sf-api (phase 1) to
 the sf-database tier. Recorded here rather than as a new plan
 because it is a hardening of the health/drain model this plan
 already owns; tracked in #3430.
+
+**Second round (2026-07-26): reconnect backoff.** With all of
+the above deployed, sfcbr still showed 1-2 minute
+"connections to all backends failing" bursts on some deploys
+(2026-07-20, 2026-07-23) — much shorter than the original
+10-20 minutes, but still a storm. The residual mechanism is
+gRPC's default subchannel reconnect backoff: it grows from 1s
+by 1.6x per failed dial to a **120s** ceiling, and
+`round_robin` does not redial a TRANSIENT_FAILURE subchannel
+early while another backend is READY. So after gateway A's
+roll, peers can sit for up to two minutes without redialling
+the recovered A; when the roll then stops gateway B inside
+that window, those peers see no READY backend at all, and the
+client's ~1.5s of total retry patience (three attempts, 0.5/1s
+sleeps) exhausts into a `DatabaseUnavailable` burst that lasts
+until the backoff timers expire. The 07-23 deploy showed this
+exactly: sf-1 rolled at 12:25:48, sf-2 at ~12:36, storm at
+12:35-12:36. The 10s settle assumed reconnect-within-10s; the
+default backoff cap made that assumption false. Fix, two
+layers: (a) cap the client channel's reconnect backoff
+(`grpc.initial_reconnect_backoff_ms=1000`,
+`grpc.max_reconnect_backoff_ms=5000` in
+`util/grpc_channel.py`) so a recovered gateway is redialled
+within 5s and the 10s settle genuinely covers the reconnect
+window — the settle must always stay longer than the cap; and
+(b) give the fast-failing `UNAVAILABLE` path more patience in
+`_grpc_call` (`GRPC_UNAVAILABLE_RETRIES=6`, ~7.5s of
+escalating sleeps, outlasting the 5s cap) so a brief window
+with no READY backend is ridden out rather than amplified,
+while `DEADLINE_EXCEEDED` attempts stay capped at three so the
+worst-case wall time stays bounded.
