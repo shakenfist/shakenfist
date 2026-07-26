@@ -229,17 +229,20 @@ def verify_token(func):
 
 def log_token_use(func):
     def wrapper(*args, **kwargs):
-        auth_header = flask.request.headers.get('Authorization', 'Bearer none')
-        token = auth_header.split(' ')[1]
         namespace, keyname = parse_jwt_identity()
 
         ns = Namespace.from_db(namespace)
         if not ns:
             return sf_api.error(401, 'authenticated namespace not known')
+
+        # NOTE(mikal): the presented token must never appear in the
+        # event. The key name identifies which credential was used,
+        # which is what an audit reader actually needs; the token
+        # itself would be replayable by anyone who can read the
+        # namespace's events.
         ns.add_event(
             EVENT_TYPE_AUDIT, 'token used to authenticate request',
             extra={
-                'token': token,
                 'keyname': keyname,
                 'method': flask.request.environ['REQUEST_METHOD'],
                 'path': flask.request.environ['PATH_INFO'],

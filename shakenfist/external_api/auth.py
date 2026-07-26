@@ -141,12 +141,15 @@ class AuthEndpoint(api_base.Resource):
                     return access_tokens.create_token(
                         namespace_from_db, keyname, keys[keyname]['nonce'])
             except ValueError as e:
+                # The key body held the stored hash and the nonce, so it
+                # cannot go in the event. The error and the key name are
+                # enough to find the malformed key and look at it
+                # directly.
                 namespace_from_db.add_event(
                     EVENT_TYPE_AUDIT, 'namespace key is invalid',
                     extra={
                         'error': str(e),
-                        'key_name': keyname,
-                        'key-body': keys[keyname]
+                        'key_name': keyname
                     })
 
         namespace_from_db.add_event(
@@ -213,16 +216,16 @@ class AuthNamespacesEndpoint(api_base.Resource):
         ns = Namespace.new(namespace)
         ns.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
 
-        # Log this special case of a token being used
-        auth_header = flask.request.headers.get('Authorization', 'Bearer none')
-        token = auth_header.split(' ')[1]
+        # Log this special case of a token being used. As everywhere
+        # else, the token itself is deliberately absent from the event:
+        # the key name says which credential was used, without leaving
+        # a replayable credential in the event log.
         invoking_namespace, keyname = parse_jwt_identity()
         parent_ns = Namespace.from_db(invoking_namespace)
         if parent_ns:
             parent_ns.add_event(
                 EVENT_TYPE_AUDIT, 'token used to create namespace %s' % namespace,
                 extra={
-                    'token': token,
                     'keyname': keyname,
                     'method': flask.request.environ['REQUEST_METHOD'],
                     'path': flask.request.environ['PATH_INFO'],
@@ -232,7 +235,6 @@ class AuthNamespacesEndpoint(api_base.Resource):
         ns.add_event(
             EVENT_TYPE_AUDIT, 'token used to create namespace',
             extra={
-                'token': token,
                 'keyname': keyname,
                 'method': flask.request.environ['REQUEST_METHOD'],
                 'path': flask.request.environ['PATH_INFO'],

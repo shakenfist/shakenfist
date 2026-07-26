@@ -25,12 +25,15 @@ def create_token(
             'nonce': nonce
         },
         expires_delta=datetime.timedelta(minutes=duration))
+    # NOTE(mikal): the token itself must never appear in the event. An
+    # event is readable by anyone who can read the namespace, and a JWT
+    # in an event log is a credential anyone reading it can replay until
+    # it expires.
     ns.add_event(
         EVENT_TYPE_AUDIT, 'token created from key',
         extra={
             'keyname': keyname,
-            'nonce': nonce,
-            'token': token
+            'nonce': nonce
         })
     return {
         'access_token': token,

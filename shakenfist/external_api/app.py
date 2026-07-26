@@ -138,12 +138,35 @@ def _is_health_probe():
     return flask.request.path in api_base.HEALTH_PROBE_PATHS
 
 
+# Request and response bodies are logged verbatim below, which is
+# useful for debugging and unacceptable for the routes which carry
+# credentials: POST /auth is sent a plaintext namespace key and
+# answers with a JWT, and the key management routes are sent key
+# secrets. Every such route lives under /auth, so bodies there are
+# not logged at all. Redacting by field name instead was rejected
+# because "key" means a metadata key name on most endpoints and a
+# secret on only a few, so the check would have to know which route
+# it was on anyway -- and would silently start leaking the day
+# somebody adds a route it had not heard of.
+#
+# The URL is still logged, so an audit reader keeps the namespace and
+# the key name. Only the credential itself is lost.
+def _handles_credentials():
+    path = flask.request.path
+    return path == '/auth' or path.startswith('/auth/')
+
+
+REDACTED_BODY = '...body not logged as this route handles credentials...'
+
+
 @app.before_request
 def log_request_info():
     if _is_health_probe():
         return
 
-    if not flask.request.content_length:
+    if _handles_credentials():
+        body = REDACTED_BODY
+    elif not flask.request.content_length:
         body = ''
     elif flask.request.content_length > 1024:
         body = '...body not logged as greater than 1kb...'
@@ -166,7 +189,9 @@ def log_response_info(response):
     if _is_health_probe():
         return response
 
-    if response.is_streamed:
+    if _handles_credentials():
+        body = REDACTED_BODY
+    elif response.is_streamed:
         body = '...body not logged as it is streamed...'
     elif response.direct_passthrough:
         body = '...body not logged as response is streaming...'

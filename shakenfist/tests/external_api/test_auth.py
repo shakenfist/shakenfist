@@ -926,3 +926,160 @@ class AuthNonceMismatchTestCase(base.ShakenFistTestCase):
         resp = self.client.get('/auth/namespaces',
                                headers={'Authorization': token})
         self.assertEqual(401, resp.status_code)
+
+
+class EventSecretsTestCase(base.ShakenFistTestCase):
+    """Audit events must never carry tokens or key material.
+
+    An event is readable by anyone who can read the object it belongs
+    to, which is a weaker bar than the credential itself clears. A JWT
+    sitting in an event log is replayable until it expires, and a
+    stored key hash is offline-attackable, so neither belongs there.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('banana', 'key1', 'bacon')
+
+        # Intercept at the eventlog rather than on any one object, so
+        # that an event added by some other object type in the same
+        # request is caught too.
+        self.events = []
+        patcher = mock.patch(
+            'shakenfist.eventlog.add_event',
+            side_effect=lambda event_type, object_type, object_uuid, message,
+            duration=None, extra=None, **kwargs: self.events.append(
+                (message, extra or {})))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.client = external_api.app.test_client()
+
+    def _extras_for(self, fragment):
+        """Every recorded extra dict whose message contains ``fragment``."""
+        found = [extra for message, extra in self.events if fragment in message]
+        self.assertNotEqual(
+            [], found,
+            f'no event matching {fragment!r} was recorded, so this test '
+            f'is not exercising what it claims to')
+        return found
+
+    def _assert_absent_everywhere(self, secret):
+        """``secret`` appears in no recorded event, under any key."""
+        for message, extra in self.events:
+            for name, value in extra.items():
+                self.assertNotIn(
+                    secret, str(value),
+                    f'event {message!r} leaked a secret in {name!r}')
+
+    def _mint(self, namespace='banana', key='bacon'):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': namespace, 'key': key}))
+        self.assertEqual(200, resp.status_code)
+        return resp.get_json()['access_token']
+
+    def test_minting_a_token_does_not_log_the_token(self):
+        token = self._mint()
+
+        for extra in self._extras_for('token created from key'):
+            self.assertNotIn('token', extra)
+            self.assertEqual('key1', extra['keyname'])
+        self._assert_absent_everywhere(token)
+
+    def test_using_a_token_does_not_log_the_token(self):
+        token = self._mint()
+        self.events.clear()
+
+        resp = self.client.get(
+            '/auth/namespaces',
+            headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(200, resp.status_code)
+
+        for extra in self._extras_for('token used to authenticate request'):
+            self.assertNotIn('token', extra)
+            # The key name still identifies which credential was used,
+            # which is the part an audit reader actually needs.
+            self.assertEqual('key1', extra['keyname'])
+        self._assert_absent_everywhere(token)
+
+    @mock.patch('shakenfist.locks.ClusterLock')
+    def test_creating_a_namespace_does_not_log_the_token(self, mock_lock):
+        token = self._mint(namespace='system', key='bar')
+        self.events.clear()
+
+        resp = self.client.post(
+            '/auth/namespaces',
+            headers={'Authorization': f'Bearer {token}'},
+            data=json.dumps({'namespace': 'freshly-made'}))
+        self.assertEqual(200, resp.status_code)
+
+        # Both the invoking namespace's event and the new namespace's
+        # own event are checked here.
+        extras = self._extras_for('token used to create namespace')
+        self.assertEqual(2, len(extras))
+        for extra in extras:
+            self.assertNotIn('token', extra)
+            self.assertEqual('key1', extra['keyname'])
+        self._assert_absent_everywhere(token)
+
+    def test_a_malformed_key_does_not_log_the_key_body(self):
+        # The key body held the stored hash and the nonce. Provoke the
+        # ValueError path by making the bcrypt comparison itself fail.
+        with mock.patch('bcrypt.checkpw',
+                        side_effect=ValueError('invalid salt')):
+            resp = self.client.post(
+                '/auth',
+                data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
+        self.assertEqual(401, resp.status_code)
+
+        for extra in self._extras_for('namespace key is invalid'):
+            self.assertNotIn('key-body', extra)
+            # The error and the key name are what make the malformed key
+            # findable, and neither is secret.
+            self.assertEqual('key1', extra['key_name'])
+            self.assertIn('invalid salt', extra['error'])
+
+        stored = Namespace.from_db('banana').lookup_key('key1')
+        self._assert_absent_everywhere(stored.key)
+        self._assert_absent_everywhere(stored.nonce)
+
+    def test_the_request_trace_does_not_log_a_plaintext_key(self):
+        # The API request tracing events in app.py log request and
+        # response bodies verbatim. On /auth that request body is the
+        # namespace's plaintext key -- worse than a token, because it
+        # does not expire.
+        self._mint()
+
+        for extra in self._extras_for('api request received'):
+            self.assertNotIn('bacon', str(extra['body']))
+            # The URL survives, so the trace still says who called what.
+            self.assertIn('/auth', extra['url'])
+        self._assert_absent_everywhere('bacon')
+
+    def test_the_request_trace_still_logs_ordinary_bodies(self):
+        # The redaction is scoped to /auth, so it must not blind the
+        # trace everywhere else.
+        token = self._mint()
+        self.events.clear()
+
+        resp = self.client.get(
+            '/instances', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(200, resp.status_code)
+
+        bodies = [extra['body']
+                  for extra in self._extras_for('api response sent')]
+        for body in bodies:
+            self.assertNotIn('credentials', str(body))
