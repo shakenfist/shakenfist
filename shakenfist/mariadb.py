@@ -54,6 +54,8 @@ from shakenfist.schema.blob_attributes import BlobAttributesData
 from shakenfist.schema.blob_data import BlobData
 from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
+from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
+from shakenfist.schema.namespace_key_data import NamespaceKeyData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_daemon_state import NodeDaemonStateData
 from shakenfist.schema.node_data import NodeData
@@ -256,6 +258,8 @@ _network_interface_attributes_table: Optional[sa.Table] = None
 _networks_table: Optional[sa.Table] = None
 _network_attributes_table: Optional[sa.Table] = None
 _ipams_table: Optional[sa.Table] = None
+_namespace_keys_table: Optional[sa.Table] = None
+_namespace_key_attributes_table: Optional[sa.Table] = None
 _agent_operations_table: Optional[sa.Table] = None
 _agent_operation_attributes_table: Optional[sa.Table] = None
 _instances_table: Optional[sa.Table] = None
@@ -289,6 +293,11 @@ NODES_VERSION = 2
 NODE_ATTRIBUTES_VERSION = 4
 NAMESPACES_VERSION = 2
 NAMESPACE_ATTRIBUTES_VERSION = 2
+# v1: schema creation. The v1->v2 step (added by phase 2 of
+# PLAN-auth-federation) migrates keys out of the
+# namespace_attributes.keys JSON column.
+NAMESPACE_KEYS_VERSION = 1
+NAMESPACE_KEY_ATTRIBUTES_VERSION = 1
 ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
 ARTIFACT_INDEXES_VERSION = 2
@@ -364,6 +373,8 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
     'node_attributes': NODE_ATTRIBUTES_VERSION,
     'namespaces': NAMESPACES_VERSION,
     'namespace_attributes': NAMESPACE_ATTRIBUTES_VERSION,
+    'namespace_keys': NAMESPACE_KEYS_VERSION,
+    'namespace_key_attributes': NAMESPACE_KEY_ATTRIBUTES_VERSION,
     'artifacts': ARTIFACTS_VERSION,
     'artifact_attributes': ARTIFACT_ATTRIBUTES_VERSION,
     'artifact_indexes': ARTIFACT_INDEXES_VERSION,
@@ -2803,6 +2814,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_node_attributes_schema(engine))
     results.append(_ensure_namespaces_schema(engine))
     results.append(_ensure_namespace_attributes_schema(engine))
+    results.append(_ensure_namespace_keys_schema(engine))
+    results.append(_ensure_namespace_key_attributes_schema(engine))
     results.append(_ensure_artifacts_schema(engine))
     results.append(_ensure_artifact_attributes_schema(engine))
     results.append(_ensure_artifact_indexes_schema(engine))
@@ -2868,6 +2881,8 @@ def register_all_tables() -> None:
     _get_node_attributes_table()
     _get_namespaces_table()
     _get_namespace_attributes_table()
+    _get_namespace_keys_table()
+    _get_namespace_key_attributes_table()
     _get_artifacts_table()
     _get_artifact_attributes_table()
     _get_artifact_indexes_table()
@@ -11186,6 +11201,864 @@ def delete_namespace_attributes(name: str) -> bool:
     if _use_database_service():
         return _grpc_delete_namespace_attributes(name)
     return _direct_delete_namespace_attributes(name)
+
+
+# =============================================================================
+# NamespaceKey Table Definitions
+# =============================================================================
+
+# A NamespaceKey as returned by the find accessor: the static row and
+# its attributes row, already joined. /auth needs the bcrypt hash for
+# every key in a namespace, so returning the pair avoids a second read
+# per key on the mint hot path.
+NamespaceKeyRow = tuple[NamespaceKeyData, NamespaceKeyAttributesData]
+
+
+# The (namespace, name) pair must be unique, but that index cannot be
+# declared on the Pydantic model: SQLUniqueIndex is a per-field marker
+# (one column only), and both the json_schema_extra 'sql_indexes' path
+# and the ``indexes`` parameter of pydantic_to_sqlalchemy_table
+# hard-code unique=False. So we build it by hand here, in the same
+# spirit as the composite UNIQUE that
+# _ensure_cluster_operation_targets_schema() adds. MariaDB has
+# supported CREATE INDEX ... IF NOT EXISTS since 10.1.4, comfortably
+# below MIN_MARIADB_VERSION, so the statement is safely idempotent.
+NAMESPACE_KEYS_UNIQUE_INDEX_SQL = (
+    'CREATE UNIQUE INDEX IF NOT EXISTS uidx_namespace_keys_namespace_name '
+    'ON namespace_keys (namespace, name)')
+
+
+def _get_namespace_keys_table() -> sa.Table:
+    """Get or create the namespace_keys table definition.
+
+    This table stores static values for NamespaceKey objects. A
+    NamespaceKey is an authentication key owned by a namespace; JWT
+    identity strings of the form "<namespace>:<keyname>" name one.
+
+    The table schema is generated from the NamespaceKeyData Pydantic
+    model. The uuid is the primary key, with an index on namespace and
+    a hand-built UNIQUE index on (namespace, name).
+    """
+    global _namespace_keys_table
+    if _namespace_keys_table is None:
+        with TABLE_CREATION_LOCK:
+            if _namespace_keys_table is not None:
+                return _namespace_keys_table
+            metadata = _get_metadata()
+            _namespace_keys_table = pydantic_to_sqlalchemy_table(
+                NamespaceKeyData,
+                'namespace_keys',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+    return _namespace_keys_table
+
+
+def _get_namespace_key_attributes_table() -> sa.Table:
+    """Get or create the namespace_key_attributes table definition.
+
+    This table stores the mutable attributes of a NamespaceKey: the
+    base64-encoded bcrypt hash, the nonce, and the expiry, scopes and
+    provenance policy fields. Rotation mutates the hash and nonce,
+    which is why they live here rather than in namespace_keys.
+    """
+    global _namespace_key_attributes_table
+    if _namespace_key_attributes_table is None:
+        with TABLE_CREATION_LOCK:
+            if _namespace_key_attributes_table is not None:
+                return _namespace_key_attributes_table
+            metadata = _get_metadata()
+            _namespace_key_attributes_table = pydantic_to_sqlalchemy_table(
+                NamespaceKeyAttributesData,
+                'namespace_key_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+    return _namespace_key_attributes_table
+
+
+def _ensure_namespace_keys_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the namespace_keys table schema is up to date."""
+    table_name = 'namespace_keys'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_namespace_keys_table()
+
+    # Version 0 or -1 means the table doesn't exist yet - create it at
+    # v1. This table postdates the etcd purge, so there is no
+    # data-import version step to skip.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+            # The composite UNIQUE index the model cannot express. See
+            # the comment on NAMESPACE_KEYS_UNIQUE_INDEX_SQL above.
+            conn.execute(sa.text(NAMESPACE_KEYS_UNIQUE_INDEX_SQL))
+            conn.commit()
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    # PLACEHOLDER FOR STEP 2d OF PLAN-auth-federation-phase-02-key-objects.md
+    # The v1->v2 step calls _migrate_keys_from_namespace_attributes(engine),
+    # which fans every namespace_attributes.keys JSON blob out into this
+    # table. It is deliberately not implemented here: this step (2b) ships
+    # the storage layer only, and NAMESPACE_KEYS_VERSION stays at 1 until
+    # the migration lands.
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NAMESPACE_KEYS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_namespace_key_attributes_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the namespace_key_attributes table schema is up to date."""
+    table_name = 'namespace_key_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_namespace_key_attributes_table()
+
+    # Version 0 or -1 means the table doesn't exist yet - create it at
+    # v1. This table postdates the etcd purge, so there is no
+    # data-import version step to skip.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    # PLACEHOLDER FOR STEP 2d OF PLAN-auth-federation-phase-02-key-objects.md
+    # The v1->v2 step is driven from _ensure_namespace_keys_schema(); this
+    # table's attribute rows are written by the same migration. Keep the
+    # two versions in lock step when 2d lands.
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NAMESPACE_KEY_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# NamespaceKey Direct Access Functions
+# These are used by the database daemon for NamespaceKey object storage.
+# =============================================================================
+
+def _decode_optional_json_list(value: Any) -> Optional[list[str]]:
+    """Decode a nullable JSON list column into a list, or None."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        decoded: Optional[list[str]] = json.loads(value)
+        return decoded
+    return cast(Optional[list[str]], value)
+
+
+def _decode_optional_json_dict(value: Any) -> Optional[dict[str, Any]]:
+    """Decode a nullable JSON dict column into a dict, or None."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        decoded: Optional[dict[str, Any]] = json.loads(value)
+        return decoded
+    return cast(Optional[dict[str, Any]], value)
+
+
+def _direct_create_namespace_key(data: NamespaceKeyData) -> bool:
+    """Create a NamespaceKey record in MariaDB.
+
+    Args:
+        data: The NamespaceKeyData to insert.
+
+    Returns:
+        True if created successfully, False if the uuid or the
+        (namespace, name) pair already exists, or on error.
+    """
+    engine = _get_engine()
+    table = _get_namespace_keys_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                namespace=data.namespace,
+                name=data.name,
+                version=data.version
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for namespace_key {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_namespace_key(
+        key_uuid: UUID) -> Optional[NamespaceKeyData]:
+    """Get NamespaceKey static values from MariaDB.
+
+    Args:
+        key_uuid: The UUID of the NamespaceKey.
+
+    Returns:
+        A NamespaceKeyData object, or None if not found.
+    """
+    engine = _get_engine()
+    table = _get_namespace_keys_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == key_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NamespaceKeyData(
+                uuid=result.uuid,
+                namespace=result.namespace,
+                name=result.name,
+                version=result.version
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for namespace_key {key_uuid}: {e}')
+        return None
+
+
+def _direct_delete_namespace_key(key_uuid: UUID) -> bool:
+    """Delete a NamespaceKey record from MariaDB.
+
+    Args:
+        key_uuid: The UUID of the NamespaceKey to delete.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    engine = _get_engine()
+    table = _get_namespace_keys_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == key_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for namespace_key {key_uuid}: {e}')
+        return False
+
+
+def _direct_find_namespace_keys(
+        namespace: str,
+        include_expired: bool,
+        now: float) -> list[NamespaceKeyRow]:
+    """List a namespace's keys, joined with their attributes.
+
+    The namespace lookup is served by the leading column of the
+    (namespace, name) unique index, and the expiry filter is pushed
+    into SQL so /auth never bcrypt-compares a key it is going to
+    reject anyway.
+
+    Args:
+        namespace: The owning namespace's name.
+        include_expired: If False, rows whose expiry is non-NULL and
+            not in the future relative to ``now`` are filtered out in
+            SQL. If True, every key in the namespace is returned.
+        now: The epoch seconds to compare expiry against. Ignored when
+            include_expired is True.
+
+    Returns:
+        A list of (static, attributes) pairs, empty on error.
+    """
+    engine = _get_engine()
+    table = _get_namespace_keys_table()
+    attrs_table = _get_namespace_key_attributes_table()
+
+    stmt = sa.select(
+        table.c.uuid,
+        table.c.namespace,
+        table.c.name,
+        table.c.version,
+        attrs_table.c.key,
+        attrs_table.c.nonce,
+        attrs_table.c.expiry,
+        attrs_table.c.scopes,
+        attrs_table.c.provenance
+    ).select_from(
+        table.join(attrs_table, attrs_table.c.uuid == table.c.uuid)
+    ).where(table.c.namespace == namespace)
+
+    if not include_expired:
+        stmt = stmt.where(
+            sa.or_(
+                attrs_table.c.expiry.is_(None),
+                attrs_table.c.expiry > now
+            )
+        )
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(stmt).fetchall()
+            return [
+                (
+                    NamespaceKeyData(
+                        uuid=row.uuid,
+                        namespace=row.namespace,
+                        name=row.name,
+                        version=row.version
+                    ),
+                    NamespaceKeyAttributesData(
+                        uuid=row.uuid,
+                        key=row.key,
+                        nonce=row.nonce,
+                        expiry=row.expiry,
+                        scopes=_decode_optional_json_list(row.scopes),
+                        provenance=_decode_optional_json_dict(row.provenance)
+                    )
+                )
+                for row in rows
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB find failed for namespace_keys '
+            f'(namespace={namespace!r}, '
+            f'include_expired={include_expired!r}): {e}')
+        return []
+
+
+def _direct_delete_expired_namespace_keys(older_than: float) -> int:
+    """Hard delete keys which expired before ``older_than``.
+
+    Removes both the attributes row and the static row. Keys with a
+    NULL expiry never expire and are never touched. Object state rows
+    and lifecycle events are the object layer's business, not this
+    function's -- callers that want the full soft-delete lifecycle
+    should drive it through the NamespaceKey object instead.
+
+    Args:
+        older_than: Unix timestamp. Keys with expiry < this are
+            deleted.
+
+    Returns:
+        Number of deleted keys.
+    """
+    engine = _get_engine()
+    table = _get_namespace_keys_table()
+    attrs_table = _get_namespace_key_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            expired = sa.select(attrs_table.c.uuid).where(
+                sa.and_(
+                    attrs_table.c.expiry.is_not(None),
+                    attrs_table.c.expiry < older_than
+                )
+            )
+            uuids = [row.uuid for row in conn.execute(expired).fetchall()]
+            if not uuids:
+                return 0
+
+            conn.execute(
+                sa.delete(attrs_table).where(attrs_table.c.uuid.in_(uuids)))
+            result = conn.execute(
+                sa.delete(table).where(table.c.uuid.in_(uuids)))
+            conn.commit()
+            return result.rowcount
+    except OperationalError as e:
+        LOG.warning(f'MariaDB delete_expired_namespace_keys failed: {e}')
+        return 0
+
+
+# =============================================================================
+# NamespaceKey Attributes Direct Access Functions
+# =============================================================================
+
+def _direct_create_namespace_key_attributes(
+        data: NamespaceKeyAttributesData) -> bool:
+    """Create a namespace_key_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_namespace_key_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                key=data.key,
+                nonce=data.nonce,
+                expiry=data.expiry,
+                scopes=(None if data.scopes is None
+                        else _json_dumps(data.scopes)),
+                provenance=(None if data.provenance is None
+                            else _json_dumps(data.provenance))
+            )
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for '
+            f'namespace_key_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_get_namespace_key_attributes(
+        key_uuid: UUID) -> Optional[NamespaceKeyAttributesData]:
+    """Get NamespaceKey attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_namespace_key_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == key_uuid)
+            result = conn.execute(stmt).fetchone()
+
+            if result is None:
+                return None
+
+            return NamespaceKeyAttributesData(
+                uuid=result.uuid,
+                key=result.key,
+                nonce=result.nonce,
+                expiry=result.expiry,
+                scopes=_decode_optional_json_list(result.scopes),
+                provenance=_decode_optional_json_dict(result.provenance)
+            )
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for '
+            f'namespace_key_attributes {key_uuid}: {e}')
+        return None
+
+
+def _direct_update_namespace_key_attributes(
+        data: NamespaceKeyAttributesData) -> bool:
+    """Update NamespaceKey attributes in MariaDB."""
+    engine = _get_engine()
+    table = _get_namespace_key_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                key=data.key,
+                nonce=data.nonce,
+                expiry=data.expiry,
+                scopes=(None if data.scopes is None
+                        else _json_dumps(data.scopes)),
+                provenance=(None if data.provenance is None
+                            else _json_dumps(data.provenance))
+            )
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB update failed for '
+            f'namespace_key_attributes {data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_namespace_key_attributes(key_uuid: UUID) -> bool:
+    """Delete NamespaceKey attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_namespace_key_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == key_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for '
+            f'namespace_key_attributes {key_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# NamespaceKey gRPC Client Functions
+# These call the database microservice for NamespaceKey operations.
+# =============================================================================
+
+def _namespace_key_to_proto(
+        data: NamespaceKeyData) -> 'database_pb2.NamespaceKeyStaticData':
+    """Build a NamespaceKeyStaticData proto from the model."""
+    return database_pb2.NamespaceKeyStaticData(
+        uuid=str(data.uuid),
+        namespace=data.namespace,
+        name=data.name,
+        version=data.version
+    )
+
+
+def _namespace_key_from_proto(
+        d: 'database_pb2.NamespaceKeyStaticData') -> NamespaceKeyData:
+    """Build a NamespaceKeyData model from its proto."""
+    return NamespaceKeyData(
+        uuid=UUID(d.uuid),
+        namespace=d.namespace,
+        name=d.name,
+        version=d.version
+    )
+
+
+def _namespace_key_attrs_to_proto(
+        data: NamespaceKeyAttributesData
+) -> 'database_pb2.NamespaceKeyAttributesProto':
+    """Build a NamespaceKeyAttributesProto from the model.
+
+    Nullable fields use proto3 field presence: expiry, scopes_json and
+    provenance_json are simply left unset when the model value is
+    None, so NULL survives the round trip.
+    """
+    proto = database_pb2.NamespaceKeyAttributesProto(
+        uuid=str(data.uuid),
+        key=data.key,
+        nonce=data.nonce
+    )
+    if data.expiry is not None:
+        proto.expiry = data.expiry
+    if data.scopes is not None:
+        proto.scopes_json = _json_dumps(data.scopes)
+    if data.provenance is not None:
+        proto.provenance_json = _json_dumps(data.provenance)
+    return proto
+
+
+def _namespace_key_attrs_from_proto(
+        d: 'database_pb2.NamespaceKeyAttributesProto'
+) -> NamespaceKeyAttributesData:
+    """Build a NamespaceKeyAttributesData model from its proto."""
+    return NamespaceKeyAttributesData(
+        uuid=UUID(d.uuid),
+        key=d.key,
+        nonce=d.nonce,
+        expiry=d.expiry if d.HasField('expiry') else None,
+        scopes=(json.loads(d.scopes_json)
+                if d.HasField('scopes_json') else None),
+        provenance=(json.loads(d.provenance_json)
+                    if d.HasField('provenance_json') else None)
+    )
+
+
+def _grpc_create_namespace_key(data: NamespaceKeyData) -> bool:
+    """Create a NamespaceKey record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNamespaceKeyRequest(
+            data=_namespace_key_to_proto(data))
+        reply = _grpc_call(stub.CreateNamespaceKey, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC CreateNamespaceKey failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_namespace_key(
+        key_uuid: UUID) -> Optional[NamespaceKeyData]:
+    """Get NamespaceKey static values via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNamespaceKeyRequest(uuid=str(key_uuid))
+        reply = _grpc_call(stub.GetNamespaceKey, request)
+        if not reply.found:
+            return None
+        return _namespace_key_from_proto(reply.data)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetNamespaceKey failed for {key_uuid}: {e}')
+        return None
+
+
+def _grpc_delete_namespace_key(key_uuid: UUID) -> bool:
+    """Delete a NamespaceKey record via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNamespaceKeyRequest(uuid=str(key_uuid))
+        reply = _grpc_call(stub.DeleteNamespaceKey, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC DeleteNamespaceKey failed for {key_uuid}: {e}')
+        return False
+
+
+def _grpc_find_namespace_keys(
+        namespace: str,
+        include_expired: bool,
+        now: float) -> list[NamespaceKeyRow]:
+    """List a namespace's keys via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.FindNamespaceKeysRequest(
+            namespace=namespace,
+            include_expired=include_expired,
+            now=now)
+        reply = _grpc_call(stub.FindNamespaceKeys, request)
+        return [
+            (
+                _namespace_key_from_proto(k.static_data),
+                _namespace_key_attrs_from_proto(k.attributes)
+            )
+            for k in reply.keys
+        ]
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC FindNamespaceKeys failed for {namespace}: {e}')
+        return []
+
+
+def _grpc_delete_expired_namespace_keys(older_than: float) -> int:
+    """Delete expired NamespaceKeys via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteExpiredNamespaceKeysRequest(
+            older_than=older_than)
+        reply = _grpc_call(stub.DeleteExpiredNamespaceKeys, request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC DeleteExpiredNamespaceKeys failed: {e}')
+        return 0
+
+
+def _grpc_create_namespace_key_attributes(
+        data: NamespaceKeyAttributesData) -> bool:
+    """Create NamespaceKey attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateNamespaceKeyAttributesRequest(
+            data=_namespace_key_attrs_to_proto(data))
+        reply = _grpc_call(stub.CreateNamespaceKeyAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC CreateNamespaceKeyAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_namespace_key_attributes(
+        key_uuid: UUID) -> Optional[NamespaceKeyAttributesData]:
+    """Get NamespaceKey attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetNamespaceKeyAttributesRequest(
+            uuid=str(key_uuid))
+        reply = _grpc_call(stub.GetNamespaceKeyAttributes, request)
+        if not reply.found:
+            return None
+        return _namespace_key_attrs_from_proto(reply.data)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetNamespaceKeyAttributes failed for '
+            f'{key_uuid}: {e}')
+        return None
+
+
+def _grpc_update_namespace_key_attributes(
+        data: NamespaceKeyAttributesData) -> bool:
+    """Update NamespaceKey attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateNamespaceKeyAttributesRequest(
+            data=_namespace_key_attrs_to_proto(data))
+        reply = _grpc_call(stub.UpdateNamespaceKeyAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC UpdateNamespaceKeyAttributes failed for '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_namespace_key_attributes(key_uuid: UUID) -> bool:
+    """Delete NamespaceKey attributes via the database service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteNamespaceKeyAttributesRequest(
+            uuid=str(key_uuid))
+        reply = _grpc_call(stub.DeleteNamespaceKeyAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC DeleteNamespaceKeyAttributes failed for '
+            f'{key_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# NamespaceKey Public API Functions
+# These route to either direct or gRPC access based on configuration.
+# =============================================================================
+
+def create_namespace_key(data: NamespaceKeyData) -> bool:
+    """Create a NamespaceKey record.
+
+    Args:
+        data: The NamespaceKeyData to insert.
+
+    Returns:
+        True if created, False if it already exists or on error.
+    """
+    if _use_database_service():
+        return _grpc_create_namespace_key(data)
+    return _direct_create_namespace_key(data)
+
+
+def get_namespace_key(key_uuid: UUID) -> Optional[NamespaceKeyData]:
+    """Get NamespaceKey static values.
+
+    Args:
+        key_uuid: The UUID of the NamespaceKey.
+
+    Returns:
+        A NamespaceKeyData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_namespace_key(key_uuid)
+    return _direct_get_namespace_key(key_uuid)
+
+
+def delete_namespace_key(key_uuid: UUID) -> bool:
+    """Delete a NamespaceKey record.
+
+    Args:
+        key_uuid: The UUID of the NamespaceKey.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_namespace_key(key_uuid)
+    return _direct_delete_namespace_key(key_uuid)
+
+
+def find_namespace_keys(
+        namespace: str,
+        include_expired: bool = False,
+        now: Optional[float] = None) -> list[NamespaceKeyRow]:
+    """List a namespace's keys, joined with their attributes.
+
+    Args:
+        namespace: The owning namespace's name.
+        include_expired: If False (the default), expired keys are
+            filtered out in SQL.
+        now: The epoch seconds to compare expiry against. Defaults to
+            the current time.
+
+    Returns:
+        A list of (static, attributes) pairs.
+    """
+    if now is None:
+        now = time.time()
+    if _use_database_service():
+        return _grpc_find_namespace_keys(namespace, include_expired, now)
+    return _direct_find_namespace_keys(namespace, include_expired, now)
+
+
+def delete_expired_namespace_keys(older_than: float) -> int:
+    """Hard delete keys which expired before ``older_than``.
+
+    Args:
+        older_than: Unix timestamp. Keys with expiry < this are
+            deleted.
+
+    Returns:
+        Number of deleted keys.
+    """
+    if _use_database_service():
+        return _grpc_delete_expired_namespace_keys(older_than)
+    return _direct_delete_expired_namespace_keys(older_than)
+
+
+def create_namespace_key_attributes(
+        data: NamespaceKeyAttributesData) -> bool:
+    """Create a NamespaceKey attributes record.
+
+    Args:
+        data: The NamespaceKeyAttributesData to create.
+
+    Returns:
+        True if created, False if it already exists or on error.
+    """
+    if _use_database_service():
+        return _grpc_create_namespace_key_attributes(data)
+    return _direct_create_namespace_key_attributes(data)
+
+
+def get_namespace_key_attributes(
+        key_uuid: UUID) -> Optional[NamespaceKeyAttributesData]:
+    """Get NamespaceKey attributes.
+
+    Args:
+        key_uuid: The UUID of the NamespaceKey.
+
+    Returns:
+        A NamespaceKeyAttributesData object, or None if not found.
+    """
+    if _use_database_service():
+        return _grpc_get_namespace_key_attributes(key_uuid)
+    return _direct_get_namespace_key_attributes(key_uuid)
+
+
+def update_namespace_key_attributes(
+        data: NamespaceKeyAttributesData) -> bool:
+    """Update NamespaceKey attributes.
+
+    Args:
+        data: The NamespaceKeyAttributesData with updated values.
+
+    Returns:
+        True if updated, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_update_namespace_key_attributes(data)
+    return _direct_update_namespace_key_attributes(data)
+
+
+def delete_namespace_key_attributes(key_uuid: UUID) -> bool:
+    """Delete NamespaceKey attributes.
+
+    Args:
+        key_uuid: The UUID of the NamespaceKey.
+
+    Returns:
+        True if deleted, False if not found or error.
+    """
+    if _use_database_service():
+        return _grpc_delete_namespace_key_attributes(key_uuid)
+    return _direct_delete_namespace_key_attributes(key_uuid)
 
 
 # =============================================================================

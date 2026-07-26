@@ -3131,6 +3131,184 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             floating_gateway=data.floating_gateway or '',
             hosteddns_json=json.dumps(data.hosteddns))
 
+    # NamespaceKey Operations (MariaDB)
+
+    def CreateNamespaceKey(
+        self,
+        request: database_pb2.CreateNamespaceKeyRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create a NamespaceKey record in MariaDB."""
+        try:
+            self.monitor.counters['create_namespace_key'].inc()
+            data = mariadb._namespace_key_from_proto(request.data)
+            success = mariadb._direct_create_namespace_key(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateNamespaceKey failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetNamespaceKey(
+        self,
+        request: database_pb2.GetNamespaceKeyRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNamespaceKeyReply:
+        """Get NamespaceKey static values from MariaDB."""
+        try:
+            self.monitor.counters['get_namespace_key'].inc()
+            data = mariadb._direct_get_namespace_key(UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetNamespaceKeyReply(found=False)
+            return database_pb2.GetNamespaceKeyReply(
+                found=True,
+                data=mariadb._namespace_key_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNamespaceKey failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNamespaceKeyReply(found=False)
+
+    def FindNamespaceKeys(
+        self,
+        request: database_pb2.FindNamespaceKeysRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindNamespaceKeysReply:
+        """List a namespace's keys, joined with their attributes."""
+        try:
+            self.monitor.counters['find_namespace_keys'].inc()
+            rows = mariadb._direct_find_namespace_keys(
+                request.namespace, request.include_expired, request.now)
+            return database_pb2.FindNamespaceKeysReply(
+                keys=[
+                    database_pb2.NamespaceKeyJoinedProto(
+                        static_data=mariadb._namespace_key_to_proto(
+                            static_data),
+                        attributes=mariadb._namespace_key_attrs_to_proto(
+                            attributes))
+                    for static_data, attributes in rows
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindNamespaceKeys failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.FindNamespaceKeysReply(keys=[])
+
+    def DeleteNamespaceKey(
+        self,
+        request: database_pb2.DeleteNamespaceKeyRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete a NamespaceKey record from MariaDB."""
+        try:
+            self.monitor.counters['delete_namespace_key'].inc()
+            success = mariadb._direct_delete_namespace_key(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNamespaceKey failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DeleteExpiredNamespaceKeys(
+        self,
+        request: database_pb2.DeleteExpiredNamespaceKeysRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteCountReply:
+        """Hard delete keys which expired before older_than."""
+        try:
+            self.monitor.counters['delete_expired_namespace_keys'].inc()
+            count = mariadb._direct_delete_expired_namespace_keys(
+                request.older_than)
+            return database_pb2.DeleteCountReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteExpiredNamespaceKeys failed', e)
+            return database_pb2.DeleteCountReply(count=0)
+
+    # NamespaceKey Attributes Operations (MariaDB)
+
+    def CreateNamespaceKeyAttributes(
+        self,
+        request: database_pb2.CreateNamespaceKeyAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Create NamespaceKey attributes in MariaDB."""
+        try:
+            self.monitor.counters[
+                'create_namespace_key_attributes'].inc()
+            data = mariadb._namespace_key_attrs_from_proto(request.data)
+            success = mariadb._direct_create_namespace_key_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CreateNamespaceKeyAttributes failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def GetNamespaceKeyAttributes(
+        self,
+        request: database_pb2.GetNamespaceKeyAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNamespaceKeyAttributesReply:
+        """Get NamespaceKey attributes from MariaDB."""
+        try:
+            self.monitor.counters['get_namespace_key_attributes'].inc()
+            data = mariadb._direct_get_namespace_key_attributes(
+                UUID(request.uuid))
+            if data is None:
+                return database_pb2.GetNamespaceKeyAttributesReply(
+                    found=False)
+            return database_pb2.GetNamespaceKeyAttributesReply(
+                found=True,
+                data=mariadb._namespace_key_attrs_to_proto(data))
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNamespaceKeyAttributes failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNamespaceKeyAttributesReply(found=False)
+
+    def UpdateNamespaceKeyAttributes(
+        self,
+        request: database_pb2.UpdateNamespaceKeyAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Update NamespaceKey attributes in MariaDB."""
+        try:
+            self.monitor.counters[
+                'update_namespace_key_attributes'].inc()
+            data = mariadb._namespace_key_attrs_from_proto(request.data)
+            success = mariadb._direct_update_namespace_key_attributes(data)
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database UpdateNamespaceKeyAttributes failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
+    def DeleteNamespaceKeyAttributes(
+        self,
+        request: database_pb2.DeleteNamespaceKeyAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Delete NamespaceKey attributes from MariaDB."""
+        try:
+            self.monitor.counters[
+                'delete_namespace_key_attributes'].inc()
+            success = mariadb._direct_delete_namespace_key_attributes(
+                UUID(request.uuid))
+            return database_pb2.StatusReply(success=success, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteNamespaceKeyAttributes failed', e)
+            return database_pb2.StatusReply(
+                success=False, error=str(e))
+
     # AgentOperation Operations (MariaDB)
 
     def CreateAgentOperation(
@@ -5087,6 +5265,15 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_namespace_attributes',
             'update_namespace_attributes',
             'delete_namespace_attributes',
+            # MariaDB namespace key operations
+            'create_namespace_key', 'get_namespace_key',
+            'find_namespace_keys', 'delete_namespace_key',
+            'delete_expired_namespace_keys',
+            # MariaDB namespace key attributes operations
+            'create_namespace_key_attributes',
+            'get_namespace_key_attributes',
+            'update_namespace_key_attributes',
+            'delete_namespace_key_attributes',
             # MariaDB network interface operations
             'create_network_interface', 'get_network_interface',
             'get_network_interfaces_by_instance',

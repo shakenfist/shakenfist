@@ -223,6 +223,24 @@ service DatabaseService {
   rpc UpdateNetworkAttributes (UpdateNetworkAttributesRequest) returns (StatusReply) {}
   rpc DeleteNetworkAttributes (DeleteNetworkAttributesRequest) returns (StatusReply) {}
 
+  // NamespaceKey Operations (MariaDB)
+  // These manage NamespaceKey static values in MariaDB. A NamespaceKey is an
+  // authentication key owned by a namespace; JWT identity strings of the form
+  // "<namespace>:<keyname>" name one.
+  rpc CreateNamespaceKey (CreateNamespaceKeyRequest) returns (StatusReply) {}
+  rpc GetNamespaceKey (GetNamespaceKeyRequest) returns (GetNamespaceKeyReply) {}
+  rpc FindNamespaceKeys (FindNamespaceKeysRequest) returns (FindNamespaceKeysReply) {}
+  rpc DeleteNamespaceKey (DeleteNamespaceKeyRequest) returns (StatusReply) {}
+  rpc DeleteExpiredNamespaceKeys (DeleteExpiredNamespaceKeysRequest) returns (DeleteCountReply) {}
+
+  // NamespaceKey Attributes Operations (MariaDB)
+  // These store mutable NamespaceKey attributes (hash, nonce, expiry, scopes,
+  // provenance). Rotation mutates the hash and nonce.
+  rpc CreateNamespaceKeyAttributes (CreateNamespaceKeyAttributesRequest) returns (StatusReply) {}
+  rpc GetNamespaceKeyAttributes (GetNamespaceKeyAttributesRequest) returns (GetNamespaceKeyAttributesReply) {}
+  rpc UpdateNamespaceKeyAttributes (UpdateNamespaceKeyAttributesRequest) returns (StatusReply) {}
+  rpc DeleteNamespaceKeyAttributes (DeleteNamespaceKeyAttributesRequest) returns (StatusReply) {}
+
   // AgentOperation Operations (MariaDB)
   // These manage AgentOperation static values in MariaDB. AgentOperations
   // represent in-guest agent tasks (execute, get-file, put-blob, chmod).
@@ -1632,6 +1650,93 @@ message UpdateNetworkAttributesRequest {
 }
 
 message DeleteNetworkAttributesRequest {
+  string uuid = 1;
+}
+
+// NamespaceKey Operations (MariaDB)
+// These manage NamespaceKey static values. A NamespaceKey is an
+// authentication key owned by a namespace; the (namespace, name) pair
+// is unique.
+
+message NamespaceKeyStaticData {
+  string uuid = 1;            // NamespaceKey UUID
+  string namespace = 2;       // Owning namespace name
+  string name = 3;            // Key name, unique within the namespace
+  int32 version = 4;          // Schema version
+}
+
+// NamespaceKey Attributes Operations (MariaDB)
+// These store the mutable attributes of a key. expiry, scopes_json and
+// provenance_json use proto3 field presence: absent means SQL NULL,
+// which for expiry means "never expires" and for scopes means
+// "unscoped / wildcard".
+
+message NamespaceKeyAttributesProto {
+  string uuid = 1;                     // References namespace_keys.uuid
+  string key = 2;                      // Base64-encoded bcrypt hash
+  string nonce = 3;                    // Token nonce
+  optional double expiry = 4;          // Epoch seconds; absent = never expires
+  optional string scopes_json = 5;     // JSON-encoded list of scope strings
+  optional string provenance_json = 6; // JSON-encoded provenance dict
+}
+
+// A key and its attributes, as returned by the indexed per-namespace
+// listing. Joined server side so /auth does not need a second round
+// trip per key to reach the hash.
+message NamespaceKeyJoinedProto {
+  NamespaceKeyStaticData static_data = 1;
+  NamespaceKeyAttributesProto attributes = 2;
+}
+
+message CreateNamespaceKeyRequest {
+  NamespaceKeyStaticData data = 1;
+}
+
+message GetNamespaceKeyRequest {
+  string uuid = 1;
+}
+
+message GetNamespaceKeyReply {
+  bool found = 1;
+  NamespaceKeyStaticData data = 2;
+}
+
+message FindNamespaceKeysRequest {
+  string namespace = 1;       // Owning namespace name
+  bool include_expired = 2;   // False applies the expiry filter in SQL
+  double now = 3;             // Epoch seconds compared against expiry
+}
+
+message FindNamespaceKeysReply {
+  repeated NamespaceKeyJoinedProto keys = 1;
+}
+
+message DeleteNamespaceKeyRequest {
+  string uuid = 1;
+}
+
+message DeleteExpiredNamespaceKeysRequest {
+  double older_than = 1;      // Keys with expiry < this are deleted
+}
+
+message CreateNamespaceKeyAttributesRequest {
+  NamespaceKeyAttributesProto data = 1;
+}
+
+message GetNamespaceKeyAttributesRequest {
+  string uuid = 1;
+}
+
+message GetNamespaceKeyAttributesReply {
+  bool found = 1;
+  NamespaceKeyAttributesProto data = 2;
+}
+
+message UpdateNamespaceKeyAttributesRequest {
+  NamespaceKeyAttributesProto data = 1;
+}
+
+message DeleteNamespaceKeyAttributesRequest {
   string uuid = 1;
 }
 
