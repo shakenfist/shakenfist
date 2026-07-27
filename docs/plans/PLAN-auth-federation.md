@@ -398,11 +398,29 @@ groundwork exists, and lives mostly outside this repository.
 | 3. Federated exchange and scope enforcement | PLAN-auth-federation-phase-03-exchange.md | Not started |
 | 4. Authentication documentation | PLAN-auth-federation-phase-04-docs.md | Not started |
 | 5. OIDC plan refresh | PLAN-auth-federation-phase-05-oidc-plan-refresh.md | Not started |
+| 6. Secrets that cannot be logged by accident | PLAN-auth-federation-phase-06-secret-types.md | Not started |
+| 7. Recognisable secrets and leak detection | PLAN-auth-federation-phase-07-secret-format.md | Not started |
 
-Phase plans for phases 2–5 have not been drafted yet; the
+Phase plans for phases 3–7 have not been drafted yet; the
 open questions above should be resolved (or explicitly
 carried into the relevant phase plan) before each phase is
 cut.
+
+Phases 6 and 7 came out of phase 2's step 2g, which removed
+five separate sites that wrote credentials into audit
+events. Four were known when the phase was planned; the
+fifth was found only because the tests asserted the secret
+appeared *nowhere* in any event rather than checking the
+named field was gone. Two rounds of the same bug in one
+phase is the argument for both: phase 6 makes the mistake
+hard to make, phase 7 makes it detectable when it is made
+anyway.
+
+Neither blocks phases 3–5, with one ordering preference:
+**phase 7's secret format should be settled before phase 3
+mints its first exchange key**, or keys minted in between
+will not match the scanners. If phase 3 runs first it should
+adopt the format itself rather than defer it.
 
 ### Phase 1: Terminology and glossary
 
@@ -595,6 +613,100 @@ opens: constraints discovered while building the machine
 half are recorded in the human half's plan, not left in
 commit messages and heads.
 
+### Phase 6: Secrets that cannot be logged by accident
+
+Every credential leak step 2g fixed had the same shape:
+`extra={'token': token}`, with the event layer coercing the
+value to a string on the way out. Nothing in the type system
+objected. The remedy is to make the secret types refuse to
+render themselves.
+
+`pydantic.SecretStr` already does exactly this — `str()` and
+`repr()` of one yield `'**********'`, and the real value
+comes back only from an explicit `.get_secret_value()` call.
+The codebase is pydantic throughout, so this is a change of
+field type rather than a new dependency or a new idiom.
+
+* `NamespaceKeyAttributesData.key` and `.nonce` become
+  `SecretStr`. So does anything else the sweep below turns
+  up — `AUTH_SECRET_SEED` in `config.py` is the obvious
+  other candidate.
+* `schema/sqlalchemy.py`'s table generator learns that
+  `SecretStr` maps to a string column, and the three-layer
+  accessors unwrap on write and re-wrap on read, so the
+  secret is wrapped everywhere above the database boundary.
+* Call sites unwrap explicitly at the points that genuinely
+  need the plaintext: the bcrypt comparison in `/auth`, the
+  nonce comparison in `verify_token`, and the JWT claim in
+  `create_token`. Each unwrap is a place a reviewer can look
+  at and ask "should this value be here?", which is the
+  whole point.
+* A sweep for other unwrapped secret-carrying fields, and a
+  test that a `SecretStr` field survives a round trip
+  through the database without being stringified on the way.
+
+Scope note: this would have caught four of step 2g's five
+sites. It would *not* have caught the fifth, which logged
+the raw HTTP request body before any model existed — that
+one is structural and stays fixed by the path check in
+`external_api/app.py`. Type safety and the request-tracing
+redaction are complementary, not alternatives.
+
+This phase is deliberately independent of the federation
+work and could be done at any time, including by someone
+who is not otherwise following this plan.
+
+### Phase 7: Recognisable secrets and leak detection
+
+Phase 6 stops secrets reaching a sink. This phase assumes
+one got out anyway and shortens the time to notice.
+
+The industry pattern is a structured secret: GitHub's
+`ghp_`-style prefix plus a CRC32 checksum in the trailing
+characters, mirrored by GitLab's `glpat-`, Stripe's
+`sk_live_` and Slack's `xoxb-`. The prefix makes the secret
+greppable; the checksum lets a scanner reject lookalikes
+without calling an API, which is what makes large-scale
+scanning tolerable. Note that this costs nothing
+cryptographically — a prefix is a label beside a random
+value, not a revealed piece of one, and the entropy of the
+random part is unchanged.
+
+* **A format for cluster-minted key secrets**: a short
+  prefix, a high-entropy random body, and a trailing
+  checksum over the two. The exact alphabet and lengths are
+  a phase-plan decision; matching GitHub's shape closely
+  enough that off-the-shelf scanner tooling is easy to
+  configure is worth more than novelty.
+* **Only for secrets Shaken Fist generates.** Namespace key
+  secrets are operator-supplied today and must stay
+  supported — an operator's chosen string cannot carry our
+  prefix. The format applies to phase 3's exchange-minted
+  keys, and to a new "let the cluster generate one for you"
+  path for operator keys. Access tokens are JWTs and are
+  already recognisable by their `eyJ` prefix and `iss`
+  claim, so they need nothing.
+* **Cheap early rejection**: `/auth` and `sf-client` can
+  fail a malformed cluster-minted key on its checksum before
+  spending a bcrypt comparison on it.
+* **A gitleaks rule** for the format. Shaken Fist has no
+  gitleaks job yet — ryll's `supply-chain.yml` has the
+  working pattern, including that `gitleaks-action@v2`
+  refuses to run on org repos without a paid licence so the
+  upstream binary is invoked directly, and that gitleaks is
+  only packaged from Debian 13 onward. Adding the job is
+  part of this phase.
+* **Log-sink detection, which is the valuable half.** Events
+  go to syslog *and* to Loki, so a credential written into
+  an event leaves the cluster and lands in log aggregation.
+  A standing Loki query for the secret format across all
+  streams would have caught every one of step 2g's five
+  sites in production, automatically, without anyone
+  thinking to look. A CI scanner only catches a secret
+  someone committed to the repository, which is the less
+  likely accident for a runtime-minted credential. Both are
+  worth having; if only one gets built, build this one.
+
 ## Agent guidance
 
 ### Execution model
@@ -665,7 +777,13 @@ implemented because the following statements will be true:
   by the cleaner daemon.
 * Scoped tokens are default-deny on untagged endpoints;
   unscoped (legacy) tokens behave exactly as before.
-* Minted secrets no longer appear in audit events.
+* Minted secrets no longer appear in audit events, and the
+  secret-carrying types cannot be stringified into one by
+  accident.
+* A credential that escapes into syslog or Loki anyway is
+  detectable by a standing query, because cluster-minted
+  secrets carry a recognisable prefix and a verifiable
+  checksum.
 * A glossary exists in `docs/`, is linked from the three
   authentication guides, and this plan's terms are used
   consistently across code, CLI help, and docs.
@@ -725,10 +843,34 @@ implemented because the following statements will be true:
 
 ### Bugs fixed during this work
 
-(none yet — but note the pre-existing behaviour of
-`create_token()` logging whole JWTs into audit events, which
-phase 2 removes, and the silent accumulation of expired
-`nonced_keys` entries, which the cleaner loop fixes.)
+Phase 2:
+
+* **Credentials in audit events**, five sites (step 2g).
+  `create_token()` logged the whole minted JWT and the
+  nonce; `log_token_use()` logged the presented JWT; both
+  namespace-creation events logged the invoking JWT; the
+  malformed-key event logged the key body, which held the
+  stored hash and the nonce. The fifth site was found while
+  testing the other four: the API request-tracing events in
+  `external_api/app.py` logged request and response bodies
+  verbatim, so `POST /auth` recorded the namespace's
+  *plaintext* key inbound and the minted token outbound.
+  Bodies are no longer logged for any route under `/auth`.
+* **Two unreachable bugs in the key update endpoint** (step
+  2e): the membership test ran one dict level too high so
+  every update reported an unknown key, and a namespace name
+  was passed where the `Namespace` object was expected.
+  Neither was reachable because nothing tested `PUT`; both
+  are pinned now.
+* **Swagger examples naming a non-existent `key_names`
+  field** (step 2e); the field is `keys`.
+* **Silent accumulation of expired keys** (step 2f), which
+  previously stayed in the `nonced_keys` dict forever.
+* **Stale-hash clobbering in the migration** (step 2d): a
+  blind upsert would have written the JSON column's stale
+  hash over a key rotated since the migration first ran.
+  Caught before it shipped, but it would have silently
+  reverted a rotation.
 
 ### Documentation index maintenance
 
