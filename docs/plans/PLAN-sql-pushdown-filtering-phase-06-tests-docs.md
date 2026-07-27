@@ -14,7 +14,7 @@ land the guardrail.
 Before responding to questions or discussion points in
 this document, read the four earlier phase plans to
 understand what has been delivered (phases 1 through 5,
-all complete), the existing shape of `PUSH-TEMPLATE.md`
+all complete), the existing shape of `PUSH-AUDIT.md`
 and `docs/operator_guide/database.md` and
 `ARCHITECTURE.md`, the test file
 `shakenfist/tests/test_mariadb_find.py` that covers the
@@ -36,7 +36,7 @@ Close out the SQL-pushdown work:
    `docs/operator_guide/database.md` and
    `ARCHITECTURE.md` so a future contributor knows when
    to use `find_*` vs `.filter()` vs the iterator.
-3. Land the `PUSH-TEMPLATE.md` guardrail — a wave-1
+3. Land the `PUSH-AUDIT.md` guardrail — a wave-1
    mechanical grep that catches new `mariadb.get_all_*(`
    additions outside the established call sites, and a
    wave-2a brief bullet that promotes SQL-pushdown
@@ -130,7 +130,7 @@ Target: ~20-40 lines of prose.
 
 No new diagrams.
 
-### 6c — PUSH-TEMPLATE.md guardrail
+### 6c — PUSH-AUDIT.md guardrail
 
 The template's wave-1 style-check block at lines 46-48
 today runs three greps (line length, stray `print()`,
@@ -184,7 +184,7 @@ explanation.
 |------|--------|--------|-----------|---------------------|
 | 6a   | medium | sonnet | none      | Extend `shakenfist/tests/test_mariadb_find.py` with Direct / Public / Grpc test classes for `find_network_interfaces` per the design above. Mirror the existing trio's structure; drop `namespace`/`name` filter-only tests (they are no-ops for this type) and add explicit "silently ignored" tests for those two criteria. Run `tox -e py3 -- shakenfist.tests.test_mariadb_find` to confirm. |
 | 6b   | medium | sonnet | none      | Add the filter-pushdown subsection to `docs/operator_guide/database.md` under the "Access Pattern" section, and a short "SQL filter-pushdown discipline" paragraph or two to the Database Layer section of `ARCHITECTURE.md`. Match existing prose voice — terse, single-sentence paragraphs, no emoji. Reference files by relative path with markdown link syntax. |
-| 6c   | medium | sonnet | none      | Edit `PUSH-TEMPLATE.md`: add the new `mariadb.get_all_*` grep as the fourth bullet in the wave-1 style-check block at lines 46-48, including the `# nopushdown:` allowlist filter and a one-line inline comment. Promote the wave-2a "SQL pushdown discipline" bullet at line 83 from advisory ("does any new code materialise...") to blocking ("Blocking: any new `mariadb.get_all_*(` call that is not on an existing line and not tagged `# nopushdown:` must be rewritten as a `find_*` call or as a bulk-scan helper with explicit justification."). |
+| 6c   | medium | sonnet | none      | Edit `PUSH-AUDIT.md`: add the new `mariadb.get_all_*` grep as the fourth bullet in the wave-1 style-check block at lines 46-48, including the `# nopushdown:` allowlist filter and a one-line inline comment. Promote the wave-2a "SQL pushdown discipline" bullet at line 83 from advisory ("does any new code materialise...") to blocking ("Blocking: any new `mariadb.get_all_*(` call that is not on an existing line and not tagged `# nopushdown:` must be rewritten as a `find_*` call or as a bulk-scan helper with explicit justification."). |
 | 6d   | low    | haiku  | none      | Mark phase 6 complete in `docs/plans/index.md`. Add a "Bugs fixed" paragraph to the master plan listing the four bugs caught during rollout (stability-branch KeyError, mock_etcd state-filter, phase-4 `_resolve_prefilter_to_states` regression, namespace alphabetical-ordering regression). Leave phase 7 at Planning. |
 | 6e   | low    | haiku  | none      | Run `pre-commit run --all-files`. Fix anything flagged. Commit as needed. |
 
@@ -202,7 +202,7 @@ with:
   `test_mariadb_find.py` test-class layout matches the
   expected "one class per direct / public / gRPC" shape.
 * For 6c: confirmation of the exact current lines of
-  `PUSH-TEMPLATE.md` that need editing (line numbers
+  `PUSH-AUDIT.md` that need editing (line numbers
   have almost certainly shifted since the plan was
   written).
 * Any design decision not explicit in the plan.
@@ -230,7 +230,7 @@ After each step:
   entry point.
 * `ARCHITECTURE.md` references the pattern briefly in
   its Database Layer section.
-* `PUSH-TEMPLATE.md` wave-1 has the new grep with an
+* `PUSH-AUDIT.md` wave-1 has the new grep with an
   `# nopushdown:` allowlist and wave-2a has the
   SQL-pushdown discipline bullet promoted to blocking.
 * `docs/plans/index.md` shows phase 6 Complete and
