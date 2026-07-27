@@ -999,6 +999,18 @@ class EventSecretsTestCase(base.ShakenFistTestCase):
             self.assertEqual('key1', extra['keyname'])
         self._assert_absent_everywhere(token)
 
+    def test_minting_a_token_does_not_log_the_nonce(self):
+        # The nonce is the revocation handle. Publishing it tells a
+        # reader which of their captured tokens are still live, and
+        # confirms that a rotation has not happened yet.
+        self._mint()
+
+        for extra in self._extras_for('token created from key'):
+            self.assertNotIn('nonce', extra)
+
+        nonce = Namespace.from_db('banana').lookup_key('key1').nonce
+        self._assert_absent_everywhere(nonce)
+
     def test_using_a_token_does_not_log_the_token(self):
         token = self._mint()
         self.events.clear()

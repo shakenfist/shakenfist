@@ -25,16 +25,15 @@ def create_token(
             'nonce': nonce
         },
         expires_delta=datetime.timedelta(minutes=duration))
-    # NOTE(mikal): the token itself must never appear in the event. An
-    # event is readable by anyone who can read the namespace, and a JWT
-    # in an event log is a credential anyone reading it can replay until
-    # it expires.
+    # NOTE(mikal): neither the token nor the nonce may appear in the
+    # event. An event is readable by anyone who can read the namespace.
+    # A JWT there is a credential anyone reading it can replay until it
+    # expires, and the nonce is the revocation handle -- publishing it
+    # tells a reader which of their captured tokens are still live, and
+    # confirms a rotation has not happened yet.
     ns.add_event(
         EVENT_TYPE_AUDIT, 'token created from key',
-        extra={
-            'keyname': keyname,
-            'nonce': nonce
-        })
+        extra={'keyname': keyname})
     return {
         'access_token': token,
         'token_type': 'Bearer',
