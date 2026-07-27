@@ -1175,7 +1175,10 @@ class GetObjectsByStateRequest(_message.Message):
 
     OBJECT_TYPE_FIELD_NUMBER: _builtins.int
     STATE_VALUES_FIELD_NUMBER: _builtins.int
+    UPDATED_BEFORE_FIELD_NUMBER: _builtins.int
     object_type: _shakenfist_enums_pb2.ObjectType.ValueType
+    updated_before: _builtins.float
+    """Only rows with update_time older than"""
     @_builtins.property
     def state_values(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
         """List of states to match"""
@@ -1185,10 +1188,11 @@ class GetObjectsByStateRequest(_message.Message):
         *,
         object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
         state_values: _abc.Iterable[_builtins.str] | None = ...,
+        updated_before: _builtins.float = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_type", b"object_type", "state_values", b"state_values"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_type", b"object_type", "state_values", b"state_values", "updated_before", b"updated_before"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

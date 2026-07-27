@@ -1130,12 +1130,17 @@ class MockMariaDB():
         return True
 
     def _mariadb_get_objects_by_state(self, object_type: ObjectType,
-                                      state_values: list[str]) -> list[str]:
+                                      state_values: list[str],
+                                      updated_before: Optional[float] = None
+                                      ) -> list[str]:
         """Mock implementation of mariadb.get_objects_by_state()"""
         result = []
         for key, data in self.mariadb_states.items():
             if (data['object_type'] == object_type and
                     data['state_value'] in state_values):
+                if (updated_before and
+                        data.get('update_time', 0) >= updated_before):
+                    continue
                 result.append(data['object_uuid'])
         self._trace(
             f'MockMariaDB.get_objects_by_state({object_type}, '

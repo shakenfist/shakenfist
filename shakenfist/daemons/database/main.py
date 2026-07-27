@@ -612,7 +612,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             if object_type is None:
                 return database_pb2.GetObjectsByStateReply(object_uuids=[])
             uuids = mariadb.get_objects_by_state(
-                object_type, list(request.state_values))
+                object_type, list(request.state_values),
+                updated_before=(request.updated_before or None))
             return database_pb2.GetObjectsByStateReply(
                 object_uuids=uuids or [])
         except Exception as e:

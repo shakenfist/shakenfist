@@ -334,7 +334,7 @@ class GetActiveBlobUuidsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result, ['uuid-1', 'uuid-2', 'uuid-3'])
         mock_get_by_state.assert_called_once_with(
-            ObjectType.BLOB, ['initial', 'created'])
+            ObjectType.BLOB, ['initial', 'created'], updated_before=None)
 
 
 class ObserveLocalBlobsTestCase(base.ShakenFistTestCase):

@@ -23,6 +23,7 @@ from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_general_background_node_queues
 from shakenfist.operations.baseoperation import get_general_user_facing_node_queues
+from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
 
@@ -406,13 +407,19 @@ def prune_events() -> None:
         LOG.warning(f'Events prune sweep failed: {e}')
 
 
+def _deleted_object_delay(objtype):
+    if objtype.endswith('_op'):
+        return 30
+    return config.CLEANER_DELAY
+
+
 @util_general.recorded_method
 def per_deleted_object_checks():
     start_time = time.time()
     if DELETED_OBJECTS_QUEUE.empty():
         _fill_per_deleted_object_queue()
         LOG.info(
-            'Refreshed per-deleted-boject queue with '
+            'Refreshed per-deleted-object queue with '
             f'{DELETED_OBJECTS_QUEUE.qsize()} items')
 
     queue_fill_cost = time.time() - start_time
@@ -425,19 +432,19 @@ def per_deleted_object_checks():
 
 
 def _fill_per_deleted_object_queue():
+    # The queue holds (object_type, uuid) tuples, not hydrated objects.
+    # Hydrating here serialised a gRPC round trip per object inside a
+    # single scheduled call, which with a large backlog blew both the
+    # fill budget and the watchdog window before any processing happened
+    # (issue 3533). The age filter is pushed down to SQL so objects too
+    # young to hard delete are never fetched at all.
+    now = time.time()
     for objtype in OBJECT_NAMES_TO_CLASSES:
         obj_uuids = mariadb.get_objects_by_state(
-            ObjectType(objtype), FINAL_OBJECT_STATES)
+            ObjectType(objtype), FINAL_OBJECT_STATES,
+            updated_before=(now - _deleted_object_delay(objtype)))
         for obj_uuid in (obj_uuids or []):
-            # The object row may have been hard-deleted by a concurrent
-            # cleaner between the state query and this lookup; suppress
-            # the failure audit so that race does not show up as an
-            # ERROR event in the logs.
-            obj = get_object_class(objtype).from_db(
-                obj_uuid, suppress_failure_audit=True)
-            if not obj:
-                continue
-            DELETED_OBJECTS_QUEUE.put(obj)
+            DELETED_OBJECTS_QUEUE.put((objtype, obj_uuid))
 
 
 def _process_per_deleted_object_queue(execution_limit=10):
@@ -449,14 +456,33 @@ def _process_per_deleted_object_queue(execution_limit=10):
             return processed
 
         try:
-            obj = DELETED_OBJECTS_QUEUE.get(block=False)
+            objtype, obj_uuid = DELETED_OBJECTS_QUEUE.get(block=False)
         except queue.Empty:
             return processed
 
         processed += 1
-        delay = config.CLEANER_DELAY
-        if obj.object_type.endswith('_op'):
-            delay = 30
 
-        if time.time() - obj.state.update_time > delay:
-            obj.hard_delete()
+        # A failure to hard delete one object must only cost that one
+        # object, not the rest of the pass (and the other scheduled
+        # tasks sharing the run_pending() invocation).
+        try:
+            # The object row may have been hard-deleted by a concurrent
+            # cleaner between the state query and this lookup; suppress
+            # the failure audit so that race does not show up as an
+            # ERROR event in the logs.
+            obj = get_object_class(objtype).from_db(
+                obj_uuid, suppress_failure_audit=True)
+            if not obj:
+                continue
+
+            # Queue entries can be old by the time we get to them, so
+            # re-check the state before acting on it.
+            if obj.state.value not in FINAL_OBJECT_STATES:
+                continue
+
+            if (time.time() - obj.state.update_time >
+                    _deleted_object_delay(objtype)):
+                obj.hard_delete()
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'hard delete of {objtype} {obj_uuid}', e)

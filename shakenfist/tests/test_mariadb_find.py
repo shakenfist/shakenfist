@@ -1226,6 +1226,34 @@ class DirectGetObjectsByStateTestCase(base.ShakenFistTestCase):
             ObjectType.NODE, ['created'])
         self.assertEqual(1, len(result))
 
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_updated_before_filters_young_rows(self, mock_get_engine):
+        from shakenfist.schema.object_types import ObjectType
+        import sqlalchemy as sa
+
+        engine, states = self._build_engine()
+        mock_get_engine.return_value = engine
+
+        old_uuid = str(uuid.uuid4())
+        with engine.connect() as conn:
+            conn.execute(sa.insert(states).values(
+                object_uuid=old_uuid,
+                object_type='node',
+                state_value='deleted',
+                update_time=100.0,
+                message=None))
+            conn.execute(sa.insert(states).values(
+                object_uuid=str(uuid.uuid4()),
+                object_type='node',
+                state_value='deleted',
+                update_time=200.0,
+                message=None))
+            conn.commit()
+
+        result = mariadb._direct_get_objects_by_state(
+            ObjectType.NODE, ['deleted'], updated_before=150.0)
+        self.assertEqual([old_uuid], result)
+
 
 class NetworkInterfaceMacaddrUniquenessTestCase(base.ShakenFistTestCase):
     """The macaddr UNIQUE constraint is scoped to active interfaces.

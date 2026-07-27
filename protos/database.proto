@@ -623,6 +623,8 @@ message DeleteObjectStateRequest {
 message GetObjectsByStateRequest {
   ObjectType object_type = 1;
   repeated string state_values = 2;  // List of states to match
+  double updated_before = 3;         // Only rows with update_time older than
+                                     // this unix timestamp; 0 means no filter
 }
 
 message GetObjectsByStateReply {

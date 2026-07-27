@@ -3019,7 +3019,8 @@ def _direct_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
 
 
 def _direct_get_objects_by_state(object_type: ObjectType,
-                                 state_values: list[str]
+                                 state_values: list[str],
+                                 updated_before: Optional[float] = None
                                  ) -> Optional[list[str]]:
     """Get all object UUIDs of a given type in specified states.
 
@@ -3027,6 +3028,11 @@ def _direct_get_objects_by_state(object_type: ObjectType,
     object of ``object_type`` regardless of state. This matches the
     pre-phase-5 ``Nodes([])`` semantics where no prefilter returned every
     node, including DELETED.
+
+    ``updated_before`` pushes an age filter down to SQL: only rows whose
+    update_time is older than the given unix timestamp are returned. The
+    deleted-object sweep uses this so young objects are not fetched at
+    all.
 
     This is the direct access version used by the database daemon.
     Returns None on error (distinct from [] for no matches).
@@ -3039,6 +3045,8 @@ def _direct_get_objects_by_state(object_type: ObjectType,
             where = [table.c.object_type == object_type]
             if state_values:
                 where.append(table.c.state_value.in_(state_values))
+            if updated_before:
+                where.append(table.c.update_time < updated_before)
             stmt = sa.select(table.c.object_uuid).where(sa.and_(*where))
             result = conn.execute(stmt).fetchall()
             return [row.object_uuid for row in result]
@@ -3114,7 +3122,8 @@ def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
 
 
 def _grpc_get_objects_by_state(object_type: ObjectType,
-                               state_values: list[str]
+                               state_values: list[str],
+                               updated_before: Optional[float] = None
                                ) -> Optional[list[str]]:
     """Get all object UUIDs of a given type in specified states via gRPC.
 
@@ -3125,7 +3134,8 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
         request = database_pb2.GetObjectsByStateRequest(
             object_type=cast(
                 shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
-            state_values=state_values
+            state_values=state_values,
+            updated_before=(updated_before or 0)
         )
         reply = _grpc_call(stub.GetObjectsByState, request)
         return list(reply.object_uuids)
@@ -3380,7 +3390,8 @@ def delete_state(object_type: ObjectType, object_uuid: str) -> bool:
 
 
 def get_objects_by_state(object_type: ObjectType,
-                         state_values: list[str]
+                         state_values: list[str],
+                         updated_before: Optional[float] = None
                          ) -> Optional[list[str]]:
     """Get all object UUIDs of a given type in specified states.
 
@@ -3391,14 +3402,18 @@ def get_objects_by_state(object_type: ObjectType,
     Args:
         object_type: The type of object.
         state_values: List of state values to match.
+        updated_before: If set, only return objects whose state
+            update_time is older than this unix timestamp.
 
     Returns:
         List of object UUIDs matching the criteria, or None if the
         query failed (distinct from [] which means no matches).
     """
     if _use_database_service():
-        return _grpc_get_objects_by_state(object_type, state_values)
-    return _direct_get_objects_by_state(object_type, state_values)
+        return _grpc_get_objects_by_state(
+            object_type, state_values, updated_before=updated_before)
+    return _direct_get_objects_by_state(
+        object_type, state_values, updated_before=updated_before)
 
 
 def get_all_states_for_type(object_type: ObjectType) -> list[tuple[str, State]]:
