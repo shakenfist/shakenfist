@@ -113,6 +113,20 @@ on an attributes row.
   [`docs/glossary.md`](docs/glossary.md) in the same change so the
   glossary never drifts from the code.
 
+### In-memory only objects never touch the database
+
+Objects constructed with `in_memory_only=True` (the IPAM built when
+hydrating a deleted network, blob-reference image artifacts) keep their
+state, attributes and events in process memory. Any new persistence
+path must be guarded on `self.in_memory_only`: a database row written
+for an in-memory object is orphaned forever, because `hard_delete()`
+early-returns for in-memory objects and state-driven iterators skip
+objects whose static row is missing (issue 3532). Related uuid format
+gotcha: `object_states.object_uuid` stores dashed uuids while `sa.Uuid`
+static-table columns store undashed CHAR(32) — SQL joining the two must
+transform one side (see the orphan reconciliation queries in
+`mariadb.py`).
+
 ### Events vs logs
 
 Shaken Fist has two structured-record streams; choose the right

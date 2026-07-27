@@ -399,6 +399,24 @@ Queue priorities (per-node and global):
    per-row inserts and deletes such as `object_references`.
 4. **State machine transitions** - Follow documented state machines in
    `docs/developer_guide/state_machine.md`
+5. **In-memory only objects must never touch the database** - Objects
+   constructed with `in_memory_only=True` (the IPAM built when hydrating
+   a deleted network, blob-reference image artifacts) keep state,
+   attributes and events in process memory. A database row written for
+   one is orphaned forever: `hard_delete()` early-returns for in-memory
+   objects and state-driven iterators skip objects with no static row.
+   This actually happened (issue 3532: 3,577 leaked ipam state rows and
+   ~22k artifact rows on sfcbr, a constant ~56 QPS of uncacheable
+   GetIPAM). If you add a new persistence path to `baseobject.py` or an
+   object class with its own MariaDB access, guard it on
+   `self.in_memory_only`.
+6. **Two uuid formats in MariaDB** - `object_states.object_uuid` (and
+   other `sa.String(36)` columns) store the dashed uuid form;
+   `sa.Uuid` columns in the static tables store undashed CHAR(32). SQL
+   joining the two must transform one side (see the orphan
+   reconciliation queries in `mariadb.py` for the index-friendly
+   pattern); ad-hoc queries that compare them directly silently never
+   match.
 
 ## MariaDB Storage
 
