@@ -137,3 +137,20 @@ class IPAMTestCase(base.ShakenFistTestCase):
 
         except exceptions.CongestedNetwork:
             pass
+
+    @mock.patch('shakenfist.mariadb.set_state')
+    @mock.patch('shakenfist.mariadb.get_state')
+    def test_in_memory_ipam_writes_no_state_row(
+            self, mock_get_state, mock_set_state):
+        # The in-memory IPAM that Network.__init__ builds for deleted
+        # networks must not write an object_states row -- nothing can ever
+        # clean such a row up (issue 3532).
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24',
+                            in_memory_only=True)
+
+        self.assertEqual(ipam.IPAM.STATE_CREATED, ipm.state.value)
+        self.assertEqual({'192.168.1.0', '192.168.1.1', '192.168.1.255'},
+                         ipm.in_use)
+        mock_get_state.assert_not_called()
+        mock_set_state.assert_not_called()

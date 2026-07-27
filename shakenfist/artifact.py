@@ -89,7 +89,14 @@ class Artifact(dbowo):
     def _load_attributes(self) -> Optional[ArtifactAttributesData]:
         """Load attributes from MariaDB."""
         if not self.__attributes_loaded:
-            self.__attributes = mariadb.get_artifact_attributes(self.uuid)
+            # In-memory only artifacts must never touch the database; an
+            # attributes row written for one is orphaned forever because
+            # hard_delete() early-returns for in-memory objects (issue
+            # 3532).
+            if self.in_memory_only:
+                self.__attributes = ArtifactAttributesData(uuid=self.uuid)
+            else:
+                self.__attributes = mariadb.get_artifact_attributes(self.uuid)
             self.__attributes_loaded = True
         return self.__attributes
 
@@ -119,7 +126,8 @@ class Artifact(dbowo):
             shared=kwargs.get('shared', attrs.shared),
             highest_index=kwargs.get('highest_index', attrs.highest_index)
         )
-        mariadb.update_artifact_attributes(updated, fields=list(kwargs))
+        if not self.in_memory_only:
+            mariadb.update_artifact_attributes(updated, fields=list(kwargs))
         self.__attributes = updated
 
     @classmethod
