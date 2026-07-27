@@ -1,0 +1,656 @@
+# Propose a fix for an open GitHub issue with Claude Code
+#
+# Designed to soak up spare CI capacity: an external conductor (or a
+# human) dispatches this workflow, a cheap triage pass picks the most
+# promising open issue, and Claude Code attempts a fix which is
+# published as a draft pull request for human review. The commit is
+# tagged with "Fixes #NNNN" so the issue closes automatically if the
+# PR merges.
+#
+# The 'automated-fix-attempted' label is applied to the selected
+# issue at the *start* of the attempt, so crashed or timed out
+# attempts are still recorded and not retried. Remove the label to
+# allow another attempt.
+#
+# SECURITY CONSIDERATIONS:
+# - Issue text is untrusted model input in general. Triage only
+#   considers issues authored by users with write access to the
+#   repository, and only comments from such users are fed to the
+#   model. Third parties therefore cannot inject instructions into
+#   an agent with push access via the issue thread.
+# - Dispatching with an explicit issue_number bypasses the author
+#   check: doing so asserts a human has read and trusts the issue
+#   text. Comment filtering still applies.
+# - Only users with write access can dispatch this workflow.
+# - The output is always a draft PR (or an issue comment); the
+#   workflow has no path to merging code.
+#
+# Template source: shakenfist/development/templates/issue-fix/
+
+name: Propose issue fix with Claude Code
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Fix this specific issue (skips triage selection)'
+        required: false
+        default: ''
+        type: string
+      candidate_limit:
+        description: 'Number of recent issues considered in triage'
+        required: false
+        default: '25'
+        type: string
+      max_turns:
+        description: 'Maximum Claude turns for the fix'
+        required: false
+        default: '200'
+        type: string
+      max_diff_lines:
+        description: 'Maximum non-test lines changed before the fix is too large for an automated PR'
+        required: false
+        default: '400'
+        type: string
+      model:
+        description: 'Model used for the fix attempt'
+        required: false
+        default: 'claude-fable-5'
+        type: string
+      dry_run:
+        description: 'Dry run (no label, no comments, no commits, no PR)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
+
+  # Regular expression matching paths that are test changes. Lines
+  # changed in matching files do not count against max_diff_lines.
+  TEST_PATH_PATTERN: '^shakenfist/tests/|^deploy/shakenfist_ci/'
+  RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  triage:
+    name: 'Select an issue to fix'
+    runs-on: [self-hosted, claude-code]
+    timeout-minutes: 30
+    outputs:
+      issue_number: ${{ steps.select.outputs.issue_number }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Find candidate issues
+        id: candidates
+        if: inputs.issue_number == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue list \
+            --repo ${{ github.repository }} \
+            --search 'is:open -linked:pr -label:automated-fix-attempted sort:created-desc' \
+            --limit ${{ inputs.candidate_limit }} \
+            --json number,title,body,author \
+            > ${{ github.workspace }}/all-issues.json
+
+          # Only issues filed by users with write access are
+          # eligible: the issue text is fed to a model with push
+          # access, and third parties must not be able to steer it.
+          echo '{}' > ${{ github.workspace }}/perms.json
+          for author in $(jq -r '[.[].author.login] | unique | .[]' \
+              ${{ github.workspace }}/all-issues.json); do
+            perm=$(gh api \
+              "repos/${{ github.repository }}/collaborators/${author}/permission" \
+              --jq '.permission' 2>/dev/null || echo 'none')
+            jq --arg a "${author}" --arg p "${perm}" '. + {($a): $p}' \
+              ${{ github.workspace }}/perms.json \
+              > ${{ github.workspace }}/perms.tmp
+            mv ${{ github.workspace }}/perms.tmp \
+              ${{ github.workspace }}/perms.json
+          done
+
+          jq --slurpfile perms ${{ github.workspace }}/perms.json \
+            '[.[] | select($perms[0][.author.login] as $p |
+              $p == "admin" or $p == "write" or $p == "maintain")]' \
+            ${{ github.workspace }}/all-issues.json \
+            > ${{ github.workspace }}/eligible-issues.json
+
+          count=$(jq length ${{ github.workspace }}/eligible-issues.json)
+          echo "Found ${count} eligible issues"
+          echo "count=${count}" >> $GITHUB_OUTPUT
+
+      - name: Triage with Claude
+        id: triage
+        if: |
+          inputs.issue_number == '' &&
+          steps.candidates.outputs.count != '0'
+        run: |
+          cat > ${{ github.workspace }}/triage-prompt.txt << 'PROMPT_EOF'
+          You are triaging open GitHub issues for this repository to
+          select ONE issue for an automated fix attempt with a coding
+          agent, or to decide that none are suitable.
+
+          Selection criteria, in priority order:
+
+          1. Achievable: the issue has a clear reproduction or a
+             clear statement of expected behaviour, looks fixable at
+             the root cause without major refactoring, and you
+             estimate the fix at under 100 changed lines excluding
+             tests. The fix must be coverable by unit tests.
+          2. Important: among achievable issues, prefer the most
+             important (data loss > correctness > reliability >
+             usability > cosmetic).
+
+          The repository is checked out in the current directory.
+          You may inspect the code to judge achievability, but keep
+          it brief -- this is triage, not diagnosis.
+
+          Be conservative: selecting nothing is better than
+          selecting an issue that needs deep design work.
+
+          End your output with exactly these two lines:
+
+          SELECTED_ISSUE: <number or none>
+          REASON: <one sentence>
+
+          # Candidate issues
+
+          PROMPT_EOF
+
+          jq -r '.[] | "## Issue #\(.number): \(.title)\n\n\(.body // "" | .[0:3000])\n\n---\n"' \
+            ${{ github.workspace }}/eligible-issues.json \
+            >> ${{ github.workspace }}/triage-prompt.txt
+
+          claude -p "$(cat ${{ github.workspace }}/triage-prompt.txt)" \
+            --dangerously-skip-permissions \
+            --model claude-haiku-4-5 \
+            --max-turns 15 \
+            --output-format text \
+            2>&1 | tee ${{ github.workspace }}/triage-output.txt \
+            || true
+
+          selected=$(grep -oE 'SELECTED_ISSUE: *[A-Za-z0-9]+' \
+            ${{ github.workspace }}/triage-output.txt | \
+            tail -1 | awk '{print $2}')
+          echo "selected=${selected}" >> $GITHUB_OUTPUT
+
+      - name: Record selection
+        id: select
+        env:
+          EXPLICIT: ${{ inputs.issue_number }}
+          TRIAGED: ${{ steps.triage.outputs.selected }}
+        run: |
+          if [ -n "${EXPLICIT}" ]; then
+            selected="${EXPLICIT}"
+          else
+            selected="${TRIAGED}"
+          fi
+
+          if echo "${selected}" | grep -qE '^[0-9]+$'; then
+            echo "Selected issue #${selected}"
+            echo "issue_number=${selected}" >> $GITHUB_OUTPUT
+          else
+            echo "No suitable issue found, nothing to do."
+            echo "issue_number=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload triage artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: issue-fix-triage-${{ github.run_id }}
+          path: |
+            ${{ github.workspace }}/all-issues.json
+            ${{ github.workspace }}/eligible-issues.json
+            ${{ github.workspace }}/triage-prompt.txt
+            ${{ github.workspace }}/triage-output.txt
+          retention-days: 14
+          if-no-files-found: ignore
+
+  fix:
+    name: 'Attempt fix'
+    needs: triage
+    if: needs.triage.outputs.issue_number != ''
+    runs-on: [self-hosted, claude-code]
+    timeout-minutes: 120
+
+    env:
+      ISSUE_NUMBER: ${{ needs.triage.outputs.issue_number }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config --global user.name "shakenfist-bot"
+          git config --global user.email "bot@shakenfist.com"
+
+      - name: Ensure labels exist
+        if: inputs.dry_run != true
+        run: |
+          gh label create 'automated-fix-attempted' \
+            --repo ${{ github.repository }} \
+            --color 'D93F0B' \
+            --description 'An automated fix was attempted; remove to allow a re-attempt' \
+            2>/dev/null || true
+          gh label create 'automated-fix' \
+            --repo ${{ github.repository }} \
+            --color '1D76DB' \
+            --description 'Pull request proposed by the issue fix workflow' \
+            2>/dev/null || true
+
+      # The label is applied before any fix work so that crashes and
+      # timeouts still leave the issue marked as attempted.
+      - name: Mark attempt on issue
+        if: inputs.dry_run != true
+        run: |
+          gh issue edit "${ISSUE_NUMBER}" \
+            --repo ${{ github.repository }} \
+            --add-label automated-fix-attempted
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo ${{ github.repository }} \
+            --body "Starting an automated fix attempt.
+
+          [View workflow run](${RUN_URL})
+
+          The \`automated-fix-attempted\` label has been applied; remove it to allow a future re-attempt."
+
+      - name: Create working branch
+        run: |
+          git branch -D "issue-fix-${ISSUE_NUMBER}" 2>/dev/null || true
+          git checkout -b "issue-fix-${ISSUE_NUMBER}"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmariadb-dev python3-dev python3-mysqldb
+
+      - name: Install project dependencies
+        run: |
+          python3 -mvenv ~/sf-venv
+          . ~/sf-venv/bin/activate
+          pip3 install uv
+          uv pip install tox tox-uv
+
+      - name: Fetch issue content
+        run: |
+          gh api "repos/${{ github.repository }}/issues/${ISSUE_NUMBER}" \
+            > ${{ github.workspace }}/issue.json
+
+          # Only comments from users with write access are passed to
+          # the model -- anyone can comment on an issue, and those
+          # comments must not be able to steer the fix.
+          gh api --paginate \
+            "repos/${{ github.repository }}/issues/${ISSUE_NUMBER}/comments" | \
+            jq -s 'add // [] | [.[] |
+              select(.author_association == "OWNER" or
+                     .author_association == "MEMBER" or
+                     .author_association == "COLLABORATOR")]' \
+            > ${{ github.workspace }}/comments.json
+
+      - name: Prepare Claude prompt
+        run: |
+          {
+            echo "Please fix GitHub issue #${ISSUE_NUMBER}, described below."
+            echo
+
+            cat << 'CONTEXT_EOF'
+          ## Context
+
+          Shaken Fist is an opinionated, minimal cloud orchestration
+          platform for VM and network management. Read AGENTS.md and
+          ARCHITECTURE.md to understand the project structure before
+          starting.
+
+          Code style: single quotes for strings, double quotes for
+          docstrings, lines wrapped at 120 characters, no trailing
+          whitespace.
+
+          Unit tests are in shakenfist/tests/ and use
+          testtools/stestr. Functional tests are in
+          deploy/shakenfist_ci/.
+          CONTEXT_EOF
+
+            echo
+            echo "## Issue #${ISSUE_NUMBER}: $(jq -r .title ${{ github.workspace }}/issue.json)"
+            echo
+            jq -r '.body // "(no description)"' ${{ github.workspace }}/issue.json
+            echo
+            echo '## Maintainer comments on the issue'
+            echo
+            jq -r '.[] | "### \(.user.login) at \(.created_at)\n\n\(.body)\n"' \
+              ${{ github.workspace }}/comments.json
+
+            cat << 'TASK_EOF'
+
+          ## Your task
+
+          1. Diagnose the root cause of the issue. Fix the root
+             cause, not the symptom.
+          2. Include unit test coverage for the fix. If the fix is
+             observable from the functional test suite, add
+             functional coverage in deploy/shakenfist_ci/ as well.
+          3. Keep the non-test portion of the change small -- the
+             target is under 100 changed lines excluding tests. If a
+             correct fix genuinely requires major refactoring, do
+             NOT attempt it: output "NO_FIX: <one line reason>",
+             leave the tree unchanged, and stop.
+          4. Run the test suite and ensure it passes:
+             ```bash
+             . ~/sf-venv/bin/activate
+             tox -ecover
+             ```
+          5. Run `pre-commit run --all-files` and fix any issues.
+          6. Stage all changes with git add (do NOT commit).
+          7. Output a commit summary (see below).
+
+          ## REQUIRED: Commit Summary Output
+
+          After completing your work and staging changes, you MUST
+          output a commit summary in the following exact format:
+
+          ```
+          COMMIT_SUMMARY_START
+          <First line: 50 chars max, imperative mood, ends with period.>
+
+          <Body: Wrap at 72 chars. Explain WHAT changed and WHY.>
+          COMMIT_SUMMARY_END
+          ```
+
+          Do not include a "Fixes #NNNN" line in the summary -- the
+          workflow adds that itself.
+          TASK_EOF
+          } > ${{ github.workspace }}/claude-prompt.txt
+
+          echo "Prompt prepared:"
+          cat ${{ github.workspace }}/claude-prompt.txt
+
+      - name: Run Claude Code to propose a fix
+        id: claude_fix
+        continue-on-error: true
+        run: |
+          if ! command -v claude &> /dev/null; then
+            echo "claude_available=false" >> $GITHUB_OUTPUT
+            echo "Error: Claude Code CLI not found"
+            exit 1
+          fi
+
+          echo "claude_available=true" >> $GITHUB_OUTPUT
+
+          start_time=$(date +%s)
+
+          claude -p "$(cat ${{ github.workspace }}/claude-prompt.txt)" \
+            --dangerously-skip-permissions \
+            --model "${{ inputs.model }}" \
+            --max-turns ${{ inputs.max_turns }} \
+            --output-format text \
+            2>&1 | tee ${{ github.workspace }}/claude-output.txt \
+            || true
+
+          mkdir -p ${{ github.workspace }}/claude-logs
+          find ~/.claude/projects -name "*.jsonl" \
+            -newermt "@${start_time}" \
+            -exec cp {} ${{ github.workspace }}/claude-logs/ \; \
+            2>/dev/null || true
+
+      - name: Assess Claude output
+        id: assess
+        if: steps.claude_fix.outputs.claude_available == 'true'
+        run: |
+          if grep -q '^NO_FIX:' ${{ github.workspace }}/claude-output.txt; then
+            echo "Claude declined to fix this issue."
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            if [ "${{ inputs.dry_run }}" != "true" ]; then
+              reason=$(grep '^NO_FIX:' \
+                ${{ github.workspace }}/claude-output.txt | head -1)
+              gh issue comment "${ISSUE_NUMBER}" \
+                --repo ${{ github.repository }} \
+                --body "The automated fix attempt concluded this issue is not suitable for an automated fix:
+
+          > ${reason}
+
+          [View workflow run](${RUN_URL})"
+            fi
+            exit 0
+          fi
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Claude produced no changes."
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            if [ "${{ inputs.dry_run }}" != "true" ]; then
+              gh issue comment "${ISSUE_NUMBER}" \
+                --repo ${{ github.repository }} \
+                --body "The automated fix attempt produced no changes.
+
+          [View workflow run](${RUN_URL})"
+            fi
+            exit 0
+          fi
+
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+
+      - name: Verify fix
+        id: verify
+        if: steps.assess.outputs.has_changes == 'true'
+        continue-on-error: true
+        run: |
+          . ~/sf-venv/bin/activate
+          set +e
+          tox -ecover \
+            2>&1 | tee ${{ github.workspace }}/verify-output.txt
+          verify_exit_code=${PIPESTATUS[0]}
+          set -e
+
+          if [ ${verify_exit_code} -eq 0 ]; then
+            echo "fix_succeeded=true" >> $GITHUB_OUTPUT
+          else
+            echo "fix_succeeded=false" >> $GITHUB_OUTPUT
+          fi
+
+          exit ${verify_exit_code}
+
+      - name: Extract commit summary
+        id: extract_summary
+        if: steps.assess.outputs.has_changes == 'true'
+        run: |
+          if grep -q "COMMIT_SUMMARY_START" \
+              ${{ github.workspace }}/claude-output.txt
+          then
+            sed -n '/COMMIT_SUMMARY_START/,/COMMIT_SUMMARY_END/p' \
+              ${{ github.workspace }}/claude-output.txt | \
+              grep -v "COMMIT_SUMMARY_START" | \
+              grep -v "COMMIT_SUMMARY_END" | \
+              sed 's/^```$//' | \
+              sed '/^$/N;/^\n$/d' \
+              > ${{ github.workspace }}/commit-summary.txt
+
+            if [ -s ${{ github.workspace }}/commit-summary.txt ]; then
+              echo "summary_found=true" >> $GITHUB_OUTPUT
+            else
+              echo "summary_found=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "summary_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      # The triage estimate of fix size is only an estimate. This is
+      # the hard cap: an over-budget fix is never published as a PR,
+      # but the branch is pushed for human inspection.
+      - name: Measure change size
+        id: measure
+        if: steps.assess.outputs.has_changes == 'true'
+        run: |
+          git add -A
+          nontest=$(git diff --cached --numstat | \
+            awk -v pat="${TEST_PATH_PATTERN}" \
+              '$3 !~ pat { if ($1 != "-") s += $1 + $2 } END { print s + 0 }')
+          echo "Non-test lines changed: ${nontest} (cap: ${{ inputs.max_diff_lines }})"
+          echo "nontest_lines=${nontest}" >> $GITHUB_OUTPUT
+
+          if [ "${nontest}" -le "${{ inputs.max_diff_lines }}" ]; then
+            echo "within_budget=true" >> $GITHUB_OUTPUT
+          else
+            echo "within_budget=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit changes
+        if: |
+          steps.verify.outputs.fix_succeeded == 'true' &&
+          inputs.dry_run != true
+        run: |
+          if [ "${{ steps.extract_summary.outputs.summary_found }}" == "true" ]; then
+            cat ${{ github.workspace }}/commit-summary.txt \
+              > ${{ github.workspace }}/commit-message.txt
+          else
+            {
+              echo "Fix issue #${ISSUE_NUMBER}."
+              echo ""
+              echo "Claude Code proposed a fix for this issue."
+            } > ${{ github.workspace }}/commit-message.txt
+          fi
+
+          {
+            echo ""
+            echo "Fixes #${ISSUE_NUMBER}"
+            echo ""
+            echo "Triggered-By: issue-fix workflow, ${RUN_URL}"
+            echo ""
+            echo "Signed-off-by: Michael Still <mikal@stillhq.com>"
+            echo "Assisted-By: Claude Code"
+            echo "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
+          } >> ${{ github.workspace }}/commit-message.txt
+
+          git commit -F ${{ github.workspace }}/commit-message.txt
+
+      - name: Publish draft PR
+        if: |
+          steps.verify.outputs.fix_succeeded == 'true' &&
+          steps.measure.outputs.within_budget == 'true' &&
+          inputs.dry_run != true
+        run: |
+          git push -f origin "issue-fix-${ISSUE_NUMBER}"
+          sleep 5
+
+          if [ "${{ steps.extract_summary.outputs.summary_found }}" == "true" ]; then
+            PR_TITLE=$(head -1 \
+              ${{ github.workspace }}/commit-summary.txt | \
+              sed 's/\.$//')
+          else
+            PR_TITLE="Fix issue #${ISSUE_NUMBER}"
+          fi
+
+          pr_url=$(gh pr create \
+            --draft \
+            --label automated-fix \
+            --assignee mikalstill \
+            --reviewer mikalstill \
+            --title "${PR_TITLE}" \
+            --body "$(cat <<EOF
+          ## Summary
+
+          Automated fix attempt for #${ISSUE_NUMBER}.
+
+          Fixes #${ISSUE_NUMBER}
+
+          ## Changes
+
+          $(git diff --stat HEAD~1)
+
+          ## Verification
+
+          The test suite passes after these changes.
+
+          [Workflow run](${RUN_URL})
+
+          ---
+          Generated with [Claude Code](https://claude.com/claude-code)
+          EOF
+          )" \
+            --head "issue-fix-${ISSUE_NUMBER}")
+
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo ${{ github.repository }} \
+            --body "An automated fix has been proposed in ${pr_url}."
+
+      - name: Report over-budget fix
+        if: |
+          steps.verify.outputs.fix_succeeded == 'true' &&
+          steps.measure.outputs.within_budget == 'false' &&
+          inputs.dry_run != true
+        run: |
+          git push -f origin "issue-fix-${ISSUE_NUMBER}"
+
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo ${{ github.repository }} \
+            --body "An automated fix was produced and passes tests, but it changes ${{ steps.measure.outputs.nontest_lines }} non-test lines (cap: ${{ inputs.max_diff_lines }}), which is too large to propose automatically.
+
+          The changes have been pushed to the \`issue-fix-${ISSUE_NUMBER}\` branch for human review. No PR was created.
+
+          [View workflow run](${RUN_URL})"
+
+      - name: Report failure
+        if: |
+          steps.assess.outputs.has_changes == 'true' &&
+          steps.verify.outputs.fix_succeeded != 'true' &&
+          inputs.dry_run != true
+        run: |
+          TEST_OUTPUT=$(tail -c 2000 \
+            ${{ github.workspace }}/verify-output.txt \
+            2>/dev/null || echo "See workflow logs for details.")
+
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo ${{ github.repository }} \
+            --body "An automated fix was attempted but the test suite does not pass with the changes, so nothing has been proposed.
+
+          [View workflow run](${RUN_URL})
+
+          **Last 2KB of test output:**
+          \`\`\`
+          ${TEST_OUTPUT}
+          \`\`\`"
+
+      - name: Dry run summary
+        if: inputs.dry_run == true
+        run: |
+          echo "Dry run: no label was applied, no comments were"
+          echo "posted, nothing was committed or pushed."
+          echo ""
+          git status
+          git diff --cached --stat
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: issue-fix-${{ env.ISSUE_NUMBER }}-${{ github.run_id }}
+          path: |
+            ${{ github.workspace }}/issue.json
+            ${{ github.workspace }}/comments.json
+            ${{ github.workspace }}/claude-prompt.txt
+            ${{ github.workspace }}/claude-output.txt
+            ${{ github.workspace }}/verify-output.txt
+            ${{ github.workspace }}/commit-summary.txt
+            ${{ github.workspace }}/commit-message.txt
+            ${{ github.workspace }}/claude-logs/
+          retention-days: 14
+          if-no-files-found: ignore
