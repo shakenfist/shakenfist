@@ -33,7 +33,7 @@ dependencies = [
     "setproctitle==1.3.7",                # bsd
     "click==8.4.2",                       # bsd
     "werkzeug==3.1.8",                    # bsd
-    "prometheus-client==0.25.0",          # apache2
+    "prometheus-client==0.26.0",          # apache2
     "bcrypt==5.0.0",                      # apache2
     "cryptography==49.0.0",               # apache2
     "python-magic==0.4.27",               # mit
