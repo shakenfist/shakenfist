@@ -58,7 +58,13 @@ def main():
 
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.bind(SOCKET_PATH)
-    s.listen(1)
+    # Every daemon on the node health checks this socket about once a
+    # second, as well as making real locking requests, and they arrive
+    # in a herd after a deploy restarts everything. Connections are
+    # serviced one at a time, so a full backlog on a Unix socket means
+    # connect() fails immediately with ECONNREFUSED instead of queueing.
+    # A deep backlog converts those refusals into short waits.
+    s.listen(128)
     s.settimeout(0.2)
     LOG.info('Listening for incoming requests')
     send_systemd_ready()
