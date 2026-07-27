@@ -22,6 +22,7 @@ from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist import mariadb
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
@@ -210,6 +211,13 @@ def health_check_nodelock():
             ...
     except ConnectionResetError:
         LOG.warning('nodelock daemon is unhealthy (connection reset)!')
+        return False
+    except (ConnectionRefusedError, MissingNodeLockSocket):
+        # nodelock only unlinks its socket at startup, so while it is
+        # restarting (for example during a deploy) the stale socket file
+        # from the previous incarnation remains on disk and connections
+        # are refused rather than failing with a missing socket.
+        LOG.warning('nodelock daemon is unhealthy (not listening)!')
         return False
 
     return True

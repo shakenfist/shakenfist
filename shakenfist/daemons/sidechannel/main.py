@@ -1204,6 +1204,7 @@ class Monitor(daemon.Daemon):
 
             except Exception as e:
                 util_exceptions.ignore_exception('side channel monitor', e)
+                time.sleep(1)
 
         LOG.info('Stopping')
         send_systemd_stopping()
