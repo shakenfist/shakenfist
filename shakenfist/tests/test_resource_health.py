@@ -164,7 +164,12 @@ class PathCheckTestCase(base.ShakenFistTestCase):
             opened = []
 
             def counting_open(path, *a, **kw):
-                if path.endswith(resource_health.HEARTBEAT_FILENAME):
+                # Only count heartbeat opens under this test's own tempdir:
+                # os.open is patched process-wide, and a probe thread leaked
+                # by another test in this worker could otherwise open its own
+                # heartbeat inside our patch window and inflate the count.
+                if (isinstance(path, str) and path.startswith(d) and
+                        path.endswith(resource_health.HEARTBEAT_FILENAME)):
                     opened.append(path)
                 return real_open(path, *a, **kw)
 
@@ -197,3 +202,10 @@ class PathCheckTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 resource_health.HealthStatus.TIMEOUT, result.status)
         release.set()
+        # Join the probe's daemon thread before finishing. Once released it
+        # resumes _probe_once with do_write=True and opens its heartbeat
+        # file; unjoined, that open races into whichever test runs next in
+        # this worker (seen as test_write_interval_gates_the_heartbeat
+        # counting a stray os.open under its process-wide patch).
+        check._probe._thread.join(5)
+        self.assertFalse(check._probe._thread.is_alive())
