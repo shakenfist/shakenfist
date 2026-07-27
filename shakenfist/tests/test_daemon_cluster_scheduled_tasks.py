@@ -641,3 +641,108 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(1, processed)
         self.assertFalse(young.hard_deleted)
+
+
+class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
+    """Orphan reconciliation: phantoms removed server-side, zombies
+    repaired by writing a deleted state row after two consecutive
+    observations (issue 3534)."""
+
+    def setUp(self):
+        super().setUp()
+        st._ZOMBIE_CANDIDATES.clear()
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids',
+                return_value=[])
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=3)
+    def test_phantoms_removed_for_all_types(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        st.reconcile_orphaned_objects()
+
+        from shakenfist import mariadb
+        deleted_types = [
+            c.args[0] for c in mock_delete_orphans.call_args_list]
+        self.assertEqual(
+            sorted(mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES),
+            sorted(deleted_types))
+        for c in mock_delete_orphans.call_args_list:
+            self.assertTrue(c.args[1] < time.time())
+        mock_delete_attrs.assert_called_once()
+        mock_set_state.assert_not_called()
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_zombies_repaired_after_two_observations(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        def stateless(objtype):
+            if objtype == ObjectType.NETWORK:
+                return [BLOB_UUID_1]
+            return []
+        mock_stateless.side_effect = stateless
+
+        # First observation: candidate recorded, nothing repaired.
+        st.reconcile_orphaned_objects()
+        mock_set_state.assert_not_called()
+
+        # Second observation: repaired with a deleted state row.
+        st.reconcile_orphaned_objects()
+        mock_set_state.assert_called_once()
+        objtype, obj_uuid, state = mock_set_state.call_args.args
+        self.assertEqual(ObjectType.NETWORK, objtype)
+        self.assertEqual(BLOB_UUID_1, obj_uuid)
+        self.assertEqual('deleted', state.value)
+        mock_add_event.assert_called_once()
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids',
+                return_value=[])
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_zombie_repair_excludes_nodes_and_namespaces(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        st.reconcile_orphaned_objects()
+
+        queried = {c.args[0] for c in mock_stateless.call_args_list}
+        self.assertNotIn(ObjectType.NODE, queried)
+        self.assertNotIn(ObjectType.NAMESPACE, queried)
+        self.assertIn(ObjectType.NETWORK, queried)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_zombie_gone_between_sweeps_not_repaired(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # A zombie observed once which then disappears (its state row
+        # was written by its creator after all) must not be repaired.
+        responses = [[BLOB_UUID_1], []]
+
+        def stateless(objtype):
+            if objtype == ObjectType.NETWORK:
+                return responses.pop(0) if responses else []
+            return []
+        mock_stateless.side_effect = stateless
+
+        st.reconcile_orphaned_objects()
+        st.reconcile_orphaned_objects()
+        mock_set_state.assert_not_called()

@@ -45,6 +45,9 @@ service DatabaseService {
   rpc SetObjectState (SetObjectStateRequest) returns (StatusReply) {}
   rpc DeleteObjectState (DeleteObjectStateRequest) returns (StatusReply) {}
   rpc GetObjectsByState (GetObjectsByStateRequest) returns (GetObjectsByStateReply) {}
+  rpc DeleteOrphanedObjectStates (DeleteOrphanedObjectStatesRequest) returns (DeleteOrphanedObjectStatesReply) {}
+  rpc GetStatelessObjectUuids (GetStatelessObjectUuidsRequest) returns (GetStatelessObjectUuidsReply) {}
+  rpc DeleteOrphanedArtifactAttributes (DeleteOrphanedArtifactAttributesRequest) returns (DeleteOrphanedArtifactAttributesReply) {}
 
   // IPAM Reservation Operations (MariaDB)
   rpc ReserveAddress (ReserveAddressRequest) returns (StatusReply) {}
@@ -629,6 +632,35 @@ message GetObjectsByStateRequest {
 
 message GetObjectsByStateReply {
   repeated string object_uuids = 1;
+}
+
+// Orphan reconciliation (issue 3534). Phantoms are object_states rows
+// whose static-values row is gone; zombies are static rows with no
+// object_states row. Both are invisible to state-driven iterators.
+message DeleteOrphanedObjectStatesRequest {
+  ObjectType object_type = 1;
+  double updated_before = 2;  // Only rows with update_time older than this
+}
+
+message DeleteOrphanedObjectStatesReply {
+  bool success = 1;
+  int64 deleted = 2;
+}
+
+message GetStatelessObjectUuidsRequest {
+  ObjectType object_type = 1;
+}
+
+message GetStatelessObjectUuidsReply {
+  repeated string object_uuids = 1;
+}
+
+message DeleteOrphanedArtifactAttributesRequest {
+}
+
+message DeleteOrphanedArtifactAttributesReply {
+  bool success = 1;
+  int64 deleted = 2;
 }
 
 // IPAM Reservation Operations (MariaDB)

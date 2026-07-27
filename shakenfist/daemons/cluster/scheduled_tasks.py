@@ -10,8 +10,11 @@ from shakenfist.constants import FINAL_OBJECT_STATES
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
+from shakenfist import eventlog
 from shakenfist import mariadb
 from shakenfist.schema.operations import baseclusteroperation as bco_schema
 from shakenfist.schema.operations import node_blob_op as nbo_schema
@@ -486,3 +489,79 @@ def _process_per_deleted_object_queue(execution_limit=10):
         except Exception as e:
             util_exceptions.ignore_exception(
                 f'hard delete of {objtype} {obj_uuid}', e)
+
+
+# Orphan reconciliation (issue 3534). Zombie repair is excluded for nodes
+# (marking a node deleted cascades deletion of its instances) and
+# namespaces (which include 'system'); phantom state rows for those types
+# are still removed, as a state row with no static row is garbage
+# regardless of type.
+ZOMBIE_REPAIR_EXCLUDED_TYPES = {'node', 'namespace'}
+
+# Phantom state rows must be at least this old before removal, so object
+# creation -- where the static and state rows land moments apart -- is
+# never raced. Zombies are instead confirmed by being observed on two
+# consecutive sweeps.
+ORPHAN_MINIMUM_AGE = 3600
+
+_ZOMBIE_CANDIDATES: dict[str, set[str]] = {}
+
+
+@util_general.recorded_method
+def reconcile_orphaned_objects():
+    """Remove phantom state rows and repair zombie static rows.
+
+    Phantoms (an object_states row whose static-values row is gone) are
+    deleted server-side. Zombies (a static-values row with no
+    object_states row) are repaired by writing a deleted state row, which
+    makes them visible to the regular deleted-object sweep; that sweep
+    then hard deletes them through the normal path. Both kinds of orphan
+    are otherwise invisible to every state-driven iterator, forever.
+
+    Runs only on the elected cluster node.
+    """
+    for objtype in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES:
+        deleted = mariadb.delete_orphaned_object_states(
+            ObjectType(objtype), time.time() - ORPHAN_MINIMUM_AGE)
+        if deleted:
+            LOG.with_fields({
+                'object_type': objtype,
+                'deleted': deleted
+            }).info('Orphan reconciliation removed phantom state rows')
+
+    deleted = mariadb.delete_orphaned_artifact_attributes()
+    if deleted:
+        LOG.with_fields({'deleted': deleted}).info(
+            'Orphan reconciliation removed orphaned artifact attributes')
+
+    for objtype in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES:
+        if objtype in ZOMBIE_REPAIR_EXCLUDED_TYPES:
+            continue
+
+        uuids = mariadb.get_stateless_object_uuids(ObjectType(objtype))
+        if uuids is None:
+            continue
+
+        current = set(uuids)
+        confirmed = current & _ZOMBIE_CANDIDATES.get(objtype, set())
+        _ZOMBIE_CANDIDATES[objtype] = current
+
+        for obj_uuid in sorted(confirmed):
+            try:
+                if not mariadb.set_state(
+                        ObjectType(objtype), obj_uuid,
+                        State(value=dbo.STATE_DELETED,
+                              update_time=time.time(),
+                              message='reconciled object with no state row')):
+                    continue
+                eventlog.add_event(
+                    EVENT_TYPE_AUDIT, objtype, obj_uuid,
+                    'the orphan reconciliation sweep marked this object '
+                    'deleted because it had no state row')
+                LOG.with_fields({
+                    'object_type': objtype,
+                    'object_uuid': obj_uuid
+                }).info('Orphan reconciliation repaired zombie object')
+            except Exception as e:
+                util_exceptions.ignore_exception(
+                    f'zombie repair of {objtype} {obj_uuid}', e)

@@ -525,6 +525,8 @@ class Monitor(daemon.Daemon):
                 scheduled_tasks.per_deleted_object_checks)
             schedule.every(15).minutes.do(
                 scheduled_tasks.reap_expired_namespace_keys)
+            schedule.every(60).minutes.do(
+                scheduled_tasks.reconcile_orphaned_objects)
             schedule.every(1).days.do(scheduled_tasks.prune_events)
 
             # And then do regular cluster maintenance things

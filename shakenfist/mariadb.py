@@ -20367,3 +20367,294 @@ def claim_coalescible_siblings(
     return _direct_claim_coalescible_siblings(
         operation_type, target_column, target_uuid,
         task_names, exclude_op_uuid)
+
+
+# =============================================================================
+# Orphan reconciliation (issue 3534)
+#
+# MariaDB can end up with two kinds of orphaned object rows, both invisible
+# to every state-driven iterator:
+#
+# - Phantoms: an object_states row whose static-values row is gone. All
+#   iterators hydrate via from_db(), which fails, so the object is silently
+#   skipped forever while its state row is re-read every sweep.
+# - Zombies: a static-values row with no object_states row, produced by a
+#   crash between static-row creation and the first state write (or a
+#   partially failed hard delete). State-based listing never returns the
+#   object, so nothing ever cleans it up.
+#
+# Format note: object_states.object_uuid stores the dashed 36 character
+# uuid form, while the static tables use sa.Uuid columns storing undashed
+# CHAR(32). The queries below transform the *outer* row's value so the
+# inner (per-row) lookup always lands on a primary key index.
+# =============================================================================
+
+# Static-values table getter (and primary key column) for each object type
+# that has one. Types absent here are not reconciled. All cluster operation
+# types share the cluster_operations table, distinguished by its
+# operation_type column (handled below by inspecting table columns).
+_STATIC_TABLE_GETTERS: dict[str, tuple[Callable[[], sa.Table], str]] = {
+    ObjectType.AGENTOPERATION.value: (_get_agent_operations_table, 'uuid'),
+    ObjectType.ARTIFACT.value: (_get_artifacts_table, 'uuid'),
+    ObjectType.BLOB.value: (_get_blobs_table, 'uuid'),
+    ObjectType.DHCP.value: (_get_dnsmasq_table, 'uuid'),
+    ObjectType.INSTANCE.value: (_get_instances_table, 'uuid'),
+    ObjectType.INTERFACE.value: (_get_network_interfaces_table, 'uuid'),
+    ObjectType.IPAM.value: (_get_ipams_table, 'uuid'),
+    ObjectType.NAMESPACE.value: (_get_namespaces_table, 'name'),
+    ObjectType.NETWORK.value: (_get_networks_table, 'uuid'),
+    ObjectType.NODE.value: (_get_nodes_table, 'uuid'),
+    ObjectType.UPLOAD.value: (_get_uploads_table, 'uuid'),
+    ObjectType.ARTIFACT_FETCH_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.IMGCACHE_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.NET_IFACE_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.NET_IFACE_IP_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.NET_IP_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.NET_MACADDR_IP_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.NET_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.NODE_AOP_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.NODE_BLOB_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.NODE_INST_NET_IFACE_OP.value: (
+        _get_cluster_operations_table, 'uuid'),
+    ObjectType.NODE_INST_NETDESC_OP.value: (
+        _get_cluster_operations_table, 'uuid'),
+    ObjectType.NODE_INST_OP.value: (_get_cluster_operations_table, 'uuid'),
+    ObjectType.NODE_INST_SNAP_OP.value: (
+        _get_cluster_operations_table, 'uuid'),
+    ObjectType.NODE_NET_OP.value: (_get_cluster_operations_table, 'uuid'),
+}
+
+# The object types the reconciliation sweep iterates.
+ORPHAN_RECONCILABLE_OBJECT_TYPES: list[str] = sorted(_STATIC_TABLE_GETTERS)
+
+
+def _dashed_uuid_expr(col: Any) -> Any:
+    """Render an undashed CHAR(32) uuid column in the dashed 36 character
+    form used by object_states.object_uuid, so a comparison against
+    object_states can use its primary key index."""
+    c = sa.cast(col, sa.String(36))
+    return sa.func.concat(
+        sa.func.substr(c, 1, 8), '-',
+        sa.func.substr(c, 9, 4), '-',
+        sa.func.substr(c, 13, 4), '-',
+        sa.func.substr(c, 17, 4), '-',
+        sa.func.substr(c, 21, 12))
+
+
+def _static_table_for_object_type(
+        object_type: ObjectType) -> Optional[tuple[sa.Table, str]]:
+    entry = _STATIC_TABLE_GETTERS.get(object_type.value)
+    if not entry:
+        return None
+    getter, pk = entry
+    return getter(), pk
+
+
+def _direct_delete_orphaned_object_states(
+        object_type: ObjectType,
+        updated_before: float) -> Optional[int]:
+    """Delete phantom object_states rows for one object type.
+
+    A row is a phantom when no static-values row exists for its uuid.
+    ``updated_before`` guards against racing object creation, where the
+    static and state rows are written moments apart.
+
+    Returns the number of rows deleted, or None on error.
+    """
+    entry = _static_table_for_object_type(object_type)
+    if entry is None:
+        return 0
+    static, pk = entry
+
+    engine = _get_engine()
+    states = _get_object_states_table()
+
+    # The static tables store undashed uuids; strip the dashes from the
+    # outer object_states value so the correlated lookup uses the static
+    # table's primary key index. Namespaces key on name, compared as-is.
+    if pk == 'name':
+        match = static.c[pk] == states.c.object_uuid
+    else:
+        match = static.c[pk] == sa.func.replace(
+            states.c.object_uuid, '-', '')
+
+    exists_clauses = [match]
+    if 'operation_type' in static.c:
+        exists_clauses.append(static.c.operation_type == object_type.value)
+
+    try:
+        with engine.begin() as conn:
+            stmt = sa.delete(states).where(sa.and_(
+                states.c.object_type == object_type,
+                states.c.update_time < updated_before,
+                ~sa.exists(
+                    sa.select(sa.literal(1)).where(sa.and_(*exists_clauses)))
+            ))
+            result = conn.execute(stmt)
+            return int(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete of orphaned {object_type} states failed: {e}')
+        return None
+
+
+def _grpc_delete_orphaned_object_states(
+        object_type: ObjectType,
+        updated_before: float) -> Optional[int]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteOrphanedObjectStatesRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                object_type.proto_id),
+            updated_before=updated_before
+        )
+        reply = _grpc_call(stub.DeleteOrphanedObjectStates, request)
+        if not reply.success:
+            return None
+        return int(reply.deleted)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC DeleteOrphanedObjectStates failed for {object_type}: {e}')
+        return None
+
+
+def delete_orphaned_object_states(
+        object_type: ObjectType,
+        updated_before: float) -> Optional[int]:
+    """Delete object_states rows for this type with no static-values row.
+
+    Args:
+        object_type: The type of object.
+        updated_before: Only rows whose update_time is older than this
+            unix timestamp are considered, so freshly-created objects
+            whose static row landed moments before their state row are
+            never affected.
+
+    Returns:
+        The number of rows deleted, or None on error.
+    """
+    if _use_database_service():
+        return _grpc_delete_orphaned_object_states(
+            object_type, updated_before)
+    return _direct_delete_orphaned_object_states(object_type, updated_before)
+
+
+def _direct_get_stateless_object_uuids(
+        object_type: ObjectType) -> Optional[list[str]]:
+    """List zombie static rows for one object type.
+
+    A static-values row is a zombie when no object_states row exists for
+    its uuid. Returns dashed uuid strings (or names for namespaces), or
+    None on error.
+    """
+    entry = _static_table_for_object_type(object_type)
+    if entry is None:
+        return []
+    static, pk = entry
+
+    engine = _get_engine()
+    states = _get_object_states_table()
+
+    # Render the outer static uuid in the dashed form object_states uses,
+    # so the correlated lookup lands on the object_states primary key.
+    # Namespaces key on name, compared as-is.
+    if pk == 'name':
+        match = states.c.object_uuid == static.c[pk]
+    else:
+        match = states.c.object_uuid == _dashed_uuid_expr(static.c[pk])
+
+    where = [~sa.exists(sa.select(sa.literal(1)).where(sa.and_(
+        match, states.c.object_type == object_type)))]
+    if 'operation_type' in static.c:
+        where.append(static.c.operation_type == object_type.value)
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(static.c[pk]).where(sa.and_(*where))
+            result = conn.execute(stmt).fetchall()
+            return [str(row[0]) for row in result]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB stateless uuid query failed for {object_type}: {e}')
+        return None
+
+
+def _grpc_get_stateless_object_uuids(
+        object_type: ObjectType) -> Optional[list[str]]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetStatelessObjectUuidsRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType,
+                object_type.proto_id)
+        )
+        reply = _grpc_call(stub.GetStatelessObjectUuids, request)
+        return list(reply.object_uuids)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetStatelessObjectUuids failed for {object_type}: {e}')
+        return None
+
+
+def get_stateless_object_uuids(
+        object_type: ObjectType) -> Optional[list[str]]:
+    """List static-values rows for this type with no object_states row.
+
+    Returns:
+        A list of dashed uuid strings (or names for namespaces), or None
+        on error.
+    """
+    if _use_database_service():
+        return _grpc_get_stateless_object_uuids(object_type)
+    return _direct_get_stateless_object_uuids(object_type)
+
+
+def _direct_delete_orphaned_artifact_attributes() -> Optional[int]:
+    """Delete artifact_attributes rows whose artifact row is gone.
+
+    Both tables store undashed uuids, so no format transform is needed.
+    Creation writes the artifacts row before the attributes row, so a
+    row without a parent can only be post-deletion garbage.
+
+    Returns the number of rows deleted, or None on error.
+    """
+    engine = _get_engine()
+    attrs = _get_artifact_attributes_table()
+    artifacts = _get_artifacts_table()
+
+    try:
+        with engine.begin() as conn:
+            stmt = sa.delete(attrs).where(~sa.exists(
+                sa.select(sa.literal(1)).where(
+                    artifacts.c.uuid == attrs.c.uuid)))
+            result = conn.execute(stmt)
+            return int(result.rowcount)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete of orphaned artifact attributes failed: {e}')
+        return None
+
+
+def _grpc_delete_orphaned_artifact_attributes() -> Optional[int]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteOrphanedArtifactAttributesRequest()
+        reply = _grpc_call(stub.DeleteOrphanedArtifactAttributes, request)
+        if not reply.success:
+            return None
+        return int(reply.deleted)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC DeleteOrphanedArtifactAttributes failed: {e}')
+        return None
+
+
+def delete_orphaned_artifact_attributes() -> Optional[int]:
+    """Delete artifact_attributes rows whose artifact row is gone.
+
+    Returns:
+        The number of rows deleted, or None on error.
+    """
+    if _use_database_service():
+        return _grpc_delete_orphaned_artifact_attributes()
+    return _direct_delete_orphaned_artifact_attributes()

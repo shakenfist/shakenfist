@@ -1219,6 +1219,132 @@ class GetObjectsByStateReply(_message.Message):
 Global___GetObjectsByStateReply: _TypeAlias = GetObjectsByStateReply  # noqa: Y015
 
 @_typing.final
+class DeleteOrphanedObjectStatesRequest(_message.Message):
+    """Orphan reconciliation (issue 3534). Phantoms are object_states rows
+    whose static-values row is gone; zombies are static rows with no
+    object_states row. Both are invisible to state-driven iterators.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: _builtins.int
+    UPDATED_BEFORE_FIELD_NUMBER: _builtins.int
+    object_type: _shakenfist_enums_pb2.ObjectType.ValueType
+    updated_before: _builtins.float
+    """Only rows with update_time older than this"""
+    def __init__(
+        self,
+        *,
+        object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        updated_before: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_type", b"object_type", "updated_before", b"updated_before"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteOrphanedObjectStatesRequest: _TypeAlias = DeleteOrphanedObjectStatesRequest  # noqa: Y015
+
+@_typing.final
+class DeleteOrphanedObjectStatesReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    DELETED_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    deleted: _builtins.int
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        deleted: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["deleted", b"deleted", "success", b"success"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteOrphanedObjectStatesReply: _TypeAlias = DeleteOrphanedObjectStatesReply  # noqa: Y015
+
+@_typing.final
+class GetStatelessObjectUuidsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: _builtins.int
+    object_type: _shakenfist_enums_pb2.ObjectType.ValueType
+    def __init__(
+        self,
+        *,
+        object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_type", b"object_type"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetStatelessObjectUuidsRequest: _TypeAlias = GetStatelessObjectUuidsRequest  # noqa: Y015
+
+@_typing.final
+class GetStatelessObjectUuidsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    OBJECT_UUIDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def object_uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        object_uuids: _abc.Iterable[_builtins.str] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_uuids", b"object_uuids"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetStatelessObjectUuidsReply: _TypeAlias = GetStatelessObjectUuidsReply  # noqa: Y015
+
+@_typing.final
+class DeleteOrphanedArtifactAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteOrphanedArtifactAttributesRequest: _TypeAlias = DeleteOrphanedArtifactAttributesRequest  # noqa: Y015
+
+@_typing.final
+class DeleteOrphanedArtifactAttributesReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    DELETED_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    deleted: _builtins.int
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        deleted: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["deleted", b"deleted", "success", b"success"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteOrphanedArtifactAttributesReply: _TypeAlias = DeleteOrphanedArtifactAttributesReply  # noqa: Y015
+
+@_typing.final
 class IPAMReservationData(_message.Message):
     """IPAM Reservation Operations (MariaDB)
     These operations manage IP address reservations in MariaDB for atomic
