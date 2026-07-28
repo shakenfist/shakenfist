@@ -20431,14 +20431,19 @@ ORPHAN_RECONCILABLE_OBJECT_TYPES: list[str] = sorted(_STATIC_TABLE_GETTERS)
 def _dashed_uuid_expr(col: Any) -> Any:
     """Render an undashed CHAR(32) uuid column in the dashed 36 character
     form used by object_states.object_uuid, so a comparison against
-    object_states can use its primary key index."""
+    object_states can use its primary key index.
+
+    Built with the string concatenation operator rather than the CONCAT
+    function so SQLAlchemy renders it per-dialect: sqlite (used by the
+    unit tests) only grew a CONCAT function in 3.44, but has always
+    supported ``||``."""
     c = sa.cast(col, sa.String(36))
-    return sa.func.concat(
-        sa.func.substr(c, 1, 8), '-',
-        sa.func.substr(c, 9, 4), '-',
-        sa.func.substr(c, 13, 4), '-',
-        sa.func.substr(c, 17, 4), '-',
-        sa.func.substr(c, 21, 12))
+
+    def part(start: int, length: int) -> Any:
+        return sa.func.substr(c, start, length, type_=sa.String())
+
+    return (part(1, 8) + '-' + part(9, 4) + '-' + part(13, 4) + '-' +
+            part(17, 4) + '-' + part(21, 12))
 
 
 def _static_table_for_object_type(
