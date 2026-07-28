@@ -311,7 +311,7 @@ small number of self-contained commits.
   without blocking, and the default ships `Enforce`.
 - Rust passes `cargo fmt --check`, `cargo clippy -- -D warnings`,
   `cargo test`; Python passes `tox -eflake8`/`tox -epy3`; the phase-4
-  pre-push audit (`PUSH-TEMPLATE.md`) is clean.
+  pre-push audit (`PUSH-AUDIT.md`) is clean.
 - Docs updated; master-plan/index status flipped.
 
 ## Future work (recorded, not in this phase)
@@ -436,7 +436,7 @@ follow-up capture.
 
 ### Pre-push audit (2026-07-07)
 
-Ran the `PUSH-TEMPLATE.md` audit against `git diff origin/develop..HEAD`.
+Ran the `PUSH-AUDIT.md` audit against `git diff origin/develop..HEAD`.
 Wave 1 (mechanical) was clean: Docker `make lint` (fmt + `clippy -D
 warnings`) and `make test` green, `flake8`/`py3` green, no
 `unsafe`/`unwrap`/`panic!`/`todo!` on any non-test enforcement path, no

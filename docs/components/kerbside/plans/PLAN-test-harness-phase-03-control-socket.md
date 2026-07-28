@@ -153,7 +153,7 @@ Serde / JSON precedent:
 - No NDJSON precedent in the codebase. This phase introduces it.
 
 Ryll planning conventions:
-- Ryll has its own `PLAN-TEMPLATE.md`, `PUSH-TEMPLATE.md`,
+- Ryll has its own `PLAN-TEMPLATE.md`, `PUSH-AUDIT.md`,
   `docs/plans/` tree.
 - Per the master plan's single-home rule, this phase's plan
   lives in **kerbside**, not in ryll. Commit messages in ryll
@@ -270,7 +270,7 @@ Notes specific to phase 3:
 
 - **Cross-repo briefing.** Every step lands in `shakenfist/ryll`,
   not kerbside. Sub-agents must consult Ryll's own
-  `PLAN-TEMPLATE.md`, `PUSH-TEMPLATE.md`, `AGENTS.md`, and
+  `PLAN-TEMPLATE.md`, `PUSH-AUDIT.md`, `AGENTS.md`, and
   `ARCHITECTURE.md` for build commands and house style — but the
   *plan they are following* is the one in this kerbside file.
   Include both pointers in the brief.

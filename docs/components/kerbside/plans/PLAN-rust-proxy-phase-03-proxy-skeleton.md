@@ -337,7 +337,7 @@ Notable deviations / findings, all deliberate:
 
 ### Pre-push audit (2026-07-06)
 
-Ran the `PUSH-TEMPLATE.md` pre-push audit against
+Ran the `PUSH-AUDIT.md` pre-push audit against
 `git diff origin/develop..HEAD` (kerbside only; ryll is a pinned
 dependency, unchanged this phase). Wave 1 (mechanical) was clean: Docker
 `make lint` (fmt + `clippy -D warnings`) and `make test` green, flake8

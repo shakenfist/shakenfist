@@ -131,6 +131,9 @@ of a HTML5 desktop environment.
 
 Guides for deploying and configuring Kerbside:
 
+- [Installation](/components/kerbside/installation/) - Packages, OS-level dependencies, and
+  deployment pointers
+
 - [Configuration](/components/kerbside/configuration/) - Configuration reference for all Kerbside
   settings including TLS, Keystone, API, and monitoring options
 
@@ -139,6 +142,15 @@ Guides for deploying and configuring Kerbside:
   including the Shaken Fist offline token exchange
 
 - [Database Schema](/components/kerbside/schema/) - Database tables, columns, and relationships
+
+### Developer Documentation
+
+Guides for working on Kerbside itself:
+
+- [Development](/components/kerbside/development/) - Database migrations and vendored web assets
+
+- [Testing](/components/kerbside/testing/) - CI lanes, the Ryll-based harnesses, the oVirt
+  console probe, the Tempest plugin, and the load-test container images
 
 ### Architecture Documentation
 
