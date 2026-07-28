@@ -162,6 +162,8 @@ EXPECTED_TABLE_NAMES = sorted([
     'node_attributes',
     'namespaces',
     'namespace_attributes',
+    'namespace_keys',
+    'namespace_key_attributes',
     'artifacts',
     'artifact_attributes',
     'artifact_indexes',

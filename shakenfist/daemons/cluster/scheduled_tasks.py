@@ -17,6 +17,8 @@ from shakenfist.schema.operations import baseclusteroperation as bco_schema
 from shakenfist.schema.operations import node_blob_op as nbo_schema
 from shakenfist.schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
+from shakenfist.namespace import Namespaces
+from shakenfist.namespace_key import keys_with_attributes
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_general_background_node_queues
@@ -334,6 +336,59 @@ def reap_stuck_cluster_operation_jobs():
                 'claimed_by': row.get('claimed_by'),
                 'claimed_at': row.get('claimed_at'),
             }).info('Reaper re-queued stuck work item')
+
+
+def reap_expired_namespace_keys() -> None:
+    """Soft delete namespace keys which expired a while ago.
+
+    Expiry enforcement is check-at-use -- an expired key stops
+    authenticating the moment it lapses, without this sweep having run.
+    All this does is tidy up, after a grace period during which the
+    lapsed key is still listable so an operator can see why their
+    automation stopped working.
+
+    The soft delete is all we do here. Hard deletion is
+    per_deleted_object_checks' job, which hard deletes any object which
+    has sat in a final state for config.CLEANER_DELAY, keys included.
+    """
+    grace = config.NAMESPACE_KEY_REAP_GRACE
+    if grace <= 0:
+        return
+
+    cutoff = time.time() - grace
+    reaped = 0
+
+    for ns in Namespaces(filters=[], prefilter='active'):
+        # include_expired is the whole point of the sweep, and the
+        # accessor joins the attributes row, so expiry costs no extra
+        # read here.
+        for key, attrs in keys_with_attributes(ns.uuid, include_expired=True):
+            if attrs.expiry is None or attrs.expiry >= cutoff:
+                continue
+
+            # Already soft deleted by an earlier sweep, and now waiting
+            # on the hard delete reaper.
+            if key.state.value in FINAL_OBJECT_STATES:
+                continue
+
+            try:
+                key.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'the cluster wide cleanup daemon is deleting this '
+                    'namespace key because it expired',
+                    extra={'expiry': attrs.expiry})
+                key.delete()
+                reaped += 1
+            except InvalidStateException as e:
+                # Raced with something else deleting the key. Not an
+                # error, the key is going away either way.
+                LOG.with_fields({
+                    'namespace': key.namespace,
+                    'key': key.name
+                }).info(f'Expired namespace key already transitioning: {e}')
+
+    if reaped:
+        LOG.info(f'Soft deleted {reaped} expired namespace keys')
 
 
 def prune_events() -> None:

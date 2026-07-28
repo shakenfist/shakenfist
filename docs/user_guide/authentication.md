@@ -5,6 +5,8 @@ in the [developer guide](/developer_guide/authentication/), that is likely more
 detail than a day to day user of Shaken Fist is interested in. This page
 therefore provides the details in a simpler and more direct form.
 
+Terms used here are defined in the [glossary](../glossary.md).
+
 As a user of Shaken Fist, the administrator of the cluster you are using will
 have created a _namespace_ to contain the resources you create in Shaken Fist.
 This namespace can have several authentication keys associated with it, which

@@ -5509,6 +5509,433 @@ class DeleteNetworkAttributesRequest(_message.Message):
 Global___DeleteNetworkAttributesRequest: _TypeAlias = DeleteNetworkAttributesRequest  # noqa: Y015
 
 @_typing.final
+class NamespaceKeyStaticData(_message.Message):
+    """NamespaceKey Operations (MariaDB)
+    These manage NamespaceKey static values. A NamespaceKey is an
+    authentication key owned by a namespace; the (namespace, name) pair
+    is unique.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    NAME_FIELD_NUMBER: _builtins.int
+    VERSION_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """NamespaceKey UUID"""
+    namespace: _builtins.str
+    """Owning namespace name"""
+    name: _builtins.str
+    """Key name, unique within the namespace"""
+    version: _builtins.int
+    """Schema version"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        namespace: _builtins.str = ...,
+        name: _builtins.str = ...,
+        version: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "namespace", b"namespace", "uuid", b"uuid", "version", b"version"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___NamespaceKeyStaticData: _TypeAlias = NamespaceKeyStaticData  # noqa: Y015
+
+@_typing.final
+class NamespaceKeyAttributesProto(_message.Message):
+    """NamespaceKey Attributes Operations (MariaDB)
+    These store the mutable attributes of a key. expiry, scopes_json and
+    provenance_json use proto3 field presence: absent means SQL NULL,
+    which for expiry means "never expires" and for scopes means
+    "unscoped / wildcard".
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    KEY_FIELD_NUMBER: _builtins.int
+    NONCE_FIELD_NUMBER: _builtins.int
+    EXPIRY_FIELD_NUMBER: _builtins.int
+    SCOPES_JSON_FIELD_NUMBER: _builtins.int
+    PROVENANCE_JSON_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """References namespace_keys.uuid"""
+    key: _builtins.str
+    """Base64-encoded bcrypt hash"""
+    nonce: _builtins.str
+    """Token nonce"""
+    expiry: _builtins.float
+    """Epoch seconds; absent = never expires"""
+    scopes_json: _builtins.str
+    """JSON-encoded list of scope strings"""
+    provenance_json: _builtins.str
+    """JSON-encoded provenance dict"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        key: _builtins.str = ...,
+        nonce: _builtins.str = ...,
+        expiry: _builtins.float | None = ...,
+        scopes_json: _builtins.str | None = ...,
+        provenance_json: _builtins.str | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_expiry", b"_expiry", "_provenance_json", b"_provenance_json", "_scopes_json", b"_scopes_json", "expiry", b"expiry", "provenance_json", b"provenance_json", "scopes_json", b"scopes_json"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_expiry", b"_expiry", "_provenance_json", b"_provenance_json", "_scopes_json", b"_scopes_json", "expiry", b"expiry", "key", b"key", "nonce", b"nonce", "provenance_json", b"provenance_json", "scopes_json", b"scopes_json", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    _WhichOneofReturnType__expiry: _TypeAlias = _typing.Literal["expiry"]  # noqa: Y015
+    _WhichOneofArgType__expiry: _TypeAlias = _typing.Literal["_expiry", b"_expiry"]  # noqa: Y015
+    _WhichOneofReturnType__provenance_json: _TypeAlias = _typing.Literal["provenance_json"]  # noqa: Y015
+    _WhichOneofArgType__provenance_json: _TypeAlias = _typing.Literal["_provenance_json", b"_provenance_json"]  # noqa: Y015
+    _WhichOneofReturnType__scopes_json: _TypeAlias = _typing.Literal["scopes_json"]  # noqa: Y015
+    _WhichOneofArgType__scopes_json: _TypeAlias = _typing.Literal["_scopes_json", b"_scopes_json"]  # noqa: Y015
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__expiry) -> _WhichOneofReturnType__expiry | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__provenance_json) -> _WhichOneofReturnType__provenance_json | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__scopes_json) -> _WhichOneofReturnType__scopes_json | None: ...
+
+Global___NamespaceKeyAttributesProto: _TypeAlias = NamespaceKeyAttributesProto  # noqa: Y015
+
+@_typing.final
+class NamespaceKeyJoinedProto(_message.Message):
+    """A key and its attributes, as returned by the indexed per-namespace
+    listing. Joined server side so /auth does not need a second round
+    trip per key to reach the hash.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    STATIC_DATA_FIELD_NUMBER: _builtins.int
+    ATTRIBUTES_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def static_data(self) -> Global___NamespaceKeyStaticData: ...
+    @_builtins.property
+    def attributes(self) -> Global___NamespaceKeyAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        static_data: Global___NamespaceKeyStaticData | None = ...,
+        attributes: Global___NamespaceKeyAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["attributes", b"attributes", "static_data", b"static_data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attributes", b"attributes", "static_data", b"static_data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___NamespaceKeyJoinedProto: _TypeAlias = NamespaceKeyJoinedProto  # noqa: Y015
+
+@_typing.final
+class CreateNamespaceKeyRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___NamespaceKeyStaticData: ...
+    def __init__(
+        self,
+        *,
+        data: Global___NamespaceKeyStaticData | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateNamespaceKeyRequest: _TypeAlias = CreateNamespaceKeyRequest  # noqa: Y015
+
+@_typing.final
+class GetNamespaceKeyRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceKeyRequest: _TypeAlias = GetNamespaceKeyRequest  # noqa: Y015
+
+@_typing.final
+class GetNamespaceKeyReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    DATA_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def data(self) -> Global___NamespaceKeyStaticData: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        data: Global___NamespaceKeyStaticData | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "found", b"found"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceKeyReply: _TypeAlias = GetNamespaceKeyReply  # noqa: Y015
+
+@_typing.final
+class GetNamespaceKeyByNameRequest(_message.Message):
+    """Point read of a single key by its unique (namespace, name) pair. This
+    is the token validation hot path, so the attributes are joined in and
+    expired keys are returned -- the caller decides what expiry means.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    NAME_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Owning namespace name"""
+    name: _builtins.str
+    """Key name, unique within the namespace"""
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+        name: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["name", b"name", "namespace", b"namespace"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceKeyByNameRequest: _TypeAlias = GetNamespaceKeyByNameRequest  # noqa: Y015
+
+@_typing.final
+class GetNamespaceKeyByNameReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    KEY_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def key(self) -> Global___NamespaceKeyJoinedProto: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        key: Global___NamespaceKeyJoinedProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["key", b"key"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["found", b"found", "key", b"key"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceKeyByNameReply: _TypeAlias = GetNamespaceKeyByNameReply  # noqa: Y015
+
+@_typing.final
+class FindNamespaceKeysRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    INCLUDE_EXPIRED_FIELD_NUMBER: _builtins.int
+    NOW_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Owning namespace name"""
+    include_expired: _builtins.bool
+    """False applies the expiry filter in SQL"""
+    now: _builtins.float
+    """Epoch seconds compared against expiry"""
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+        include_expired: _builtins.bool = ...,
+        now: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["include_expired", b"include_expired", "namespace", b"namespace", "now", b"now"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___FindNamespaceKeysRequest: _TypeAlias = FindNamespaceKeysRequest  # noqa: Y015
+
+@_typing.final
+class FindNamespaceKeysReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    KEYS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def keys(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceKeyJoinedProto]: ...
+    def __init__(
+        self,
+        *,
+        keys: _abc.Iterable[Global___NamespaceKeyJoinedProto] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["keys", b"keys"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___FindNamespaceKeysReply: _TypeAlias = FindNamespaceKeysReply  # noqa: Y015
+
+@_typing.final
+class DeleteNamespaceKeyRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteNamespaceKeyRequest: _TypeAlias = DeleteNamespaceKeyRequest  # noqa: Y015
+
+@_typing.final
+class DeleteExpiredNamespaceKeysRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    OLDER_THAN_FIELD_NUMBER: _builtins.int
+    older_than: _builtins.float
+    """Keys with expiry < this are deleted"""
+    def __init__(
+        self,
+        *,
+        older_than: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["older_than", b"older_than"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteExpiredNamespaceKeysRequest: _TypeAlias = DeleteExpiredNamespaceKeysRequest  # noqa: Y015
+
+@_typing.final
+class CreateNamespaceKeyAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___NamespaceKeyAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: Global___NamespaceKeyAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CreateNamespaceKeyAttributesRequest: _TypeAlias = CreateNamespaceKeyAttributesRequest  # noqa: Y015
+
+@_typing.final
+class GetNamespaceKeyAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceKeyAttributesRequest: _TypeAlias = GetNamespaceKeyAttributesRequest  # noqa: Y015
+
+@_typing.final
+class GetNamespaceKeyAttributesReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOUND_FIELD_NUMBER: _builtins.int
+    DATA_FIELD_NUMBER: _builtins.int
+    found: _builtins.bool
+    @_builtins.property
+    def data(self) -> Global___NamespaceKeyAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        found: _builtins.bool = ...,
+        data: Global___NamespaceKeyAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "found", b"found"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceKeyAttributesReply: _TypeAlias = GetNamespaceKeyAttributesReply  # noqa: Y015
+
+@_typing.final
+class UpdateNamespaceKeyAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def data(self) -> Global___NamespaceKeyAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        data: Global___NamespaceKeyAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___UpdateNamespaceKeyAttributesRequest: _TypeAlias = UpdateNamespaceKeyAttributesRequest  # noqa: Y015
+
+@_typing.final
+class DeleteNamespaceKeyAttributesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DeleteNamespaceKeyAttributesRequest: _TypeAlias = DeleteNamespaceKeyAttributesRequest  # noqa: Y015
+
+@_typing.final
 class AgentOperationStaticData(_message.Message):
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values. AgentOperations represent

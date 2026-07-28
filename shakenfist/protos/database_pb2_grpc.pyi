@@ -239,6 +239,25 @@ class DatabaseServiceStub:
     GetNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkAttributesRequest, _database_pb2.GetNetworkAttributesReply]
     UpdateNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkAttributesRequest, _database_pb2.StatusReply]
     DeleteNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkAttributesRequest, _database_pb2.StatusReply]
+    CreateNamespaceKey: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceKeyRequest, _database_pb2.StatusReply]
+    """NamespaceKey Operations (MariaDB)
+    These manage NamespaceKey static values in MariaDB. A NamespaceKey is an
+    authentication key owned by a namespace; JWT identity strings of the form
+    "<namespace>:<keyname>" name one.
+    """
+    GetNamespaceKey: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyRequest, _database_pb2.GetNamespaceKeyReply]
+    GetNamespaceKeyByName: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyByNameRequest, _database_pb2.GetNamespaceKeyByNameReply]
+    FindNamespaceKeys: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindNamespaceKeysRequest, _database_pb2.FindNamespaceKeysReply]
+    DeleteNamespaceKey: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceKeyRequest, _database_pb2.StatusReply]
+    DeleteExpiredNamespaceKeys: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteExpiredNamespaceKeysRequest, _database_pb2.DeleteCountReply]
+    CreateNamespaceKeyAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceKeyAttributesRequest, _database_pb2.StatusReply]
+    """NamespaceKey Attributes Operations (MariaDB)
+    These store mutable NamespaceKey attributes (hash, nonce, expiry, scopes,
+    provenance). Rotation mutates the hash and nonce.
+    """
+    GetNamespaceKeyAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyAttributesRequest, _database_pb2.GetNamespaceKeyAttributesReply]
+    UpdateNamespaceKeyAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceKeyAttributesRequest, _database_pb2.StatusReply]
+    DeleteNamespaceKeyAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceKeyAttributesRequest, _database_pb2.StatusReply]
     CreateAgentOperation: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationRequest, _database_pb2.StatusReply]
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values in MariaDB. AgentOperations
@@ -536,6 +555,25 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     GetNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkAttributesRequest, _database_pb2.GetNetworkAttributesReply]  # type: ignore[assignment]
     UpdateNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    CreateNamespaceKey: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceKeyRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    """NamespaceKey Operations (MariaDB)
+    These manage NamespaceKey static values in MariaDB. A NamespaceKey is an
+    authentication key owned by a namespace; JWT identity strings of the form
+    "<namespace>:<keyname>" name one.
+    """
+    GetNamespaceKey: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyRequest, _database_pb2.GetNamespaceKeyReply]  # type: ignore[assignment]
+    GetNamespaceKeyByName: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyByNameRequest, _database_pb2.GetNamespaceKeyByNameReply]  # type: ignore[assignment]
+    FindNamespaceKeys: _aio.UnaryUnaryMultiCallable[_database_pb2.FindNamespaceKeysRequest, _database_pb2.FindNamespaceKeysReply]  # type: ignore[assignment]
+    DeleteNamespaceKey: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceKeyRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteExpiredNamespaceKeys: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteExpiredNamespaceKeysRequest, _database_pb2.DeleteCountReply]  # type: ignore[assignment]
+    CreateNamespaceKeyAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceKeyAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    """NamespaceKey Attributes Operations (MariaDB)
+    These store mutable NamespaceKey attributes (hash, nonce, expiry, scopes,
+    provenance). Rotation mutates the hash and nonce.
+    """
+    GetNamespaceKeyAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceKeyAttributesRequest, _database_pb2.GetNamespaceKeyAttributesReply]  # type: ignore[assignment]
+    UpdateNamespaceKeyAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceKeyAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    DeleteNamespaceKeyAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceKeyAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     CreateAgentOperation: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateAgentOperationRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """AgentOperation Operations (MariaDB)
     These manage AgentOperation static values in MariaDB. AgentOperations
@@ -1668,6 +1706,85 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     def DeleteNetworkAttributes(
         self,
         request: _database_pb2.DeleteNetworkAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def CreateNamespaceKey(
+        self,
+        request: _database_pb2.CreateNamespaceKeyRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
+        """NamespaceKey Operations (MariaDB)
+        These manage NamespaceKey static values in MariaDB. A NamespaceKey is an
+        authentication key owned by a namespace; JWT identity strings of the form
+        "<namespace>:<keyname>" name one.
+        """
+
+    @_abc_1.abstractmethod
+    def GetNamespaceKey(
+        self,
+        request: _database_pb2.GetNamespaceKeyRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetNamespaceKeyReply, _abc.Awaitable[_database_pb2.GetNamespaceKeyReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetNamespaceKeyByName(
+        self,
+        request: _database_pb2.GetNamespaceKeyByNameRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetNamespaceKeyByNameReply, _abc.Awaitable[_database_pb2.GetNamespaceKeyByNameReply]]: ...
+
+    @_abc_1.abstractmethod
+    def FindNamespaceKeys(
+        self,
+        request: _database_pb2.FindNamespaceKeysRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.FindNamespaceKeysReply, _abc.Awaitable[_database_pb2.FindNamespaceKeysReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteNamespaceKey(
+        self,
+        request: _database_pb2.DeleteNamespaceKeyRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteExpiredNamespaceKeys(
+        self,
+        request: _database_pb2.DeleteExpiredNamespaceKeysRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.DeleteCountReply, _abc.Awaitable[_database_pb2.DeleteCountReply]]: ...
+
+    @_abc_1.abstractmethod
+    def CreateNamespaceKeyAttributes(
+        self,
+        request: _database_pb2.CreateNamespaceKeyAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
+        """NamespaceKey Attributes Operations (MariaDB)
+        These store mutable NamespaceKey attributes (hash, nonce, expiry, scopes,
+        provenance). Rotation mutates the hash and nonce.
+        """
+
+    @_abc_1.abstractmethod
+    def GetNamespaceKeyAttributes(
+        self,
+        request: _database_pb2.GetNamespaceKeyAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetNamespaceKeyAttributesReply, _abc.Awaitable[_database_pb2.GetNamespaceKeyAttributesReply]]: ...
+
+    @_abc_1.abstractmethod
+    def UpdateNamespaceKeyAttributes(
+        self,
+        request: _database_pb2.UpdateNamespaceKeyAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteNamespaceKeyAttributes(
+        self,
+        request: _database_pb2.DeleteNamespaceKeyAttributesRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 

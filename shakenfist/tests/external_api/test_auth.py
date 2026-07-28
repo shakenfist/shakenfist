@@ -1,8 +1,12 @@
+import base64
 import json
 import logging
 import sys
+import time
 from unittest import mock
 from uuid import uuid4
+
+import bcrypt
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -178,6 +182,48 @@ class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn('access_token', resp.get_json())
 
+    def test_service_key_bypasses_existence_check(self):
+        # Pin the legacy exact-name '_service_key' bypass in verify_token
+        # (base.py:195): a token whose keyname is exactly '_service_key'
+        # skips the nonce/existence check entirely, so it keeps validating
+        # even after the underlying key is removed from the namespace.
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
+        self.assertEqual(200, resp.status_code)
+        service_token = 'Bearer %s' % resp.get_json()['access_token']
+
+        # The token validates on a verify_token-guarded endpoint.
+        resp = self.client.get('/auth/namespaces',
+                               headers={'Authorization': service_token})
+        self.assertEqual(200, resp.status_code)
+
+        # Remove the underlying key entirely.
+        Namespace.from_db('banana').remove_key('_service_key')
+
+        # The bypass means the token STILL validates despite the key being
+        # gone -- verify_token never looks it up for the exact name.
+        resp = self.client.get('/auth/namespaces',
+                               headers={'Authorization': service_token})
+        self.assertEqual(200, resp.status_code)
+
+    def test_ordinary_key_does_not_bypass_existence_check(self):
+        # Contrast with the bypass above: a token minted from an ordinary key
+        # is rejected once that key is removed (base.py:196-200).
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
+        self.assertEqual(200, resp.status_code)
+        ordinary_token = 'Bearer %s' % resp.get_json()['access_token']
+
+        resp = self.client.get('/auth/namespaces',
+                               headers={'Authorization': ordinary_token})
+        self.assertEqual(200, resp.status_code)
+
+        Namespace.from_db('banana').remove_key('key1')
+
+        resp = self.client.get('/auth/namespaces',
+                               headers={'Authorization': ordinary_token})
+        self.assertEqual(401, resp.status_code)
+
 
 class AuthWithLingeringInstance(base.ShakenFistTestCase):
     def setUp(self):
@@ -351,6 +397,42 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
             resp.get_json())
         self.assertEqual(403, resp.status_code)
 
+    @mock.patch('shakenfist.locks.ClusterLock')
+    def test_add_key_rejects_service_key_prefix(self, mock_lock):
+        # Pin _namespace_keys_putpost's rejection of any _service_key-prefixed
+        # name with a 403 (auth.py:288-289). The existing suite only covers
+        # the exact name 'service_key' on the namespace-create path.
+        resp = self.client.post('/auth/namespaces/system/keys',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'key_name': '_service_key_smuggled',
+                                    'key': 'cheese'
+                                }))
+        self.assertEqual(403, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'illegal key name',
+                'status': 403
+            },
+            resp.get_json())
+
+    @mock.patch('shakenfist.locks.ClusterLock')
+    def test_add_key_rejects_bare_service_key_prefix(self, mock_lock):
+        # The prefix check also rejects the bare '_service_key' name.
+        resp = self.client.post('/auth/namespaces/system/keys',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'key_name': '_service_key',
+                                    'key': 'cheese'
+                                }))
+        self.assertEqual(403, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'illegal key name',
+                'status': 403
+            },
+            resp.get_json())
+
     def test_delete_namespace_key_missing_args(self):
         resp = self.client.delete('/auth/namespaces/system/',
                                   headers={'Authorization': self.auth_token})
@@ -367,6 +449,103 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
                 'status': 404
             },
             resp.get_json())
+
+    # The expiry body parameter is new in the phase which made keys
+    # first class objects. It is additive: absent means no expiry,
+    # which is what every pre-existing client sends.
+
+    def _add_key(self, key_name, key, expiry=None):
+        body = {'key_name': key_name, 'key': key}
+        if expiry is not None:
+            body['expiry'] = expiry
+        return self.client.post(
+            '/auth/namespaces/system/keys',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps(body))
+
+    def test_add_key_accepts_a_future_expiry(self):
+        expiry = time.time() + 3600
+        resp = self._add_key('expiring', 'sekrit', expiry=expiry)
+
+        # This endpoint has always answered with the bare key name.
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('expiring', resp.get_json())
+
+        stored = Namespace.from_db('system').lookup_key('expiring')
+        self.assertEqual(expiry, stored.expiry)
+
+    def test_add_key_without_expiry_stores_none(self):
+        resp = self._add_key('forever', 'sekrit')
+
+        self.assertEqual(200, resp.status_code)
+        self.assertIsNone(
+            Namespace.from_db('system').lookup_key('forever').expiry)
+
+    def test_add_key_rejects_an_expiry_in_the_past(self):
+        resp = self._add_key('stale', 'sekrit', expiry=time.time() - 1)
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('expiry must be in the future',
+                         resp.get_json()['error'])
+
+    def test_add_key_rejects_a_non_numeric_expiry(self):
+        resp = self._add_key('bogus', 'sekrit', expiry='tomorrow')
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('expiry is not a number', resp.get_json()['error'])
+
+    def test_add_key_rejects_a_boolean_expiry(self):
+        # bool is a subclass of int, so "expiry": true would otherwise
+        # sneak past a naive isinstance check and become 1970.
+        resp = self._add_key('boolean', 'sekrit', expiry=True)
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('expiry is not a number', resp.get_json()['error'])
+
+    # The key update endpoint had two bugs which meant it never worked:
+    # it tested membership against the wrong level of the keys dict, and
+    # it handed a namespace name to a helper which expected the object.
+    # Both are fixed, so these tests pin behaviour that has no history.
+
+    def test_update_key_replaces_the_secret(self):
+        self._add_key('rotate-me', 'original')
+        original = Namespace.from_db('system').lookup_key('rotate-me')
+
+        resp = self.client.put(
+            '/auth/namespaces/system/keys/rotate-me',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'key': 'replacement'}))
+        self.assertEqual(200, resp.status_code)
+
+        rotated = Namespace.from_db('system').lookup_key('rotate-me')
+        self.assertNotEqual(original.nonce, rotated.nonce)
+        self.assertTrue(bcrypt.checkpw(
+            'replacement'.encode('utf-8'), base64.b64decode(rotated.key)))
+        self.assertFalse(bcrypt.checkpw(
+            'original'.encode('utf-8'), base64.b64decode(rotated.key)))
+
+    def test_update_key_accepts_an_expiry(self):
+        self._add_key('rotate-me', 'original')
+        expiry = time.time() + 3600
+
+        resp = self.client.put(
+            '/auth/namespaces/system/keys/rotate-me',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'key': 'replacement', 'expiry': expiry}))
+
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            expiry,
+            Namespace.from_db('system').lookup_key('rotate-me').expiry)
+
+    def test_update_key_rejects_an_unknown_key(self):
+        resp = self.client.put(
+            '/auth/namespaces/system/keys/never-existed',
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'key': 'replacement'}))
+
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual('key does not exist', resp.get_json()['error'])
 
 
 class ExternalApiTestCase(base.ShakenFistTestCase):
@@ -623,3 +802,296 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             'trust': {'full': ['system']},
             'version': 7
         }, resp.get_json())
+
+
+class AuthExpiredKeyTestCase(base.ShakenFistTestCase):
+    """Pin that an expired key can neither mint nor validate.
+
+    Covers brief item (ii): because both POST /auth and verify_token read
+    through the read-time-filtered `keys` accessor, an expired key can no
+    longer mint new tokens nor validate outstanding ones. time.time is
+    mocked in the namespace module to step across the key's expiry; this
+    does not disturb JWT signature/expiry validation, which uses
+    datetime.now rather than time.time.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        # key1 (secret 'bacon') never expires; expkey expires at epoch 2000.
+        self.mock_mariadb.create_namespace('banana', 'key1', 'bacon')
+        Namespace.from_db('banana').add_key('expkey', 'expsecret', expiry=2000)
+
+        self.client = external_api.app.test_client()
+
+    def test_expired_key_cannot_mint(self):
+        # Before the expiry, the key mints a token.
+        with mock.patch('shakenfist.namespace.time.time', return_value=1000):
+            resp = self.client.post(
+                '/auth',
+                data=json.dumps({'namespace': 'banana', 'key': 'expsecret'}))
+            self.assertEqual(200, resp.status_code)
+
+        # After the expiry, the same secret is rejected -- the key is hidden
+        # from the accessor that /auth iterates.
+        with mock.patch('shakenfist.namespace.time.time', return_value=3000):
+            resp = self.client.post(
+                '/auth',
+                data=json.dumps({'namespace': 'banana', 'key': 'expsecret'}))
+            self.assertEqual(401, resp.status_code)
+            self.assertEqual(
+                {'error': 'unauthorized', 'status': 401}, resp.get_json())
+
+            # The never-expiring key1 still mints even past that time.
+            resp = self.client.post(
+                '/auth',
+                data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
+            self.assertEqual(200, resp.status_code)
+
+    def test_expired_key_cannot_validate_outstanding_token(self):
+        # Mint a token from the key while it is still valid.
+        with mock.patch('shakenfist.namespace.time.time', return_value=1000):
+            resp = self.client.post(
+                '/auth',
+                data=json.dumps({'namespace': 'banana', 'key': 'expsecret'}))
+            self.assertEqual(200, resp.status_code)
+            token = 'Bearer %s' % resp.get_json()['access_token']
+
+            # While valid it authenticates a verify_token-guarded endpoint.
+            resp = self.client.get(
+                '/auth/namespaces', headers={'Authorization': token})
+            self.assertEqual(200, resp.status_code)
+
+        # Once the key has expired the outstanding token no longer validates,
+        # even though the JWT itself is still within its own lifetime.
+        with mock.patch('shakenfist.namespace.time.time', return_value=3000):
+            resp = self.client.get(
+                '/auth/namespaces', headers={'Authorization': token})
+            self.assertEqual(401, resp.status_code)
+
+
+class AuthNonceMismatchTestCase(base.ShakenFistTestCase):
+    """Pin nonce-based revocation on key rotation.
+
+    Covers brief item (iii): rotating a key (add_key with the same name
+    generates a fresh nonce) invalidates every token minted from the old
+    nonce -- replaying such a token against a verify_token-guarded endpoint
+    returns 401 (base.py:196-210).
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.mock_mariadb.create_namespace('banana', 'key1', 'bacon')
+
+        self.client = external_api.app.test_client()
+
+    def test_rotating_key_invalidates_outstanding_token(self):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
+        self.assertEqual(200, resp.status_code)
+        token = 'Bearer %s' % resp.get_json()['access_token']
+
+        # The freshly-minted token validates.
+        resp = self.client.get('/auth/namespaces',
+                               headers={'Authorization': token})
+        self.assertEqual(200, resp.status_code)
+
+        # Rotate the key: re-adding it under the same name generates a new
+        # nonce, so the old token's nonce claim no longer matches.
+        Namespace.from_db('banana').add_key('key1', 'bacon')
+
+        resp = self.client.get('/auth/namespaces',
+                               headers={'Authorization': token})
+        self.assertEqual(401, resp.status_code)
+
+
+class EventSecretsTestCase(base.ShakenFistTestCase):
+    """Audit events must never carry tokens or key material.
+
+    An event is readable by anyone who can read the object it belongs
+    to, which is a weaker bar than the credential itself clears. A JWT
+    sitting in an event log is replayable until it expires, and a
+    stored key hash is offline-attackable, so neither belongs there.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('banana', 'key1', 'bacon')
+
+        # Intercept at the eventlog rather than on any one object, so
+        # that an event added by some other object type in the same
+        # request is caught too.
+        self.events = []
+        patcher = mock.patch(
+            'shakenfist.eventlog.add_event',
+            side_effect=lambda event_type, object_type, object_uuid, message,
+            duration=None, extra=None, **kwargs: self.events.append(
+                (message, extra or {})))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.client = external_api.app.test_client()
+
+    def _extras_for(self, fragment):
+        """Every recorded extra dict whose message contains ``fragment``."""
+        found = [extra for message, extra in self.events if fragment in message]
+        self.assertNotEqual(
+            [], found,
+            f'no event matching {fragment!r} was recorded, so this test '
+            f'is not exercising what it claims to')
+        return found
+
+    def _assert_absent_everywhere(self, secret):
+        """``secret`` appears in no recorded event, under any key."""
+        for message, extra in self.events:
+            for name, value in extra.items():
+                self.assertNotIn(
+                    secret, str(value),
+                    f'event {message!r} leaked a secret in {name!r}')
+
+    def _mint(self, namespace='banana', key='bacon'):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': namespace, 'key': key}))
+        self.assertEqual(200, resp.status_code)
+        return resp.get_json()['access_token']
+
+    def test_minting_a_token_does_not_log_the_token(self):
+        token = self._mint()
+
+        for extra in self._extras_for('token created from key'):
+            self.assertNotIn('token', extra)
+            self.assertEqual('key1', extra['keyname'])
+        self._assert_absent_everywhere(token)
+
+    def test_minting_a_token_does_not_log_the_nonce(self):
+        # The nonce is the revocation handle. Publishing it tells a
+        # reader which of their captured tokens are still live, and
+        # confirms that a rotation has not happened yet.
+        self._mint()
+
+        for extra in self._extras_for('token created from key'):
+            self.assertNotIn('nonce', extra)
+
+        nonce = Namespace.from_db('banana').lookup_key('key1').nonce
+        self._assert_absent_everywhere(nonce)
+
+    def test_using_a_token_does_not_log_the_token(self):
+        token = self._mint()
+        self.events.clear()
+
+        resp = self.client.get(
+            '/auth/namespaces',
+            headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(200, resp.status_code)
+
+        for extra in self._extras_for('token used to authenticate request'):
+            self.assertNotIn('token', extra)
+            # The key name still identifies which credential was used,
+            # which is the part an audit reader actually needs.
+            self.assertEqual('key1', extra['keyname'])
+        self._assert_absent_everywhere(token)
+
+    @mock.patch('shakenfist.locks.ClusterLock')
+    def test_creating_a_namespace_does_not_log_the_token(self, mock_lock):
+        token = self._mint(namespace='system', key='bar')
+        self.events.clear()
+
+        resp = self.client.post(
+            '/auth/namespaces',
+            headers={'Authorization': f'Bearer {token}'},
+            data=json.dumps({'namespace': 'freshly-made'}))
+        self.assertEqual(200, resp.status_code)
+
+        # Both the invoking namespace's event and the new namespace's
+        # own event are checked here.
+        extras = self._extras_for('token used to create namespace')
+        self.assertEqual(2, len(extras))
+        for extra in extras:
+            self.assertNotIn('token', extra)
+            self.assertEqual('key1', extra['keyname'])
+        self._assert_absent_everywhere(token)
+
+    def test_a_malformed_key_does_not_log_the_key_body(self):
+        # The key body held the stored hash and the nonce. Provoke the
+        # ValueError path by making the bcrypt comparison itself fail.
+        with mock.patch('bcrypt.checkpw',
+                        side_effect=ValueError('invalid salt')):
+            resp = self.client.post(
+                '/auth',
+                data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
+        self.assertEqual(401, resp.status_code)
+
+        for extra in self._extras_for('namespace key is invalid'):
+            self.assertNotIn('key-body', extra)
+            # The error and the key name are what make the malformed key
+            # findable, and neither is secret.
+            self.assertEqual('key1', extra['key_name'])
+            self.assertIn('invalid salt', extra['error'])
+
+        stored = Namespace.from_db('banana').lookup_key('key1')
+        self._assert_absent_everywhere(stored.key)
+        self._assert_absent_everywhere(stored.nonce)
+
+    def test_the_request_trace_does_not_log_a_plaintext_key(self):
+        # The API request tracing events in app.py log request and
+        # response bodies verbatim. On /auth that request body is the
+        # namespace's plaintext key -- worse than a token, because it
+        # does not expire.
+        self._mint()
+
+        for extra in self._extras_for('api request received'):
+            self.assertNotIn('bacon', str(extra['body']))
+            # The URL survives, so the trace still says who called what.
+            self.assertIn('/auth', extra['url'])
+        self._assert_absent_everywhere('bacon')
+
+    def test_the_request_trace_still_logs_ordinary_bodies(self):
+        # The redaction is scoped to /auth, so it must not blind the
+        # trace everywhere else.
+        token = self._mint()
+        self.events.clear()
+
+        resp = self.client.get(
+            '/instances', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(200, resp.status_code)
+
+        bodies = [extra['body']
+                  for extra in self._extras_for('api response sent')]
+        for body in bodies:
+            self.assertNotIn('credentials', str(body))

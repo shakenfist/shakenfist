@@ -106,6 +106,13 @@ belongs in a table with per-row inserts and deletes — see the
 `instance_location` rows in `object_references` — never in a JSON list
 on an attributes row.
 
+### Documentation
+
+- When a change adds, renames, or removes a user-visible concept
+  (an object type, state, term, or similar), update
+  [`docs/glossary.md`](docs/glossary.md) in the same change so the
+  glossary never drifts from the code.
+
 ### Events vs logs
 
 Shaken Fist has two structured-record streams; choose the right

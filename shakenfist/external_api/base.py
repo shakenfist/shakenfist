@@ -114,6 +114,7 @@ def swagger_helper(section, description, parameters, responses,
         'ipv4': {'type': 'string', 'format': 'an IPv4 address as a string'},
         'namespace': {'type': 'string', 'format': 'the name of a namespace'},
         'node': {'type': 'string', 'format': 'the name of a node'},
+        'number': {'type': 'number', 'format': 'a floating point number'},
         'string': {'type': 'string', 'format': 'string'},
         'url': {'type': 'string', 'format': 'url'},
         'uuid': {'type': 'string', 'format': 'uuid'},
@@ -192,14 +193,27 @@ def verify_token(func):
                 'JWT token is for deleted namespace')
             raise NoAuthorizationError()
 
+        # NOTE(mikal): the exact name '_service_key' skips the nonce
+        # check entirely. This predates nonced keys and some deployment
+        # may still be holding a token of that shape, so it is
+        # deliberately preserved here (phase 2 Decision 1 of the auth
+        # federation plan); its retirement is recorded as phase 3 work.
+        # Note that this is an exact match, not a prefix match -- the
+        # '_service_key_<rand>' keys get_api_token() mints are checked
+        # like any other key.
         if key_name != '_service_key':
-            keys = ns.keys.get('nonced_keys', {})
-            if key_name not in keys:
+            # One indexed point read of the named key, honouring
+            # expiry. This must never be cached: the nonce is the
+            # revocation handle for every token minted from the key, so
+            # a stale cache would delay revocation, which is the entire
+            # point of the mechanism.
+            key = ns.lookup_key(key_name)
+            if not key:
                 LOG.with_fields({'namespace', ns_name}).error(
                     'JWT token uses non-existent key')
                 raise NoAuthorizationError()
 
-            nonce = keys[key_name].get('nonce')
+            nonce = key.nonce
             if 'nonce' not in jwt_data:
                 LOG.with_fields({'namespace', ns_name}).error(
                     'JWT token lacks nonce')
@@ -215,17 +229,20 @@ def verify_token(func):
 
 def log_token_use(func):
     def wrapper(*args, **kwargs):
-        auth_header = flask.request.headers.get('Authorization', 'Bearer none')
-        token = auth_header.split(' ')[1]
         namespace, keyname = parse_jwt_identity()
 
         ns = Namespace.from_db(namespace)
         if not ns:
             return sf_api.error(401, 'authenticated namespace not known')
+
+        # NOTE(mikal): the presented token must never appear in the
+        # event. The key name identifies which credential was used,
+        # which is what an audit reader actually needs; the token
+        # itself would be replayable by anyone who can read the
+        # namespace's events.
         ns.add_event(
             EVENT_TYPE_AUDIT, 'token used to authenticate request',
             extra={
-                'token': token,
                 'keyname': keyname,
                 'method': flask.request.environ['REQUEST_METHOD'],
                 'path': flask.request.environ['PATH_INFO'],

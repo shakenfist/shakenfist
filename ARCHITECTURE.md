@@ -75,8 +75,8 @@ The database microservice (`sf-database`) centralizes all database access:
 - All other daemons use the gRPC interface
 - Provides Prometheus metrics for database operations
 
-The `sf-database` box in the diagram represents a tier of N >= 1 instances.
-All instances connect to the same MariaDB; none is elected. Every other SF
+The `sf-database` box in the diagram represents a tier of N >= 1 replicas.
+All replicas connect to the same MariaDB; none is elected. Every other SF
 daemon reaches the tier through a client-side load-balanced gRPC channel
 constructed over the `MARIADB_GATEWAY_HOSTS` list of endpoints. Dead
 endpoints are skipped via subchannel connectivity state and client
@@ -410,7 +410,7 @@ two layers, both controlled by this metadata:
   transitions every other pending coalescible op on the same target
   to `STATE_COMPLETE` in one SQL statement. When the dispatcher
   surfaces a folded sibling's `work_queue` row, the terminal-state
-  branch drops it cleanly. A `'coalesced sibling ops'` audit event
+  branch drops it cleanly. A `'coalesced sibling ops'` event
   on the survivor records the folded uuids.
 
 The enqueue-side dedup is the cheaper of the two -- the row never
@@ -840,6 +840,16 @@ Objects follow defined state machines. Key states:
 - `initial` -> `created`
 - `created` -> `deleted`
 
+### Namespace Key States
+- `initial` -> `created`
+- `created` -> `deleted` (soft delete)
+
+A `NamespaceKey` (`shakenfist/namespace_key.py`) is the credential a namespace
+authenticates with, and is a database-backed object owned by its namespace.
+There is no error state, because key operations are atomic. Expiry is not a
+state: it is enforced when the key is used, and the cluster daemon separately
+soft-deletes long-expired keys so that the standard reaper hard-deletes them.
+
 See `docs/developer_guide/state_machine.md` for complete documentation.
 
 ## Configuration
@@ -957,7 +967,14 @@ The develop branch uses:
 ## Security Model
 
 - Multi-tenant with namespace isolation
-- JWT-based authentication
+- JWT-based authentication, minted from namespace keys and bound to the
+  minting key's nonce so that rotating or deleting a key revokes its
+  outstanding tokens immediately
+- Namespace keys are database-backed objects with optional expiry, enforced
+  when the key is used rather than by a sweep
+- Credentials never enter events, which are shipped to syslog and Loki;
+  events record the key name, and request tracing does not log bodies for
+  routes under `/auth`
 - RBAC with admin/user roles
 - Network isolation via VXLAN
 

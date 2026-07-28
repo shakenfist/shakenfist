@@ -206,7 +206,7 @@ MariaDB directly using SQLAlchemy. Ordinary cluster nodes (running `sf-api`,
 
 **`MARIADB_GATEWAY_HOSTS`** is set on every cluster node. It is the list of
 `sf-database` gRPC endpoints that non-database daemons connect to. For a
-single-instance deployment this list has one entry; for higher availability,
+single-replica deployment this list has one entry; for higher availability,
 list multiple `sf-database` endpoints and the gRPC client library round-robins
 requests across them.
 
@@ -222,15 +222,15 @@ In summary:
 | `sf-database`, schema tool | `MARIADB_HOST` | Direct SQLAlchemy → MariaDB |
 | All other daemons | `MARIADB_GATEWAY_HOSTS` | gRPC → `sf-database` tier |
 | `sf-database` itself (gRPC listener) | `MARIADB_GATEWAY_PORT` | Port each `sf-database` binds on (default 13005) |
-| Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` instance (default 13006) |
+| Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` replica (default 13006) |
 
-**Multi-instance deployments**: More than one `sf-database` instance can run
-against the same MariaDB server. List every instance's mesh IP in
+**Multi-replica deployments**: More than one `sf-database` replica can run
+against the same MariaDB server. List every replica's mesh IP in
 `MARIADB_GATEWAY_HOSTS`, comma-separated — for example,
 `MARIADB_GATEWAY_HOSTS="10.0.0.20,10.0.0.21,10.0.0.22"`. Every `sf-database`
-instance must be able to reach the MariaDB server; in BYO deployments this
+replica must be able to reach the MariaDB server; in BYO deployments this
 typically means the operator's MariaDB is bound to a routable interface rather
-than `127.0.0.1`. This multi-instance shape is exercised by CI on every
+than `127.0.0.1`. This multi-replica shape is exercised by CI on every
 merge-queue run, so operators can rely on it as a supported production
 configuration.
 
@@ -239,7 +239,7 @@ SF daemon connects to the tier with a gRPC channel that round-robins requests
 across the listed endpoints. Dead endpoints are skipped automatically: the
 round-robin policy avoids subchannels whose TCP connection is down, and
 aggressive client keepalives (a ping every 10 seconds with a 5 second
-timeout) detect a hung instance within about 15 seconds. There is no
+timeout) detect a hung replica within about 15 seconds. There is no
 external load balancer to configure -- the round-robin behaviour and
 failure detection are inside the gRPC client library. `sf-database` also
 publishes the standard `grpc.health.v1.Health` protocol against the
@@ -312,7 +312,7 @@ The status reflects the outcome of the most recent ~10 s background poll:
 `SERVING` means `sf-database` can reach MariaDB; `NOT_SERVING` means the
 last poll failed. Schema currency (whether the schema is up to date) is
 only checked at startup and is not a runtime signal — a running
-`sf-database` instance always has an up-to-date schema.
+`sf-database` replica always has an up-to-date schema.
 
 `sf-api` consumes this signal through its per-worker readiness checker
 (`shakenfist/external_api/health.py`). When `sf-database` reports
@@ -580,6 +580,7 @@ values (immutable data set at creation time):
 | `blobs` | Blob | uuid, modified, fetched_at, version |
 | `nodes` | Node | uuid, fqdn (unique index), ip, version |
 | `namespaces` | Namespace | name (VARCHAR PK), version |
+| `namespace_keys` | NamespaceKey | uuid, namespace, name, version. UNIQUE index on (namespace, name), which also serves the per-namespace listing |
 | `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
 | `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
 | `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
@@ -599,7 +600,8 @@ dedicated attribute tables:
 |-------|-------------|------------|
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
 | `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; for one transition release the legacy `instances` JSON column is dual-written and unioned into reads so rolling upgrade and rollback both see fresh placements |
-| `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON) |
+| `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON). Keys live in `namespace_keys` / `namespace_key_attributes` since the v2 `namespace_keys` migration; the legacy `keys` JSON column is left in place until a later schema bump drops it |
+| `namespace_key_attributes` | NamespaceKey | uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict) |
 | `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
@@ -620,6 +622,31 @@ read-modify-write cycles are reserved for row creation and schema
 upgrades: with concurrent writers on different nodes, an unmasked write
 pushes a stale snapshot of the other columns over any update committed
 since the writer read the row (a cross-attribute lost update).
+
+Namespace keys used to be anonymous entries inside that row's `keys`
+JSON dict. They are now objects in their own right, so that a key can
+carry an expiry, be listed, reaped, and (in a later release) scoped.
+The static row is one per key, and the hash and nonce live in the
+attribute row because rotating a key replaces both.
+
+Version 2 of `namespace_keys` is a one-shot data migration rather than
+a schema change: `sf-ctl ensure-mariadb-schema` reads every
+`namespace_attributes.keys` blob and fans each `nonced_keys` entry out
+into a static row, an attribute row, and an `object_states` row in
+state `created`. Hashes, nonces and expiries are copied verbatim, so
+tokens issued before the upgrade keep working; scopes and provenance
+are NULL. Expired keys are migrated too and removed by the reaper on
+its next pass. The migration is idempotent — keys which already have a
+row are skipped — so it is safe to re-run.
+
+The legacy JSON column is deliberately left untouched by the
+migration, exactly as the `node_daemon_states` migration left
+`node_attributes.daemon_states` in place. One consequence is worth
+knowing before an upgrade: **rolling back to a pre-upgrade release
+revives the JSON column**, which still holds every key that existed
+before the migration, but keys created or rotated after the migration
+exist only in the new tables and will be invisible to the rolled-back
+code.
 
 #### Node Identity and UUID Persistence
 

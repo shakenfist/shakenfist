@@ -4,6 +4,8 @@ Everything that you interact with in Shaken Fist is an object. Objects are
 almost always referred to by a UUID (specifically a version 4 UUID) as a
 string. The exceptions are: `node`s; `namespace`s; and `key`s within a namespace.
 
+Terms used here are defined in the [glossary](../glossary.md).
+
 In general an object is referred to in the API or on the command line "by
 reference", which means you can either pass the object's name or its UUID to the
 command. So for example if we had an instance with the UUID
