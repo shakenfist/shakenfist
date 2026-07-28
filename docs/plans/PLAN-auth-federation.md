@@ -429,7 +429,7 @@ groundwork exists, and lives mostly outside this repository.
 | 4. Authentication documentation | PLAN-auth-federation-phase-04-docs.md | Not started |
 | 5. OIDC plan refresh | PLAN-auth-federation-phase-05-oidc-plan-refresh.md | Not started |
 | 6. Secrets that cannot be logged by accident | PLAN-auth-federation-phase-06-secret-types.md | Not started |
-| 7. Recognisable secrets and leak detection | PLAN-auth-federation-phase-07-secret-format.md | Not started |
+| 7. Leak detection | PLAN-auth-federation-phase-07-leak-detection.md | Not started |
 
 Phase plans for phases 4–7 have not been drafted yet; the
 open questions above should be resolved (or explicitly
@@ -446,11 +446,13 @@ phase is the argument for both: phase 6 makes the mistake
 hard to make, phase 7 makes it detectable when it is made
 anyway.
 
-Neither blocks phases 3–5, with one ordering preference:
-**phase 7's secret format should be settled before phase 3
-mints its first exchange key**, or keys minted in between
-will not match the scanners. If phase 3 runs first it should
-adopt the format itself rather than defer it.
+Neither blocks phases 3–5. There was an ordering hazard here
+— phase 7's secret format needed to be settled before phase
+3 minted its first exchange key, or keys minted in between
+would not match the scanners — and it is resolved by moving
+the format into phase 3, which is where the first
+cluster-generated secrets appear. Phase 7 keeps the
+detection half, which has no such constraint.
 
 ### Phase 1: Terminology and glossary
 
@@ -686,46 +688,30 @@ This phase is deliberately independent of the federation
 work and could be done at any time, including by someone
 who is not otherwise following this plan.
 
-### Phase 7: Recognisable secrets and leak detection
+### Phase 7: Leak detection
 
 Phase 6 stops secrets reaching a sink. This phase assumes
 one got out anyway and shortens the time to notice.
 
-The industry pattern is a structured secret: GitHub's
-`ghp_`-style prefix plus a CRC32 checksum in the trailing
-characters, mirrored by GitLab's `glpat-`, Stripe's
-`sk_live_` and Slack's `xoxb-`. The prefix makes the secret
-greppable; the checksum lets a scanner reject lookalikes
-without calling an API, which is what makes large-scale
-scanning tolerable. Note that this costs nothing
-cryptographically — a prefix is a label beside a random
-value, not a revealed piece of one, and the entropy of the
-random part is unchanged.
+The credential *format* this phase was originally going to
+define now lands in phase 3 instead, because phase 3 mints
+the first cluster-generated key secrets and anything minted
+before the format existed would need reissuing. Phase 3
+therefore delivers the `sfk_` prefix, the CRC32 checksum,
+the reservation of the prefix against operator-supplied
+secrets, and early rejection on a bad checksum. What remains
+here is detecting the format once it escapes.
 
-* **A format for cluster-minted key secrets**: a short
-  prefix, a high-entropy random body, and a trailing
-  checksum over the two. The exact alphabet and lengths are
-  a phase-plan decision; matching GitHub's shape closely
-  enough that off-the-shelf scanner tooling is easy to
-  configure is worth more than novelty.
-* **Only for secrets Shaken Fist generates.** Namespace key
-  secrets are operator-supplied today and must stay
-  supported — an operator's chosen string cannot carry our
-  prefix. The format applies to phase 3's exchange-minted
-  keys, and to a new "let the cluster generate one for you"
-  path for operator keys. Access tokens are JWTs and are
-  already recognisable by their `eyJ` prefix and `iss`
-  claim, so they need nothing.
-* **Cheap early rejection**: `/auth` and `sf-client` can
-  fail a malformed cluster-minted key on its checksum before
-  spending a bcrypt comparison on it.
 * **A gitleaks rule** for the format. Shaken Fist has no
   gitleaks job yet — ryll's `supply-chain.yml` has the
   working pattern, including that `gitleaks-action@v2`
   refuses to run on org repos without a paid licence so the
   upstream binary is invoked directly, and that gitleaks is
   only packaged from Debian 13 onward. Adding the job is
-  part of this phase.
+  part of this phase. Note the `secret-handling` consistency
+  audit in `shakenfist/development` already requires a
+  scanner in CI, so this phase is also how Shaken Fist
+  becomes compliant with an audit it currently fails.
 * **Log-sink detection, which is the valuable half.** Events
   go to syslog *and* to Loki, so a credential written into
   an event leaves the cluster and lands in log aggregation.
@@ -736,6 +722,10 @@ random part is unchanged.
   someone committed to the repository, which is the less
   likely accident for a runtime-minted credential. Both are
   worth having; if only one gets built, build this one.
+* **A verification pass** that the format phase 3 shipped is
+  actually what the scanners match — one regression test
+  asserting a freshly minted key is matched by the committed
+  gitleaks rule, so the two cannot drift apart silently.
 
 ## Agent guidance
 

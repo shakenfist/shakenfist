@@ -26,14 +26,21 @@ The phase covers:
   authentication path.
 - `TrustedIssuer` and `MappingRule` objects, with CRUD APIs.
 - Identity token validation against cached JWKS.
+- A recognisable format for cluster-minted key secrets, absorbed from
+  what was phase 7, so that the first federated key ever minted
+  already carries it.
 - The exchange endpoint, with the abuse resistance an unauthenticated
   endpoint needs.
 - Proof that scopes survive the namespace trust boundary.
 
 Deliberately **not** in this phase: `sf-client federation ...`
 commands, which live in the client-python repository and follow as
-their own change; the CI conductor integration; and the cache
-save/restore actions.
+their own change; the CI conductor integration; the cache
+save/restore actions; and the *detection* half of the old phase 7 —
+the gitleaks CI job, the custom scanner rule and the Loki query.
+Detection is independent of the exchange and stays its own phase; the
+credential *format* it detects is not, because keys minted before the
+format exists would need reissuing.
 
 ## Design
 
@@ -242,6 +249,53 @@ still-running job.
 Federated keys appear in the legacy `keys` listing like any other key.
 Hiding them would make audits lie.
 
+### Cluster-minted credential format (absorbed from phase 7)
+
+Phase 3 is where Shaken Fist starts generating key secrets rather than
+only accepting operator-chosen ones, so this is where the generated
+form gets a shape. Doing it later would mean every key minted in
+between needs reissuing before a scanner could recognise it.
+
+Following the pattern GitHub (`ghp_`), GitLab (`glpat-`), Stripe
+(`sk_live_`) and Slack (`xoxb-`) use:
+
+```
+sfk_<32 chars base62 random><6 chars base62 CRC32 checksum>
+```
+
+42 characters total, comfortably inside the existing 72-character
+limit that `auth.py` enforces. The random body carries ~190 bits. The
+prefix makes a leaked key greppable; the checksum lets a scanner
+reject lookalikes without calling us, which is what makes scanning at
+volume tolerable rather than alert spam.
+
+This costs nothing cryptographically. A bearer token is a random
+identifier, not ciphertext, so a fixed prefix is a label beside the
+random part rather than a revealed piece of it — the entropy of the
+random body is unchanged.
+
+**The prefix must be reserved.** `/auth` cannot tell which stored key
+a presented secret is meant to match until it bcrypt-compares against
+each one, so "reject early on a bad checksum" is only sound if no
+legitimate secret can carry the prefix and fail the checksum. Key
+creation therefore rejects operator-supplied secrets beginning with
+`sfk_`, mirroring how `_service_key` is already reserved for key
+*names* in `auth.py`.
+
+That reservation has one upgrade consequence which must reach the
+operator guide rather than being discovered: **an existing key whose
+secret happens to begin with `sfk_` will stop authenticating** once
+early rejection is live, and must be rotated. The probability is
+negligible — it is a four-character prefix on a user-chosen secret —
+but it is not zero, and it is a silent authentication failure rather
+than a loud one.
+
+Applies only to secrets the cluster generates: exchange-minted keys,
+the `_service_key_*` keys `get_api_token()` mints, and a new
+"generate one for me" option on operator key creation. An
+operator-supplied secret is whatever they chose and cannot carry our
+prefix.
+
 ### Token lifetime (resolves open question 6)
 
 Mint-time `expires_delta` is capped at the key's remaining lifetime.
@@ -291,6 +345,15 @@ issuer-generic without shipping an Authentik dependency.
    already-minted keys.**
 7. **Minted key names carry a random discriminator**, so re-runs never
    collide and never rotate a live key.
+8. **The credential format moves here from phase 7** (operator,
+   2026-07-29). Phase 3 mints the first cluster-generated keys, so the
+   format has to exist before them or they need reissuing. The
+   detection half — gitleaks in CI, the custom rule, the Loki query —
+   is independent of the exchange and stays in phase 7.
+9. **The `sfk_` prefix is reserved on operator-supplied secrets**, so
+   that failing a bad checksum early at `/auth` is sound rather than a
+   guess. Carries a documented upgrade caveat for the negligible but
+   non-zero case of an existing secret already starting with `sfk_`.
 
 ## Step plan
 
@@ -298,20 +361,21 @@ issuer-generic without shipping an Authentik dependency.
 |------|--------|-------|-----------|---------------------|
 | 3a | high | opus | none | Enforcement inversion, no scopes yet. Move `verify_token` (and `log_token_use`) onto `api_base.Resource.method_decorators`; remove the 120 per-method `@api_base.verify_token` decorators; add an `@api_base.public` marker and apply it to exactly `Root.get`, `Livez.get`, `Readyz.get`, `AuthEndpoint.post`. Class-level decorators run outermost so auth precedes ownership checks — verify that ordering with a test, it is the load-bearing assumption. Add the structural test: enumerate `app.url_map` and assert every rule's methods either authenticate or are `@public`. Add a pre-commit check modelled on `tools/check-from-db-by-ref-namespace.sh` that fails if a resource method is added without either. No behaviour change intended: the full existing suite must pass unmodified. Commit subject: "api: authenticate every endpoint by default." |
 | 3b | high | opus | none | Scope vocabulary and enforcement. Derivation (`<family>.<verb>` from resource class and method name, families defaulting from the class name with a `scope_family` class attribute override, verbs `read`/`write`/`delete`); the `@api_base.scope(verb=..., family=...)` annotation for overrides; enforcement on the same universal path added in 3a; wildcard `*` for tokens minted from unscoped keys; default-deny where derivation is impossible. Add the `admin` scope requirement to `caller_is_admin` per Decision 3. Publish the vocabulary and derivation rule in the developer guide. Tests: derivation for each verb, override honoured, wildcard passes everything, scoped token denied outside its scopes, and an admin endpoint refused to a scoped `system` key. Commit subject: "auth: derive and enforce token scopes." |
-| 3c | medium | opus | none | `TrustedIssuer` object, following the `NamespaceKey` recipe exactly (`shakenfist/namespace_key.py`, `schema/namespace_key_data.py`, the `mariadb.py` three-layer accessors, `protos/database.proto`, `daemons/database/main.py` handlers, `OBJECT_NAMES_TO_CLASSES`). System-namespace-only CRUD endpoints under `/auth/issuers`. Unique on `name`. Run `tox -e genprotos`, never `grpc_tools` directly. Commit subject: "objects: add the TrustedIssuer object." |
-| 3d | medium | opus | none | `MappingRule` object, same recipe, owned by its namespace, unique on `(namespace, name)`. CRUD under `/auth/namespaces/{namespace}/rules`, gated by `requires_namespace_ownership` (already defined in `external_api/auth.py` and used by key creation). Claim matcher validation at creation: exact strings or lists of strings only, at least one bound claim, referenced issuer must exist. Rules are deleted with their namespace. Commit subject: "objects: add the MappingRule object." |
-| 3e | medium | opus | none | Identity token validation, no endpoint yet. A `shakenfist/federation.py` module: unverified header/claim peek to read `iss`; issuer lookup; `PyJWKClient` with `cache_jwk_set` and a configured `lifespan`; single-flight refetch on unknown `kid` (a lock per issuer, so concurrent requests collapse to one fetch); `aud`/`exp`/`nbf` verification; claim matching against a rule. Pure functions plus one cache object, no Flask. Tests use locally generated RSA keys and a mock JWKS endpoint — no network. Cover: good token, bad signature, wrong `aud`, expired, unknown `kid` refetch, refetch happens once under concurrency. Commit subject: "federation: validate identity tokens against trusted issuers." |
-| 3f | high | opus | none | The exchange endpoint. `POST /auth/federated`, `@public`, body `{token, namespace, rule}`, implementing the eight-step order in the Design section. Mint via `NamespaceKey.new()` with the rule's scopes, `key_ttl` as expiry, provenance recording the rule reference and satisfied claims, and a random discriminator on the name. Audit events per the Design section, including the failed-exchange event against the rule's owning namespace and the deliberate silence when no owner can be identified. Response `{namespace, key_name, key}`. Config: `FEDERATION_MAX_TOKEN_BYTES`, `FEDERATION_JWKS_CACHE_SECONDS`. Commit subject: "auth: exchange identity tokens for scoped namespace keys." |
-| 3g | medium | opus | none | Abuse resistance: the `(jti, rule_uuid)` replay table with a unique index (the failing insert *is* the detection — no read-then-write race), expiring at the inbound token's `exp` and reaped by the cluster daemon alongside expired keys; per-source rate limiting backed by MariaDB so the limit is cluster-wide rather than per worker, with `FEDERATION_RATE_LIMIT_PER_MINUTE` and `0` to disable. Tests: replay refused, same token against a second rule allowed, rate limit trips and recovers, reaper removes expired jti rows. Commit subject: "federation: replay and rate limit protection for the exchange." |
-| 3h | medium | opus | none | Closeout. The trust-composition test from open question 11 (scoped key in A, trust B→A, read allowed across the boundary, write refused). The Authentik proof test: a mock issuer with `groups` claims, a rule binding them, a successful exchange with no code differing from the GitHub path. End-to-end functional coverage in `shakenfist/deploy/cluster_ci`. Docs: the scope vocabulary and derivation rule, the exchange flow, issuer and rule configuration, and a worked GitHub Actions example written against public GitHub concepts only — nothing about the private CI conductor. Glossary entries for trusted issuer, mapping rule and scope stop being future tense. Master plan open questions 1, 2, 3, 4, 5, 6, 9, 10, 11 marked resolved; phase 3 → Complete in the Execution table and `docs/plans/index.md`. Note the `sf-client federation ...` client-python follow-up in Future work. Commit subject: "docs: federated identity exchange." |
+| 3c | medium | opus | none | Cluster-minted credential format, absorbed from the old phase 7. A `shakenfist/util/credentials.py` (or similar) with `generate()` producing `sfk_` + 32 base62 random + 6 base62 CRC32 checksum, and `looks_valid(secret)` verifying prefix and checksum. Reserve the prefix: key create and update reject an operator-supplied secret starting with `sfk_`, mirroring the existing `_service_key` name reservation in `external_api/auth.py`. Wire generation into `get_api_token()`'s `_service_key_*` secrets and add a "generate one for me" option to operator key creation (a request with no `key` returns a generated one — the response already returns the key name, so returning the secret is an additive change). Early rejection at `/auth`: a presented secret carrying the prefix but failing the checksum is refused before any bcrypt comparison. Tests: round trip, checksum catches single-character corruption, prefix reserved at create and update, early rejection fires, an operator secret without the prefix is unaffected. Document the upgrade caveat (an existing secret beginning with `sfk_` must be rotated) in the operator guide. Commit subject: "auth: give cluster-minted key secrets a recognisable format." |
+| 3d | medium | opus | none | `TrustedIssuer` object, following the `NamespaceKey` recipe exactly (`shakenfist/namespace_key.py`, `schema/namespace_key_data.py`, the `mariadb.py` three-layer accessors, `protos/database.proto`, `daemons/database/main.py` handlers, `OBJECT_NAMES_TO_CLASSES`). System-namespace-only CRUD endpoints under `/auth/issuers`. Unique on `name`. Run `tox -e genprotos`, never `grpc_tools` directly. Commit subject: "objects: add the TrustedIssuer object." |
+| 3e | medium | opus | none | `MappingRule` object, same recipe, owned by its namespace, unique on `(namespace, name)`. CRUD under `/auth/namespaces/{namespace}/rules`, gated by `requires_namespace_ownership` (already defined in `external_api/auth.py` and used by key creation). Claim matcher validation at creation: exact strings or lists of strings only, at least one bound claim, referenced issuer must exist. Rules are deleted with their namespace. Commit subject: "objects: add the MappingRule object." |
+| 3f | medium | opus | none | Identity token validation, no endpoint yet. A `shakenfist/federation.py` module: unverified header/claim peek to read `iss`; issuer lookup; `PyJWKClient` with `cache_jwk_set` and a configured `lifespan`; single-flight refetch on unknown `kid` (a lock per issuer, so concurrent requests collapse to one fetch); `aud`/`exp`/`nbf` verification; claim matching against a rule. Pure functions plus one cache object, no Flask. Tests use locally generated RSA keys and a mock JWKS endpoint — no network. Cover: good token, bad signature, wrong `aud`, expired, unknown `kid` refetch, refetch happens once under concurrency. Commit subject: "federation: validate identity tokens against trusted issuers." |
+| 3g | high | opus | none | The exchange endpoint. `POST /auth/federated`, `@public`, body `{token, namespace, rule}`, implementing the eight-step order in the Design section. Mint via `NamespaceKey.new()`, with the secret produced by 3c's generator so every federated key is scanner-recognisable from the first one, and with the rule's scopes, `key_ttl` as expiry, provenance recording the rule reference and satisfied claims, and a random discriminator on the name. Audit events per the Design section, including the failed-exchange event against the rule's owning namespace and the deliberate silence when no owner can be identified. Response `{namespace, key_name, key}`. Config: `FEDERATION_MAX_TOKEN_BYTES`, `FEDERATION_JWKS_CACHE_SECONDS`. Commit subject: "auth: exchange identity tokens for scoped namespace keys." |
+| 3h | medium | opus | none | Abuse resistance: the `(jti, rule_uuid)` replay table with a unique index (the failing insert *is* the detection — no read-then-write race), expiring at the inbound token's `exp` and reaped by the cluster daemon alongside expired keys; per-source rate limiting backed by MariaDB so the limit is cluster-wide rather than per worker, with `FEDERATION_RATE_LIMIT_PER_MINUTE` and `0` to disable. Tests: replay refused, same token against a second rule allowed, rate limit trips and recovers, reaper removes expired jti rows. Commit subject: "federation: replay and rate limit protection for the exchange." |
+| 3i | medium | opus | none | Closeout. The trust-composition test from open question 11 (scoped key in A, trust B→A, read allowed across the boundary, write refused). The Authentik proof test: a mock issuer with `groups` claims, a rule binding them, a successful exchange with no code differing from the GitHub path. End-to-end functional coverage in `shakenfist/deploy/cluster_ci`. Docs: the scope vocabulary and derivation rule, the exchange flow, issuer and rule configuration, and a worked GitHub Actions example written against public GitHub concepts only — nothing about the private CI conductor. Glossary entries for trusted issuer, mapping rule and scope stop being future tense. Master plan open questions 1, 2, 3, 4, 5, 6, 9, 10, 11 marked resolved; phase 3 → Complete in the Execution table and `docs/plans/index.md`. Note the `sf-client federation ...` client-python follow-up in Future work, and confirm the master plan's phase 7 now reads as detection-only since its format half landed here. Commit subject: "docs: federated identity exchange." |
 
 After each step the management session runs
 `pre-commit run --all-files`, reads the diff against the brief, and
 confirms no unrelated edits. After 3a additionally: the full existing
 suite passed *unmodified*, since 3a is a pure refactor. After 3b: a
-manual read confirming no endpoint lost enforcement. After 3f and 3g:
+manual read confirming no endpoint lost enforcement. After 3g and 3h:
 present the diff for operator review before commit — the exchange is
-the security boundary of this whole plan. After 3h:
+the security boundary of this whole plan. After 3i:
 `tox -e genprotos` is a no-op against the committed tree.
 
 ## Risks and mitigations
@@ -329,7 +393,7 @@ the security boundary of this whole plan. After 3h:
 - **Risk:** scope derivation silently mislabels an endpoint, granting
   more than an operator expects — the failure is quiet because it
   looks like it works.
-  **Mitigation:** the override list is one grep; 3h's documentation
+  **Mitigation:** the override list is one grep; 3i's documentation
   publishes the derived scope for every endpoint family so it can be
   reviewed as data rather than inferred from code.
 - **Risk:** claim matching is too narrow for real GitHub usage and
@@ -343,11 +407,18 @@ the security boundary of this whole plan. After 3h:
   **Mitigation:** Decision 4's full ordering, with size and allowlist
   checks before any network call, and single-flight JWKS refetch.
 - **Risk:** a scoped key minted into `system` escalates.
-  **Mitigation:** Decision 3. Additionally, 3d should consider
+  **Mitigation:** Decision 3. Additionally, 3e should consider
   warning at rule creation when the target namespace is `system`.
+- **Risk:** reserving the `sfk_` prefix breaks an operator whose
+  existing key secret already starts with it, and it breaks as a
+  silent authentication failure rather than a loud one.
+  **Mitigation:** the probability is negligible (a four-character
+  prefix on a user-chosen secret) but not zero, so it is called out in
+  the operator guide's upgrade notes rather than left to be
+  discovered. 3c's brief makes documenting it part of the step.
 - **Risk:** trust becomes a scope-escape hatch.
   **Mitigation:** open question 11's test, which is a named
-  deliverable of 3h rather than an afterthought.
+  deliverable of 3i rather than an afterthought.
 
 ## Definition of done
 
@@ -372,6 +443,11 @@ the security boundary of this whole plan. After 3h:
       writable across, asserted by test.
 - [ ] No secret appears in any event; the failed-exchange event
       reaches the rule owner.
+- [ ] Every cluster-minted secret carries the `sfk_` prefix and a
+      verifiable checksum; the prefix is reserved against
+      operator-supplied secrets; a bad checksum is rejected before any
+      bcrypt comparison; and the rotation caveat for a pre-existing
+      `sfk_`-prefixed secret is in the operator guide.
 - [ ] `pre-commit run --all-files` clean; `tox -e genprotos` no-op;
       unit tests green; functional CI green on the branch **before**
       the PR merges.
@@ -384,5 +460,5 @@ the security boundary of this whole plan. After 3h:
 Before executing any step of this phase, the implementing sub-agent
 must back-brief the management session on its understanding of the
 brief and surrounding context. The management session must present
-the 3f and 3g diffs for operator review before commit — the exchange
+the 3g and 3h diffs for operator review before commit — the exchange
 endpoint is the security boundary this entire plan exists to create.
