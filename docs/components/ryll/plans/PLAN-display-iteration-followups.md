@@ -1,6 +1,6 @@
 # Display Iteration Follow-ups
 
-Deferred work identified during the PUSH-TEMPLATE review of the display
+Deferred work identified during the PUSH-AUDIT review of the display
 rendering, QUIC decode, multi-monitor and agent support PR.
 
 ## Status: Open
