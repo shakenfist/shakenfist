@@ -959,7 +959,7 @@ We will know the MVP has landed when:
 
 #### Items deferred from the post-Phase-3 pre-push audit
 
-Tracked from a `PUSH-TEMPLATE.md` audit run after Phases 0–3
+Tracked from a `PUSH-AUDIT.md` audit run after Phases 0–3
 landed. Blocking items (malformed-SDP test, doc gaps, rustls
 provider init, unwrap → expect polish) were addressed before
 the audit's push gate; the items below are advisory and
@@ -1021,7 +1021,7 @@ deferred:
 
 #### Items deferred from the post-Phase-8 pre-push audit
 
-Tracked from a `PUSH-TEMPLATE.md` audit run after Phases 0–8
+Tracked from a `PUSH-AUDIT.md` audit run after Phases 0–8
 landed. Three blocking security findings (token leaking into
 structured logs, reaper-vs-/offer race, no rate limit on
 /offer) were addressed before push as commits `0d2ed6e0`,

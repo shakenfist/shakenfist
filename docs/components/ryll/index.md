@@ -79,13 +79,18 @@ both ends of the traffic through the proxy. This would allow:
 
 ## Documentation Index
 
+- [Features](/components/ryll/features/) - The detailed feature catalogue and mode guides
 - [Installation](/components/ryll/installation/) - Pre-built packages, pip, and building from source
-- [Binary Portability](/components/ryll/portability/) - How to share built binaries
-- [Channel Diagnostics Audit](/components/ryll/channel-diagnostics-audit/) - Per-channel observability checklist
 - [Configuration](/components/ryll/configuration/) - CLI options and .vv file format
-- [Libvirt / SPICE Server Recommendations](/components/ryll/libvirt-spice-recommendations/) - Guest XML settings for best display responsiveness
+- [Web frontend](/components/ryll/web-frontend/) - Operator guide for `--web` mode
+- [Control socket protocol](/components/ryll/control-socket-protocol/) - Driving headless sessions from external tools
+- [Development](/components/ryll/development/) - Building, testing, CI, and contributing
 - [macOS Development](/components/ryll/development-macos/) - Build and test locally on macOS
 - [Troubleshooting](/components/ryll/troubleshooting/) - Common issues and debugging
+- [Binary Portability](/components/ryll/portability/) - How to share built binaries
+- [Releasing](/components/ryll/releasing/) - How to publish a new release
+- [Channel Diagnostics Audit](/components/ryll/channel-diagnostics-audit/) - Per-channel observability checklist
+- [Libvirt / SPICE Server Recommendations](/components/ryll/libvirt-spice-recommendations/) - Guest XML settings for best display responsiveness
 
 ## Project Files
 

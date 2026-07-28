@@ -87,16 +87,37 @@ Note that `--capture` mode is not available on Windows builds.
 per-architecture manylinux wheel with the compiled ryll GUI binary
 already embedded — no runtime download, no cache, works offline
 immediately after install. Wheels are published for Linux
-`x86_64`/`aarch64` with glibc >= 2.28; other platforms should use one
-of the packages above. See the
-[README](/components/ryll/../README/#installing-via-pip) for the runtime system
-library requirements.
+`x86_64`/`aarch64` with glibc >= 2.28 (built in the `manylinux_2_28`
+container); other platforms — macOS, Windows, musl libc, or older
+glibc — should use one of the packages above.
+
+The binary is the same GUI application as every other install path, so
+it needs the underlying GUI/audio system libraries at runtime, which
+pip cannot install:
+
+```bash
+sudo apt-get install -y libxcb1 libwayland-client0 libxkbcommon0 \
+    libasound2 libopus0 libgl1
+```
+
+On newer distributions (Debian trixie, Ubuntu 24.04+) the ALSA runtime
+package was renamed `libasound2t64` as part of the 64-bit `time_t`
+transition, so install `libasound2t64` in place of `libasound2` there.
+
+If one is missing, ryll fails to start with a dynamic-loader or
+GUI-initialisation error naming the library; install the packages above
+to resolve it. `remote-viewer` is the fallback whenever ryll can't be
+installed or run on a given platform.
+
+See [plans/PLAN-pip-distribution.md](/components/ryll/plans/PLAN-pip-distribution/)
+for the full design rationale.
 
 ## Building from source
 
 If no pre-built package is available for your platform, you can build
-ryll from source. See the [README](/components/ryll/../README/) for build instructions
-and the [portability guide](/components/ryll/portability/) for platform-specific notes.
+ryll from source. See the [development guide](/components/ryll/development/) for build
+instructions and the [portability guide](/components/ryll/portability/) for
+platform-specific notes.
 
 For macOS development and interactive testing, see the
 [macOS development guide](/components/ryll/development-macos/).

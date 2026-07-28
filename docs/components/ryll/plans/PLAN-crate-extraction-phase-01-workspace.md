@@ -46,7 +46,7 @@ ryll-repo/
 ├── STYLEGUIDE.md
 ├── LICENSE
 ├── PLAN-TEMPLATE.md
-├── PUSH-TEMPLATE.md
+├── PUSH-AUDIT.md
 └── renovate.json
 ```
 
