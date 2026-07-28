@@ -323,6 +323,9 @@ api.add_resource(api_auth.AuthEndpoint, '/auth')
 api.add_resource(api_auth.AuthNamespacesEndpoint, '/auth/namespaces')
 api.add_resource(api_auth.AuthNamespaceEndpoint,
                  '/auth/namespaces/<namespace>')
+api.add_resource(api_auth.AuthIssuersEndpoint, '/auth/issuers')
+api.add_resource(api_auth.AuthIssuerEndpoint,
+                 '/auth/issuers/<issuer_name>')
 api.add_resource(api_auth.AuthNamespaceKeysEndpoint,
                  '/auth/namespaces/<namespace>/keys')
 api.add_resource(api_auth.AuthNamespaceKeyEndpoint,

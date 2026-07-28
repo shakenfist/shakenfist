@@ -245,6 +245,22 @@ service DatabaseService {
   rpc UpdateNamespaceKeyAttributes (UpdateNamespaceKeyAttributesRequest) returns (StatusReply) {}
   rpc DeleteNamespaceKeyAttributes (DeleteNamespaceKeyAttributesRequest) returns (StatusReply) {}
 
+  // TrustedIssuer Operations (MariaDB)
+  // A TrustedIssuer is an external identity provider this cluster will
+  // believe. Cluster level and system owned: who may vouch for
+  // identities here is an administrative decision.
+  rpc CreateTrustedIssuer (CreateTrustedIssuerRequest) returns (StatusReply) {}
+  rpc GetTrustedIssuer (GetTrustedIssuerRequest) returns (GetTrustedIssuerReply) {}
+  rpc GetTrustedIssuerByName (GetTrustedIssuerByNameRequest) returns (GetTrustedIssuerReply) {}
+  rpc GetAllTrustedIssuers (GetAllTrustedIssuersRequest) returns (GetAllTrustedIssuersReply) {}
+  rpc DeleteTrustedIssuer (DeleteTrustedIssuerRequest) returns (StatusReply) {}
+
+  // TrustedIssuer Attributes Operations (MariaDB)
+  rpc CreateTrustedIssuerAttributes (CreateTrustedIssuerAttributesRequest) returns (StatusReply) {}
+  rpc GetTrustedIssuerAttributes (GetTrustedIssuerAttributesRequest) returns (GetTrustedIssuerAttributesReply) {}
+  rpc UpdateTrustedIssuerAttributes (UpdateTrustedIssuerAttributesRequest) returns (StatusReply) {}
+  rpc DeleteTrustedIssuerAttributes (DeleteTrustedIssuerAttributesRequest) returns (StatusReply) {}
+
   // AgentOperation Operations (MariaDB)
   // These manage AgentOperation static values in MariaDB. AgentOperations
   // represent in-guest agent tasks (execute, get-file, put-blob, chmod).
@@ -1785,6 +1801,76 @@ message UpdateNamespaceKeyAttributesRequest {
 }
 
 message DeleteNamespaceKeyAttributesRequest {
+  string uuid = 1;
+}
+
+// TrustedIssuer Operations (MariaDB)
+// An external identity provider this cluster is willing to believe.
+// The name is unique cluster wide, because mapping rules reference an
+// issuer by name.
+
+message TrustedIssuerStaticData {
+  string uuid = 1;            // TrustedIssuer UUID
+  string name = 2;            // Unique cluster wide
+  int32 version = 3;          // Schema version
+}
+
+// The mutable configuration. Kept separate from the static values so
+// an operator can correct where signing keys are fetched from without
+// the issuer's identity changing underneath the rules referencing it.
+message TrustedIssuerAttributesProto {
+  string uuid = 1;         // References trusted_issuers.uuid
+  string issuer_url = 2;   // Exact expected value of the token iss claim
+  string jwks_uri = 3;     // Where signing keys are fetched
+  string audience = 4;     // Expected aud claim
+}
+
+message CreateTrustedIssuerRequest {
+  TrustedIssuerStaticData data = 1;
+}
+
+message GetTrustedIssuerRequest {
+  string uuid = 1;
+}
+
+message GetTrustedIssuerByNameRequest {
+  string name = 1;
+}
+
+message GetTrustedIssuerReply {
+  bool found = 1;
+  TrustedIssuerStaticData data = 2;
+}
+
+message GetAllTrustedIssuersRequest {
+}
+
+message GetAllTrustedIssuersReply {
+  repeated TrustedIssuerStaticData issuers = 1;
+}
+
+message DeleteTrustedIssuerRequest {
+  string uuid = 1;
+}
+
+message CreateTrustedIssuerAttributesRequest {
+  TrustedIssuerAttributesProto data = 1;
+}
+
+message GetTrustedIssuerAttributesRequest {
+  string uuid = 1;
+}
+
+message GetTrustedIssuerAttributesReply {
+  bool found = 1;
+  TrustedIssuerAttributesProto data = 2;
+}
+
+message UpdateTrustedIssuerAttributesRequest {
+  TrustedIssuerAttributesProto data = 1;
+}
+
+message DeleteTrustedIssuerAttributesRequest {
   string uuid = 1;
 }
 

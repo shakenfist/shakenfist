@@ -62,6 +62,9 @@ from shakenfist.schema.namespace_attributes import NamespaceAttributesData
 from shakenfist.schema.namespace_data import NamespaceData
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.schema.namespace_key_data import NamespaceKeyData
+from shakenfist.schema.trusted_issuer_attributes import (
+    TrustedIssuerAttributesData)
+from shakenfist.schema.trusted_issuer_data import TrustedIssuerData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_daemon_state import NodeDaemonStateData
 from shakenfist.schema.node_data import NodeData
@@ -266,6 +269,8 @@ _network_attributes_table: Optional[sa.Table] = None
 _ipams_table: Optional[sa.Table] = None
 _namespace_keys_table: Optional[sa.Table] = None
 _namespace_key_attributes_table: Optional[sa.Table] = None
+_trusted_issuers_table: Optional[sa.Table] = None
+_trusted_issuer_attributes_table: Optional[sa.Table] = None
 _agent_operations_table: Optional[sa.Table] = None
 _agent_operation_attributes_table: Optional[sa.Table] = None
 _instances_table: Optional[sa.Table] = None
@@ -305,6 +310,8 @@ NAMESPACE_ATTRIBUTES_VERSION = 2
 # version, so the attributes table stays at v1.
 NAMESPACE_KEYS_VERSION = 2
 NAMESPACE_KEY_ATTRIBUTES_VERSION = 1
+TRUSTED_ISSUERS_VERSION = 1
+TRUSTED_ISSUER_ATTRIBUTES_VERSION = 1
 ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
 ARTIFACT_INDEXES_VERSION = 2
@@ -385,6 +392,8 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
     'namespace_attributes': NAMESPACE_ATTRIBUTES_VERSION,
     'namespace_keys': NAMESPACE_KEYS_VERSION,
     'namespace_key_attributes': NAMESPACE_KEY_ATTRIBUTES_VERSION,
+    'trusted_issuers': TRUSTED_ISSUERS_VERSION,
+    'trusted_issuer_attributes': TRUSTED_ISSUER_ATTRIBUTES_VERSION,
     'artifacts': ARTIFACTS_VERSION,
     'artifact_attributes': ARTIFACT_ATTRIBUTES_VERSION,
     'artifact_indexes': ARTIFACT_INDEXES_VERSION,
@@ -3118,6 +3127,8 @@ def ensure_schema() -> list[dict[str, Any]]:
     # on an upgrading cluster both tables are created by this same call.
     results.append(_ensure_namespace_key_attributes_schema(engine))
     results.append(_ensure_namespace_keys_schema(engine))
+    results.append(_ensure_trusted_issuer_attributes_schema(engine))
+    results.append(_ensure_trusted_issuers_schema(engine))
     results.append(_ensure_artifacts_schema(engine))
     results.append(_ensure_artifact_attributes_schema(engine))
     results.append(_ensure_artifact_indexes_schema(engine))
@@ -3191,6 +3202,8 @@ def register_all_tables() -> None:
     _get_namespaces_table()
     _get_namespace_attributes_table()
     _get_namespace_keys_table()
+    _get_trusted_issuers_table()
+    _get_trusted_issuer_attributes_table()
     _get_namespace_key_attributes_table()
     _get_artifacts_table()
     _get_artifact_attributes_table()
@@ -12716,6 +12729,537 @@ def delete_namespace_key_attributes(key_uuid: UUID) -> bool:
     if _use_database_service():
         return _grpc_delete_namespace_key_attributes(key_uuid)
     return _direct_delete_namespace_key_attributes(key_uuid)
+
+
+# =============================================================================
+# TrustedIssuer Table Definitions
+# =============================================================================
+
+def _get_trusted_issuers_table() -> sa.Table:
+    """Get or create the trusted_issuers table definition.
+
+    A TrustedIssuer is an external identity provider this cluster is
+    willing to believe. The table is generated from the
+    TrustedIssuerData Pydantic model, with uuid as the primary key and
+    a unique index on name, since mapping rules reference an issuer by
+    name and two issuers sharing one would make a rule ambiguous.
+    """
+    global _trusted_issuers_table
+    if _trusted_issuers_table is None:
+        with TABLE_CREATION_LOCK:
+            if _trusted_issuers_table is not None:
+                return _trusted_issuers_table
+            metadata = _get_metadata()
+            _trusted_issuers_table = pydantic_to_sqlalchemy_table(
+                TrustedIssuerData,
+                'trusted_issuers',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+    return _trusted_issuers_table
+
+
+def _get_trusted_issuer_attributes_table() -> sa.Table:
+    """Get or create the trusted_issuer_attributes table definition."""
+    global _trusted_issuer_attributes_table
+    if _trusted_issuer_attributes_table is None:
+        with TABLE_CREATION_LOCK:
+            if _trusted_issuer_attributes_table is not None:
+                return _trusted_issuer_attributes_table
+            metadata = _get_metadata()
+            _trusted_issuer_attributes_table = pydantic_to_sqlalchemy_table(
+                TrustedIssuerAttributesData,
+                'trusted_issuer_attributes',
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False
+            )
+    return _trusted_issuer_attributes_table
+
+
+def _ensure_trusted_issuers_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the trusted_issuers table schema is up to date."""
+    table_name = 'trusted_issuers'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_trusted_issuers_table()
+
+    # This table has no pre-object history to import, so version 1 is
+    # simply "the table exists".
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+
+        with engine.connect() as conn:
+            for idx in table.indexes:
+                try:
+                    idx.create(conn, checkfirst=True)
+                except Exception as e:
+                    LOG.debug(f'Index {idx.name} creation skipped: {e}')
+            conn.commit()
+
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': TRUSTED_ISSUERS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+def _ensure_trusted_issuer_attributes_schema(
+        engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the trusted_issuer_attributes table schema is up to date."""
+    table_name = 'trusted_issuer_attributes'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_trusted_issuer_attributes_table()
+
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table (version 1)')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': TRUSTED_ISSUER_ATTRIBUTES_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
+# =============================================================================
+# TrustedIssuer Direct Access Functions
+# =============================================================================
+
+def _direct_create_trusted_issuer(data: TrustedIssuerData) -> bool:
+    """Create a trusted_issuers record in MariaDB."""
+    engine = _get_engine()
+    table = _get_trusted_issuers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid, name=data.name, version=data.version)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        # The unique index on name rejected this. A duplicate issuer
+        # name is a caller error rather than a failure.
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB create failed for trusted_issuer {data.name}: {e}')
+        return False
+
+
+def _direct_get_trusted_issuer(
+        issuer_uuid: UUID) -> Optional[TrustedIssuerData]:
+    """Get a trusted_issuers record from MariaDB."""
+    engine = _get_engine()
+    table = _get_trusted_issuers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == issuer_uuid)
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return TrustedIssuerData(
+                uuid=row.uuid, name=row.name, version=row.version)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for trusted_issuer {issuer_uuid}: {e}')
+        return None
+
+
+def _direct_get_trusted_issuer_by_name(
+        name: str) -> Optional[TrustedIssuerData]:
+    """Look an issuer up by its unique name.
+
+    This is the hot path: the exchange endpoint resolves the issuer
+    named by a mapping rule on every request.
+    """
+    engine = _get_engine()
+    table = _get_trusted_issuers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.name == name)
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return TrustedIssuerData(
+                uuid=row.uuid, name=row.name, version=row.version)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get failed for trusted_issuer named {name}: {e}')
+        return None
+
+
+def _direct_get_all_trusted_issuers() -> list[TrustedIssuerData]:
+    """Every configured issuer. Small by nature -- one per IdP."""
+    engine = _get_engine()
+    table = _get_trusted_issuers_table()
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(sa.select(table)).fetchall()
+            return [
+                TrustedIssuerData(
+                    uuid=row.uuid, name=row.name, version=row.version)
+                for row in rows
+            ]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB list failed for trusted_issuers: {e}')
+        return []
+
+
+def _direct_delete_trusted_issuer(issuer_uuid: UUID) -> bool:
+    """Delete a trusted_issuers record from MariaDB."""
+    engine = _get_engine()
+    table = _get_trusted_issuers_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == issuer_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB delete failed for trusted_issuer {issuer_uuid}: {e}')
+        return False
+
+
+def _direct_create_trusted_issuer_attributes(
+        data: TrustedIssuerAttributesData) -> bool:
+    """Create a trusted_issuer_attributes record in MariaDB."""
+    engine = _get_engine()
+    table = _get_trusted_issuer_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.insert(table).values(
+                uuid=data.uuid,
+                issuer_url=data.issuer_url,
+                jwks_uri=data.jwks_uri,
+                audience=data.audience)
+            conn.execute(stmt)
+            conn.commit()
+            return True
+    except IntegrityError:
+        return False
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB create failed for trusted_issuer_attributes '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _direct_get_trusted_issuer_attributes(
+        issuer_uuid: UUID) -> Optional[TrustedIssuerAttributesData]:
+    """Get TrustedIssuer attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_trusted_issuer_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table).where(table.c.uuid == issuer_uuid)
+            row = conn.execute(stmt).fetchone()
+            if row is None:
+                return None
+            return TrustedIssuerAttributesData(
+                uuid=row.uuid,
+                issuer_url=row.issuer_url,
+                jwks_uri=row.jwks_uri,
+                audience=row.audience)
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB get failed for trusted_issuer_attributes '
+            f'{issuer_uuid}: {e}')
+        return None
+
+
+def _direct_update_trusted_issuer_attributes(
+        data: TrustedIssuerAttributesData) -> bool:
+    """Replace a TrustedIssuer's mutable attributes.
+
+    The whole attribute set is written together because these three
+    values are one coherent configuration: pointing at a different
+    issuer_url while leaving a stale jwks_uri would be a broken state
+    rather than a partial update.
+    """
+    engine = _get_engine()
+    table = _get_trusted_issuer_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.update(table).where(
+                table.c.uuid == data.uuid
+            ).values(
+                issuer_url=data.issuer_url,
+                jwks_uri=data.jwks_uri,
+                audience=data.audience)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB update failed for trusted_issuer_attributes '
+            f'{data.uuid}: {e}')
+        return False
+
+
+def _direct_delete_trusted_issuer_attributes(issuer_uuid: UUID) -> bool:
+    """Delete TrustedIssuer attributes from MariaDB."""
+    engine = _get_engine()
+    table = _get_trusted_issuer_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.delete(table).where(table.c.uuid == issuer_uuid)
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(
+            'MariaDB delete failed for trusted_issuer_attributes '
+            f'{issuer_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# TrustedIssuer Proto Conversion and gRPC Access Functions
+# =============================================================================
+
+def _trusted_issuer_to_proto(
+        data: TrustedIssuerData) -> 'database_pb2.TrustedIssuerStaticData':
+    return database_pb2.TrustedIssuerStaticData(
+        uuid=str(data.uuid), name=data.name, version=data.version)
+
+
+def _trusted_issuer_from_proto(
+        proto: 'database_pb2.TrustedIssuerStaticData') -> TrustedIssuerData:
+    return TrustedIssuerData(
+        uuid=UUID(proto.uuid), name=proto.name, version=proto.version)
+
+
+def _trusted_issuer_attrs_to_proto(
+        data: TrustedIssuerAttributesData
+) -> 'database_pb2.TrustedIssuerAttributesProto':
+    return database_pb2.TrustedIssuerAttributesProto(
+        uuid=str(data.uuid),
+        issuer_url=data.issuer_url,
+        jwks_uri=data.jwks_uri,
+        audience=data.audience)
+
+
+def _trusted_issuer_attrs_from_proto(
+        proto: 'database_pb2.TrustedIssuerAttributesProto'
+) -> TrustedIssuerAttributesData:
+    return TrustedIssuerAttributesData(
+        uuid=UUID(proto.uuid),
+        issuer_url=proto.issuer_url,
+        jwks_uri=proto.jwks_uri,
+        audience=proto.audience)
+
+
+def _grpc_create_trusted_issuer(data: TrustedIssuerData) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateTrustedIssuerRequest(
+            data=_trusted_issuer_to_proto(data))
+        reply = _grpc_call(stub.CreateTrustedIssuer, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC CreateTrustedIssuer failed for {data.name}: {e}')
+        return False
+
+
+def _grpc_get_trusted_issuer(
+        issuer_uuid: UUID) -> Optional[TrustedIssuerData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetTrustedIssuerRequest(uuid=str(issuer_uuid))
+        reply = _grpc_call(stub.GetTrustedIssuer, request)
+        if not reply.found:
+            return None
+        return _trusted_issuer_from_proto(reply.data)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetTrustedIssuer failed for {issuer_uuid}: {e}')
+        return None
+
+
+def _grpc_get_trusted_issuer_by_name(
+        name: str) -> Optional[TrustedIssuerData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetTrustedIssuerByNameRequest(name=name)
+        reply = _grpc_call(stub.GetTrustedIssuerByName, request)
+        if not reply.found:
+            return None
+        return _trusted_issuer_from_proto(reply.data)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetTrustedIssuerByName failed for {name}: {e}')
+        return None
+
+
+def _grpc_get_all_trusted_issuers() -> list[TrustedIssuerData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetAllTrustedIssuersRequest()
+        reply = _grpc_call(stub.GetAllTrustedIssuers, request)
+        return [_trusted_issuer_from_proto(i) for i in reply.issuers]
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetAllTrustedIssuers failed: {e}')
+        return []
+
+
+def _grpc_delete_trusted_issuer(issuer_uuid: UUID) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteTrustedIssuerRequest(
+            uuid=str(issuer_uuid))
+        reply = _grpc_call(stub.DeleteTrustedIssuer, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC DeleteTrustedIssuer failed for {issuer_uuid}: {e}')
+        return False
+
+
+def _grpc_create_trusted_issuer_attributes(
+        data: TrustedIssuerAttributesData) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CreateTrustedIssuerAttributesRequest(
+            data=_trusted_issuer_attrs_to_proto(data))
+        reply = _grpc_call(stub.CreateTrustedIssuerAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC CreateTrustedIssuerAttributes failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_get_trusted_issuer_attributes(
+        issuer_uuid: UUID) -> Optional[TrustedIssuerAttributesData]:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetTrustedIssuerAttributesRequest(
+            uuid=str(issuer_uuid))
+        reply = _grpc_call(stub.GetTrustedIssuerAttributes, request)
+        if not reply.found:
+            return None
+        return _trusted_issuer_attrs_from_proto(reply.data)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC GetTrustedIssuerAttributes failed for {issuer_uuid}: {e}')
+        return None
+
+
+def _grpc_update_trusted_issuer_attributes(
+        data: TrustedIssuerAttributesData) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.UpdateTrustedIssuerAttributesRequest(
+            data=_trusted_issuer_attrs_to_proto(data))
+        reply = _grpc_call(stub.UpdateTrustedIssuerAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC UpdateTrustedIssuerAttributes failed for {data.uuid}: {e}')
+        return False
+
+
+def _grpc_delete_trusted_issuer_attributes(issuer_uuid: UUID) -> bool:
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.DeleteTrustedIssuerAttributesRequest(
+            uuid=str(issuer_uuid))
+        reply = _grpc_call(stub.DeleteTrustedIssuerAttributes, request)
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        LOG.error(
+            f'gRPC DeleteTrustedIssuerAttributes failed for {issuer_uuid}: {e}')
+        return False
+
+
+# =============================================================================
+# TrustedIssuer Public Access Functions
+# =============================================================================
+
+def create_trusted_issuer(data: TrustedIssuerData) -> bool:
+    """Create a TrustedIssuer. False if the name is already taken."""
+    if _use_database_service():
+        return _grpc_create_trusted_issuer(data)
+    return _direct_create_trusted_issuer(data)
+
+
+def get_trusted_issuer(issuer_uuid: UUID) -> Optional[TrustedIssuerData]:
+    """Get a TrustedIssuer's static values by UUID."""
+    if _use_database_service():
+        return _grpc_get_trusted_issuer(issuer_uuid)
+    return _direct_get_trusted_issuer(issuer_uuid)
+
+
+def get_trusted_issuer_by_name(name: str) -> Optional[TrustedIssuerData]:
+    """Look up a TrustedIssuer by its unique name."""
+    if _use_database_service():
+        return _grpc_get_trusted_issuer_by_name(name)
+    return _direct_get_trusted_issuer_by_name(name)
+
+
+def get_all_trusted_issuers() -> list[TrustedIssuerData]:
+    """Every configured TrustedIssuer."""
+    if _use_database_service():
+        return _grpc_get_all_trusted_issuers()
+    return _direct_get_all_trusted_issuers()
+
+
+def delete_trusted_issuer(issuer_uuid: UUID) -> bool:
+    """Delete a TrustedIssuer's static row."""
+    if _use_database_service():
+        return _grpc_delete_trusted_issuer(issuer_uuid)
+    return _direct_delete_trusted_issuer(issuer_uuid)
+
+
+def create_trusted_issuer_attributes(
+        data: TrustedIssuerAttributesData) -> bool:
+    """Create a TrustedIssuer's mutable attributes."""
+    if _use_database_service():
+        return _grpc_create_trusted_issuer_attributes(data)
+    return _direct_create_trusted_issuer_attributes(data)
+
+
+def get_trusted_issuer_attributes(
+        issuer_uuid: UUID) -> Optional[TrustedIssuerAttributesData]:
+    """Get a TrustedIssuer's mutable attributes."""
+    if _use_database_service():
+        return _grpc_get_trusted_issuer_attributes(issuer_uuid)
+    return _direct_get_trusted_issuer_attributes(issuer_uuid)
+
+
+def update_trusted_issuer_attributes(
+        data: TrustedIssuerAttributesData) -> bool:
+    """Replace a TrustedIssuer's mutable attributes."""
+    if _use_database_service():
+        return _grpc_update_trusted_issuer_attributes(data)
+    return _direct_update_trusted_issuer_attributes(data)
+
+
+def delete_trusted_issuer_attributes(issuer_uuid: UUID) -> bool:
+    """Delete a TrustedIssuer's mutable attributes."""
+    if _use_database_service():
+        return _grpc_delete_trusted_issuer_attributes(issuer_uuid)
+    return _direct_delete_trusted_issuer_attributes(issuer_uuid)
 
 
 # =============================================================================

@@ -92,6 +92,10 @@ class _ObjectTypeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_ObjectType
     """"unknown_managed_executable" """
     OBJECT_TYPE_NAMESPACE_KEY: _ObjectType.ValueType  # 29
     """"namespace_key" """
+    OBJECT_TYPE_TRUSTED_ISSUER: _ObjectType.ValueType  # 30
+    """"trusted_issuer" """
+    OBJECT_TYPE_MAPPING_RULE: _ObjectType.ValueType  # 31
+    """"mapping_rule" """
 
 class ObjectType(_ObjectType, metaclass=_ObjectTypeEnumTypeWrapper):
     """ObjectType enum - all valid object types in Shaken Fist
@@ -157,6 +161,10 @@ OBJECT_TYPE_UNKNOWN_MANAGED_EXECUTABLE: ObjectType.ValueType  # 28
 """"unknown_managed_executable" """
 OBJECT_TYPE_NAMESPACE_KEY: ObjectType.ValueType  # 29
 """"namespace_key" """
+OBJECT_TYPE_TRUSTED_ISSUER: ObjectType.ValueType  # 30
+""""trusted_issuer" """
+OBJECT_TYPE_MAPPING_RULE: ObjectType.ValueType  # 31
+""""mapping_rule" """
 Global___ObjectType: _TypeAlias = ObjectType  # noqa: Y015
 
 class _ReservationType:

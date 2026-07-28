@@ -147,3 +147,6 @@ class ObjectType(str, Enum):
     # above was written, so its proto_id continues the sequence rather
     # than sitting alphabetically alongside NAMESPACE.
     NAMESPACE_KEY = ObjectTypeValue(string='namespace_key', proto_id=29)
+    TRUSTED_ISSUER = ObjectTypeValue(
+        string='trusted_issuer', proto_id=30)
+    MAPPING_RULE = ObjectTypeValue(string='mapping_rule', proto_id=31)
