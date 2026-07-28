@@ -141,8 +141,15 @@ class AuthEndpoint(api_base.Resource):
             possible_key = base64.b64decode(keys[keyname]['key'])
             try:
                 if bcrypt.checkpw(key.encode('utf-8'), possible_key):
+                    # One extra point read, and only on the successful
+                    # match rather than per candidate key. The legacy
+                    # accessor shape above is pinned by the phase 2
+                    # behaviour preservation tests, so scopes are
+                    # fetched here rather than widening it.
+                    matched = namespace_from_db.lookup_key(keyname)
                     return access_tokens.create_token(
-                        namespace_from_db, keyname, keys[keyname]['nonce'])
+                        namespace_from_db, keyname, keys[keyname]['nonce'],
+                        scopes=matched.scopes if matched else None)
             except ValueError as e:
                 # The key body held the stored hash and the nonce, so it
                 # cannot go in the event. The error and the key name are

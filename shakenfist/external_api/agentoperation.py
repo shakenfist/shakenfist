@@ -92,6 +92,10 @@ agentoperation_get_example = """{
 
 
 class AgentOperationEndpoint(api_base.Resource):
+    # Derivation would give 'agent' from the leading word, which
+    # reads as though it were about the in-guest agent itself.
+    scope_family = 'agentoperation'
+
     @swag_from(api_base.swagger_helper(
         'agentoperations', 'Get information for an agent operation.',
         [('operation_uuid', 'query', 'uuid', 'The UUID of an agent operation.', True)],

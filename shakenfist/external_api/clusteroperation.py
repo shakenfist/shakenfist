@@ -104,6 +104,10 @@ def _hydrate_op(op_uuid):
 
 
 class ClusterOperationEndpoint(api_base.Resource):
+    # Derivation would give 'cluster', which sounds like cluster
+    # administration rather than operation history.
+    scope_family = 'clusteroperation'
+
     @swag_from(api_base.swagger_helper(
         'clusteroperations', 'Get information for a cluster operation.',
         [
@@ -150,6 +154,8 @@ class ClusterOperationEndpoint(api_base.Resource):
 
 
 class ClusterOperationChainEndpoint(api_base.Resource):
+    scope_family = 'clusteroperation'
+
     """Return the transitive ``depends_on`` closure for a cluster operation.
 
     Starts from ``op_uuid`` and walks every ``depends_on`` ancestor via
@@ -273,6 +279,8 @@ class ClusterOperationChainEndpoint(api_base.Resource):
 
 
 class ClusterOperationsEndpoint(api_base.Resource):
+    scope_family = 'clusteroperation'
+
     """List cluster operations targeting a specific object.
 
     Query parameters:

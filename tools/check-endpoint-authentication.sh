@@ -16,8 +16,8 @@
 #   1. A resource class must inherit from `api_base.Resource`. One
 #      subclassing `flask_restful.Resource` directly would miss
 #      `method_decorators` entirely and be silently open.
-#   2. `@api_base.public` must be the first (outermost) decorator on
-#      its method. The marker is an attribute read off the bound method
+#   2. `@api_base.public` and `@api_base.scope` must be the first
+#      (outermost) decorator on their method. The marker is an attribute read off the bound method
 #      at dispatch, and several decorators in base.py predate
 #      functools.wraps and so do not propagate attributes -- a `@public`
 #      buried under one of them would be invisible, and the endpoint
@@ -107,14 +107,17 @@ def find_problems(source, path):
             if item.name not in HTTP_METHODS:
                 continue
             names = [_decorator_name(d) for d in item.decorator_list]
-            public = [n for n in names
-                      if n in ('api_base.public', 'public')]
-            if not public:
-                continue
-            if names[0] not in ('api_base.public', 'public'):
-                yield (f'{path}:{item.lineno}: {node.name}.{item.name} has '
-                       f'@public but it is not the outermost decorator '
-                       f'(found {names[0]!r} above it)')
+
+            # Both markers are attributes read off the bound method at
+            # dispatch, so both must be outermost for the same reason.
+            for marker in ('public', 'scope'):
+                qualified = (f'api_base.{marker}', marker)
+                if not any(n in qualified for n in names):
+                    continue
+                if names[0] not in qualified:
+                    yield (f'{path}:{item.lineno}: {node.name}.{item.name} '
+                           f'has @{marker} but it is not the outermost '
+                           f'decorator (found {names[0]!r} above it)')
 
 
 GOOD = '''
@@ -136,6 +139,22 @@ class Thing(api_base.Resource):
         pass
 '''
 
+BAD_SCOPE_NOT_OUTERMOST = '''
+class Thing(api_base.Resource):
+    @swag_from({})
+    @api_base.scope(verb='power')
+    def post(self):
+        pass
+'''
+
+GOOD_SCOPE = '''
+class Thing(api_base.Resource):
+    @api_base.scope(verb='power')
+    @swag_from({})
+    def post(self):
+        pass
+'''
+
 BAD_WRONG_BASE = '''
 class Thing(flask_restful.Resource):
     def get(self):
@@ -154,7 +173,12 @@ def selftest():
     if list(find_problems(GOOD, '<selftest>')):
         raise SystemExit(
             'guardrail self-test failed: the good shape was flagged')
+    if list(find_problems(GOOD_SCOPE, '<selftest>')):
+        raise SystemExit(
+            'guardrail self-test failed: a correctly placed @scope was '
+            'flagged')
     for name, snippet in (('public not outermost', BAD_NOT_OUTERMOST),
+                          ('scope not outermost', BAD_SCOPE_NOT_OUTERMOST),
                           ('wrong base class', BAD_WRONG_BASE)):
         if not list(find_problems(snippet, '<selftest>')):
             raise SystemExit(
