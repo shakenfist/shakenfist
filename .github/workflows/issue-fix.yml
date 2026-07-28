@@ -32,6 +32,10 @@
 #   reopen it -- before the full CI suite runs.
 # - The issue-fix-<N> branches are owned by this workflow and are
 #   force-updated on each attempt.
+# - Scratch files (prompts, logs, captured output) live in
+#   runner.temp, never the workspace: the workspace is the repo
+#   checkout, and anything written there is swept into the commit by
+#   "git add -A" and counted against the size cap.
 #
 # Template source: shakenfist/development/templates/issue-fix/
 
@@ -116,31 +120,31 @@ jobs:
             --search 'is:open -linked:pr -label:automated-fix-attempted sort:created-desc' \
             --limit "${CANDIDATE_LIMIT}" \
             --json number,title,body,author \
-            > ${{ github.workspace }}/all-issues.json
+            > ${{ runner.temp }}/all-issues.json
 
           # Only issues filed by users with write access are
           # eligible: the issue text is fed to a model with push
           # access, and third parties must not be able to steer it.
-          echo '{}' > ${{ github.workspace }}/perms.json
+          echo '{}' > ${{ runner.temp }}/perms.json
           for author in $(jq -r '[.[].author.login] | unique | .[]' \
-              ${{ github.workspace }}/all-issues.json); do
+              ${{ runner.temp }}/all-issues.json); do
             perm=$(gh api \
               "repos/${{ github.repository }}/collaborators/${author}/permission" \
               --jq '.permission' 2>/dev/null || echo 'none')
             jq --arg a "${author}" --arg p "${perm}" '. + {($a): $p}' \
-              ${{ github.workspace }}/perms.json \
-              > ${{ github.workspace }}/perms.tmp
-            mv ${{ github.workspace }}/perms.tmp \
-              ${{ github.workspace }}/perms.json
+              ${{ runner.temp }}/perms.json \
+              > ${{ runner.temp }}/perms.tmp
+            mv ${{ runner.temp }}/perms.tmp \
+              ${{ runner.temp }}/perms.json
           done
 
-          jq --slurpfile perms ${{ github.workspace }}/perms.json \
+          jq --slurpfile perms ${{ runner.temp }}/perms.json \
             '[.[] | select($perms[0][.author.login] as $p |
               $p == "admin" or $p == "write" or $p == "maintain")]' \
-            ${{ github.workspace }}/all-issues.json \
-            > ${{ github.workspace }}/eligible-issues.json
+            ${{ runner.temp }}/all-issues.json \
+            > ${{ runner.temp }}/eligible-issues.json
 
-          count=$(jq length ${{ github.workspace }}/eligible-issues.json)
+          count=$(jq length ${{ runner.temp }}/eligible-issues.json)
           echo "Found ${count} eligible issues"
           echo "count=${count}" >> $GITHUB_OUTPUT
 
@@ -150,7 +154,7 @@ jobs:
           inputs.issue_number == '' &&
           steps.candidates.outputs.count != '0'
         run: |
-          cat > ${{ github.workspace }}/triage-prompt.txt << 'PROMPT_EOF'
+          cat > ${{ runner.temp }}/triage-prompt.txt << 'PROMPT_EOF'
           You are triaging open GitHub issues for this repository to
           select ONE issue for an automated fix attempt with a coding
           agent, or to decide that none are suitable.
@@ -183,15 +187,15 @@ jobs:
           PROMPT_EOF
 
           jq -r '.[] | "## Issue #\(.number): \(.title)\n\n\(.body // "" | .[0:3000])\n\n---\n"' \
-            ${{ github.workspace }}/eligible-issues.json \
-            >> ${{ github.workspace }}/triage-prompt.txt
+            ${{ runner.temp }}/eligible-issues.json \
+            >> ${{ runner.temp }}/triage-prompt.txt
 
-          claude -p "$(cat ${{ github.workspace }}/triage-prompt.txt)" \
+          claude -p "$(cat ${{ runner.temp }}/triage-prompt.txt)" \
             --dangerously-skip-permissions \
             --model claude-haiku-4-5 \
             --max-turns 15 \
             --output-format text \
-            2>&1 | tee ${{ github.workspace }}/triage-output.txt \
+            2>&1 | tee ${{ runner.temp }}/triage-output.txt \
             || true
 
           # Model output formatting varies (markdown emphasis,
@@ -200,7 +204,7 @@ jobs:
           # first number on it. An unparseable line fails safe --
           # nothing is selected.
           sel_line=$(grep -i 'SELECTED_ISSUE' \
-            ${{ github.workspace }}/triage-output.txt | \
+            ${{ runner.temp }}/triage-output.txt | \
             tail -1 || true)
           if echo "${sel_line}" | grep -qi 'none'; then
             selected='none'
@@ -229,7 +233,7 @@ jobs:
             if echo "${selected}" | grep -qE '^[0-9]+$'; then
               member=$(jq --argjson n "${selected}" \
                 'any(.[]; .number == $n)' \
-                ${{ github.workspace }}/eligible-issues.json)
+                ${{ runner.temp }}/eligible-issues.json)
               if [ "${member}" != "true" ]; then
                 echo "Triage selected #${selected}, which is not in"
                 echo "the eligible set; ignoring the selection."
@@ -252,10 +256,10 @@ jobs:
         with:
           name: issue-fix-triage-${{ github.run_id }}
           path: |
-            ${{ github.workspace }}/all-issues.json
-            ${{ github.workspace }}/eligible-issues.json
-            ${{ github.workspace }}/triage-prompt.txt
-            ${{ github.workspace }}/triage-output.txt
+            ${{ runner.temp }}/all-issues.json
+            ${{ runner.temp }}/eligible-issues.json
+            ${{ runner.temp }}/triage-prompt.txt
+            ${{ runner.temp }}/triage-output.txt
           retention-days: 14
           if-no-files-found: ignore
 
@@ -336,7 +340,7 @@ jobs:
       - name: Fetch issue content
         run: |
           gh api "repos/${{ github.repository }}/issues/${ISSUE_NUMBER}" \
-            > ${{ github.workspace }}/issue.json
+            > ${{ runner.temp }}/issue.json
 
           # Only comments from users with write access are passed to
           # the model -- anyone can comment on an issue, and those
@@ -347,26 +351,26 @@ jobs:
           gh api --paginate \
             "repos/${{ github.repository }}/issues/${ISSUE_NUMBER}/comments" | \
             jq -s 'add // []' \
-            > ${{ github.workspace }}/comments-all.json
+            > ${{ runner.temp }}/comments-all.json
 
-          echo '{}' > ${{ github.workspace }}/comment-perms.json
+          echo '{}' > ${{ runner.temp }}/comment-perms.json
           for author in $(jq -r '[.[].user.login] | unique | .[]' \
-              ${{ github.workspace }}/comments-all.json); do
+              ${{ runner.temp }}/comments-all.json); do
             perm=$(gh api \
               "repos/${{ github.repository }}/collaborators/${author}/permission" \
               --jq '.permission' 2>/dev/null || echo 'none')
             jq --arg a "${author}" --arg p "${perm}" '. + {($a): $p}' \
-              ${{ github.workspace }}/comment-perms.json \
-              > ${{ github.workspace }}/comment-perms.tmp
-            mv ${{ github.workspace }}/comment-perms.tmp \
-              ${{ github.workspace }}/comment-perms.json
+              ${{ runner.temp }}/comment-perms.json \
+              > ${{ runner.temp }}/comment-perms.tmp
+            mv ${{ runner.temp }}/comment-perms.tmp \
+              ${{ runner.temp }}/comment-perms.json
           done
 
-          jq --slurpfile perms ${{ github.workspace }}/comment-perms.json \
+          jq --slurpfile perms ${{ runner.temp }}/comment-perms.json \
             '[.[] | select($perms[0][.user.login] as $p |
               $p == "admin" or $p == "write" or $p == "maintain")]' \
-            ${{ github.workspace }}/comments-all.json \
-            > ${{ github.workspace }}/comments.json
+            ${{ runner.temp }}/comments-all.json \
+            > ${{ runner.temp }}/comments.json
 
       - name: Prepare Claude prompt
         run: |
@@ -392,14 +396,14 @@ jobs:
           CONTEXT_EOF
 
             echo
-            echo "## Issue #${ISSUE_NUMBER}: $(jq -r .title ${{ github.workspace }}/issue.json)"
+            echo "## Issue #${ISSUE_NUMBER}: $(jq -r .title ${{ runner.temp }}/issue.json)"
             echo
-            jq -r '.body // "(no description)"' ${{ github.workspace }}/issue.json
+            jq -r '.body // "(no description)"' ${{ runner.temp }}/issue.json
             echo
             echo '## Maintainer comments on the issue'
             echo
             jq -r '.[] | "### \(.user.login) at \(.created_at)\n\n\(.body)\n"' \
-              ${{ github.workspace }}/comments.json
+              ${{ runner.temp }}/comments.json
 
             cat << 'TASK_EOF'
 
@@ -441,10 +445,10 @@ jobs:
           Do not include a "Fixes #NNNN" line in the summary -- the
           workflow adds that itself.
           TASK_EOF
-          } > ${{ github.workspace }}/claude-prompt.txt
+          } > ${{ runner.temp }}/claude-prompt.txt
 
           echo "Prompt prepared:"
-          cat ${{ github.workspace }}/claude-prompt.txt
+          cat ${{ runner.temp }}/claude-prompt.txt
 
       - name: Run Claude Code to propose a fix
         id: claude_fix
@@ -460,30 +464,30 @@ jobs:
 
           start_time=$(date +%s)
 
-          claude -p "$(cat ${{ github.workspace }}/claude-prompt.txt)" \
+          claude -p "$(cat ${{ runner.temp }}/claude-prompt.txt)" \
             --dangerously-skip-permissions \
             --model "${MODEL}" \
             --max-turns "${MAX_TURNS}" \
             --output-format text \
-            2>&1 | tee ${{ github.workspace }}/claude-output.txt \
+            2>&1 | tee ${{ runner.temp }}/claude-output.txt \
             || true
 
-          mkdir -p ${{ github.workspace }}/claude-logs
+          mkdir -p ${{ runner.temp }}/claude-logs
           find ~/.claude/projects -name "*.jsonl" \
             -newermt "@${start_time}" \
-            -exec cp {} ${{ github.workspace }}/claude-logs/ \; \
+            -exec cp {} ${{ runner.temp }}/claude-logs/ \; \
             2>/dev/null || true
 
       - name: Assess Claude output
         id: assess
         if: steps.claude_fix.outputs.claude_available == 'true'
         run: |
-          if grep -q '^NO_FIX:' ${{ github.workspace }}/claude-output.txt; then
+          if grep -q '^NO_FIX:' ${{ runner.temp }}/claude-output.txt; then
             echo "Claude declined to fix this issue."
             echo "has_changes=false" >> $GITHUB_OUTPUT
             if [ "${DRY_RUN}" != "true" ]; then
               reason=$(grep '^NO_FIX:' \
-                ${{ github.workspace }}/claude-output.txt | head -1)
+                ${{ runner.temp }}/claude-output.txt | head -1)
               gh issue comment "${ISSUE_NUMBER}" \
                 --repo ${{ github.repository }} \
                 --body "The automated fix attempt concluded this issue is not suitable for an automated fix:
@@ -518,7 +522,7 @@ jobs:
           . ~/sf-venv/bin/activate
           set +e
           tox -ecover \
-            2>&1 | tee ${{ github.workspace }}/verify-output.txt
+            2>&1 | tee ${{ runner.temp }}/verify-output.txt
           verify_exit_code=${PIPESTATUS[0]}
           set -e
 
@@ -535,17 +539,17 @@ jobs:
         if: steps.assess.outputs.has_changes == 'true'
         run: |
           if grep -q "COMMIT_SUMMARY_START" \
-              ${{ github.workspace }}/claude-output.txt
+              ${{ runner.temp }}/claude-output.txt
           then
             sed -n '/COMMIT_SUMMARY_START/,/COMMIT_SUMMARY_END/p' \
-              ${{ github.workspace }}/claude-output.txt | \
+              ${{ runner.temp }}/claude-output.txt | \
               grep -v "COMMIT_SUMMARY_START" | \
               grep -v "COMMIT_SUMMARY_END" | \
               sed 's/^```$//' | \
               sed '/^$/N;/^\n$/d' \
-              > ${{ github.workspace }}/commit-summary.txt
+              > ${{ runner.temp }}/commit-summary.txt
 
-            if [ -s ${{ github.workspace }}/commit-summary.txt ]; then
+            if [ -s ${{ runner.temp }}/commit-summary.txt ]; then
               echo "summary_found=true" >> $GITHUB_OUTPUT
             else
               echo "summary_found=false" >> $GITHUB_OUTPUT
@@ -580,14 +584,14 @@ jobs:
           inputs.dry_run != true
         run: |
           if [ "${{ steps.extract_summary.outputs.summary_found }}" == "true" ]; then
-            cat ${{ github.workspace }}/commit-summary.txt \
-              > ${{ github.workspace }}/commit-message.txt
+            cat ${{ runner.temp }}/commit-summary.txt \
+              > ${{ runner.temp }}/commit-message.txt
           else
             {
               echo "Fix issue #${ISSUE_NUMBER}."
               echo ""
               echo "Claude Code proposed a fix for this issue."
-            } > ${{ github.workspace }}/commit-message.txt
+            } > ${{ runner.temp }}/commit-message.txt
           fi
 
           {
@@ -599,9 +603,9 @@ jobs:
             echo "Signed-off-by: Michael Still <mikal@stillhq.com>"
             echo "Assisted-By: Claude Code"
             echo "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
-          } >> ${{ github.workspace }}/commit-message.txt
+          } >> ${{ runner.temp }}/commit-message.txt
 
-          git commit -F ${{ github.workspace }}/commit-message.txt
+          git commit -F ${{ runner.temp }}/commit-message.txt
 
       - name: Publish draft PR
         if: |
@@ -614,7 +618,7 @@ jobs:
 
           if [ "${{ steps.extract_summary.outputs.summary_found }}" == "true" ]; then
             PR_TITLE=$(head -1 \
-              ${{ github.workspace }}/commit-summary.txt | \
+              ${{ runner.temp }}/commit-summary.txt | \
               sed 's/\.$//')
           else
             PR_TITLE="Fix issue #${ISSUE_NUMBER}"
@@ -680,7 +684,7 @@ jobs:
           inputs.dry_run != true
         run: |
           TEST_OUTPUT=$(tail -c 2000 \
-            ${{ github.workspace }}/verify-output.txt \
+            ${{ runner.temp }}/verify-output.txt \
             2>/dev/null || echo "See workflow logs for details.")
 
           gh issue comment "${ISSUE_NUMBER}" \
@@ -709,13 +713,13 @@ jobs:
         with:
           name: issue-fix-${{ env.ISSUE_NUMBER }}-${{ github.run_id }}
           path: |
-            ${{ github.workspace }}/issue.json
-            ${{ github.workspace }}/comments.json
-            ${{ github.workspace }}/claude-prompt.txt
-            ${{ github.workspace }}/claude-output.txt
-            ${{ github.workspace }}/verify-output.txt
-            ${{ github.workspace }}/commit-summary.txt
-            ${{ github.workspace }}/commit-message.txt
-            ${{ github.workspace }}/claude-logs/
+            ${{ runner.temp }}/issue.json
+            ${{ runner.temp }}/comments.json
+            ${{ runner.temp }}/claude-prompt.txt
+            ${{ runner.temp }}/claude-output.txt
+            ${{ runner.temp }}/verify-output.txt
+            ${{ runner.temp }}/commit-summary.txt
+            ${{ runner.temp }}/commit-message.txt
+            ${{ runner.temp }}/claude-logs/
           retention-days: 14
           if-no-files-found: ignore
