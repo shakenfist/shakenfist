@@ -10,13 +10,9 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/user_guide/objects/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-auth-federation-phase-02-key-objects/">
       
       
-        <link rel="prev" href="../events/">
-      
-      
-        <link rel="next" href="../metadata/">
       
       
         
@@ -27,7 +23,7 @@
     
     
       
-        <title>Objects - Shaken Fist</title>
+        <title>Phase 2 — namespace keys as first-class objects - Shaken Fist</title>
       
     
     
@@ -101,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#objects" class="md-skip">
+        <a href="#phase-2-namespace-keys-as-first-class-objects" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Objects
+              Phase 2 — namespace keys as first-class objects
             
           </span>
         </div>
@@ -8399,20 +8395,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
@@ -8433,7 +8427,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -8451,7 +8445,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
+      <a href="../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -8479,7 +8473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication/" class="md-nav__link">
+      <a href="../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -8507,7 +8501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ansible/" class="md-nav__link">
+      <a href="../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -8535,7 +8529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../artifacts/" class="md-nav__link">
+      <a href="../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -8563,7 +8557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../affinity/" class="md-nav__link">
+      <a href="../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -8591,7 +8585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../consoles/" class="md-nav__link">
+      <a href="../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -8619,7 +8613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../events/" class="md-nav__link">
+      <a href="../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -8644,19 +8638,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -8672,7 +8657,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -8685,7 +8669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../metadata/" class="md-nav__link">
+      <a href="../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -9520,7 +9504,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -9548,7 +9532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -9576,7 +9560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -10126,6 +10110,152 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#object-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Object shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-resolves-master-plan-open-question-7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration (resolves master plan open question 7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hot-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hot path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#service-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reaping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reaping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -10145,27 +10275,341 @@
   
 
 
-<h1 id="objects">Objects<a class="headerlink" href="#objects" title="Permanent link">&para;</a></h1>
-<p>Everything that you interact with in Shaken Fist is an object. Objects are
-almost always referred to by a UUID (specifically a version 4 UUID) as a
-string. The exceptions are: <code>node</code>s; <code>namespace</code>s; and <code>key</code>s within a namespace.</p>
-<p>Terms used here are defined in the <a href="../../glossary/">glossary</a>.</p>
-<p>In general an object is referred to in the API or on the command line "by
-reference", which means you can either pass the object's name or its UUID to the
-command. So for example if we had an instance with the UUID
-0a38d51e-2f72-4848-80fb-03031978633b named "mikal", then we could run either of
-the commands below to the same effect:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sf-client instance show 0a38d51e-2f72-4848-80fb-03031978633b
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sf-client instance show mikal
-</code></pre></div>
-<p>In the case where you refer to an object by name, a lookup occurs of all
-objects visible to you (those in your namespace, and namespaces that trust
-your namespace). Additionally, shared artifacts are included if you're using
-an artifact command.</p>
-<p>It is possible that the name you're using isn't unique. For example there might
-be two instances named "mikal" with different UUIDs. In that case, you will get
-an error indicating that there was more than one object which matched, and you'll
-need to use a UUID to refer to the object.</p>
+<h1 id="phase-2-namespace-keys-as-first-class-objects">Phase 2 — namespace keys as first-class objects<a class="headerlink" href="#phase-2-namespace-keys-as-first-class-objects" title="Permanent link">&para;</a></h1>
+<p>Parent plan:
+<a href="../PLAN-auth-federation/">PLAN-auth-federation.md</a>.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p>Phase 2 promotes namespace keys from anonymous entries in the
+<code>namespace_attributes.keys</code> JSON column to <code>DatabaseBackedObject</code>s
+with their own tables, lifecycle, events, expiry surfaced through
+the API, and reaping. After this phase ships, a key is something an
+operator can list with its expiry and provenance, expired keys are
+actually removed rather than accumulating invisibly, and no secret
+material is written to the event log. Behaviour visible to existing
+clients is unchanged.</p>
+<p>The phase covers:</p>
+<ul>
+<li>A behaviour-preservation test suite, written and committed
+  <em>before</em> any production change, pinning today's semantics.</li>
+<li>The <code>NamespaceKey</code> object: Pydantic models, tables, three-layer
+  accessors, protos, database-daemon handlers, the DBO class, and
+  an iterator with SQL-pushdown find.</li>
+<li>A one-shot, version-gated data migration out of the JSON column
+  (the <code>node_daemon_states</code> precedent), run by
+  <code>sf-ctl ensure-mariadb-schema</code>.</li>
+<li>Cutover of every consumer: <code>Namespace.keys</code>/<code>add_key</code>/
+  <code>remove_key</code>/<code>external_view</code>, <code>get_api_token</code> (service keys),
+  <code>/auth</code> minting, <code>verify_token</code>'s nonce check, and the key CRUD
+  endpoints — including an additive <code>expiry</code> API parameter and
+  fixes for two latent bugs in the key-update PUT endpoint.</li>
+<li>Reaping of expired and soft-deleted keys.</li>
+<li>Removing secret material (whole JWTs, stored key hashes) from
+  all auth-related events.</li>
+<li>Documentation and glossary updates.</li>
+</ul>
+<p>Out of scope (deferred):</p>
+<ul>
+<li>Scopes <em>enforcement</em> and everything federation: phase 3. The
+  scopes column exists after this phase but is NULL (= unscoped,
+  wildcard behaviour) for every key.</li>
+<li><code>sf-client</code> changes (client-python is a separate repository);
+  this phase delivers the API-side <code>expiry</code> support and records
+  the client work as follow-up.</li>
+<li>Dropping the legacy <code>keys</code> JSON column: a later schema bump,
+  per the <code>node_daemon_states</code> precedent ("left in place until
+  nothing reads it").</li>
+<li>Retiring the legacy <code>_service_key</code> exact-name nonce bypass in
+  <code>verify_token</code> (see "Decisions" below).</li>
+</ul>
+<h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
+<h3 id="object-shape">Object shape<a class="headerlink" href="#object-shape" title="Permanent link">&para;</a></h3>
+<p><code>NamespaceKey</code> follows the AgentOperation pattern (the closest
+"small DBO owned by a parent" exemplar,
+<code>shakenfist/operations/agentoperation.py:20</code>): a frozen static
+model plus a mutable attributes model, both Pydantic-generated
+tables via <code>pydantic_to_sqlalchemy_table</code>
+(<code>shakenfist/schema/sqlalchemy.py:370</code>).</p>
+<ul>
+<li><strong>Static</strong> (<code>namespace_key_data.py</code>, frozen): <code>uuid</code>
+  (SQLNativeUUID, PK), <code>namespace</code> (SQLIndex — the owning
+  namespace's name, matching <code>namespaces.name</code>), <code>name</code> (the key
+  name; unique index on <code>(namespace, name)</code>), <code>version</code>.</li>
+<li><strong>Attributes</strong> (<code>namespace_key_attributes.py</code>, mutable, keyed by
+  uuid): <code>key</code> (the base64-encoded bcrypt hash), <code>nonce</code>, <code>expiry</code>
+  (nullable float epoch), <code>scopes</code> (nullable JSON list; NULL means
+  unscoped/wildcard — phase 3 formalises the vocabulary),
+  <code>provenance</code> (nullable JSON dict; phase 3's exchange writes the
+  mapping-rule reference and satisfied claims).</li>
+</ul>
+<p>Hash and nonce live in <em>attributes</em> because key update (rotation)
+mutates them. JWT identity strings stay <code>&lt;namespace&gt;:&lt;keyname&gt;</code> —
+tokens reference keys by name, so outstanding tokens survive the
+migration untouched.</p>
+<p><code>ObjectType.NAMESPACE_KEY</code> gets a fresh, never-reused <code>proto_id</code>
+(<code>shakenfist/schema/object_types.py:107-144</code>). <code>state_targets</code>:
+initial → created → deleted (→ hard-deleted via the standard
+reaper); no error state — key operations are atomic.</p>
+<h3 id="migration-resolves-master-plan-open-question-7">Migration (resolves master plan open question 7)<a class="headerlink" href="#migration-resolves-master-plan-open-question-7" title="Permanent link">&para;</a></h3>
+<p>The codebase answers the one-shot-vs-dual-read question for us:
+migrations are folded into <code>_ensure_*_schema</code> version steps, run
+only by <code>sf-ctl ensure-mariadb-schema</code> (<code>shakenfist/client/ctl.py:190</code>),
+and <code>sf-database</code> <em>refuses to start</em> if the schema is behind
+(<code>daemons/database/main.py:5208</code>). New code therefore never runs
+against unmigrated data, and <strong>no dual-read window is needed</strong>.</p>
+<ul>
+<li>Tables land at v1; the v1→v2 step runs
+  <code>_migrate_keys_from_namespace_attributes(engine)</code>: read every
+  <code>namespace_attributes.keys</code> JSON blob, fan <code>nonced_keys</code> entries
+  out as rows (<code>INSERT ... ON DUPLICATE KEY UPDATE</code>, idempotent),
+  preserving name, hash, nonce, and expiry; migrated keys get
+  NULL scopes and NULL provenance. Modelled exactly on
+  <code>_migrate_daemon_states_from_node_attributes</code>
+  (<code>shakenfist/mariadb.py:8926</code>).</li>
+<li>Expired entries are migrated too (the reaper deletes them on its
+  first pass) so the migration needs no policy.</li>
+<li>The JSON column is left in place, unread, until a later version
+  drops it.</li>
+<li><strong>Rollback caveat (documented, accepted):</strong> rolling back to
+  pre-phase code revives the JSON column, which still holds every
+  pre-migration key; keys created or rotated <em>after</em> migration
+  exist only in the table and are invisible to rolled-back code.
+  Same trade the <code>node_daemon_states</code> migration made.</li>
+</ul>
+<h3 id="hot-path">Hot path<a class="headerlink" href="#hot-path" title="Permanent link">&para;</a></h3>
+<p><code>verify_token</code> today does a namespace static read plus a whole
+<code>namespace_attributes</code> row load per request for the nonce compare
+(<code>external_api/base.py:171-213</code>). After cutover it does the
+namespace static read plus a point read of one key row via the
+unique <code>(namespace, name)</code> index — equal or cheaper. Per the master
+plan's open question 7 caution: <strong>no caching of key lookups</strong>; a
+stale cache would delay nonce revocation.</p>
+<p><code>/auth</code> minting iterates a namespace's keys bcrypt-comparing each
+(<code>auth.py:95-101</code>); this becomes an indexed
+<code>find keys where namespace = X</code> returning the same set. Note the
+reaper actively shrinks this set over time (today expired service
+keys accumulate and are bcrypt-compared forever — an existing
+performance leak this phase also fixes).</p>
+<h3 id="service-keys">Service keys<a class="headerlink" href="#service-keys" title="Permanent link">&para;</a></h3>
+<p><code>get_api_token</code> (<code>namespace.py:292-314</code>) is the sole producer of
+<code>_service_key_&lt;rand&gt;</code> keys: 5-minute expiry, minted at most every
+~285 s per worker per namespace thanks to the in-process
+<code>CACHED_TOKENS</code> cache. That volume is modest, so service keys
+become ordinary key objects — no special storage path. Their
+lifecycle events are equally modest (a create event a few times an
+hour per busy namespace). The reaper (below) finally deletes them
+after expiry, fixing the current unbounded accumulation in the
+attributes row.</p>
+<h3 id="reaping">Reaping<a class="headerlink" href="#reaping" title="Permanent link">&para;</a></h3>
+<p>Two mechanisms, both existing patterns:</p>
+<ol>
+<li>A cluster-daemon scheduled task (pattern:
+   <code>delete_stale_cluster_operation_targets</code>,
+   <code>daemons/cluster/main.py:100-102</code>) sweeps keys with
+   <code>expiry &lt; now - grace</code> and <em>soft-deletes</em> them (state →
+   deleted, with an "expired" audit event on the key). Grace
+   default: <code>config.CLEANER_DELAY</code>-scale, new config option
+   <code>NAMESPACE_KEY_REAP_GRACE</code> (expired keys are already
+   unusable at exactly <code>expiry</code> via the read-time filter — the
+   sweep is hygiene, so the grace period only controls how long
+   the corpse is visible in listings).</li>
+<li><code>per_deleted_object_checks</code>
+   (<code>daemons/cluster/scheduled_tasks.py:355</code>) hard-deletes
+   long-soft-deleted keys automatically once <code>NamespaceKey</code> is in
+   <code>OBJECT_NAMES_TO_CLASSES</code>.</li>
+</ol>
+<p>Enforcement remains check-at-use (design principle 6): <code>/auth</code> and
+<code>verify_token</code> filter expiry exactly, in the query or in code, and
+never depend on the reaper's cadence.</p>
+<h3 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>The legacy <code>_service_key</code> exact-name nonce bypass is
+   preserved</strong> (<code>base.py:195</code>, pinned by
+   <code>AuthWithServiceKeyTestCase</code>). It predates nonced keys and some
+   deployment may still hold such a token shape. Retirement is
+   recorded for phase 3's endpoint-security pass (where scoped
+   tokens make the audit natural) — not silently dropped here.</li>
+<li><strong>Key-name validation is made consistent</strong>: today namespace
+   creation rejects the exact name <code>service_key</code> (<code>auth.py:166</code>)
+   while key creation rejects the <code>_service_key</code> prefix
+   (<code>auth.py:288</code>). Both paths will reject both patterns; this is
+   a behaviour change only for names nobody can have legitimately
+   wanted.</li>
+<li><strong>The mint event stays on the namespace</strong> (message unchanged)
+   so operator-facing event streams keep their shape; it simply
+   stops embedding the JWT. Per-key "used for mint" events are
+   <em>not</em> added — event volume would double for no audit gain,
+   since the namespace event already names the key.</li>
+<li><strong>The two PUT-endpoint bugs are fixed, not preserved</strong>
+   (<code>auth.py:353</code> membership-tests the wrong dict level;
+   <code>auth.py:358</code> passes a namespace <em>string</em> where the object is
+   expected). The endpoint appears to have never worked and has
+   zero test coverage; fixing it is safe precisely because no
+   working client can depend on it. New tests pin the fixed
+   behaviour.</li>
+<li><strong>Events that currently leak secrets</strong> lose exactly the secret
+   fields, nothing else: <code>create_token</code> (<code>access_tokens.py:28-34</code>)
+   and <code>log_token_use</code> (<code>base.py:225-233</code>) drop <code>token</code>; the
+   namespace-creation events (<code>auth.py:180-198</code>) drop <code>token</code>; the
+   invalid-key event (<code>auth.py:103-109</code>) drops <code>key-body</code>.
+   Messages, event types, and remaining extras are unchanged.</li>
+</ol>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2a</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Behaviour-preservation tests, committed before any production change. Extend <code>shakenfist/tests/external_api/test_auth.py</code> (and add <code>shakenfist/tests/test_namespace_keys.py</code> if cleaner) to pin: (i) <code>add_key(expiry=...)</code> stores expiry and the <code>keys</code> accessor filters an expired key (<code>namespace.py:165-194</code>); (ii) an expired key can no longer mint via <code>/auth</code> nor validate via <code>verify_token</code> (mock <code>time.time</code>); (iii) nonce mismatch → 401 (mint a token, rotate the key via <code>add_key</code> same name, replay the old token against a <code>verify_token</code>-guarded endpoint); (iv) <code>_namespace_keys_putpost</code> rejects <code>_service_key</code>-prefixed names (<code>auth.py:288</code>); (v) the legacy exact-name <code>_service_key</code> bypass in <code>verify_token</code> (<code>base.py:195</code>) — extend <code>AuthWithServiceKeyTestCase</code>; (vi) <code>get_api_token</code> creates a <code>_service_key_*</code> key with ~300 s expiry and reuses the cached token on a second call (<code>namespace.py:289-314</code>); (vii) <code>external_view()</code> returns <code>keys</code> as a list of names with no hashes/nonces (<code>namespace.py:239-256</code>). Do NOT test the PUT key-update endpoint (known broken; fixed in 2e). Style: mock-heavy like the existing <code>AuthKeysTestCase</code>. Run <code>tox</code> targets per CLAUDE.md. Commit subject: "tests: pin namespace key behaviour before the DBO migration."</td>
+</tr>
+<tr>
+<td>2b</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Storage layer. Following the AgentOperation recipe exactly: (i) <code>shakenfist/schema/namespace_key_data.py</code> (frozen; uuid <code>SQLNativeUUID</code> PK, namespace <code>SQLIndex</code>, name, version) and <code>namespace_key_attributes.py</code> (mutable; uuid PK, key, nonce, expiry nullable float, scopes nullable JSON, provenance nullable JSON), field markers per <code>schema/sqlalchemy.py:140-173</code>; unique index on (namespace, name) — check <code>SQLUniqueIndex</code> (<code>sqlalchemy.py:149</code>) supports composite or add the index in the ensure function like the hand-built indexes in <code>_ensure_agent_operations_schema</code> (<code>mariadb.py:13881</code>). (ii) In <code>mariadb.py</code>: <code>_get_namespace_keys_table</code>/<code>_get_namespace_key_attributes_table</code> (pattern <code>:13836/:13863</code>), <code>_ensure_*_schema</code> (pattern <code>:13881/:13918</code>), <code>NAMESPACE_KEYS_VERSION</code> constant near <code>:199</code>, entries in <code>EXPECTED_SCHEMA_VERSIONS</code> (<code>:252</code>), <code>ensure_schema()</code> (<code>:2477-2512</code>), <code>register_all_tables()</code> (<code>:2524</code>). (iii) Three-layer accessors mirroring <code>:13960-14395</code>: create/get/update/delete for both tables, plus <code>_direct_find_namespace_keys(namespace, include_expired: bool, now: float)</code> doing the indexed per-namespace listing with optional <code>expiry IS NULL OR expiry &gt; now</code> SQL filter, and <code>_direct_delete_expired_namespace_keys(older_than)</code> (pattern <code>_direct_delete_stale_transfers</code>, <code>mariadb.py:7808</code>). (iv) protos/database.proto messages + RPCs (pattern <code>:1594-1645</code>, <code>:228-236</code>), then <code>tox -e genprotos</code> (never grpc_tools directly), commit regenerated stubs together. (v) daemons/database/main.py handlers (pattern <code>:3104-3198</code>) and Monitor operations list entries (<code>:4931</code>, entries near <code>:5023</code>). Unit tests for schema-up idempotency and accessor routing, mirroring the eventlog phase 1 test shapes. Commit subject: "mariadb: add namespace_keys tables, accessors, and RPCs."</td>
+</tr>
+<tr>
+<td>2c</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>The object. New <code>shakenfist/namespace_key.py</code>: <code>NamespaceKey(dbo)</code> with <code>object_type = ObjectType.NAMESPACE_KEY</code> (add member with fresh proto_id in <code>schema/object_types.py:107-144</code>), <code>initial_version</code>/<code>current_version</code>, <code>state_targets</code> {initial→created, created→deleted, deleted→hard_deleted per baseobject conventions}, <code>_db_create</code>/<code>_db_get</code> (pattern <code>operations/agentoperation.py:57/85</code>), <code>new(namespace, name, plaintext_secret, expiry=None, scopes=None, provenance=None)</code> that bcrypt-hashes exactly as <code>namespace.py:180</code> does today and generates the nonce via <code>sfrandom.random_id()</code>, <code>rotate(plaintext_secret)</code> (new hash + new nonce under <code>get_lock_attr</code>), <code>external_view()</code> (never the hash or nonce), <code>delete()</code>/<code>hard_delete()</code> (drop both rows; pattern <code>agentoperation.py:188-194</code>), and <code>NamespaceKeys(dbo_iter)</code> with SQL-pushdown <code>_find</code> calling the 2b find accessor (pattern <code>instance.py:2079</code>). Register in <code>OBJECT_NAMES_TO_CLASSES</code> so <code>per_deleted_object_checks</code> (<code>daemons/cluster/scheduled_tasks.py:355-407</code>) reaps soft-deleted keys. Unit tests: state transitions, rotation changes nonce, external_view redaction. Commit subject: "objects: add the NamespaceKey DatabaseBackedObject."</td>
+</tr>
+<tr>
+<td>2d</td>
+<td>medium</td>
+<td>opus</td>
+<td>none</td>
+<td>Migration. <code>_migrate_keys_from_namespace_attributes(engine)</code> in mariadb.py modelled line-for-line on <code>_migrate_daemon_states_from_node_attributes</code> (<code>:8926-9014</code>): read each <code>namespace_attributes</code> row, fan <code>keys['nonced_keys']</code> entries into the new tables (uuid4 per key; INSERT ... ON DUPLICATE KEY UPDATE on the (namespace, name) unique index; preserve key/nonce/expiry verbatim; scopes and provenance NULL; object_states row 'created' per migrated key), count (migrated, errors), leave the JSON column untouched. Wire as the v1→v2 step of <code>_ensure_namespace_keys_schema</code>. Unit test with a mocked engine: one namespace with two keys (one expired) → two rows; re-run is a no-op. Update docs/operator_guide/database.md's schema-changes section per its conventions. Commit subject: "mariadb: migrate namespace keys out of the attributes JSON column."</td>
+</tr>
+<tr>
+<td>2e</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Cutover. (i) <code>namespace.py</code>: <code>keys</code> accessor, <code>add_key</code>, <code>remove_key</code>, <code>external_view</code>, and <code>get_api_token</code> re-point at NamespaceKey objects (accessor returns the same <code>{'nonced_keys': {...}}</code> shape initially so <code>/auth</code> and <code>verify_token</code> call-sites can be reviewed one at a time — or refactor call-sites to a cleaner <code>lookup_key(name)</code>; implementer's choice, but the wire-visible <code>external_view</code> and endpoint responses must be byte-identical, proven by 2a's tests). Remove the now-dead whole-blob <code>get_lock_attr('keys', ...)</code> read-modify-write; per-key uniqueness now comes from the DB index (handle IntegrityError on duplicate add as the existing behaviour dictates — today add_key overwrites; preserve overwrite-as-rotation semantics explicitly). (ii) <code>external_api/base.py</code> <code>verify_token</code>: replace the attributes-row load with a point read of the named key; preserve the exact-name <code>_service_key</code> bypass (<code>:195</code>) and all error semantics. (iii) <code>external_api/auth.py</code>: <code>/auth</code> POST iterates the find-accessor results; key CRUD endpoints move to NamespaceKey; ADD the additive optional <code>expiry</code> body parameter (float epoch; validated &gt; now) to key create/update; FIX the PUT endpoint bugs (<code>:353</code> membership check, <code>:358</code> str-vs-object) with new tests; align <code>service_key</code>/<code>_service_key</code> validation per Decision 2; fix the swagger examples that say <code>key_names</code> (the real field is <code>keys</code>). Run the FULL 2a suite unchanged — it must pass without modification (the checklist's bit-compatibility proof). Commit subject: "auth: serve namespace keys from the key objects."</td>
+</tr>
+<tr>
+<td>2f</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Reaper. New scheduled task in the cluster daemon (<code>daemons/cluster/main.py</code> maintenance preamble, pattern <code>:100-102</code>): fetch keys with <code>expiry &lt; now - config.NAMESPACE_KEY_REAP_GRACE</code> (new config option in <code>config.py</code> near <code>CLUSTER_OPERATION_TARGET_RETENTION</code> <code>:265</code>, default 3600, <code>0</code> disables), soft-delete each via the object (state → deleted) with an "expired" audit event on the key. Hard delete then happens via <code>per_deleted_object_checks</code> automatically (verify with a test that a deleted key older than CLEANER_DELAY is hard-deleted by <code>_process_per_deleted_object_queue</code>, pattern <code>scheduled_tasks.py:388-407</code>). Unit tests: sweep soft-deletes only sufficiently-expired keys; disabled when config is 0. Commit subject: "cluster: reap expired namespace keys."</td>
+</tr>
+<tr>
+<td>2g</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Secrets out of events. Exactly Decision 5's four sites: <code>util/access_tokens.py:28-34</code> drop <code>'token'</code> from the extra dict; <code>external_api/base.py:225-233</code> (<code>log_token_use</code>) drop <code>'token'</code>; <code>external_api/auth.py:180-198</code> both namespace-creation events drop <code>'token'</code>; <code>auth.py:103-109</code> drop <code>'key-body'</code>. Nothing else about the events changes (messages, types, other extras). Update or add unit tests asserting the extras no longer contain the secrets (grep the tests for existing assertions on these events first — some pin the extra shape). Commit subject: "events: stop logging tokens and key material."</td>
+</tr>
+<tr>
+<td>2h</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Docs and closeout. (i) <code>docs/developer_guide/authentication.md</code>: keys are now objects — describe lifecycle, expiry, rotation-changes-nonce, the reaper, and correct anything the cutover changed; (ii) <code>docs/developer_guide/api_reference/authentication.md</code>: document the <code>expiry</code> parameter and fix the <code>key_names</code>→<code>keys</code> examples; (iii) <code>docs/glossary.md</code>: the namespace key entry's expiry stops being future tense (scopes/provenance stay planned); (iv) <code>ARCHITECTURE.md</code> object-type list gains NamespaceKey; (v) master plan: mark open question 7 resolved (one-shot version-gated migration, no dual-read, rollback caveat documented), phase 2 → Complete in the Execution table and <code>docs/plans/index.md</code>; (vi) note the client-python follow-up (<code>--expiry</code> flag) in the master plan's Future work. Commit subject: "docs: namespace keys as first-class objects."</td>
+</tr>
+</tbody>
+</table>
+<p>After each step the management session runs
+<code>pre-commit run --all-files</code>, reads the diff against the brief, and
+confirms no unrelated edits. After 2e additionally: the full 2a
+suite passed unmodified; a manual read of <code>verify_token</code> confirming
+no caching crept in and the <code>_service_key</code> bypass survived. After
+2h: <code>tox -e genprotos</code> is a no-op against the committed tree.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Risk:</strong> the cutover subtly changes <code>/auth</code> or <code>verify_token</code>
+  semantics (error codes, key-iteration order, expired-key
+  handling).
+  <strong>Mitigation:</strong> 2a's suite is written against the <em>old</em> code and
+  must pass unmodified after 2e; the step ordering makes this
+  mechanical to verify.</li>
+<li><strong>Risk:</strong> service-key concurrency changes — today <code>add_key</code>
+  serialises on one cluster lock per namespace; per-row inserts
+  race instead.
+  <strong>Mitigation:</strong> the unique <code>(namespace, name)</code> index is the
+  arbiter; service-key names are random so collisions are
+  negligible; user add_key preserves overwrite-as-rotation
+  explicitly. 2e's brief calls this out.</li>
+<li><strong>Risk:</strong> migration on a large deployment (many namespaces ×
+  accumulated service keys) is slow inside
+  <code>sf-ctl ensure-mariadb-schema</code>.
+  <strong>Mitigation:</strong> volumes are small in practice (keys are counted
+  in tens, not millions, even with the leak); the migration is a
+  single pass with idempotent inserts and can be re-run.</li>
+<li><strong>Risk:</strong> rolled-back code loses post-migration keys (rollback
+  caveat).
+  <strong>Mitigation:</strong> documented in the operator guide's upgrade
+  notes; pre-existing keys are unaffected; the exposure window is
+  one upgrade cycle. Precedent accepted for <code>node_daemon_states</code>.</li>
+<li><strong>Risk:</strong> event-shape changes (2g) break an operator's log
+  tooling that greps for the removed fields.
+  <strong>Mitigation:</strong> the removed fields are secrets that should never
+  have been logged; the event messages and types are unchanged;
+  release notes flag it.</li>
+</ul>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 2a's behaviour-preservation suite exists in a commit that
+      predates every production change, and passes unmodified at
+      phase end. <code>test_namespace_keys.py</code> was never edited after
+      2a; <code>test_auth.py</code> has additions only.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>namespace_keys</code> + <code>namespace_key_attributes</code> tables exist,
+      version-gated, with the migration as the v1→v2 step; the
+      legacy JSON column is untouched and unread.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>NamespaceKey</code> is a DBO with events, soft delete, expiry,
+      NULL scopes/provenance placeholders, and SQL-pushdown
+      listing; registered for the standard hard-delete reaper.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>/auth</code>, <code>verify_token</code>, key CRUD, <code>external_view</code>, and
+      <code>get_api_token</code> all serve from the key objects; wire shapes
+      byte-identical except the additive <code>expiry</code> parameter and
+      the fixed PUT endpoint.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Expired keys are soft-deleted by the cluster daemon sweep
+      and hard-deleted by the existing reaper; enforcement never
+      depends on either.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No event carries a JWT or key hash; asserted by tests. Went
+      further than planned: the tests assert the secret appears in
+      <em>no</em> event under any key, which found a fifth site the plan
+      had not counted (raw request/response bodies logged by the
+      API request tracing, so <code>POST /auth</code> recorded the caller's
+      plaintext key). Bodies are no longer logged under <code>/auth</code>.
+      The token nonce was also removed, after the operator agreed
+      it should not be published either.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> clean; <code>tox -e genprotos</code>
+      no-op (verified by md5sum over the generated stubs before
+      and after); unit tests green at 1438.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Functional CI green on the branch. <strong>Not yet run</strong> — the
+      branch has not been pushed, so no CI has ever executed
+      against it. This is the one outstanding item at phase end.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Master plan open question 7 marked resolved; phase status
+      updated in the Execution table and <code>docs/plans/index.md</code>;
+      glossary and guides updated.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Each step is a single self-contained commit following
+      project conventions including the Prompt paragraph and
+      Co-Authored-By line. Two commits beyond the step plan: the
+      nonce removal, and the master-plan phases 6 and 7 that step
+      2g's findings prompted.</li>
+</ul>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step of this phase, the implementing
+sub-agent should back-brief the management session on its
+understanding of the brief and surrounding context. The management
+session must review 2a's test list with the operator before 2b
+begins, and present the 2e diff for operator review before commit —
+it is the security-sensitive cutover.</p>
 
 
 
@@ -10186,7 +10630,7 @@ need to use a UUID to refer to the object.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20user_guide/objects.md&body=%2A%2ASource%20file%3A%2A%2A%20%60user_guide/objects.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/user_guide/objects/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-auth-federation-phase-02-key-objects.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-auth-federation-phase-02-key-objects.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-auth-federation-phase-02-key-objects/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

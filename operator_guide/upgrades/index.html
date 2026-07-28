@@ -10541,7 +10541,7 @@ and the network maintainer can race the queue worker once -- which
 manifests as the "Recreating not okay network on hypervisor" event
 firing in syslog for that network. The recreate is idempotent with
 the queued operation's own <code>create_on_hypervisor</code>, so there is no
-functional breakage; only the audit event.</p>
+functional breakage; only the event.</p>
 <p>Operations enqueued after the migration completes record all of
 their targets correctly, so the gate behaves as designed once the
 in-flight v1 ops drain.</p>

@@ -11663,7 +11663,7 @@ MariaDB directly using SQLAlchemy. Ordinary cluster nodes (running <code>sf-api<
 <code>sf-queues</code>, etc.) do <strong>not</strong> have <code>MARIADB_HOST</code> set and should never need it.</p>
 <p><strong><code>MARIADB_GATEWAY_HOSTS</code></strong> is set on every cluster node. It is the list of
 <code>sf-database</code> gRPC endpoints that non-database daemons connect to. For a
-single-instance deployment this list has one entry; for higher availability,
+single-replica deployment this list has one entry; for higher availability,
 list multiple <code>sf-database</code> endpoints and the gRPC client library round-robins
 requests across them.</p>
 <p>A node running <code>sf-database</code> has <strong>both</strong> keys set: <code>MARIADB_HOST</code> for its own
@@ -11698,17 +11698,17 @@ example, when <code>sf-api</code> and <code>sf-database</code> are co-located).<
 <tr>
 <td>Prometheus scraper</td>
 <td><code>MARIADB_GATEWAY_METRICS_PORT</code></td>
-<td>Metrics port on each <code>sf-database</code> instance (default 13006)</td>
+<td>Metrics port on each <code>sf-database</code> replica (default 13006)</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Multi-instance deployments</strong>: More than one <code>sf-database</code> instance can run
-against the same MariaDB server. List every instance's mesh IP in
+<p><strong>Multi-replica deployments</strong>: More than one <code>sf-database</code> replica can run
+against the same MariaDB server. List every replica's mesh IP in
 <code>MARIADB_GATEWAY_HOSTS</code>, comma-separated — for example,
 <code>MARIADB_GATEWAY_HOSTS="10.0.0.20,10.0.0.21,10.0.0.22"</code>. Every <code>sf-database</code>
-instance must be able to reach the MariaDB server; in BYO deployments this
+replica must be able to reach the MariaDB server; in BYO deployments this
 typically means the operator's MariaDB is bound to a routable interface rather
-than <code>127.0.0.1</code>. This multi-instance shape is exercised by CI on every
+than <code>127.0.0.1</code>. This multi-replica shape is exercised by CI on every
 merge-queue run, so operators can rely on it as a supported production
 configuration.</p>
 <p><strong>Load balancing</strong>: When <code>MARIADB_GATEWAY_HOSTS</code> is a multi-element list, every
@@ -11716,7 +11716,7 @@ SF daemon connects to the tier with a gRPC channel that round-robins requests
 across the listed endpoints. Dead endpoints are skipped automatically: the
 round-robin policy avoids subchannels whose TCP connection is down, and
 aggressive client keepalives (a ping every 10 seconds with a 5 second
-timeout) detect a hung instance within about 15 seconds. There is no
+timeout) detect a hung replica within about 15 seconds. There is no
 external load balancer to configure -- the round-robin behaviour and
 failure detection are inside the gRPC client library. <code>sf-database</code> also
 publishes the standard <code>grpc.health.v1.Health</code> protocol against the
@@ -11790,7 +11790,7 @@ Operators can probe this with <code>grpc-health-probe</code>:</p>
 <code>SERVING</code> means <code>sf-database</code> can reach MariaDB; <code>NOT_SERVING</code> means the
 last poll failed. Schema currency (whether the schema is up to date) is
 only checked at startup and is not a runtime signal — a running
-<code>sf-database</code> instance always has an up-to-date schema.</p>
+<code>sf-database</code> replica always has an up-to-date schema.</p>
 <p><code>sf-api</code> consumes this signal through its per-worker readiness checker
 (<code>shakenfist/external_api/health.py</code>). When <code>sf-database</code> reports
 <code>NOT_SERVING</code>, the checker flips the cached flag after three consecutive
@@ -12083,6 +12083,11 @@ values (immutable data set at creation time):</p>
 <td>name (VARCHAR PK), version</td>
 </tr>
 <tr>
+<td><code>namespace_keys</code></td>
+<td>NamespaceKey</td>
+<td>uuid, namespace, name, version. UNIQUE index on (namespace, name), which also serves the per-namespace listing</td>
+</tr>
+<tr>
 <td><code>artifacts</code></td>
 <td>Artifact</td>
 <td>uuid, artifact_type, source_url, name, namespace, version</td>
@@ -12141,7 +12146,12 @@ dedicated attribute tables:</p>
 <tr>
 <td><code>namespace_attributes</code></td>
 <td>Namespace</td>
-<td>name, keys (JSON), trust (JSON)</td>
+<td>name, keys (JSON), trust (JSON). Keys live in <code>namespace_keys</code> / <code>namespace_key_attributes</code> since the v2 <code>namespace_keys</code> migration; the legacy <code>keys</code> JSON column is left in place until a later schema bump drops it</td>
+</tr>
+<tr>
+<td><code>namespace_key_attributes</code></td>
+<td>NamespaceKey</td>
+<td>uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict)</td>
 </tr>
 <tr>
 <td><code>artifact_attributes</code></td>
@@ -12186,6 +12196,28 @@ read-modify-write cycles are reserved for row creation and schema
 upgrades: with concurrent writers on different nodes, an unmasked write
 pushes a stale snapshot of the other columns over any update committed
 since the writer read the row (a cross-attribute lost update).</p>
+<p>Namespace keys used to be anonymous entries inside that row's <code>keys</code>
+JSON dict. They are now objects in their own right, so that a key can
+carry an expiry, be listed, reaped, and (in a later release) scoped.
+The static row is one per key, and the hash and nonce live in the
+attribute row because rotating a key replaces both.</p>
+<p>Version 2 of <code>namespace_keys</code> is a one-shot data migration rather than
+a schema change: <code>sf-ctl ensure-mariadb-schema</code> reads every
+<code>namespace_attributes.keys</code> blob and fans each <code>nonced_keys</code> entry out
+into a static row, an attribute row, and an <code>object_states</code> row in
+state <code>created</code>. Hashes, nonces and expiries are copied verbatim, so
+tokens issued before the upgrade keep working; scopes and provenance
+are NULL. Expired keys are migrated too and removed by the reaper on
+its next pass. The migration is idempotent — keys which already have a
+row are skipped — so it is safe to re-run.</p>
+<p>The legacy JSON column is deliberately left untouched by the
+migration, exactly as the <code>node_daemon_states</code> migration left
+<code>node_attributes.daemon_states</code> in place. One consequence is worth
+knowing before an upgrade: <strong>rolling back to a pre-upgrade release
+revives the JSON column</strong>, which still holds every key that existed
+before the migration, but keys created or rotated after the migration
+exist only in the new tables and will be invisible to the rolled-back
+code.</p>
 <h4 id="node-identity-and-uuid-persistence">Node Identity and UUID Persistence<a class="headerlink" href="#node-identity-and-uuid-persistence" title="Permanent link">&para;</a></h4>
 <p>Each node in the cluster is assigned a real UUID (UUID version 4) when it
 first registers with the cluster. Previously, nodes used their FQDN as a

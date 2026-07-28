@@ -10,13 +10,9 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/user_guide/objects/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-auth-federation/">
       
       
-        <link rel="prev" href="../events/">
-      
-      
-        <link rel="next" href="../metadata/">
       
       
         
@@ -27,7 +23,7 @@
     
     
       
-        <title>Objects - Shaken Fist</title>
+        <title>Workload identity federation and first-class namespace keys - Shaken Fist</title>
       
     
     
@@ -101,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#objects" class="md-skip">
+        <a href="#workload-identity-federation-and-first-class-namespace-keys" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Objects
+              Workload identity federation and first-class namespace keys
             
           </span>
         </div>
@@ -8399,20 +8395,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
@@ -8433,7 +8427,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -8451,7 +8445,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
+      <a href="../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -8479,7 +8473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication/" class="md-nav__link">
+      <a href="../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -8507,7 +8501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ansible/" class="md-nav__link">
+      <a href="../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -8535,7 +8529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../artifacts/" class="md-nav__link">
+      <a href="../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -8563,7 +8557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../affinity/" class="md-nav__link">
+      <a href="../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -8591,7 +8585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../consoles/" class="md-nav__link">
+      <a href="../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -8619,7 +8613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../events/" class="md-nav__link">
+      <a href="../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -8644,19 +8638,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -8672,7 +8657,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -8685,7 +8669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../metadata/" class="md-nav__link">
+      <a href="../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -9520,7 +9504,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -9548,7 +9532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -9576,7 +9560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -10126,6 +10110,302 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Situation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#relationship-to-the-oidc-authentication-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to the OIDC authentication plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-principles-from-the-design-discussion-2026-07-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design principles (from the design discussion, 2026-07-14)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission and problem statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-terminology-and-glossary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Terminology and glossary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-namespace-keys-as-first-class-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Namespace keys as first-class objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-federated-exchange-and-scope-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Federated exchange and scope enforcement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-authentication-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Authentication documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-oidc-plan-refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: OIDC plan refresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-6-secrets-that-cannot-be-logged-by-accident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Secrets that cannot be logged by accident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-7-recognisable-secrets-and-leak-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 7: Recognisable secrets and leak detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent guidance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execution-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#planning-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Planning effort
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#management-session-review-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Management session review checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration-and-logistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration and logistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration and logistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs fixed during this work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation-index-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation index maintenance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -10145,27 +10425,922 @@
   
 
 
-<h1 id="objects">Objects<a class="headerlink" href="#objects" title="Permanent link">&para;</a></h1>
-<p>Everything that you interact with in Shaken Fist is an object. Objects are
-almost always referred to by a UUID (specifically a version 4 UUID) as a
-string. The exceptions are: <code>node</code>s; <code>namespace</code>s; and <code>key</code>s within a namespace.</p>
-<p>Terms used here are defined in the <a href="../../glossary/">glossary</a>.</p>
-<p>In general an object is referred to in the API or on the command line "by
-reference", which means you can either pass the object's name or its UUID to the
-command. So for example if we had an instance with the UUID
-0a38d51e-2f72-4848-80fb-03031978633b named "mikal", then we could run either of
-the commands below to the same effect:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sf-client instance show 0a38d51e-2f72-4848-80fb-03031978633b
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sf-client instance show mikal
-</code></pre></div>
-<p>In the case where you refer to an object by name, a lookup occurs of all
-objects visible to you (those in your namespace, and namespaces that trust
-your namespace). Additionally, shared artifacts are included if you're using
-an artifact command.</p>
-<p>It is possible that the name you're using isn't unique. For example there might
-be two instances named "mikal" with different UUIDs. In that case, you will get
-an error indicating that there was more than one object which matched, and you'll
-need to use a UUID to refer to the object.</p>
+<h1 id="workload-identity-federation-and-first-class-namespace-keys">Workload identity federation and first-class namespace keys<a class="headerlink" href="#workload-identity-federation-and-first-class-namespace-keys" title="Permanent link">&para;</a></h1>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before responding to questions or discussion points in this
+document, explore the shakenfist codebase thoroughly. Read
+relevant source files, understand existing patterns (object
+lifecycle, state machines, MariaDB storage via the three-layer
+direct/gRPC/public pattern, Pydantic schemas, daemon
+architecture, operation queue system, event logging), and
+ground your answers in what the code actually does today. Do
+not speculate about the codebase when you could read it
+instead. Where a question touches on external concepts (OIDC
+workload identity, JWT validation, JWKS rotation, GitHub
+Actions OIDC claims, Authentik/Keycloak <code>client_credentials</code>
+service accounts), research as needed to give a confident
+answer. Flag any uncertainty explicitly rather than guessing.</p>
+<p>All planning documents should go into <code>docs/plans/</code>.</p>
+<p>Consult <code>ARCHITECTURE.md</code> for the system architecture
+overview, object types, and daemon structure. Consult
+<code>CLAUDE.md</code> for build commands, project conventions, and
+database access patterns. Consult <code>GOALS.md</code> for current
+development priorities. Key references inside the repo for
+this plan:</p>
+<ul>
+<li><code>shakenfist/external_api/auth.py</code> — the <code>/auth</code> endpoint
+  and namespace/key CRUD endpoints.</li>
+<li><code>shakenfist/external_api/base.py</code> — <code>verify_token</code>,
+  <code>caller_is_admin</code>, and the nonce re-verification against
+  the minting key.</li>
+<li><code>shakenfist/util/access_tokens.py</code> — JWT mint/parse
+  helpers on <code>flask_jwt_extended</code>; identity is
+  <code>&lt;namespace uuid&gt;:&lt;keyname&gt;</code>.</li>
+<li><code>shakenfist/namespace.py</code> — the <code>Namespace</code> DBO,
+  <code>add_key</code>/<code>remove_key</code>, the read-time expiry filter on
+  <code>keys</code>, and the trust model.</li>
+<li><code>shakenfist/schema/namespace_attributes.py</code> — the <code>keys</code>
+  (nonced dict) and <code>trust</code> JSON columns.</li>
+<li><code>shakenfist/daemons/cleaner/</code> — the housekeeping daemon
+  that will gain key reaping.</li>
+<li><code>docs/{developer,operator,user}_guide/authentication.md</code>
+  — the current authentication documentation surface.</li>
+<li><code>docs/plans/PLAN-oidc-authentication.md</code> — the sibling
+  (stub) plan for <em>human</em> OIDC login. This plan is the
+  machine/workload half; see "Relationship to the OIDC
+  authentication plan" below.</li>
+</ul>
+<p>When we get to detailed planning, the convention is a
+separate plan file per detailed phase, named
+<code>PLAN-auth-federation-phase-NN-descriptive.md</code> in the same
+directory, tracked in the Execution table below.</p>
+<p>I prefer one commit per logical change, and at minimum one
+commit per phase. Do not batch unrelated changes into a
+single commit. Each commit should be self-contained: it
+should build, pass tests, and have a clear commit message
+explaining what changed and why.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>Shaken Fist authenticates callers with namespace-scoped keys:
+bcrypt-hashed entries in the <code>nonced_keys</code> dict of the
+<code>namespace_attributes.keys</code> JSON column. <code>/auth</code> walks the
+namespace's keys, bcrypt-compares the presented secret, and
+mints a JWT whose identity is <code>&lt;namespace uuid&gt;:&lt;keyname&gt;</code>
+and which carries the key's <code>nonce</code> as a claim
+(<code>util/access_tokens.py</code>). On every request, <code>verify_token</code>
+re-looks-up the minting key and rejects tokens whose nonce no
+longer matches (<code>external_api/base.py</code>), so deleting or
+rotating a key immediately invalidates all outstanding
+tokens minted from it.</p>
+<p>Facts about the current implementation that shape this plan:</p>
+<ul>
+<li><strong>Key expiry half-exists.</strong> <code>Namespace.add_key()</code> accepts
+  an optional <code>expiry</code>, and the <code>keys</code> accessor filters
+  expired entries at read time (<code>namespace.py</code>). Because
+  both <code>/auth</code> and <code>verify_token</code> read through that
+  accessor, an expired key can neither mint new tokens nor
+  validate outstanding ones — expiry is enforced exactly, at
+  use time. But expired entries are only <em>hidden</em>, never
+  deleted from storage, and expiry is not surfaced through
+  the API or <code>sf-client</code>.</li>
+<li><strong>Keys are not objects.</strong> They are anonymous dict entries:
+  no per-key events, no soft-delete lifecycle, no attributes
+  beyond hash/nonce/expiry, no place to hang scopes or
+  provenance.</li>
+<li><strong>Tokens are all-powerful within their namespace.</strong> There
+  is no notion of a token (or key) that may only touch, say,
+  blobs and artifacts.</li>
+<li><strong>Minted JWTs are logged into the event stream.</strong>
+  <code>create_token()</code> writes the entire token into a namespace
+  audit event (<code>util/access_tokens.py</code>). Events are
+  namespace-scoped, but this pattern must not be repeated
+  for federated key material, and is worth revisiting.</li>
+</ul>
+<p>The motivating use case is CI caching: ephemeral GitHub
+Actions runners (created by a CI conductor that cannot know
+at provision time which repository's job will land on a
+runner) need scoped, short-lived access to per-repository
+cache namespaces on a Shaken Fist cluster. GitHub Actions
+mints an OIDC identity token per job whose claims
+(<code>repository</code>, <code>ref</code>, <code>event_name</code>, <code>job_workflow_ref</code>)
+cryptographically identify the workload — but only at job
+runtime, on the runner itself. The clean design is therefore
+an <em>exchange</em>: the workflow presents the GitHub-signed JWT to
+Shaken Fist, which validates it against a trusted-issuer
+configuration and mints a <strong>namespace key</strong> with a defined
+expiry and a defined set of permitted operations. The caller
+then uses that key exactly as any <code>sf-client</code> user does
+today, including automatic token re-mint mid-job. The nonce
+mechanism gives revocation of derived tokens for free when
+the key expires or is deleted.</p>
+<p>Nothing in the exchange design is GitHub-specific: the same
+trusted-issuer + claim-mapping machinery must accommodate a
+future Authentik/Keycloak issuer (e.g. <code>client_credentials</code>
+service accounts) with only configuration.</p>
+<h3 id="relationship-to-the-oidc-authentication-plan">Relationship to the OIDC authentication plan<a class="headerlink" href="#relationship-to-the-oidc-authentication-plan" title="Permanent link">&para;</a></h3>
+<p><code>PLAN-oidc-authentication.md</code> (stub) covers <em>humans</em> logging
+in with corporate identity, where IdP-issued JWTs are used
+directly as bearer tokens and namespace access is derived
+from group claims. This plan covers <em>workloads</em> exchanging an
+IdP-issued JWT for a scoped namespace key. They share
+infrastructure this plan builds first: trusted-issuer
+configuration, JWKS fetch/cache/rotation, and JWT signature +
+claim validation. They differ after validation: this plan
+mints a key; the human plan authorises requests directly off
+the external token. Phase 2 here (keys as first-class
+objects) is also the groundwork for that plan's
+"service-account token" re-framing of namespace keys (its
+open question 11). Decisions here should be taken with that
+plan on the desk; phase 5 of this plan exists to rewrite
+that stub against whatever phases 1–4 actually build.</p>
+<h3 id="design-principles-from-the-design-discussion-2026-07-14">Design principles (from the design discussion, 2026-07-14)<a class="headerlink" href="#design-principles-from-the-design-discussion-2026-07-14" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Attribute-based issuance, scope-based
+   enforcement.</strong> All policy intelligence — evaluating the
+   external token's claims against a mapping rule — runs
+   once, at the exchange endpoint. What comes out is a key
+   (and, derived from it, tokens) carrying a dumb, explicit
+   list of permitted operations. Per-request enforcement is
+   set membership against an endpoint tag, not attribute
+   evaluation. No policy engine in the hot path.</li>
+<li><strong>The exchange yields a key, not a token.</strong> A
+   <code>(namespace, key)</code> pair is the credential shape every
+   existing consumer understands, including the client's
+   automatic re-auth when a token expires mid-job; and the
+   existing nonce mechanism means key expiry/deletion
+   revokes all derived tokens immediately.</li>
+<li><strong>Issuer-generic by construction.</strong> Trusted issuers and
+   mapping rules are data, not code. GitHub Actions is the
+   first issuer; an Authentik or Keycloak issuer must be
+   addable without a code change.</li>
+<li><strong>Fail closed for scoped credentials.</strong> Tokens minted
+   from a scoped key are default-deny on any endpoint not
+   yet tagged with a required operation. Tokens minted from
+   traditional (unscoped) keys carry an implicit wildcard,
+   so existing deployments are unaffected.</li>
+<li><strong>Never log secret material.</strong> The exchange logs key
+   <em>name</em>, scopes, expiry, and the inbound claims that
+   satisfied the rule — never the key itself. The existing
+   token-in-event behaviour of <code>create_token()</code> is
+   revisited in phase 2.</li>
+<li><strong>Check-at-use is the enforcement; the cleaner is
+   hygiene.</strong> Expiry is already enforced exactly at use
+   time via the filtered accessor. The cleaner daemon's new
+   reaping loop exists to garbage-collect dead entries and
+   emit lifecycle events, and nothing about security may
+   depend on its cadence.</li>
+</ol>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Give Shaken Fist a first-class, auditable model for
+credential issuance and scoping, so that an external
+workload identity (initially a GitHub Actions job) can be
+exchanged for a time-bounded, operation-scoped namespace
+key without any party having to hold a long-lived secret on
+the workload's behalf. Along the way, promote namespace keys
+from anonymous dict entries to first-class objects, pin down
+the project's authentication vocabulary, and document the
+result for operators and users.</p>
+<p>Explicitly deferred: the CI conductor's adoption of the
+exchange (provisioning cache namespaces, the save/restore
+actions in <code>shakenfist/actions</code>, ref-scoped cache-poisoning
+rules). That work follows in its own plan once this
+groundwork exists, and lives mostly outside this repository.</p>
+<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Scope vocabulary.</strong> Three candidate shapes were
+   discussed:</li>
+<li><em>Hand-defined intent verbs</em> — coarse
+     <code>resource-family.verb</code> strings (<code>blob.read</code>,
+     <code>artifact.write</code>). Readable policy language, but every
+     endpoint must be hand-tagged, which creates the
+     coverage long-tail in open question 2.</li>
+<li><em>Object name + REST verb</em> (<code>instance.get</code>,
+     <code>artifact.post</code>) — mechanically derivable from the
+     resource class and HTTP method, so coverage is
+     automatically complete. But HTTP verbs are
+     implementation vocabulary, not policy vocabulary
+     (operators should not need to know whether an upload
+     is POST or PUT to reason about a rule); POSTed
+     sub-resource actions conflate (<code>instance.post</code> is both
+     "create" and "reboot"); and capability strings become
+     coupled to routing, so a REST refactor (e.g. the
+     artifact UX rework) silently churns or widens
+     long-lived mapping rules.</li>
+<li><em>Hybrid (current lean)</em> — intent verbs, mechanically
+     derived: GET/HEAD → <code>.read</code>, POST/PUT/PATCH →
+     <code>.write</code>, DELETE → <code>.delete</code>, with an explicit
+     per-endpoint override where the derivation misleads
+     (e.g. sub-resource power actions stay
+     <code>instance.write</code>, or gain a named <code>instance.power</code> if
+     they ever need separating). Keeps automatic coverage,
+     a three-verb operator vocabulary, and insulation from
+     route changes.
+   Implementation sketch for the hybrid: flask-restful
+   resource methods are literally named after the HTTP
+   verb, so the verb derives from the method name and the
+   object family from the resource class (a class
+   attribute where the class name is unhelpful).
+   Enforcement itself lives on the already-universal
+   <code>verify_token</code> path, so derivation-based checking
+   applies to every authenticated endpoint without anyone
+   remembering to decorate; a lightweight decorator taking
+   keyword arguments with these derived defaults (e.g.
+   <code>@scope(verb='power')</code>) exists purely to <em>annotate</em>
+   overrides at the decoration site, where they are
+   greppable and visible in review. The override audit in
+   open question 2 is then one grep.
+   Phase 3 must publish the chosen vocabulary, the
+   derivation rule, and the rule for growing it. If the
+   hybrid is chosen, open question 2 largely dissolves.
+   Decided (2026-07-15, forced by the phase 1 terminology
+   survey): the noun is <strong>scope</strong>, not "capability" —
+   <code>check_capability</code> already names the client's
+   feature-probe mechanism, and reusing the word would put
+   two meanings in the same CLI surface. The vocabulary
+   <em>shape</em> (hybrid derivation) remains open.</li>
+<li><strong>Endpoint tagging coverage.</strong> Phase 3 tags at minimum
+   the blob and artifact endpoints (the CI cache needs).
+   Untagged endpoints are default-deny for scoped tokens.
+   Do we accept a long tail of untagged endpoints, or drive
+   to full coverage within the phase? Note this question
+   only exists in its hard form under hand-tagging; the
+   hybrid derivation in open question 1 makes coverage
+   automatic, reducing this to auditing the override list.</li>
+<li><strong>Ownership model for mapping rules.</strong> Current lean
+   (from design discussion): split the concept in two.
+   <em>Trusted issuers</em> (issuer URL, JWKS, audience) are
+   cluster-level, system-owned objects — "who may vouch
+   for identities here" is an admin decision. <em>Mapping
+   rules</em> (bound claims → scopes, TTL, key template) are
+   owned by the namespace they target, like instances and
+   networks, because a rule is a standing, claim-gated
+   authorization to mint keys in that namespace — the same
+   privilege class as <code>add-key</code>, gated the same way
+   (namespace ownership, or admin). Rules reference their
+   issuer; minted keys reference their rule in provenance;
+   so the full chain issuer ← rule ← key ← token is
+   object-modelled. Consequences: rules are deleted with
+   their namespace; "who can get into this namespace" is
+   answered by listing its rules (the inbound sibling of
+   the trust list); the exchange request names its target
+   (<code>{identity token, namespace, rule name}</code>), so matching
+   is one lookup plus one claim check with no
+   cross-namespace rule enumeration; a workflow needing
+   two namespaces exchanges its token twice against two
+   rules. Deliberately given up: templated namespace
+   auto-creation (<code>gh-{repository-name}</code>) — there is no
+   namespace yet to own such a rule, and pre-creating
+   namespace + rule per repository belongs to the
+   orchestration layer (the CI conductor) rather than the
+   platform. To resolve in the phase 3 plan: whether
+   multiple rules per namespace may bind the same issuer,
+   and what rule mutation means for keys already minted
+   from it (lean: nothing — keys stand alone once minted,
+   with provenance recording the rule as it was).</li>
+<li><strong>Exchange endpoint abuse resistance.</strong> The exchange is
+   necessarily reachable without an SF credential (its
+   authentication <em>is</em> the external JWT). It must be cheap
+   to reject garbage: issuer allowlist check before JWKS
+   fetch, JWKS cached with sane TTL and single-flight
+   refetch on unknown <code>kid</code>, per-source rate limiting, and
+   strict maximum token size. How much of this is v1?</li>
+<li><strong>Key visibility and naming.</strong> With phase 2, keys are
+   first-class objects owned by their namespace, so
+   provenance, expiry, and scopes are queryable attributes
+   — a federated key is distinguished by its rule
+   reference, not by smuggling metadata into its name, and
+   "show me every key rule X minted" is an ordinary
+   filtered listing. What actually remains open:</li>
+<li>Collision handling for rule-minted names: the rule's
+     key-name template (e.g. incorporating the workflow
+     run id) can collide on re-runs of the same run — does
+     the exchange refuse, replace, or suffix?</li>
+<li>How much the legacy <code>key_names</code> API shape exposes:
+     it must keep returning names for existing clients,
+     but does it include federated keys (lean: yes — they
+     are real keys, and hiding them from the legacy view
+     makes audits lie), with richer detail reserved for
+     the new object listing?</li>
+<li>Whether a light naming convention is still worth
+     having purely for human scanning of mixed listings
+     (lean: let the rule's template decide; no enforced
+     prefix).</li>
+<li><strong>JWT lifetime vs key lifetime.</strong> The nonce check
+   already invalidates derived tokens the moment the key
+   expires, so capping <code>expires_delta</code> at the key's
+   remaining lifetime is cosmetic. Do it anyway for
+   clarity, or leave mint-time duration alone?</li>
+<li><strong>Migration mechanics for key storage.</strong> The decision
+   to make keys first-class namespace-owned objects (with
+   rule references, provenance, per-key events, cleaner
+   reaping, and filtered listings) effectively forecloses
+   wrapping object semantics around the existing
+   <code>namespace_attributes.keys</code> JSON column: real
+   relationships and SQL-level filtering want a real table
+   with a Pydantic schema, per the codebase's standard
+   object shape and the BYO-MariaDB direction. What
+   remains open is the transition:</li>
+<li>Migration path for existing <code>nonced_keys</code> entries
+     (bcrypt hashes and nonces copy verbatim; no expiry,
+     wildcard scope): one-shot migration at upgrade, or a
+     dual-read window where <code>/auth</code> and <code>verify_token</code>
+     consult the table first and fall back to the column?</li>
+<li>Rollback story if the migration must be reversed
+     after new-style keys (with expiry/scopes) exist.</li>
+<li>When the legacy column is retired: immediately after
+     migration, or kept read-only for a deprecation
+     window?</li>
+<li>Hot-path cost: <code>verify_token</code> re-verifies the nonce
+     on every request, so the key lookup moves from an
+     attribute-blob read to an indexed table read —
+     confirm this is neutral-or-better, and decide whether
+     any caching is warranted (with care: a stale cache
+     would delay nonce-based revocation, which is the
+     mechanism's whole point).</li>
+</ol>
+<p><strong>Resolved by phase 2 (2026-07-27).</strong> One-shot migration,
+   no dual-read window. Schema migrations here are
+   operator-driven via <code>sf-ctl ensure-mariadb-schema</code>, and
+   <code>sf-database</code> refuses to start against a stale schema, so
+   there is no window in which old and new code run against
+   the same database and nothing for a dual read to protect.
+   The migration is the v1→v2 step of
+   <code>_ensure_namespace_keys_schema</code>, copying hash, nonce and
+   expiry verbatim with idempotent upserts, and is safe to
+   re-run.</p>
+<p>The legacy <code>namespace_attributes.keys</code> column is left in
+   place but is neither read nor written from phase 2
+   onward. Rollback therefore loses keys created after the
+   migration, while keys that predate it are unaffected —
+   the exposure is one upgrade cycle, it is documented in
+   the operator guide's upgrade notes, and it matches the
+   precedent accepted for <code>node_daemon_states</code>.</p>
+<p>The hot path improved rather than regressed:
+   <code>verify_token</code> previously loaded a namespace's entire
+   attributes row and walked every key in it, and now does a
+   single point read served by the leading column of the
+   <code>(namespace, name)</code> unique index. <code>/auth</code> additionally
+   pushes the expiry filter into SQL, so it no longer
+   bcrypt-compares keys it is going to reject. No caching was
+   added, deliberately: a stale cache would delay nonce-based
+   revocation, and the point read is already cheaper than
+   what it replaced.
+8. <strong>Glossary location.</strong> Resolved by phase 1 (2026-07-15):
+   a single <code>docs/glossary.md</code> at the top level, in the
+   mkdocs navigation after Features, linked from the three
+   authentication guides and <code>objects.md</code>.
+9. <strong><code>system</code> interplay.</strong> Scoped keys in the <code>system</code>
+   namespace would today pass <code>caller_is_admin</code> (it only
+   checks the namespace name). Phase 3 must decide whether
+   admin endpoints also require a scope (e.g.
+   <code>admin.*</code>) so a scoped system-namespace key cannot
+   escalate. Related to the sibling plan's open question 5.
+10. <strong>Opt-out rather than opt-in enforcement.</strong> The
+    "must remember to decorate" problem predates this plan:
+    <code>verify_token</code> itself is applied by hand per method,
+    so a forgotten decorator is a silently open endpoint.
+    Inverting this flips the failure mode from fail-open to
+    fail-closed: apply authentication and derived
+    scope enforcement universally (either via
+    <code>method_decorators</code> on the shared <code>api_base.Resource</code>
+    base — class-level decorators run outermost, so auth
+    correctly precedes the per-method ownership checks — or
+    via an app-wide <code>before_request</code> hook), with a small
+    explicit <code>@public</code> annotation for the genuinely
+    unauthenticated endpoints (<code>/auth</code> POST, the federated
+    exchange, the health probes already special-cased in
+    <code>HEALTH_PROBE_PATHS</code>). The audit then inverts from
+    "did every endpoint remember auth?" to "is every
+    <code>@public</code> justified?", and a custom pre-commit check
+    (precedent: the <code>from_db_by_ref</code> scoping hook) can
+    backstop the pattern. Semantic decorators
+    (<code>caller_is_admin</code>, <code>requires_namespace_ownership</code>)
+    remain opt-in — they are per-endpoint policy, not
+    defaults. Phase 3 should decide whether this inversion
+    is in scope or a fast-follow refactor.
+11. <strong>Scopes must compose with trust.</strong> Namespace trust
+    grants cross-namespace visibility, and the deferred CI
+    conductor design leans on it (a PR-scratch namespace
+    with read-trust on the per-repo cache namespace). A
+    scoped key's scopes must follow it across the
+    trust boundary — <code>blob.read</code> means "may read blobs it
+    can see", wherever trust makes them visible, and a
+    scoped token must never gain wildcard behaviour just
+    because the object it touches lives in a trusting
+    namespace. Phase 3 needs a test asserting exactly
+    this, or trust becomes a scope-escape hatch.</p>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Plan</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Terminology and glossary</td>
+<td><a href="../PLAN-auth-federation-phase-01-glossary/">PLAN-auth-federation-phase-01-glossary.md</a></td>
+<td>Complete</td>
+</tr>
+<tr>
+<td>2. Namespace keys as first-class objects</td>
+<td><a href="../PLAN-auth-federation-phase-02-key-objects/">PLAN-auth-federation-phase-02-key-objects.md</a></td>
+<td>Complete</td>
+</tr>
+<tr>
+<td>3. Federated exchange and scope enforcement</td>
+<td>PLAN-auth-federation-phase-03-exchange.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>4. Authentication documentation</td>
+<td>PLAN-auth-federation-phase-04-docs.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>5. OIDC plan refresh</td>
+<td>PLAN-auth-federation-phase-05-oidc-plan-refresh.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>6. Secrets that cannot be logged by accident</td>
+<td>PLAN-auth-federation-phase-06-secret-types.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>7. Recognisable secrets and leak detection</td>
+<td>PLAN-auth-federation-phase-07-secret-format.md</td>
+<td>Not started</td>
+</tr>
+</tbody>
+</table>
+<p>Phase plans for phases 3–7 have not been drafted yet; the
+open questions above should be resolved (or explicitly
+carried into the relevant phase plan) before each phase is
+cut.</p>
+<p>Phases 6 and 7 came out of phase 2's step 2g, which removed
+five separate sites that wrote credentials into audit
+events. Four were known when the phase was planned; the
+fifth was found only because the tests asserted the secret
+appeared <em>nowhere</em> in any event rather than checking the
+named field was gone. Two rounds of the same bug in one
+phase is the argument for both: phase 6 makes the mistake
+hard to make, phase 7 makes it detectable when it is made
+anyway.</p>
+<p>Neither blocks phases 3–5, with one ordering preference:
+<strong>phase 7's secret format should be settled before phase 3
+mints its first exchange key</strong>, or keys minted in between
+will not match the scanners. If phase 3 runs first it should
+adopt the format itself rather than defer it.</p>
+<h3 id="phase-1-terminology-and-glossary">Phase 1: Terminology and glossary<a class="headerlink" href="#phase-1-terminology-and-glossary" title="Permanent link">&para;</a></h3>
+<p>Nail down the vocabulary this plan (and the sibling OIDC
+plan) needs, and fold in other overloaded terms the codebase
+already uses. Deliverable: a glossary page in <code>docs/</code>,
+linked from the three authentication guides and registered
+in the docs navigation.</p>
+<p>Authentication terms to pin (from the design discussion):</p>
+<ul>
+<li><strong>identity token</strong> — an externally-issued JWT proving
+  workload or user identity (e.g. GitHub Actions OIDC
+  token, Authentik-issued token).</li>
+<li><strong>trusted issuer</strong> — an external token issuer the cluster
+  is configured to accept, with its JWKS location and
+  expected audience.</li>
+<li><strong>mapping rule</strong> — a first-class object, owned by the
+  namespace it targets, that is a standing claim-gated
+  authorization to mint keys there: a trusted-issuer
+  reference, bound claims, scopes, expiry.</li>
+<li><strong>namespace key</strong> — the stored credential (bcrypt hash +
+  nonce, now optionally expiry, scopes, provenance) from
+  which access tokens are minted.</li>
+<li><strong>access token</strong> — a Shaken Fist-issued JWT, minted from
+  a namespace key via <code>/auth</code>, nonce-bound to that key.</li>
+<li><strong>scope</strong> — a <code>resource-family.verb</code> string naming an
+  operation class a key (and its tokens) may perform. Not
+  "capability": that word already names the client's
+  server-feature-probe mechanism (<code>check_capability</code>).</li>
+<li><strong>nonce</strong> — the per-key value embedded in derived tokens
+  and re-verified on every request; the revocation
+  mechanism.</li>
+<li><strong>trust</strong> — the existing namespace-to-namespace
+  visibility grant (unchanged by this plan, but must be
+  defined to stop it being confused with issuer trust).</li>
+</ul>
+<p>Candidate non-auth terms to sweep for and define in the same
+pass (the artifact/blob/label cluster is already the subject
+of <code>PLAN-artifact-ux-rework.md</code> and should be defined
+consistently with it): artifact, blob, label, upload,
+snapshot, namespace, instance, node roles, agent operation,
+side channel, DBO/state machine states. The phase plan
+should include a deliberate sweep for others rather than
+assuming this list is complete.</p>
+<h3 id="phase-2-namespace-keys-as-first-class-objects">Phase 2: Namespace keys as first-class objects<a class="headerlink" href="#phase-2-namespace-keys-as-first-class-objects" title="Permanent link">&para;</a></h3>
+<p>Promote keys from <code>nonced_keys</code> dict entries to
+<code>DatabaseBackedObject</code>s with the standard lifecycle:</p>
+<ul>
+<li>Attributes: key name, bcrypt hash, nonce, optional
+  expiry, scopes (default wildcard), provenance (a mapping
+  rule reference plus the satisfied claims, for
+  exchange-minted keys; empty for operator-created ones),
+  owning namespace.</li>
+<li>Per-key audit events (created, used-for-mint (sampled or
+  rate-limited if noisy), expired, soft-deleted).</li>
+<li>Soft delete via the standard state machine; the cleaner
+  daemon gains a loop that soft-deletes expired keys and
+  hard-deletes long-soft-deleted ones. Enforcement remains
+  the read-time filter — the cleaner is hygiene only.</li>
+<li>Expiry surfaced through the API and
+  <code>sf-client namespace add-key --expiry ...</code>; key listings
+  gain expiry/scope/provenance columns.</li>
+<li>Preserve exact <code>/auth</code> and <code>verify_token</code> semantics,
+  including the nonce mechanism, and the <code>key_names</code> API
+  shape for existing clients.</li>
+<li>Keys move to their own table with a Pydantic schema (the
+  standard object shape; enables the rule/provenance
+  references and SQL-level filtered listings). Existing
+  <code>nonced_keys</code> entries migrate with no expiry and
+  wildcard scope; transition mechanics per open question
+  7.</li>
+<li>Stop writing minted JWTs into audit events; log token
+  metadata (keyname, expiry, jti if we add one) instead.</li>
+</ul>
+<h3 id="phase-3-federated-exchange-and-scope-enforcement">Phase 3: Federated exchange and scope enforcement<a class="headerlink" href="#phase-3-federated-exchange-and-scope-enforcement" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Trusted issuer objects</strong> (admin-managed, system
+  namespace only): issuer URL, JWKS endpoint/caching,
+  audience. "Who may vouch for identities on this cluster"
+  is a cluster-level decision.</li>
+<li><strong>Mapping rule objects</strong>, owned by the namespace they
+  target (creation gated like <code>add-key</code>: namespace
+  ownership or admin): a reference to a trusted issuer,
+  bound claims (e.g. <code>repository_owner</code>, <code>repository</code>,
+  <code>ref</code>), scopes, key TTL, key-name template. A rule is a
+  standing, claim-gated authorization to mint keys in its
+  owning namespace; see open question 3 for the ownership
+  rationale. The phase plan must define claim-matching
+  semantics precisely: exact values and enumerated
+  alternatives first, anchored patterns only with explicit
+  justification — permissive pattern-matching on bound
+  claims is the classic OIDC-federation vulnerability, and
+  a sloppy pattern silently widens a rule. CRUD APIs plus
+  <code>sf-client federation ...</code> commands.</li>
+<li><strong>Exchange endpoint</strong> (e.g. <code>POST /auth/federated</code>):
+  request names its target — <code>{identity token, namespace,
+  rule name}</code>. Validates the presented identity token
+  (signature via cached JWKS, <code>iss</code> matching the rule's
+  issuer, <code>aud</code>, <code>exp</code>), checks the rule's bound claims,
+  mints a scoped expiring key in the owning namespace, and
+  returns <code>(namespace, key name, key)</code>. The key's
+  provenance records the rule and the satisfied claims.
+  Successful exchanges write an audit event carrying the
+  satisfied claims — never the secret. Failed exchanges
+  are audited too, against the rule's owning namespace: a
+  stream of near-miss claim failures is what probing looks
+  like, and the namespace owner is the party who needs to
+  see it.</li>
+<li><strong>Scope enforcement</strong>: scopes copied from key into
+  token claims at mint; enforcement lives on the universal
+  <code>verify_token</code> path with scopes derived per the open
+  question 1 hybrid, and a lightweight annotation
+  decorator for per-endpoint overrides; wildcard for
+  tokens minted from unscoped legacy keys; default-deny
+  for scoped tokens wherever derivation is impossible.
+  The open-question-9 decision about admin endpoints and
+  the open-question-10 decision about opt-out inversion
+  land here.</li>
+<li><strong>Abuse resistance</strong> per open question 4, including
+  replay: the exchange should be single-use per inbound
+  token <code>jti</code> <em>per rule</em> — repeat exchange of the same
+  token against the same rule is refused, while the
+  legitimate "one token, two rules, two namespaces"
+  pattern still works.</li>
+<li>GitHub Actions is the worked first issuer; the phase
+  plan must demonstrate (at design level) an Authentik
+  <code>client_credentials</code> rule differing only in
+  configuration.</li>
+</ul>
+<h3 id="phase-4-authentication-documentation">Phase 4: Authentication documentation<a class="headerlink" href="#phase-4-authentication-documentation" title="Permanent link">&para;</a></h3>
+<p>Update <code>docs/{developer,operator,user}_guide/authentication.md</code>
+and cross-link the glossary:</p>
+<ul>
+<li>Developer guide: key objects, nonce revocation, scope
+  enforcement, the exchange flow, how issuance and
+  enforcement split.</li>
+<li>Operator guide: configuring trusted issuers and mapping
+  rules, worked GitHub Actions example (a generic
+  "grant a repository's workflows scoped access to a
+  namespace" recipe — written against public GitHub
+  Actions concepts only, not the private CI conductor's
+  internals), key lifecycle and reaping.</li>
+<li>User guide: what a federated key is, how expiry and
+  scopes surface in <code>sf-client</code>.</li>
+</ul>
+<p>The GitHub example must stand alone for any reader running
+their own runners; nothing in <code>docs/</code> should describe or
+depend on the private CI conductor implementation.</p>
+<h3 id="phase-5-oidc-plan-refresh">Phase 5: OIDC plan refresh<a class="headerlink" href="#phase-5-oidc-plan-refresh" title="Permanent link">&para;</a></h3>
+<p>Rewrite <code>PLAN-oidc-authentication.md</code> (the human-login
+sibling, currently a stub) against the as-built reality of
+phases 1–4, so it plans forward from what exists rather
+than from the pre-federation codebase:</p>
+<ul>
+<li>Its Situation section describes key objects, scopes, the
+  trusted-issuer configuration, and the exchange endpoint
+  as existing infrastructure, with pointers to the
+  glossary's terms.</li>
+<li>Its tentative phases 1–2 (JWT validation refactor; OIDC
+  validator with discovery/JWKS) are marked superseded by
+  this plan's phase 3, and its remaining phases renumbered
+  around what is genuinely left: interactive CLI flows,
+  claim-driven multi-namespace authorisation, admin-as-a-
+  claim, IdP worked examples, and functional testing.</li>
+<li>Its open question 1 (issuer trust model) is recorded as
+  resolved by the trusted-issuer objects; open question 11
+  (service-account rename: UX or schema migration) is
+  re-answered in terms of key objects.</li>
+<li>A new open question is added: whether human login should
+  use IdP tokens directly as bearer credentials
+  per-request (its original design) or exchange them for a
+  short-lived scoped session credential via the phase 3
+  machinery, with the trade-offs (multi-namespace access
+  favours direct-bearer; revocation and a single
+  enforcement path favour exchange) laid out for its own
+  phase 0 decisions pass.</li>
+<li>Anything phases 1–4 shipped that contradicts other text
+  in the stub is corrected, so the two plans never
+  disagree about the codebase.</li>
+</ul>
+<p>This phase is documentation-only and closes the loop the
+"Relationship to the OIDC authentication plan" section
+opens: constraints discovered while building the machine
+half are recorded in the human half's plan, not left in
+commit messages and heads.</p>
+<h3 id="phase-6-secrets-that-cannot-be-logged-by-accident">Phase 6: Secrets that cannot be logged by accident<a class="headerlink" href="#phase-6-secrets-that-cannot-be-logged-by-accident" title="Permanent link">&para;</a></h3>
+<p>Every credential leak step 2g fixed had the same shape:
+<code>extra={'token': token}</code>, with the event layer coercing the
+value to a string on the way out. Nothing in the type system
+objected. The remedy is to make the secret types refuse to
+render themselves.</p>
+<p><code>pydantic.SecretStr</code> already does exactly this — <code>str()</code> and
+<code>repr()</code> of one yield <code>'**********'</code>, and the real value
+comes back only from an explicit <code>.get_secret_value()</code> call.
+The codebase is pydantic throughout, so this is a change of
+field type rather than a new dependency or a new idiom.</p>
+<ul>
+<li><code>NamespaceKeyAttributesData.key</code> and <code>.nonce</code> become
+  <code>SecretStr</code>. So does anything else the sweep below turns
+  up — <code>AUTH_SECRET_SEED</code> in <code>config.py</code> is the obvious
+  other candidate.</li>
+<li><code>schema/sqlalchemy.py</code>'s table generator learns that
+  <code>SecretStr</code> maps to a string column, and the three-layer
+  accessors unwrap on write and re-wrap on read, so the
+  secret is wrapped everywhere above the database boundary.</li>
+<li>Call sites unwrap explicitly at the points that genuinely
+  need the plaintext: the bcrypt comparison in <code>/auth</code>, the
+  nonce comparison in <code>verify_token</code>, and the JWT claim in
+  <code>create_token</code>. Each unwrap is a place a reviewer can look
+  at and ask "should this value be here?", which is the
+  whole point.</li>
+<li>A sweep for other unwrapped secret-carrying fields, and a
+  test that a <code>SecretStr</code> field survives a round trip
+  through the database without being stringified on the way.</li>
+</ul>
+<p>Scope note: this would have caught four of step 2g's five
+sites. It would <em>not</em> have caught the fifth, which logged
+the raw HTTP request body before any model existed — that
+one is structural and stays fixed by the path check in
+<code>external_api/app.py</code>. Type safety and the request-tracing
+redaction are complementary, not alternatives.</p>
+<p>This phase is deliberately independent of the federation
+work and could be done at any time, including by someone
+who is not otherwise following this plan.</p>
+<h3 id="phase-7-recognisable-secrets-and-leak-detection">Phase 7: Recognisable secrets and leak detection<a class="headerlink" href="#phase-7-recognisable-secrets-and-leak-detection" title="Permanent link">&para;</a></h3>
+<p>Phase 6 stops secrets reaching a sink. This phase assumes
+one got out anyway and shortens the time to notice.</p>
+<p>The industry pattern is a structured secret: GitHub's
+<code>ghp_</code>-style prefix plus a CRC32 checksum in the trailing
+characters, mirrored by GitLab's <code>glpat-</code>, Stripe's
+<code>sk_live_</code> and Slack's <code>xoxb-</code>. The prefix makes the secret
+greppable; the checksum lets a scanner reject lookalikes
+without calling an API, which is what makes large-scale
+scanning tolerable. Note that this costs nothing
+cryptographically — a prefix is a label beside a random
+value, not a revealed piece of one, and the entropy of the
+random part is unchanged.</p>
+<ul>
+<li><strong>A format for cluster-minted key secrets</strong>: a short
+  prefix, a high-entropy random body, and a trailing
+  checksum over the two. The exact alphabet and lengths are
+  a phase-plan decision; matching GitHub's shape closely
+  enough that off-the-shelf scanner tooling is easy to
+  configure is worth more than novelty.</li>
+<li><strong>Only for secrets Shaken Fist generates.</strong> Namespace key
+  secrets are operator-supplied today and must stay
+  supported — an operator's chosen string cannot carry our
+  prefix. The format applies to phase 3's exchange-minted
+  keys, and to a new "let the cluster generate one for you"
+  path for operator keys. Access tokens are JWTs and are
+  already recognisable by their <code>eyJ</code> prefix and <code>iss</code>
+  claim, so they need nothing.</li>
+<li><strong>Cheap early rejection</strong>: <code>/auth</code> and <code>sf-client</code> can
+  fail a malformed cluster-minted key on its checksum before
+  spending a bcrypt comparison on it.</li>
+<li><strong>A gitleaks rule</strong> for the format. Shaken Fist has no
+  gitleaks job yet — ryll's <code>supply-chain.yml</code> has the
+  working pattern, including that <code>gitleaks-action@v2</code>
+  refuses to run on org repos without a paid licence so the
+  upstream binary is invoked directly, and that gitleaks is
+  only packaged from Debian 13 onward. Adding the job is
+  part of this phase.</li>
+<li><strong>Log-sink detection, which is the valuable half.</strong> Events
+  go to syslog <em>and</em> to Loki, so a credential written into
+  an event leaves the cluster and lands in log aggregation.
+  A standing Loki query for the secret format across all
+  streams would have caught every one of step 2g's five
+  sites in production, automatically, without anyone
+  thinking to look. A CI scanner only catches a secret
+  someone committed to the repository, which is the less
+  likely accident for a runtime-minted credential. Both are
+  worth having; if only one gets built, build this one.</li>
+</ul>
+<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
+<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
+<p>All implementation work is done by sub-agents, never in the
+management session. The management session is reserved for
+planning, review, and decision-making. The workflow, effort
+levels, model choice guidance, and review checklist follow
+<code>PLAN-TEMPLATE.md</code> exactly; each phase plan carries its own
+step-level table (Step / Effort / Model / Isolation / Brief).</p>
+<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Phase 1 (glossary): <strong>medium</strong> — mostly survey and
+  writing; the auth terms are already settled above.</li>
+<li>Phase 2 (key objects): <strong>high</strong> — storage migration,
+  lifecycle semantics, and strict behaviour-preservation of
+  <code>/auth</code> and <code>verify_token</code> need careful design and strong
+  test coverage before/after.</li>
+<li>Phase 3 (exchange): <strong>high</strong> — security-sensitive
+  surface; JWKS handling, claim binding, and fail-closed
+  enforcement all have sharp edges. Research GitHub's OIDC
+  claim set and Authentik/Keycloak token shapes during
+  planning, not implementation.</li>
+<li>Phase 4 (docs): <strong>medium</strong>, but review at high effort —
+  the "don't reveal the conductor" constraint is a
+  judgement call on every page.</li>
+<li>Phase 5 (OIDC plan refresh): <strong>medium</strong> — documentation
+  only, but it requires accurately summarising what phases
+  1–4 shipped and framing an architectural trade-off
+  (direct-bearer vs exchange-based sessions) fairly for a
+  decision that is deliberately not being made yet.</li>
+</ul>
+<h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
+<p>As per <code>PLAN-TEMPLATE.md</code>, plus for this plan specifically:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No secret material (keys, tokens) is written to
+      events, logs, or fixtures anywhere in the diff.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Scoped-token behaviour is fail-closed on untagged
+      endpoints, proven by a unit test.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Scopes compose with namespace trust — a scoped token
+      touching objects visible via trust keeps its scopes
+      (open question 11), proven by a unit test.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Legacy key/token behaviour is bit-compatible, proven
+      by tests that pre-date the change.</li>
+</ul>
+<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
+<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<p>We will know when this plan has been successfully
+implemented because the following statements will be true:</p>
+<ul>
+<li>A GitHub Actions workflow, holding nothing but its own
+  OIDC token, can exchange it against a configured mapping
+  rule for a namespace key that expires, is scoped to blob
+  and artifact operations, and works with an unmodified
+  <code>sf-client</code>.</li>
+<li>Deleting or expiring that key immediately invalidates
+  tokens minted from it (existing nonce semantics, proven
+  by test).</li>
+<li>An equivalent mapping rule for an Authentik-style issuer
+  requires configuration only — no code change.</li>
+<li>Namespace keys are database-backed objects with events,
+  soft delete, expiry, scopes, and provenance; existing
+  keys and clients are unaffected; expired keys are reaped
+  by the cleaner daemon.</li>
+<li>Scoped tokens are default-deny on untagged endpoints;
+  unscoped (legacy) tokens behave exactly as before.</li>
+<li>Minted secrets no longer appear in audit events, and the
+  secret-carrying types cannot be stringified into one by
+  accident.</li>
+<li>A credential that escapes into syslog or Loki anyway is
+  detectable by a standing query, because cluster-minted
+  secrets carry a recognisable prefix and a verifiable
+  checksum.</li>
+<li>A glossary exists in <code>docs/</code>, is linked from the three
+  authentication guides, and this plan's terms are used
+  consistently across code, CLI help, and docs.</li>
+<li>The code passes <code>pre-commit run --all-files</code> (flake8,
+  stestr unit tests, mypy); new code follows the
+  three-layer database pattern and Pydantic schema
+  conventions; functional coverage exercises the exchange
+  end-to-end in <code>shakenfist/deploy/cluster_ci</code>.</li>
+<li><code>docs/{developer,operator,user}_guide/authentication.md</code>
+  are updated, and describe the feature without reference
+  to the private CI conductor.</li>
+<li><code>ARCHITECTURE.md</code>, <code>README.md</code>, and <code>AGENTS.md</code> are
+  updated for the new object types and endpoints.</li>
+<li><code>PLAN-oidc-authentication.md</code> has been rewritten against
+  the as-built infrastructure: superseded phases marked,
+  resolved open questions recorded, and the direct-bearer
+  versus exchange-based-session question posed for its own
+  phase 0 — the two plans nowhere disagree about the
+  codebase.</li>
+</ul>
+<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>CI conductor integration</strong> (its own plan, in the
+  conductor's repository): pre-create per-repo cache
+  namespaces and mapping rules; ref-scoped scratch
+  namespaces with read-trust on the per-repo namespace to
+  enforce the actions/cache poisoning rule (PR-ref writes
+  never readable by trusted builds); retention/pruning of
+  cache artifacts.</li>
+<li><strong>Cache save/restore actions</strong> in <code>shakenfist/actions</code>:
+  composite actions that request the GitHub OIDC token,
+  exchange it, and tar/untar paths via <code>sf-client</code> blob
+  operations.</li>
+<li><strong>Human OIDC login</strong> — <code>PLAN-oidc-authentication.md</code>
+  proceeds on top of this plan's trusted-issuer and JWT
+  validation infrastructure.</li>
+<li><strong>Publishing the CI conductor</strong> (currently the private
+  <code>private-ci</code> repository, hypothetically as
+  <code>shakenfist/ci-conductor</code>): deliberately <em>not</em> a phase of
+  this plan. Beyond the missing deployment story and
+  authentication the operator already noted, the working
+  tree and git history contain embedded secrets (at
+  minimum, a shared CI SSH private key inside
+  <code>conductor/templates/userdata.yaml.j2</code>), so publication
+  requires credential rotation plus either a history scrub
+  or a fresh-start repository, and its own security review.
+  This plan reduces what the conductor must keep secret
+  (fewer long-lived credentials), which makes eventual
+  publication easier; revisit once the conductor has grown
+  a deployment story.</li>
+<li><strong><code>sf-client namespace add-key --expiry</code></strong>: phase 2 added
+  the <code>expiry</code> body parameter to the key create and update
+  endpoints, but the command line has no flag for it yet,
+  so the REST API or the Python client must be used
+  directly. A client-python change, hence not a phase of
+  this plan.</li>
+<li><strong>Token introspection / jti denylist</strong> if bounded-delay
+  revocation of <em>scoped keys themselves</em> (as opposed to
+  their derived tokens) ever proves insufficient.</li>
+<li><strong>Templated mapping rules</strong> with namespace auto-creation,
+  per open question 3, if per-repo rule sprawl becomes
+  real.</li>
+</ul>
+<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<p>Phase 2:</p>
+<ul>
+<li><strong>Credentials in audit events</strong>, five sites (step 2g).
+  <code>create_token()</code> logged the whole minted JWT and the
+  nonce; <code>log_token_use()</code> logged the presented JWT; both
+  namespace-creation events logged the invoking JWT; the
+  malformed-key event logged the key body, which held the
+  stored hash and the nonce. The fifth site was found while
+  testing the other four: the API request-tracing events in
+  <code>external_api/app.py</code> logged request and response bodies
+  verbatim, so <code>POST /auth</code> recorded the namespace's
+  <em>plaintext</em> key inbound and the minted token outbound.
+  Bodies are no longer logged for any route under <code>/auth</code>.</li>
+<li><strong>Two unreachable bugs in the key update endpoint</strong> (step
+  2e): the membership test ran one dict level too high so
+  every update reported an unknown key, and a namespace name
+  was passed where the <code>Namespace</code> object was expected.
+  Neither was reachable because nothing tested <code>PUT</code>; both
+  are pinned now.</li>
+<li><strong>Swagger examples naming a non-existent <code>key_names</code>
+  field</strong> (step 2e); the field is <code>keys</code>.</li>
+<li><strong>Silent accumulation of expired keys</strong> (step 2f), which
+  previously stayed in the <code>nonced_keys</code> dict forever.</li>
+<li><strong>Stale-hash clobbering in the migration</strong> (step 2d): a
+  blind upsert would have written the JSON column's stale
+  hash over a key rotated since the migration first ran.
+  Caught before it shipped, but it would have silently
+  reverted a rotation.</li>
+</ul>
+<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
+<p>When this plan changes status:</p>
+<ul>
+<li><code>docs/plans/index.md</code> — rows for this plan's phases live
+  in the Plan Status table; keep them current.</li>
+<li><code>docs/plans/order.yml</code> — this master plan is registered;
+  phase files are not.</li>
+</ul>
+<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<p>Before executing any step of this plan, the implementing
+sub-agent must back brief the operator as to its
+understanding of the phase plan and how the work it intends
+to do aligns with that plan.</p>
 
 
 
@@ -10186,7 +11361,7 @@ need to use a UUID to refer to the object.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20user_guide/objects.md&body=%2A%2ASource%20file%3A%2A%2A%20%60user_guide/objects.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/user_guide/objects/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-auth-federation.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-auth-federation.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-auth-federation/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

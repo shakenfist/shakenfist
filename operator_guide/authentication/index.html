@@ -9764,6 +9764,39 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#key-expiry-and-reaping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key expiry and reaping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keys-and-the-event-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys and the event log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#trusts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10181,6 +10214,39 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#key-expiry-and-reaping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key expiry and reaping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keys-and-the-event-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys and the event log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#trusts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10218,6 +10284,60 @@
 <p>For a detailed discussion of how Shaken Fist authentication works, please see
 the discussion in the <a href="/developer_guide/authentication/">developer guide</a>.</p>
 </details>
+<p>Terms used here are defined in the <a href="../../glossary/">glossary</a>.</p>
+<h2 id="key-expiry-and-reaping">Key expiry and reaping<a class="headerlink" href="#key-expiry-and-reaping" title="Permanent link">&para;</a></h2>
+<p>Namespace keys may carry an optional expiry. Expiry is enforced when the key is
+used, so an expired key stops authenticating the instant it lapses -- there is
+no window during which it still works because a cleanup task has not run yet.</p>
+<p>Tidying up expired keys is a separate, purely cosmetic concern. The cluster
+daemon sweeps every fifteen minutes and soft-deletes keys which expired more
+than <code>NAMESPACE_KEY_REAP_GRACE</code> seconds ago; the standard object reaper then
+hard-deletes them once they have been soft-deleted for <code>CLEANER_DELAY</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NAMESPACE_KEY_REAP_GRACE</code></td>
+<td><code>3600</code></td>
+<td>Seconds after expiry before a key is soft-deleted. <code>0</code> disables reaping, retaining expired keys forever.</td>
+</tr>
+</tbody>
+</table>
+<p>The grace period is there so that an operator investigating automation which
+suddenly stopped working can still see the key that lapsed. Lengthen it if you
+want a longer forensic window; set it to <code>0</code> if you would rather expired keys
+were never removed. Neither choice affects security, because enforcement does
+not depend on the sweep having run.</p>
+<h2 id="keys-and-the-event-log">Keys and the event log<a class="headerlink" href="#keys-and-the-event-log" title="Permanent link">&para;</a></h2>
+<p>Credentials are deliberately absent from Shaken Fist's events. This is worth
+knowing about because events are written to syslog <em>and</em> shipped to Loki, so
+anything in an event has left the cluster and is sitting in log aggregation,
+which usually has weaker access control than the credential does.</p>
+<p>Events record the key <em>name</em> that was used, never the key secret, its stored
+hash, its nonce, or any minted or presented token. Separately, the API request
+tracing that records request and response bodies skips bodies entirely for
+routes under <code>/auth</code>, since those carry plaintext key secrets inbound and
+minted tokens outbound. The request URL is still logged, so you keep the
+namespace and the key name.</p>
+<p>If you have log tooling that greps for tokens in Shaken Fist events, it will
+find nothing from these releases onward. That is the intent, not a regression.</p>
+<h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
+<p>Keys used to live in a JSON column on the <code>namespace_attributes</code> table and are
+now first-class objects in their own tables. Migration happens during
+<code>sf-ctl ensure-mariadb-schema</code>, preserving each key's hash, nonce and expiry
+exactly, so tokens minted before the upgrade keep validating and no operator
+action is required.</p>
+<p>The migration is one-way in the usual sense: keys created <em>after</em> the upgrade
+are not written back to the old JSON column, so downgrading to a release that
+predates this change loses them. Keys that existed before the upgrade are
+unaffected either way. The exposure is one upgrade cycle, and it matches the
+precedent set by the <code>node_daemon_states</code> migration.</p>
 <h2 id="trusts">Trusts<a class="headerlink" href="#trusts" title="Permanent link">&para;</a></h2>
 <details class="info" open="open">
 <summary>Info</summary>

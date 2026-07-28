@@ -10490,6 +10490,26 @@ the keys used to authenticate to a namespace.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">[</span><span class="err">&#39;je</span><span class="kc">n</span><span class="err">ki</span><span class="kc">ns</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="kc">ne</span><span class="err">wkey&#39;</span><span class="p">]</span>
 </code></pre></div>
 </details>
+<details class="info" open="open">
+<summary>Key expiry</summary>
+<p>The create (<code>POST</code>) and update (<code>PUT</code>) calls accept an optional <code>expiry</code>
+body parameter, as epoch seconds. A key with no expiry never expires,
+which is the default and the behaviour of every key created before this
+parameter existed.</p>
+<p>The value must be a number in the future. An expiry in the past is
+rejected with a 400 rather than creating a key which is unusable the
+instant it exists, since that is far more likely to be a units mistake
+-- milliseconds instead of seconds, say -- than an intent.</p>
+<p>An expired key can neither mint new tokens nor validate a request, from
+the moment it lapses. Tokens already minted from it remain valid until
+their own expiry; delete the key if you need those invalidated
+immediately.</p>
+<p>Note that updating a key rotates it, and rotation replaces the whole
+mutable attribute set. Updating a key without passing <code>expiry</code> clears
+any expiry it previously carried.</p>
+<p>The <code>sf-client</code> command line does not expose a flag for this yet, so use
+the REST API or the Python client directly for now.</p>
+</details>
 <details class="example">
 <summary>Python API client: remove a specific key from a namespace</summary>
 <p>This example deletes a key from the namespace and then lists all keys:</p>

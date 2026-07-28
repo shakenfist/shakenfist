@@ -9305,6 +9305,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Key management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keys-are-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys are objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expiry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expiry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -9345,6 +9384,17 @@
     <span class="md-ellipsis">
       
         Key Storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#secrets-and-the-event-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets and the event log
       
     </span>
   </a>
@@ -10299,6 +10349,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Key management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keys-are-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys are objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expiry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expiry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -10345,6 +10434,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#secrets-and-the-event-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets and the event log
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -10373,6 +10473,7 @@ calls in the form of a HTTP header on the request. The tokens can expire, in
 which case a caller needs to re-authenticate and then retry their request. The
 process to create and use a token is discussed further in the
 <em>Authentication</em> section below.</p>
+<p>Terms used here are defined in the <a href="../../glossary/">glossary</a>.</p>
 <p>Shaken Fist logically divides objects into "namespaces". These namespaces can be
 thought of as tenants, although there might be other reasons to divide resources
 into their own buckets -- for example the Shaken Fist CI system uses a namespace
@@ -10463,6 +10564,43 @@ the key) and logging which access token was used in the event logs.</p>
 Shaken Fist. This usage is discussed in the <em>Inter-node Authentication</em> section
 below.</p>
 </details>
+<h3 id="keys-are-objects">Keys are objects<a class="headerlink" href="#keys-are-objects" title="Permanent link">&para;</a></h3>
+<p>A key is a first-class object owned by its namespace, with the same lifecycle
+machinery as an instance or a network: its own UUID, state machine, event
+stream, and soft delete. Practically, that means a key's history is auditable
+-- when it was created, when it was rotated, when it expired -- rather than
+being an anonymous entry in a JSON blob hanging off the namespace.</p>
+<p>Nothing about this is visible on the wire. The key management endpoints and
+their responses are unchanged, and a client written against an older release
+behaves identically.</p>
+<h3 id="rotation">Rotation<a class="headerlink" href="#rotation" title="Permanent link">&para;</a></h3>
+<p>Adding a key whose name already exists rotates that key rather than creating a
+second one. The stored hash is replaced, and so is the nonce -- which means
+every access token minted from the old secret stops validating immediately.
+The key object itself survives with its UUID and its event history intact, so a
+rotation shows up as an event on the key rather than as a delete and a create.</p>
+<p>This is long-standing behaviour: <code>add-key</code> has always overwritten a key of the
+same name. It is called out here because it is the mechanism behind revocation,
+and because rotation clears any expiry the key previously carried.</p>
+<h3 id="expiry">Expiry<a class="headerlink" href="#expiry" title="Permanent link">&para;</a></h3>
+<p>A key may carry an optional expiry, as epoch seconds, supplied when the key is
+created or updated. A key with no expiry never expires, which is the default
+and matches every key created before this feature existed.</p>
+<p>Enforcement is at the point of use, not on a timer. An expired key can neither
+mint new tokens at <code>/auth</code> nor validate a request, from the instant it lapses
+-- there is no window in which an expired key still works because a cleanup
+task has not run yet. Tokens already minted from a key that later expires
+remain valid until their own expiry, which is nominally fifteen minutes; delete
+the key if you need them invalidated immediately, since that changes the nonce.</p>
+<p>Expired keys are tidied up by the cluster daemon rather than vanishing the
+moment they lapse. It soft-deletes keys that expired more than
+<code>NAMESPACE_KEY_REAP_GRACE</code> seconds ago (one hour by default; set it to <code>0</code> to
+disable reaping and keep expired keys forever), and the standard object reaper
+hard-deletes them once they have been soft-deleted for <code>CLEANER_DELAY</code>. The
+grace period exists so that an operator debugging automation which suddenly
+stopped working can still see the key that lapsed. Because enforcement is at
+the point of use, none of these timings affect security -- only how long the
+evidence sticks around.</p>
 <h2 id="authenticating-directly-to-the-rest-api">Authenticating directly to the REST API<a class="headerlink" href="#authenticating-directly-to-the-rest-api" title="Permanent link">&para;</a></h2>
 <p>The authentication endpoint <code>/auth</code> is used to obtain a token to authenticate
 future API requests. For example, I can obtain an authentication token from the
@@ -10563,10 +10701,35 @@ after five minutes, and are never reused. Before v0.7 service keys were always
 named "_service_key". From v0.7 service keys have a name of the form
 "_service_key[a-zA-Z]+".</p>
 <h2 id="key-storage">Key Storage<a class="headerlink" href="#key-storage" title="Permanent link">&para;</a></h2>
-<p>Shaken Fist stores the access keys in MariaDB (in the <code>namespace_attributes</code>
-table). The keys are stored as the base64 encoding of the key post salting and
-hashing. The python <code>bcrypt</code> library is used to perform salting, hashing, and
-key verification.</p>
+<p>Shaken Fist stores keys in MariaDB across two tables: <code>namespace_keys</code> holds
+the immutable values (UUID, owning namespace, key name), and
+<code>namespace_key_attributes</code> holds what rotation changes (the hash, the nonce,
+the expiry). The secret itself is never stored -- what is kept is the base64
+encoding of the secret after salting and hashing, with the python <code>bcrypt</code>
+library performing salting, hashing and verification.</p>
+<p>The <code>(namespace, name)</code> pair carries a unique index, which is what makes a key
+name unique within its namespace and what serves the per-namespace listing on
+the authentication path.</p>
+<p>Keys previously lived in a <code>keys</code> JSON column on the <code>namespace_attributes</code>
+table. Existing keys are migrated into the new tables by
+<code>sf-ctl ensure-mariadb-schema</code> during upgrade, preserving each key's hash,
+nonce and expiry exactly, so tokens minted before the upgrade continue to
+validate. The old column is left in place but is no longer read or written.
+Note that this means downgrading after the migration loses any key created
+afterwards; keys that predate the upgrade are unaffected.</p>
+<h2 id="secrets-and-the-event-log">Secrets and the event log<a class="headerlink" href="#secrets-and-the-event-log" title="Permanent link">&para;</a></h2>
+<p>Credentials never appear in events. This matters more than it might sound,
+because events are written to syslog and shipped to Loki, so a credential in an
+event is a credential in log aggregation -- somewhere with weaker access
+control than the credential itself.</p>
+<p>Concretely: minted tokens, presented tokens, stored hashes and nonces are all
+absent from event payloads. What is recorded is the key <em>name</em>, which is what
+makes an audit trail useful without making it a credential store.</p>
+<p>The generic API request tracing, which records request and response bodies for
+debugging, does not log bodies for any route under <code>/auth</code>. Those routes carry
+plaintext key secrets inbound and minted tokens outbound. The request URL is
+still recorded, so the trace retains the namespace and the key name and loses
+only the credential.</p>
 
 
 

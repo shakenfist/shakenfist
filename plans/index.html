@@ -10990,6 +10990,48 @@
 <td>OIDC as an authentication option for human users; existing namespace keys re-framed as service-account tokens for automation</td>
 </tr>
 <tr>
+<td><a href="PLAN-auth-federation/">Auth federation</a></td>
+<td><a href="PLAN-auth-federation-phase-01-glossary/">Phase 1: Terminology and glossary</a></td>
+<td>Complete</td>
+<td>Pin authentication vocabulary and other overloaded codebase terms in a docs/ glossary</td>
+</tr>
+<tr>
+<td><a href="PLAN-auth-federation/">Auth federation</a></td>
+<td><a href="PLAN-auth-federation-phase-02-key-objects/">Phase 2: Namespace keys as first-class objects</a></td>
+<td>Complete</td>
+<td>Keys become DBOs with events, soft delete, expiry, scopes, and provenance; cleaner reaps expired keys</td>
+</tr>
+<tr>
+<td><a href="PLAN-auth-federation/">Auth federation</a></td>
+<td>Phase 3: Federated exchange and scope enforcement</td>
+<td>Not started</td>
+<td>Exchange an external identity token (GitHub Actions first, issuer-generic) for a scoped expiring namespace key</td>
+</tr>
+<tr>
+<td><a href="PLAN-auth-federation/">Auth federation</a></td>
+<td>Phase 4: Authentication documentation</td>
+<td>Not started</td>
+<td>Update the three authentication guides for keys, scopes, and federation without depending on private CI internals</td>
+</tr>
+<tr>
+<td><a href="PLAN-auth-federation/">Auth federation</a></td>
+<td>Phase 5: OIDC plan refresh</td>
+<td>Not started</td>
+<td>Rewrite the human-login OIDC stub plan against the as-built federation infrastructure</td>
+</tr>
+<tr>
+<td><a href="PLAN-auth-federation/">Auth federation</a></td>
+<td>Phase 6: Secrets that cannot be logged by accident</td>
+<td>Not started</td>
+<td>Move key material to pydantic SecretStr, so stringifying a secret into an event renders asterisks instead</td>
+</tr>
+<tr>
+<td><a href="PLAN-auth-federation/">Auth federation</a></td>
+<td>Phase 7: Recognisable secrets and leak detection</td>
+<td>Not started</td>
+<td>GitHub-style prefix and checksum on cluster-minted secrets, with gitleaks and Loki queries to catch leaks</td>
+</tr>
+<tr>
 <td><a href="PLAN-artifact-ux-rework/">Artifact UX rework</a></td>
 <td>Master plan</td>
 <td>Stub</td>
