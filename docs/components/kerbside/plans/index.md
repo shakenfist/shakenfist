@@ -7,7 +7,7 @@ design decisions that do not require phased execution.
 
 New plans should follow the structure in `PLAN-TEMPLATE.md` at the
 repo root. For pre-push audits of our own work see
-`PUSH-TEMPLATE.md`.
+`PUSH-AUDIT.md`.
 
 ## Master plans
 

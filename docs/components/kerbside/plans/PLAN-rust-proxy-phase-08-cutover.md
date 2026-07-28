@@ -330,7 +330,7 @@ pass `bash -n`. **No blocking, high, or medium findings.**
 
 ### Full-series pre-push audit (2026-07-09)
 
-After the master plan was marked complete, the `PUSH-TEMPLATE.md` audit was
+After the master plan was marked complete, the `PUSH-AUDIT.md` audit was
 run across the **whole** stacked series (`git diff develop..HEAD`, phases
 2–8), not just phase 8. Wave 1 (flake8 + the 66-test py3 suite + style
 greps) and the wave-2 mechanical script were green; the four wave-2

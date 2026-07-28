@@ -357,7 +357,7 @@ recorded as the natural phase-7 CI-lane driver.
 
 ### Pre-push audit (2026-07-08)
 
-Ran the `PUSH-TEMPLATE.md` audit against the phase-5 diff (`git diff
+Ran the `PUSH-AUDIT.md` audit against the phase-5 diff (`git diff
 rust-proxy-phase-4..HEAD`; phase 4 was audited separately). Wave 1
 (mechanical) was clean: Docker `make lint`/`make test` and
 `flake8`/`py3` green, and the only non-test `expect()`s are the
