@@ -10783,32 +10783,32 @@ post-decisions plan.</p>
 <tr>
 <td>1. <code>events</code>/<code>event_objects</code> schema, accessors, the <code>RecordEventBatch</code> RPC on sf-database, and the events-row-count gauge</td>
 <td>PLAN-eventlog-direct-mariadb-phase-01-schema.md</td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2. Swap the drainer's RPC target from sf-eventlog to sf-database; promote <code>event_uuid</code> and <code>request_id</code> to first-class fields; wire spool-depth, drop, and insert metrics</td>
 <td>PLAN-eventlog-direct-mariadb-phase-02-write.md</td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3. Move prune sweep into the cluster daemon's scheduled tasks, with prune-delete counter</td>
 <td>PLAN-eventlog-direct-mariadb-phase-03-prune.md</td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>4. REST API direct-read path via a new <code>GetObjectEvents</code> RPC on sf-database</td>
 <td>PLAN-eventlog-direct-mariadb-phase-04-read.md</td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>5. Delete <code>sf-eventlog</code> daemon, gRPC protos, systemd unit, config, the MariaDB <code>event_dlq</code>, and the on-disk sqlite chunks</td>
 <td>PLAN-eventlog-direct-mariadb-phase-05-remove.md</td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>6. Documentation (operator guide for the new eventlog, ARCHITECTURE/README/AGENTS updates, cut-over loss called out in release notes)</td>
 <td>PLAN-eventlog-direct-mariadb-phase-06-docs.md</td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
