@@ -24,6 +24,7 @@ The repository uses several GitHub Actions workflows:
 | `pr-address-comments.yml` | Address review comments on bot command | `@shakenfist-bot please address comments` |
 | `pr-fix-tests.yml` | Fix test failures on bot command | `@shakenfist-bot please attempt to fix` |
 | `test-drift-fix.yml` | Unit test fixer (called by pr-fix-tests) | workflow_call, workflow_dispatch |
+| `issue-fix.yml` | Triage open issues, propose a fix as a draft PR | workflow_dispatch |
 
 ### Merge Queue Pattern
 
