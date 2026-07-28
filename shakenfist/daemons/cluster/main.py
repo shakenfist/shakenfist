@@ -203,6 +203,12 @@ class Monitor(daemon.Daemon):
             maximum=(2 * config.NODE_DISK_RESERVATION_GB),
             intention='blobs')
 
+        # Compute which instances use which blobs once for the whole pass.
+        # Doing this per blob repeats the instance walk (and its per-disk
+        # attribute and dependency chain reads) for every blob, which was
+        # the bulk of the cluster daemon's idle database load (issue 3502).
+        blob_usage = instance.instance_blob_usage()
+
         # We count fetches currently requested (or under way) as having completed
         # in order to stop over-replication for large blobs.
         for blob_uuid in mariadb.get_active_blob_uuids():
@@ -211,7 +217,7 @@ class Monitor(daemon.Daemon):
             b = Blob.from_db(blob_uuid)
             if not b:
                 continue
-            instances = instance.instance_usage_for_blob_uuid(b.uuid)
+            instances = blob_usage.get(str(b.uuid), [])
             if instances:
                 in_use_blobs[b.uuid] += 1
 
@@ -236,8 +242,11 @@ class Monitor(daemon.Daemon):
                     b.cascading_delete()
                 continue
 
+            # Each locations read is a database round trip, so read once
+            # and reuse below.
+            blob_locations = b.locations
             incomplete_nodes = [loc['node'] for loc in b.incomplete_healthy_locations]
-            locations = b.locations + incomplete_nodes
+            locations = blob_locations + incomplete_nodes
             delta = len(locations) - config.BLOB_REPLICATION_FACTOR
             if delta > 0:
                 # So... The blob replication factor is a target not a limit.
@@ -248,7 +257,7 @@ class Monitor(daemon.Daemon):
                 # its needed there is slow and annoying.
 
                 # Work out where the blob is in active use.
-                excess_locations = b.locations
+                excess_locations = list(blob_locations)
                 in_use_locations = []
 
                 for instance_uuid in instances:
@@ -277,7 +286,7 @@ class Monitor(daemon.Daemon):
                 # We have exactly the right number of copies, but what if
                 # the blob is on a really full node?
                 for n in low_disk_nodes:
-                    if n in b.locations:
+                    if n in blob_locations:
                         # We have at least one space constrained node with
                         # this blob. Request an extra temporary copy of the
                         # blob elsewhere so we can hopefully clean up one of

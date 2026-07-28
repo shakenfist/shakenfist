@@ -196,6 +196,7 @@ class CascadeDispatchTestCase(base.ShakenFistTestCase):
         m._cascade_errored_node = mock.MagicMock()
         patches = {
             'mariadb': mock.DEFAULT,
+            'instance': mock.DEFAULT,
             'ipam': mock.DEFAULT,
             'network': mock.DEFAULT,
             'artifact': mock.DEFAULT,
@@ -241,7 +242,8 @@ class CascadeDispatchTestCase(base.ShakenFistTestCase):
         # Re-drive with the pre-seeded guard set.
         with mock.patch.multiple(
                 'shakenfist.daemons.cluster.main',
-                mariadb=mock.DEFAULT, ipam=mock.DEFAULT, network=mock.DEFAULT,
+                mariadb=mock.DEFAULT, instance=mock.DEFAULT,
+                ipam=mock.DEFAULT, network=mock.DEFAULT,
                 artifact=mock.DEFAULT, remove_abandoned_uploads=mock.DEFAULT,
                 nodes_by_free_disk_descending=mock.DEFAULT,
                 Nodes=mock.DEFAULT) as mocks:

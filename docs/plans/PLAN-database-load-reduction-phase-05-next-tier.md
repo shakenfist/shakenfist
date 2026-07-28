@@ -72,8 +72,11 @@ were written by in-memory-only IPAM objects leaking their state to MariaDB
 (#3532), accumulated because the deleted-object sweep could not drain its
 backlog (#3533), and were invisible to every cleanup path until the orphan
 reconciliation sweep (#3534). Those three fixes, not further caching, are
-what clears the `cluster` caller's `GetIPAM` floor. #3502 remains open and
-is smaller once the deleted-object backlog drains.
+what clears the `cluster` caller's `GetIPAM` floor. The same investigation
+closed #3502: the sweep's `GetInstanceAttributes`/`GetReferencesFrom` floor
+was O(blobs × instances) — `instance_usage_for_blob_uuid()` re-walked every
+healthy instance (and every disk's dependency chain) for every blob — and
+is now a single `instance_blob_usage()` pass per cleanup loop.
 
 These are deliberately *not* bundled into this phase's PR. #3499 and #3500 are
 behaviour changes (backoff trades a little first-task latency for a large load
