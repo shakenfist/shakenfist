@@ -10094,10 +10094,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#push-templatemd-guardrail" class="md-nav__link">
+  <a href="#push-auditmd-guardrail" class="md-nav__link">
     <span class="md-ellipsis">
       
-        PUSH-TEMPLATE.md guardrail
+        PUSH-AUDIT.md guardrail
       
     </span>
   </a>
@@ -10351,7 +10351,7 @@ drop is idempotent so a re-run is a no-op.</p>
 <p>Column drop is safe because the stored list is pure
 cache: every UUID in the list is derivable from the
 <code>network_interfaces</code> table via an indexed query.</p>
-<h3 id="push-templatemd-guardrail">PUSH-TEMPLATE.md guardrail<a class="headerlink" href="#push-templatemd-guardrail" title="Permanent link">&para;</a></h3>
+<h3 id="push-auditmd-guardrail">PUSH-AUDIT.md guardrail<a class="headerlink" href="#push-auditmd-guardrail" title="Permanent link">&para;</a></h3>
 <p>The phase-6 guardrail catches new <code>mariadb.get_all_*(</code>
 call sites; phase 7's work exposes a second pattern worth
 guarding against — new <code>list[str]</code> / <code>list[UUID]</code> fields
@@ -10421,7 +10421,7 @@ append/remove from such a list) get the same flag.</p>
 <td>low</td>
 <td>haiku</td>
 <td>none</td>
-<td>Add a wave-2a code-quality bullet to <code>PUSH-TEMPLATE.md</code> directing the reviewer to flag new <code>list[str]</code> / <code>list[UUID4]</code> fields on <code>shakenfist/schema/*_attributes.py</code> as a potential cached FK list — prompt the reviewer to ask "is this a list of child-object UUIDs that a <code>WHERE &lt;fk&gt; = ?</code> query could provide live?" — and to apply the same flag to any new <code>add_*</code> / <code>remove_*</code> mutator pair on an attributes object. Place the bullet adjacent to the phase-6 "SQL pushdown (blocking)" bullet. Wording should match the tone and structure of the adjacent bullets. One commit.</td>
+<td>Add a wave-2a code-quality bullet to <code>PUSH-AUDIT.md</code> directing the reviewer to flag new <code>list[str]</code> / <code>list[UUID4]</code> fields on <code>shakenfist/schema/*_attributes.py</code> as a potential cached FK list — prompt the reviewer to ask "is this a list of child-object UUIDs that a <code>WHERE &lt;fk&gt; = ?</code> query could provide live?" — and to apply the same flag to any new <code>add_*</code> / <code>remove_*</code> mutator pair on an attributes object. Place the bullet adjacent to the phase-6 "SQL pushdown (blocking)" bullet. Wording should match the tone and structure of the adjacent bullets. One commit.</td>
 </tr>
 <tr>
 <td>7g</td>
@@ -10487,7 +10487,7 @@ with:</p>
   iterate objects, writer call sites deleted.</li>
 <li><code>pre-commit run --all-files</code> passes; <code>test_mariadb_find</code>
   gains at least two new tests for the FK filters.</li>
-<li><code>PUSH-TEMPLATE.md</code> wave-2a brief has a new bullet
+<li><code>PUSH-AUDIT.md</code> wave-2a brief has a new bullet
   directing the reviewer to flag new attribute-list-of-FK
   patterns, so a future contributor does not re-introduce
   a denormalised cache that phase 7 just removed.</li>

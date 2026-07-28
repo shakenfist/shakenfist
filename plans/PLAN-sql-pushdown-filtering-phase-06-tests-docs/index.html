@@ -10061,10 +10061,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6c-push-templatemd-guardrail" class="md-nav__link">
+  <a href="#6c-push-auditmd-guardrail" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6c — PUSH-TEMPLATE.md guardrail
+        6c — PUSH-AUDIT.md guardrail
       
     </span>
   </a>
@@ -10175,7 +10175,7 @@ land the guardrail.</p>
 <p>Before responding to questions or discussion points in
 this document, read the four earlier phase plans to
 understand what has been delivered (phases 1 through 5,
-all complete), the existing shape of <code>PUSH-TEMPLATE.md</code>
+all complete), the existing shape of <code>PUSH-AUDIT.md</code>
 and <code>docs/operator_guide/database.md</code> and
 <code>ARCHITECTURE.md</code>, the test file
 <code>shakenfist/tests/test_mariadb_find.py</code> that covers the
@@ -10195,7 +10195,7 @@ Flag uncertainty explicitly.</p>
    <code>docs/operator_guide/database.md</code> and
    <code>ARCHITECTURE.md</code> so a future contributor knows when
    to use <code>find_*</code> vs <code>.filter()</code> vs the iterator.</li>
-<li>Land the <code>PUSH-TEMPLATE.md</code> guardrail — a wave-1
+<li>Land the <code>PUSH-AUDIT.md</code> guardrail — a wave-1
    mechanical grep that catches new <code>mariadb.get_all_*(</code>
    additions outside the established call sites, and a
    wave-2a brief bullet that promotes SQL-pushdown
@@ -10279,7 +10279,7 @@ namespace indexes). Link out to
 <code>docs/operator_guide/database.md</code> for the details.</p>
 <p>Target: ~20-40 lines of prose.</p>
 <p>No new diagrams.</p>
-<h3 id="6c-push-templatemd-guardrail">6c — PUSH-TEMPLATE.md guardrail<a class="headerlink" href="#6c-push-templatemd-guardrail" title="Permanent link">&para;</a></h3>
+<h3 id="6c-push-auditmd-guardrail">6c — PUSH-AUDIT.md guardrail<a class="headerlink" href="#6c-push-auditmd-guardrail" title="Permanent link">&para;</a></h3>
 <p>The template's wave-1 style-check block at lines 46-48
 today runs three greps (line length, stray <code>print()</code>,
 new <code>etcd</code> references). Add a fourth:</p>
@@ -10351,7 +10351,7 @@ explanation.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Edit <code>PUSH-TEMPLATE.md</code>: add the new <code>mariadb.get_all_*</code> grep as the fourth bullet in the wave-1 style-check block at lines 46-48, including the <code># nopushdown:</code> allowlist filter and a one-line inline comment. Promote the wave-2a "SQL pushdown discipline" bullet at line 83 from advisory ("does any new code materialise...") to blocking ("Blocking: any new <code>mariadb.get_all_*(</code> call that is not on an existing line and not tagged <code># nopushdown:</code> must be rewritten as a <code>find_*</code> call or as a bulk-scan helper with explicit justification.").</td>
+<td>Edit <code>PUSH-AUDIT.md</code>: add the new <code>mariadb.get_all_*</code> grep as the fourth bullet in the wave-1 style-check block at lines 46-48, including the <code># nopushdown:</code> allowlist filter and a one-line inline comment. Promote the wave-2a "SQL pushdown discipline" bullet at line 83 from advisory ("does any new code materialise...") to blocking ("Blocking: any new <code>mariadb.get_all_*(</code> call that is not on an existing line and not tagged <code># nopushdown:</code> must be rewritten as a <code>find_*</code> call or as a bulk-scan helper with explicit justification.").</td>
 </tr>
 <tr>
 <td>6d</td>
@@ -10381,7 +10381,7 @@ with:</p>
   <code>test_mariadb_find.py</code> test-class layout matches the
   expected "one class per direct / public / gRPC" shape.</li>
 <li>For 6c: confirmation of the exact current lines of
-  <code>PUSH-TEMPLATE.md</code> that need editing (line numbers
+  <code>PUSH-AUDIT.md</code> that need editing (line numbers
   have almost certainly shifted since the plan was
   written).</li>
 <li>Any design decision not explicit in the plan.</li>
@@ -10408,7 +10408,7 @@ with:</p>
   entry point.</li>
 <li><code>ARCHITECTURE.md</code> references the pattern briefly in
   its Database Layer section.</li>
-<li><code>PUSH-TEMPLATE.md</code> wave-1 has the new grep with an
+<li><code>PUSH-AUDIT.md</code> wave-1 has the new grep with an
   <code># nopushdown:</code> allowlist and wave-2a has the
   SQL-pushdown discipline bullet promoted to blocking.</li>
 <li><code>docs/plans/index.md</code> shows phase 6 Complete and

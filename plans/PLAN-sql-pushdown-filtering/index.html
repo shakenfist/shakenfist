@@ -10477,7 +10477,7 @@ could regress (name collision within namespace, state
 transitions during lookup, cross-namespace lookups under
 <code>system</code>), and update <code>docs/operator_guide/database.md</code> and
 <code>ARCHITECTURE.md</code> to describe the new pattern.</p>
-<p>Also add a guardrail in <code>PUSH-TEMPLATE.md</code> to keep this
+<p>Also add a guardrail in <code>PUSH-AUDIT.md</code> to keep this
 regression from sneaking back in: a wave-1 mechanical grep
 that flags new additions of <code>mariadb.get_all_*(</code> in the diff
 (excluding <code>shakenfist/mariadb.py</code>, admin tooling under
@@ -10672,7 +10672,7 @@ because the following statements will be true:</p>
   primitive and the SQL pushdown rule.</li>
 <li><code>ARCHITECTURE.md</code> mentions the three-layer pattern's
   filter-pushdown discipline.</li>
-<li><code>PUSH-TEMPLATE.md</code> has a wave-1 mechanical grep that
+<li><code>PUSH-AUDIT.md</code> has a wave-1 mechanical grep that
   flags new <code>mariadb.get_all_*(</code> additions outside the
   allowlist, and the wave-2a brief marks SQL-pushdown
   discipline as blocking.</li>
@@ -10727,7 +10727,7 @@ creep:</p>
   enable.</li>
 </ul>
 <h4 id="items-raised-by-the-phase-7-pre-push-audit">Items raised by the phase 7 pre-push audit<a class="headerlink" href="#items-raised-by-the-phase-7-pre-push-audit" title="Permanent link">&para;</a></h4>
-<p>The <code>PUSH-TEMPLATE.md</code> audit on the post-phase-7 branch
+<p>The <code>PUSH-AUDIT.md</code> audit on the post-phase-7 branch
 flagged a handful of items that are real but not phase-7
 specific. Capturing them here so the next contributor in
 this area has a punch list rather than re-discovering
