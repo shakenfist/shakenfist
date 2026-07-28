@@ -864,6 +864,23 @@ implemented because the following statements will be true:
   (fewer long-lived credentials), which makes eventual
   publication easier; revisit once the conductor has grown
   a deployment story.
+* **Restoring prune-on-write for expired keys**, if the
+  cluster daemon's sweep proves too weak a guarantee. While
+  phase 2 was in flight, develop independently fixed issue
+  #3521: `get_api_token()` mints a short-lived
+  `_service_key_*` every few minutes per daemon, and
+  filtering those only on read let the `keys` JSON blob grow
+  until it crossed gRPC's maximum message size, failing
+  namespace reads cluster-wide. The fix purged expired
+  entries on every write. Phase 2's cutover removes that
+  code path. The original failure mode cannot recur — keys
+  are rows now, so no single value grows, and the expiry
+  filter is applied in SQL — but the guarantee is weaker in
+  one respect: removal now depends on the cluster daemon
+  running, where purging on write did not. The consequence
+  if it never runs is bounded table growth rather than a
+  cluster-wide read failure. `delete_expired_namespace_keys()`
+  already exists if we decide the write path should sweep too.
 * **`sf-client namespace add-key --expiry`**: phase 2 added
   the `expiry` body parameter to the key create and update
   endpoints, but the command line has no flag for it yet,
