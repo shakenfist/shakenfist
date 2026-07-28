@@ -337,15 +337,35 @@
              | map('int')
              | min }}
 
-    # Per-host RAM reservation default: 10% of system RAM, floored at 2 GB.
-    # RAM_SYSTEM_RESERVATION is in GB (the scheduler multiplies it by 1024 to
-    # get MB), so this must be computed in GB -- ansible_memtotal_mb is in MB.
-    # The operator may override ram_system_reservation in group_vars; this only
-    # fills in a sensible per-host default when it is not set.
-    - name: Default the RAM system reservation from this host's memory
+    # Per-host resource reservation defaults. These are per-host (not
+    # cluster-wide) and fold in the infra-role bump that used to be applied
+    # server-side: network/database nodes get extra RAM and CPU headroom for
+    # the daemons they run in addition to hypervisor workloads. The operator
+    # may override any of node_ram_reservation_gb / node_cpu_reservation_threads
+    # / node_disk_reservation_gb per host in inventory host_vars/group_vars;
+    # this only fills in a sensible default when the var is not already set.
+    #
+    # node_ram_reservation_gb is in GB (SHAKENFIST_NODE_RAM_RESERVATION_GB is
+    # multiplied by 1024 to get MB by the scheduler), so this must be computed
+    # in GB -- ansible_memtotal_mb is in MB. 10% of system RAM, floored at
+    # 2 GB, plus 4 GB on network/database nodes.
+    - name: Default the per-host resource reservations
       ansible.builtin.set_fact:
-        ram_system_reservation: "{{ [2.0, (ansible_memtotal_mb / 1024.0 * 0.1) | round(2)] | max }}"
-      when: ram_system_reservation is not defined
+        node_ram_reservation_gb: >-
+          {{ ([2.0, (ansible_memtotal_mb / 1024.0 * 0.1) | round(2)] | max)
+             + ((node_is_network_node or node_is_database_node) | ternary(4.0, 0.0)) }}
+      when: node_ram_reservation_gb is not defined
+
+    - name: Default the per-host CPU thread reservation
+      ansible.builtin.set_fact:
+        node_cpu_reservation_threads: >-
+          {{ (1 + ((node_is_network_node or node_is_database_node) | ternary(1, 0))) * 2 }}
+      when: node_cpu_reservation_threads is not defined
+
+    - name: Default the per-host disk reservation
+      ansible.builtin.set_fact:
+        node_disk_reservation_gb: 20
+      when: node_disk_reservation_gb is not defined
 
 
 # ---------------------------------------------------------------------------
@@ -515,13 +535,6 @@
       changed_when: true
       no_log: true
 
-    - name: Set the RAM system reservation
-      ansible.builtin.command: >-
-        /srv/shakenfist/venv/bin/sf-ctl set-config
-        RAM_SYSTEM_RESERVATION {{ hostvars[cluster_db_host]['ram_system_reservation'] }}
-      delegate_to: "{{ cluster_db_host }}"
-      changed_when: true
-
     - name: Set the maximum hypervisor MTU
       ansible.builtin.command: >-
         /srv/shakenfist/venv/bin/sf-ctl set-config
@@ -549,6 +562,16 @@
       delegate_to: "{{ cluster_db_host }}"
       changed_when: true
       loop: "{{ extra_config | from_json }}"
+
+    # Retire the pre-rename, now-inert RAM_SYSTEM_RESERVATION cluster_config
+    # row. Reservations are now per-node NODE_* keys set via /etc/sf/config, so
+    # this key is no longer read. Deleting an already-absent key is a no-op
+    # (rowcount 0), so this is idempotent. Safe to remove in a future release.
+    - name: Retire the inert RAM_SYSTEM_RESERVATION cluster config row
+      ansible.builtin.command: >-
+        /srv/shakenfist/venv/bin/sf-ctl unset-config RAM_SYSTEM_RESERVATION
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: false
 
     - name: Verify the cluster configuration
       ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl verify-config

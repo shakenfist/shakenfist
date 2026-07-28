@@ -6,6 +6,7 @@ from shakenfist import exceptions
 from shakenfist import scheduler
 from shakenfist.config import SFConfig
 from shakenfist.constants import GiB
+from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -15,7 +16,8 @@ fake_config = SFConfig(
     SCHEDULER_CACHE_TIMEOUT=30,
     CPU_OVERCOMMIT_RATIO=16.0,
     RAM_OVERCOMMIT_RATIO=1.5,
-    RAM_SYSTEM_RESERVATION=5.0,
+    NODE_RAM_RESERVATION_GB=5.0,
+    NODE_CPU_RESERVATION_THREADS=2,
     NETWORK_NODE_IP='10.0.0.1',
 )
 
@@ -137,6 +139,10 @@ class LowResourceTestCase(SchedulerTestCase):
             str(exc))
 
     def test_not_enough_disk(self):
+        # No disk_reservation_gb is published, so admission falls back to the
+        # config default NODE_DISK_RESERVATION_GB (20): 20 GiB free - 20 = 0 GB
+        # of headroom, and a 21 GB request is rejected. This is numerically
+        # identical to the retired MINIMUM_FREE_DISK behaviour.
         self.mock_mariadb.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -346,9 +352,8 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
     def test_missing_cpu_schedulable_falls_back_to_synthetic(self):
         # Metrics rows written by an older resources daemon lack the
         # reservation-aware cpu_schedulable field; those nodes get a
-        # synthetic reservation approximated from their role flags (one
-        # core, two threads, for these plain hypervisors), per-node,
-        # without error.
+        # synthetic reservation by subtracting the configured per-node
+        # thread reservation (2 threads here), per-node, without error.
         self.mock_mariadb.set_node_metrics_same()
         self.mock_mariadb.update_node_metrics('node2', {
             'cpu_max': 12, 'cpu_load_1': 4.0})
@@ -365,17 +370,22 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
         self.assertSetEqual(
             self._node_uuids_set('node3', 'node4'), set(nodes))
 
-    def test_old_dialect_infra_node_not_favoured(self):
-        # A not-yet-upgraded infra-role node must not look bigger and
-        # idler than an identical upgraded one: the synthetic fallback
-        # applies the role-aware reservation to old-dialect rows, so
-        # both size to 8 schedulable threads and share a bucket.
+    def test_old_dialect_fallback_ignores_infra_role(self):
+        # The synthetic fallback no longer applies a role-aware bump: it
+        # subtracts the flat per-node thread reservation regardless of the
+        # role flags an old-dialect row carries. So an old-dialect
+        # infra-role node and an old-dialect plain node with identical
+        # cpu_max size identically (max(1, 12 - 2) = 10 schedulable
+        # threads) and share a bucket -- the infra node is neither
+        # favoured nor penalised. (Under the retired role-aware fallback
+        # the infra node would have sized to 8 threads, normalised load
+        # 2.0 / 8 = 0.25 -> bucket 1, splitting it from the plain node's
+        # 2.0 / 10 = 0.20 -> bucket 0.)
         self.mock_mariadb.set_node_metrics_same()
         self.mock_mariadb.update_node_metrics('node2', {
-            'cpu_max': 12, 'cpu_schedulable': 8, 'cpu_load_1': 2.5,
-            'is_database_node': True})
+            'cpu_max': 12, 'cpu_load_1': 2.0, 'is_database_node': True})
         self.mock_mariadb.update_node_metrics('node3', {
-            'cpu_max': 12, 'cpu_load_1': 2.5, 'is_database_node': True})
+            'cpu_max': 12, 'cpu_load_1': 2.0})
         self.mock_mariadb.update_node_metrics('node4', {
             'cpu_max': 12, 'cpu_load_1': 12.0})
 
@@ -393,7 +403,7 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
         # A metrics baseline that passes every admission stage, built on
         # the same shapes the LowResourceTestCase tests use. The fake
         # config pins CPU_OVERCOMMIT_RATIO=16.0 and
-        # RAM_SYSTEM_RESERVATION=5.0.
+        # NODE_RAM_RESERVATION_GB=5.0.
         metrics = {
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -459,7 +469,7 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
 
     def test_ram_check_falls_back_to_config_reservation(self):
         # Without a published memory_reserved_mb the check falls back to
-        # RAM_SYSTEM_RESERVATION (5 GB in the fake config).
+        # NODE_RAM_RESERVATION_GB (5 GB in the fake config).
         self.mock_mariadb.set_node_metrics_same(self._baseline(
             memory_available=5*1024+1024))
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
@@ -534,17 +544,14 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
         for n, per_node in resources['per_node'].items():
             metrics = s.metrics[n]
             # The expected base must mirror _schedulable_threads(): the
-            # published value when present, otherwise the role-aware
-            # synthetic reservation (two threads per reserved core).
+            # published value when present, otherwise the synthetic
+            # reservation subtracting the flat per-node thread reservation
+            # (NODE_CPU_RESERVATION_THREADS=2), with no infra-role bump.
             expected_base = metrics.get('cpu_schedulable')
             if not expected_base:
-                reserved_cores = 1
-                if (metrics.get('is_network_node') or
-                        metrics.get('is_database_node')):
-                    reserved_cores += 1
-                expected_base = max(
-                    1, metrics.get('cpu_max', 0) - reserved_cores * 2)
-            expected_reserved = metrics.get('memory_reserved_mb', 5.0 * 1024)
+                expected_base = max(1, metrics.get('cpu_max', 0) - 2)
+            expected_reserved = metrics.get(
+                'memory_reserved_mb', int(5.0 * 1024))
 
             self.assertEqual(expected_base, per_node['cpu_schedulable'])
             self.assertEqual(expected_reserved, per_node['memory_reserved_mb'])
@@ -555,6 +562,132 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
             self.assertEqual(
                 metrics.get('memory_available', 0) - expected_reserved,
                 per_node['ram_max_per_instance'])
+
+
+class DiskReservationAdmissionTestCase(SchedulerTestCase):
+    """Test disk admission against the candidate node's published reservation."""
+
+    def _baseline(self, **overrides):
+        # A metrics baseline that passes every non-disk admission stage.
+        metrics = {
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 45*GiB,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12,
+        }
+        metrics.update(overrides)
+        return metrics
+
+    def test_admission_honours_published_disk_reservation(self):
+        # Every node starts with 45 GiB free on the instances filesystem, so
+        # under the default 20 GB reservation each has 25 GB of headroom. node2
+        # advertises MORE raw free disk (60 GiB) but a much larger published
+        # reservation (45 GB), leaving it only 15 GB of headroom -- so a 20 GB
+        # instance must skip node2 and land on the default-reservation nodes.
+        # This proves the per-node published reservation, not raw free disk,
+        # drives admission in _has_sufficient_disk.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.update_node_metrics('node2', {
+            'disk_free_instances': 60*GiB,
+            'disk_reservation_gb': 45,
+        })
+
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', disk_spec=[{'base': 'cirros', 'size': 20}])
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
+    def test_admission_falls_back_to_config_reservation(self):
+        # Without a published disk_reservation_gb the check falls back to
+        # NODE_DISK_RESERVATION_GB (20 GB default): 20 GiB free - 20 = 0 GB of
+        # headroom, so even a 1 GB instance is rejected on every node.
+        self.mock_mariadb.set_node_metrics_same(self._baseline(
+            disk_free_instances=20*GiB))
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', disk_spec=[{'base': 'cirros', 'size': 1}])
+        exc = self.assertRaises(exceptions.LowResourceException,
+                                scheduler.Scheduler().find_candidates,
+                                fake_inst)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_free_disk',
+            str(exc))
+
+
+class NodesByFreeDiskDescendingTestCase(SchedulerTestCase):
+    """Test reservation-aware blob-placement ranking (nodes_by_free_disk_descending)."""
+
+    def _set_blob_disk(self, fqdn, free_gib, reservation_gb):
+        self.mock_mariadb.update_node_metrics(fqdn, {
+            'disk_free_blobs': free_gib * GiB,
+            'disk_reservation_gb': reservation_gb,
+        })
+
+    def test_ranking_and_filtering_respects_per_node_reservation(self):
+        # Every node has an identical 100 GiB free on the blobs filesystem, so
+        # ranking is driven purely by each node's own published reservation:
+        # headroom = 100 - reservation.
+        self.mock_mariadb.set_node_metrics_same()
+        self._set_blob_disk('node2', 100, 20)      # headroom 80
+        self._set_blob_disk('node3', 100, 50)      # headroom 50
+        self._set_blob_disk('node4', 100, 70)      # headroom 30
+        self._set_blob_disk('node1_net', 100, 95)  # headroom 5
+
+        self.assertEqual(
+            ['node2', 'node3', 'node4', 'node1_net'],
+            nodes_by_free_disk_descending(intention='blobs'))
+
+        # A minimum-headroom filter drops the high-reservation nodes even though
+        # their raw free disk is identical to the survivors'.
+        self.assertEqual(
+            ['node2', 'node3'],
+            nodes_by_free_disk_descending(minimum=45, intention='blobs'))
+
+        # A maximum-headroom band keeps only the tightest nodes.
+        self.assertEqual(
+            ['node4', 'node1_net'],
+            nodes_by_free_disk_descending(maximum=40, intention='blobs'))
+
+    def test_missing_reservation_falls_back_to_config_default(self):
+        # A metrics row without disk_reservation_gb falls back to the config
+        # default (NODE_DISK_RESERVATION_GB=20): node3 with 40 GiB free has 20 GB
+        # headroom and outranks node2 with 25 GiB free (5 GB headroom); node4
+        # with 21 GiB free just clears the minimum, and node1_net with 5 GiB free
+        # has negative headroom and is filtered out.
+        self.mock_mariadb.set_node_metrics_same()
+        self.mock_mariadb.update_node_metrics('node2', {
+            'disk_free_blobs': 25 * GiB})
+        self.mock_mariadb.update_node_metrics('node3', {
+            'disk_free_blobs': 40 * GiB})
+        self.mock_mariadb.update_node_metrics('node4', {
+            'disk_free_blobs': 21 * GiB})
+        self.mock_mariadb.update_node_metrics('node1_net', {
+            'disk_free_blobs': 5 * GiB})
+
+        self.assertEqual(
+            ['node3', 'node2', 'node4'],
+            nodes_by_free_disk_descending(minimum=1, intention='blobs'))
+
+    def test_low_disk_band_includes_negative_headroom(self):
+        # The blob rebalancer calls this helper with only a maximum headroom
+        # band and no lower bound, so a node that has fallen BELOW its own
+        # reservation (negative headroom) -- the most urgent to relieve -- must
+        # still be returned. A default minimum of 0 would wrongly drop it.
+        self.mock_mariadb.set_node_metrics_same()
+        self._set_blob_disk('node2', 5, 20)       # headroom -15, critically low
+        self._set_blob_disk('node3', 50, 20)      # headroom 30, low
+        self._set_blob_disk('node4', 100, 20)     # headroom 80, plenty
+        self._set_blob_disk('node1_net', 25, 20)  # headroom 5, low
+
+        # Mirrors the rebalance call: a maximum headroom band, no minimum. node4
+        # is excluded as not low; the three low nodes rank by headroom
+        # descending, with the negative-headroom node last but present.
+        self.assertEqual(
+            ['node3', 'node1_net', 'node2'],
+            nodes_by_free_disk_descending(maximum=40, intention='blobs'))
 
 
 class AffinityTestCase(SchedulerTestCase):

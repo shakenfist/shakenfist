@@ -18996,6 +18996,21 @@ def _grpc_set_cluster_config(key_name: str, value: Any) -> None:
             f'Database set_cluster_config failed: {response.error}')
 
 
+def _grpc_delete_cluster_config(key_name: str) -> None:
+    """Delete a cluster config key via the database microservice."""
+    stub = _get_database_stub()
+    if not stub:
+        return
+
+    request = database_pb2.DeleteClusterConfigRequest(
+        key_name=key_name,
+    )
+    response = _grpc_call(stub.DeleteClusterConfig, request)
+    if response is not None and not response.success:
+        LOG.error(
+            f'Database delete_cluster_config failed: {response.error}')
+
+
 # =============================================================================
 # Cluster Config Public API Functions
 # =============================================================================
@@ -19025,6 +19040,20 @@ def set_cluster_config(key_name: str, value: Any) -> None:
         _grpc_set_cluster_config(key_name, value)
         return
     _direct_set_cluster_config(key_name, value)
+
+
+def delete_cluster_config(key_name: str) -> None:
+    """Delete a single cluster config key.
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Callers running on the database node
+    (MARIADB_HOST set) use direct access so that bootstrap-time
+    commands work before the database daemon is started.
+    """
+    if _use_database_service():
+        _grpc_delete_cluster_config(key_name)
+        return
+    _direct_delete_cluster_config(key_name)
 
 
 # =============================================================================

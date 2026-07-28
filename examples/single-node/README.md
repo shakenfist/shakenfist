@@ -88,16 +88,18 @@ and points `server_package` / `client_package` at the distributed wheels.
 The shared playbook runs, in order:
 
 1. (optional) build local wheels and distribute them;
-2. validate mesh MTUs, then compute the capability flags and cluster-wide
+2. validate mesh MTUs, then compute the capability flags, cluster-wide
    values (`network_node_ip`, `mariadb_gateway_hosts`, `max_hypervisor_mtu`,
-   `all_mesh_hosts`, `ram_system_reservation`);
+   `all_mesh_hosts`) and per-host resource reservation defaults
+   (`node_ram_reservation_gb`, `node_cpu_reservation_threads`,
+   `node_disk_reservation_gb`);
 3. validate KVM on the hypervisor;
 4. bootstrap the internal CA and distribute per-host SPICE certificates;
 5. bootstrap + configure the node (writes `/etc/sf/config` with the direct
    MariaDB block, because this box is the database tier);
 6. `sf-ctl ensure-mariadb-schema` (once);
-7. write the cluster config (`AUTH_SECRET_SEED`, `RAM_SYSTEM_RESERVATION`,
-   `MAX_HYPERVISOR_MTU`, `DNS_SERVER`, ...) and the system namespace key
+7. write the cluster config (`AUTH_SECRET_SEED`, `MAX_HYPERVISOR_MTU`,
+   `DNS_SERVER`, ...) and the system namespace key
    **before** registering, so `sf-database`'s `verify-config` gate passes;
 8. register the node and start the daemons;
 9. run the sanity checks (sf-api/sf-queues active, API returns 401).

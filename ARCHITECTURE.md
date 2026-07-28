@@ -814,9 +814,8 @@ ranks by **load per schedulable thread** in coarse buckets with
 headroom-weighted selection so differently sized machines share work
 proportionally.
 
-Capacity is reservation-aware: the resources daemon reserves physical
-cores and RAM for the operating system on every hypervisor, plus more on
-nodes carrying cluster-wide roles (network node, database node), and
+Capacity is reservation-aware: the resources daemon reserves hardware
+threads and RAM for the operating system on every hypervisor, and
 publishes the schedulable remainder (`cpu_schedulable`,
 `memory_reserved_mb`) in `node_metrics`. Admission and the
 `/admin/resources` API share the same arithmetic through common helpers.

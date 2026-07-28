@@ -83,8 +83,10 @@ class HybridCoreCountsTestCase(base.ShakenFistTestCase):
 
 class ComputeReservationsTestCase(base.ShakenFistTestCase):
     def test_hyperthreaded_plain_hypervisor(self):
-        # Ryzen 5 3600 shape: 6 cores, 12 threads, no infra role. One core
-        # reserved for the OS costs two threads.
+        # Ryzen 5 3600 shape: 6 cores, 12 threads. The default 2-thread
+        # reservation is subtracted straight off the thread count; the
+        # informational cpu_cores_reserved derives back to ceil(2 / 2) = 1
+        # physical core.
         self.assertEqual(
             {
                 'cpu_cores_reserved': 1,
@@ -92,11 +94,12 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_schedulable': 5,
                 'memory_reserved_mb': 2048,
             },
-            resources_main._compute_reservations(6, 12, False, 1, 1, 2.0, 4.0, 65536))
+            resources_main._compute_reservations(6, 12, 2, 2.0, 65536))
 
-    def test_hyperthreaded_infra_role(self):
-        # The same hardware carrying network or database duties reserves a
-        # second core and extra RAM.
+    def test_hyperthreaded_larger_reservation(self):
+        # The same hardware with a larger per-node reservation (for
+        # example the value Ansible templates onto an infra-role host):
+        # 4 threads reserved, 6 GB RAM.
         self.assertEqual(
             {
                 'cpu_cores_reserved': 2,
@@ -104,10 +107,11 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_schedulable': 4,
                 'memory_reserved_mb': 6144,
             },
-            resources_main._compute_reservations(6, 12, True, 1, 1, 2.0, 4.0, 65536))
+            resources_main._compute_reservations(6, 12, 4, 6.0, 65536))
 
-    def test_non_hyperthreaded_infra_role(self):
-        # 8 cores, 8 threads: reserved cores convert 1:1 to threads.
+    def test_non_hyperthreaded(self):
+        # 8 cores, 8 threads: threads_per_core is 1, so reserving 2 threads
+        # derives to 2 reserved physical cores.
         self.assertEqual(
             {
                 'cpu_cores_reserved': 2,
@@ -115,11 +119,12 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_schedulable': 6,
                 'memory_reserved_mb': 6144,
             },
-            resources_main._compute_reservations(8, 8, True, 1, 1, 2.0, 4.0, 65536))
+            resources_main._compute_reservations(8, 8, 2, 6.0, 65536))
 
-    def test_hybrid_infra_role(self):
+    def test_hybrid_topology(self):
         # i9-12900 shape: 16 cores, 24 threads. ceil(24 / 16) = 2 threads
-        # per reserved core, which errs conservative on hybrid parts.
+        # per core, so reserving 4 threads derives to 2 physical cores,
+        # which errs conservative on hybrid parts.
         self.assertEqual(
             {
                 'cpu_cores_reserved': 2,
@@ -127,25 +132,26 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_schedulable': 14,
                 'memory_reserved_mb': 6144,
             },
-            resources_main._compute_reservations(16, 24, True, 1, 1, 2.0, 4.0, 65536))
+            resources_main._compute_reservations(16, 24, 4, 6.0, 65536))
 
     def test_schedulable_floors_at_one(self):
-        # A tiny 2-core non-hyperthreaded infra node cannot reserve itself
-        # to zero.
+        # A tiny 2-core non-hyperthreaded node reserving more threads than
+        # it has cannot reserve itself to zero.
         self.assertEqual(
             {
-                'cpu_cores_reserved': 2,
+                'cpu_cores_reserved': 4,
                 'cpu_schedulable': 1,
                 'cpu_cores_schedulable': 1,
                 'memory_reserved_mb': 6144,
             },
-            resources_main._compute_reservations(2, 2, True, 1, 1, 2.0, 4.0, 65536))
+            resources_main._compute_reservations(2, 2, 4, 6.0, 65536))
 
     def test_memory_reservation_capped_on_small_nodes(self):
         # A small node carrying every role (the single-node deployment
-        # case) must not reserve itself out of scheduling: the memory
-        # reservation is capped at half the machine. Here the uncapped
-        # reservation would be 6144 MB of a 6144 MB node.
+        # case), or one given an oversized override, must not reserve
+        # itself out of scheduling: the memory reservation is capped at
+        # half the machine. Here the uncapped reservation would be 6144 MB
+        # of a 6144 MB node.
         self.assertEqual(
             {
                 'cpu_cores_reserved': 2,
@@ -153,7 +159,7 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_schedulable': 1,
                 'memory_reserved_mb': 3072,
             },
-            resources_main._compute_reservations(2, 4, True, 1, 1, 2.0, 4.0, 6144))
+            resources_main._compute_reservations(2, 4, 4, 6.0, 6144))
 
     def test_configurable_reservations(self):
         # The knobs are honoured, not hardcoded.
@@ -164,7 +170,7 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_schedulable': 12,
                 'memory_reserved_mb': 9216,
             },
-            resources_main._compute_reservations(16, 24, True, 2, 2, 1.0, 8.0, 65536))
+            resources_main._compute_reservations(16, 24, 8, 9.0, 65536))
 
 
 class HealthGaugeTestCase(base.ShakenFistTestCase):

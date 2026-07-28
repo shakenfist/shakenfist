@@ -31,8 +31,11 @@ a placement decision can be reconstructed after the fact (see
 5. **RAM admission** -- the node must retain its published memory
    reservation after placement, and KSM overcommit must stay
    under `RAM_OVERCOMMIT_RATIO`.
-6. **Disk capacity** -- requested disk must fit while leaving
-   `MINIMUM_FREE_DISK` GB free.
+6. **Disk capacity** -- requested disk must fit while leaving the
+   node's `NODE_DISK_RESERVATION_GB` free on the instances/blobs
+   filesystems. The candidate node publishes its own reservation as
+   the `disk_reservation_gb` metric, so admission honours that
+   node's per-host value rather than the evaluator's own config.
 7. **Disk bandwidth** -- nodes whose disks are saturated (busy
    more than 120% of wall time across spindles) are excluded.
 8. **Affinity** -- surviving nodes are scored against the
@@ -44,35 +47,50 @@ a placement decision can be reconstructed after the fact (see
 
 ## System reservations
 
-Some of a machine's capacity is never offered to instances. The
-resources daemon computes reservations locally (it knows the
-node's roles and CPU topology) and publishes the *schedulable*
-remainder in `node_metrics`; the scheduler consumes the published
-values rather than recomputing them.
+Some of a machine's capacity is never offered to instances. Each
+node carries three **per-node** reservation values -- RAM, CPU and
+disk -- set through that node's `/etc/sf/config`, which the deploy
+templates per host. These are ordinary node-local config keys, not
+cluster config: they are **never** set with `sf-ctl set-config`,
+which only reaches cluster-wide values. The resources daemon reads
+its own node's values, computes the *schedulable* remainder, and
+publishes it in `node_metrics`; the scheduler consumes the
+published values rather than recomputing them.
 
-Reservations are denominated in **physical cores, not threads**:
+- **CPU** -- `NODE_CPU_RESERVATION_THREADS` (default 2) is a count
+  of hardware **threads**, not physical cores, reserved for the
+  operating system and host-level services. It is subtracted
+  directly from the node's thread count; there is no cores-to-threads
+  conversion in the arithmetic that scheduling uses (an informational
+  `cpu_cores_reserved` field derives a core-equivalent for display,
+  but nothing in admission consumes it).
+- **RAM** -- `NODE_RAM_RESERVATION_GB` (default 2.0) is the amount
+  of RAM, in GB, held back for the operating system and host-level
+  services.
+- **Disk** -- `NODE_DISK_RESERVATION_GB` (default 20.0) is the free
+  disk, in GB, kept on the instances and blobs filesystems. It is
+  published as the `disk_reservation_gb` metric and applied at both
+  allocation points.
 
-- Every hypervisor reserves `CPU_SYSTEM_RESERVATION` cores
-  (default 1) for the operating system.
-- A node carrying a cluster-wide infrastructure role -- it is the
-  network node or a database node -- reserves
-  `CPU_INFRA_ROLE_RESERVATION` further cores (default 1). This is
-  one extra core in total, not one per role.
-- Reserved cores convert to threads at `ceil(threads / cores)`
-  threads per core, which errs conservative on hybrid parts where
-  some cores have two threads and some have one.
-
-RAM is treated symmetrically: every node holds back
-`RAM_SYSTEM_RESERVATION` GB (default 2) and infra-role nodes hold
-back `RAM_INFRA_ROLE_RESERVATION` GB more (default 4, sized for
-the network and database daemons' working sets).
+There is no separate reservation added on nodes carrying a
+cluster-wide role (network node, database node). Instead, the
+Ansible deploy computes a per-host *default* for each of the three
+values that already accounts for a node's roles -- each host's own
+10% of RAM floored at 2 GB, plus a 4 GB bump on network/database
+nodes, for RAM; `(1 + 1 if network/database else 0) * 2` threads for
+CPU; and a flat 20 GB for disk -- and only fills that default in
+when the operator hasn't already set the value. An operator can
+override any of the three per host in inventory (`host_vars` or
+`group_vars`), which is the supported way to give a specific node
+(for example one also running an unrelated sensor workload) extra
+headroom.
 
 The published fields are `cpu_cores`, `cpu_threads`,
 `cpu_cores_reserved`, `cpu_schedulable` (threads),
-`cpu_cores_schedulable` and `memory_reserved_mb`. On Intel hybrid
-CPUs the daemon also publishes `cpu_cores_performance` and
-`cpu_cores_efficiency`; these are informational and nothing in
-scheduling consumes them yet.
+`cpu_cores_schedulable`, `memory_reserved_mb` and
+`disk_reservation_gb`. On Intel hybrid CPUs the daemon also
+publishes `cpu_cores_performance` and `cpu_cores_efficiency`; these
+are informational and nothing in scheduling consumes them yet.
 
 ## Load-aware ordering
 
@@ -113,8 +131,9 @@ The historic default of 16 dated back to assumptions about large
 numbers of mostly-idle instances, and in practice never rejected a
 node -- RAM always bound first. If your workload matches that older
 assumption (many small, mostly-idle instances), the historic
-behaviour can be restored with `CPU_OVERCOMMIT_RATIO=16` and the
-reservation variables set to zero.
+behaviour can be restored with `CPU_OVERCOMMIT_RATIO=16` and
+`NODE_CPU_RESERVATION_THREADS` / `NODE_RAM_RESERVATION_GB` set to
+zero per node.
 
 Note that on a cluster already packed beyond the new cap, existing
 instances are untouched but new schedules to full nodes are
@@ -122,12 +141,16 @@ refused until they drain.
 
 ## Configuration reference
 
+Except for `CPU_OVERCOMMIT_RATIO`, `RAM_OVERCOMMIT_RATIO`,
+`SCHEDULER_TARGET_LOAD` and `SCHEDULER_CACHE_TIMEOUT` (cluster-wide,
+set with `sf-ctl set-config`), the reservation variables below are
+**per-node** and set through each node's `/etc/sf/config`:
+
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `CPU_SYSTEM_RESERVATION` | 1 | Physical cores reserved for the OS on every hypervisor |
-| `CPU_INFRA_ROLE_RESERVATION` | 1 | Additional cores reserved on network / database nodes |
-| `RAM_SYSTEM_RESERVATION` | 2.0 | GB of RAM reserved for the OS on every node |
-| `RAM_INFRA_ROLE_RESERVATION` | 4.0 | Additional GB reserved on network / database nodes |
+| `NODE_RAM_RESERVATION_GB` | 2.0 | GB of RAM reserved per node for the OS and host services |
+| `NODE_CPU_RESERVATION_THREADS` | 2 | Hardware threads reserved per node |
+| `NODE_DISK_RESERVATION_GB` | 20.0 | GB of free disk kept per node on the instances/blobs filesystems |
 | `CPU_OVERCOMMIT_RATIO` | 3.0 | vCPUs admitted per schedulable thread |
 | `SCHEDULER_TARGET_LOAD` | 0.75 | Target sustained load per schedulable thread, used for selection weighting |
 | `SCHEDULER_CACHE_TIMEOUT` | 5 | Seconds an sf-api worker caches its metrics view |
@@ -165,11 +188,13 @@ reports as available is what the scheduler would actually admit.
 ## Mixed-version clusters
 
 Metrics rows written by a resources daemon older than the
-reservation scheme lack the new fields. For exactly those rows
-the scheduler synthesises an approximate CPU reservation from the
-node's role flags (assuming two threads per reserved core) so
+reservation scheme lack the new fields. For exactly those rows the
+scheduler falls back to subtracting the evaluating node's own
+`NODE_CPU_RESERVATION_THREADS` (there is no infra-role bump in this
+fallback -- it cannot know a remote node's per-host override) so
 that a not-yet-upgraded node doesn't look artificially large and
-absorb bursts during the roll, and falls back to the config RAM
-reservation for memory. Audit events mark these nodes with
+absorb bursts during the roll. RAM and disk fall back the same way,
+to `NODE_RAM_RESERVATION_GB` and `NODE_DISK_RESERVATION_GB`
+respectively. Audit events mark these nodes with
 `cpu_schedulable_from_fallback`. The window closes as each node's
 resources daemon restarts and republishes.

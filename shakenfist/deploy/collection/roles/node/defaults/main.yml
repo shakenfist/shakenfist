@@ -17,6 +17,13 @@ node_is_hypervisor: false
 node_is_network_node: false
 node_is_database_node: false
 
+# Reservations. Literal fallbacks matching the server Field defaults, so a
+# standalone/role-isolated run still renders a sane /etc/sf/config. The
+# example playbook computes per-host values from inventory facts.
+node_ram_reservation_gb: 2.0
+node_cpu_reservation_threads: 2
+node_disk_reservation_gb: 20
+
 # Cluster-wide values (the same on every host). The example playbook computes
 # these from inventory group membership.
 network_node_ip: "127.0.0.1"

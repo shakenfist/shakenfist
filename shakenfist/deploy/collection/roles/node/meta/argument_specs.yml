@@ -106,6 +106,24 @@ argument_specs:
         default: "10.10.0.0/24"
         description:
           - The floating IP network block. Becomes SHAKENFIST_FLOATING_NETWORK.
+      node_ram_reservation_gb:
+        type: float
+        default: 2.0
+        description:
+          - This node's RAM reservation, in GB. Becomes
+            SHAKENFIST_NODE_RAM_RESERVATION_GB.
+      node_cpu_reservation_threads:
+        type: int
+        default: 2
+        description:
+          - This node's CPU thread reservation. Becomes
+            SHAKENFIST_NODE_CPU_RESERVATION_THREADS.
+      node_disk_reservation_gb:
+        type: float
+        default: 20.0
+        description:
+          - This node's disk reservation, in GB. Becomes
+            SHAKENFIST_NODE_DISK_RESERVATION_GB.
       system_key:
         type: str
         default: "unknown"

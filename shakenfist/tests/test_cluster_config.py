@@ -63,7 +63,7 @@ class DirectGetAllClusterConfigTestCase(base.ShakenFistTestCase):
             result=_MockResult(rows=[
                 ('AUTH_SECRET_SEED', 'secret123'),
                 ('DNS_SERVER', '8.8.8.8'),
-                ('RAM_SYSTEM_RESERVATION', 5),
+                ('RAM_OVERCOMMIT_RATIO', 5),
             ]))
         mock_engine.return_value = _MockEngine(conn)
 
@@ -71,7 +71,7 @@ class DirectGetAllClusterConfigTestCase(base.ShakenFistTestCase):
         self.assertEqual(result, {
             'AUTH_SECRET_SEED': 'secret123',
             'DNS_SERVER': '8.8.8.8',
-            'RAM_SYSTEM_RESERVATION': 5,
+            'RAM_OVERCOMMIT_RATIO': 5,
         })
 
     @mock.patch('shakenfist.mariadb._get_engine')
@@ -175,6 +175,30 @@ class PublicClusterConfigRoutingTestCase(base.ShakenFistTestCase):
         mariadb.set_cluster_config('DNS_SERVER', '8.8.8.8')
 
         mock_grpc.assert_called_once_with('DNS_SERVER', '8.8.8.8')
+        mock_direct.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_delete_cluster_config')
+    @mock.patch('shakenfist.mariadb._grpc_delete_cluster_config')
+    def test_delete_routes_to_direct_when_mariadb_host_set(
+            self, mock_grpc, mock_direct, mock_use_service):
+        mock_use_service.return_value = False
+
+        mariadb.delete_cluster_config('DNS_SERVER')
+
+        mock_direct.assert_called_once_with('DNS_SERVER')
+        mock_grpc.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_delete_cluster_config')
+    @mock.patch('shakenfist.mariadb._grpc_delete_cluster_config')
+    def test_delete_routes_to_grpc_otherwise(
+            self, mock_grpc, mock_direct, mock_use_service):
+        mock_use_service.return_value = True
+
+        mariadb.delete_cluster_config('DNS_SERVER')
+
+        mock_grpc.assert_called_once_with('DNS_SERVER')
         mock_direct.assert_not_called()
 
 

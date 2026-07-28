@@ -97,36 +97,31 @@ def _get_hybrid_core_counts(sysfs_root='/sys'):
         return {}
 
 
-def _compute_reservations(cpu_cores, cpu_threads, is_infra_role,
-                          cpu_system_reservation, cpu_infra_role_reservation,
-                          ram_system_reservation_gb, ram_infra_role_reservation_gb,
-                          memory_total_mb):
-    """Compute schedulable capacity after system reservations.
+def _compute_reservations(cpu_cores, cpu_threads, cpu_reservation_threads,
+                          ram_reservation_gb, memory_total_mb):
+    """Compute schedulable capacity after the node's reservations.
 
-    Reservations are expressed in physical cores (an infra-role node -- one
-    running cluster-wide daemons, that is a network node or database node --
-    reserves extra), but scheduling accounts in threads, so reserved cores
-    convert at ceil(threads / cores) threads per core. That rounding is
-    conservative on hybrid parts where threads-per-core is an average.
+    The CPU reservation is a single absolute per-node value expressed in
+    hardware threads, subtracted directly from the thread count scheduling
+    accounts in. The informational cpu_cores_reserved metric is derived
+    back into physical cores at ceil(threads / cores) threads per core,
+    which errs conservative on hybrid parts where threads-per-core is an
+    average.
 
     The memory reservation is capped at half the machine so that a small
     node carrying every role (the single-node deployment case) can still
     schedule instances -- the analogue of cpu_schedulable's floor of one.
+    It also bounds an oversized operator override.
     """
-    cpu_cores_reserved = cpu_system_reservation
-    memory_reserved_gb = ram_system_reservation_gb
-    if is_infra_role:
-        cpu_cores_reserved += cpu_infra_role_reservation
-        memory_reserved_gb += ram_infra_role_reservation_gb
-
-    memory_reserved_mb = int(memory_reserved_gb * 1024)
+    memory_reserved_mb = int(ram_reservation_gb * 1024)
     if memory_total_mb:
         memory_reserved_mb = min(memory_reserved_mb, memory_total_mb // 2)
 
     threads_per_core = math.ceil(cpu_threads / cpu_cores)
+    cpu_cores_reserved = math.ceil(cpu_reservation_threads / threads_per_core)
     return {
         'cpu_cores_reserved': cpu_cores_reserved,
-        'cpu_schedulable': max(1, cpu_threads - cpu_cores_reserved * threads_per_core),
+        'cpu_schedulable': max(1, cpu_threads - cpu_reservation_threads),
         'cpu_cores_schedulable': max(1, cpu_cores - cpu_cores_reserved),
         'memory_reserved_mb': memory_reserved_mb,
     }
@@ -171,25 +166,21 @@ class Monitor(daemon.Daemon):
             # CPU topology and system reservations. cpu_cores is physical
             # cores and cpu_threads is logical CPUs (cpu_max above is also
             # logical CPUs, from libvirt, and is retained for compatibility).
-            # Scheduling accounts in threads; reservations are expressed in
-            # physical cores. psutil can return None for either count, in
-            # which case we publish nothing and the scheduler falls back to
-            # its unreserved arithmetic for this node.
+            # Scheduling accounts in threads, and the reservation is a single
+            # absolute per-node value in threads. psutil can return None for
+            # either count, in which case we publish nothing and the
+            # scheduler falls back to its unreserved arithmetic for this node.
             cpu_cores = psutil.cpu_count(logical=False)
             cpu_threads = psutil.cpu_count(logical=True)
             if cpu_cores and cpu_threads:
-                infra_role = (config.NODE_IS_NETWORK_NODE or
-                              config.NODE_IS_DATABASE_NODE)
                 retval.update({
                     'cpu_cores': cpu_cores,
                     'cpu_threads': cpu_threads,
                 })
                 retval.update(_compute_reservations(
-                    cpu_cores, cpu_threads, infra_role,
-                    config.CPU_SYSTEM_RESERVATION,
-                    config.CPU_INFRA_ROLE_RESERVATION,
-                    config.RAM_SYSTEM_RESERVATION,
-                    config.RAM_INFRA_ROLE_RESERVATION,
+                    cpu_cores, cpu_threads,
+                    config.NODE_CPU_RESERVATION_THREADS,
+                    config.NODE_RAM_RESERVATION_GB,
                     psutil.virtual_memory().total // 1024 // 1024))
             retval.update(_get_hybrid_core_counts())
 
@@ -269,7 +260,8 @@ class Monitor(daemon.Daemon):
             retval.update({
                 'disk_total': total,
                 'disk_free': minimum,
-                'disk_used': used
+                'disk_used': used,
+                'disk_reservation_gb': config.NODE_DISK_RESERVATION_GB
             })
 
             # NOTE(mikal): these are _counters_ -- that is, like gauges in

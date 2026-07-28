@@ -511,6 +511,25 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         self.assertNotEqual(result.exit_code, 0)
         mock_mariadb.set_cluster_config.assert_not_called()
 
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_unset_config(self, mock_mariadb):
+        from shakenfist.client.ctl import unset_config
+
+        result = self.runner.invoke(unset_config, ['myflag'])
+
+        self.assertEqual(result.exit_code, 0)
+        mock_mariadb.delete_cluster_config.assert_called_once_with('myflag')
+        self.assertIn('Unsetting myflag', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_unset_config_no_flag(self, mock_mariadb):
+        from shakenfist.client.ctl import unset_config
+
+        result = self.runner.invoke(unset_config, [])
+
+        self.assertNotEqual(result.exit_code, 0)
+        mock_mariadb.delete_cluster_config.assert_not_called()
+
     @mock.patch('shakenfist.client.ctl.Namespace')
     def test_bootstrap_system_key_from_stdin(self, mock_namespace):
         from shakenfist.client.ctl import bootstrap_system_key

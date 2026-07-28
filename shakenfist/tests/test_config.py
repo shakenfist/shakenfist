@@ -24,13 +24,13 @@ class ConfigTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, conf.CPU_OVERCOMMIT_RATIO)
 
     @mock.patch.dict('os.environ',
-                     {'SHAKENFIST_RAM_SYSTEM_RESERVATION': '4.0'})
+                     {'SHAKENFIST_NODE_RAM_RESERVATION_GB': '4.0'})
     def test_float_override(self):
         conf = SFConfig()
-        self.assertTrue(isinstance(conf.RAM_SYSTEM_RESERVATION, float))
-        self.assertEqual(4.0, conf.RAM_SYSTEM_RESERVATION)
+        self.assertTrue(isinstance(conf.NODE_RAM_RESERVATION_GB, float))
+        self.assertEqual(4.0, conf.NODE_RAM_RESERVATION_GB)
 
     @mock.patch.dict('os.environ',
-                     {'SHAKENFIST_RAM_SYSTEM_RESERVATION': 'banana'})
+                     {'SHAKENFIST_NODE_RAM_RESERVATION_GB': 'banana'})
     def test_bogus_override(self):
         self.assertRaises(ValueError, SFConfig)
