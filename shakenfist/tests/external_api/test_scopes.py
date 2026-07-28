@@ -8,20 +8,19 @@ particular that everything which existed before scopes did keeps
 working, which is the property that makes this safe to ship.
 """
 
-import base64
 import json
 import logging
 import sys
-import time
-from unittest import mock
 
-import bcrypt
 import flask_restful
 
+from shakenfist import mariadb
 from shakenfist.external_api import app as external_api
-from shakenfist.external_api import base as api_base
 from shakenfist.external_api import scopes
 from shakenfist.namespace import Namespace
+from shakenfist.namespace_key import NamespaceKey
+from shakenfist.schema.namespace_key_attributes import (
+    NamespaceKeyAttributesData)
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -199,10 +198,6 @@ class EnforcementTestCase(base.ShakenFistTestCase):
         key = ns.lookup_key(name)
         # add_key does not take scopes yet -- the federated exchange in
         # a later step is what sets them -- so write them directly.
-        from shakenfist import mariadb
-        from shakenfist.schema.namespace_key_attributes import (
-            NamespaceKeyAttributesData)
-        from shakenfist.namespace_key import NamespaceKey
         obj = NamespaceKey.from_db_by_name(namespace, name)
         mariadb.update_namespace_key_attributes(
             NamespaceKeyAttributesData(

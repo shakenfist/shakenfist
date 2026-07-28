@@ -26,6 +26,7 @@ from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import Namespaces
 from shakenfist.util import access_tokens
+from shakenfist.util import credentials
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util.access_tokens import request_namespace
 
@@ -133,6 +134,19 @@ class AuthEndpoint(api_base.Resource):
             # Must be a string to encode()
             return sf_api.error(400, 'key is not a string')
 
+        # A secret carrying the reserved prefix but failing its
+        # checksum cannot match any stored key, because operator
+        # supplied secrets may not carry that prefix. Reject it before
+        # spending a bcrypt comparison per key on it. Note this is a
+        # cost optimisation and a corruption check, not a security
+        # boundary: a well formed but wrong secret still goes through
+        # the full comparison below.
+        if credentials.has_prefix(key) and not credentials.looks_valid(key):
+            namespace_from_db.add_event(
+                EVENT_TYPE_AUDIT,
+                'malformed cluster generated key presented')
+            return sf_api.error(401, 'unauthorized')
+
         # The accessor is an indexed listing of the namespace's keys
         # with the expiry filter pushed into SQL, so expired keys are
         # never bcrypt compared here -- they simply are not returned.
@@ -213,14 +227,12 @@ class AuthNamespacesEndpoint(api_base.Resource):
         if key_name:
             if not key:
                 return sf_api.error(400, 'no key specified')
-            if not isinstance(key, str):
-                # Must be a string to encode()
-                return sf_api.error(400, 'key is not a string')
             err = _validate_key_name(key_name)
             if err:
                 return err
-            if len(key) > 72:
-                return sf_api.error(422, 'keys cannot be longer than 72 characters')
+            key, err = _validate_key_secret(key)
+            if err:
+                return err
 
         ns = Namespace.new(namespace)
         ns.add_event(EVENT_TYPE_AUDIT, 'creation request from REST API')
@@ -330,23 +342,63 @@ class AuthNamespaceEndpoint(api_base.Resource):
         return namespace_from_db.external_view()
 
 
+def _validate_key_secret(key):
+    """Check an operator-supplied key secret.
+
+    Returns (key, error_response), exactly one of which is None.
+
+    The sfk_ prefix is reserved for secrets the cluster generates. That
+    reservation is load bearing rather than cosmetic: /auth rejects a
+    presented secret which carries the prefix but fails its checksum,
+    without bcrypt comparing it against anything, and that is only
+    sound if no legitimate operator secret can be shaped that way.
+    """
+    if not isinstance(key, str):
+        # Must be a string to encode()
+        return None, sf_api.error(400, 'key is not a string')
+    if len(key) > 72:
+        return None, sf_api.error(
+            422, 'keys cannot be longer than 72 characters')
+    if credentials.has_prefix(key):
+        return None, sf_api.error(
+            400, 'the %s prefix is reserved for cluster generated keys; '
+                 'omit the key entirely to have one generated for you'
+                 % credentials.PREFIX)
+    return key, None
+
+
 def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None):
-    """Create or rotate a namespace key. ``ns`` is a Namespace object."""
+    """Create or rotate a namespace key. ``ns`` is a Namespace object.
+
+    Returns the key name, or a dict carrying the generated secret when
+    the caller asked the cluster to pick one.
+    """
     if not key_name:
         return sf_api.error(400, 'no key name specified')
-    if not key:
-        return sf_api.error(400, 'no key specified')
     err = _validate_key_name(key_name)
     if err:
         return err
-    if len(key) > 72:
-        return sf_api.error(422, 'keys cannot be longer than 72 characters')
+
+    # A caller who supplies no secret is asking the cluster to generate
+    # one. The generated form is the only way to get a secret carrying
+    # the sfk_ prefix, and it is returned exactly once -- only the
+    # bcrypt hash is stored, so it cannot be recovered afterwards.
+    generated = False
+    if not key:
+        key = credentials.generate()
+        generated = True
+    else:
+        key, err = _validate_key_secret(key)
+        if err:
+            return err
 
     expiry, err = _validate_key_expiry(expiry)
     if err:
         return err
 
     ns.add_key(key_name, key, expiry=expiry)
+    if generated:
+        return {'key_name': key_name, 'key': key}
     return key_name
 
 
