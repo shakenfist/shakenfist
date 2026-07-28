@@ -113,7 +113,6 @@ class ClusterOperationEndpoint(api_base.Resource):
         [(200, 'Information about a single cluster operation.', clusteroperation_get_example),
          (403, 'Operation belongs to a namespace the caller cannot see.', None),
          (404, 'Operation not found.', None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, operation_type=None, operation_uuid=None):
         if operation_type not in OPERATION_NAMES_TO_CLASSES:
@@ -172,7 +171,6 @@ class ClusterOperationChainEndpoint(api_base.Resource):
          (403, 'Chain crosses into a namespace the caller cannot see, '
           'or includes an op without a recorded target.', None),
          (404, 'Operation not found.', None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, op_uuid=None):
         root = _hydrate_op(op_uuid)
@@ -303,7 +301,6 @@ class ClusterOperationsEndpoint(api_base.Resource):
          (400, 'Invalid target_object_type or missing target_uuid.', None),
          (403, 'Target object is in a namespace you cannot see.', None),
          (404, 'Target object not found.', None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, target_object_type=None, target_uuid=None):
         # These parameters arrive as keyword arguments when the SF client

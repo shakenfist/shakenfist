@@ -32,7 +32,6 @@ class AdminLocksEndpoint(api_base.Resource):
         [(200, 'All locks currently held in the cluster.',
           admin_locks_get_example)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self):
@@ -51,7 +50,6 @@ class AdminClusterCaCertificateEndpoint(api_base.Resource):
         'admin', 'Retrieve the CA certificate used for TLS in this cluster.', [],
         [(200, 'A PEM encoded CA certificate.',
           admin_cacert_get_example)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self):
         cacert = ''
@@ -86,7 +84,6 @@ class AdminVDITokenPublicKeyEndpoint(api_base.Resource):
           admin_vdi_token_pubkey_get_example),
          (404, 'No Kerbside VDI token signing key has been configured.',
           None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self):
         material = vdi_tokens.get_signing_material()
@@ -109,7 +106,6 @@ class AdminResourcesEndpoint(api_base.Resource):
         [(200, 'All summary of resource usage and availability in the cluster.',
           admin_resources_get_example)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self):

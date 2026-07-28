@@ -70,7 +70,6 @@ class NodeEndpoint(api_base.Resource):
         [('node_name', 'query', 'node', 'The name of a node.', True)],
         [(200, 'Information about a single node.', node_get_example),
          (404, 'Node not found.', None)]))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):
@@ -84,7 +83,6 @@ class NodeEndpoint(api_base.Resource):
         [('node_name', 'query', 'node', 'The name of a node.', True)],
         [(200, 'Information about a single node.', node_delete_example),
          (404, 'Node not found.', None)]))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def delete(self, node=None):
@@ -122,7 +120,6 @@ class NodesEndpoint(api_base.Resource):
         [],
         [(200, 'Information about all nodes.', node_list_example),
          (404, 'Node not found.', None)]))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self):
@@ -170,7 +167,6 @@ class NodeEventsEndpoint(api_base.Resource):
         ],
         [(200, 'Event information about a single node.', node_events_example),
          (404, 'Node not found.', None)]))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None, event_type=None, limit=100):
@@ -195,7 +191,6 @@ class NodeProcessMetricsEndpoint(api_base.Resource):
         ],
         [(200, 'Process metrics for a single node.', node_process_metrics_example),
          (404, 'Node not found.', None)]))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):
@@ -212,7 +207,6 @@ class NodeMetadatasEndpoint(api_base.Resource):
         [(200, 'Node metadata, if any.', None),
          (404, 'Node not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):
@@ -232,7 +226,6 @@ class NodeMetadatasEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Node not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def post(self, node=None, key=None, value=None):
@@ -261,7 +254,6 @@ class NodeMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Node not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def put(self, node=None, key=None, value=None):
@@ -287,7 +279,6 @@ class NodeMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Node not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @api_base.log_token_use
     def delete(self, node=None, key=None, value=None):

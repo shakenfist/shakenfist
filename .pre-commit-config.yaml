@@ -71,6 +71,19 @@ repos:
         files: ^shakenfist/external_api/.*\.py$
         pass_filenames: false
 
+      - id: check-endpoint-authentication
+        name: Check endpoints authenticate by default
+        description: >-
+          Authentication is applied to every resource method by
+          api_base.Resource.method_decorators. Reject resources which
+          subclass flask_restful.Resource directly (they would miss it
+          entirely) and @api_base.public markers which are not the
+          outermost decorator (they would be invisible at dispatch).
+        entry: tools/check-endpoint-authentication.sh
+        language: system
+        files: ^shakenfist/external_api/.*\.py$
+        pass_filenames: false
+
   # Type checking with mypy (incremental rollout via tox)
   # Requires: pip install tox mypy
   - repo: local

@@ -143,7 +143,6 @@ class NetworkEndpoint(api_base.Resource):
           'The namespace to contain the network.', False)],
         [(200, 'Information about a single network.', network_get_example),
          (404, 'Network not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -159,7 +158,6 @@ class NetworkEndpoint(api_base.Resource):
           'operation that will perform the work; clients should poll the '
           'cluster-operations endpoints to observe completion.', None),
          (404, 'Network not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.requires_namespace_exist_if_specified
@@ -210,7 +208,6 @@ class NetworksEndpoint(api_base.Resource):
         'networks', 'Get a list of all networks visible to the authenticated namespace.',
         [('all', 'body', 'boolean', 'Include deleted networks.', False)],
         [(200, 'A list of information about visible networks.', networks_get_example)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
         filters = [partial(baseobject.namespace_filter,
@@ -245,7 +242,6 @@ class NetworksEndpoint(api_base.Resource):
         ],
         [(200, 'Information about a single network.', network_get_example),
          (400, 'The netblock is invalid.', None)]))
-    @api_base.verify_token
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
@@ -294,7 +290,6 @@ class NetworksEndpoint(api_base.Resource):
                'completion.', None),
          (400, 'The confirm parameter is not True or a administrative user has '
                'not specified a namespace.', None)]))
-    @api_base.verify_token
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def delete(self, confirm=False, namespace=None, clean_wait=False):
@@ -397,7 +392,6 @@ class NetworkEventsEndpoint(api_base.Resource):
         ],
         [(200, 'Event information about a single network.', network_events_example),
          (404, 'Network not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -442,7 +436,6 @@ class NetworkInterfacesEndpoint(api_base.Resource):
         [(200, 'The network interfaces on a single network.',
           network_interfaces_example),
          (404, 'Network not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -463,7 +456,6 @@ class NetworkMetadatasEndpoint(api_base.Resource):
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -481,7 +473,6 @@ class NetworkMetadatasEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Network not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -508,7 +499,6 @@ class NetworkMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Network not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -532,7 +522,6 @@ class NetworkMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Network not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -583,7 +572,6 @@ class NetworkPingEndpoint(api_base.Resource):
           None),
          (404, 'Network not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     # NOTE(phase-7): this is the sole remaining `redirect_to_network_node`
@@ -631,7 +619,6 @@ class NetworkAddressesEndpoint(api_base.Resource):
         ],
         [(200, 'Address allocations', network_allocations_example),
          (404, 'Network not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -654,7 +641,6 @@ class NetworkRouteAddressEndpoint(api_base.Resource):
         [(200, 'The address that was routed', None),
          (507, 'No floating addresses are available', None),
          (404, 'Network not found.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.requires_network_active
@@ -687,7 +673,6 @@ class NetworkUnrouteAddressEndpoint(api_base.Resource):
         [(200, 'The address that was routed', None),
          (403, 'That address is not routed by this network.', None),
          (404, 'That address is not routed.', None)]))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.requires_network_active
@@ -728,7 +713,6 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
          (400, 'Network does not have provide_dns enabled', None),
          (404, 'Network not found.', None),
          (406, 'The provided DNS entry is invalid', None)]))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.requires_network_active
@@ -757,7 +741,6 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
          (400, 'Network does not have provide_dns enabled or name not found', None),
          (404, 'Network not found.', None),
          (406, 'The provided DNS entry is invalid', None)]))
-    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.requires_network_active
@@ -808,7 +791,6 @@ class NetworkOutstandingOperationsEndpoint(api_base.Resource):
             'A list of the cluster operations not yet executed for this network.',
             network_outstanding_operations_example),
          (404, 'Network not found.', None)]))
-    @api_base.verify_token
     @use_kwargs(get_args, location='query')
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership

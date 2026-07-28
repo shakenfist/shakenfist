@@ -221,6 +221,7 @@ def log_response_info(response):
 
 
 class Root(api_base.Resource):
+    @api_base.public
     def get(self):
         resp = flask.Response(
             ('<html><head><title>Shaken Fist REST API service</title></head>'
@@ -260,6 +261,7 @@ class Livez(api_base.Resource):
     # Unauthenticated: liveness means "this worker process is serving HTTP".
     # It deliberately does not check any downstream dependency, so a healthy
     # but not-yet-ready worker is not killed by an orchestrator liveness probe.
+    @api_base.public
     def get(self):
         resp = flask.Response('ok', mimetype='text/plain')
         resp.status_code = 200
@@ -270,6 +272,7 @@ class Readyz(api_base.Resource):
     # Unauthenticated: readiness reflects whether this worker should receive
     # traffic. health.is_ready() already returns False when the worker is
     # draining or its cached readiness state is stale.
+    @api_base.public
     def get(self):
         if health.is_ready():
             return flask.Response('ready', mimetype='text/plain', status=200)

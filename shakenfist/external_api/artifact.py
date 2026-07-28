@@ -229,7 +229,6 @@ class ArtifactEndpoint(api_base.Resource):
           'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact not found.', None)]))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
@@ -247,7 +246,6 @@ class ArtifactEndpoint(api_base.Resource):
         [(200, ('The artifact has been deleted. The final state of the '
                 'artifact is returned.'), artifact_delete_example),
          (404, 'Artifact not found.', None)]))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -303,7 +301,6 @@ class ArtifactsEndpoint(api_base.Resource):
         [(200, ('A list of artifact dictionaries, each containing the same '
                 'output as a GET for a single artifact would show.'),
           artifacts_get_example)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self, node=None):
         retval = []
@@ -339,7 +336,6 @@ class ArtifactsEndpoint(api_base.Resource):
         ],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact not found.', None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist_if_specified
     def post(self, url=None, shared=False, namespace=None):
@@ -389,7 +385,6 @@ class ArtifactsEndpoint(api_base.Resource):
          (400, ('Confirm parameter not set, or a system user must specify a '
                 'namespace.'), None),
          (401, 'You cannot delete other namespaces.', None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist_if_specified
     def delete(self, confirm=False, namespace=None):
@@ -446,7 +441,6 @@ class ArtifactUploadEndpoint(api_base.Resource):
         [(200, 'Information about a single artifact.', artifact_get_example),
          (403, 'Invalid artifact type specified.', None),
          (404, 'Upload, namespace, or blob not found.', None)]))
-    @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist_if_specified
     def post(self, artifact_name=None, upload_uuid=None, blob_uuid=None,
@@ -574,7 +568,6 @@ class ArtifactEventsEndpoint(api_base.Resource):
         ],
         [(200, 'Event information about a single artifact.', artifact_events_example),
          (404, 'Artifact not found.', None)]))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
@@ -627,7 +620,6 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         [(200, 'A list of the blobs which form the artifact versions.',
           artifact_versions_example),
          (404, 'Artifact not found.', None)]))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_access
     def get(self, artifact_ref=None, artifact_from_db=None):
@@ -653,7 +645,6 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         [(200, 'No return value', ''),
          (400, 'The max_versions must be an integer.', None),
          (404, 'Artifact not found.', None)]))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -681,7 +672,6 @@ class ArtifactVersionEndpoint(api_base.Resource):
         ],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact index not found.', None)]))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -713,7 +703,6 @@ class ArtifactShareEndpoint(api_base.Resource):
         [(200, 'Information about a single artifact.', artifact_get_example),
          (403, 'Only artifacts in the system namespace may be shared.', None),
          (404, 'Artifact not found.', None)]))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -735,7 +724,6 @@ class ArtifactUnshareEndpoint(api_base.Resource):
         [(200, 'Information about a single artifact.', artifact_get_example),
          (403, 'Artifact not shared.', None),
          (404, 'Artifact not found.', None)]))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -756,7 +744,6 @@ class ArtifactMetadatasEndpoint(api_base.Resource):
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -774,7 +761,6 @@ class ArtifactMetadatasEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -801,7 +787,6 @@ class ArtifactMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -825,7 +810,6 @@ class ArtifactMetadataEndpoint(api_base.Resource):
          (400, 'One of key or value are missing.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -872,7 +856,6 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
             'A list of the cluster operations not yet executed for this artifact.',
             artifact_outstanding_operations_example),
          (404, 'Artifact not found.', None)]))
-    @api_base.verify_token
     @use_kwargs(get_args, location='query')
     @arg_is_artifact_ref
     @requires_artifact_access

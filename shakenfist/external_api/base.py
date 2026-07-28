@@ -740,11 +740,52 @@ def object_events_response(object_type, object_uuid, limit, event_type):
     ]
 
 
+def public(func):
+    """Mark an endpoint method as deliberately unauthenticated.
+
+    Authentication is applied to every resource method by
+    Resource.method_decorators below, so this marker is the only way
+    out of it, and every use of it needs justifying in review. There
+    should only ever be a handful.
+
+    Apply it as the outermost (topmost) decorator on the method. The
+    marker is an attribute read off the bound method at dispatch time,
+    and several decorators in this file predate functools.wraps and so
+    do not propagate attributes -- being outermost means the marker
+    cannot be swallowed by whatever is applied beneath it. The
+    structural test in shakenfist/tests/external_api/test_auth_universal.py
+    enumerates the routes and will fail if this is ever not true.
+    """
+    func._sf_public = True
+    return func
+
+
+def _authenticate_unless_public(func):
+    # The method_decorators entry which makes authentication the
+    # default. flask_restful applies these to the bound method at
+    # dispatch, so this wraps outside every per-method decorator --
+    # which is what lets authentication precede the ownership checks
+    # that assume an authenticated caller.
+    if getattr(func, '_sf_public', False):
+        return func
+    return verify_token(func)
+
+
 class Resource(flask_restful.Resource):
     # Remember that order here matters, the record_exception
     # wrapper deliberately reraises the exception so that
     # generic_wrapper can handle the response after logging.
+    #
+    # flask_restful applies these in list order with each wrapping the
+    # previous, so the LAST entry ends up outermost and therefore runs
+    # FIRST. Reading bottom to top gives execution order: exceptions
+    # are suppressed and recorded, authorization errors are turned into
+    # responses, the request is logged, and only then is the caller
+    # authenticated. Authentication is last in that sequence but still
+    # ahead of every per-method decorator, so an unauthenticated
+    # request never reaches an ownership check.
     method_decorators = [
+        _authenticate_unless_public,
         log_request,
         handle_authorization_exceptions,
         handle_database_unavailable,

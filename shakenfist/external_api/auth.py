@@ -111,6 +111,9 @@ def _validate_key_expiry(expiry):
 
 
 class AuthEndpoint(api_base.Resource):
+    # Unauthenticated by definition: this is where a caller trades a
+    # namespace key for a token, so it cannot require a token.
+    @api_base.public
     @swag_from(api_base.swagger_helper(
         'auth', 'Authenticate and create access token.',
         [
@@ -192,7 +195,6 @@ class AuthNamespacesEndpoint(api_base.Resource):
          (400, 'No namespace specified, no key specified, or key is not a string.', None),
          (403, 'Illegal key name.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
@@ -250,7 +252,6 @@ class AuthNamespacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'List all namespaces visible to this namespace.', [],
         [(200, 'The namespace as created.', namespace_list_example)]))
-    @api_base.verify_token
     @api_base.log_token_use
     def get(self):
         retval = []
@@ -271,7 +272,6 @@ class AuthNamespaceEndpoint(api_base.Resource):
          (403, 'You cannot delete the system namespace.', None),
          (404, 'Namespace not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @arg_is_namespace
     @api_base.log_token_use
@@ -316,7 +316,6 @@ class AuthNamespaceEndpoint(api_base.Resource):
         ],
         [(200, 'Information about a single namespace.', namespace_get_example),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -353,7 +352,6 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
         ],
         [(200, 'A list of keynames for the namespace.', '["deploy", ...]'),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -379,7 +377,6 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
          (403, 'Illegal key name.', None),
          (404, 'Namespace not found.', None),
          (422, 'Keys cannot be longer than 72 characters.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.requires_namespace_exist_if_specified
@@ -412,7 +409,6 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
          (404, 'Namespace or key not found.', None),
          (422, 'Keys cannot be longer than 72 characters.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @api_base.caller_is_admin
     @requires_namespace_ownership
     @arg_is_namespace
@@ -444,7 +440,6 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
         [(200, 'Nothing.', None),
          (400, 'No key name specified.', None),
          (404, 'Namespace or key not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -469,7 +464,6 @@ class AuthMetadatasEndpoint(api_base.Resource):
         ],
         [(200, 'Namespace metadata, if any.', None),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -486,7 +480,6 @@ class AuthMetadatasEndpoint(api_base.Resource):
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @api_base.requires_namespace_exist_if_specified
     @arg_is_namespace
@@ -513,7 +506,6 @@ class AuthMetadataEndpoint(api_base.Resource):
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @api_base.requires_namespace_exist_if_specified
     @arg_is_namespace
@@ -537,7 +529,6 @@ class AuthMetadataEndpoint(api_base.Resource):
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
          (404, 'Namespace not found.', None)]))
-    @api_base.verify_token
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
@@ -560,7 +551,6 @@ class AuthNamespaceTrustsEndpoint(api_base.Resource):
          (400, 'No external namespace specified.', None),
          (404, 'Namespace not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_namespace
     @api_base.log_token_use
     def post(self, namespace=None, external_namespace=None, namespace_from_db=None):
@@ -591,7 +581,6 @@ class AuthNamespaceTrustEndpoint(api_base.Resource):
          (400, 'No external namespace specified.', None),
          (404, 'Namespace not found.', None)],
         requires_admin=True))
-    @api_base.verify_token
     @arg_is_namespace
     @api_base.log_token_use
     def delete(self, namespace=None, external_namespace=None, namespace_from_db=None):
