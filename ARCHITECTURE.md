@@ -840,6 +840,16 @@ Objects follow defined state machines. Key states:
 - `initial` -> `created`
 - `created` -> `deleted`
 
+### Namespace Key States
+- `initial` -> `created`
+- `created` -> `deleted` (soft delete)
+
+A `NamespaceKey` (`shakenfist/namespace_key.py`) is the credential a namespace
+authenticates with, and is a database-backed object owned by its namespace.
+There is no error state, because key operations are atomic. Expiry is not a
+state: it is enforced when the key is used, and the cluster daemon separately
+soft-deletes long-expired keys so that the standard reaper hard-deletes them.
+
 See `docs/developer_guide/state_machine.md` for complete documentation.
 
 ## Configuration
@@ -957,7 +967,14 @@ The develop branch uses:
 ## Security Model
 
 - Multi-tenant with namespace isolation
-- JWT-based authentication
+- JWT-based authentication, minted from namespace keys and bound to the
+  minting key's nonce so that rotating or deleting a key revokes its
+  outstanding tokens immediately
+- Namespace keys are database-backed objects with optional expiry, enforced
+  when the key is used rather than by a sweep
+- Credentials never enter events, which are shipped to syslog and Loki;
+  events record the key name, and request tracing does not log bodies for
+  routes under `/auth`
 - RBAC with admin/user roles
 - Network isolation via VXLAN
 

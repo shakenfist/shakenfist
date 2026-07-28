@@ -131,12 +131,15 @@ with Linux network namespaces, which the networking documentation uses heavily
 (`docs/operator_guide/networking/overview.md`).
 
 **namespace key**{#namespace-key} -- The stored credential from which
-[access tokens](#access-token) are minted: a bcrypt hash plus a [nonce](#nonce),
-and -- as the federation work lands -- optional expiry, [scopes](#scope), and
-provenance. `/auth` bcrypt-compares a presented secret against the namespace's
-keys and mints a token bound to the matching key's nonce. Defined in
-`shakenfist/namespace.py` (the `keys`, `add_key`, and `remove_key` members) and
-`docs/developer_guide/authentication.md`.
+[access tokens](#access-token) are minted: a bcrypt hash, a [nonce](#nonce),
+and an optional expiry. [Scopes](#scope) and provenance are reserved on the
+object but are not yet populated or enforced -- they arrive with the federation
+exchange. `/auth` bcrypt-compares a presented secret against the namespace's
+unexpired keys and mints a token bound to the matching key's nonce. A key is a
+first-class object owned by its namespace, with its own lifecycle, events and
+soft delete. Defined in `shakenfist/namespace_key.py` (the object) and
+`shakenfist/namespace.py` (the `keys`, `lookup_key`, `add_key` and `remove_key`
+members), and described in `docs/developer_guide/authentication.md`.
 
 **node**{#node} -- A cluster member machine. A node carries one or more *roles*,
 which are configuration, not object types:

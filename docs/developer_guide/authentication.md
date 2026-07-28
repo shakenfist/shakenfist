@@ -122,6 +122,53 @@ the key) and logging which access token was used in the event logs.
     Shaken Fist. This usage is discussed in the *Inter-node Authentication* section
     below.
 
+### Keys are objects
+
+A key is a first-class object owned by its namespace, with the same lifecycle
+machinery as an instance or a network: its own UUID, state machine, event
+stream, and soft delete. Practically, that means a key's history is auditable
+-- when it was created, when it was rotated, when it expired -- rather than
+being an anonymous entry in a JSON blob hanging off the namespace.
+
+Nothing about this is visible on the wire. The key management endpoints and
+their responses are unchanged, and a client written against an older release
+behaves identically.
+
+### Rotation
+
+Adding a key whose name already exists rotates that key rather than creating a
+second one. The stored hash is replaced, and so is the nonce -- which means
+every access token minted from the old secret stops validating immediately.
+The key object itself survives with its UUID and its event history intact, so a
+rotation shows up as an event on the key rather than as a delete and a create.
+
+This is long-standing behaviour: `add-key` has always overwritten a key of the
+same name. It is called out here because it is the mechanism behind revocation,
+and because rotation clears any expiry the key previously carried.
+
+### Expiry
+
+A key may carry an optional expiry, as epoch seconds, supplied when the key is
+created or updated. A key with no expiry never expires, which is the default
+and matches every key created before this feature existed.
+
+Enforcement is at the point of use, not on a timer. An expired key can neither
+mint new tokens at `/auth` nor validate a request, from the instant it lapses
+-- there is no window in which an expired key still works because a cleanup
+task has not run yet. Tokens already minted from a key that later expires
+remain valid until their own expiry, which is nominally fifteen minutes; delete
+the key if you need them invalidated immediately, since that changes the nonce.
+
+Expired keys are tidied up by the cluster daemon rather than vanishing the
+moment they lapse. It soft-deletes keys that expired more than
+`NAMESPACE_KEY_REAP_GRACE` seconds ago (one hour by default; set it to `0` to
+disable reaping and keep expired keys forever), and the standard object reaper
+hard-deletes them once they have been soft-deleted for `CLEANER_DELAY`. The
+grace period exists so that an operator debugging automation which suddenly
+stopped working can still see the key that lapsed. Because enforcement is at
+the point of use, none of these timings affect security -- only how long the
+evidence sticks around.
+
 ## Authenticating directly to the REST API
 
 The authentication endpoint `/auth` is used to obtain a token to authenticate
@@ -243,7 +290,38 @@ named "_service_key". From v0.7 service keys have a name of the form
 
 ## Key Storage
 
-Shaken Fist stores the access keys in MariaDB (in the `namespace_attributes`
-table). The keys are stored as the base64 encoding of the key post salting and
-hashing. The python `bcrypt` library is used to perform salting, hashing, and
-key verification.
+Shaken Fist stores keys in MariaDB across two tables: `namespace_keys` holds
+the immutable values (UUID, owning namespace, key name), and
+`namespace_key_attributes` holds what rotation changes (the hash, the nonce,
+the expiry). The secret itself is never stored -- what is kept is the base64
+encoding of the secret after salting and hashing, with the python `bcrypt`
+library performing salting, hashing and verification.
+
+The `(namespace, name)` pair carries a unique index, which is what makes a key
+name unique within its namespace and what serves the per-namespace listing on
+the authentication path.
+
+Keys previously lived in a `keys` JSON column on the `namespace_attributes`
+table. Existing keys are migrated into the new tables by
+`sf-ctl ensure-mariadb-schema` during upgrade, preserving each key's hash,
+nonce and expiry exactly, so tokens minted before the upgrade continue to
+validate. The old column is left in place but is no longer read or written.
+Note that this means downgrading after the migration loses any key created
+afterwards; keys that predate the upgrade are unaffected.
+
+## Secrets and the event log
+
+Credentials never appear in events. This matters more than it might sound,
+because events are written to syslog and shipped to Loki, so a credential in an
+event is a credential in log aggregation -- somewhere with weaker access
+control than the credential itself.
+
+Concretely: minted tokens, presented tokens, stored hashes and nonces are all
+absent from event payloads. What is recorded is the key *name*, which is what
+makes an audit trail useful without making it a credential store.
+
+The generic API request tracing, which records request and response bodies for
+debugging, does not log bodies for any route under `/auth`. Those routes carry
+plaintext key secrets inbound and minted tokens outbound. The request URL is
+still recorded, so the trace retains the namespace and the key name and loses
+only the credential.

@@ -246,31 +246,45 @@ no caching crept in and the `_service_key` bypass survived. After
 
 ## Definition of done
 
-- [ ] 2a's behaviour-preservation suite exists in a commit that
+- [x] 2a's behaviour-preservation suite exists in a commit that
       predates every production change, and passes unmodified at
-      phase end.
-- [ ] `namespace_keys` + `namespace_key_attributes` tables exist,
+      phase end. `test_namespace_keys.py` was never edited after
+      2a; `test_auth.py` has additions only.
+- [x] `namespace_keys` + `namespace_key_attributes` tables exist,
       version-gated, with the migration as the v1→v2 step; the
       legacy JSON column is untouched and unread.
-- [ ] `NamespaceKey` is a DBO with events, soft delete, expiry,
+- [x] `NamespaceKey` is a DBO with events, soft delete, expiry,
       NULL scopes/provenance placeholders, and SQL-pushdown
       listing; registered for the standard hard-delete reaper.
-- [ ] `/auth`, `verify_token`, key CRUD, `external_view`, and
+- [x] `/auth`, `verify_token`, key CRUD, `external_view`, and
       `get_api_token` all serve from the key objects; wire shapes
       byte-identical except the additive `expiry` parameter and
       the fixed PUT endpoint.
-- [ ] Expired keys are soft-deleted by the cluster daemon sweep
+- [x] Expired keys are soft-deleted by the cluster daemon sweep
       and hard-deleted by the existing reaper; enforcement never
       depends on either.
-- [ ] No event carries a JWT or key hash; asserted by tests.
-- [ ] `pre-commit run --all-files` clean; `tox -e genprotos`
-      no-op; unit tests green; functional CI green on the branch.
-- [ ] Master plan open question 7 marked resolved; phase status
+- [x] No event carries a JWT or key hash; asserted by tests. Went
+      further than planned: the tests assert the secret appears in
+      *no* event under any key, which found a fifth site the plan
+      had not counted (raw request/response bodies logged by the
+      API request tracing, so `POST /auth` recorded the caller's
+      plaintext key). Bodies are no longer logged under `/auth`.
+      The token nonce was also removed, after the operator agreed
+      it should not be published either.
+- [x] `pre-commit run --all-files` clean; `tox -e genprotos`
+      no-op (verified by md5sum over the generated stubs before
+      and after); unit tests green at 1438.
+- [ ] Functional CI green on the branch. **Not yet run** — the
+      branch has not been pushed, so no CI has ever executed
+      against it. This is the one outstanding item at phase end.
+- [x] Master plan open question 7 marked resolved; phase status
       updated in the Execution table and `docs/plans/index.md`;
       glossary and guides updated.
-- [ ] Each step is a single self-contained commit following
+- [x] Each step is a single self-contained commit following
       project conventions including the Prompt paragraph and
-      Co-Authored-By line.
+      Co-Authored-By line. Two commits beyond the step plan: the
+      nonce removal, and the master-plan phases 6 and 7 that step
+      2g's findings prompted.
 
 ## Back brief
 

@@ -242,6 +242,30 @@ the keys used to authenticate to a namespace.
     ['jenkins', 'newkey']
     ```
 
+???+ info "Key expiry"
+
+    The create (`POST`) and update (`PUT`) calls accept an optional `expiry`
+    body parameter, as epoch seconds. A key with no expiry never expires,
+    which is the default and the behaviour of every key created before this
+    parameter existed.
+
+    The value must be a number in the future. An expiry in the past is
+    rejected with a 400 rather than creating a key which is unusable the
+    instant it exists, since that is far more likely to be a units mistake
+    -- milliseconds instead of seconds, say -- than an intent.
+
+    An expired key can neither mint new tokens nor validate a request, from
+    the moment it lapses. Tokens already minted from it remain valid until
+    their own expiry; delete the key if you need those invalidated
+    immediately.
+
+    Note that updating a key rotates it, and rotation replaces the whole
+    mutable attribute set. Updating a key without passing `expiry` clears
+    any expiry it previously carried.
+
+    The `sf-client` command line does not expose a flag for this yet, so use
+    the REST API or the Python client directly for now.
+
 ??? example "Python API client: remove a specific key from a namespace"
 
     This example deletes a key from the namespace and then lists all keys:

@@ -344,6 +344,36 @@ groundwork exists, and lives mostly outside this repository.
      any caching is warranted (with care: a stale cache
      would delay nonce-based revocation, which is the
      mechanism's whole point).
+
+   **Resolved by phase 2 (2026-07-27).** One-shot migration,
+   no dual-read window. Schema migrations here are
+   operator-driven via `sf-ctl ensure-mariadb-schema`, and
+   `sf-database` refuses to start against a stale schema, so
+   there is no window in which old and new code run against
+   the same database and nothing for a dual read to protect.
+   The migration is the v1→v2 step of
+   `_ensure_namespace_keys_schema`, copying hash, nonce and
+   expiry verbatim with idempotent upserts, and is safe to
+   re-run.
+
+   The legacy `namespace_attributes.keys` column is left in
+   place but is neither read nor written from phase 2
+   onward. Rollback therefore loses keys created after the
+   migration, while keys that predate it are unaffected —
+   the exposure is one upgrade cycle, it is documented in
+   the operator guide's upgrade notes, and it matches the
+   precedent accepted for `node_daemon_states`.
+
+   The hot path improved rather than regressed:
+   `verify_token` previously loaded a namespace's entire
+   attributes row and walked every key in it, and now does a
+   single point read served by the leading column of the
+   `(namespace, name)` unique index. `/auth` additionally
+   pushes the expiry filter into SQL, so it no longer
+   bcrypt-compares keys it is going to reject. No caching was
+   added, deliberately: a stale cache would delay nonce-based
+   revocation, and the point read is already cheaper than
+   what it replaced.
 8. **Glossary location.** Resolved by phase 1 (2026-07-15):
    a single `docs/glossary.md` at the top level, in the
    mkdocs navigation after Features, linked from the three
@@ -394,7 +424,7 @@ groundwork exists, and lives mostly outside this repository.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Terminology and glossary | [PLAN-auth-federation-phase-01-glossary.md](PLAN-auth-federation-phase-01-glossary.md) | Complete |
-| 2. Namespace keys as first-class objects | [PLAN-auth-federation-phase-02-key-objects.md](PLAN-auth-federation-phase-02-key-objects.md) | Planning |
+| 2. Namespace keys as first-class objects | [PLAN-auth-federation-phase-02-key-objects.md](PLAN-auth-federation-phase-02-key-objects.md) | Complete |
 | 3. Federated exchange and scope enforcement | PLAN-auth-federation-phase-03-exchange.md | Not started |
 | 4. Authentication documentation | PLAN-auth-federation-phase-04-docs.md | Not started |
 | 5. OIDC plan refresh | PLAN-auth-federation-phase-05-oidc-plan-refresh.md | Not started |
@@ -834,6 +864,12 @@ implemented because the following statements will be true:
   (fewer long-lived credentials), which makes eventual
   publication easier; revisit once the conductor has grown
   a deployment story.
+* **`sf-client namespace add-key --expiry`**: phase 2 added
+  the `expiry` body parameter to the key create and update
+  endpoints, but the command line has no flag for it yet,
+  so the REST API or the Python client must be used
+  directly. A client-python change, hence not a phase of
+  this plan.
 * **Token introspection / jti denylist** if bounded-delay
   revocation of *scoped keys themselves* (as opposed to
   their derived tokens) ever proves insufficient.
