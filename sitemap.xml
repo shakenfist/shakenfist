@@ -2513,6 +2513,26 @@
          <lastmod>2026-07-28</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-01-config-cpu-ram/</loc>
+         <lastmod>2026-07-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-02-disk-metric/</loc>
+         <lastmod>2026-07-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-03-ansible-templating/</loc>
+         <lastmod>2026-07-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-04-docs-cleanup/</loc>
+         <lastmod>2026-07-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations/</loc>
+         <lastmod>2026-07-28</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/plans/PLAN-qemu-futures/</loc>
          <lastmod>2026-07-28</lastmod>
     </url>

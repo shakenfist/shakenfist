@@ -8550,15 +8550,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#load-aware-scheduling-and-system-reservations" class="md-nav__link">
+  <a href="#load-aware-scheduling-and-per-node-resource-reservations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Load-aware scheduling and system reservations
+        Load-aware scheduling and per-node resource reservations
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Load-aware scheduling and system reservations">
+    <nav class="md-nav" aria-label="Load-aware scheduling and per-node resource reservations">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -10235,6 +10235,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operator_guide/scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operator_guide/threads/" class="md-nav__link">
         
   
@@ -10550,15 +10578,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#load-aware-scheduling-and-system-reservations" class="md-nav__link">
+  <a href="#load-aware-scheduling-and-per-node-resource-reservations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Load-aware scheduling and system reservations
+        Load-aware scheduling and per-node resource reservations
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Load-aware scheduling and system reservations">
+    <nav class="md-nav" aria-label="Load-aware scheduling and per-node resource reservations">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -11031,22 +11059,33 @@ therefore no longer matches any non-empty <code>namespace=&lt;x&gt;</code> filte
 Admin scripts that habitually pass <code>namespace='system'</code> on every
 network call will now receive a 404 when querying the floating
 network and must omit <code>namespace</code> to reach it.</p>
-<h2 id="load-aware-scheduling-and-system-reservations">Load-aware scheduling and system reservations<a class="headerlink" href="#load-aware-scheduling-and-system-reservations" title="Permanent link">&para;</a></h2>
+<h2 id="load-aware-scheduling-and-per-node-resource-reservations">Load-aware scheduling and per-node resource reservations<a class="headerlink" href="#load-aware-scheduling-and-per-node-resource-reservations" title="Permanent link">&para;</a></h2>
 <p>The scheduler now understands that machines come in different sizes
 and that some machines have other jobs to do. Three related changes
 landed together:</p>
 <ul>
-<li><strong>System reservations.</strong> Every hypervisor reserves one physical CPU
-  core for the operating system, and nodes carrying a cluster-wide
-  infrastructure role (the network node, or a database node) reserve
-  one further core plus additional RAM. New configuration variables
-  control this: <code>CPU_SYSTEM_RESERVATION</code> (default 1 core),
-  <code>CPU_INFRA_ROLE_RESERVATION</code> (default 1 core) and
-  <code>RAM_INFRA_ROLE_RESERVATION</code> (default 4 GB, additional to the
-  existing <code>RAM_SYSTEM_RESERVATION</code>). The resources daemon publishes
-  the resulting schedulable capacity in node metrics, along with CPU
-  topology (physical cores, threads, and performance / efficiency
-  core counts on hybrid parts).</li>
+<li><strong>Per-node resource reservations.</strong> Every node reserves RAM, CPU
+  and disk for the operating system and host-level services, through
+  three config keys: <code>NODE_RAM_RESERVATION_GB</code> (default 2.0 GB),
+  <code>NODE_CPU_RESERVATION_THREADS</code> (default 2 hardware <strong>threads</strong> --
+  reservation is denominated in threads, not physical cores) and
+  <code>NODE_DISK_RESERVATION_GB</code> (default 20.0 GB, kept free on the
+  instances and blobs filesystems). These are <strong>per-node</strong> values,
+  set through each node's <code>/etc/sf/config</code> (which the Ansible deploy
+  templates per host), and are never set cluster-wide with
+  <code>sf-ctl set-config</code>. There is no separate addition for nodes
+  carrying a cluster-wide role (network node, database node) in the
+  server; instead, the deploy computes a per-host default that
+  already folds in that bump -- 10% of the host's RAM floored at
+  2 GB plus 4 GB on network/database nodes, four threads instead of
+  two on network/database nodes, and a flat 20 GB of disk -- and an
+  operator can override any of the three per host from inventory.
+  The resources daemon reads its own node's values, computes the
+  resulting schedulable capacity, and publishes it in node metrics
+  (<code>cpu_schedulable</code>, <code>memory_reserved_mb</code>, <code>disk_reservation_gb</code>),
+  along with CPU topology (physical cores, threads, and performance /
+  efficiency core counts on hybrid parts). <code>NODE_DISK_RESERVATION_GB</code>
+  replaces the old cluster-wide <code>MINIMUM_FREE_DISK</code>.</li>
 <li><strong>Placement is load-aware and size-aware.</strong> Candidate nodes are
   ranked by load per schedulable thread rather than raw load average,
   and selection within a band of similar nodes is weighted by each
@@ -11058,17 +11097,18 @@ landed together:</p>
 </ul>
 <h3 id="cpu_overcommit_ratio-semantic-change"><code>CPU_OVERCOMMIT_RATIO</code> semantic change<a class="headerlink" href="#cpu_overcommit_ratio-semantic-change" title="Permanent link">&para;</a></h3>
 <p><code>CPU_OVERCOMMIT_RATIO</code> now multiplies the <em>schedulable</em> thread count
-(threads minus reserved cores) rather than all threads, and its
-default has dropped from 16 to 3.0. The old default dated back to
-assumptions about many mostly-idle instances and in practice never
-rejected a node; the new default was measured on a CI-dominated
-cluster where busy hypervisors sustain 2.3-3.0 allocated vCPUs per
-thread with RAM as the binding constraint.</p>
+(threads minus <code>NODE_CPU_RESERVATION_THREADS</code>) rather than all
+threads, and its default has dropped from 16 to 3.0. The old default
+dated back to assumptions about many mostly-idle instances and in
+practice never rejected a node; the new default was measured on a
+CI-dominated cluster where busy hypervisors sustain 2.3-3.0 allocated
+vCPUs per thread with RAM as the binding constraint.</p>
 <p>If your cluster is already packed beyond the new cap, existing
 instances are untouched but new schedules to full nodes will be
 refused until they drain. Operators who prefer the historic
-behaviour can set <code>CPU_OVERCOMMIT_RATIO=16</code> (and the reservation
-variables to zero) in their deployment configuration.</p>
+behaviour can set <code>CPU_OVERCOMMIT_RATIO=16</code> and
+<code>NODE_CPU_RESERVATION_THREADS</code> / <code>NODE_RAM_RESERVATION_GB</code> to zero
+per node in inventory.</p>
 
 
 

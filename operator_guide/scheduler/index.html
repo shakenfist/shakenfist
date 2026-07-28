@@ -13,6 +13,10 @@
         <link rel="canonical" href="https://shakenfist.com/operator_guide/scheduler/">
       
       
+        <link rel="prev" href="../python_versions/">
+      
+      
+        <link rel="next" href="../threads/">
       
       
         
@@ -9508,18 +9512,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
         
           
           <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
@@ -9540,7 +9546,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
@@ -9919,6 +9925,158 @@
                 
   
   
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-placement-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The placement pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-reservations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System reservations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#load-aware-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Load-aware ordering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-overcommit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU overcommit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagnosing-a-placement-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnosing a placement decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mixed-version-clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed-version clusters
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
   
   
     <li class="md-nav__item">
@@ -10132,8 +10290,11 @@ a placement decision can be reconstructed after the fact (see
 <li><strong>RAM admission</strong> -- the node must retain its published memory
    reservation after placement, and KSM overcommit must stay
    under <code>RAM_OVERCOMMIT_RATIO</code>.</li>
-<li><strong>Disk capacity</strong> -- requested disk must fit while leaving
-   <code>MINIMUM_FREE_DISK</code> GB free.</li>
+<li><strong>Disk capacity</strong> -- requested disk must fit while leaving the
+   node's <code>NODE_DISK_RESERVATION_GB</code> free on the instances/blobs
+   filesystems. The candidate node publishes its own reservation as
+   the <code>disk_reservation_gb</code> metric, so admission honours that
+   node's per-host value rather than the evaluator's own config.</li>
 <li><strong>Disk bandwidth</strong> -- nodes whose disks are saturated (busy
    more than 120% of wall time across spindles) are excluded.</li>
 <li><strong>Affinity</strong> -- surviving nodes are scored against the
@@ -10144,33 +10305,49 @@ a placement decision can be reconstructed after the fact (see
    across similar nodes. See below.</li>
 </ol>
 <h2 id="system-reservations">System reservations<a class="headerlink" href="#system-reservations" title="Permanent link">&para;</a></h2>
-<p>Some of a machine's capacity is never offered to instances. The
-resources daemon computes reservations locally (it knows the
-node's roles and CPU topology) and publishes the <em>schedulable</em>
-remainder in <code>node_metrics</code>; the scheduler consumes the published
-values rather than recomputing them.</p>
-<p>Reservations are denominated in <strong>physical cores, not threads</strong>:</p>
+<p>Some of a machine's capacity is never offered to instances. Each
+node carries three <strong>per-node</strong> reservation values -- RAM, CPU and
+disk -- set through that node's <code>/etc/sf/config</code>, which the deploy
+templates per host. These are ordinary node-local config keys, not
+cluster config: they are <strong>never</strong> set with <code>sf-ctl set-config</code>,
+which only reaches cluster-wide values. The resources daemon reads
+its own node's values, computes the <em>schedulable</em> remainder, and
+publishes it in <code>node_metrics</code>; the scheduler consumes the
+published values rather than recomputing them.</p>
 <ul>
-<li>Every hypervisor reserves <code>CPU_SYSTEM_RESERVATION</code> cores
-  (default 1) for the operating system.</li>
-<li>A node carrying a cluster-wide infrastructure role -- it is the
-  network node or a database node -- reserves
-  <code>CPU_INFRA_ROLE_RESERVATION</code> further cores (default 1). This is
-  one extra core in total, not one per role.</li>
-<li>Reserved cores convert to threads at <code>ceil(threads / cores)</code>
-  threads per core, which errs conservative on hybrid parts where
-  some cores have two threads and some have one.</li>
+<li><strong>CPU</strong> -- <code>NODE_CPU_RESERVATION_THREADS</code> (default 2) is a count
+  of hardware <strong>threads</strong>, not physical cores, reserved for the
+  operating system and host-level services. It is subtracted
+  directly from the node's thread count; there is no cores-to-threads
+  conversion in the arithmetic that scheduling uses (an informational
+  <code>cpu_cores_reserved</code> field derives a core-equivalent for display,
+  but nothing in admission consumes it).</li>
+<li><strong>RAM</strong> -- <code>NODE_RAM_RESERVATION_GB</code> (default 2.0) is the amount
+  of RAM, in GB, held back for the operating system and host-level
+  services.</li>
+<li><strong>Disk</strong> -- <code>NODE_DISK_RESERVATION_GB</code> (default 20.0) is the free
+  disk, in GB, kept on the instances and blobs filesystems. It is
+  published as the <code>disk_reservation_gb</code> metric and applied at both
+  allocation points.</li>
 </ul>
-<p>RAM is treated symmetrically: every node holds back
-<code>RAM_SYSTEM_RESERVATION</code> GB (default 2) and infra-role nodes hold
-back <code>RAM_INFRA_ROLE_RESERVATION</code> GB more (default 4, sized for
-the network and database daemons' working sets).</p>
+<p>There is no separate reservation added on nodes carrying a
+cluster-wide role (network node, database node). Instead, the
+Ansible deploy computes a per-host <em>default</em> for each of the three
+values that already accounts for a node's roles -- each host's own
+10% of RAM floored at 2 GB, plus a 4 GB bump on network/database
+nodes, for RAM; <code>(1 + 1 if network/database else 0) * 2</code> threads for
+CPU; and a flat 20 GB for disk -- and only fills that default in
+when the operator hasn't already set the value. An operator can
+override any of the three per host in inventory (<code>host_vars</code> or
+<code>group_vars</code>), which is the supported way to give a specific node
+(for example one also running an unrelated sensor workload) extra
+headroom.</p>
 <p>The published fields are <code>cpu_cores</code>, <code>cpu_threads</code>,
 <code>cpu_cores_reserved</code>, <code>cpu_schedulable</code> (threads),
-<code>cpu_cores_schedulable</code> and <code>memory_reserved_mb</code>. On Intel hybrid
-CPUs the daemon also publishes <code>cpu_cores_performance</code> and
-<code>cpu_cores_efficiency</code>; these are informational and nothing in
-scheduling consumes them yet.</p>
+<code>cpu_cores_schedulable</code>, <code>memory_reserved_mb</code> and
+<code>disk_reservation_gb</code>. On Intel hybrid CPUs the daemon also
+publishes <code>cpu_cores_performance</code> and <code>cpu_cores_efficiency</code>; these
+are informational and nothing in scheduling consumes them yet.</p>
 <h2 id="load-aware-ordering">Load-aware ordering<a class="headerlink" href="#load-aware-ordering" title="Permanent link">&para;</a></h2>
 <p>Candidate nodes that survive the hard filters are bucketed by
 <strong>load per schedulable thread</strong> (<code>cpu_load_1 / cpu_schedulable</code>)
@@ -10203,12 +10380,17 @@ allocated vCPUs per thread with RAM as the binding constraint.</p>
 numbers of mostly-idle instances, and in practice never rejected a
 node -- RAM always bound first. If your workload matches that older
 assumption (many small, mostly-idle instances), the historic
-behaviour can be restored with <code>CPU_OVERCOMMIT_RATIO=16</code> and the
-reservation variables set to zero.</p>
+behaviour can be restored with <code>CPU_OVERCOMMIT_RATIO=16</code> and
+<code>NODE_CPU_RESERVATION_THREADS</code> / <code>NODE_RAM_RESERVATION_GB</code> set to
+zero per node.</p>
 <p>Note that on a cluster already packed beyond the new cap, existing
 instances are untouched but new schedules to full nodes are
 refused until they drain.</p>
 <h2 id="configuration-reference">Configuration reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h2>
+<p>Except for <code>CPU_OVERCOMMIT_RATIO</code>, <code>RAM_OVERCOMMIT_RATIO</code>,
+<code>SCHEDULER_TARGET_LOAD</code> and <code>SCHEDULER_CACHE_TIMEOUT</code> (cluster-wide,
+set with <code>sf-ctl set-config</code>), the reservation variables below are
+<strong>per-node</strong> and set through each node's <code>/etc/sf/config</code>:</p>
 <table>
 <thead>
 <tr>
@@ -10219,24 +10401,19 @@ refused until they drain.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>CPU_SYSTEM_RESERVATION</code></td>
-<td>1</td>
-<td>Physical cores reserved for the OS on every hypervisor</td>
-</tr>
-<tr>
-<td><code>CPU_INFRA_ROLE_RESERVATION</code></td>
-<td>1</td>
-<td>Additional cores reserved on network / database nodes</td>
-</tr>
-<tr>
-<td><code>RAM_SYSTEM_RESERVATION</code></td>
+<td><code>NODE_RAM_RESERVATION_GB</code></td>
 <td>2.0</td>
-<td>GB of RAM reserved for the OS on every node</td>
+<td>GB of RAM reserved per node for the OS and host services</td>
 </tr>
 <tr>
-<td><code>RAM_INFRA_ROLE_RESERVATION</code></td>
-<td>4.0</td>
-<td>Additional GB reserved on network / database nodes</td>
+<td><code>NODE_CPU_RESERVATION_THREADS</code></td>
+<td>2</td>
+<td>Hardware threads reserved per node</td>
+</tr>
+<tr>
+<td><code>NODE_DISK_RESERVATION_GB</code></td>
+<td>20.0</td>
+<td>GB of free disk kept per node on the instances/blobs filesystems</td>
 </tr>
 <tr>
 <td><code>CPU_OVERCOMMIT_RATIO</code></td>
@@ -10285,12 +10462,14 @@ headroom using the same arithmetic as admission, so what it
 reports as available is what the scheduler would actually admit.</p>
 <h2 id="mixed-version-clusters">Mixed-version clusters<a class="headerlink" href="#mixed-version-clusters" title="Permanent link">&para;</a></h2>
 <p>Metrics rows written by a resources daemon older than the
-reservation scheme lack the new fields. For exactly those rows
-the scheduler synthesises an approximate CPU reservation from the
-node's role flags (assuming two threads per reserved core) so
+reservation scheme lack the new fields. For exactly those rows the
+scheduler falls back to subtracting the evaluating node's own
+<code>NODE_CPU_RESERVATION_THREADS</code> (there is no infra-role bump in this
+fallback -- it cannot know a remote node's per-host override) so
 that a not-yet-upgraded node doesn't look artificially large and
-absorb bursts during the roll, and falls back to the config RAM
-reservation for memory. Audit events mark these nodes with
+absorb bursts during the roll. RAM and disk fall back the same way,
+to <code>NODE_RAM_RESERVATION_GB</code> and <code>NODE_DISK_RESERVATION_GB</code>
+respectively. Audit events mark these nodes with
 <code>cpu_schedulable_from_fallback</code>. The window closes as each node's
 resources daemon restarts and republishes.</p>
 

@@ -10014,6 +10014,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operator_guide/scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operator_guide/threads/" class="md-nav__link">
         
   
@@ -10948,6 +10976,30 @@
 <td>Phase 5: Next-tier reductions</td>
 <td>Not started</td>
 <td>Data-driven reduction of <code>dequeue</code>/<code>get_ipam</code>/locks/blob-transfer polling, planned from phase 4 attribution numbers</td>
+</tr>
+<tr>
+<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
+<td><a href="PLAN-per-host-resource-reservations-phase-01-config-cpu-ram/">Phase 1: Config keys + CPU/RAM math</a></td>
+<td>Complete</td>
+<td>New <code>NODE_*</code> reservation keys; flat per-node CPU (threads) / RAM math, dropping the infra-role branch</td>
+</tr>
+<tr>
+<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
+<td><a href="PLAN-per-host-resource-reservations-phase-02-disk-metric/">Phase 2: Disk reservation model</a></td>
+<td>Complete</td>
+<td>Per-node disk floor at the instances/blobs allocation points; publish <code>disk_reservation_gb</code> and convert <code>MINIMUM_FREE_DISK</code> consumers</td>
+</tr>
+<tr>
+<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
+<td><a href="PLAN-per-host-resource-reservations-phase-03-ansible-templating/">Phase 3: Ansible templating</a></td>
+<td>Complete</td>
+<td>Per-host defaults templated into <code>/etc/sf/config</code>; stop <code>set-config</code>'ing reservations; inventory override</td>
+</tr>
+<tr>
+<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
+<td><a href="PLAN-per-host-resource-reservations-phase-04-docs-cleanup/">Phase 4: Docs and cleanup</a></td>
+<td>Complete</td>
+<td>Operator docs, plan index, <code>sf-ctl unset-config</code> + inert-row retirement</td>
 </tr>
 </tbody>
 </table>
