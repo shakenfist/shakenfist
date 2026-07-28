@@ -6904,6 +6904,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ticket-lifecycle-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket lifecycle keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#example-vv-files" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7109,6 +7120,62 @@
     
   
     Control Socket Protocol — Version 1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
   
 
     
@@ -7361,10 +7428,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_15" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_15" id="__nav_3_9_15_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
             
   
   
@@ -7382,8 +7449,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_15">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_17">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -10442,6 +10509,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ticket-lifecycle-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket lifecycle keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#example-vv-files" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10920,6 +10998,29 @@ the standard virt-viewer format used by <code>remote-viewer</code> and other SPI
 </tr>
 </tbody>
 </table>
+<h3 id="ticket-lifecycle-keys">Ticket lifecycle keys<a class="headerlink" href="#ticket-lifecycle-keys" title="Permanent link">&para;</a></h3>
+<p>ryll also reads two ticket-related keys with ryll-specific behaviour:</p>
+<ul>
+<li><strong><code>delete-this-file=1</code></strong> — the standard "remove this file
+  after reading" hint. ryll additionally treats this as a
+  signal that the SPICE ticket is <strong>single-use</strong>: any
+  reconnect attempt would be rejected by the server, so
+  auto-reconnect is suppressed and a "single-use ticket"
+  modal is shown instead of the normal retry sequence.</li>
+<li><strong><code>ticket-valid-until=&lt;unix-ts&gt;</code></strong> — a ryll extension key
+  (no equivalent in remote-viewer). When set, ryll surfaces a
+  T-30s warning notification, suppresses auto-reconnect once
+  the deadline has passed, and shows a "ticket expired" modal
+  with the expiry time.</li>
+</ul>
+<p>Both keys degrade gracefully — absent values mean the previous
+ryll behaviour. Producer-side documentation lives in the
+companion doc
+<a href="https://github.com/shakenfist/kerbside-wt-docs/blob/main/docs/spice/console-vv-extensions.md"><code>console-vv-extensions.md</code></a>
+in the kerbside-wt-docs repository, which is the canonical
+reference for SPICE deployment authors (Kerbside, oVirt,
+custom gateways) who want their .vv output to drive ryll's
+reconnect UX correctly.</p>
 <h3 id="example-vv-files">Example .vv Files<a class="headerlink" href="#example-vv-files" title="Permanent link">&para;</a></h3>
 <p><strong>Minimal (insecure connection):</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[virt-viewer]</span>

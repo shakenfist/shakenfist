@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/ryll/installation/">
       
       
-        <link rel="prev" href="../control-socket-protocol/">
+        <link rel="prev" href="../features/">
       
       
         <link rel="next" href="../TOKIO-WEDGING/">
@@ -6769,6 +6769,62 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -7117,10 +7173,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_15" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9_17" >
         
           
-          <label class="md-nav__link" for="__nav_3_9_15" id="__nav_3_9_15_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9_17" id="__nav_3_9_17_label" tabindex="0">
             
   
   
@@ -7138,8 +7194,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_9_15">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_9_17_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9_17">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -10212,14 +10268,29 @@ on your <code>PATH</code>.</p>
 per-architecture manylinux wheel with the compiled ryll GUI binary
 already embedded — no runtime download, no cache, works offline
 immediately after install. Wheels are published for Linux
-<code>x86_64</code>/<code>aarch64</code> with glibc &gt;= 2.28; other platforms should use one
-of the packages above. See the
-<a href="/components/ryll/../README/#installing-via-pip">README</a> for the runtime system
-library requirements.</p>
+<code>x86_64</code>/<code>aarch64</code> with glibc &gt;= 2.28 (built in the <code>manylinux_2_28</code>
+container); other platforms — macOS, Windows, musl libc, or older
+glibc — should use one of the packages above.</p>
+<p>The binary is the same GUI application as every other install path, so
+it needs the underlying GUI/audio system libraries at runtime, which
+pip cannot install:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>libxcb1<span class="w"> </span>libwayland-client0<span class="w"> </span>libxkbcommon0<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>libasound2<span class="w"> </span>libopus0<span class="w"> </span>libgl1
+</code></pre></div>
+<p>On newer distributions (Debian trixie, Ubuntu 24.04+) the ALSA runtime
+package was renamed <code>libasound2t64</code> as part of the 64-bit <code>time_t</code>
+transition, so install <code>libasound2t64</code> in place of <code>libasound2</code> there.</p>
+<p>If one is missing, ryll fails to start with a dynamic-loader or
+GUI-initialisation error naming the library; install the packages above
+to resolve it. <code>remote-viewer</code> is the fallback whenever ryll can't be
+installed or run on a given platform.</p>
+<p>See <a href="/components/ryll/plans/PLAN-pip-distribution/">plans/PLAN-pip-distribution.md</a>
+for the full design rationale.</p>
 <h2 id="building-from-source">Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">&para;</a></h2>
 <p>If no pre-built package is available for your platform, you can build
-ryll from source. See the <a href="/components/ryll/../README/">README</a> for build instructions
-and the <a href="/components/ryll/portability/">portability guide</a> for platform-specific notes.</p>
+ryll from source. See the <a href="/components/ryll/development/">development guide</a> for build
+instructions and the <a href="/components/ryll/portability/">portability guide</a> for
+platform-specific notes.</p>
 <p>For macOS development and interactive testing, see the
 <a href="/components/ryll/development-macos/">macOS development guide</a>.</p>
 
