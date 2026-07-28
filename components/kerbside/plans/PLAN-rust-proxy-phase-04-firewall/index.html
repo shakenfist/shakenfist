@@ -4453,6 +4453,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../proxy-architecture/" class="md-nav__link">
         
   
@@ -4461,6 +4517,34 @@
     
   
     Kerbside Proxy Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -4491,10 +4575,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_9" checked>
         
           
-          <label class="md-nav__link" for="__nav_3_7_6" id="__nav_3_7_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_9" id="__nav_3_7_9_label" tabindex="0">
             
   
   
@@ -4512,8 +4596,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_6_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3_7_6">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -5537,10 +5621,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_7" id="__nav_3_7_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
             
   
   
@@ -5558,8 +5642,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_7">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -10796,7 +10880,7 @@ small number of self-contained commits.</p>
   without blocking, and the default ships <code>Enforce</code>.</li>
 <li>Rust passes <code>cargo fmt --check</code>, <code>cargo clippy -- -D warnings</code>,
   <code>cargo test</code>; Python passes <code>tox -eflake8</code>/<code>tox -epy3</code>; the phase-4
-  pre-push audit (<code>PUSH-TEMPLATE.md</code>) is clean.</li>
+  pre-push audit (<code>PUSH-AUDIT.md</code>) is clean.</li>
 <li>Docs updated; master-plan/index status flipped.</li>
 </ul>
 <h2 id="future-work-recorded-not-in-this-phase">Future work (recorded, not in this phase)<a class="headerlink" href="#future-work-recorded-not-in-this-phase" title="Permanent link">&para;</a></h2>
@@ -10917,7 +11001,7 @@ was not run separately (it shares remote-viewer's spice-gtk client
 engine); ryll headless was not run this pass and remains a worthwhile
 follow-up capture.</p>
 <h3 id="pre-push-audit-2026-07-07">Pre-push audit (2026-07-07)<a class="headerlink" href="#pre-push-audit-2026-07-07" title="Permanent link">&para;</a></h3>
-<p>Ran the <code>PUSH-TEMPLATE.md</code> audit against <code>git diff origin/develop..HEAD</code>.
+<p>Ran the <code>PUSH-AUDIT.md</code> audit against <code>git diff origin/develop..HEAD</code>.
 Wave 1 (mechanical) was clean: Docker <code>make lint</code> (fmt + <code>clippy -D
 warnings</code>) and <code>make test</code> green, <code>flake8</code>/<code>py3</code> green, no
 <code>unsafe</code>/<code>unwrap</code>/<code>panic!</code>/<code>todo!</code> on any non-test enforcement path, no
