@@ -216,7 +216,7 @@ transitions during lookup, cross-namespace lookups under
 `system`), and update `docs/operator_guide/database.md` and
 `ARCHITECTURE.md` to describe the new pattern.
 
-Also add a guardrail in `PUSH-TEMPLATE.md` to keep this
+Also add a guardrail in `PUSH-AUDIT.md` to keep this
 regression from sneaking back in: a wave-1 mechanical grep
 that flags new additions of `mariadb.get_all_*(` in the diff
 (excluding `shakenfist/mariadb.py`, admin tooling under
@@ -394,7 +394,7 @@ because the following statements will be true:
   primitive and the SQL pushdown rule.
 * `ARCHITECTURE.md` mentions the three-layer pattern's
   filter-pushdown discipline.
-* `PUSH-TEMPLATE.md` has a wave-1 mechanical grep that
+* `PUSH-AUDIT.md` has a wave-1 mechanical grep that
   flags new `mariadb.get_all_*(` additions outside the
   allowlist, and the wave-2a brief marks SQL-pushdown
   discipline as blocking.
@@ -451,7 +451,7 @@ creep:
 
 #### Items raised by the phase 7 pre-push audit
 
-The `PUSH-TEMPLATE.md` audit on the post-phase-7 branch
+The `PUSH-AUDIT.md` audit on the post-phase-7 branch
 flagged a handful of items that are real but not phase-7
 specific. Capturing them here so the next contributor in
 this area has a punch list rather than re-discovering

@@ -200,7 +200,7 @@ Column drop is safe because the stored list is pure
 cache: every UUID in the list is derivable from the
 `network_interfaces` table via an indexed query.
 
-### PUSH-TEMPLATE.md guardrail
+### PUSH-AUDIT.md guardrail
 
 The phase-6 guardrail catches new `mariadb.get_all_*(`
 call sites; phase 7's work exposes a second pattern worth
@@ -231,7 +231,7 @@ append/remove from such a list) get the same flag.
 | 7c   | medium | sonnet | none      | Network side. Rewrite `Network.networkinterfaces` as a query-backed property returning `list[NetworkInterface]`. Remove `add_networkinterface`, `remove_networkinterface`, references to `networkinterfaces_initialized` from the getter/setter paths. Migrate all Network-side callers identified in 7a. This includes `network/interface.py:195` and `:299` (which called `add/remove_networkinterface`), `network/network.py:861` (delete loop), and the external_api / daemons paths. Adapt helpers that previously took a list of UUIDs. Be vigilant about the circular-import network<->interface (use a late import inside the property; document). One commit. |
 | 7d   | medium | sonnet | none      | Instance side. Rewrite `Instance.interfaces` as a query-backed property returning `list[NetworkInterface]`. Remove the setter, `interfaces_append`, and all writer call sites. Readers migrate from UUIDs to objects. One commit. |
 | 7e   | medium | sonnet | none      | Schema cleanup. Drop `networkinterfaces` and `networkinterfaces_initialized` fields from `schema/network_attributes.py:NetworkAttributesData` and `interfaces` from `schema/instance_attributes.py:InstanceAttributesData`. Add idempotent v-bump migrations to `_ensure_network_attributes_schema` and `_ensure_instance_attributes_schema` in `mariadb.py` that drop the columns (CREATE-INDEX-IF-NOT-EXISTS-style pattern with try/except). Bump the VERSION constants. One commit. |
-| 7f   | low    | haiku  | none      | Add a wave-2a code-quality bullet to `PUSH-TEMPLATE.md` directing the reviewer to flag new `list[str]` / `list[UUID4]` fields on `shakenfist/schema/*_attributes.py` as a potential cached FK list — prompt the reviewer to ask "is this a list of child-object UUIDs that a `WHERE <fk> = ?` query could provide live?" — and to apply the same flag to any new `add_*` / `remove_*` mutator pair on an attributes object. Place the bullet adjacent to the phase-6 "SQL pushdown (blocking)" bullet. Wording should match the tone and structure of the adjacent bullets. One commit. |
+| 7f   | low    | haiku  | none      | Add a wave-2a code-quality bullet to `PUSH-AUDIT.md` directing the reviewer to flag new `list[str]` / `list[UUID4]` fields on `shakenfist/schema/*_attributes.py` as a potential cached FK list — prompt the reviewer to ask "is this a list of child-object UUIDs that a `WHERE <fk> = ?` query could provide live?" — and to apply the same flag to any new `add_*` / `remove_*` mutator pair on an attributes object. Place the bullet adjacent to the phase-6 "SQL pushdown (blocking)" bullet. Wording should match the tone and structure of the adjacent bullets. One commit. |
 | 7g   | low    | haiku  | none      | Run `pre-commit run --all-files`. Fix anything flagged (most likely a stale import after removing add/remove mutators). Mark phase 7 complete in `docs/plans/index.md`. Commit as needed. |
 
 ## Back brief
@@ -291,7 +291,7 @@ After each step:
   iterate objects, writer call sites deleted.
 * `pre-commit run --all-files` passes; `test_mariadb_find`
   gains at least two new tests for the FK filters.
-* `PUSH-TEMPLATE.md` wave-2a brief has a new bullet
+* `PUSH-AUDIT.md` wave-2a brief has a new bullet
   directing the reviewer to flag new attribute-list-of-FK
   patterns, so a future contributor does not re-introduce
   a denormalised cache that phase 7 just removed.

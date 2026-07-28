@@ -10,12 +10,12 @@
 ## Deployment
 
 Shaken Fist is deployed with the `shakenfist.shakenfist` Ansible collection
-(which lives in [`shakenfist/deploy/collection/`](shakenfist/deploy/collection/)
+(which lives in [`shakenfist/deploy/collection/`](https://github.com/shakenfist/shakenfist/tree/develop/shakenfist/deploy/collection)
 in this repository and is published to Ansible Galaxy). You write an inventory
 describing your machines, set a handful of variables, and run a playbook.
-Ready-to-use examples ship in [`examples/`](examples/) —
+Ready-to-use examples ship in [`examples/`](https://github.com/shakenfist/shakenfist/tree/develop/examples) —
 `examples/single-node/` is the recommended quickstart. See
-[`docs/operator_guide/installation.md`](docs/operator_guide/installation.md)
+[`docs/operator_guide/installation.md`](https://github.com/shakenfist/shakenfist/blob/develop/docs/operator_guide/installation.md)
 for the full walkthrough.
 
 ## Prerequisites
@@ -23,18 +23,18 @@ for the full walkthrough.
 Shaken Fist requires an operator-provided MariaDB 10.6.0+ server. Before
 deploying, provision a MariaDB instance and apply the bootstrap snippet
 (`tools/bootstrap-mariadb.sql`). See
-[`docs/operator_guide/database.md`](docs/operator_guide/database.md) for the
+[`docs/operator_guide/database.md`](https://github.com/shakenfist/shakenfist/blob/develop/docs/operator_guide/database.md) for the
 complete setup workflow.
 
 Shaken Fist emits structured JSON logs and can ship them to an
 operator-provided [Loki](https://grafana.com/oss/loki/), or log locally to the
 systemd journal if you prefer your own log agent. See
-[`docs/operator_guide/logging.md`](docs/operator_guide/logging.md).
+[`docs/operator_guide/logging.md`](https://github.com/shakenfist/shakenfist/blob/develop/docs/operator_guide/logging.md).
 
 Shaken Fist monitors the storage each node depends on and takes a node with
 failed storage (a dead disk or a hung NFS mount) out of scheduling
 automatically. See
-[`docs/operator_guide/node_health.md`](docs/operator_guide/node_health.md).
+[`docs/operator_guide/node_health.md`](https://github.com/shakenfist/shakenfist/blob/develop/docs/operator_guide/node_health.md).
 
 ## Claude Code Skills
 
