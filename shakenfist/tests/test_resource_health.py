@@ -39,6 +39,29 @@ class DeadlineProbeTestCase(base.ShakenFistTestCase):
         with testtools.ExpectedException(ValueError):
             probe.run(boom, 1.0)
 
+    def test_completed_probe_with_lingering_thread_is_not_outstanding(self):
+        # The worker sets its completion event before its thread terminates,
+        # so on a loaded machine a completed probe's thread can still report
+        # is_alive() when the next run() arrives. That must not be mistaken
+        # for an outstanding probe. Reproduce the window deterministically by
+        # standing in a still-alive thread while the completion event is set.
+        probe = resource_health.DeadlineProbe()
+        completed, result = probe.run(lambda: 'first', 1.0)
+        self.assertTrue(completed)
+        self.assertEqual('first', result)
+
+        release = threading.Event()
+        stand_in = threading.Thread(
+            target=release.wait, args=(5,), daemon=True)
+        stand_in.start()
+        self.addCleanup(release.set)
+        probe._thread = stand_in
+        self.assertTrue(probe._completed.is_set())
+
+        completed, result = probe.run(lambda: 'second', 1.0)
+        self.assertTrue(completed)
+        self.assertEqual('second', result)
+
     def test_timeout_leaves_probe_outstanding_and_is_not_relaunched(self):
         probe = resource_health.DeadlineProbe()
         release = threading.Event()
@@ -183,6 +206,27 @@ class PathCheckTestCase(base.ShakenFistTestCase):
             self.assertEqual(resource_health.HealthStatus.OK, first.status)
             self.assertEqual(resource_health.HealthStatus.OK, second.status)
             self.assertEqual(1, len(opened))
+
+    def test_back_to_back_checks_survive_lingering_worker_thread(self):
+        # The flake behind issue #3551: a check() whose probe completed can
+        # leave its worker thread alive for a few more instructions, and a
+        # back-to-back second check() must still report OK rather than
+        # TIMEOUT. Simulate the scheduler latency with a stand-in thread
+        # that is still alive after the first probe's event has fired.
+        with tempfile.TemporaryDirectory() as d:
+            check = resource_health.PathCheck(d)
+            first = check.check()
+            self.assertEqual(resource_health.HealthStatus.OK, first.status)
+
+            release = threading.Event()
+            stand_in = threading.Thread(
+                target=release.wait, args=(5,), daemon=True)
+            stand_in.start()
+            self.addCleanup(release.set)
+            check._probe._thread = stand_in
+
+            second = check.check()
+            self.assertEqual(resource_health.HealthStatus.OK, second.status)
 
     def test_timeout_when_probe_hangs(self):
         check = resource_health.PathCheck('/does/not/matter', timeout=0.05)
