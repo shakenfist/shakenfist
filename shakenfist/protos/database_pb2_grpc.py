@@ -169,6 +169,21 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.GetObjectsByStateRequest.SerializeToString,
                 response_deserializer=database__pb2.GetObjectsByStateReply.FromString,
                 _registered_method=True)
+        self.DeleteOrphanedObjectStates = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteOrphanedObjectStates',
+                request_serializer=database__pb2.DeleteOrphanedObjectStatesRequest.SerializeToString,
+                response_deserializer=database__pb2.DeleteOrphanedObjectStatesReply.FromString,
+                _registered_method=True)
+        self.GetStatelessObjectUuids = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetStatelessObjectUuids',
+                request_serializer=database__pb2.GetStatelessObjectUuidsRequest.SerializeToString,
+                response_deserializer=database__pb2.GetStatelessObjectUuidsReply.FromString,
+                _registered_method=True)
+        self.DeleteOrphanedArtifactAttributes = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/DeleteOrphanedArtifactAttributes',
+                request_serializer=database__pb2.DeleteOrphanedArtifactAttributesRequest.SerializeToString,
+                response_deserializer=database__pb2.DeleteOrphanedArtifactAttributesReply.FromString,
+                _registered_method=True)
         self.ReserveAddress = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/ReserveAddress',
                 request_serializer=database__pb2.ReserveAddressRequest.SerializeToString,
@@ -1175,6 +1190,24 @@ class DatabaseServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def GetObjectsByState(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteOrphanedObjectStates(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetStatelessObjectUuids(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteOrphanedArtifactAttributes(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2400,6 +2433,21 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetObjectsByState,
                     request_deserializer=database__pb2.GetObjectsByStateRequest.FromString,
                     response_serializer=database__pb2.GetObjectsByStateReply.SerializeToString,
+            ),
+            'DeleteOrphanedObjectStates': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteOrphanedObjectStates,
+                    request_deserializer=database__pb2.DeleteOrphanedObjectStatesRequest.FromString,
+                    response_serializer=database__pb2.DeleteOrphanedObjectStatesReply.SerializeToString,
+            ),
+            'GetStatelessObjectUuids': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetStatelessObjectUuids,
+                    request_deserializer=database__pb2.GetStatelessObjectUuidsRequest.FromString,
+                    response_serializer=database__pb2.GetStatelessObjectUuidsReply.SerializeToString,
+            ),
+            'DeleteOrphanedArtifactAttributes': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteOrphanedArtifactAttributes,
+                    request_deserializer=database__pb2.DeleteOrphanedArtifactAttributesRequest.FromString,
+                    response_serializer=database__pb2.DeleteOrphanedArtifactAttributesReply.SerializeToString,
             ),
             'ReserveAddress': grpc.unary_unary_rpc_method_handler(
                     servicer.ReserveAddress,
@@ -3966,6 +4014,87 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/GetObjectsByState',
             database__pb2.GetObjectsByStateRequest.SerializeToString,
             database__pb2.GetObjectsByStateReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteOrphanedObjectStates(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteOrphanedObjectStates',
+            database__pb2.DeleteOrphanedObjectStatesRequest.SerializeToString,
+            database__pb2.DeleteOrphanedObjectStatesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetStatelessObjectUuids(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetStatelessObjectUuids',
+            database__pb2.GetStatelessObjectUuidsRequest.SerializeToString,
+            database__pb2.GetStatelessObjectUuidsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteOrphanedArtifactAttributes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/DeleteOrphanedArtifactAttributes',
+            database__pb2.DeleteOrphanedArtifactAttributesRequest.SerializeToString,
+            database__pb2.DeleteOrphanedArtifactAttributesReply.FromString,
             options,
             channel_credentials,
             insecure,

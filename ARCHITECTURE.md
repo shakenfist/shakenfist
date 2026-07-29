@@ -367,6 +367,21 @@ Reaper activity is exported on
 `cluster_op_reaper_rejected_total`, scraped from
 `CLUSTER_METRICS_PORT` on the cluster daemon.
 
+The cluster daemon also runs two other reaping sweeps from
+`daemons/cluster/scheduled_tasks.py`. `per_deleted_object_checks()`
+(every 15 minutes) hard deletes objects that have been in a final
+state (`deleted`, `complete`, `abort`) for longer than their grace
+period; its work queue holds `(object_type, uuid)` tuples fetched
+with the age filter pushed down to SQL, and objects are hydrated one
+at a time at processing time inside a per-item exception guard.
+`reconcile_orphaned_objects()` (hourly) removes "phantom"
+`object_states` rows whose static-values row is gone (with an age
+guard so mid-creation objects are never raced) and repairs "zombie"
+static rows that have no state row by writing a `deleted` state row
+once the zombie has been seen on two consecutive sweeps; node and
+namespace objects are excluded from zombie repair. Both kinds of
+orphan are otherwise invisible to every state-driven iterator.
+
 #### Batched, Priority-Aware Dequeue
 
 `sf-net` and the `sf-queues` worker pool both call a single

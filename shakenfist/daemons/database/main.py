@@ -612,13 +612,79 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             if object_type is None:
                 return database_pb2.GetObjectsByStateReply(object_uuids=[])
             uuids = mariadb.get_objects_by_state(
-                object_type, list(request.state_values))
+                object_type, list(request.state_values),
+                updated_before=(request.updated_before or None))
             return database_pb2.GetObjectsByStateReply(
                 object_uuids=uuids or [])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetObjectsByState failed', e)
             return database_pb2.GetObjectsByStateReply(object_uuids=[])
+
+    def DeleteOrphanedObjectStates(
+        self,
+        request: database_pb2.DeleteOrphanedObjectStatesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteOrphanedObjectStatesReply:
+        """Delete phantom object_states rows for one object type."""
+        try:
+            self.monitor.counters['delete_orphaned_object_states'].inc()
+            object_type = ObjectType.from_proto_id(request.object_type)
+            if object_type is None:
+                return database_pb2.DeleteOrphanedObjectStatesReply(
+                    success=False, deleted=0)
+            deleted = mariadb.delete_orphaned_object_states(
+                object_type, request.updated_before)
+            if deleted is None:
+                return database_pb2.DeleteOrphanedObjectStatesReply(
+                    success=False, deleted=0)
+            return database_pb2.DeleteOrphanedObjectStatesReply(
+                success=True, deleted=deleted)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteOrphanedObjectStates failed', e)
+            return database_pb2.DeleteOrphanedObjectStatesReply(
+                success=False, deleted=0)
+
+    def GetStatelessObjectUuids(
+        self,
+        request: database_pb2.GetStatelessObjectUuidsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetStatelessObjectUuidsReply:
+        """List zombie static rows (no object_states row) for a type."""
+        try:
+            self.monitor.counters['get_stateless_object_uuids'].inc()
+            object_type = ObjectType.from_proto_id(request.object_type)
+            if object_type is None:
+                return database_pb2.GetStatelessObjectUuidsReply(
+                    object_uuids=[])
+            uuids = mariadb.get_stateless_object_uuids(object_type)
+            return database_pb2.GetStatelessObjectUuidsReply(
+                object_uuids=uuids or [])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetStatelessObjectUuids failed', e)
+            return database_pb2.GetStatelessObjectUuidsReply(object_uuids=[])
+
+    def DeleteOrphanedArtifactAttributes(
+        self,
+        request: database_pb2.DeleteOrphanedArtifactAttributesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.DeleteOrphanedArtifactAttributesReply:
+        """Delete artifact_attributes rows whose artifact row is gone."""
+        try:
+            self.monitor.counters['delete_orphaned_artifact_attributes'].inc()
+            deleted = mariadb.delete_orphaned_artifact_attributes()
+            if deleted is None:
+                return database_pb2.DeleteOrphanedArtifactAttributesReply(
+                    success=False, deleted=0)
+            return database_pb2.DeleteOrphanedArtifactAttributesReply(
+                success=True, deleted=deleted)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database DeleteOrphanedArtifactAttributes failed', e)
+            return database_pb2.DeleteOrphanedArtifactAttributesReply(
+                success=False, deleted=0)
 
     # IPAM Reservation Operations (MariaDB)
     # These operations provide atomic IP address reservation and management.
@@ -5245,6 +5311,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state',
+            # Orphan reconciliation
+            'delete_orphaned_object_states', 'get_stateless_object_uuids',
+            'delete_orphaned_artifact_attributes',
             # MariaDB IPAM operations
             'reserve_address', 'release_address', 'get_reservation',
             'get_reservations_for_ipam', 'delete_reservation',

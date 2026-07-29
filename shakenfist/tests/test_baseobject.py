@@ -91,3 +91,49 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
             d.error = 'real bad'
 
         d.error = 'real bad'
+
+
+class InMemoryStateTestObject(DatabaseBackedObject):
+    state_targets = {
+        None: (DatabaseBackedObject.STATE_CREATED, ),
+        DatabaseBackedObject.STATE_CREATED: (DatabaseBackedObject.STATE_DELETED, ),
+        DatabaseBackedObject.STATE_DELETED: (),
+    }
+
+
+class InMemoryOnlyStateTestCase(base.ShakenFistTestCase):
+    """In-memory only objects must never read or write primary state in
+    MariaDB. A state row written by an in-memory object leaks forever:
+    hard_delete() early-returns for in-memory objects and state-driven
+    iterators skip objects with no static row, so nothing can remove it
+    (issue 3532)."""
+
+    @mock.patch('shakenfist.mariadb.set_state')
+    @mock.patch('shakenfist.mariadb.get_state')
+    def test_in_memory_state_never_touches_mariadb(
+            self, mock_get_state, mock_set_state):
+        d = InMemoryStateTestObject(
+            '12345678-1234-4321-8234-123456789012', in_memory_only=True)
+        self.assertIsNone(d.state.value)
+
+        d.state = DatabaseBackedObject.STATE_CREATED
+        self.assertEqual(DatabaseBackedObject.STATE_CREATED, d.state.value)
+
+        d.state = DatabaseBackedObject.STATE_DELETED
+        self.assertEqual(DatabaseBackedObject.STATE_DELETED, d.state.value)
+
+        mock_get_state.assert_not_called()
+        mock_set_state.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb.set_state')
+    @mock.patch('shakenfist.mariadb.get_state')
+    def test_in_memory_state_still_validates_transitions(
+            self, mock_get_state, mock_set_state):
+        d = InMemoryStateTestObject(
+            '12345678-1234-4321-8234-123456789012', in_memory_only=True)
+
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            d.state = DatabaseBackedObject.STATE_DELETED
+
+        mock_get_state.assert_not_called()
+        mock_set_state.assert_not_called()

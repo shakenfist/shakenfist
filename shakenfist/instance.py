@@ -12,6 +12,7 @@ import shutil
 import socket
 import time
 import xml.etree.ElementTree as ET
+from collections import defaultdict
 from functools import partial
 from uuid import UUID
 from uuid import uuid4
@@ -2188,35 +2189,51 @@ def all_instances():
             yield i
 
 
-def instance_usage_for_blob_uuid(blob_uuid, node=None):
+def instance_blob_usage(node=None):
+    """Map blob uuid to the uuids of healthy instances using that blob.
+
+    Walks every healthy instance (optionally filtered to one node) exactly
+    once, recording the blobs each disk references directly and via its
+    dependency chain. Callers that need usage for many blobs -- the
+    cluster wide cleanup loop -- must use this rather than calling
+    instance_usage_for_blob_uuid() per blob: the per-blob form repeats
+    the instance walk, and its per-disk block_devices and dependency
+    chain reads, for every single blob (issue 3502).
+    """
     filters = []
     if node:
         filters.append(partial(placement_filter, node))
 
-    instance_uuids = []
+    usage: dict[str, list[str]] = defaultdict(list)
     for inst in Instances(filters, prefilter='healthy'):
         # inst.block_devices isn't populated until the instance is created,
         # so it may not be ready yet. This means we will miss instances
         # which have been requested but not yet started.
+        inst_uuid = str(inst.uuid)
+        in_use: set[str] = set()
         for d in inst.block_devices.get('devices', []):
             if 'blob_uuid' not in d:
                 continue
 
-            # This blob is in direct use
-            if d['blob_uuid'] == blob_uuid:
-                instance_uuids.append(str(inst.uuid))
-                continue
+            # This blob is in direct use...
+            in_use.add(d['blob_uuid'])
 
-            # The blob is deleted
-            disk_blob = blob.Blob.from_db(d['blob_uuid'], suppress_failure_audit=True)
-            if not disk_blob:
-                continue
-
-            # Recurse for dependencies
-            while disk_blob.depends_on:
-                disk_blob = blob.Blob.from_db(disk_blob.depends_on)
-                if disk_blob and disk_blob.uuid == blob_uuid:
-                    instance_uuids.append(str(inst.uuid))
+            # ...and so is everything in its dependency chain.
+            disk_blob = blob.Blob.from_db(
+                d['blob_uuid'], suppress_failure_audit=True)
+            while disk_blob:
+                depends_on = disk_blob.depends_on
+                if not depends_on:
                     break
+                in_use.add(depends_on)
+                disk_blob = blob.Blob.from_db(
+                    depends_on, suppress_failure_audit=True)
 
-    return instance_uuids
+        for blob_uuid in in_use:
+            usage[blob_uuid].append(inst_uuid)
+
+    return dict(usage)
+
+
+def instance_usage_for_blob_uuid(blob_uuid, node=None):
+    return instance_blob_usage(node=node).get(str(blob_uuid), [])

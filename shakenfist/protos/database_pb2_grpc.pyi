@@ -69,6 +69,9 @@ class DatabaseServiceStub:
     SetObjectState: _grpc.UnaryUnaryMultiCallable[_database_pb2.SetObjectStateRequest, _database_pb2.StatusReply]
     DeleteObjectState: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectStateRequest, _database_pb2.StatusReply]
     GetObjectsByState: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetObjectsByStateRequest, _database_pb2.GetObjectsByStateReply]
+    DeleteOrphanedObjectStates: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteOrphanedObjectStatesRequest, _database_pb2.DeleteOrphanedObjectStatesReply]
+    GetStatelessObjectUuids: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetStatelessObjectUuidsRequest, _database_pb2.GetStatelessObjectUuidsReply]
+    DeleteOrphanedArtifactAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteOrphanedArtifactAttributesRequest, _database_pb2.DeleteOrphanedArtifactAttributesReply]
     ReserveAddress: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReserveAddressRequest, _database_pb2.StatusReply]
     """IPAM Reservation Operations (MariaDB)"""
     ReleaseAddress: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReleaseAddressRequest, _database_pb2.StatusReply]
@@ -385,6 +388,9 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     SetObjectState: _aio.UnaryUnaryMultiCallable[_database_pb2.SetObjectStateRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteObjectState: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectStateRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     GetObjectsByState: _aio.UnaryUnaryMultiCallable[_database_pb2.GetObjectsByStateRequest, _database_pb2.GetObjectsByStateReply]  # type: ignore[assignment]
+    DeleteOrphanedObjectStates: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteOrphanedObjectStatesRequest, _database_pb2.DeleteOrphanedObjectStatesReply]  # type: ignore[assignment]
+    GetStatelessObjectUuids: _aio.UnaryUnaryMultiCallable[_database_pb2.GetStatelessObjectUuidsRequest, _database_pb2.GetStatelessObjectUuidsReply]  # type: ignore[assignment]
+    DeleteOrphanedArtifactAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteOrphanedArtifactAttributesRequest, _database_pb2.DeleteOrphanedArtifactAttributesReply]  # type: ignore[assignment]
     ReserveAddress: _aio.UnaryUnaryMultiCallable[_database_pb2.ReserveAddressRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """IPAM Reservation Operations (MariaDB)"""
     ReleaseAddress: _aio.UnaryUnaryMultiCallable[_database_pb2.ReleaseAddressRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
@@ -860,6 +866,27 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.GetObjectsByStateRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.GetObjectsByStateReply, _abc.Awaitable[_database_pb2.GetObjectsByStateReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteOrphanedObjectStates(
+        self,
+        request: _database_pb2.DeleteOrphanedObjectStatesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.DeleteOrphanedObjectStatesReply, _abc.Awaitable[_database_pb2.DeleteOrphanedObjectStatesReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetStatelessObjectUuids(
+        self,
+        request: _database_pb2.GetStatelessObjectUuidsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetStatelessObjectUuidsReply, _abc.Awaitable[_database_pb2.GetStatelessObjectUuidsReply]]: ...
+
+    @_abc_1.abstractmethod
+    def DeleteOrphanedArtifactAttributes(
+        self,
+        request: _database_pb2.DeleteOrphanedArtifactAttributesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.DeleteOrphanedArtifactAttributesReply, _abc.Awaitable[_database_pb2.DeleteOrphanedArtifactAttributesReply]]: ...
 
     @_abc_1.abstractmethod
     def ReserveAddress(

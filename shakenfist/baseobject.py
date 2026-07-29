@@ -174,6 +174,13 @@ class DatabaseBackedObject:
         self.__in_memory_only = in_memory_only
         if self.__in_memory_only:
             self.__in_memory_values = {}
+            # Primary state for in-memory objects lives here, never in
+            # MariaDB. An in-memory object that wrote a real object_states
+            # row would leak it forever: hard_delete() early-returns for
+            # in-memory objects, and state-driven iterators skip objects
+            # whose static row is missing, so no cleanup path could ever
+            # find the row again (issue 3532).
+            self.__in_memory_state = None
 
         self.log = LOG.with_fields({self.object_type: str(self.__uuid)})
 
@@ -527,8 +534,14 @@ class DatabaseBackedObject:
         return self._state_read(state_attribute_name='state')
 
     def _state_read(self, state_attribute_name='state'):
-        # Primary state is stored in MariaDB
+        # Primary state is stored in MariaDB, except for in-memory only
+        # objects, which must never touch the database
         if state_attribute_name == 'state':
+            if self.__in_memory_only:
+                if self.__in_memory_state is not None:
+                    return self.__in_memory_state
+                return State(value=None, update_time=0)
+
             state = mariadb.get_state(self.object_type, str(self.uuid))
             if state is not None:
                 return state
@@ -576,8 +589,13 @@ class DatabaseBackedObject:
 
         new_state = State(value=new_value, update_time=time.time(), message=message)
 
-        # Primary state is stored in MariaDB
+        # Primary state is stored in MariaDB, except for in-memory only
+        # objects, which must never touch the database
         if state_attribute_name == 'state':
+            if self.__in_memory_only:
+                self.__in_memory_state = new_state
+                return
+
             if not mariadb.set_state(self.object_type, str(self.uuid), new_state):
                 LOG.with_fields({
                     'object_type': self.object_type,
