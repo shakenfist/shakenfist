@@ -333,6 +333,7 @@ nav:
                 - "Self-hosted runner migration": components/ryll/plans/PLAN-self-hosted-runners.md
                 - "Pip-installable ryll": components/ryll/plans/PLAN-pip-distribution.md
     - Features: features.md
+    - Glossary: glossary.md
     - Release notes:
         - "v0.7 to v0.8 (unreleased)": release_notes/v07-v08.md
     - Community: community.md
