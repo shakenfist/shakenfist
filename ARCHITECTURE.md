@@ -93,6 +93,18 @@ startup, not a runtime health signal.
 See [`docs/operator_guide/database.md`](docs/operator_guide/database.md) —
 "MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.
 
+Schema management (`ensure_schema()` in `mariadb.py`, run via `sf-ctl
+ensure-mariadb-schema`) is version-gated per table, plus one un-gated
+pass: native MariaDB `ENUM` columns are reconciled against their Python
+enums on every run, because a MariaDB `ENUM` freezes its value list at
+`CREATE TABLE` time and a new Python enum member changes no table
+version. Without this pass, an upgrade adding an enum member (e.g.
+`ObjectType.NAMESPACE_KEY`) works on fresh installs but breaks existing
+databases with "Data truncated for column" errors. Enum columns are
+discovered from the SQLAlchemy metadata, so new `sa.Enum(...)` columns
+are covered automatically; the live upgrade path is exercised by the
+"Schema ENUM widening" CI job (`tools/ci-enum-widening-test.sh`).
+
 #### Static object value cache
 
 The database client in `mariadb.py` carries a small read-through cache for

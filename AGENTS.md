@@ -106,6 +106,22 @@ belongs in a table with per-row inserts and deletes — see the
 `instance_location` rows in `object_references` — never in a JSON list
 on an attributes row.
 
+### Native ENUM columns and Python enums
+
+A handful of columns are native MariaDB `ENUM` types built with
+`sa.Enum(SomePythonEnum)` (e.g. `object_states.object_type`). MariaDB
+freezes an `ENUM`'s value list at `CREATE TABLE` time, so adding a
+member to the Python enum works on fresh installs but breaks existing
+databases ("Data truncated for column", error 1265) — greenfield CI
+will not catch this. You do NOT need to write a migration when adding
+an enum member: `ensure_schema()` ends with a reconciliation pass
+(`_ensure_native_enum_columns()` in `shakenfist/mariadb.py`) that
+discovers every `sa.Enum` column from the SQLAlchemy metadata and
+widens stale columns automatically. Unit coverage lives in
+`shakenfist/tests/test_mariadb_enum_columns.py`; the live upgrade path
+is exercised against a real MariaDB by the "Schema ENUM widening" CI
+job in `functional-tests.yml` (`tools/ci-enum-widening-test.sh`).
+
 ### Documentation
 
 - When a change adds, renames, or removes a user-visible concept

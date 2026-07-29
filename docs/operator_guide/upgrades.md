@@ -100,6 +100,40 @@ Migrated table 'object_states' from version 1 to 2
 MariaDB schema verified.
 ```
 
+### ENUM value reconciliation
+
+Some columns (for example `object_states.object_type`) are native MariaDB
+`ENUM` types whose permitted values mirror a Python enum in the code. A
+MariaDB `ENUM` freezes its value list when the table is created, so a code
+upgrade that adds a new enum member leaves existing databases unable to
+store the new value — inserts fail with MariaDB error 1265 ("Data
+truncated for column ..."). Fresh installs are unaffected, which makes
+this failure mode easy to miss in greenfield testing; it is exactly what
+broke namespace key writes when the `NAMESPACE_KEY` object type shipped
+in July 2026.
+
+To close this class of problem, `sf-ctl ensure-mariadb-schema` ends with
+a reconciliation pass that compares every native `ENUM` column against
+its Python enum and widens the column in place when the code has grown
+new values. Appending values to an `ENUM` is a metadata-only change in
+MariaDB and does not rewrite the table. Values removed from the code are
+deliberately retained in the column (existing rows may still hold them)
+and logged. The pass reports its work in the command output:
+
+```
+Widened ENUM column(s): object_states.object_type
+```
+
+or, on an up-to-date database:
+
+```
+Native ENUM columns are up to date
+```
+
+Because enum growth does not change any table version, this pass runs on
+every invocation rather than being version-gated. It is idempotent and
+cheap (one `information_schema` query per `ENUM` column).
+
 ### Known migration notes
 
 #### cluster_operation_targets v1 to v2

@@ -277,7 +277,13 @@ def ensure_mariadb_schema() -> None:
     results = mariadb.ensure_schema()
 
     for r in results:
-        if r['migrated']:
+        if 'altered_columns' in r:
+            if r['migrated']:
+                click.echo('Widened ENUM column(s): '
+                           f"{', '.join(r['altered_columns'])}")
+            else:
+                click.echo('Native ENUM columns are up to date')
+        elif r['migrated']:
             if r['start_version'] <= 0:
                 click.echo(f"Created table '{r['table']}' at version "
                            f"{r['end_version']}")
