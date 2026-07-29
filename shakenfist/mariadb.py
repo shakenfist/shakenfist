@@ -17,6 +17,10 @@
 # Each table has a version number tracked in the schema_versions table.
 # When ensure_schema() is called, it checks the current version and applies
 # any necessary migrations. This follows the same pattern as eventlog.py.
+# Native ENUM columns are additionally reconciled against their Python
+# enums on every ensure_schema() run (see _ensure_native_enum_columns),
+# because enum growth changes no table version and so cannot be caught by
+# the version gate.
 
 from ipaddress import IPv4Address
 import json
@@ -1040,13 +1044,135 @@ def _get_object_states_table() -> sa.Table:
     return _object_states_table
 
 
-def _build_object_type_enum_values() -> str:
-    """Build the ENUM values string for ObjectType.
+def _native_enum_columns() -> list[tuple[str, sa.Column[Any]]]:
+    """List every column rendered as a native MariaDB ENUM.
 
-    Returns a comma-separated list of quoted enum values for use in
-    ALTER TABLE statements.
+    Discovers (table name, column) pairs directly from the registered
+    SQLAlchemy metadata rather than from a hand-maintained list, so a new
+    ``sa.Enum(...)`` column -- or a new member added to an existing Python
+    enum -- is automatically covered by _ensure_native_enum_columns()
+    without anyone remembering to write a migration.
     """
-    return ', '.join(f"'{ot.value}'" for ot in ObjectType)
+    register_all_tables()
+    found = []
+    for table in _get_metadata().tables.values():
+        for column in table.columns:
+            if (isinstance(column.type, sa.Enum) and
+                    column.type.enum_class is not None):
+                found.append((table.name, column))
+    return sorted(found, key=lambda entry: (entry[0], entry[1].name))
+
+
+def _parse_enum_column_type(column_type: str) -> Optional[list[str]]:
+    """Parse the value list out of an information_schema COLUMN_TYPE.
+
+    Returns None if the column is not an ENUM. Values are single quoted
+    with embedded quotes doubled, e.g. enum('A','B','it''s').
+    """
+    if not column_type.lower().startswith('enum('):
+        return None
+    inner = column_type[column_type.index('(') + 1:column_type.rindex(')')]
+
+    values: list[str] = []
+    current: list[str] = []
+    in_string = False
+    i = 0
+    while i < len(inner):
+        ch = inner[i]
+        if in_string:
+            if ch == "'":
+                if i + 1 < len(inner) and inner[i + 1] == "'":
+                    current.append("'")
+                    i += 1
+                else:
+                    in_string = False
+                    values.append(''.join(current))
+                    current = []
+            else:
+                current.append(ch)
+        elif ch == "'":
+            in_string = True
+        i += 1
+    return values
+
+
+def _render_enum_ddl(values: list[str]) -> str:
+    """Render an ENUM(...) type clause for the given values."""
+    quoted = ', '.join("'" + v.replace("'", "''") + "'" for v in values)
+    return f'ENUM({quoted})'
+
+
+def _ensure_native_enum_columns(engine: sa.Engine) -> dict[str, Any]:
+    """Widen native ENUM columns whose Python enum has grown.
+
+    A MariaDB ENUM column stores its permitted values in the table
+    definition, frozen at CREATE TABLE time. Adding a member to the Python
+    enum therefore only takes effect on fresh installs; existing databases
+    reject the new value with "Data truncated for column ..." (error 1265).
+    That is exactly what broke every API request touching namespace keys
+    when ObjectType.NAMESPACE_KEY shipped without a widening migration.
+
+    This reconciles every native ENUM column against its Python enum on
+    each ensure_schema() run: values present in Python but not in the
+    database trigger an ALTER TABLE ... MODIFY COLUMN with the full value
+    list. Appending values to an ENUM is an in-place metadata-only change
+    on MariaDB. Values present in the database but no longer in the Python
+    enum are retained (rows may still reference them) and logged.
+    """
+    altered: list[str] = []
+    with engine.connect() as conn:
+        for table_name, column in _native_enum_columns():
+            row = conn.execute(
+                sa.text(
+                    'SELECT COLUMN_TYPE FROM information_schema.COLUMNS '
+                    'WHERE TABLE_SCHEMA = DATABASE() '
+                    'AND TABLE_NAME = :table_name '
+                    'AND COLUMN_NAME = :column_name'),
+                {'table_name': table_name, 'column_name': column.name}
+            ).first()
+            if row is None:
+                LOG.debug(
+                    f'ENUM reconciliation skipping {table_name}.'
+                    f'{column.name}: column not present in database')
+                continue
+
+            db_values = _parse_enum_column_type(row[0])
+            if db_values is None:
+                LOG.warning(
+                    f'ENUM reconciliation skipping {table_name}.'
+                    f'{column.name}: database type is not an ENUM '
+                    f'({row[0]})')
+                continue
+
+            # column.type.enums is the exact value list SQLAlchemy renders
+            # at CREATE TABLE time (enum member names, not values).
+            expected = list(cast(sa.Enum, column.type).enums)
+            missing = [v for v in expected if v not in db_values]
+            if not missing:
+                continue
+
+            stale = [v for v in db_values if v not in expected]
+            if stale:
+                LOG.warning(
+                    f'ENUM column {table_name}.{column.name} retains '
+                    f'values no longer in the Python enum: {stale}')
+
+            nullability = 'NULL' if column.nullable else 'NOT NULL'
+            LOG.info(
+                f'Widening ENUM column {table_name}.{column.name} '
+                f'with new values: {missing}')
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} '
+                f'MODIFY COLUMN {column.name} '
+                f'{_render_enum_ddl(expected + stale)} {nullability}'))
+            conn.commit()
+            altered.append(f'{table_name}.{column.name}')
+
+    return {
+        'table': 'native-enum-columns',
+        'altered_columns': altered,
+        'migrated': bool(altered),
+    }
 
 
 def _build_object_filter_query(
@@ -1976,15 +2102,6 @@ def _get_ipam_reservations_table() -> sa.Table:
     return _ipam_reservations_table
 
 
-def _build_reservation_type_enum_values() -> str:
-    """Build the ENUM values string for ReservationType.
-
-    Returns a comma-separated list of quoted enum values for use in
-    ALTER TABLE statements.
-    """
-    return ', '.join(f"'{rt.value}'" for rt in ReservationType)
-
-
 def _ensure_ipam_reservations_schema(engine: sa.Engine) -> dict[str, Any]:
     """Ensure the ipam_reservations table schema is up to date.
 
@@ -2844,6 +2961,13 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_cluster_config_schema(engine))
     results.append(_ensure_events_schema(engine))
     results.append(_ensure_event_objects_schema(engine))
+
+    # Widen any native ENUM column whose Python enum has grown since the
+    # table was created. This runs after the per-table ensures so every
+    # table exists, and must not be skipped: the version-gated migrations
+    # above cannot see enum drift because adding an enum member changes no
+    # table version.
+    results.append(_ensure_native_enum_columns(engine))
 
     # Log summary
     migrated = [r for r in results if r['migrated']]

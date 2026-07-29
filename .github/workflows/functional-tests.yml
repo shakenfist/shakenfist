@@ -569,6 +569,43 @@ jobs:
           if-no-files-found: error
           path: /srv/github/artifacts/bundle.zip
 
+  # MariaDB ENUM columns freeze their permitted values at CREATE TABLE
+  # time, so a Python enum gaining a member silently breaks existing
+  # databases while greenfield CI deploys keep passing -- which is how
+  # ObjectType.NAMESPACE_KEY shipped without a widening migration and
+  # broke namespace key writes on upgraded clusters. The functional
+  # matrix cannot catch this class of bug because it always deploys a
+  # fresh schema. This job installs a real MariaDB on an ephemeral VM
+  # runner, builds the schema, shrinks each ENUM column back one member
+  # (what a pre-upgrade database looks like), and verifies the
+  # ensure_schema() reconciliation pass widens them and the newest
+  # values become writable. Gated by can_merge.
+  schema_enum_widening:
+    name: "Schema ENUM widening"
+    if: >-
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
+      && needs.check_paths.outputs.code_changed != 'false'
+    needs: [check_paths]
+    runs-on: [self-hosted, vm, debian-12]
+    timeout-minutes: 30
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-schema-enum-widening
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install MariaDB
+        timeout-minutes: 10
+        run: |
+          sudo bash tools/ci-install-mariadb.sh \
+              tools/bootstrap-mariadb.sql '' ci-test-password
+
+      - name: Run live ENUM widening tests
+        timeout-minutes: 15
+        run: bash tools/ci-enum-widening-test.sh ci-test-password
+
   can_see_status:
     name: "Can see status"
     runs-on: [self-hosted, static]
@@ -601,6 +638,7 @@ jobs:
       - functional_matrix_merge_collection
       - ansible_modules_collection
       - node_lifecycle_collection
+      - schema_enum_widening
       - check_paths
     if: always() && github.event_name == 'merge_group'
     permissions:
