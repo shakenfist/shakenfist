@@ -144,6 +144,7 @@ nav:
                 - "Plans index": components/instar/plans/index.md
                 - "Distro matrix CI": components/instar/plans/PLAN-distro-matrix-ci.md
                 - "Release v0.2.0": components/instar/plans/PLAN-release-v0.2.md
+                - "Release v0.3.0": components/instar/plans/PLAN-release-v0.3.md
                 - "First public release of instar": components/instar/plans/PLAN-release.md
                 - "Security audit": components/instar/plans/PLAN-audit.md
                 - "Coverage-guided fuzzing": components/instar/plans/PLAN-coverage-fuzzing.md
