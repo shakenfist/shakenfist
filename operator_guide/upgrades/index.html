@@ -10187,6 +10187,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#enum-value-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ENUM value reconciliation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#known-migration-notes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10350,6 +10361,17 @@
     <span class="md-ellipsis">
       
         Manual schema verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enum-value-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ENUM value reconciliation
       
     </span>
   </a>
@@ -10549,6 +10571,31 @@ migrations were applied. For example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Migrated table &#39;object_states&#39; from version 1 to 2
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>MariaDB schema verified.
 </code></pre></div>
+<h3 id="enum-value-reconciliation">ENUM value reconciliation<a class="headerlink" href="#enum-value-reconciliation" title="Permanent link">&para;</a></h3>
+<p>Some columns (for example <code>object_states.object_type</code>) are native MariaDB
+<code>ENUM</code> types whose permitted values mirror a Python enum in the code. A
+MariaDB <code>ENUM</code> freezes its value list when the table is created, so a code
+upgrade that adds a new enum member leaves existing databases unable to
+store the new value — inserts fail with MariaDB error 1265 ("Data
+truncated for column ..."). Fresh installs are unaffected, which makes
+this failure mode easy to miss in greenfield testing; it is exactly what
+broke namespace key writes when the <code>NAMESPACE_KEY</code> object type shipped
+in July 2026.</p>
+<p>To close this class of problem, <code>sf-ctl ensure-mariadb-schema</code> ends with
+a reconciliation pass that compares every native <code>ENUM</code> column against
+its Python enum and widens the column in place when the code has grown
+new values. Appending values to an <code>ENUM</code> is a metadata-only change in
+MariaDB and does not rewrite the table. Values removed from the code are
+deliberately retained in the column (existing rows may still hold them)
+and logged. The pass reports its work in the command output:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Widened ENUM column(s): object_states.object_type
+</code></pre></div>
+<p>or, on an up-to-date database:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Native ENUM columns are up to date
+</code></pre></div>
+<p>Because enum growth does not change any table version, this pass runs on
+every invocation rather than being version-gated. It is idempotent and
+cheap (one <code>information_schema</code> query per <code>ENUM</code> column).</p>
 <h3 id="known-migration-notes">Known migration notes<a class="headerlink" href="#known-migration-notes" title="Permanent link">&para;</a></h3>
 <h4 id="cluster_operation_targets-v1-to-v2">cluster_operation_targets v1 to v2<a class="headerlink" href="#cluster_operation_targets-v1-to-v2" title="Permanent link">&para;</a></h4>
 <p>The v1 schema declared <code>operation_uuid</code> as a column-level <code>UNIQUE</code>,
@@ -10609,7 +10656,7 @@ described in <a href="../load_balancing/">Load Balancing</a>. Without an LB watc
 them <strong>before</strong> rolling any nodes to the new build. Run the following on a
 node with direct MariaDB access (i.e. <code>MARIADB_HOST</code> configured — typically
 a database-tier node):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>/srv/shakenfist/venv/bin/sf-ctl<span class="w"> </span>ensure-mariadb-schema
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sudo<span class="w"> </span>/srv/shakenfist/venv/bin/sf-ctl<span class="w"> </span>ensure-mariadb-schema
 </code></pre></div>
 <p><code>sf-database</code> refuses to start if the schema version does not match what
 its build expects, so applying migrations first lets you upgrade the
@@ -10620,7 +10667,7 @@ See <a href="#mariadb-schema-migrations">MariaDB schema migrations</a> above and
 <p>Upgrade <strong>one node at a time</strong>. Confirm that each node is healthy before
 moving to the next.</p>
 <p><strong>1. Stop <code>sf-api</code> on the node.</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>sf-api
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>sf-api
 </code></pre></div>
 <p>Systemd sends SIGTERM. On receipt, the <code>sf-api</code> worker immediately flips
 <code>/readyz</code> to return <code>503 Service Unavailable</code>. The load balancer detects this
@@ -10637,17 +10684,17 @@ the grace period.</p>
 <p><strong>2. Upgrade the node's virtualenv.</strong></p>
 <p>Follow the manual venv-upgrade procedure described in
 <a href="#upgrade-process">Upgrade process</a> above, for example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sudo<span class="w"> </span>/srv/shakenfist/venv/bin/pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>shakenfist
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sudo<span class="w"> </span>/srv/shakenfist/venv/bin/pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>shakenfist
 </code></pre></div>
 <p><strong>3. Restart SF services on the node.</strong></p>
 <p>For hypervisor nodes restart all services:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-cleaner<span class="w"> </span>sf-cluster<span class="w"> </span>sf-net<span class="w"> </span>sf-nodelock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>sf-privexec<span class="w"> </span>sf-queues<span class="w"> </span>sf-resources<span class="w"> </span>sf-sidechannel<span class="w"> </span>sf-transfers
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-cleaner<span class="w"> </span>sf-cluster<span class="w"> </span>sf-net<span class="w"> </span>sf-nodelock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>sf-privexec<span class="w"> </span>sf-queues<span class="w"> </span>sf-resources<span class="w"> </span>sf-sidechannel<span class="w"> </span>sf-transfers
 </code></pre></div>
 <p>For a database-tier node restart the database service first:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-database
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-cleaner<span class="w"> </span>sf-cluster<span class="w"> </span>sf-net<span class="w"> </span>sf-nodelock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>sf-privexec<span class="w"> </span>sf-queues<span class="w"> </span>sf-resources<span class="w"> </span>sf-sidechannel<span class="w"> </span>sf-transfers
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-database
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-cleaner<span class="w"> </span>sf-cluster<span class="w"> </span>sf-net<span class="w"> </span>sf-nodelock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span>sf-privexec<span class="w"> </span>sf-queues<span class="w"> </span>sf-resources<span class="w"> </span>sf-sidechannel<span class="w"> </span>sf-transfers
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -10659,13 +10706,13 @@ failover details.</p>
 </div>
 <p><strong>4. Confirm the node is healthy before moving on.</strong></p>
 <p>Poll <code>/readyz</code> until it returns <code>200 OK</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://&lt;node-ip&gt;:13000/readyz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;ready&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://&lt;node-ip&gt;:13000/readyz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;ready&quot;</span>
 </code></pre></div>
 <p><code>/readyz</code> returns <code>200</code> once the worker has successfully contacted
 <code>sf-database</code>. The load balancer will return the node to rotation on its
 next successful probe.</p>
 <p>You can also probe the <code>sf-database</code> gRPC health endpoint directly:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>grpc-health-probe<span class="w"> </span>-addr<span class="o">=</span>&lt;sf-database-host&gt;:13005
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>grpc-health-probe<span class="w"> </span>-addr<span class="o">=</span>&lt;sf-database-host&gt;:13005
 </code></pre></div>
 <p><code>SERVING</code> means <code>sf-database</code> can reach MariaDB and the node is ready for
 the next node upgrade. See the
