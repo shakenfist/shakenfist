@@ -181,11 +181,17 @@
       <channel name='smartcard' mode='secure'/>
       <channel name='usbredir' mode='secure'/>
 
-      <image compression="auto_glz"/>
-      <jpeg compression="always"/>
-      <zlib compression="always"/>
+      <!-- NOTE(mikal): auto_lz over auto_glz because glz payloads are slow
+           to decode client-side; auto (not always) for jpeg/zlib so the
+           server honours client capability advertisements like LZ4; and
+           streaming mode filter because mode all causes rapid stream
+           create/destroy flapping on cursor blinks and window drags. See
+           https://github.com/shakenfist/ryll/blob/develop/docs/libvirt-spice-recommendations.md -->
+      <image compression="auto_lz"/>
+      <jpeg compression="auto"/>
+      <zlib compression="auto"/>
       <playback compression="on"/>
-      <streaming mode="all"/>
+      <streaming mode="filter"/>
     </graphics>
     {%- endif %}
 
