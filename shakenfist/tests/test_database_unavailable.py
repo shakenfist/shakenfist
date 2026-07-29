@@ -12,6 +12,7 @@ import uuid
 from unittest import mock
 
 import grpc
+from sqlalchemy.exc import OperationalError
 
 from shakenfist import exceptions
 from shakenfist import locks
@@ -170,6 +171,92 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             exceptions.DatabaseUnavailable,
             mariadb.get_node_by_fqdn, 'sf-1')
+
+
+class NamespaceAttributesFetchFailureTestCase(base.ShakenFistTestCase):
+    """Issue 3522: a failed namespace key set fetch must raise, not read
+    as an authoritative "no attributes row" (which the auth path treats
+    as an empty key set and answers with a 401)."""
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.RESOURCE_EXHAUSTED))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_grpc_error_raises_database_unavailable(
+            self, mock_use, mock_stub, mock_call):
+        # The trigger from issue 3521: a keys blob over the 4MiB message
+        # cap fails RESOURCE_EXHAUSTED, which is not retryable and so
+        # reaches the wrapper as a raw RpcError rather than as a
+        # DatabaseUnavailable from _grpc_call's retry exhaustion.
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_namespace_attributes, 'banana')
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_direct_operational_error_raises_database_unavailable(
+            self, mock_use, mock_engine):
+        # The direct path feeds the database daemon's servicer: swallowing
+        # an OperationalError there made the daemon reply found=False, so
+        # a MariaDB outage read as "namespace has no keys" cluster-wide.
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_namespace_attributes, 'banana')
+
+
+class NamespaceKeyFetchFailureTestCase(base.ShakenFistTestCase):
+    """Issue 3522, post auth federation phase 2: the auth path reads
+    keys via find_namespace_keys (/auth) and get_namespace_key_by_name
+    (token validation), so those reads must also raise on failure
+    rather than conflating an outage with "no such key"."""
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.RESOURCE_EXHAUSTED))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_grpc_find_error_raises_database_unavailable(
+            self, mock_use, mock_stub, mock_call):
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.find_namespace_keys, 'banana', False, 0.0)
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.RESOURCE_EXHAUSTED))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_grpc_point_read_error_raises_database_unavailable(
+            self, mock_use, mock_stub, mock_call):
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_namespace_key_by_name, 'banana', 'key1')
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_direct_find_operational_error_raises_database_unavailable(
+            self, mock_use, mock_engine):
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.find_namespace_keys, 'banana', False, 0.0)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_direct_point_read_operational_error_raises_database_unavailable(
+            self, mock_use, mock_engine):
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_namespace_key_by_name, 'banana', 'key1')
 
 
 class GrpcCallMethodNameTestCase(base.ShakenFistTestCase):

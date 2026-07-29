@@ -663,6 +663,31 @@ def handle_authorization_exceptions(func):
     return wrapper
 
 
+def handle_database_unavailable(func):
+    # An unreachable or failing database must surface to clients as a
+    # 503, never as an authentication or "object not found" failure:
+    # the auth path treating an unreadable namespace key set as a 401
+    # 'JWT token uses non-existent key' sent clients into
+    # re-authentication loops and misdirected diagnosis towards key
+    # rotation (issue 3522, the auth-path variant of issue 3373). This
+    # sits below record_exception in the decorator stack so a database
+    # outage answers each request with a clean 503 rather than
+    # recording a server exception per request for the duration.
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except exceptions.DatabaseUnavailable as e:
+            LOG.with_fields({
+                'method': flask.request.method,
+                'path': flask.request.path,
+                'error': str(e)}).error(
+                'Database unavailable while handling API request')
+            return sf_api.error(503, 'database unavailable, please retry',
+                                suppress_traceback=True)
+
+    return wrapper
+
+
 def record_exception(func):
     def wrapper(*args, **kwargs):
         try:
@@ -709,6 +734,7 @@ class Resource(flask_restful.Resource):
     method_decorators = [
         log_request,
         handle_authorization_exceptions,
+        handle_database_unavailable,
         record_exception,
         suppress_exceptions_to_client
         ]

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import bcrypt
 
+from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.config import SFConfig
@@ -150,6 +151,77 @@ class AuthTestCase(base.ShakenFistTestCase):
             },
             _clean_traceback(resp.get_json()))
         self.assertEqual(401, resp.status_code)
+
+
+class AuthDatabaseUnavailableTestCase(base.ShakenFistTestCase):
+    """Issue 3522: an unreadable namespace key set must surface as a 503,
+    not as a 401 telling the client its credentials are bad."""
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.mock_mariadb.create_namespace('banana', 'key1', 'bacon')
+
+        # The client must be created after all the mocks, or the mocks are not
+        # correctly applied.
+        self.client = external_api.app.test_client()
+
+    def _get_token(self):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
+        self.assertEqual(200, resp.status_code)
+        return 'Bearer %s' % resp.get_json()['access_token']
+
+    def test_token_verification_surfaces_outage_as_503(self):
+        auth_token = self._get_token()
+
+        # Token verification point reads the JWT's key via
+        # get_namespace_key_by_name (auth federation phase 2), so that
+        # is the read which must not conflate an outage with "no such
+        # key".
+        with mock.patch(
+                'shakenfist.mariadb.get_namespace_key_by_name',
+                side_effect=exceptions.DatabaseUnavailable('keys unreadable')):
+            resp = self.client.get(
+                '/auth/namespaces', headers={'Authorization': auth_token})
+
+        self.assertEqual(503, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'database unavailable, please retry',
+                'status': 503
+            },
+            _clean_traceback(resp.get_json()))
+
+    def test_login_surfaces_outage_as_503(self):
+        # /auth lists the namespace's keys via find_namespace_keys
+        # (auth federation phase 2), so that is the read which must not
+        # conflate an outage with "the namespace has no usable keys".
+        with mock.patch(
+                'shakenfist.mariadb.find_namespace_keys',
+                side_effect=exceptions.DatabaseUnavailable('keys unreadable')):
+            resp = self.client.post(
+                '/auth',
+                data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
+
+        self.assertEqual(503, resp.status_code)
+
+    def test_token_verification_works_once_database_recovers(self):
+        auth_token = self._get_token()
+        resp = self.client.get(
+            '/auth/namespaces', headers={'Authorization': auth_token})
+        self.assertEqual(200, resp.status_code)
 
 
 class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):

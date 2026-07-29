@@ -10999,8 +10999,13 @@ def _direct_get_namespace_attributes(name: str) -> Optional[NamespaceAttributesD
                 trust=result.trust if result.trust else ['system'],
             )
     except OperationalError as e:
+        # As with the gRPC path above, a database failure must not read
+        # as "no attributes row". Raising here also means the database
+        # daemon's GetNamespaceAttributes servicer returns INTERNAL to
+        # its clients instead of found=False (issue 3522).
         LOG.warning(f'MariaDB get failed for namespace_attributes {name}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'namespace attributes for {name} could not be read: {e}') from e
 
 
 def _namespace_attributes_column_values(
@@ -11153,8 +11158,15 @@ def _grpc_get_namespace_attributes(name: str) -> Optional[NamespaceAttributesDat
             trust=json.loads(reply.data.trust_json) if reply.data.trust_json else ['system'],
         )
     except grpc.RpcError as e:
+        # None from this function means "no attributes row exists" and the
+        # auth path treats that as an authoritative empty key set, so a
+        # transport or server failure here must raise instead: mapping it
+        # to None turned a RESOURCE_EXHAUSTED on an oversized keys blob
+        # into cluster-wide 401s (issue 3522, the auth-path variant of
+        # issue 3373).
         LOG.error(f'gRPC GetNamespaceAttributes failed for {name}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'namespace attributes for {name} could not be read: {e}') from e
 
 
 def _grpc_update_namespace_attributes(
@@ -11747,8 +11759,8 @@ def _direct_get_namespace_key_by_name(
         name: The key name, unique within that namespace.
 
     Returns:
-        A (static, attributes) pair, or None if there is no such key
-        or on error.
+        A (static, attributes) pair, or None if there is no such key.
+        Raises DatabaseUnavailable if the database cannot be read.
     """
     engine = _get_engine()
     table = _get_namespace_keys_table()
@@ -11792,10 +11804,15 @@ def _direct_get_namespace_key_by_name(
                 )
             )
     except OperationalError as e:
+        # As with the gRPC path, a database failure must not read as
+        # "no such key". Raising here also means the database daemon's
+        # GetNamespaceKeyByName servicer returns INTERNAL to its
+        # clients instead of found=False (issue 3522).
         LOG.warning(
             f'MariaDB get failed for namespace_key '
             f'(namespace={namespace!r}, name={name!r}): {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'namespace key {namespace}:{name} could not be read: {e}') from e
 
 
 def _direct_delete_namespace_key(key_uuid: UUID) -> bool:
@@ -11842,7 +11859,8 @@ def _direct_find_namespace_keys(
             include_expired is True.
 
     Returns:
-        A list of (static, attributes) pairs, empty on error.
+        A list of (static, attributes) pairs. Raises
+        DatabaseUnavailable if the database cannot be read.
     """
     engine = _get_engine()
     table = _get_namespace_keys_table()
@@ -11893,11 +11911,17 @@ def _direct_find_namespace_keys(
                 for row in rows
             ]
     except OperationalError as e:
+        # As with the gRPC path, a database failure must not read as
+        # "the namespace has no usable keys". Raising here also means
+        # the database daemon's FindNamespaceKeys servicer returns
+        # INTERNAL to its clients instead of an empty listing
+        # (issue 3522).
         LOG.warning(
             f'MariaDB find failed for namespace_keys '
             f'(namespace={namespace!r}, '
             f'include_expired={include_expired!r}): {e}')
-        return []
+        raise exceptions.DatabaseUnavailable(
+            f'namespace keys for {namespace} could not be listed: {e}') from e
 
 
 def _direct_delete_expired_namespace_keys(older_than: float) -> int:
@@ -12162,10 +12186,15 @@ def _grpc_get_namespace_key_by_name(
             _namespace_key_attrs_from_proto(reply.key.attributes)
         )
     except grpc.RpcError as e:
+        # None from this function means "no such key" and token
+        # validation treats that as an authoritative 401, so a
+        # transport or server failure here must raise instead
+        # (issue 3522).
         LOG.error(
             f'gRPC GetNamespaceKeyByName failed for '
             f'{namespace}:{name}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'namespace key {namespace}:{name} could not be read: {e}') from e
 
 
 def _grpc_delete_namespace_key(key_uuid: UUID) -> bool:
@@ -12200,9 +12229,14 @@ def _grpc_find_namespace_keys(
             for k in reply.keys
         ]
     except grpc.RpcError as e:
+        # An empty list from this function means "the namespace has no
+        # usable keys" and /auth treats that as an authoritative 401,
+        # so a transport or server failure here must raise instead
+        # (issue 3522).
         LOG.error(
             f'gRPC FindNamespaceKeys failed for {namespace}: {e}')
-        return []
+        raise exceptions.DatabaseUnavailable(
+            f'namespace keys for {namespace} could not be listed: {e}') from e
 
 
 def _grpc_delete_expired_namespace_keys(older_than: float) -> int:
