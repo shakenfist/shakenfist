@@ -162,7 +162,7 @@ def restore_instances():
         except Exception as e:
             util_exceptions.ignore_exception(
                 'restore instance %s' % inst, e)
-            inst.etcd.enqueue_delete_due_error(
+            inst.enqueue_delete_due_error(
                 'exception while restoring instance on daemon restart')
 
     # Reconcile the recorded instance placements for this node: add any

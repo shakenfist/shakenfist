@@ -13,11 +13,94 @@ upgrade on 2026-07-12). The restore must run on a background thread
 so its waits complete once the main loop is consuming.
 """
 
+import contextlib
 import threading
 from unittest import mock
 
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.tests import base
+
+
+class FakeInstance:
+    """A deliberately minimal instance stand-in.
+
+    This is a plain class rather than a MagicMock so that accessing an
+    attribute which does not exist on real Instance objects (such as the
+    etcd-era ``inst.etcd``) raises AttributeError, just like production.
+    """
+
+    def __init__(self, uuid, fail_restore=False):
+        self.uuid = uuid
+        self.power_state = 'on'
+        self.fail_restore = fail_restore
+        self.restored = False
+        self.delete_errors = []
+
+    def get_lock(self, timeout=None, op=None, global_scope=False):
+        return contextlib.nullcontext()
+
+    def create_on_hypervisor(self):
+        if self.fail_restore:
+            raise RuntimeError('hypervisor exploded')
+        self.restored = True
+
+    def enqueue_delete_due_error(self, error_msg):
+        self.delete_errors.append(error_msg)
+
+    def __str__(self):
+        return 'instance(%s)' % self.uuid
+
+
+class RestoreInstancesErrorPathTestCase(base.ShakenFistTestCase):
+    """Regression test for issue #3552.
+
+    The instance-restore error path used to call
+    ``inst.etcd.enqueue_delete_due_error(...)``, an etcd-era leftover.
+    Instance objects no longer have an ``etcd`` attribute, so a failed
+    restore raised AttributeError instead of enqueuing the delete, and
+    the exception aborted the loop so later instances were never
+    restored.
+    """
+
+    def test_failed_restore_enqueues_delete_and_continues(self):
+        failing = FakeInstance('uuid-failing', fail_restore=True)
+        healthy = FakeInstance('uuid-healthy')
+
+        fake_config = mock.MagicMock()
+        fake_config.NODE_NAME = 'fake-node'
+
+        fake_instance_module = mock.MagicMock()
+        fake_instance_module.Instances.return_value = [failing, healthy]
+        fake_instance_module.Instance.STATE_INITIAL = 'initial'
+
+        fake_node = mock.MagicMock()
+        fake_node.instances = []
+        fake_node_class = mock.MagicMock()
+        fake_node_class.from_db.return_value = fake_node
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mock.patch.object(
+                startup_tasks, 'config', fake_config))
+            stack.enter_context(mock.patch.object(
+                startup_tasks, 'instance', fake_instance_module))
+            stack.enter_context(mock.patch.object(
+                startup_tasks, 'interfaces_for_instance', return_value=[]))
+            stack.enter_context(mock.patch.object(
+                startup_tasks, 'Node', fake_node_class))
+            mock_ignore = stack.enter_context(mock.patch.object(
+                startup_tasks.util_exceptions, 'ignore_exception'))
+
+            startup_tasks.restore_instances()
+
+        # The failing instance was enqueued for deletion due to error...
+        self.assertEqual(
+            ['exception while restoring instance on daemon restart'],
+            failing.delete_errors)
+        mock_ignore.assert_called_once()
+
+        # ...and the failure did not stop later instances being restored.
+        self.assertTrue(healthy.restored)
+        self.assertEqual([], healthy.delete_errors)
 
 
 class StartupRestoreThreadTestCase(base.ShakenFistTestCase):
