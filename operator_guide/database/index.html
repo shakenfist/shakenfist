@@ -12029,6 +12029,32 @@ schedule. It re-queues or rejects rows whose claim has gone stale:</p>
   <code>cluster_op_reaper_requeued_total</code> and
   <code>cluster_op_reaper_rejected_total</code> record reaper activity.</li>
 </ul>
+<p>The cluster daemon also runs a deleted-object sweep (every 15 minutes)
+which hard deletes objects that have been in a final state (<code>deleted</code>,
+<code>complete</code>, <code>abort</code>) for longer than their grace period (<code>CLEANER_DELAY</code>
+for most objects, 30 seconds for completed operations). The sweep's
+work queue holds <code>(object_type, uuid)</code> tuples — the candidate list is a
+single SQL query per object type with the age filter applied
+database-side, and objects are hydrated one at a time at processing
+time, so a large backlog or a single failing object cannot stall the
+pass.</p>
+<p>An hourly orphan reconciliation sweep handles rows the state-driven
+iterators cannot see:</p>
+<ul>
+<li><strong>Phantoms</strong> — <code>object_states</code> rows whose static-values row is gone
+  (for example after a partially failed hard delete). These are deleted
+  database-side, guarded by a one hour minimum row age so objects
+  mid-creation are never raced. Orphaned <code>artifact_attributes</code> rows are
+  removed the same way.</li>
+<li><strong>Zombies</strong> — static-values rows with no <code>object_states</code> row
+  (for example after a crash between static-row creation and the first
+  state write). Once a zombie has been observed on two consecutive
+  sweeps it is repaired by writing a <code>deleted</code> state row, after which
+  the regular deleted-object sweep hard deletes it. Node and namespace
+  objects are never auto-repaired.</li>
+</ul>
+<p>Both sweeps log what they remove, and zombie repairs also emit an audit
+event against the repaired object.</p>
 <p>Cluster operation targets are stored separately because:</p>
 <ul>
 <li><strong>Append-only history</strong>: Every operation enqueued against an object creates
