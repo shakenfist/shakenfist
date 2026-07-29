@@ -2,8 +2,10 @@
 
 ## What is Ryll?
 
-Ryll is a purpose-built SPICE VDI test client, written in Rust. It exists to
-support performance testing of the **Kerbside** SPICE proxy.
+Ryll is a multi-modal SPICE VDI client, written in Rust. It began life as a
+purpose-built test client for performance testing of the **Kerbside** SPICE
+proxy, and has since grown into a client suitable for day-to-day interactive
+use — while keeping the instrumentation that made it useful for testing.
 
 ## Background
 
@@ -37,12 +39,17 @@ Existing SPICE clients like `remote-viewer` (spice-gtk) are designed for
 end-user use. They work well for connecting to VMs, but they're not designed
 to be instrumented for performance testing.
 
-Ryll was built to:
+Ryll was originally built to:
 
 1. **Generate controlled traffic** - Predictable workloads for benchmarking
 2. **Measure latency precisely** - Track time from keystroke to display update
 3. **Run headless** - Automated testing without GUI overhead
 4. **Be fully instrumented** - Every metric needed for proxy performance analysis
+
+Those goals still stand, but along the way ryll grew broad enough protocol
+coverage (display, cursor, inputs, audio, USB redirection, WebDAV folder
+sharing) and enough delivery modes (desktop GUI, headless, web browser) that
+it is now a practical client for real workloads, not just test ones.
 
 ## The Testing Setup
 
