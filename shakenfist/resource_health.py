@@ -113,19 +113,26 @@ class DeadlineProbe:
 
     def __init__(self) -> None:
         self._thread: threading.Thread | None = None
+        self._completed: threading.Event | None = None
 
     def run(self, fn: Callable[[], T],
             timeout: float) -> tuple[bool, T | None]:
         """Run ``fn`` under ``timeout`` seconds.
 
         Returns ``(completed, result)``. ``completed`` is False if a prior
-        probe is still running, or if this probe did not return within
+        probe is still outstanding, or if this probe did not return within
         ``timeout``; in both cases the worker thread is left running (as a
         daemon) and ``result`` is None. When ``completed`` is True the
         result is ``fn``'s return value. If ``fn`` raises, the exception is
         re-raised from here.
         """
-        if self._thread is not None and self._thread.is_alive():
+        # "Outstanding" means the previous probe body has not finished, which
+        # its completion event reports -- not thread liveness. The worker sets
+        # the event (in its finally block) before the thread itself terminates,
+        # so on a loaded machine a completed probe's thread can still be alive
+        # in its final few instructions; that must not gate a new run.
+        if (self._thread is not None and self._thread.is_alive() and
+                self._completed is not None and not self._completed.is_set()):
             return (False, None)
 
         event = threading.Event()
@@ -140,6 +147,7 @@ class DeadlineProbe:
                 event.set()
 
         self._thread = threading.Thread(target=worker, daemon=True)
+        self._completed = event
         self._thread.start()
 
         if event.wait(timeout):
