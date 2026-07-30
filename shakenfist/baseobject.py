@@ -341,7 +341,11 @@ class DatabaseBackedObject:
         return f'{self.object_type}({self.__uuid})'
 
     def unique_label(self):
-        return (self.object_type, self.__uuid)
+        # The uuid is stringified here: several consumers (event 'extra'
+        # payloads, tuple comparisons against str uuids, JSON encoding by the
+        # log shipper) require a str, and a raw uuid.UUID silently breaks
+        # them (issue 3573).
+        return (self.object_type, str(self.__uuid))
 
     def add_event(self, eventtype, message, duration=None, extra=None,
                   suppress_event_logging=False, log_as_error=False):

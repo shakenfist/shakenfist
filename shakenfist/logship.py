@@ -38,7 +38,9 @@ on-node access. Tracked in
 ``docs/plans/PLAN-remove-syslog-forwarding.md`` (Future work) and
 the OpenTelemetry thread.
 """
+import json
 import logging
+from typing import Any
 
 from pylogrus import JsonFormatter
 from shakenfist_utilities import logs
@@ -74,6 +76,26 @@ _FALLBACK_ENABLED_FIELDS = [
 ]
 
 
+def _json_safe_fields(fields: dict[str, Any]) -> dict[str, Any]:
+    """Return fields with any unserialisable values stringified.
+
+    Values that already encode cleanly pass through untouched; anything
+    else is round-tripped through ``json.dumps(default=str)`` (or, as a
+    last resort, ``str()``) so the record as a whole always encodes.
+    """
+    safe = {}
+    for key, value in fields.items():
+        try:
+            json.dumps(value)
+            safe[key] = value
+        except (TypeError, ValueError):
+            try:
+                safe[key] = json.loads(json.dumps(value, default=str))
+            except (TypeError, ValueError):
+                safe[key] = str(value)
+    return safe
+
+
 # Module-level singletons. ``start()`` is idempotent and guards
 # against a double start.
 _handler: 'LokiHandler' = None  # type: ignore[assignment]
@@ -100,7 +122,20 @@ class LokiHandler(logging.Handler):
             # callers that merely import ``logship``.
             from shakenfist import logship_spool
 
-            line = self.format(record)
+            try:
+                line = self.format(record)
+            except (TypeError, ValueError):
+                # Defence in depth: a caller attached a field that is not
+                # JSON serialisable (issue 3573: raw uuid.UUID values in
+                # event 'extra'). Losing the record to handleError dumps a
+                # raw multi-line traceback to stderr/syslog instead, so
+                # stringify the offending fields and retry -- a slightly
+                # lossy field beats a dropped record.
+                extra_fields = getattr(record, 'extra_fields', None)
+                if isinstance(extra_fields, dict):
+                    setattr(record, 'extra_fields',
+                            _json_safe_fields(extra_fields))
+                line = self.format(record)
             ts_ns = int(record.created * 1_000_000_000)
             logship_spool.enqueue(ts_ns, line)
         except Exception:

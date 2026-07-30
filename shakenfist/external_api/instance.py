@@ -307,7 +307,9 @@ def _netdesc_safety_checks(netdesc, namespace):
     if not n:
         return sf_api.error(
             404, 'network %s not found' % netdesc['network_uuid'])
-    netdesc['network_uuid'] = n.uuid
+    # Stringified because the netdesc is later logged as event 'extra',
+    # which must be JSON serialisable (issue 3573).
+    netdesc['network_uuid'] = str(n.uuid)
 
     if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
         # The requested address must be within the ip range specified

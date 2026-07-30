@@ -398,7 +398,7 @@ class BaseClusterOperation(BaseOperation):
                 'queued')
 
         # Re-enqueue this operation for a retry after delay seconds
-        wo: Optional[list[str]] = None
+        wo: Optional[list[tuple[str, str]]] = None
         if waiting_on:
             wo = []
             for wobj in waiting_on:
