@@ -98,6 +98,12 @@ class UtilLibvirtPowerState(base.ShakenFistTestCase):
         domain = FakeStatefulDomain(FakeLibvirtModule.VIR_DOMAIN_RUNNING)
         self.assertIsNone(_connection().extract_pause_reason(domain))
 
+    def test_pause_reason_pmsuspended_is_not_paused(self):
+        # PMSUSPENDED reports as 'paused' via extract_power_state, but it
+        # is not VIR_DOMAIN_PAUSED so there is no pause reason.
+        domain = FakeStatefulDomain(FakeLibvirtModule.VIR_DOMAIN_PMSUSPENDED)
+        self.assertIsNone(_connection().extract_pause_reason(domain))
+
     def test_pause_reason_user(self):
         domain = FakeStatefulDomain(
             FakeLibvirtModule.VIR_DOMAIN_PAUSED,
@@ -110,8 +116,27 @@ class UtilLibvirtPowerState(base.ShakenFistTestCase):
             FakeLibvirtModule.VIR_DOMAIN_PAUSED,
             reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_IOERROR)
         self.assertEqual(
-            util_libvirt.PAUSED_REASON_IOERROR,
-            _connection().extract_pause_reason(domain))
+            'i/o error', _connection().extract_pause_reason(domain))
+
+    def test_is_paused_ioerror(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_IOERROR)
+        self.assertTrue(_connection().is_paused_ioerror(domain))
+
+    def test_is_paused_ioerror_user_pause(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_USER)
+        self.assertFalse(_connection().is_paused_ioerror(domain))
+
+    def test_is_paused_ioerror_not_paused(self):
+        # A stale I/O error reason code on a domain which is no longer
+        # paused must not count: both the state and the reason matter.
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_RUNNING,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_IOERROR)
+        self.assertFalse(_connection().is_paused_ioerror(domain))
 
     def test_pause_reason_unrecognised(self):
         domain = FakeStatefulDomain(

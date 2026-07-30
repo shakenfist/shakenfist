@@ -29,7 +29,6 @@ PAUSED_REASON_STRINGS = {
     'VIR_DOMAIN_PAUSED_POSTCOPY_FAILED': 'post-copy migration failed',
     'VIR_DOMAIN_PAUSED_API_ERROR': 'api error',
 }
-PAUSED_REASON_IOERROR = 'i/o error'
 
 
 def get_libvirt() -> ModuleType:
@@ -86,10 +85,10 @@ class LibvirtConnection():
         # RUNNING, SHUTDOWN
         return 'on'
 
-    def extract_pause_reason(self, domain: Any) -> str | None:
-        """Return a human readable pause reason, or None if not paused.
+    def is_paused_ioerror(self, domain: Any) -> bool:
+        """True if qemu paused this domain because a disk operation failed.
 
-        The reason is what distinguishes an operator pause
+        The pause reason is what distinguishes an operator pause
         (VIR_DOMAIN_PAUSED_USER) from qemu stopping the guest because a
         disk operation failed (VIR_DOMAIN_PAUSED_IOERROR, produced by
         error_policy='stop' in the domain XML and by qemu's default
@@ -97,10 +96,24 @@ class LibvirtConnection():
         July 2026 ran for six hours with guests taking EIO while we
         polled the bare state enum and saw only "running" -- the reason
         code is how a storage failure becomes visible to the poller.
+
+        Compared as raw libvirt enums so that this safety critical
+        decision never depends on the display strings rendered by
+        extract_pause_reason().
         """
         state, reason = domain.state()
-        if state == self.libvirt.VIR_DOMAIN_PMSUSPENDED:
-            return 'power management suspend'
+        return (state == self.libvirt.VIR_DOMAIN_PAUSED and
+                reason == getattr(
+                    self.libvirt, 'VIR_DOMAIN_PAUSED_IOERROR', None))
+
+    def extract_pause_reason(self, domain: Any) -> str | None:
+        """Return a human readable pause reason, or None if not paused.
+
+        Display only: control flow decisions (is this an I/O error
+        pause?) must use is_paused_ioerror(), which compares the raw
+        libvirt enums rather than these rendered strings.
+        """
+        state, reason = domain.state()
         if state != self.libvirt.VIR_DOMAIN_PAUSED:
             return None
 

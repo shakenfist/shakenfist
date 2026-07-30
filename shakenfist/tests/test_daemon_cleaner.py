@@ -524,6 +524,81 @@ class CleanerIOErrorPausedInstanceTestCase(CleanerTestCase):
             ObjectType.INSTANCE, instance_uuids['ioerror'])
         self.assertEqual(instance.Instance.STATE_DELETED, db_state['value'])
 
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks._delete_with_kill')
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks._delete_with_virsh',
+        return_value=False)
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_ioerror_paused_delete_wait_falls_back_to_kill(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists,
+            mock_virsh, mock_kill):
+        """If virsh cannot destroy the I/O error paused domain (its qemu
+        may be wedged in the hung storage), the delete-wait path must
+        fall back to the SIGKILL method and still mark the instance
+        deleted."""
+        global _test_instance_uuids
+
+        instance_uuids = {}
+        for name in ['running', 'shutoff', 'crashed', 'paused', 'suspended',
+                     'ioerror']:
+            inst = self.mock_mariadb.create_instance(
+                name, set_state=instance.Instance.STATE_CREATED)
+            instance_uuids[name] = str(inst.uuid)
+        _test_instance_uuids = instance_uuids
+
+        ioerror = instance.Instance.from_db(instance_uuids['ioerror'])
+        ioerror.state = instance.Instance.STATE_DELETE_WAIT
+
+        cleaner_st.update_power_states()
+
+        kills = [c for c in mock_kill.call_args_list
+                 if c[0][0] == instance_uuids['ioerror']]
+        self.assertEqual(1, len(kills))
+
+        db_state = self.mock_mariadb.get_mariadb_state(
+            ObjectType.INSTANCE, instance_uuids['ioerror'])
+        self.assertEqual(instance.Instance.STATE_DELETED, db_state['value'])
+
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks.util_concurrency.execute')
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_operator_paused_delete_wait_instance_not_destroyed(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists,
+            mock_execute):
+        """The destroy-on-delete-wait branch is specific to I/O error
+        pauses: an operator paused instance in delete-wait must be left
+        to the normal queued delete flow, not destroyed by the poller."""
+        global _test_instance_uuids
+
+        instance_uuids = {}
+        for name in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
+            inst = self.mock_mariadb.create_instance(
+                name, set_state=instance.Instance.STATE_CREATED)
+            instance_uuids[name] = str(inst.uuid)
+        _test_instance_uuids = instance_uuids
+
+        paused = instance.Instance.from_db(instance_uuids['paused'])
+        paused.state = instance.Instance.STATE_DELETE_WAIT
+
+        cleaner_st.update_power_states()
+
+        destroys = [c for c in mock_execute.call_args_list
+                    if 'virsh destroy' in c[0][0] and
+                    instance_uuids['paused'] in c[0][0]]
+        self.assertEqual(0, len(destroys))
+
+        db_state = self.mock_mariadb.get_mariadb_state(
+            ObjectType.INSTANCE, instance_uuids['paused'])
+        self.assertEqual(
+            instance.Instance.STATE_DELETE_WAIT, db_state['value'])
+
 
 class CleanerWatchdogTestCase(base.ShakenFistTestCase):
     """``_maintain_blobs`` globs the on-disk blob directory and does
