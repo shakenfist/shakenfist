@@ -4,9 +4,10 @@ This document specifies the wire protocol spoken between Ryll's headless
 mode and any external driver that connects to its Unix-domain control
 socket. It is the load-bearing contract for all of phase 3 of the
 kerbside automated-SPICE-test-harness plan. Downstream work — the
-phase 4 latency loadtest port, the phase 6 `digest_updated` event
-layer, and the phase 7 Sextant scenario tempest test — all implement
-against this document. Read the whole document before writing a client
+phase 4 latency loadtest port and the phase 7 Sextant scenario
+tempest test — implements against this document; the phase 6
+`digest_updated` event layer has landed and shipped as protocol
+v1.1. Read the whole document before writing a client
 or implementing a verb.
 
 Protocol version: **1.1**
@@ -64,11 +65,13 @@ Version history:
 
 ### What this protocol does NOT cover (phase 3 non-goals)
 
-- **Digest events.** The `digest_updated` event is reserved for phase
-  6. It will be added as a new event name in a minor version bump
-  (v1.1) without changing any existing envelope or verb. Clients that
-  ask to subscribe to `digest_updated` in v1.0 will receive an empty
-  `subscribed` list for that name; this is intentional.
+- **Digest events.** The `digest_updated` event was reserved for
+  phase 6 and has since been added, exactly as planned, as a new
+  event name in the v1.1 minor version bump without changing any
+  existing envelope or verb (see the event reference). Clients that
+  ask to subscribe to `digest_updated` on a v1.0 server — or on a
+  v1.1 server built without the `digest-decode` feature — receive an
+  empty `subscribed` list for that name; this is intentional.
 - **Mouse and USB-redirection verbs.** The latency loadtest and first
   Sextant scenarios do not need them. They will be added as new minor-
   version verbs when a test that requires them arrives.
@@ -569,9 +572,11 @@ wire, except that the server writes each line atomically.
 **Unknown event names are silently ignored** and will not appear in the
 `subscribed` result. This is intentional forward-compatibility
 behaviour: a client compiled against a newer version of this document
-may ask for `digest_updated` (a phase 6 event) while talking to a v1.0
-server that does not know the name. Rather than failing the call, the
-server silently drops unrecognised names from the result. The client
+may ask for `digest_updated` (a v1.1 event, feature-gated) while
+talking to a v1.0 server, or to a v1.1 server built without the
+`digest-decode` feature, and neither knows the name. Rather than
+failing the call, the server silently drops unrecognised names from
+the result. The client
 can check `subscribed` to discover which names were actually accepted,
 and fall back gracefully if a name it needs is not present.
 
@@ -596,8 +601,9 @@ Worked example:
 ← {"id": 8, "ok": true, "result": {"subscribed": ["latency"]}}
 ```
 
-In this example `digest_updated` was silently dropped (not yet
-implemented in v1.0).
+In this example `digest_updated` was silently dropped — the server
+is either a v1.0 build or a v1.1 build without the `digest-decode`
+feature.
 
 ---
 
@@ -647,8 +653,10 @@ has subscribed to. All events share the same envelope shape:
 
 Emitted on every PING/PONG return path through the SPICE main channel.
 The latency is the round-trip time from when Ryll sent the PING to when
-it received the PONG, measured in milliseconds. This is the same metric
-the `--latency-file` flag writes to disk in headless mode.
+it received the PONG, measured in milliseconds. (The `--latency-file`
+flag was intended to write this metric to disk in headless mode, but
+is currently declared and unused — this event stream is the working
+way to collect latency samples.)
 
 High-frequency callers (the phase 4 loadtest) should subscribe to this
 event and accumulate samples client-side rather than polling with
@@ -930,7 +938,8 @@ All error responses share the same structure:
 The `code` field is a stable, machine-readable string. Do not parse
 `message` programmatically; it may change between minor versions.
 
-The following error codes are defined in v1.0:
+The following error codes are defined in v1.x (all were present in
+v1.0; v1.1 added no new codes):
 
 | Code | Semantics |
 |------|-----------|
@@ -943,7 +952,7 @@ The following error codes are defined in v1.0:
 | `agent_not_connected` | A `paste` was requested but the SPICE vdagent is not currently connected. |
 | `no_such_surface` | A `screenshot` was requested for a `surface_id` that does not exist in the current session. |
 | `unsupported_format` | A `screenshot` was requested with a `format` value other than `"png"` or `"rgba"`. |
-| `not_implemented` | The method is recognised but not yet implemented. Used during incremental rollout (steps 3b–3g) before each verb is fully wired. Should not appear in a complete v1.0 implementation. |
+| `not_implemented` | The method is recognised but not yet implemented. Used during incremental rollout (steps 3b–3g) before each verb is fully wired. Should not appear in a complete implementation; retained in the code so partial builds have a stable code to return. |
 | `internal_error` | An unexpected condition occurred server-side. The `message` field will contain details. Report these as bugs. |
 
 Additional error codes may be added in future **minor** version bumps.
@@ -958,7 +967,7 @@ domain-specific codes.
 ## Versioning
 
 The protocol version is a dotted `major.minor` string. The current
-version is **1.0**.
+version is **1.1**.
 
 Rules:
 
@@ -986,8 +995,9 @@ Forward-compatibility obligations:
   error rather than panicking. Servers must also silently ignore unknown
   event names in `subscribe`/`unsubscribe` params.
 
-Version 1.0 is the first published version. No prior published version
-exists.
+Version 1.0 was the first published version. Version 1.1 (the
+current version) added the `surface_drawn` and `digest_updated`
+events; see the version history at the top of this document.
 
 ---
 
@@ -1000,7 +1010,7 @@ indicates the sender: `→` is client-to-server, `←` is server-to-client.
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.0", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.1", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
 → {"id": 2, "method": "status", "params": {}}
 ← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
 → {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
@@ -1023,7 +1033,10 @@ listening for the next client.
 Key observations from this transcript:
 
 - The `hello` handshake always comes first and its response lists the
-  full verb and event catalogue.
+  full verb and event catalogue. Note the minor-version interop at
+  work: the client requested `"1.0"` and the v1.1 server accepted it,
+  responding with the version *it* speaks and advertising
+  `surface_drawn`, which this v1.0 client simply never subscribes to.
 - `status` gives a snapshot of the session state at that instant. The
   surfaces list shows one surface, which is all that most single-monitor
   guests present.

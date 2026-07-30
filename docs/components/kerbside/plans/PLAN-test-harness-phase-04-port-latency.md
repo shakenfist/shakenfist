@@ -334,32 +334,34 @@ Phase 4 is done when:
 
 Items deliberately deferred from phase 4:
 
-- **Restore keypress-to-screen latency semantics (committed for
-  phase 6+).** PING/PONG round-trip is a stand-in, not the metric
-  the operator actually wants. The operator's goal is to measure
-  whether Kerbside introduces user-perceivable latency on
-  sessions, which requires measuring end-to-end keypress-to-screen
-  time, not just the underlying SPICE channel round-trip. Phase 6
-  must add a `surface_drawn` (or equivalently-named) control-
-  socket event that fires when a draw operation lands on the
-  display surface, and the orchestrator here gets a follow-up to
-  switch the CSV back to the legacy metric semantics. The CSV
-  shape (one float per line, seconds) stays the same across both
-  switches so downstream consumers don't have to change. This is
-  not "nice to have" — phase 6's success criteria should include
-  it.
-- **Shrink the loadtest image via a ryll `headless` Cargo
-  feature (committed for phase 6).** Ryll has no headless
-  Cargo feature today, so the binary unconditionally links
-  eframe / egui / egui-winit / cpal and the runtime image
-  carries libgl1, libx11-6, libxcb1, libxkbcommon0,
-  libwayland-client0, and libasound2. Phase 4 just accepts
-  the bloat. Phase 6 adds a `headless` feature flag to ryll's
-  Cargo.toml that gates the GUI/audio modules behind it, and
-  the loadtest Dockerfile here switches its stage-1 build to
-  `cargo build --release --no-default-features --features
-  headless` and the stage-2 runtime layer drops those system
-  libs. Tracked in the master plan's phase 6 row.
+- ~~**Restore keypress-to-screen latency semantics (committed for
+  phase 6+).**~~ **Resolved in phase 6 step 6d** (merged to
+  develop via PR #110).  ryll v1.1 added a
+  `surface_drawn` control-socket event (phase 6 step 6b) that
+  fires once per display draw command; the orchestrator now
+  subscribes to it, FIFO-pairs each `surface_drawn` with the
+  oldest pending keypress wallclock_us, and writes the
+  resulting delta as keypress-to-screen latency in seconds to
+  the CSV.  The CSV shape (one float per line) is unchanged,
+  so downstream consumers see the same column with the
+  intended metric.  Hard-fails at startup if the server does
+  not advertise `surface_drawn` in `supported_events` (no
+  PING/PONG fallback by design).
+- ~~**Shrink the loadtest image via a ryll `headless` Cargo
+  feature (committed for phase 6).**~~ **Resolved in phase 6
+  steps 6a + 6d.**  ryll's GUI and audio stacks are now gated
+  behind default-on `gui` and `audio` Cargo features.
+  `cargo build --release --no-default-features -p ryll` drops
+  eframe / egui / egui-winit / arboard / rfd / cpal /
+  opus-decoder / rtrb / winit from the dependency tree.
+  Phase 6 step 6d switches `loadtests/latency/Dockerfile`
+  stage 2 to that build and drops libasound2, libgl1,
+  libx11-6, libxcb1, libxkbcommon0, libwayland-client0 from
+  the runtime apt-get list.  The phase 5 direct-qemu CI lane
+  workflow shrinks identically.  The features are named
+  `gui` / `audio` (additive) rather than `headless`
+  (subtractive) to keep `cargo build --all-features` working;
+  the user-facing effect is identical.
 - **Wiring the latency loadtest into GitHub Actions.** Today
   it's run out-of-band; CI integration is a separate piece of
   work.

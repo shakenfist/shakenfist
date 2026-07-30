@@ -218,6 +218,7 @@ nav:
                 - "Kerbside VDI tokens phase 6: cluster-wide scrape and host_subject": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape.md
                 - "Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci.md
                 - "Kerbside VDI tokens phase 8: documentation": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs.md
+                - "Kerbside VDI tokens phase 9: full cross-repo end-to-end lane": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e.md
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
                 - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
@@ -290,7 +291,7 @@ nav:
             - "K1: tokio waker silently lost on main channel after T+465 s": components/ryll/TOKIO-WEDGING.md
             - "Libvirt / QEMU Settings for Best SPICE Performance with Ryll": components/ryll/libvirt-spice-recommendations.md
             - "macOS runtime-metrics verification runbook": components/ryll/macos-metrics-verification.md
-            - "Multi-mode parity matrix": components/ryll/multi-mode-parity.md
+            - "Multi-mode feature parity": components/ryll/multi-mode-parity.md
             - "Releasing": components/ryll/releasing.md
             - "ryll --web operator guide": components/ryll/web-frontend.md
             - "Troubleshooting": components/ryll/troubleshooting.md
