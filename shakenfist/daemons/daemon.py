@@ -636,7 +636,7 @@ class WorkerPoolDaemon(Daemon):
 
         if num_workers <= max_workers - 2:
             # Refresh disk metrics on the same 30 s cadence as before.
-            # ``disk_busy_time_delta_per_seconds`` reports milliseconds
+            # ``disk_busy_time_delta_per_second`` reports milliseconds
             # per second; a value over 800 (~80%) gates ``high_io``
             # background work so a saturated disk doesn't get more
             # piled onto it.
@@ -650,8 +650,8 @@ class WorkerPoolDaemon(Daemon):
                     self.metrics_acquired_at = 0
 
             metrics_values = self.metrics.get('metrics', {})
-            disk_busy = int(metrics_values.get(
-                'disk_busy_time_delta_per_seconds', '0'))
+            disk_busy = float(metrics_values.get(
+                'disk_busy_time_delta_per_second', '0'))
             for queue_name in get_all_background_node_queues(
                     config.NODE_UUID):
                 if 'high_io' in queue_name and disk_busy > 800:
