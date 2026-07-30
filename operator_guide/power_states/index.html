@@ -10076,6 +10076,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power States
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -10092,6 +10110,36 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#disk-io-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk I/O errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -10237,6 +10285,25 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#disk-io-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk I/O errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -10262,7 +10329,7 @@
 <ul>
 <li><strong>on</strong>: the instance is running</li>
 <li><strong>off</strong>: the instance is not running</li>
-<li><strong>paused</strong>: the instance is paused</li>
+<li><strong>paused</strong>: the instance is paused, either by an operator request or by the hypervisor because a disk I/O error occurred (see below)</li>
 <li><strong>crashed</strong>: the instance is crashed according to the hypervisor. Instances in this power state will also be in an instance state of "error".</li>
 </ul>
 <p>There are additionally a set of "transition states" which are used to indicate that you have requested a change of state that might not yet have completed. These are:</p>
@@ -10272,6 +10339,9 @@
 <li>transition-to-paused</li>
 </ul>
 <p>We're hoping to not have to implement a transition-to-crashed state, but you never know.</p>
+<h2 id="disk-io-errors">Disk I/O errors<a class="headerlink" href="#disk-io-errors" title="Permanent link">&para;</a></h2>
+<p>Instance disks are configured with a "stop" error policy: when the storage backing a disk fails (for example a dying NVMe device or an unreachable NFS mount), qemu pauses the instance instead of passing I/O errors through to the guest. Shaken Fist notices the pause reason and marks the instance as errored, recording per-disk error detail in the instance's error message and event log.</p>
+<p>Note that this is deliberately permanent -- even a transient storage error pauses the guest and errors the instance, because an instance which has taken disk errors is not trustworthy. The errored instance is terminal (it cannot return to the created state), but it can still be snapshotted to salvage data. The paused domain is left in place as forensic state until the operator deletes the instance.</p>
 
 
 
