@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-scheduler-reservations/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-00-findings/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Atomic scheduling via a reservations table - Shaken Fist</title>
+        <title>Scheduler reservations phase 0: current-state findings - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#atomic-scheduling-via-a-reservations-table" class="md-skip">
+        <a href="#scheduler-reservations-phase-0-current-state-findings" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Atomic scheduling via a reservations table
+              Scheduler reservations phase 0: current-state findings
             
           </span>
         </div>
@@ -10172,66 +10172,110 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#part-1-shaken-fist-server-current-state" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Part 1: Shaken Fist server current state
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Situation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mission-and-problem-statement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mission and problem statement
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Open questions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Execution">
+    <nav class="md-nav" aria-label="Part 1: Shaken Fist server current state">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#phase-scope-stubs" class="md-nav__link">
+  <a href="#scheduler-today-post-phase-00a" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase scope stubs
+        Scheduler today (post phase 00a)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scheduler-callers-exactly-three" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduler callers (exactly three)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#node_metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        node_metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instance-create-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instance create lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster_locks-leasing-pattern-the-template" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cluster_locks leasing pattern (the template)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-new-table-rpc-object-end-to-end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new table + RPC + object, end to end
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#namespace-lifecycle-and-authz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Namespace lifecycle and authz
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sql-pushdown-precedent-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SQL pushdown precedent constraints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#surprises-server-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Surprises (server side)
       
     </span>
   </a>
@@ -10244,33 +10288,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dependencies-on-other-plans" class="md-nav__link">
+  <a href="#part-2-ci-conductor-current-state" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dependencies on other plans
+        Part 2: CI conductor current state
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent guidance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Agent guidance">
+    <nav class="md-nav" aria-label="Part 2: CI conductor current state">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#execution-model" class="md-nav__link">
+  <a href="#admission-today" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Execution model
+        Admission today
       
     </span>
   </a>
@@ -10278,10 +10311,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#planning-effort" class="md-nav__link">
+  <a href="#namespace-lifecycle-hooks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Planning effort
+        Namespace lifecycle hooks
       
     </span>
   </a>
@@ -10289,10 +10322,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-level-guidance" class="md-nav__link">
+  <a href="#footprint-data-available" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step-level guidance
+        Footprint data available
       
     </span>
   </a>
@@ -10300,10 +10333,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#management-session-review-checklist" class="md-nav__link">
+  <a href="#deferral-mechanics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Management session review checklist
+        Deferral mechanics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sf-client-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SF client usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#surprises-contradictions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Surprises / contradictions
       
     </span>
   </a>
@@ -10316,22 +10371,34 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
+  <a href="#part-3-external-prior-art" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Administration and logistics
+        Part 3: External prior art
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Administration and logistics">
+    <nav class="md-nav" aria-label="Part 3: External prior art">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
+  <a href="#a-mariadbinnodb-atomic-claim-idioms" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Success criteria
+        A. MariaDB/InnoDB atomic-claim idioms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A. MariaDB/InnoDB atomic-claim idioms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-innodb-actually-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What InnoDB actually guarantees
       
     </span>
   </a>
@@ -10339,10 +10406,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
+  <a href="#empirical-results-mariadb10627-innodb_lock_wait_timeout3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Future work
+        Empirical results (mariadb:10.6.27, innodb_lock_wait_timeout=3)
       
     </span>
   </a>
@@ -10350,10 +10417,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+  <a href="#analysis-per-idiom" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bugs fixed during this work
+        Analysis per idiom
       
     </span>
   </a>
@@ -10361,10 +10428,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
+  <a href="#mariadb-specific-caveats" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation index maintenance
+        MariaDB-specific caveats
       
     </span>
   </a>
@@ -10372,10 +10439,59 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
+  <a href="#benchmark-design-step-2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Back brief
+        Benchmark design (step 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-benchmark-results-run-2026-07-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 benchmark results (run 2026-07-30)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-openstack-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. OpenStack Placement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-kubernetes-resourcequota-friends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Kubernetes ResourceQuota + friends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prior-art-recommendations-for-phase-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prior-art recommendations for phase 0
       
     </span>
   </a>
@@ -10408,669 +10524,1055 @@
   
 
 
-<h1 id="atomic-scheduling-via-a-reservations-table">Atomic scheduling via a reservations table<a class="headerlink" href="#atomic-scheduling-via-a-reservations-table" title="Permanent link">&para;</a></h1>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the shakenfist codebase thoroughly. Read the
-current scheduler (<code>shakenfist/scheduler.py</code>), its callers
-(<code>shakenfist/external_api/instance.py</code>,
-<code>shakenfist/external_api/admin.py</code>,
-<code>shakenfist/operations/node_inst_netdesc_op.py</code>), the
-<code>node_metrics</code> table and how it is populated (the resources
-daemon under <code>shakenfist/daemons/resources/</code>), the existing
-SQL-pushdown pattern delivered by <code>PLAN-sql-pushdown-filtering</code>,
-the cluster-lock leasing pattern in <code>shakenfist/locks.py</code>, and
-the instance lifecycle states. Ground your answers in what the
-code actually does today rather than guessing.</p>
-<p>Where a question touches on external concepts (database
-isolation levels, conditional-INSERT idioms, row-locking
-behaviour under MariaDB / InnoDB, OpenStack's
-scheduler-vs-placement-API split), research as needed to give a
-confident answer. Flag any uncertainty explicitly rather than
-guessing.</p>
-<p>All planning documents go into <code>docs/plans/</code>.</p>
-<p>Consult <code>ARCHITECTURE.md</code> for the system architecture overview
-and the existing object / state subsystems. Consult <code>CLAUDE.md</code>
-for build commands, project conventions, the existing "push
-filtering down to the SQL layer" rule, and the lease /
-<code>expires_at</code> pattern already used by <code>cluster_locks</code>.</p>
-<p>This plan is a <strong>placeholder</strong>. It captures intent and the
-known open questions and is intentionally light on detail.
-Phase 0 will resolve the open questions into a decisions
-section and the phase table below will be re-cut accordingly.</p>
-<p>When we get to detailed planning, I prefer a separate plan
-file per detailed phase, named for the master plan with
-<code>-phase-NN-descriptive</code> appended before the <code>.md</code> extension.</p>
-<p>I prefer one commit per logical change, and at minimum one
-commit per phase. Do not batch unrelated changes into a single
-commit.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>Today's scheduler (<code>shakenfist/scheduler.py</code>) is <strong>in-process
-and distributed</strong>: every sf-api worker instantiates its own
-<code>Scheduler</code> object and consults the shared <code>node_metrics</code>
-table to decide where to place a new instance. The metrics
-table is refreshed by the resources daemon every 60 seconds,
-so the scheduler's view of cluster capacity is always somewhat
-stale, and — more importantly — there is no coordination
-between two scheduling decisions in flight on different sf-api
-processes at the same instant.</p>
-<p>This produces two concrete pain points:</p>
-<ol>
-<li><strong>The "schedule N, fail on N-1" pattern.</strong> A bulk create
-   (most painfully, a CI job that wants 50 VMs) is issued as N
-   sequential <code>POST /instances</code> calls. Each consults the
-   scheduler against essentially the same metrics snapshot,
-   the early creates pass, and somewhere around N-1 the actual
-   capacity runs out — but only at instance-build time, after
-   all the upstream work has been done. The cluster has wasted
-   substantial effort and the operator sees a half-built job.</li>
-<li><strong>Concurrent races on tight clusters.</strong> Two scheduling
-   decisions made simultaneously on different sf-api processes
-   can both pick the same target node, since neither sees the
-   other's choice. This races on capacity, but it also races
-   on affinity / anti-affinity correctness — today's affinity
-   logic (<code>scheduler.py:364-445</code>) scores nodes against the
-   <em>currently placed</em> instances, not pending decisions.</li>
-</ol>
-<p>The cleaner shape is to make "pick a node" and "claim capacity
-on that node" a single atomic operation. The natural primitive
-is a <code>node_reservations</code> table that the scheduler's effective
-capacity view is computed against:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>effective_capacity(node) = node_metrics(node) - SUM(active reservations on node)
-</code></pre></div>
-<p>A scheduling decision becomes a conditional INSERT into
-<code>node_reservations</code> whose WHERE clause expresses every hard
-constraint (fits the capacity? matches required affinity? not
-on an anti-affinity-forbidden node?) in SQL — pushed down to
-MariaDB exactly as the project's existing pushdown rule
-prescribes. If the INSERT places a row, the reservation is
-claimed atomically against every concurrent scheduler. If it
-places zero rows, the candidate set was empty and the request
-can be held, retried, or rejected.</p>
-<p>The reservation is consumed when the instance is durably
-placed (<code>Instance.place_instance()</code>) — note the instance
-state machine is <code>initial → preflight → creating → created</code>;
-there is no <code>building</code> state, and the 2026-07-30 phase 0
-review decided against adding one (it would not improve
-atomicity, which comes from doing the claim consumption in
-the same database transaction as an existing transition).
-Reservations are explicitly released on instance create
-failure, with a leased <code>expires_at TIMESTAMP</code> modelled on
-the <code>cluster_locks</code> pattern as a crash backstop only — not
-the routine release mechanism — so stranded reservations
-cannot leak capacity.</p>
-<p>This design was chosen in preference to two alternatives:</p>
-<ul>
-<li><strong>Centralising scheduling in the cluster daemon
-  post-election</strong>, running serially in a single process so it
-  can maintain an in-memory overlay of pending decisions.
-  Rejected because it walks back the direction of
-  <code>PLAN-remove-primary</code> (reducing critical-path single-point-
-  of-failure roles), introduces a throughput ceiling, and
-  couples a hot user-request path to a daemon whose other
-  duties are background-shaped.</li>
-<li><strong>Keeping the scheduler in-process and adding a separate
-  reservation log that callers read before deciding.</strong>
-  Rejected because it's the worst of both worlds — adds the
-  reservation-table complexity without the atomicity that
-  makes it worth having.</li>
-</ul>
-<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Shaken Fist scheduling becomes atomic: capacity and constraint
-checks are pushed down into a single conditional INSERT
-against a <code>node_reservations</code> table, with reservations
-consumed at instance-build time and auto-expired via a leased
-TTL. The user-facing <code>POST /instances</code> flow gains a sibling
-batch-create primitive that maps "I want N instances together
-or not at all" to a single transaction.</p>
-<p>Concretely, after this plan lands:</p>
-<ul>
-<li>A <code>node_reservations</code> table holds per-decision capacity
-  claims (cpus, memory, disk) plus enough context for
-  constraint queries (namespace, tags / affinity intent), with
-  <code>expires_at</code> for lease semantics.</li>
-<li>The scheduler's effective capacity view subtracts active
-  reservations from <code>node_metrics</code> in SQL.</li>
-<li>Scheduling decisions are conditional INSERTs that either
-  place a reservation atomically or return "no candidate."</li>
-<li>The instance lifecycle gains a "reservation consumed" point
-  (working position: at <code>place_instance()</code>, with
-  allocation-denominated accounting from the database, so the
-  reservation window is seconds in the normal case and only
-  stretches for batch creates) and an explicit release on
-  create failure.</li>
-<li>A reservation reaper handles abandoned reservations whose
-  <code>expires_at</code> has passed without consumption.</li>
-<li>A new batch-create API accepts a list of N instance specs
-  and either places all N reservations in one transaction or
-  fails the batch atomically. The shape of the user-facing
-  endpoint (<code>POST /instances/batch</code>? a multi-instance
-  variant of the existing endpoint?) is decided in phase 0.</li>
-<li>The existing in-process <code>Scheduler</code> callers
-  (<code>external_api/instance.py:792</code>, <code>external_api/admin.py:80</code>,
-  <code>operations/node_inst_netdesc_op.py:144</code>) are ported to
-  the new primitive.</li>
-<li>Per-rejection audit logging is preserved as a diagnostic
-  mode that runs the verbose Python-side "why didn't this fit
-  anywhere?" query <em>on demand</em> or <em>on failure</em>, not on every
-  successful schedule. The day-to-day audit log records "node
-  N won, reservation R" and nothing else.</li>
-</ul>
-<p>The principle is: <strong>atomicity through the database, not
-through serialisation</strong>. The DB already has the primitives;
-the existing project rule already says to use them; this is an
-overdue application of both.</p>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<p>This plan is light on detail because almost every concrete
-decision depends on a phase 0 research pass. A design
-discussion on 2026-07-30 added a further set of questions
-(14-19, recorded in the phase 0 plan): the conductor and
-manual-tenant use cases want a <strong>namespace-scoped capacity
-claim</strong> -- created before any instance exists, drawn down as
-instances are created, doubling as an enforceable quota
-ceiling -- alongside or instead of the per-decision
-reservation described here. A conductor-side capacity ledger
-was considered as a stopgap and rejected because its claims
-would be invisible to SF's scheduler, so any second scheduler
-(most concretely the operator hand-building a test cloud)
-races in-flight claims; that multi-scheduler condition is
-what justifies the DB-atomic primitive. The questions below
-include at least:</p>
-<ol>
-<li><strong>Conditional INSERT vs SELECT FOR UPDATE.</strong> Both shapes
-   work for the atomicity guarantee. Conditional INSERT is the
-   more honest expression of "filter and claim in one
-   operation" and probably scales better. SELECT FOR UPDATE is
-   easier to read. Phase 0 picks one with explicit reasoning
-   and benchmarks the chosen shape under contention.</li>
-<li><strong>Reservation row schema.</strong> Minimum is <code>(node_uuid, cpus,
-   memory, disk, expires_at, owner_uuid, reservation_uuid)</code>.
-   For affinity correctness against pending reservations the
-   row probably also needs <code>(namespace, tags JSON)</code> or
-   equivalent. Phase 0 decides exactly what affinity-relevant
-   fields the row carries and how they participate in the
-   constraint query.</li>
-<li><strong>Reservation lifecycle states.</strong> When precisely is a
-   reservation "consumed"? The instance state machine is
-   <code>initial → preflight → creating → created</code> — the
-   <code>building</code> state this plan originally named does not
-   exist, and the 2026-07-30 review decided against adding
-   one: consumption atomicity comes from doing the claim
-   decrement in the same database transaction as an existing
-   write, so a new state adds upgrade and test churn without
-   improving the guarantee. Working position: consume at
-   <code>place_instance()</code>, with allocation-denominated
-   accounting from the database (placed, non-dead instances
-   count as allocation). Alternatives phase 0 must still
-   weigh: at <code>preflight</code> (target node re-admission) or
-   <code>creating</code> (hypervisor build start). Whatever is chosen
-   must tolerate placement changing without a scheduling
-   decision — preflight can redirect to another node, and
-   the cleaner rewrites placement for locally-found domains
-   (<code>daemons/cleaner/scheduled_tasks.py</code>) — and each option
-   has different failure modes around partial creates.</li>
-<li><strong>Reservation TTL.</strong> What's the right default lease? Long
-   enough that a slow-starting instance doesn't lose its
-   capacity claim mid-create; short enough that abandoned
-   reservations don't strand capacity for long. Probably
-   minutes, refreshable if needed, decided in phase 0.</li>
-<li><strong>Reaper design.</strong> Modelled on <code>cluster_locks</code>
-   self-recovery (any candidate steals an expired row), or a
-   dedicated background task in the cluster daemon, or a
-   trigger from the resources daemon's metrics refresh? The
-   <code>cluster_locks</code> model is simpler and SPOF-free, which
-   argues for repeating it.</li>
-<li><strong>Affinity model simplification.</strong> Today's affinity is
-   arbitrary signed integer weights summed per matching
-   co-located instance. There is reason to believe nobody uses
-   the weighted form in practice. Phase 0 decides between
-   three options: keep arbitrary numeric weights; drop
-   affinity entirely; or compromise on binary soft affinity
-   (<code>prefer_with_tag=[...]</code> and <code>prefer_without_tag=[...]</code>
-   contributing ±1 per match, plus optional hard
-   <code>require_with_tag=[...]</code> / <code>require_without_tag=[...]</code>).
-   Hard constraints become WHERE clauses; soft preferences
-   become ORDER BY terms. The binary-soft option drops the
-   "what does weight=7 mean operationally" cognitive load
-   without losing the use case of "place near my web tier."</li>
-<li><strong>Soft preference scoring in SQL vs Python.</strong> Hard
-   constraints push down. Soft preferences (CPU load
-   ordering, affinity ranking under the binary model) can
-   push down too, but as the heuristic surface grows it may
-   be cleaner to ORDER BY in SQL for the simple cases and
-   tie-break in Python over a small filtered set. Phase 0
-   picks the split.</li>
-<li><strong>Batch-create API shape and semantics.</strong> All-or-nothing
-   is the easy case. Partial-fill ("place as many as you
-   can") and hold-until-fittable ("keep the request pending
-   in a queue until capacity exists") are tempting but each
-   add their own state surface. Phase 0 decides what the
-   user-facing primitive offers, with the CI-job-fits-as-a-
-   whole use case as the lead motivation.</li>
-<li><strong>Per-rejection audit logging.</strong> Today's scheduler logs
-   per-node per-resource rejection reasons. The pushdown
-   query produces "no candidate" with no per-node story.
-   Proposed: on a failed batch, run the verbose Python-side
-   diagnostic against the same snapshot to produce the audit
-   detail. On a successful schedule, log only "node N won,
-   reservation R." Phase 0 confirms this is the right
-   tradeoff and identifies any audit consumers that would
-   break.</li>
-<li><strong>Generality of the reservations primitive.</strong> A
-    capacity-style reservation table could plausibly serve
-    other "claim a finite resource atomically" use cases —
-    floating IPs from a pool, VXLAN IDs, network IDs, even
-    the per-session floating IP idea floated in the sticky-
-    transfers discussion. Phase 0 decides whether the table
-    is instance-scheduling-specific or designed as a generic
-    primitive from the start. The cost of generic-from-day-1
-    is real; the cost of retrofitting later is also real.</li>
-<li><strong>Migration path for existing callers.</strong> The three
-    in-process <code>Scheduler()</code> call sites are not all on the
-    instance-create hot path —
-    <code>node_inst_netdesc_op.py</code> runs from the queue worker, not
-    the API. Phase 0 confirms each caller's expectations and
-    decides whether they all migrate together or whether the
-    queue-worker callers keep the old shape for now.</li>
-<li><strong>Interaction with content-aware placement.</strong> Future
-    blob-storage work may want placement decisions to prefer
-    nodes that already hold a given blob. A reservation table
-    that carries enough context to express "this instance
-    wants blob X" composes; a capacity-only table doesn't.
-    Worth deciding whether to lay the groundwork or
-    explicitly defer.</li>
-<li><strong>Demand-denominated capacity and a learned overcommit.</strong>
-    The static <code>CPU_OVERCOMMIT_RATIO</code> (default 16, inherited
-    from OpenStack's <code>cpu_allocation_ratio</code> folklore) encodes
-    an assumption of many mostly-idle, uncorrelated VMs. CI
-    workloads are few, large and <em>correlated</em> — every VM in a
-    job compiles at full tilt simultaneously — so the honest
-    admission model is load-denominated: each hypervisor has
-    a target sustained load per schedulable core, and
-    admission asks whether <em>effective load</em> would exceed it.
-    A purely reactive controller cannot deliver this: a CI
-    burst places 50 VMs in seconds, each VM contributes zero
-    load while booting and ramps over minutes, <code>cpu_load_1</code>
-    is a one-minute average, and the metrics snapshot is up
-    to 60 seconds stale — the actuation-to-observation lag
-    exceeds the burst, so a reactive scheme admits everything
-    and discovers the overload minutes later. The reservation
-    row is the natural feedforward term: it carries an
-    <em>expected demand</em> estimate (initially vCPUs × a
-    demand-per-vCPU constant, later a per-namespace learned
-    value) whose contribution to effective load decays as the
-    instance ages and its real demand becomes visible in
-    measured load — a demand claim consumed over time,
-    analogous to the capacity claim consumed at placement.
-    Phase 0 must decide whether the reservation schema
-    carries an expected-demand field and a decay /
-    consumption rule from day one (cheap now, painful to
-    retrofit), even though the learning loop that tunes
-    demand estimates is explicitly future work. Phase 00a
-    delivers the static stopgap (load-per-core ordering,
-    core-denominated system reservations, a measured
-    overcommit default) and the tracking groundwork the
-    learner will need. The 00a-1 sfcbr measurements (see the
-    Measurements appendix in the phase 00a plan) chose
-    <code>CPU_OVERCOMMIT_RATIO = 3.0</code> — observed viable packing on
-    plain nodes was 2.3-3.0 vCPUs per thread, with RAM binding
-    first — and confirmed <code>SCHEDULER_TARGET_LOAD = 0.75</code>; the
-    observed demand-per-vCPU range is the seed constant for
-    the learner. None of this is exotic: it is demand-based
-    scheduling of the kind VMware DRS and Borg have run for
-    years (2026-07-17 design discussion), arrived at from the
-    CI failure mode rather than the literature, and the
-    static ratio is the degenerate case of the learned model,
-    so nothing phase 00a shipped is thrown away when the
-    learner arrives.</li>
-</ol>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<p>Re-cut 2026-07-30 from the phase 0 decisions
-(PLAN-scheduler-reservations-phase-00-decisions.md, Decisions
-section). The headline change from the original provisional
-cut: there is no <code>node_reservations</code> row-per-decision table
-and no conditional-INSERT primitive — phase 0's benchmark
-disproved both — so the schema phases now build materialised
-capacity counters, namespace claims, and a reconciler
-instead, and the batch-create phase is deferred out of the
-table entirely (decision D8).</p>
+<h1 id="scheduler-reservations-phase-0-current-state-findings">Scheduler reservations phase 0: current-state findings<a class="headerlink" href="#scheduler-reservations-phase-0-current-state-findings" title="Permanent link">&para;</a></h1>
+<p>This document is the output of step 1 of
+<code>PLAN-scheduler-reservations-phase-00-decisions.md</code> — the
+research pass over the Shaken Fist server, the CI conductor,
+and external prior art. It is input material for the decisions
+in that plan, not a decisions document itself. Findings were
+produced by high-effort research sub-agents on 2026-07-30 and
+are grounded in file:line references to the code as of that
+date.</p>
+<h2 id="part-1-shaken-fist-server-current-state">Part 1: Shaken Fist server current state<a class="headerlink" href="#part-1-shaken-fist-server-current-state" title="Permanent link">&para;</a></h2>
+<p>Worktree at <code>817051585</code> (develop plus the plan seed). All
+line numbers from that tree.</p>
+<h3 id="scheduler-today-post-phase-00a">Scheduler today (post phase 00a)<a class="headerlink" href="#scheduler-today-post-phase-00a" title="Permanent link">&para;</a></h3>
+<p><code>shakenfist/scheduler.py</code> has exactly two public entry points
+and <strong>no <code>place_instance</code></strong> — that name is
+<code>Instance.place_instance()</code> (<code>shakenfist/instance.py:912</code>), a
+separate persistence step callers invoke after the scheduler
+returns. <code>Scheduler.find_candidates(inst, candidates=None)</code>
+(<code>scheduler.py:277-557</code>) returns an ordered list of node
+UUIDs; callers take <code>[0]</code>. <code>summarize_resources()</code>
+(<code>:559-638</code>) feeds <code>GET /admin/resources</code>.</p>
+<p><code>Scheduler.__init__</code> (<code>:84-94</code>) calls <code>refresh_metrics()</code>
+eagerly; metrics re-refresh inside <code>find_candidates</code> when
+older than <code>SCHEDULER_CACHE_TIMEOUT</code> (5s, <code>config.py:180</code>).
+Candidate set = nodes in <code>Node.ACTIVE_STATES</code> with a metrics
+row younger than 120s (<code>scheduler.py:56-58</code>).</p>
+<p>Admission checks, in execution order — all Python loops over
+<code>self.metrics[node]</code>, each followed by
+<code>_log_and_raise_on_error</code> (<code>:259-275</code>) raising
+<code>LowResourceException</code> when the candidate list empties:</p>
 <table>
 <thead>
 <tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
+<th>Stage</th>
+<th>Code</th>
+<th>Fields consulted</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>00a. Load-aware ordering and system reservations (static quick wins)</td>
-<td>PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md</td>
-<td>Implemented (awaiting sfcbr soak)</td>
+<td><code>is_hypervisor</code></td>
+<td><code>:337-343</code></td>
+<td><code>is_hypervisor</code></td>
 </tr>
 <tr>
-<td>0. Research and decisions document</td>
-<td>PLAN-scheduler-reservations-phase-00-decisions.md</td>
-<td>Complete — decisions approved 2026-07-30; step 3 data addendum due ~2026-08-13 (revises sizing constants only, does not gate phases 1-3)</td>
+<td><code>queue_state</code></td>
+<td><code>:100-112</code></td>
+<td><code>node_queue_waiting</code> vs 20</td>
 </tr>
 <tr>
-<td>1. Promote node capacity fields to typed columns</td>
-<td>PLAN-scheduler-reservations-phase-01-node-metrics-columns.md</td>
-<td>Not started</td>
+<td><code>cpu_max_per_instance</code></td>
+<td><code>:356-368</code></td>
+<td><code>cpu_max_per_instance</code></td>
 </tr>
 <tr>
-<td>2. Capacity tables, reconciler and migration</td>
-<td>PLAN-scheduler-reservations-phase-02-capacity-tables.md</td>
-<td>Not started</td>
+<td><code>sufficient_idle_cpu</code></td>
+<td><code>:148-166</code></td>
+<td><code>cpu_schedulable</code> × <code>CPU_OVERCOMMIT_RATIO</code> vs <code>cpu_total_instance_vcpus</code></td>
 </tr>
 <tr>
-<td>3. Claim primitive and placement integration</td>
-<td>PLAN-scheduler-reservations-phase-03-primitive.md</td>
-<td>Not started</td>
+<td><code>sufficient_idle_memory</code></td>
+<td><code>:168-210</code></td>
+<td><code>memory_available</code>, <code>memory_reserved_mb</code>, <code>memory_total_instance_actual</code>, <code>memory_max</code></td>
 </tr>
 <tr>
-<td>4. Namespace claims object and API</td>
-<td>PLAN-scheduler-reservations-phase-04-claims-api.md</td>
-<td>Not started</td>
+<td><code>sufficient_free_disk</code></td>
+<td><code>:212-238</code></td>
+<td><code>disk_free_instances</code> (bytes), <code>disk_reservation_gb</code></td>
 </tr>
 <tr>
-<td>5. Caller migration and hard ceiling</td>
-<td>PLAN-scheduler-reservations-phase-05-callers.md</td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>6. Affinity model rework</td>
-<td>PLAN-scheduler-reservations-phase-06-affinity.md</td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>7. Diagnostic-mode rejection logging</td>
-<td>PLAN-scheduler-reservations-phase-07-diagnostics.md</td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>8. Documentation and operator guide</td>
-<td>PLAN-scheduler-reservations-phase-08-docs.md</td>
-<td>Not started</td>
+<td><code>sufficient_idle_disk</code></td>
+<td><code>:240-257</code></td>
+<td><code>disk_busy_time_delta_per_sec</code> — <strong>dead, see Surprises</strong></td>
 </tr>
 </tbody>
 </table>
-<h3 id="phase-scope-stubs">Phase scope stubs<a class="headerlink" href="#phase-scope-stubs" title="Permanent link">&para;</a></h3>
-<p>Each stub is the seed for that phase's plan file; decisions
-referenced as D-numbers are in the phase 0 decisions document.</p>
-<p><strong>Phase 1 — typed capacity columns.</strong> <code>node_metrics</code> stores
-capacity in a schemaless <code>metrics_json</code> column; SQL-side
-capacity arithmetic needs the ~11 capacity-relevant fields
-(cpu counts, load, memory totals/available, disk
-totals/available, per-host reservations, overcommit inputs)
-promoted to typed columns maintained by the resources daemon.
-Includes fixing the dead disk-bandwidth checks found in phase
-0 (the <code>_per_sec</code> / <code>_per_second</code> / <code>_seconds</code> spelling
-three-way) or removing them explicitly. Pure widening: no
-behaviour change to scheduling.</p>
-<p><strong>Phase 2 — capacity tables.</strong> Create
-<code>scheduler_node_capacity</code>, <code>namespace_claims</code> and
-<code>cluster_capacity</code> per D2, the reconciler in the cluster
-daemon's elected-leader loop per D5, and the
-<code>ensure-mariadb-schema</code> migration. Counters are maintained
-and reconciled but <strong>nothing consumes them for admission
-yet</strong> — this phase is observable-but-inert, so it can soak on
-sfcbr while phase 3 is built.</p>
-<p><strong>Phase 3 — claim primitive and placement.</strong> The guarded-
-UPDATE admission RPC in <code>sf-database</code> (D1), consumption at
-<code>place_instance()</code> in the same transaction as the placement
-write (D3), release on <code>hard_delete()</code> and failed create,
-preflight-redirect and cleaner placement-rewrite paths moved
-onto the primitive, the demand feedforward term (D13), and
-the scheduler's pick-then-claim loop (D7). The concurrent-
-scheduling test from the review checklist lands here.</p>
-<p><strong>Phase 4 — namespace claims API.</strong> The claim as a
-first-class object with REST CRUD and client verbs (D15),
-advisory-mode ceiling enforcement with structured events
-(D16), opt-in semantics and best-effort accounting for
-unclaimed namespaces (D14/D17). The conductor-side
-integration (D18) lands in private-ci once this phase ships.</p>
-<p><strong>Phase 5 — caller migration and hard ceiling.</strong> Migrate the
-three <code>Scheduler()</code> call sites per D11 (queue worker to the
-claim-consuming path; API-side feasibility precheck;
-admin capacity view), remove the legacy in-Python capacity
-filtering, and flip the ceiling from advisory to hard one
-release after phase 4 (D16).</p>
-<p><strong>Phase 6 — affinity rework.</strong> Binary soft affinity plus
-hard require constraints, weighted-form deprecation mapping,
-ranking precedence above load ordering (D6). Closes the
-issue-3565 flake class.</p>
-<p><strong>Phase 7 — diagnostics.</strong> Failure-path verbose diagnostic
-against the same snapshot, success-path drawdown events,
-ceiling-rejection events (D9). Confirm CI triage tooling
-reads the new events.</p>
-<p><strong>Phase 8 — documentation.</strong> Operator guide for claims and
-capacity (including the two service classes and the
-reconciler), developer-guide write-up of the guarded-UPDATE
-idiom (D10), user-facing affinity migration notes.</p>
-<h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
+<p><code>_schedulable_threads</code> (<code>:114-138</code>) prefers published
+<code>cpu_schedulable</code>, falls back to local config for stale rows;
+<code>_memory_reserved_mb</code> (<code>:140-146</code>) mirrors it. Defaults:
+<code>SCHEDULER_TARGET_LOAD=0.75</code>, <code>CPU_OVERCOMMIT_RATIO=3.0</code>,
+<code>RAM_OVERCOMMIT_RATIO=3.0</code>, <code>NODE_RAM_RESERVATION_GB=2.0</code>,
+<code>NODE_CPU_RESERVATION_THREADS=2</code>,
+<code>NODE_DISK_RESERVATION_GB=20.0</code>.</p>
+<p><strong>Nothing in admission accounts for a pending instance.</strong>
+<code>cpu_total_instance_vcpus</code> / <code>memory_total_instance_actual</code>
+come from libvirt's <em>active</em> domains
+(<code>daemons/resources/main.py:315-327</code>), <code>memory_available</code> is
+psutil. A just-placed instance is invisible until it boots
+AND the target's next 60s metrics cycle publishes it. This is
+the race the master plan targets.</p>
+<p><strong>Affinity</strong> (<code>:414-496</code>): <code>inst.affinity</code> is the <code>affinity</code>
+metadata dict, validated at
+<code>external_api/instance.py:1303-1312</code>. Per candidate:
+<code>Node.from_db()</code>, <code>n.instances</code> (an <code>object_references</code> query
+unioned with the legacy JSON column, <code>node.py:623-652</code>), then
+<code>Instance.from_db()</code> per co-located instance — O(candidates ×
+instances) DB round trips on the API hot path, unindexed.
+Score = sum of weights for matching tags, then applied as a
+<strong>hard filter</strong>: <code>candidates = by_affinity[max(scores)]</code>
+(<code>:484-485</code>). Functional test
+<code>cluster_ci_tests/test_scheduler.py:19-110</code> asserts hard
+co-location for +100 and hard separation for -100 — a
+behavioural contract the affinity rework must preserve or
+explicitly migrate.</p>
+<p><strong>Load ordering (00a)</strong> (<code>:498-556</code>): bucket by
+<code>floor((cpu_load_1 / schedulable_threads) / 0.25)</code>, keep
+lowest bucket, Efraimidis-Spirakis weighted shuffle with
+weight <code>max(0.1, TARGET_LOAD × threads − cpu_load_1)</code>. The
+whole ordered list is returned.</p>
+<p><strong>Audit events</strong>: a successful decision emits 14 audit events
+via spooled <code>add_event_multi</code> (enqueue, not DB write, on the
+hot path): <code>started scheduling</code>, <code>schedule inputs</code> (with
+metrics_age_seconds), initial candidates, one per stage with
+<code>{candidates, dropped}</code>, affinity detail, load detail, final
+candidates with weights. A failed decision emits
+<code>schedule has no candidates at stage {stage}</code> then raises.
+Today's per-rejection audit is the per-stage <code>dropped</code> dicts.</p>
+<h3 id="scheduler-callers-exactly-three">Scheduler callers (exactly three)<a class="headerlink" href="#scheduler-callers-exactly-three" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong><code>external_api/instance.py:789-816</code></strong> — API hot path.
+   Module-global <code>SCHEDULER</code> reused per gunicorn worker.
+   Ordering: validation → <code>Instance.new()</code> (state
+   <code>initial</code>) → metadata written (<strong>affinity known before
+   placement</strong>) → IPs reserved → <code>find_candidates</code> →
+   <code>inst.place_instance(placement)</code> → artifact ops →
+   <code>node_inst_netdesc_op</code> enqueue. On
+   <code>LowResourceException</code>: audit, <code>enqueue_delete_due_error</code>,
+   HTTP <strong>507</strong>. No retry, no walking the candidate list.</li>
+<li><strong><code>external_api/admin.py:106-117</code></strong> — <code>GET
+   /admin/resources</code>, admin-only, <strong>fresh Scheduler per
+   request</strong> (full metrics fan-out), read-only.
+   <code>cluster_ci_tests/test_nodes.py:40-70</code> asserts against it.</li>
+<li><strong><code>operations/node_inst_netdesc_op.py:141-204</code></strong> —
+   <code>_instance_preflight</code> on the <em>target node's</em> queue worker.
+   Sets state <code>preflight</code>, re-runs admission for this node
+   only. The only retrying caller: on LowResource, if
+   <code>placement_attempts &gt; 3</code> → abort; if <code>requested_placement</code>
+   → abort; else re-schedule excluding this node, re-place,
+   mint a new op on the new node, abort this op. No
+   requeue-on-LowResource path — redirect once or give up.</li>
+</ol>
+<h3 id="node_metrics">node_metrics<a class="headerlink" href="#node_metrics" title="Permanent link">&para;</a></h3>
+<p>Written by the resources daemon every <strong>60s</strong>
+(<code>daemons/resources/main.py:606-616</code>, gate at <code>:659-661</code>).
+Table (<code>mariadb.py:1493-1519</code>): <code>node_uuid PK, fqdn,
+timestamp, metrics_json JSON</code> — one row per node,
+deliberately schemaless (docstring <code>:1496-1503</code>: "SQL
+queryability of individual fields is not needed"). Worst-case
+snapshot age at a decision ≈ 65s (60s cadence + 5s cache);
+<code>schedule inputs</code> records <code>metrics_age_seconds</code>.</p>
+<p>Capacity-relevant fields: <code>cpu_max</code>, <code>cpu_max_per_instance</code>,
+<code>cpu_cores</code>/<code>cpu_threads</code>, <code>cpu_load_1/5/15</code>,
+<code>cpu_total_instance_vcpus</code>; reservations published via
+<code>_compute_reservations()</code> (<code>:100-127</code>) — <code>cpu_schedulable =
+max(1, cpu_threads - NODE_CPU_RESERVATION_THREADS)</code>,
+<code>memory_reserved_mb = min(GB×1024, memory_total_mb // 2)</code>
+(<strong>half-machine cap</strong>), <code>disk_reservation_gb</code> raw;
+<code>memory_max</code>, <code>memory_available</code> (psutil MB), KSM fields,
+<code>memory_total_instance_{max,actual}</code>;
+<code>disk_free_{instances,...}</code> (bytes), busy-time counters and
+deltas; role flags, queue depths.</p>
+<h3 id="instance-create-lifecycle">Instance create lifecycle<a class="headerlink" href="#instance-create-lifecycle" title="Permanent link">&para;</a></h3>
+<p>Sizing (<code>cpus</code>, <code>memory</code>, <code>disk_spec</code>) is frozen by
+<code>Instance.new()</code> before <code>find_candidates</code> is called —
+<strong>everything a claim needs is known before scheduling</strong>.
+State machine (<code>instance.py:181-233</code>): <code>initial → preflight →
+creating → created</code> plus <code>&lt;state&gt;-error</code> and
+<code>delete_wait</code>/<code>deleted</code>. <strong>There is no <code>building</code> state</strong>
+(see Surprises). Failure/cleanup paths after placement but
+before running — each a required claim-release point:
+API-side failures after <code>place_instance</code> (no try/except at
+<code>external_api/instance.py:816-865</code>); preflight redirect
+(release old node's claim, take new); preflight aborts
+(attempts&gt;3, requested-node, reschedule-failure);
+<code>_instance_start</code> network failures; <code>_instance_create</code>
+invalid-state/image-shrink; dispatcher catch-all; power-on
+failure (<code>instance.py:976-977</code>); dependency abort; and the
+cleaner <strong>rewriting placement outside the scheduler</strong>
+(<code>daemons/cleaner/scheduled_tasks.py:121,218</code> call
+<code>place_instance(config.NODE_UUID)</code> for locally-found
+domains). <code>hard_delete()</code> (<code>instance.py:1044-1063</code>) is driven
+by the cluster daemon's deleted-object sweep every 15
+minutes; <strong>a claims table needs a hook there</strong>.</p>
+<h3 id="cluster_locks-leasing-pattern-the-template">cluster_locks leasing pattern (the template)<a class="headerlink" href="#cluster_locks-leasing-pattern-the-template" title="Permanent link">&para;</a></h3>
+<p><code>CLUSTER_LOCK_LEASE_SECONDS = 60</code>; <code>expires_at</code> written
+server-side as <code>NOW() + INTERVAL n SECOND</code> so clock skew
+cannot enable steals (<code>mariadb.py:1755-1761</code>). Acquire
+(<code>_direct_acquire_cluster_lock</code>, <code>:19698-19786</code>) is a
+<em>single</em> <code>INSERT ... ON DUPLICATE KEY UPDATE</code> with per-column
+<code>CASE WHEN expires_at &lt; NOW()</code> steal semantics, followed by a
+PK SELECT to disambiguate (rowcounts unreliable across
+drivers); its docstring records the earlier two-statement
+shape was a guaranteed S→X upgrade deadlock. Refresh: guarded
+UPDATE, rowcount-as-CAS, 20s cadence (lease/3, two missable).
+Release: DELETE-as-CAS. <code>_retry_on_deadlock</code> wraps all three
+(4 attempts, jittered 5/10/20ms). <code>lost_event</code> protocol for
+long holders. <strong>No reaper at all</strong> — recovery happens on the
+next acquire. <strong>v4 deliberately dropped the <code>expires_at</code>
+index</strong> because under RR it widened gap-lock footprints and
+caused 1213 deadlocks (<code>:1853-1871</code>) — in direct tension with
+a reap-by-expiry query (see Surprises).</p>
+<h3 id="adding-a-new-table-rpc-object-end-to-end">Adding a new table + RPC + object, end to end<a class="headerlink" href="#adding-a-new-table-rpc-object-end-to-end" title="Permanent link">&para;</a></h3>
+<p>Best precedents: <code>namespace_key</code> (full first-class object)
+and <code>node_daemon_states</code> (JSON-to-table migration). The
+checklist: (1) Pydantic schema in <code>shakenfist/schema/</code> with
+<code>sql_indexes</code> config; (2) table registration in <code>mariadb.py</code>
+under <code>TABLE_CREATION_LOCK</code> + <code>register_all_tables()</code>; (3)
+version constant + <code>EXPECTED_SCHEMA_VERSIONS</code> + the
+concurrency test's <code>EXPECTED_TABLE_NAMES</code>; (4)
+<code>_ensure_*_schema()</code> appended to <code>ensure_schema()</code> (run only
+via <code>sf-ctl ensure-mariadb-schema</code>); (5) three access layers
+(<code>_direct_*</code>, <code>_grpc_*</code>, public router); (6)
+<code>protos/database.proto</code> + <code>tox -e genprotos</code>; (7)
+<code>DatabaseServicer</code> handlers + Monitor counters; (8) if
+first-class: <code>ObjectType</code> member (fresh proto_id; latest is
+<code>NAMESPACE_KEY = 29</code>), <code>OBJECT_NAMES_TO_CLASSES</code>, a <code>dbo</code>
+subclass, REST endpoints in <code>external_api/app.py</code>, optional
+cluster-daemon reap task (template:
+<code>reap_expired_namespace_keys</code>,
+<code>daemons/cluster/scheduled_tasks.py:345-380</code>); (9) enum
+widening is automatic; (10) <code>verify_schema_versions</code> means
+sf-database refuses to start on mismatch, so <strong>no dual-read
+window is ever needed</strong> (argument made explicitly in
+<code>PLAN-auth-federation-phase-02-key-objects.md:87-92</code>).</p>
+<h3 id="namespace-lifecycle-and-authz">Namespace lifecycle and authz<a class="headerlink" href="#namespace-lifecycle-and-authz" title="Permanent link">&para;</a></h3>
+<p>Namespaces use their <strong>name</strong> as identifier, not a UUID
+(<code>namespace.py:49-66</code>). <code>state_targets = {None: created,
+created: deleted}</code> — no error state. Create is admin-only
+(<code>external_api/auth.py:181-248</code>). Soft delete
+(<code>auth.py:263-310</code>) refuses <code>system</code>, refuses if any non-dead
+instance or network remains — <strong>a claim must be added to that
+emptiness gate or torn down explicitly there</strong>.
+<code>hard_delete()</code> (<code>namespace.py:302-314</code>) is the cascade hook.
+Authz: <code>caller_is_admin</code> vs <code>arg_is_namespace</code> +
+<code>requires_namespace_ownership</code> (trusted parent namespaces can
+already act on children). <strong>There is no existing per-namespace
+quota or limit object of any kind.</strong></p>
+<h3 id="sql-pushdown-precedent-constraints">SQL pushdown precedent constraints<a class="headerlink" href="#sql-pushdown-precedent-constraints" title="Permanent link">&para;</a></h3>
+<p>Typed Pydantic criteria (not predicate rewriting);
+three-layer discipline mandatory; <strong>errors return empty and
+log, never raise</strong> — a hazard for claims, where "did not fit"
+and "database broke" must differ (see Surprises); indexes on
+existing tables need explicit <code>CREATE INDEX IF NOT EXISTS</code>;
+two UUID formats (dashed String(36) vs undashed CHAR(32) —
+JOINs must cast, else silently never match, <code>CLAUDE.md</code>).
+In-tree prior art: <code>_direct_claim_coalescible_siblings</code>
+(<code>mariadb.py:19512-19624</code>) is a real <code>SELECT ... FOR UPDATE</code>
++ bulk UPDATE claim; <code>_direct_reserve_address</code> (<code>:5231-5268</code>)
+claims via plain INSERT + <code>IntegrityError</code> = "taken" (unique
+key, not aggregate capacity).</p>
+<h3 id="surprises-server-side">Surprises (server side)<a class="headerlink" href="#surprises-server-side" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>There is no <code>building</code> state.</strong> The master plan's
+   consumption point ("reservation consumed at <code>building</code>")
+   names a state that does not exist. Real machine: <code>initial
+   → preflight → creating → created</code>. Nearest analogues:
+   <code>preflight</code> (target node's queue worker) and <code>creating</code>
+   (hypervisor, immediately before disk config). Phase 0 must
+   pick one; they differ by a full network-reconcile op chain
+   and an image fetch.</li>
+<li><strong><code>node_metrics</code> capacity data is an opaque JSON column by
+   design</strong> (<code>mariadb.py:1496-1503</code>). The master plan's
+   <code>effective_capacity(node)</code> SQL cannot be written cleanly
+   today — phase 1 must promote ~11 capacity fields to typed
+   columns (or indexed generated columns). Confirms the
+   prior-art finding independently.</li>
+<li><strong><code>_has_idle_disk_bandwidth</code> has never worked</strong>: scheduler
+   reads <code>disk_busy_time_delta_per_sec</code>, daemon publishes
+   <code>disk_busy_time_delta_per_second</code>; <code>.get(..., '0')</code> makes
+   it silently pass. The queue worker's <code>high_io</code> gate has a
+   third spelling (<code>_seconds</code>, <code>daemons/daemon.py:650</code>) and
+   is also dead. The unit test bakes the wrong key in
+   (<code>tests/test_scheduler.py:178</code>). Two live bugs, neither in
+   the plan's bug list.</li>
+<li><strong>Affinity is a hard filter, not a soft preference</strong>
+   (<code>by_affinity[max]</code> discards all non-maximal buckets), and
+   the functional test asserts strict semantics from ±100.
+   Question 6's "soft preferences become ORDER BY terms"
+   would weaken observable behaviour and break that test
+   unless the binary model keeps <code>require_*</code> semantics for
+   today's large weights.</li>
+<li><strong>The affinity pass is the most expensive thing on the
+   create path</strong> (per-candidate per-instance object loads,
+   unindexed, plus a legacy JSON union). Pushing affinity
+   into SQL is a latency win independent of atomicity.</li>
+<li><strong>cluster_locks v4 removed the <code>expires_at</code> index as a
+   deadlock vector</strong> — but a reservation reaper wants exactly
+   that index. The lock table resolved the tension by having
+   every hot path be a PK lookup and no reaper at all. The
+   claims design must resolve it too (aligns with prior-art
+   recommendation 8: explicit release primary, expiry as
+   backstop — which keeps the reap query rare).</li>
+<li><strong>The pushdown error convention conflates "no rows" with
+   "database broke"</strong> (<code>[]</code> for both). A claim primitive must
+   break with the convention or return a tri-state — "no
+   candidate" (reject) and "DB unreachable" (retry) must
+   differ. Note <code>DatabaseUnavailable</code> now exists precisely to
+   keep this distinction; the claim path must use it.</li>
+<li><strong>The hard-delete hook is behind cluster-daemon election</strong>
+   — claim cleanup on instance hard-delete inherits that
+   SPOF regardless of the reaper-model choice.</li>
+<li><strong>Placement is rewritten outside the scheduler</strong>: the
+   cleaner calls <code>place_instance(config.NODE_UUID)</code> for
+   locally-found domains, incrementing the same
+   <code>placement_attempts</code> counter preflight uses as its retry
+   budget. A claim keyed to placement must tolerate placement
+   changing without a scheduling decision.</li>
+<li><strong><code>GET /admin/resources</code> must subtract active claims</strong>
+    and <code>cluster_ci_tests/test_nodes.py:49-70</code> will notice if
+    it disagrees with admission.</li>
+<li><strong><code>memory_reserved_mb</code> is capped at half the machine</strong>
+    and <code>cpu_schedulable</code> floored at 1 — an
+    effective-capacity query recomputing reservations from
+    config instead of reading published metrics will disagree
+    with admission on small deployments.</li>
+<li><strong>Unit mismatches are endemic</strong>: <code>disk_free_instances</code>
+    is bytes, <code>disk['size']</code> and <code>disk_reservation_gb</code> are
+    GB; sizeless disks (CD-ROMs) are excluded from admission
+    entirely — so "claim virtual size from disk_spec"
+    under-counts CD-ROMs and base-image-sized disks. The
+    claim arithmetic must define its units once and convert
+    at the edges.</li>
+</ol>
+<h2 id="part-2-ci-conductor-current-state">Part 2: CI conductor current state<a class="headerlink" href="#part-2-ci-conductor-current-state" title="Permanent link">&para;</a></h2>
+<p>Repo: <code>shakenfist/private-ci</code>. All references <code>file:line</code>.</p>
+<h3 id="admission-today">Admission today<a class="headerlink" href="#admission-today" title="Permanent link">&para;</a></h3>
+<p><strong>Budget.</strong> <code>MAX_WORKERS = 7</code> at <code>conductor/provisioner.py:139</code>;
+<code>BUILDER_RESERVED_SLOTS = 2</code> at <code>provisioner.py:147</code>.</p>
+<p><code>create_workers()</code> (<code>provisioner.py:697-947</code>) computes, at
+<code>provisioner.py:745-758</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>permitted_additional = MAX_WORKERS - len(active_instances)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    - len(preflight_instances) - len(idle_instances)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    - builder_count - reserved
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>reserved = max(0, BUILDER_RESERVED_SLOTS - builder_count)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    if builder_busy else 0
+</code></pre></div>
+<p>One instance = one slot regardless of size label — the budget
+is a <strong>count</strong>, not a resource sum. There is no
+cluster-capacity input anywhere in the conductor: no
+<code>get_nodes</code>/cluster-resource call exists in <code>conductor/*.py</code>.
+<code>MAX_WORKERS</code> is a hand-tuned constant, exactly as
+<code>PLAN-workflow-cost-tracking.md:20-27</code> describes ("we
+basically hope that it all fits").</p>
+<p>Two hard gates precede the arithmetic: <code>quarantined_labels is
+None</code> → provision nothing (<code>provisioner.py:728-733</code>);
+<code>'dependencies' in quarantined_labels</code> → provision nothing
+(<code>provisioner.py:738-743</code>). Per-label quarantine skip at
+<code>provisioner.py:779-785</code>.</p>
+<p>The three counted lists: <code>active_instances</code>,
+<code>idle_instances</code>, <code>preflight_instances</code> are lists of <strong>GitHub
+runner names</strong> built in <code>collector.py:274-306</code> from
+<code>github.list_workers()</code> — <code>active</code> = online+busy, <code>idle</code> =
+online+not busy, <code>preflight</code> = registered-but-offline and too
+young to delete, plus cloud instances GitHub has never seen
+adopted as preflight at <code>collector.py:325-340</code>.
+<code>builder_instances</code> is the cloud-side list of live
+image-builder instances in the <code>ci-images</code> namespace
+(<code>collector.py:166-176</code>).</p>
+<p><strong>Per-(os,size) demand.</strong> <code>provisioner.py:776-834</code>: outer
+loop over <code>CI_IMAGES</code> (<code>provisioner.py:42-96</code>), inner over
+<code>CI_SIZES.keys()</code> (<code>provisioner.py:100-137</code>, insertion order
+xs,s,m,m-bigdisk,l,xl,xl-bigdisk). For each combo present in
+<code>jobs_by_label_and_size</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>additional = min(jobs_for_combo - idle - building,
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                 max_additional - requested)
+</code></pre></div>
+<p>where <code>max_additional = min(permitted_additional,
+queued_jobs)</code> (<code>provisioner.py:774</code>), <code>hit_max</code> breaks both
+loops at <code>provisioner.py:820-823</code>. Ordering consequence:
+<strong>label order dominates size order</strong>, so it is not a
+smallest-first global policy — <code>debian-11/xl</code> is attempted
+before <code>rocky-10/xs</code>.</p>
+<p><strong>Cadence.</strong> <code>main.py:142</code> <code>while True</code>, <code>main.py:327</code>
+<code>time.sleep(10)</code> per cycle. When saturated, <code>create_workers()</code>
+itself does <code>time.sleep(30)</code> and returns
+(<code>provisioner.py:759-771</code>), i.e. a ~40s cycle under load.
+Watchdog: <code>Heartbeat</code> (<code>main.py:45-88</code>), stale window 300s
+(<code>main.py:42</code>) — anything a claim call adds must stay inside
+that.</p>
+<h3 id="namespace-lifecycle-hooks">Namespace lifecycle hooks<a class="headerlink" href="#namespace-lifecycle-hooks" title="Permanent link">&para;</a></h3>
+<p><strong>Creation sequence</strong> — all inside the innermost
+<code>for i in range(additional)</code> loop, <code>provisioner.py:836-947</code>,
+with no <code>try</code>/<code>except</code> anywhere in the function:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Line</th>
+<th>Call</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ids minted</td>
+<td><code>provisioner.py:840-841</code></td>
+<td><code>sf_random.random_id()</code> × 2</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td><code>provisioner.py:869-871</code></td>
+<td><code>system_namespace.create_namespace('sfcbr-%s')</code></td>
+</tr>
+<tr>
+<td>key</td>
+<td><code>provisioner.py:872-875</code></td>
+<td><code>add_namespace_key(ns, 'conductor', ns_key)</code></td>
+</tr>
+<tr>
+<td>trust</td>
+<td><code>provisioner.py:876-878</code></td>
+<td><code>add_namespace_trust('ci-images', ns)</code></td>
+</tr>
+<tr>
+<td>per-ns client</td>
+<td><code>provisioner.py:879-887</code></td>
+<td><code>sfclient.build_client(namespace=..., key=ns_key)</code></td>
+</tr>
+<tr>
+<td>network</td>
+<td><code>provisioner.py:889-892</code></td>
+<td><code>ci_namespace.allocate_network('10.0.0.0/24', ...)</code></td>
+</tr>
+<tr>
+<td>userdata</td>
+<td><code>provisioner.py:894-906</code></td>
+<td><code>render_userdata()</code> + <code>github.new_worker_token()</code></td>
+</tr>
+<tr>
+<td>instance</td>
+<td><code>provisioner.py:907-943</code></td>
+<td><code>create_instance(...)</code> with metadata <code>{'os','size'}</code></td>
+</tr>
+<tr>
+<td>bookkeeping</td>
+<td><code>provisioner.py:944-947</code></td>
+<td><code>instance_ages[name] = time.time()</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Claim create slots at <code>provisioner.py:871-876</code></strong> — after
+<code>create_namespace</code>, before <code>allocate_network</code> /
+<code>create_instance</code>. Claim size is fully known there:
+<code>CI_SIZES[ci_size]</code> cpu/ram, boot disk +
+<code>CI_DEPENDENCIES_DISK_SIZE = 60</code> (<code>provisioner.py:98</code>,
+<code>918-936</code>).</p>
+<p><strong>Error handling today: none on this path.</strong> An
+<code>APIException</code> from any of those calls propagates to the
+catch-all at <code>main.py:321-325</code>, abandoning the rest of the
+provisioning pass. The half-built namespace is
+garbage-collected a cycle later as a stray namespace
+(<code>collector.py:222-231</code>, <code>main.py:258-262</code>). <code>SFTimeout</code> gets
+its own arm at <code>main.py:312-319</code>. A failing claim create that
+raises would abort the whole cycle — a claim-aware loop must
+catch locally.</p>
+<p><strong>Teardown.</strong> <code>remove_namespace()</code>
+(<code>provisioner.py:525-605</code>), each step independently
+<code>try</code>-wrapped by deliberate design (docstring
+<code>provisioner.py:527-537</code>): costs, <code>delete_all_instances</code>,
+<code>delete_all_networks</code>, per-network fallback,
+<code>remove_namespace_trust</code>, <code>delete_namespace</code>. <strong>Claim delete
+slots at <code>provisioner.py:595</code></strong> (just before
+<code>delete_namespace</code>), in its own broad <code>try</code>. Three teardown
+entry points live in <code>collector.py</code> (<code>collector.py:288</code>,
+<code>292</code>, <code>327</code>), so claim release must hang off
+<code>remove_namespace()</code>, not off the main loop. Stray-namespace
+teardown (<code>main.py:259</code>) is the path that would release a
+claim whose instance never came up. If the claim is a child
+of the namespace object with its own expiry (Q15 working
+position), all of this is covered by <code>delete_namespace</code> plus
+the TTL backstop.</p>
+<h3 id="footprint-data-available">Footprint data available<a class="headerlink" href="#footprint-data-available" title="Permanent link">&para;</a></h3>
+<p>Schema <code>workflow_costs</code> at <code>db.py:154-196</code>. The
+reservation-denominated columns are <code>peak_allocated_cpus</code>,
+<code>peak_allocated_ram_mb</code>, <code>peak_allocated_disk_gb</code>,
+<code>peak_concurrent_instances</code>, <code>total_instances</code>
+(<code>db.py:96-100</code>), produced at teardown by
+<code>_peak_concurrent_allocation()</code> (<code>provisioner.py:279-316</code>, an
+event sweep over instance lifetime intervals). Namespace-wide,
+so it <strong>includes the nested under-cloud instances a
+cluster-CI workflow creates</strong>. Documented undercount:
+instances hard-deleted before teardown are invisible
+(<code>provisioner.py:463-467</code>).</p>
+<p><code>get_cost_observations(min_runs=3)</code> (<code>db.py:1062-1173</code>)
+groups by <strong>(repo, workflow_name, runner_size)</strong> and returns
+<code>MAX(peak_allocated_*)</code> per group — the worst run — plus
+averages. This is already a <code>footprint(repo, workflow)</code>
+estimator input; the headroom convention to reuse is
+<code>sizing.py:28-30</code> (<code>RAM_HEADROOM 1.3</code>, <code>DISK_HEADROOM 1.2</code>,
+<code>CPU_HEADROOM 2.0</code>). The grouping key is not <code>job_name</code>, even
+though it is stored (<code>db.py:160</code>); a per-job estimator needs
+a new query.</p>
+<p><strong>The conductor knows repo/workflow/job at creation time —
+confirmed.</strong> <code>queued_jobs_by_label_and_size</code> maps
+<code>(label, size) → [{repo, run_id, workflow_name, job_name,
+labels, html_url, created_at}]</code> (<code>github.py:990-1003</code>),
+passed through <code>collector.py:582-584</code> → <code>main.py:286-288</code> →
+<code>create_workers()</code>. Inside the loop it is popped per worker
+at <code>provisioner.py:828-848</code> (<code>triggering_job</code>) and today used
+only for a log line. So a claim can be sized
+per-(repo, workflow, job) at creation. Caveats: (a) the
+association is heuristic — GitHub does not say which runner
+picks up which job, so the popped job is only the
+<em>triggering</em> job; (b) <code>pending_jobs</code> may be empty
+(<code>triggering_job=None</code> branch at <code>862-868</code>), so the estimator
+needs a size-label fallback; (c) label→size resolution is
+itself defaulted when a job carries no size label
+(<code>github.py:956-974</code>).</p>
+<p>Post-hoc attribution is already solved and durable:
+<code>runner_jobs</code> (<code>github.py:1005-1021</code>) → <code>worker_metadata</code>
+(<code>main.py:171-204</code>) → <code>runner_attribution</code> table
+(<code>db.py:267-277</code>), merged at <code>provisioner.py:479-484</code>.</p>
+<h3 id="deferral-mechanics">Deferral mechanics<a class="headerlink" href="#deferral-mechanics" title="Permanent link">&para;</a></h3>
+<p><strong>No "tried and failed" state exists.</strong> <code>create_workers()</code> is
+stateless across cycles; a claim rejection would be forgotten
+in 10s and retried identically. Deferral needs new state; the
+durable-state precedent is <code>runner_attribution</code>
+(<code>db.py:255-266</code>) and <code>bugfix_dispatches</code>. Nothing today ages
+or prioritises: <code>pending_jobs</code> order is GitHub iteration
+order, but <code>created_at</code> is carried per queued job
+(<code>github.py:1000-1002</code>), so FIFO aging is available for free.
+"Run smaller queued jobs first" requires inverting the loop
+nesting at <code>provisioner.py:776-786</code> (size-major rather than
+label-major) — a small, contained change. Hysteresis
+precedents: the 600s reap cooling-off
+(<code>provisioner.py:616-619</code>) and the imagebuilder's
+<code>next_attempt</code> backoff (<code>collector.py:121-122</code>).</p>
+<p><strong>Dashboard surface.</strong> The snapshot is assembled in one
+literal at <code>collector.py:547-568</code>; natural claim telemetry:
+a <code>claim</code> key per entry in <code>queued_jobs_list</code>/<code>workers</code> plus
+counters in <code>summary</code> (touch <code>collector.py:547</code> and defaults
+at <code>state.py:5-26</code>; <code>web.py</code> needs no change). Prometheus:
+add a <code>Gauge</code> in <code>metrics.py:16-63</code>, read in
+<code>observe_snapshot()</code> (<code>metrics.py:78-89</code>); <code>HEADROOM</code>
+(<code>metrics.py:47-49</code>) is the existing analogue.</p>
+<h3 id="sf-client-usage">SF client usage<a class="headerlink" href="#sf-client-usage" title="Permanent link">&para;</a></h3>
+<p>Every SF call goes through <code>sfclient.build_client()</code>
+(<code>sfclient.py:106-117</code>) → <code>TimeoutClient</code>
+(<code>sfclient.py:81-103</code>), a <code>__getattr__</code> proxy bounding any
+call at 90s. <strong>A new <code>reservation_create()</code> client method
+needs zero changes in <code>sfclient.py</code></strong> — proxied
+automatically, raising <code>SFTimeout</code> on hang, which
+<code>main.py:312-319</code> already handles.</p>
+<p>Two client identities: the <strong>system</strong> client
+(<code>main.py:101-104</code>) used for namespace lifecycle, and a
+short-lived per-runner-namespace client
+(<code>provisioner.py:879-887</code>) used only for <code>allocate_network</code>
+and <code>create_instance</code>. A claim is a privileged/quota object,
+so it belongs on the system client.</p>
+<p>The <code>ci-images</code> namespace (<code>provisioner.py:634-654</code>) hosts
+image-builder instances — if claims are how capacity is
+guaranteed, <code>ci-images</code> needs one too, and
+<code>BUILDER_RESERVED_SLOTS</code> becomes redundant with it.</p>
+<p><strong>Client dependency.</strong> <code>requirements.txt:2</code> is bare
+<code>shakenfist-client</code> — no pin. The real pin is the deploy:
+33fl <code>conductor.yml:81-87</code> force-installs
+<code>git+https://github.com/shakenfist/client-python@develop</code>
+(sfcbr tracks shakenfist develop). New client methods are
+available on next deploy with no pin bump. Client
+conventions: thin <code>_request_url</code> wrappers, and new server
+features gated by <code>check_capability()</code>
+(<code>apiclient.py:253-255</code>). The conductor already codes
+defensively for client skew (<code>CLEANUP_EXCEPTIONS</code> assembled
+with <code>getattr</code>/<code>hasattr</code>, <code>provisioner.py:157-166</code>); expect a
+capability string plus <code>hasattr(client, 'reservation_create')</code>
+so an un-upgraded client degrades to unclaimed behaviour.</p>
+<h3 id="surprises-contradictions">Surprises / contradictions<a class="headerlink" href="#surprises-contradictions" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong><code>MAX_WORKERS</code> is 7 in code but 6 in the docs</strong>
+   (<code>ARCHITECTURE.md:847</code>). Don't quote the doc number.</li>
+<li><strong>The budget is a slot count, not a resource sum.</strong>
+   Claims make the conductor resource-aware for the first
+   time, and <code>MAX_WORKERS</code> then becomes a second, coarser
+   limiter that will silently dominate (7 × xs is nothing;
+   7 × xl-bigdisk is 56 vCPU / 112 GB / 4.2 TB). The
+   integration contract must say what happens to
+   <code>MAX_WORKERS</code> — retired, raised, or kept as a
+   GitHub-API-cost guard.</li>
+<li><strong>Per-workflow claim sizing at creation is already
+   plumbed</strong> (<code>triggering_job</code>), but the association is
+   heuristic — which argues for the mutable claim of Q15
+   rather than one-shot sizing.</li>
+<li><strong>Three teardown call sites live in <code>collector.py</code></strong>, so
+   claim-release logic must live in <code>remove_namespace()</code>.</li>
+<li><strong><code>create_workers()</code> has no exception handling.</strong> A claim
+   create that raises kills the rest of the cycle — the
+   opposite of "defer this runner and try a smaller one".</li>
+<li><strong>Dashboard <code>headroom</code> and the provisioning budget
+   disagree</strong> (<code>collector.py:488-494</code> omits the builder
+   reserve), and <strong>stray instances are counted in neither</strong>
+   — under claims, a stray namespace becomes a claim leak.</li>
+<li><code>conductor/dashboard.py</code> is dead code; the live dashboard
+   is <code>web.py</code> + <code>templates/dashboard.html</code> + <code>state.py</code>.</li>
+<li><strong><code>get_cost_observations()</code> requires <code>min_runs=3</code></strong> and
+   drops unattributed rows — the size-label fallback is the
+   default for anything new, not an edge case.</li>
+<li><code>peak_allocated_disk_gb</code> sums <em>virtual</em> <code>disk_spec</code> sizes
+   — already the right denomination for the Q16 claim
+   semantics.</li>
+<li>No test covers <code>create_workers()</code>; claim-aware admission
+    arrives with no harness to extend.</li>
+</ol>
+<h2 id="part-3-external-prior-art">Part 3: External prior art<a class="headerlink" href="#part-3-external-prior-art" title="Permanent link">&para;</a></h2>
+<p><strong>Method note.</strong> Section A combines MySQL/MariaDB reference
+documentation with an <strong>empirical probe run against
+<code>mariadb:10.6.27</code></strong> (matching SF's <code>MIN_MARIADB_VERSION =
+(10, 6, 0)</code>, <code>shakenfist/mariadb.py:354</code>), because the
+load-bearing question — does an aggregate-guarded
+<code>INSERT ... SELECT</code> actually block a concurrent claimer? — is
+not answerable from the docs alone. Sections B and C are
+documentation/source-grounded.</p>
+<h3 id="a-mariadbinnodb-atomic-claim-idioms">A. MariaDB/InnoDB atomic-claim idioms<a class="headerlink" href="#a-mariadbinnodb-atomic-claim-idioms" title="Permanent link">&para;</a></h3>
+<h4 id="what-innodb-actually-guarantees">What InnoDB actually guarantees<a class="headerlink" href="#what-innodb-actually-guarantees" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Fact</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INSERT INTO T SELECT ... FROM S WHERE ...</code> sets an X index-record lock (no gap lock) on each inserted row. "If the transaction isolation level is READ COMMITTED, InnoDB does the search on S as a consistent read (no locks). Otherwise, InnoDB sets shared next-key locks on rows from S."</td>
+<td>MySQL manual, innodb-locks-set</td>
+</tr>
+<tr>
+<td>Under RR, locking reads / <code>UPDATE</code> / <code>DELETE</code> take <strong>only an index-record lock</strong> when the search uses "a unique index with a unique search condition"; <strong>gap or next-key locks</strong> for any other search condition.</td>
+<td>innodb-transaction-isolation-levels</td>
+</tr>
+<tr>
+<td>Under RC, locking reads/<code>UPDATE</code>/<code>DELETE</code> "lock only index records, not the gaps before them ... Gap locking is only used for foreign-key constraint checking and duplicate-key checking."</td>
+<td>ibid</td>
+</tr>
+<tr>
+<td>The RR snapshot <strong>does not apply to DML</strong>: "The snapshot ... applies to SELECT statements within a transaction, not necessarily to DML statements." A searched <code>UPDATE</code> evaluates its <code>WHERE</code> against the latest committed rows.</td>
+<td>innodb-consistent-read</td>
+</tr>
+<tr>
+<td><code>SELECT ... FOR UPDATE</code> reads latest data with X locks; MySQL explicitly warns the <code>FOR SHARE</code>-then-update counter pattern deadlocks.</td>
+<td>innodb-locking-reads</td>
+</tr>
+<tr>
+<td>Gap locks are "purely inhibitive ... Gap locks can co-exist." Two holders of the same gap lock that both then insert into it <strong>deadlock</strong>.</td>
+<td>innodb-locking</td>
+</tr>
+<tr>
+<td>MariaDB: "Gap locks are disabled if ... the isolation level is set to <code>READ COMMITTED</code>."</td>
+<td>MariaDB InnoDB lock modes</td>
+</tr>
+</tbody>
+</table>
+<h4 id="empirical-results-mariadb10627-innodb_lock_wait_timeout3">Empirical results (mariadb:10.6.27, innodb_lock_wait_timeout=3)<a class="headerlink" href="#empirical-results-mariadb10627-innodb_lock_wait_timeout3" title="Permanent link">&para;</a></h4>
+<p><strong>Test 1 — two claimers, guard read before either write,
+capacity 4, each claims 3 (only one may win):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Idiom</th>
+<th>REPEATABLE READ</th>
+<th>READ COMMITTED</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. <code>INSERT ... SELECT</code> aggregate guard, explicit txn</td>
+<td>correct: A=1 row, B blocked → 1205, SUM=3</td>
+<td><strong>BROKEN: A=1, B=1, SUM=6 vs capacity 4</strong></td>
+</tr>
+<tr>
+<td>2. <code>SELECT SUM(...) FOR UPDATE</code> then INSERT</td>
+<td>correct but <strong>1213 deadlock</strong> on one session</td>
+<td><strong>BROKEN: both read 0, both inserted, SUM=6</strong></td>
+</tr>
+<tr>
+<td>3. guarded single-row <code>UPDATE</code></td>
+<td>correct, SUM=3</td>
+<td>correct, SUM=3</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Test 2 — 32 truly-concurrent single-statement claims,
+capacity 20, 1 unit each:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Idiom</th>
+<th>REPEATABLE READ</th>
+<th>READ COMMITTED</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. <code>INSERT ... SELECT</code> aggregate guard</td>
+<td>SUM=20 but <strong>11/32 attempts (34%) failed with deadlock 1213</strong></td>
+<td>SUM=20, 0 errors — <em>see caveat</em></td>
+</tr>
+<tr>
+<td>3. <code>UPDATE claims SET used = used + 1 WHERE used + 1 &lt;= limit</code></td>
+<td><strong>exactly 20 granted, 12 rejected (rowcount 0), 0 errors, 0 deadlocks</strong></td>
+<td>identical</td>
+</tr>
+</tbody>
+</table>
+<p>Caveat on the RC/idiom-1 "pass": the shell harness spawned 32
+<code>docker exec</code> clients whose startup jitter (~100-300 ms) far
+exceeds the statement window — the statements barely
+overlapped. Test 1's RC result (SUM=6) is the reliable
+demonstration and matches the documented behaviour. The
+proper benchmark harness must generate real overlap
+(threaded Python with a barrier), or it cannot validate
+anything.</p>
+<h4 id="analysis-per-idiom">Analysis per idiom<a class="headerlink" href="#analysis-per-idiom" title="Permanent link">&para;</a></h4>
+<p><strong>Idiom 1 — conditional <code>INSERT ... SELECT</code> with
+aggregate/<code>NOT EXISTS</code> guard.</strong> Correct <em>only</em> under
+REPEATABLE READ (RR turns the read into shared next-key
+locks). Under READ COMMITTED it is <strong>silently and unboundedly
+wrong</strong> — the guard evaluates against a snapshot that cannot
+see a concurrent uncommitted claim. The price of RR
+correctness is a 34% deadlock rate at 32-way contention on a
+hot key (S-then-gap-then-insert upgrade pattern). Worse, the
+interesting form ("pick the best node that fits",
+<code>ORDER BY headroom LIMIT 1</code>) must scan and S-lock <em>every</em>
+candidate node's reservation range, so the lock footprint and
+deadlock window grow linearly with cluster size. SF has
+already been burned by this shape:
+<code>_direct_acquire_cluster_lock</code>'s docstring records that the
+earlier INSERT-IGNORE-then-UPDATE version was "a classic
+InnoDB shared-shared upgrade deadlock vector", fixed by
+collapsing to one statement with no shared-lock read.</p>
+<p><strong>Idiom 2 — <code>SELECT ... FOR UPDATE</code> then INSERT/UPDATE.</strong>
+Safe for a single row by primary key at any isolation level.
+Unsafe for an aggregate/range guard under RC (no gap locks ⇒
+phantom; empirically SUM=6/4). Under RR safe but deadlocked
+immediately at 2-way contention (co-existing gap locks on the
+empty range, then conflicting insert intentions). Genuine
+advantages: lock-order control (<code>ORDER BY node_uuid</code>) and
+<code>NOWAIT</code> / <code>SKIP LOCKED</code> (both available at SF's 10.6 floor).
+Architectural constraint: a multi-statement transaction must
+execute entirely inside one <code>sf-database</code> RPC — spreading it
+over gRPC round trips holds InnoDB locks across the network.
+So "easier to read" (master plan Q1) only holds as a single
+server-side function, at which point the readability
+advantage largely evaporates.</p>
+<p><strong>Idiom 3 — single-row <code>UPDATE</code> with arithmetic guard. The
+clear winner, and it is not close.</strong> Statement-level
+atomicity (autocommit suffices); current read, not snapshot
+read; PK equality ⇒ index-record lock only ⇒ no phantom, no
+gap-lock deadlock, <strong>identical behaviour under RR and RC</strong>
+(a real robustness property for operator-tuned MariaDBs, per
+the BYO-mariadb direction). Multi-dimensional claims (cpu AND
+memory AND disk) live in one row, so "every constraint holds
+or nothing changes" is free. <code>rowcount == 0</code> is an
+unambiguous, cheap "did not fit". House style already:
+<code>_direct_acquire_cluster_lock</code> (guarded
+<code>INSERT ... ON DUPLICATE KEY UPDATE</code>) and
+<code>_direct_refresh_cluster_lock</code> (guarded UPDATE + rowcount as
+CAS) are this idiom, proven under production contention.</p>
+<p>Costs and caveats: requires <strong>materialised</strong> <code>used_*</code>
+counters (not derived <code>SUM()</code>), which needs a
+drift-correcting reconciler. Claiming from <em>two</em> rows (node
+AND namespace) breaks single-statement atomicity — needs a
+transaction with canonical lock ordering. MariaDB has <strong>no
+<code>UPDATE ... RETURNING</code></strong>, so reading back post-claim usage is
+a follow-up PK SELECT (as <code>_direct_acquire_cluster_lock</code>
+already does). Verify the driver's <code>rowcount</code> semantics
+(<code>CLIENT_FOUND_ROWS</code> vs affected-rows) in a unit test; reject
+zero-sized claims so "no change" cannot be confused with "did
+not fit".</p>
+<p><strong>What real systems use:</strong> guarded decrement +
+check-affected-rows is the canonical inventory pattern.
+OpenStack Placement and Kubernetes ResourceQuota both use
+idiom 3's generalisation — CAS on a version/generation
+integer inside one transaction. No serious system builds a
+hot claim path on <code>INSERT ... SELECT SUM(...)</code>.</p>
+<h4 id="mariadb-specific-caveats">MariaDB-specific caveats<a class="headerlink" href="#mariadb-specific-caveats" title="Permanent link">&para;</a></h4>
 <ul>
-<li><strong><code>PLAN-sql-pushdown-filtering</code> is the existing precedent</strong>
-  and pattern for SQL-side filtering. The reservations work
-  applies that same rule to a new domain (scheduling decisions)
-  rather than extending it. No hard ordering dependency, but
-  phase 0 should read the pushdown plan's decisions document
-  before deciding the conditional-INSERT shape so the two
-  approaches stay coherent.</li>
-<li><strong><code>PLAN-per-host-resource-reservations</code> (complete) is landed
-  groundwork.</strong> It generalised phase 00a's cluster-global
-  reservation knobs into per-host settings:
-  <code>NODE_RAM_RESERVATION_GB</code>, <code>NODE_CPU_RESERVATION_THREADS</code>
-  (thread-denominated — a semantics change from 00a's cores)
-  and <code>NODE_DISK_RESERVATION_GB</code> (which took over
-  <code>MINIMUM_FREE_DISK</code> and is published as a
-  <code>disk_reservation_gb</code> node metric, so remote evaluators
-  judge a node by that node's own reservation rather than
-  their local config). The reservations table's
-  effective-capacity query must subtract these published
-  per-host reservations; conceptually this plan extends the
-  same "capacity the scheduler may not use" idea from static
-  per-host configuration to dynamic per-claim rows.</li>
-<li><strong><code>PLAN-remove-primary</code> does not block this plan</strong> and this
-  plan does not block <code>PLAN-remove-primary</code>. They are
-  compatible by design — the reservations-via-DB-atomicity
-  shape was chosen specifically to avoid adding a new
-  critical-path role that <code>PLAN-remove-primary</code> would then
-  have to undo.</li>
-<li><strong>OpenTelemetry instrumentation (not yet drafted) would
-  inform phase 0</strong> by giving real numbers for current
-  scheduling latency and contention. If OTel lands first, use
-  it. If not, phase 0 includes a one-off benchmark of the
-  current scheduler under contention as input to the
-  conditional-INSERT vs SELECT-FOR-UPDATE choice.</li>
-<li><strong>The future content-aware placement work</strong> in the
-  blob-storage roadmap is a natural successor — reservations
-  that carry workload context (blob affinity) are the
-  substrate. Out of scope here; phase 0 should consider how
-  the schema choice today would or wouldn't compose later.</li>
+<li><strong><code>innodb_snapshot_isolation</code> is ON by default from 11.6.2
+  / 11.8</strong> and makes RR <code>UPDATE</code>/<code>DELETE</code> fail with
+  <strong>ER_CHECKREAD (1020)</strong> when the target row changed since
+  the snapshot. SF's supported range spans 10.6 (absent) to
+  11.8+ (ON), so any explicit-transaction claim path must
+  handle 1020 as a retryable conflict; benchmarks must run
+  with it both ON and OFF. Idiom 3 in autocommit is
+  unaffected. MDEV-39263 reports it fires "most of the time,
+  but not every time" — never rely on it for correctness.</li>
+<li><code>INSERT ... RETURNING</code> (10.5+) exists; <code>UPDATE ...
+  RETURNING</code> does not.</li>
+<li><code>NOWAIT</code>/<code>WAIT n</code> since 10.3, <code>SKIP LOCKED</code> since 10.6.</li>
+<li><code>Innodb_deadlocks</code> global status variable is a useful
+  benchmark and production metric.</li>
 </ul>
-<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
-<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
-<p>All implementation work is done by sub-agents, never in the
-management session. The workflow mirrors
-<code>PLAN-remove-primary.md</code> and <code>PLAN-sticky-transfers.md</code>: plan
-in the management session, spawn a sub-agent per implementation
-step, review in the management session, fix or retry, commit
-when satisfied.</p>
-<p>This work touches the instance-create hot path and a piece of
-infrastructure (atomic capacity claim) that is hard to retrofit
-once committed. Sub-agents working on phases 0-2 should be
-skewed toward <strong>opus at high effort</strong> because the schema and
-atomicity-model choices are costly to undo. Phases 4-8 are more
-mechanical and can use lower-effort sub-agents.</p>
-<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
-<p>The master plan itself is <strong>medium effort</strong> — it's a
-placeholder converging on a direction. Phase 0 (research and
-decisions, including the affinity simplification decision and
-the generic-vs-specific reservation table decision) is high
-effort. Subsequent phases will be re-evaluated once phase 0
-lands.</p>
-<h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
-<p>Each phase plan should include a step table in the same format
-as <code>PLAN-remove-primary.md</code>, with effort, model, isolation, and
-brief columns.</p>
-<h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
-<p>Standard checklist from <code>PLAN-remove-primary.md</code>, plus:</p>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The atomicity guarantee is exercised by a concurrent-
-      scheduling test, not just asserted in docs. Two
-      simultaneous batch reservations against a tight cluster
-      must produce a consistent outcome.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The reaper's behaviour against an abandoned reservation
-      is exercised end-to-end, not stubbed.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Per-rejection audit logging in diagnostic mode produces
-      the same depth of detail as today's scheduler did by
-      default. Operators must not lose the ability to debug a
-      failed schedule, even if they have to ask for the detail
-      explicitly.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The affinity behaviour after the model rework is
-      documented in terms a user can read, with a clear
-      migration note if the existing weighted form is changing
-      or being removed.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Object cleanup (<code>hard_delete()</code>) accounts for
-      reservation rows owned by a deleted instance.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> mypy coverage for the new scheduling primitive is at
-      least as good as today's scheduler, ideally better.</li>
-</ul>
-<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
-<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
-<p>We will know when this plan has been successfully implemented
-because the following statements will be true:</p>
+<h4 id="benchmark-design-step-2">Benchmark design (step 2)<a class="headerlink" href="#benchmark-design-step-2" title="Permanent link">&para;</a></h4>
+<p>Benchmark <strong>idiom 3 first</strong>, idiom 2-as-one-server-side-RPC
+(<code>NOWAIT</code>, canonical lock order) as the multi-row fallback,
+and treat idiom 1 as the thing to disprove. <strong>This reverses
+the master plan's Q1 lean, with evidence.</strong> Corollary: Q1 and
+Q2 are one decision — materialised counters make atomicity
+trivial; derived <code>SUM()</code> forces a locking read and inherits
+every hazard above. <strong>Prerequisite for phase 1:</strong>
+<code>node_metrics</code> stores capacity in a schemaless <code>metrics_json</code>
+column (docstring: "SQL queryability of individual fields is
+not needed" — no longer true); capacity fields must be
+promoted to typed columns before SQL-side capacity arithmetic
+is possible.</p>
+<p>Harness: throwaway threaded Python (one connection per
+worker, <code>threading.Barrier</code> for real overlap — not shell),
+against dockerised <code>mariadb:10.6</code> AND <code>11.8</code>. Schema:
+<code>bench_claims(claim_key PK, limit_{vcpus,mem,disk},
+used_{vcpus,mem,disk}, expires_at)</code> for idiom 3;
+<code>bench_reservations(uuid PK, claim_key, vcpus, mem, disk,
+expires_at, KEY(claim_key, expires_at))</code> for idioms 1/2.
+Patterns, 60 s each, W ∈ {1,2,4,8,16,32,64}: P1 single hot
+key (~50% rejects — the tight-cluster design case); P2 spread
+over 20 keys; P3 pick-best-of-20 by headroom then claim (the
+separator — idiom 1 must lock all 20); P4 P1 + background
+reaper deleting expired rows every 1 s; P5 batch all-or-
+nothing (N=10). Matrix: {RR, RC} ×
+{snapshot_isolation ON, OFF}. Metrics: (1) invariant
+<code>used &lt;= limit</code> and <code>used == Σ granted</code> — any violation
+disqualifies; (2) granted/s and rejected/s; (3) latency
+p50/p95/p99/max; (4) <code>Innodb_deadlocks</code> delta + app-side
+1213/1205/1020 counts; (5) row-lock wait deltas; (6)
+<code>Handler_read_*</code> deltas (exposes idiom 1's lock footprint
+growth with K).</p>
+<h4 id="step-2-benchmark-results-run-2026-07-30">Step 2 benchmark results (run 2026-07-30)<a class="headerlink" href="#step-2-benchmark-results-run-2026-07-30" title="Permanent link">&para;</a></h4>
+<p>Executed as designed: threaded Python (pymysql), one
+connection per worker, <code>threading.Barrier</code> start, 8 s cells,
+against dockerised <code>mariadb:10.6</code> and <code>mariadb:11.8</code> with
+<code>innodb_lock_wait_timeout=3</code>. 96 cells: idioms {i1
+conditional INSERT...SELECT, i2 FOR-UPDATE-aggregate, i3
+guarded UPDATE, i3t guarded UPDATEs in a canonical-order
+transaction, i2b FOR UPDATE NOWAIT then UPDATE} × patterns
+P1-P5 × {RR, RC} × {10.6, 11.8×snapshot ON, 11.8×snapshot
+OFF} × workers {4, 8, 32}. Violations were detected two ways:
+an app-side weighted outstanding counter whose peak can only
+exceed the limit if the database really overshot
+(increment-after-grant, decrement-before-release), and a
+monitor thread sampling committed usage at 100 ms.</p>
+<p>Headline matrix (worst cells per idiom):</p>
+<table>
+<thead>
+<tr>
+<th>Idiom</th>
+<th>RR</th>
+<th>RC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>i1 INSERT...SELECT</td>
+<td><strong>livelock</strong>: hot key at W=32 granted 2-15 ops in 8 s with 6,730-14,476 deadlocks (all versions)</td>
+<td><strong>silently wrong</strong>: up to 2,103 violation events per cell, committed usage observed 16 units over a limit of 16 (100% overshoot)</td>
+</tr>
+<tr>
+<td>i2 FOR UPDATE aggregate</td>
+<td>livelock at W=32 (12,215 deadlocks, 1 grant) on 10.6; 2,110 deadlocks on 11.8</td>
+<td>wrong: violations in every RC cell (up to 194)</td>
+</tr>
+<tr>
+<td>i3 guarded UPDATE</td>
+<td><strong>0 deadlocks, 0 violations, all 96 cells</strong></td>
+<td>identical — isolation-independent</td>
+</tr>
+<tr>
+<td>i3t multi-key txn</td>
+<td>0 deadlocks, 0 violations; 13,900-14,700 grants/8 s at W=32</td>
+<td>identical</td>
+</tr>
+<tr>
+<td>i2b FOR UPDATE NOWAIT</td>
+<td>correct but ~50,000 NOWAIT retries (1205) at W=32 collapse throughput ~9× vs i3t (1,600 vs 14,700 grants)</td>
+<td>identical</td>
+</tr>
+</tbody>
+</table>
+<p>Additional observations:</p>
 <ul>
-<li>Scheduling decisions are atomic with respect to capacity:
-  two concurrent batch creates against a tight cluster cannot
-  both succeed when only one batch fits.</li>
-<li>The "schedule N, fail on N-1" pattern is no longer
-  reachable for batch creates. Either the whole batch is
-  reserved up front or it fails up front.</li>
-<li>The <code>node_reservations</code> table is the single source of
-  truth for pending capacity claims, and stranded reservations
-  are reaped without operator intervention.</li>
-<li>The existing in-process <code>Scheduler()</code> callers are gone, or
-  explicitly justified for staying on the old shape with a
-  documented reason.</li>
-<li>The new batch-create API exists, is documented, and is used
-  end-to-end in at least one functional test under
-  <code>deploy/cluster_ci</code>.</li>
-<li>The affinity model is either preserved as today, simplified
-  to the binary-soft form, or removed — with a clear documented
-  rationale and a migration note for the user-facing API.</li>
-<li>Per-rejection audit logging in diagnostic mode produces
-  detail at least equivalent to today's default. The
-  day-to-day audit log is shorter than today's by design.</li>
-<li><code>pre-commit run --all-files</code> passes.</li>
+<li><strong>ER_CHECKREAD (1020) never fired</strong>, including i3t explicit
+  transactions on 11.8 with <code>innodb_snapshot_isolation=ON</code>.
+  The guarded UPDATE is the transaction's first statement, so
+  the snapshot is established by the DML itself and there is
+  no stale-snapshot window. The risk returns if a plain
+  SELECT precedes the guarded UPDATE inside the same RR
+  transaction — keep 1020 in the retryable set anyway.</li>
+<li>i3 P3 (pick-best-of-20 then claim, the production shape
+  from D7) granted 12,000-15,000 ops/8 s with reject rates
+  under 1.5% and zero anomalies; i1 P3 managed 146-722
+  grants with ~1,000 deadlocks per cell under RR.</li>
+<li>i3 P4 (concurrent reaper deletes) showed no interaction:
+  the reaper's range DELETEs never deadlocked the PK-equality
+  guarded UPDATE. i1 P4 was its worst cell (livelock, 14,476
+  deadlocks), confirming the delete/insert gap-lock
+  interaction.</li>
+<li>Latency for i3/i3t stayed p95 ≤ 8.5 ms in every cell
+  including W=32 hot-key; i1/i2 RR cells hit p95 of 8
+  <strong>seconds</strong> (lock-wait-timeout storms).</li>
+<li>Non-zero <code>residual_after_quiesce</code> in i1/i2 error cells is
+  reservation rows leaked by releases that themselves died in
+  deadlock storms — an operational footgun in its own right
+  (a real deployment would strand capacity until a reaper
+  ran), not an additional invariant violation.</li>
 </ul>
-<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Generic resource-claim primitive.</strong> If phase 0 chooses to
-  keep the reservation table instance-scheduling-specific,
-  later work may want to extend it to other finite resources
-  (floating IPs, VXLAN IDs, network IDs). Out of scope here;
-  the phase 0 generic-vs-specific decision should leave a
-  comment about which way to extend.</li>
-<li><strong>Hold-until-fittable batch creates.</strong> If the batch-create
-  API ships as all-or-nothing, a later iteration could add a
-  queue for batches that don't fit right now but might once
-  other reservations expire or consume. Useful for CI burst
-  smoothing.</li>
-<li><strong>Content-aware placement.</strong> Reservations that carry blob
-  affinity intent slot into the broader blob-storage roadmap.</li>
-<li><strong>Reservation-aware autoscaling signals.</strong> A persistent
-  reservation backlog (batches waiting on capacity) is a real
-  scale-out signal an external system could consume.</li>
-<li><strong>Network bandwidth as a scheduling input.</strong> Today's
-  scheduler considers CPU, memory, and disk capacity but not
-  ingress / egress bandwidth. With the smeared-carrier model
-  from <code>PLAN-network-carrier-model</code>, network bandwidth on
-  carrier nodes becomes a meaningful constraint — a carrier
-  hosting many high-traffic networks can saturate its NIC
-  while showing plenty of CPU / RAM / disk headroom. Worth
-  <em>tracking</em> as a reservation dimension (so placement can
-  avoid worsening hot spots) even if actively <em>limiting</em>
-  network throughput is out of scope (rate-limiting at the
-  hypervisor is operationally complicated and probably not
-  worth the effort versus capacity-aware placement). Out of
-  scope here pending the carrier model and OpenTelemetry
-  measurements; revisit once those land.</li>
-<li><strong>Real host load and node-role awareness as scheduling
-  inputs.</strong> CPU admission today counts only allocated VM vCPUs
-  (times <code>CPU_OVERCOMMIT_RATIO</code>, default 16), so it almost never
-  rejects a node, and the only real-utilisation signal is a
-  <code>math.floor(cpu_load_1)</code> tie-break. This ignores three things:
-  (a) actual CPU utilisation; (b) the service load a combined
-  network / database node carries — neither <code>is_network_node</code>
-  nor <code>is_database_node</code> is consulted anywhere in
-  <code>scheduler.py</code>, and there is no CPU analogue of
-  <code>RAM_SYSTEM_RESERVATION</code>; and (c) heterogeneous core counts,
-  because the <code>floor()</code> quantisation collapses every sub-1.0
-  node into a single uniform-random bucket. Observed on sfcbr
-  2026-07-17: a CI burst stacked three 16 GB VMs onto the
-  12-core network+DB node (load ~15) while two idle 24-core
-  nodes sat ~90% free. Cheapest high-value change is to rank by
-  <strong>load-per-core</strong> instead of <code>floor(raw load)</code>, which fixes
-  both the bucket collapse and the heterogeneity blindness in
-  one move; the fuller fix de-weights infra-role nodes and/or
-  adds a CPU service reservation. These are soft-preference
-  ordering inputs, so they should compose with the reservation
-  model's ORDER BY / tie-break surface (open questions 6-7)
-  rather than being bolted on as a parallel heuristic. Diagnose
-  with <code>tools/sfcbr-capacity.sh</code> in the 33fl repo (per-node
-  load-per-core plus infra-role tags). <strong>Status: delivered as
-  phase 00a</strong> (load-per-core ordering, coarse buckets to
-  preserve burst spreading, core-denominated system
-  reservations for the OS and infra-role daemons, headroom-
-  weighted selection, CPU topology tracking, and a measured
-  overcommit default); the reservation knobs were subsequently
-  generalised per host by
-  <code>PLAN-per-host-resource-reservations</code> (see Dependencies).</li>
-<li><strong>Demand-based adaptive overcommit (the learning loop).</strong>
-  The end-state sketched in open question 13: each node's
-  expected demand-per-vCPU is <em>learned</em> from observed
-  <code>cpu_load_1 / cpu_total_instance_vcpus</code> over time, probably
-  tracked per namespace (a CI namespace learns ~0.8-1.0 per
-  vCPU; a namespace of idle pet VMs learns ~0.05), with
-  damping, floor / ceiling clamps, and a bias toward
-  recent-window <em>max</em> rather than mean because correlated
-  bursts are the failure mode that matters. The learned
-  estimate replaces the static demand constant that phase 00a
-  ships and feeds the expected-demand field on reservation
-  rows (if phase 0 adopts it). Validate the model offline
-  first — an analysis report over recorded sfcbr metrics —
-  before anything trusts it in the placement path.</li>
-</ul>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>This section should list any bugs we encounter during
-development that we fixed.</p>
-<ul>
-<li><strong>KSM metrics were never published</strong> (pre-existing, found by
-  the phase 00a code review): the resources daemon's KSM block
-  skipped every sysfs file (trailing-newline filter), used a
-  literal <code>'memory_ksm_{ent}'</code> key (missing f-prefix), and
-  re-read an exhausted file handle so the swallowed ValueError
-  hid it all. No <code>memory_ksm_*</code> field had ever reached
-  <code>node_metrics</code>.</li>
-<li><strong>ZeroDivisionError on metrics rows lacking <code>memory_max</code></strong>
-  (pre-existing, found by the same review): the KSM overcommit
-  admission check divided by <code>memory_max</code> with no guard, so a
-  partially-written hypervisor row crashed <code>find_candidates()</code>
-  instead of excluding the node with a recorded reason.</li>
-</ul>
-<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
-<p>When creating a new master plan from this template, update the
-following files in <code>docs/plans/</code>:</p>
-<ul>
-<li><strong><code>index.md</code></strong> — add a row to the <em>Plan Status</em> table.</li>
-<li><strong><code>order.yml</code></strong> — add an entry for the new master plan.</li>
-</ul>
-<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
-<p>Before executing any step of this plan, please back brief the
-operator as to your understanding of the plan and how the work
-you intend to do aligns with that plan.</p>
+<p><strong>Conclusion: unchanged from the indicative probes, now with
+real overlap and at scale — the guarded single-row UPDATE
+(and its canonical-order transactional extension for
+multi-row claims) is the only idiom that is simultaneously
+correct at both isolation levels, deadlock-free, and fastest.
+Decision D1 stands on this evidence.</strong> Throwaway harness:
+scratchpad <code>bench/bench.py</code> + <code>run_matrix.sh</code> (not committed,
+per plan); raw results preserved in the session transcript.</p>
+<h3 id="b-openstack-placement">B. OpenStack Placement<a class="headerlink" href="#b-openstack-placement" title="Permanent link">&para;</a></h3>
+<p>Providers form a tree; resource classes (<code>VCPU</code>,
+<code>MEMORY_MB</code>, <code>DISK_GB</code>, <code>CUSTOM_*</code>) are names with semantics
+in inventory rows: <code>total</code>, <code>reserved</code>, <code>min_unit</code>,
+<code>max_unit</code>, <code>step_size</code>, <code>allocation_ratio</code>. The capacity
+check (verbatim from
+<code>placement/objects/research_context.py</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">sa</span><span class="o">.</span><span class="n">and_</span><span class="p">(</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">sql</span><span class="o">.</span><span class="n">func</span><span class="o">.</span><span class="n">coalesce</span><span class="p">(</span><span class="n">usage</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">used</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">amount</span> <span class="o">&lt;=</span> <span class="p">(</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="p">(</span><span class="n">inv_tbl</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">total</span> <span class="o">-</span> <span class="n">inv_tbl</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">reserved</span><span class="p">)</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="o">*</span> <span class="n">inv_tbl</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">allocation_ratio</span><span class="p">),</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">inv_tbl</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">min_unit</span> <span class="o">&lt;=</span> <span class="n">amount</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">inv_tbl</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">max_unit</span> <span class="o">&gt;=</span> <span class="n">amount</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">amount</span> <span class="o">%</span> <span class="n">inv_tbl</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">step_size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+</code></pre></div>
+<p>Usable capacity is exactly <code>(total - reserved) *
+allocation_ratio</code> — <code>reserved</code> is subtracted before the
+ratio. <code>reserved == total</code> became legal (microversion 1.26)
+as node soft-disable / drain.</p>
+<p><code>GET /allocation_candidates</code> is <strong>advisory</strong> — no lock, no
+reservation, no TTL; the caller claims and must handle
+losing. The atomic claim is <code>PUT /allocations/{consumer}</code>:
+the consumer's entire allocation set across many providers
+replaced in one DB transaction
+(<code>@wrap_db_retry(retry_on_deadlock=True)</code>), with
+<code>_check_capacity_exceeded()</code> inside the same transaction and
+a generation bump on every touched provider/consumer.
+<strong>Two meanings of 409</strong> are load-bearing in nova's client:
+capacity exhaustion (do not retry that provider) vs
+<code>placement.concurrent_update</code> generation mismatch (re-read
+and retry, bounded at 4).</p>
+<p>Buys: N active-active schedulers, no distributed lock
+(correctness is one row-level generation check); capacity
+accounting decoupled from placement policy. Costs: a second
+service + DB + microversions; retry storms; <strong>allocation
+leaks</strong> (claim and instance record are separate writes —
+hence <code>nova-manage placement heal_allocations</code> and
+<code>audit --delete</code>).</p>
+<p>Worth stealing: (1) one atomic multi-row allocation write
+keyed by consumer, the DB adjudicating via a single SQL
+predicate; (2) <strong>generation CAS over row locks</strong> — serialise
+the commit, not the scheduler's think time, and return
+distinguishable errors; (3) <code>reserved</code> as a first-class field
+distinct from <code>total</code>, mapping directly onto the landed
+<code>NODE_*_RESERVATION_*</code> settings, with <code>reserved == total</code> as
+free node drain; (4) resource classes as strings
+(<code>(provider, class, amount)</code> rows) so a new dimension is data
+not migration — answers Q10/Q12 cheaply; (5) candidates never
+reserve. <strong>Do not copy:</strong> provider trees, traits, granular
+request groups, sharing-via-aggregate, and the
+separate-service split itself — atomicity comes from one
+transaction, not another process, and staying in-process
+eliminates the entire leak/heal category. If the reservation
+row and instance row are ever written in separate
+transactions, you will leak; write them together or build the
+orphan-reaper query up front.</p>
+<h3 id="c-kubernetes-resourcequota-friends">C. Kubernetes ResourceQuota + friends<a class="headerlink" href="#c-kubernetes-resourcequota-friends" title="Permanent link">&para;</a></h3>
+<p><strong>Admission is synchronous; the controller reconciles.</strong> On a
+fitting request the admission plugin CAS-updates
+<code>ResourceQuota.status.used</code> via resourceVersion (the design
+proposal calls the bottleneck intentional). Waiters are
+batched <strong>by namespace</strong> (concurrent creates coalesce into
+one status write), retries hardcoded at 3, exhaustion fails
+closed. A look-aside cache of the apiserver's own last write
+took one benchmark from 12 conflicts to 0. Behind it, the
+quota controller does a full recalculation every 5 minutes
+plus event-driven replenishment — and it is <em>not optional</em>:
+"admission control is incapable of guaranteeing a DELETE
+request actually succeeded." One documented over-admission
+hole: a request matching several quota objects updates them
+non-atomically; upstream's advice is one quota per namespace.</p>
+<p><strong>What is counted: declared intent, never observation</strong> —
+requests/limits from the pod spec, summed over non-terminal
+pods. Quota never evicts; "neither contention nor changes to
+quota will affect already created resources." <strong>LimitRange</strong>
+mutates defaults in <em>before</em> quota checks — a ceiling
+without defaults is a wall every unannotated create hits.
+QoS classes are <em>derived from declarations</em> (Guaranteed
+requires limit == request) — precisely the claimed-namespace
+shape of Q17.</p>
+<p><strong>kube-scheduler assume/reserve:</strong> scheduling cycles run
+serially over an in-memory cache that assumes pods before
+binding (the feedforward analogue). <strong>The 30 s assumed-pod
+TTL is gone</strong>: issue #106361 found a bind exceeding the TTL
+let the assumption expire while the bind still landed —
+double-placement — and the fix was expiry = never, then the
+whole TTL machinery was deleted. Assumed state is released
+only by explicit Forget or by observing the pod — never by a
+clock.</p>
+<p>Transferable lessons: (1) count declared intent, not measured
+usage (validates the Q16 virtual-disk-size position); (2)
+admission-time-only accounting is a complete design — but
+decide explicitly whether shrink-below-current-usage is
+allowed as a pure ceiling change (K8s semantics) versus
+floored at usage (current Q15 wording); (3) the hot counter
+row is an intentional serialisation point — masked
+conditional UPDATE, never full-row read-modify-write (cf.
+CLAUDE.md pitfall 3's lost-update history), batch by
+namespace if it ever gets hot; (4) <strong>exactly one claim row
+per namespace as a UNIQUE constraint</strong> — closes K8s's one
+real over-admission hole and answers Q14's shape; (5) ship
+the drift reconciler with the counter, not after (deletes are
+invisible to admission); (6) ship namespace-level defaulting
+with any ceiling; (7) <strong>explicit release primary, expiry as
+crash backstop only</strong> — a TTL-driven release of provisional
+capacity actively causes double-allocation (#106361); this
+tempers master plan Q4/Q5's cluster_locks-style lease
+framing.</p>
+<h3 id="prior-art-recommendations-for-phase-0">Prior-art recommendations for phase 0<a class="headerlink" href="#prior-art-recommendations-for-phase-0" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Reverse the Q1 lean: guarded single-row UPDATE, not
+   conditional INSERT ... SELECT (empirical: only idiom
+   correct at both isolation levels; zero deadlocks at
+   32-way).</li>
+<li>Decide Q2 before Q1 is meaningful — they are one
+   decision. Choose materialised <code>used_*</code> counters.</li>
+<li>One claim row per namespace, enforced by UNIQUE (Q14).</li>
+<li>Adopt <code>total</code> / <code>reserved</code> as separate fields; <code>reserved
+   == total</code> is node drain (maps onto NODE_* reservations).</li>
+<li>Model dimensions as <code>(claim, resource_class, amount)</code>
+   rows if Q10/Q12 generality is wanted — new dimensions
+   become data, not migrations.</li>
+<li>Two distinguishable failures: "out of capacity" (no
+   retry) vs "concurrent update" (bounded retry).</li>
+<li>Ship the drift reconciler and orphan-reaper query in the
+   same phase as the counter.</li>
+<li>Explicit release primary; <code>expires_at</code> generous crash
+   backstop only (k8s #106361).</li>
+<li>Handle MariaDB 1020 (ER_CHECKREAD) as retryable conflict;
+   benchmark on 10.6 and 11.8, snapshot isolation ON and OFF.</li>
+<li>Phase 1 prerequisite: promote node_metrics capacity
+    fields out of <code>metrics_json</code> into typed columns.</li>
+<li>Benchmark harness must be threaded-with-barrier, not
+    shell (the shell probe produced a false pass for the
+    unsafe idiom).</li>
+<li>Reuse <code>_direct_acquire_cluster_lock</code> as the reference
+    implementation — same idiom, already proven here under
+    production contention, deadlock post-mortem in its
+    docstring.</li>
+</ol>
 
 
 
@@ -11091,7 +11593,7 @@ you intend to do aligns with that plan.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-scheduler-reservations.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-scheduler-reservations.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-scheduler-reservations/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-scheduler-reservations-phase-00-findings.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-scheduler-reservations-phase-00-findings.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-scheduler-reservations-phase-00-findings/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
