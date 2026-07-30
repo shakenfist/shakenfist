@@ -9,6 +9,27 @@ from shakenfist_utilities import logs  # noreorder
 LOG, _ = logs.setup(__name__)
 LIBVIRT: ModuleType | None = None
 
+# https://libvirt.org/html/libvirt-libvirt-domain.html#virDomainPausedReason
+# Looked up by constant name with a getattr() fallback because older python
+# bindings do not define all of these.
+PAUSED_REASON_STRINGS = {
+    'VIR_DOMAIN_PAUSED_UNKNOWN': 'unknown',
+    'VIR_DOMAIN_PAUSED_USER': 'user request',
+    'VIR_DOMAIN_PAUSED_MIGRATION': 'migration',
+    'VIR_DOMAIN_PAUSED_SAVE': 'save',
+    'VIR_DOMAIN_PAUSED_DUMP': 'dump',
+    'VIR_DOMAIN_PAUSED_IOERROR': 'i/o error',
+    'VIR_DOMAIN_PAUSED_WATCHDOG': 'watchdog',
+    'VIR_DOMAIN_PAUSED_FROM_SNAPSHOT': 'from snapshot',
+    'VIR_DOMAIN_PAUSED_SHUTTING_DOWN': 'shutting down',
+    'VIR_DOMAIN_PAUSED_SNAPSHOT': 'snapshot',
+    'VIR_DOMAIN_PAUSED_CRASHED': 'crashed',
+    'VIR_DOMAIN_PAUSED_STARTING_UP': 'starting up',
+    'VIR_DOMAIN_PAUSED_POSTCOPY': 'post-copy migration',
+    'VIR_DOMAIN_PAUSED_POSTCOPY_FAILED': 'post-copy migration failed',
+    'VIR_DOMAIN_PAUSED_API_ERROR': 'api error',
+}
+
 
 def get_libvirt() -> ModuleType:
     global LIBVIRT
@@ -64,12 +85,83 @@ class LibvirtConnection():
         # RUNNING, SHUTDOWN
         return 'on'
 
+    def is_paused_ioerror(self, domain: Any) -> bool:
+        """True if qemu paused this domain because a disk operation failed.
+
+        The pause reason is what distinguishes an operator pause
+        (VIR_DOMAIN_PAUSED_USER) from qemu stopping the guest because a
+        disk operation failed (VIR_DOMAIN_PAUSED_IOERROR, produced by
+        error_policy='stop' in the domain XML and by qemu's default
+        ENOSPC write error handling). The sf-6 blob NVMe failure of
+        July 2026 ran for six hours with guests taking EIO while we
+        polled the bare state enum and saw only "running" -- the reason
+        code is how a storage failure becomes visible to the poller.
+
+        Compared as raw libvirt enums so that this safety critical
+        decision never depends on the display strings rendered by
+        extract_pause_reason().
+        """
+        state, reason = domain.state()
+        return (state == self.libvirt.VIR_DOMAIN_PAUSED and
+                reason == getattr(
+                    self.libvirt, 'VIR_DOMAIN_PAUSED_IOERROR', None))
+
+    def extract_pause_reason(self, domain: Any) -> str | None:
+        """Return a human readable pause reason, or None if not paused.
+
+        Display only: control flow decisions (is this an I/O error
+        pause?) must use is_paused_ioerror(), which compares the raw
+        libvirt enums rather than these rendered strings.
+        """
+        state, reason = domain.state()
+        if state != self.libvirt.VIR_DOMAIN_PAUSED:
+            return None
+
+        for const, pretty in PAUSED_REASON_STRINGS.items():
+            if reason == getattr(self.libvirt, const, None):
+                return pretty
+        return f'unrecognised reason {reason}'
+
+    def extract_disk_errors(self, domain: Any) -> dict[str, str]:
+        """Per-disk error state via virDomainGetDiskErrors.
+
+        Returns a dict of disk alias (vda etc) to error description for
+        disks the hypervisor considers errored; healthy disks are
+        omitted. Best effort: a libvirt error collecting the detail
+        returns an empty dict rather than raising, because callers use
+        this to enrich an error report, not to decide whether there is
+        an error at all.
+        """
+        error_strings = {
+            getattr(self.libvirt, 'VIR_DOMAIN_DISK_ERROR_NONE', 0): None,
+            getattr(self.libvirt, 'VIR_DOMAIN_DISK_ERROR_UNSPEC', 1):
+                'unspecified error',
+            getattr(self.libvirt, 'VIR_DOMAIN_DISK_ERROR_NO_SPACE', 2):
+                'no space',
+        }
+
+        out: dict[str, str] = {}
+        try:
+            for disk, code in (domain.diskErrors() or {}).items():
+                translated = error_strings.get(
+                    code, f'unrecognised error {code}')
+                if translated:
+                    out[disk] = translated
+        except self.libvirt.libvirtError as e:
+            LOG.debug(f'Failed to collect disk errors: {e}')
+        return out
+
     def extract_power_state_pretty(self, domain: Any) -> str:
-        # We skip the reason code because they don't look super useful. They're
-        # in a series of enums with names like VirtDomainCrashedReason as
-        # documented at https://libvirt.org/html/libvirt-libvirt-domain.html
-        # if we ever change our mind about that.
+        # For most states we skip the reason code because they don't look
+        # super useful. They're in a series of enums with names like
+        # VirtDomainCrashedReason as documented at
+        # https://libvirt.org/html/libvirt-libvirt-domain.html
+        # Paused is the exception: there the reason is the difference
+        # between an operator pause and qemu halting the guest on a disk
+        # error, so we include it.
         state, _ = domain.state()
+        if state == self.libvirt.VIR_DOMAIN_PAUSED:
+            return f'paused ({self.extract_pause_reason(domain)})'
 
         # https://libvirt.org/html/libvirt-libvirt-domain.html#virDomainState
         libvirt_states_to_strings = {

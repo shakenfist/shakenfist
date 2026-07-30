@@ -48,7 +48,8 @@
     {%- for disk in disks %}
     {%- if disk.bus != 'nvme' %}
     <disk type='{{disk.source_type}}' device='{{disk.present_as}}'>
-      <driver name='qemu' type='{{disk.type}}' cache='{{disk.cache_mode}}'/>
+      <driver name='qemu' type='{{disk.type}}' cache='{{disk.cache_mode}}'
+              error_policy='stop' rerror_policy='stop'/>
       {{disk.source}}
       {{disk.backing}}
       <target dev='{{disk.device}}' bus='{{disk.bus}}'/>

@@ -154,6 +154,27 @@ class InstanceTestCase(base.ShakenFistTestCase):
         s = str(i)
         self.assertEqual('instance(%s)' % instance_uuid, s)
 
+    def test_nvme_bus_disk_stops_on_io_error(self):
+        # NVME-bus disks are attached via raw qemu -drive args rather than a
+        # libvirt <disk>, so they must carry werror/rerror=stop themselves to
+        # get the same pause-on-I/O-error behaviour libvirt.tmpl gives the
+        # other buses. Without it a backing-store failure would be invisible
+        # (guest keeps running, taking EIO).
+        instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'nvmebox', instance_uuid,
+            disk_spec=[{'base': 'cirros', 'size': 21},
+                       {'size': 10, 'bus': 'nvme'}])
+        i = instance.Instance.from_db(instance_uuid)
+
+        block_devices = i._initialize_block_devices()
+        extra = block_devices['extracommands']
+        drive_args = [extra[idx + 1] for idx, tok in enumerate(extra)
+                      if tok == '-drive']
+        self.assertEqual(1, len(drive_args))
+        self.assertIn('werror=stop', drive_args[0])
+        self.assertIn('rerror=stop', drive_args[0])
+
     def test_make_config_drive(self):
         instance_uuid = str(uuid.uuid4())
         network_uuid = str(uuid.uuid4())

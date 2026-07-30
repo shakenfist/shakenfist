@@ -24,6 +24,23 @@ class FakeLibvirtError(Exception):
 class FakeLibvirtModule:
     libvirtError = FakeLibvirtError
 
+    VIR_DOMAIN_NOSTATE = 0
+    VIR_DOMAIN_RUNNING = 1
+    VIR_DOMAIN_BLOCKED = 2
+    VIR_DOMAIN_PAUSED = 3
+    VIR_DOMAIN_SHUTDOWN = 4
+    VIR_DOMAIN_SHUTOFF = 5
+    VIR_DOMAIN_CRASHED = 6
+    VIR_DOMAIN_PMSUSPENDED = 7
+
+    VIR_DOMAIN_PAUSED_UNKNOWN = 0
+    VIR_DOMAIN_PAUSED_USER = 1
+    VIR_DOMAIN_PAUSED_IOERROR = 5
+
+    VIR_DOMAIN_DISK_ERROR_NONE = 0
+    VIR_DOMAIN_DISK_ERROR_UNSPEC = 1
+    VIR_DOMAIN_DISK_ERROR_NO_SPACE = 2
+
 
 class FakeDomain:
     def __init__(self, memory_stats=None, block_info=None):
@@ -51,6 +68,113 @@ class FakeDomain:
         if self._block_info is None:
             raise FakeLibvirtError('no media')
         return self._block_info
+
+
+class FakeStatefulDomain:
+    def __init__(self, state, reason=0, disk_errors=None,
+                 disk_errors_raise=False):
+        self._state = state
+        self._reason = reason
+        self._disk_errors = disk_errors or {}
+        self._disk_errors_raise = disk_errors_raise
+
+    def state(self):
+        return [self._state, self._reason]
+
+    def diskErrors(self):
+        if self._disk_errors_raise:
+            raise FakeLibvirtError('domain went away')
+        return self._disk_errors
+
+
+def _connection():
+    lc = util_libvirt.LibvirtConnection()
+    lc.libvirt = FakeLibvirtModule()
+    return lc
+
+
+class UtilLibvirtPowerState(base.ShakenFistTestCase):
+    def test_pause_reason_not_paused(self):
+        domain = FakeStatefulDomain(FakeLibvirtModule.VIR_DOMAIN_RUNNING)
+        self.assertIsNone(_connection().extract_pause_reason(domain))
+
+    def test_pause_reason_pmsuspended_is_not_paused(self):
+        # PMSUSPENDED reports as 'paused' via extract_power_state, but it
+        # is not VIR_DOMAIN_PAUSED so there is no pause reason.
+        domain = FakeStatefulDomain(FakeLibvirtModule.VIR_DOMAIN_PMSUSPENDED)
+        self.assertIsNone(_connection().extract_pause_reason(domain))
+
+    def test_pause_reason_user(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_USER)
+        self.assertEqual(
+            'user request', _connection().extract_pause_reason(domain))
+
+    def test_pause_reason_ioerror(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_IOERROR)
+        self.assertEqual(
+            'i/o error', _connection().extract_pause_reason(domain))
+
+    def test_is_paused_ioerror(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_IOERROR)
+        self.assertTrue(_connection().is_paused_ioerror(domain))
+
+    def test_is_paused_ioerror_user_pause(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_USER)
+        self.assertFalse(_connection().is_paused_ioerror(domain))
+
+    def test_is_paused_ioerror_not_paused(self):
+        # A stale I/O error reason code on a domain which is no longer
+        # paused must not count: both the state and the reason matter.
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_RUNNING,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_IOERROR)
+        self.assertFalse(_connection().is_paused_ioerror(domain))
+
+    def test_pause_reason_unrecognised(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED, reason=999)
+        self.assertEqual(
+            'unrecognised reason 999',
+            _connection().extract_pause_reason(domain))
+
+    def test_power_state_pretty_includes_pause_reason(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_IOERROR)
+        self.assertEqual(
+            'paused (i/o error)',
+            _connection().extract_power_state_pretty(domain))
+
+    def test_power_state_pretty_other_states_unchanged(self):
+        domain = FakeStatefulDomain(FakeLibvirtModule.VIR_DOMAIN_RUNNING)
+        self.assertEqual(
+            'running', _connection().extract_power_state_pretty(domain))
+
+    def test_disk_errors_filters_healthy_disks(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED,
+            reason=FakeLibvirtModule.VIR_DOMAIN_PAUSED_IOERROR,
+            disk_errors={
+                'vda': FakeLibvirtModule.VIR_DOMAIN_DISK_ERROR_UNSPEC,
+                'vdb': FakeLibvirtModule.VIR_DOMAIN_DISK_ERROR_NONE,
+                'vdc': FakeLibvirtModule.VIR_DOMAIN_DISK_ERROR_NO_SPACE,
+            })
+        self.assertEqual(
+            {'vda': 'unspecified error', 'vdc': 'no space'},
+            _connection().extract_disk_errors(domain))
+
+    def test_disk_errors_best_effort_on_libvirt_error(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_PAUSED, disk_errors_raise=True)
+        self.assertEqual({}, _connection().extract_disk_errors(domain))
 
 
 class UtilLibvirtStatistics(base.ShakenFistTestCase):
