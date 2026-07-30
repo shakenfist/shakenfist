@@ -559,7 +559,7 @@ class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
         super().setUp()
         self.mock_create_and_enqueue = mock.patch(
             'shakenfist.mariadb.create_and_enqueue_cluster_operation',
-            return_value=True,
+            return_value=(True, ''),
         ).start()
         self.mock_create_target = mock.patch(
             'shakenfist.mariadb.create_cluster_operation_target',
@@ -876,7 +876,7 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
                     target_object_type=target_object_type,
                     target_uuid=target_uuid,
                     created_at=kwargs['created_at'])
-            return True
+            return True, ''
 
         with mock.patch(
                 'shakenfist.mariadb.create_and_enqueue_cluster_operation',
