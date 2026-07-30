@@ -5878,6 +5878,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../docker-tarball-formats/" class="md-nav__link">
         
   
@@ -6295,10 +6323,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_9" id="__nav_3_8_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_10" id="__nav_3_8_10_label" tabindex="0">
             
   
   
@@ -6316,8 +6344,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_8_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_9">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_8_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -10695,7 +10723,9 @@ connections is approximately <code>-j × -J</code>.</p>
 <h3 id="-rate-limit-default-none"><code>--rate-limit</code> (default: none)<a class="headerlink" href="#-rate-limit-default-none" title="Permanent link">&para;</a></h3>
 <p>Sets a <strong>requests-per-second cap</strong> across all threads. When set, occystrap
 limits the rate of HTTP requests to avoid triggering registry rate limits
-(HTTP 429).</p>
+(HTTP 429). The rate limiter uses a token-bucket algorithm and is
+thread-safe, so it correctly throttles requests across parallel
+download/upload threads.</p>
 <p>Recommended starting values:
 - <strong>Docker Hub:</strong> 2.0 (anonymous) or 5.0 (authenticated)
 - <strong>Quay.io:</strong> 5.0
@@ -10705,6 +10735,14 @@ limits the rate of HTTP requests to avoid triggering registry rate limits
 <strong>exponential backoff</strong>. Each retry waits longer (2^attempt seconds).</p>
 <p>Increase to 5-7 for unreliable networks or registries that occasionally
 return transient errors.</p>
+<p>Retry behavior:</p>
+<ul>
+<li><strong>429 (Too Many Requests)</strong>: Retried, respects the <code>Retry-After</code> header
+  when present, otherwise uses exponential backoff</li>
+<li><strong>5xx (Server Errors)</strong>: Retried with exponential backoff</li>
+<li><strong>Connection errors</strong>: Retried with exponential backoff</li>
+<li><strong>Other errors</strong>: Not retried</li>
+</ul>
 <h2 id="connection-efficiency">Connection Efficiency<a class="headerlink" href="#connection-efficiency" title="Permanent link">&para;</a></h2>
 <p>Occystrap uses <a href="https://www.python-httpx.org/">httpx</a> with HTTP/2 support.
 This provides:</p>
@@ -10717,6 +10755,9 @@ This provides:</p>
   where the server supports it, falling back to HTTP/1.1 transparently.</li>
 </ul>
 <p>These optimisations apply automatically. No user configuration is needed.</p>
+<p>Note: Docker daemon communication (docker:// and dockerpush:// inputs,
+docker:// output) still uses requests-unixsocket for Unix domain socket
+access. The httpx optimisations apply only to registry HTTP traffic.</p>
 <h2 id="output-specific-behaviour">Output-Specific Behaviour<a class="headerlink" href="#output-specific-behaviour" title="Permanent link">&para;</a></h2>
 <h3 id="dir-output"><code>dir://</code> output<a class="headerlink" href="#dir-output" title="Permanent link">&para;</a></h3>
 <p>When the temp directory and output directory are on the same filesystem,
