@@ -24,6 +24,7 @@ from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import ProcessExecutionError
+from shakenfist.exceptions import TruncatedNodeLockResponse
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_all_background_node_queues
@@ -209,15 +210,18 @@ def health_check_nodelock():
     try:
         with util_concurrency.NodeLock('_health_check'):
             ...
-    except ConnectionResetError:
-        LOG.warning('nodelock daemon is unhealthy (connection reset)!')
-        return False
-    except (ConnectionRefusedError, MissingNodeLockSocket):
+    except (ConnectionError, FileNotFoundError, MissingNodeLockSocket,
+            TruncatedNodeLockResponse) as e:
         # nodelock only unlinks its socket at startup, so while it is
-        # restarting (for example during a deploy) the stale socket file
-        # from the previous incarnation remains on disk and connections
-        # are refused rather than failing with a missing socket.
-        LOG.warning('nodelock daemon is unhealthy (not listening)!')
+        # restarting (for example during a deploy) clients see a range of
+        # transient failures rather than one exception type: the stale
+        # socket file refuses connections, the startup unlink races
+        # connect() (FileNotFoundError), an accepted connection can be
+        # reset or aborted or closed without a reply mid-shutdown, and a
+        # not-yet-created socket is missing entirely. They all mean the
+        # same thing here, and any of them escaping bypasses
+        # wait_for_nodelock()'s calm 1Hz retry loop.
+        LOG.warning(f'nodelock daemon is unhealthy ({e.__class__.__name__})!')
         return False
 
     return True
