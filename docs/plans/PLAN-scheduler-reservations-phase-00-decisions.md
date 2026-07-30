@@ -202,9 +202,9 @@ re-cut phase plans' scopes.
 
 | Step | Description | Status |
 |------|-------------|--------|
-| 1 | Codebase and conductor research pass; write up current-state findings | Not started |
-| 2 | Benchmark conditional INSERT vs SELECT FOR UPDATE under contention (throwaway harness) | Not started |
-| 3 | Analyse accumulated `peak_allocated_*` data from sfcbr for realistic claim shapes | Not started |
+| 1 | Codebase and conductor research pass; write up current-state findings | Complete — see PLAN-scheduler-reservations-phase-00-findings.md |
+| 2 | Benchmark claim idioms under contention (throwaway harness) | Designed (findings Part 3: threaded-with-barrier harness, 5 patterns, isolation matrix); indicative 2-way and 32-way probes already run — guarded UPDATE won, conditional INSERT broken under RC and 34% deadlocks under RR |
+| 3 | Analyse accumulated `peak_allocated_*` data from sfcbr for realistic claim shapes | Blocked on data — collection deployed 2026-07-30, needs ~2 weeks of runs |
 | 4 | Draft decisions for master-plan questions 1-13 | Not started |
 | 5 | Draft decisions for questions 14-19 (namespace claims) | Not started |
 | 6 | Re-cut the master plan phase table; write scope stubs for phases 1+ | Not started |

@@ -92,11 +92,18 @@ claimed atomically against every concurrent scheduler. If it
 places zero rows, the candidate set was empty and the request
 can be held, retried, or rejected.
 
-The reservation is consumed when the instance transitions
-into the `building` state, explicitly released on instance
-create failure, and auto-expired via a leased
-`expires_at TIMESTAMP` modelled on the `cluster_locks`
-pattern so stranded reservations cannot leak capacity.
+The reservation is consumed when the instance is durably
+placed (`Instance.place_instance()`) — note the instance
+state machine is `initial → preflight → creating → created`;
+there is no `building` state, and the 2026-07-30 phase 0
+review decided against adding one (it would not improve
+atomicity, which comes from doing the claim consumption in
+the same database transaction as an existing transition).
+Reservations are explicitly released on instance create
+failure, with a leased `expires_at TIMESTAMP` modelled on
+the `cluster_locks` pattern as a crash backstop only — not
+the routine release mechanism — so stranded reservations
+cannot leak capacity.
 
 This design was chosen in preference to two alternatives:
 
@@ -135,7 +142,10 @@ Concretely, after this plan lands:
 - Scheduling decisions are conditional INSERTs that either
   place a reservation atomically or return "no candidate."
 - The instance lifecycle gains a "reservation consumed" point
-  (instance enters `building`) and an explicit release on
+  (working position: at `place_instance()`, with
+  allocation-denominated accounting from the database, so the
+  reservation window is seconds in the normal case and only
+  stretches for batch creates) and an explicit release on
   create failure.
 - A reservation reaper handles abandoned reservations whose
   `expires_at` has passed without consumption.
@@ -191,11 +201,24 @@ include at least:
    fields the row carries and how they participate in the
    constraint query.
 3. **Reservation lifecycle states.** When precisely is a
-   reservation "consumed"? Proposed: when the instance
-   transitions to `building`. Alternatives: at the moment of
-   instance create success; at first heartbeat on the target
-   node; at libvirt domain define. Each has different failure
-   modes around partial creates.
+   reservation "consumed"? The instance state machine is
+   `initial → preflight → creating → created` — the
+   `building` state this plan originally named does not
+   exist, and the 2026-07-30 review decided against adding
+   one: consumption atomicity comes from doing the claim
+   decrement in the same database transaction as an existing
+   write, so a new state adds upgrade and test churn without
+   improving the guarantee. Working position: consume at
+   `place_instance()`, with allocation-denominated
+   accounting from the database (placed, non-dead instances
+   count as allocation). Alternatives phase 0 must still
+   weigh: at `preflight` (target node re-admission) or
+   `creating` (hypervisor build start). Whatever is chosen
+   must tolerate placement changing without a scheduling
+   decision — preflight can redirect to another node, and
+   the cleaner rewrites placement for locally-found domains
+   (`daemons/cleaner/scheduled_tasks.py`) — and each option
+   has different failure modes around partial creates.
 4. **Reservation TTL.** What's the right default lease? Long
    enough that a slow-starting instance doesn't lose its
    capacity claim mid-create; short enough that abandoned
