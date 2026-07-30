@@ -2875,7 +2875,7 @@ class MockMariaDB():
         """Mock implementation of the atomic create+enqueue path.
 
         Mirrors the real function's contract: insert-only on
-        cluster_operations (returns False on duplicate), records
+        cluster_operations (returns (False, error) on duplicate), records
         a work_queue row in work_queue_store, and -- when
         ``targets`` is supplied -- writes one
         cluster_operation_targets row per target in the same call,
@@ -2891,7 +2891,7 @@ class MockMariaDB():
             self._trace(
                 f'MockMariaDB.create_and_enqueue_cluster_operation'
                 f'({key}): duplicate')
-            return False
+            return False, f'duplicate cluster_operation uuid: {key}'
 
         row = dict(metadata)
         row['uuid'] = key
@@ -2941,7 +2941,7 @@ class MockMariaDB():
         self._trace(
             f'MockMariaDB.create_and_enqueue_cluster_operation'
             f'({key}): created and enqueued on {queue_name}')
-        return True
+        return True, ''
 
     def _mariadb_enqueue_work_item(
             self, queue_name, work_item, delay=0.0):

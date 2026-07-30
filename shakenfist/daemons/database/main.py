@@ -5064,9 +5064,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 if ot is None:
                     return database_pb2.StatusReply(
                         success=False,
-                        error='Invalid target_object_type')
+                        error=(
+                            f'Invalid target_object_type '
+                            f'{t.target_object_type}'))
                 targets.append((ot, t.target_uuid))
-            success = (
+            success, error = (
                 mariadb
                 ._direct_create_and_enqueue_cluster_operation(
                     UUID(request.uuid),
@@ -5079,7 +5081,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 )
             )
             return database_pb2.StatusReply(
-                success=success, error='')
+                success=success, error=error)
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database CreateAndEnqueueClusterOperation failed',

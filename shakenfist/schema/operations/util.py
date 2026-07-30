@@ -63,7 +63,7 @@ def enqueue_cluster_operation(
                 continue
             op_targets.append((target_object_type, target_uuid))
 
-    success = mariadb.create_and_enqueue_cluster_operation(
+    success, error = mariadb.create_and_enqueue_cluster_operation(
         op_uuid=metadata['uuid'],
         operation_type=object_type_str,
         metadata=metadata,
@@ -75,7 +75,11 @@ def enqueue_cluster_operation(
     if not success:
         LOG.with_fields({
             'operation_uuid': metadata['uuid'],
+            'operation_type': object_type_str,
             'queue_name': queue_name,
+            'targets': [
+                f'{ot.name.lower()}:{u}' for ot, u in op_targets],
+            'error': error,
         }).error('Failed to enqueue cluster operation')
         return
 

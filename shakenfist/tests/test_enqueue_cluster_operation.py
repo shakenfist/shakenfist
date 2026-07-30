@@ -99,7 +99,7 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         return md
 
     def test_happy_path_calls_rpc_and_emits_audit_event(self):
-        self.mock_create_and_enqueue.return_value = True
+        self.mock_create_and_enqueue.return_value = (True, '')
 
         util.enqueue_cluster_operation(
             _FakeObjectType('NODE_INST_OP'),
@@ -133,7 +133,7 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         self.assertNotIn('uuid', extra)
 
     def test_target_override_changes_queue_name(self):
-        self.mock_create_and_enqueue.return_value = True
+        self.mock_create_and_enqueue.return_value = (True, '')
 
         util.enqueue_cluster_operation(
             _FakeObjectType('NET_OP'),
@@ -159,7 +159,7 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         self.mock_add_event_multi.assert_not_called()
 
     def test_multiple_uuid_keys_produce_fanout_targets(self):
-        self.mock_create_and_enqueue.return_value = True
+        self.mock_create_and_enqueue.return_value = (True, '')
 
         md = self._metadata()
         md['network_uuid'] = NETWORK_UUID
@@ -176,7 +176,8 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         self.assertNotIn(('', OP_UUID), targets)
 
     def test_rpc_failure_suppresses_audit_event(self):
-        self.mock_create_and_enqueue.return_value = False
+        self.mock_create_and_enqueue.return_value = (
+            False, 'MariaDB error: deadlock')
 
         util.enqueue_cluster_operation(
             _FakeObjectType('NODE_INST_OP'),
@@ -186,6 +187,35 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         # No audit event on failure -- phase 3's contract is that
         # audit events are caller-side and only happen after the
         # RPC returns True.
+        self.mock_add_event_multi.assert_not_called()
+
+    def test_rpc_failure_logs_actionable_diagnostics(self):
+        # Issue 3524: a bare 'Failed to enqueue cluster operation'
+        # with only the operation uuid and queue name cannot be
+        # actioned. The failure log must carry the operation type,
+        # the derived targets and the underlying error.
+        self.mock_create_and_enqueue.return_value = (
+            False, 'MariaDB error: deadlock')
+
+        with mock.patch(
+                'shakenfist.schema.operations.util.LOG') as mock_log:
+            util.enqueue_cluster_operation(
+                _FakeObjectType('NODE_INST_OP'),
+                self._metadata(),
+                model_class=_NullableTargetModel)
+
+        mock_log.with_fields.assert_called_once()
+        fields = mock_log.with_fields.call_args[0][0]
+        self.assertEqual(OP_UUID, fields['operation_uuid'])
+        self.assertEqual('node_inst_op', fields['operation_type'])
+        self.assertEqual(
+            f'{NODE_UUID}-clusteroperation-user_waiting',
+            fields['queue_name'])
+        self.assertEqual(
+            [f'instance:{INSTANCE_UUID}'], fields['targets'])
+        self.assertEqual('MariaDB error: deadlock', fields['error'])
+        mock_log.with_fields.return_value.error.assert_called_once_with(
+            'Failed to enqueue cluster operation')
         self.mock_add_event_multi.assert_not_called()
 
 
@@ -210,7 +240,7 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
         self.mock_create_and_enqueue = mock.patch(
             'shakenfist.mariadb.create_and_enqueue_cluster_operation'
         ).start()
-        self.mock_create_and_enqueue.return_value = True
+        self.mock_create_and_enqueue.return_value = (True, '')
 
         self.mock_create_target = mock.patch(
             'shakenfist.mariadb.create_cluster_operation_target'
@@ -319,7 +349,7 @@ class EnqueueClusterOperationFamilyTestCase(base.ShakenFistTestCase):
         self.mock_create_and_enqueue = mock.patch(
             'shakenfist.mariadb.create_and_enqueue_cluster_operation'
         ).start()
-        self.mock_create_and_enqueue.return_value = True
+        self.mock_create_and_enqueue.return_value = (True, '')
 
         self.mock_create_target = mock.patch(
             'shakenfist.mariadb.create_cluster_operation_target'

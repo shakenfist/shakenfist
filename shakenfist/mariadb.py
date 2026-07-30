@@ -18215,7 +18215,7 @@ def _direct_create_and_enqueue_cluster_operation(
         created_at: float,
         queue_name: str,
         delay: float = 0.0,
-        targets: Optional[list[tuple[ObjectType, str]]] = None) -> bool:
+        targets: Optional[list[tuple[ObjectType, str]]] = None) -> tuple[bool, str]:
     """Atomically create a cluster operation and enqueue its work item.
 
     Writes the following rows in a single MariaDB transaction:
@@ -18249,12 +18249,14 @@ def _direct_create_and_enqueue_cluster_operation(
     duplicated inline instead. That duplication is the price of
     getting the atomicity right.
 
-    Returns True on success. Returns False if the cluster_operations
-    insert hits a duplicate uuid (IntegrityError) or if any write
-    raises OperationalError -- in both cases the `with` context
-    rolls back the uncommitted transaction automatically. Audit
-    events are out of scope; callers emit them via eventlog after
-    the RPC returns successfully.
+    Returns (True, '') on success. Returns (False, error) if the
+    cluster_operations insert hits a duplicate uuid (IntegrityError)
+    or if any write raises OperationalError -- in both cases the
+    `with` context rolls back the uncommitted transaction
+    automatically and ``error`` describes the underlying failure so
+    callers can log an actionable diagnostic. Audit events are out
+    of scope; callers emit them via eventlog after the RPC returns
+    successfully.
     """
     engine = _get_engine()
     cluster_ops_table = _get_cluster_operations_table()
@@ -18321,17 +18323,17 @@ def _direct_create_and_enqueue_cluster_operation(
                 conn.execute(target_stmt)
 
             conn.commit()
-            return True
-    except IntegrityError:
+            return True, ''
+    except IntegrityError as e:
         LOG.warning(
             f'MariaDB atomic create+enqueue refused duplicate '
             f'cluster_operation {op_uuid}')
-        return False
+        return False, f'duplicate cluster_operation uuid: {e}'
     except OperationalError as e:
         LOG.warning(
             f'MariaDB atomic create+enqueue failed for '
             f'cluster_operation {op_uuid}: {e}')
-        return False
+        return False, f'MariaDB error: {e}'
 
 
 def _direct_set_cluster_operation_error(
@@ -18533,8 +18535,13 @@ def _grpc_create_and_enqueue_cluster_operation(
         created_at: float,
         queue_name: str,
         delay: float = 0.0,
-        targets: Optional[list[tuple[ObjectType, str]]] = None) -> bool:
-    """Atomic create+enqueue via the database microservice."""
+        targets: Optional[list[tuple[ObjectType, str]]] = None) -> tuple[bool, str]:
+    """Atomic create+enqueue via the database microservice.
+
+    Returns (success, error) where ``error`` is the failure detail
+    reported by the database service (or the gRPC exception), so
+    callers can log why an enqueue failed.
+    """
     try:
         stub = _get_database_stub()
         target_msgs = [
@@ -18560,12 +18567,12 @@ def _grpc_create_and_enqueue_cluster_operation(
         )
         reply = _grpc_call(
             stub.CreateAndEnqueueClusterOperation, request)
-        return bool(reply.success)
+        return bool(reply.success), reply.error
     except grpc.RpcError as e:
         LOG.warning(
             f'gRPC CreateAndEnqueueClusterOperation failed for '
             f'{op_uuid}: {e}')
-        return False
+        return False, f'gRPC error: {e}'
 
 
 def _grpc_set_cluster_operation_error(
@@ -18964,7 +18971,7 @@ def create_and_enqueue_cluster_operation(
         created_at: float,
         queue_name: str,
         delay: float = 0.0,
-        targets: Optional[list[tuple[ObjectType, str]]] = None) -> bool:
+        targets: Optional[list[tuple[ObjectType, str]]] = None) -> tuple[bool, str]:
     """Atomically create a cluster operation and enqueue its job.
 
     Writes the cluster_operations header, an object_states row
@@ -18997,8 +19004,10 @@ def create_and_enqueue_cluster_operation(
             cluster_operation_targets in the same transaction.
 
     Returns:
-        True on success. False if the operation uuid already
-        exists (duplicate) or on MariaDB error.
+        A (success, error) tuple. (True, '') on success;
+        (False, error) if the operation uuid already exists
+        (duplicate) or on MariaDB/gRPC error, where ``error``
+        describes the underlying failure.
     """
     u = _ensure_uuid(op_uuid)
     if _use_database_service():

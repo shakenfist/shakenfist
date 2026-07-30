@@ -74,7 +74,7 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         from uuid import UUID
-        result = (
+        success, error = (
             mariadb._direct_create_and_enqueue_cluster_operation(
                 UUID(OP_UUID_STR),
                 'node_net_op',
@@ -84,7 +84,8 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
             )
         )
 
-        self.assertTrue(result)
+        self.assertTrue(success)
+        self.assertEqual('', error)
         # Three inserts (cluster_operations, object_states,
         # work_queue) then one commit.
         self.assertEqual(mock_conn.execute.call_count, 3)
@@ -98,7 +99,7 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
 
         from uuid import UUID
         from shakenfist.schema.object_types import ObjectType
-        result = (
+        success, error = (
             mariadb._direct_create_and_enqueue_cluster_operation(
                 UUID(OP_UUID_STR),
                 'node_inst_net_iface_op',
@@ -112,7 +113,8 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
             )
         )
 
-        self.assertTrue(result)
+        self.assertTrue(success)
+        self.assertEqual('', error)
         # Three base inserts (cluster_operations, object_states,
         # work_queue) plus one insert per target, all before a
         # single commit -- the atomicity that makes an enqueued op
@@ -130,7 +132,7 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         from uuid import UUID
-        result = (
+        success, error = (
             mariadb._direct_create_and_enqueue_cluster_operation(
                 UUID(OP_UUID_STR),
                 'node_net_op',
@@ -140,7 +142,8 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
             )
         )
 
-        self.assertFalse(result)
+        self.assertFalse(success)
+        self.assertIn('duplicate', error)
         # Only the first execute was attempted; no commit.
         self.assertEqual(mock_conn.execute.call_count, 1)
         mock_conn.commit.assert_not_called()
@@ -157,7 +160,7 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         from uuid import UUID
-        result = (
+        success, error = (
             mariadb._direct_create_and_enqueue_cluster_operation(
                 UUID(OP_UUID_STR),
                 'node_net_op',
@@ -167,7 +170,8 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
             )
         )
 
-        self.assertFalse(result)
+        self.assertFalse(success)
+        self.assertIn('DB down', error)
         # Only two executes attempted (third would be work_queue).
         self.assertEqual(mock_conn.execute.call_count, 2)
         mock_conn.commit.assert_not_called()
@@ -184,7 +188,7 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         from uuid import UUID
-        result = (
+        success, error = (
             mariadb._direct_create_and_enqueue_cluster_operation(
                 UUID(OP_UUID_STR),
                 'node_net_op',
@@ -194,7 +198,8 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
             )
         )
 
-        self.assertFalse(result)
+        self.assertFalse(success)
+        self.assertIn('DB down', error)
         self.assertEqual(mock_conn.execute.call_count, 3)
         mock_conn.commit.assert_not_called()
 
@@ -325,3 +330,61 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         self.assertEqual(params['state_value'], 'queued')
         self.assertEqual(params['update_time'], 1000.0)
         self.assertIsNone(params['message'])
+
+
+class GrpcCreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
+    """Tests for _grpc_create_and_enqueue_cluster_operation().
+
+    Issue 3524: the client used to return only bool(reply.success),
+    discarding reply.error entirely, so a failed enqueue reported by
+    the database service surfaced as an undiagnosable bare 'Failed to
+    enqueue cluster operation' at the schema layer. These tests pin
+    the (success, error) propagation contract.
+    """
+
+    def _call(self):
+        from uuid import UUID
+        return mariadb._grpc_create_and_enqueue_cluster_operation(
+            UUID(OP_UUID_STR),
+            'node_net_op',
+            _make_metadata(),
+            1000.0,
+            'node-clusteroperation-user_waiting',
+        )
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_success_returns_empty_error(
+            self, mock_stub, mock_call):
+        mock_call.return_value = mock.Mock(success=True, error='')
+
+        success, error = self._call()
+
+        self.assertTrue(success)
+        self.assertEqual('', error)
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_failure_reply_propagates_service_error(
+            self, mock_stub, mock_call):
+        mock_call.return_value = mock.Mock(
+            success=False,
+            error='duplicate cluster_operation uuid: boom')
+
+        success, error = self._call()
+
+        self.assertFalse(success)
+        self.assertEqual(
+            'duplicate cluster_operation uuid: boom', error)
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_rpc_error_propagates_exception_detail(
+            self, mock_stub, mock_call):
+        import grpc
+        mock_call.side_effect = grpc.RpcError('service unavailable')
+
+        success, error = self._call()
+
+        self.assertFalse(success)
+        self.assertIn('service unavailable', error)
